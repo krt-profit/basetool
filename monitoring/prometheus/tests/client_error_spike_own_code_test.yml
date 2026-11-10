@@ -1,0 +1,52 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - a CSP burst from extension or translation code
+    interval: 1m
+    input_series:
+      - series: 'basetool_client_error_total{kind="csp_violation"}'
+        values: "0x1440 1+1x90"
+      - series: 'basetool_client_csp_violation_total{directive="style-src-elem",code_origin="other"}'
+        values: "0x1440 1+1x90"
+      - series: 'basetool_client_csp_violation_total{directive="trusted-types",code_origin="extension"}'
+        values: "0x1530"
+    alert_rule_test:
+      - eval_time: 1530m
+        alertname: ClientErrorSpike
+        exp_alerts: []
+
+  - name: fires - a CSP burst from the page's own code
+    interval: 1m
+    input_series:
+      - series: 'basetool_client_error_total{kind="csp_violation"}'
+        values: "0x1440 1+1x90"
+      - series: 'basetool_client_csp_violation_total{directive="img-src",code_origin="self"}'
+        values: "0x1440 1+1x90"
+    alert_rule_test:
+      - eval_time: 1530m
+        alertname: ClientErrorSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              kind: csp_violation
+            exp_annotations:
+              summary: "Browser client errors stepped up (csp_violation)"
+              description: "The frontend's client-error beacon has reported csp_violation failures well above their own daily baseline for 30 minutes — the browser half of a page is throwing, which produces no server-side error of any kind. Check what shipped in the last frontend deploy; a script_error / unhandled_rejection step means a krtFetch handler is dying (live update silently stops working on that surface), a resource_error step means an asset the templates still reference is 404ing, a csp_violation step means a template or script now does something the Content-Security-Policy blocks (an inline script or style without the nonce, a new third-party host, a DOM sink written without a Trusted Types policy value) and that part of the page silently does not work, or under the report-only Trusted Types policy is reported while it still works, an i18n_missing step means a page stopped providing a localized string a script reads (the UI now shows the key name). A csp_violation step counts only violations by the page's own code (code_origin self or inline); extension and browser-translation code is excluded. For a csp_violation step read basetool_client_csp_violation_total by directive first (dashboard 07, panel 85): require-trusted-types-for or trusted-types is the report-only Trusted Types policy, script-src-* / style-src-* / img-src is the enforced policy. Raise ClientErrorReportController to DEBUG via /actuator/loggers to get the message and script URL for the duration of the investigation."
+  - name: fires - a script-error burst, unchanged by the CSP filter
+    interval: 1m
+    input_series:
+      - series: 'basetool_client_error_total{kind="script_error"}'
+        values: "0x1440 1+1x90"
+    alert_rule_test:
+      - eval_time: 1530m
+        alertname: ClientErrorSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              kind: script_error
+            exp_annotations:
+              summary: "Browser client errors stepped up (script_error)"
+              description: "The frontend's client-error beacon has reported script_error failures well above their own daily baseline for 30 minutes — the browser half of a page is throwing, which produces no server-side error of any kind. Check what shipped in the last frontend deploy; a script_error / unhandled_rejection step means a krtFetch handler is dying (live update silently stops working on that surface), a resource_error step means an asset the templates still reference is 404ing, a csp_violation step means a template or script now does something the Content-Security-Policy blocks (an inline script or style without the nonce, a new third-party host, a DOM sink written without a Trusted Types policy value) and that part of the page silently does not work, or under the report-only Trusted Types policy is reported while it still works, an i18n_missing step means a page stopped providing a localized string a script reads (the UI now shows the key name). A csp_violation step counts only violations by the page's own code (code_origin self or inline); extension and browser-translation code is excluded. For a csp_violation step read basetool_client_csp_violation_total by directive first (dashboard 07, panel 85): require-trusted-types-for or trusted-types is the report-only Trusted Types policy, script-src-* / style-src-* / img-src is the enforced policy. Raise ClientErrorReportController to DEBUG via /actuator/loggers to get the message and script URL for the duration of the investigation."

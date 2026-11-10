@@ -2615,9 +2615,14 @@ Two frontend meters were added by the 2026-08 logging audit:
   directive (in `message`) and the blocked **origin** (in `source`) — the browser half reduces
   `blockedURI` to `scheme://host[:port]` or to the bare keyword (`inline`, `eval`, `data`, …), and
   `ClientErrorReportController.originOnly` repeats the reduction server-side, so a path, query or
-  user info never reaches the `DEBUG` line even from a crafted beacon. It rides the same panel 43
-  and the same `ClientErrorSpike` rule; browser extensions that inject inline code are part of its
-  permanent background, which is exactly what the step-change shape tolerates. Since 2026-10-04 it
+  user info never reaches the `DEBUG` line even from a crafted beacon. It rides the same panel 43,
+  but `ClientErrorSpike` counts it only when the page's own code caused it: the recording rules
+  `basetool:client_error_own_code:increase1h` / `:increase24h` take every other `kind` from
+  `basetool_client_error_total` and `csp_violation` from
+  `basetool_client_csp_violation_total{code_origin=~"self|inline"}`. Extension and browser-translation
+  code (`code_origin` `extension` or `other`) injects stylesheets and Trusted Types policies on every
+  busy hour (196 `style-src-elem` reports in three days of 2026-11, none from our code), so counting
+  it fired the alert on traffic alone; it stays visible on panel 85. Since 2026-10-04 it
   also carries the **Trusted Types** violations of the report-only policy (ADR-0239): `message` is
   `require-trusted-types-for` followed by the sink the browser names (`Element innerHTML`, never the
   sample's markup), or `trusted-types` followed by the policy name the CSP does not list (at most 40
@@ -2643,8 +2648,8 @@ Two frontend meters were added by the 2026-08 logging audit:
   counted as `other` otherwise, so the label set is bounded whatever a caller sends (REQ-OBS-006).
   Panel 85 on dashboard `07` plots it per hour beside panel 43. `require-trusted-types-for` and
   `trusted-types` are the report-only Trusted Types policy, `script-src-*` / `style-src-*` /
-  `img-src` / `connect-src` the enforced one. No alert of its own: `ClientErrorSpike` already
-  fires on the `csp_violation` kind and its text points here.
+  `img-src` / `connect-src` the enforced one. No alert of its own: `ClientErrorSpike` fires on
+  its `self` and `inline` series and its text points here.
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =
