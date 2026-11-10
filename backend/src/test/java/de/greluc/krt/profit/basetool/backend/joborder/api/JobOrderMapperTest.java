@@ -68,7 +68,6 @@ class JobOrderMapperTest {
 
     mapper =
         new JobOrderMapperImpl(
-            userMapper,
             materialMapper,
             handoverMapper,
             squadronMapper,

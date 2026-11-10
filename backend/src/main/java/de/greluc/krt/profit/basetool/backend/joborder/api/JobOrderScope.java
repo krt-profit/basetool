@@ -19,35 +19,29 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
-/**
- * The JPQL scope fragment of the module's scoped aggregate (REQ-DATA-010), spliced into the
- * {@code @Query} values of the repositories that list the aggregate.
- *
- * <p>The fragment lives beside the aggregate's repository and is the list-side half of the rule
- * that {@code JobOrderAccessPolicy} enforces row by row: both widen together (plan section 5.4). It
- * is a compile-time constant, which an annotation value needs, so the class is {@code public} and
- * has no behaviour. A query that needs more than the fragment starts with a text block, appends the
- * constant and continues only with plain string literals.
- */
+/** Shared JPQL readership for web order pages, counts, lookups and material representations. */
 public final class JobOrderScope {
 
   /** Non-instantiable constant holder. */
   private JobOrderScope() {}
 
-  /** Concrete current responsible-unit scope without a general queue grant. */
-  public static final String CONCRETE_RESPONSIBLE_PREDICATE =
-      "(:isAdminAllScope = true OR (:activeOrgUnitId IS NOT NULL AND"
-          + " o.responsibleOrgUnit.id = :activeOrgUnitId) OR (:activeOrgUnitId IS NULL AND"
-          + " o.responsibleOrgUnit.id IN :memberOrgUnitIds))";
-
-  /** Queue scope including its existing eligible-reader SK escape. */
-  public static final String PREDICATE =
+  /** Complete web order readership, independent of the reduced allocation and Exchange scope. */
+  public static final String READ_PREDICATE =
       """
       (
         :isAdminAllScope = true
-        OR TYPE(o.responsibleOrgUnit) = SpecialCommand
-        OR (:activeOrgUnitId IS NOT NULL AND o.responsibleOrgUnit.id = :activeOrgUnitId)
-        OR (:activeOrgUnitId IS NULL AND o.responsibleOrgUnit.id IN :memberOrgUnitIds)
-       )
+        OR (:activeOrgUnitId IS NOT NULL AND (o.responsibleOrgUnit.id = :activeOrgUnitId
+          OR o.requestingOrgUnit.id = :activeOrgUnitId))
+        OR (:activeOrgUnitId IS NULL AND (o.responsibleOrgUnit.id IN :memberOrgUnitIds
+          OR o.requestingOrgUnit.id IN :memberOrgUnitIds))
+        OR EXISTS (SELECT h.id FROM JobOrderUnitReadHistory h WHERE h.jobOrder = o
+          AND ((:activeOrgUnitId IS NOT NULL AND h.orgUnit.id = :activeOrgUnitId)
+            OR (:activeOrgUnitId IS NULL AND h.orgUnit.id IN :memberOrgUnitIds)))
+        OR EXISTS (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o
+          AND ((:activeOrgUnitId IS NOT NULL AND p.claimingOrgUnit.id = :activeOrgUnitId)
+            OR (:activeOrgUnitId IS NULL AND p.claimingOrgUnit.id IN :memberOrgUnitIds)))
+        OR EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o
+          AND a.user.id = :callerId)
+      )
       """;
 }

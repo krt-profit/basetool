@@ -80,7 +80,10 @@ import org.springframework.context.ApplicationEventPublisher;
  * Unit tests for the priority and status transitions of {@link JobOrderService} and its priority
  * normalisation loop.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderServicePriorityAndStatusTest {
 
   @Mock private ProfitHierarchyService profitHierarchy;
@@ -129,7 +132,13 @@ class JobOrderServicePriorityAndStatusTest {
             responsibilityGuard,
             jobOrderAccessPolicy,
             materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
+            new InventoryStockReads(
+                inventoryItemRepository,
+                inventoryItemMapper,
+                null,
+                null,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
             new InventoryStockCommands(
                 new InventoryOrderWrites(
                     inventoryItemRepository,
@@ -157,12 +166,18 @@ class JobOrderServicePriorityAndStatusTest {
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
+                org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
                 responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,
                 eventPublisher,
-                jobOrderStockProjectionService),
-            liveSyncPublisher);
+                jobOrderStockProjectionService,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
+                        .class)),
+            liveSyncPublisher,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     lenient()
         .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
@@ -189,7 +204,6 @@ class JobOrderServicePriorityAndStatusTest {
               o.getVersion(),
               null,
               null,
-              false,
               false,
               false,
               null,

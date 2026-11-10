@@ -31,10 +31,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.support.OrderCreationOptionsFixtures;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +74,8 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    when(backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class))
+        .thenReturn(OrderCreationOptionsFixtures.permitted(UUID.randomUUID()));
   }
 
   @Test
@@ -80,6 +84,15 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
     mockMvc.perform(get("/orders/create")).andExpect(status().is3xxRedirection());
 
     verify(backendApiClient, never()).getCached(any(CachedCatalog.class), anyTypeRef());
+  }
+
+  @Test
+  @WithMockUser
+  void aReaderWithoutAnAuthorizedPairCannotOpenTheCreationForm() throws Exception {
+    when(backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class))
+        .thenReturn(new JobOrderCreateOptionsDto(false, List.of(), List.of(), null, null));
+
+    mockMvc.perform(get("/orders/create")).andExpect(status().isForbidden());
   }
 
   @Test
@@ -103,6 +116,8 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .thenReturn(Collections.emptyList());
     UUID material = UUID.randomUUID();
     UUID unit = UUID.randomUUID();
+    when(backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class))
+        .thenReturn(OrderCreationOptionsFixtures.permitted(unit));
 
     JobOrderForm form =
         (JobOrderForm)
@@ -132,6 +147,8 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .thenReturn(Collections.emptyList());
     UUID item = UUID.randomUUID();
     UUID unit = UUID.randomUUID();
+    when(backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class))
+        .thenReturn(OrderCreationOptionsFixtures.permitted(unit));
 
     ModelAndView page =
         mockMvc

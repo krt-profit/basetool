@@ -28,10 +28,12 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
+import de.greluc.krt.profit.basetool.frontend.support.OrderCreationOptionsFixtures;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -76,6 +78,9 @@ class OrdersCreateFormPatternRenderTest {
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    doReturn(OrderCreationOptionsFixtures.permitted(UUID.randomUUID()))
+        .when(backendApiClient)
+        .get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class);
     doReturn(List.of()).when(backendApiClient).getCached(any(CachedCatalog.class), anyTypeRef());
   }
 
@@ -199,9 +204,8 @@ class OrdersCreateFormPatternRenderTest {
             List.of(),
             Instant.now(),
             1L,
+            true,
             null,
-            null,
-            false,
             false,
             false,
             null,

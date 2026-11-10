@@ -86,7 +86,7 @@ class NavigationRegistryTest {
                   .contains(key));
     }
     assertThat(registry.defaultTabs(NavigationMode.MEMBER).get(2).entryKeys())
-        .containsExactly("orders.list", "orders.own", "orders.assigned", "orders.create");
+        .containsExactly("orders.list");
     assertThat(registry.defaultTabs(NavigationMode.ADMIN))
         .extracting(tab -> tab.entryKeys().getFirst())
         .containsExactly("admin.dashboard", "admin.members", "admin.auditlog");
@@ -151,9 +151,6 @@ class NavigationRegistryTest {
             "/inventory",
             "/refinery-orders",
             "/orders",
-            "/orders",
-            "/orders",
-            "/orders/create",
             "/materials",
             "/materialboerse",
             "/supply/needs",
@@ -237,7 +234,7 @@ class NavigationRegistryTest {
         .containsExactlyInAnyOrder("hangar.overview", "hangar.catalog", "hangar.unit");
     assertThat(registry.familyOf(Set.of("bank.dashboard")))
         .contains("bank.manage", "bank.grants", "bank.requests");
-    assertThat(registry.familyOf(Set.of("orders.own"))).contains("orders.demand");
+    assertThat(registry.familyOf(Set.of("orders.list"))).contains("orders.demand");
     assertThat(registry.familyOf(Set.of("future.page"))).isEmpty();
   }
 

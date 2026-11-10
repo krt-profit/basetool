@@ -136,7 +136,6 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             null,
             false,
             false,
-            false,
             null,
             false);
 
@@ -179,7 +178,6 @@ class JobOrderListRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false,
             false,
             false,
             null,

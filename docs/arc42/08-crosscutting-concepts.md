@@ -35,8 +35,7 @@ Beyond roles there are three mechanisms that are easy to miss:
   subject, so it is invisible to everyone else regardless of role.
 - **Field redaction for partial viewers** — some surfaces return a reduced projection rather than
   refusing, so a page can exist for a caller who may see *some* of it: a member below Logistician
-  reading a peer's mission (`MissionPeerRedactor`, guarded by an ArchUnit rule), a requester-only
-  viewer of a job order (`REQ-ORDERS-023`). There is no anonymous or guest tier any more — ADR-0159
+  reading a peer's mission (`MissionPeerRedactor`, guarded by an ArchUnit rule), independently hidden mission facts inside an otherwise complete order view (`REQ-ORDERS-052`). There is no anonymous or guest tier any more — ADR-0159
   removed both audiences.
 - **The session store is not a trust boundary** — a session value names its own class, so the
   frontend reads only classes on `SessionTypeAllowList` (REQ-SEC-067, ADR-0206). Shipped in
@@ -584,3 +583,9 @@ Enrichment records distinguish physical/cargo/UI geometry, micro-SCU/SCU, source
 requested relationship state. They remain game-source evidence under the area's decided P4K
 precedence. [REQ-DATA-032…038](../specs/data-persistence.md) and
 [ADR-0349](../adr/0349-external-catalogue-identity-presence-and-application.md) are canonical.
+
+The MATERIAL/ITEM workspace uses the shared reader contract of
+[orders-core.md](../specs/orders-core.md). Its paged query and counts, concrete reads and live-room
+probe use the same audience. Observed unit relationships retain concrete history reading through
+current legitimate unit reach; [ADR-0356](../adr/0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md)
+owns that boundary. The producer panel and reduced external Exchange remain separate.

@@ -497,7 +497,7 @@
 /operations/{id}/update POST -> OperationPageController#updateOperation gate=method:@missionManagerGate.isGranted() layout=yes
 /operations/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#updateOperationAjax gate=method:@missionManagerGate.isGranted() layout=yes
 /orders GET -> JobOrderPageController#viewOrders gate=class:isAuthenticated() layout=yes
-/orders/create GET -> JobOrderPageController#viewCreateForm gate=class:isAuthenticated() layout=yes
+/orders/create GET -> JobOrderCreatePageController#viewCreateForm gate=class:isAuthenticated() layout=yes
 /orders/create POST -> JobOrderWriteController#createOrder gate=class:isAuthenticated() layout=yes
 /orders/create POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#createOrderAjax gate=class:isAuthenticated() layout=yes
 /orders/item-blueprints/{gameItemId} GET -> JobOrderPageController#itemBlueprints gate=class:isAuthenticated() layout=yes
@@ -534,7 +534,7 @@
 /orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/requested-update POST -> JobOrderWriteController#updateOrderAsRequester gate=class:isAuthenticated() layout=yes
 /orders/{id}/requested-update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAsRequesterAjax gate=class:isAuthenticated() layout=yes
-/orders/{id}/responsible-org-unit PATCH -> JobOrderWriteController#transferResponsibility gate=class:isAuthenticated() layout=yes
+/orders/{id}/responsible-org-unit PATCH -> JobOrderResponsibilityProxyController#transferResponsibility gate=class:isAuthenticated() layout=no
 /orders/{id}/status POST -> JobOrderWriteController#updateStatus gate=class:isAuthenticated() layout=yes
 /orders/{id}/update POST -> JobOrderWriteController#updateOrder gate=method:@logisticianGate.isGranted() layout=yes
 /orders/{id}/update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAjax gate=method:@logisticianGate.isGranted() layout=yes

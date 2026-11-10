@@ -107,7 +107,7 @@ public enum LiveSyncTopicClass {
       false,
       "orders_queue",
       "/api/v1/me/capabilities",
-      "canViewJobOrders|canViewOwnJobOrders|canViewAssignedJobOrders"),
+      "canViewOrderWorkspace"),
 
   /**
    * Per-refinery-order room for {@code /refinery-orders/{id}}, authorized by {@code GET

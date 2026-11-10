@@ -91,6 +91,7 @@ public class JobOrderItemProductionService {
   private static final double QUANTITY_EPSILON = 1e-4;
 
   private final JobOrderRepository jobOrderRepository;
+  private final MaterialPromiseCoordinator materialPromises;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final StockCommands stockCommands;
   private final JobOrderItemService jobOrderItemService;
@@ -143,6 +144,7 @@ public class JobOrderItemProductionService {
       UUID jobOrderId, UUID jobOrderItemId, JobOrderItemProductionCreateDto dto) {
     assertMayBookInFor(dto.bookIn());
 
+    materialPromises.lockOrder(jobOrderId);
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);

@@ -84,11 +84,14 @@ class JobOrderEditorTest {
         new JobOrderEditor(
             jobOrderRepository,
             profitHierarchy,
+            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
             responsibilityGuard,
             jobOrderAccessPolicy,
             auditRecorder,
             eventPublisher,
-            jobOrderStockProjectionService);
+            jobOrderStockProjectionService,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class));
     id = UUID.randomUUID();
     order = new JobOrder();
     order.setId(id);

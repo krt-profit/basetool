@@ -30,6 +30,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.blueprint.api.MemberBlueprintSharings;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprint;
+import de.greluc.krt.profit.basetool.backend.blueprint.api.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
@@ -41,16 +44,19 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgHierarchyService;
@@ -98,12 +104,15 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private JobOrderRepository orders;
   @Autowired private MaterialClaimRepository claims;
+  @Autowired private JobOrderParticipationRepository participations;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private JobOrderHandoverRepository handovers;
   @Autowired private QualityTierRepository tiers;
   @Autowired private MaterialRepository materials;
   @Autowired private GameItemRepository gameItems;
   @Autowired private BlueprintRepository blueprints;
+  @Autowired private PersonalBlueprintRepository personalBlueprints;
+  @Autowired private MemberBlueprintSharings sharings;
 
   private MockMvc mvc;
   private OrgUnit profit;
@@ -143,6 +152,431 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     blueprint.setOutputItem(gameItem);
     blueprint.setOutputName(gameItem.getName());
     blueprintId = blueprints.saveAndFlush(blueprint).getId();
+  }
+
+  @Test
+  void requesterReadsTheSameCompleteOrderInQueueNumberDetailAndLinkedReadsWithoutEnrollment()
+      throws Exception {
+    memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
+    memberships.flush();
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requester)
+            .handle("Shared requester workspace")
+            .build();
+    order.addMaterial(
+        JobOrderMaterial.builder()
+            .material(materials.findById(material).orElseThrow())
+            .qualityTier(tiers.findByMinQuality(0).orElseThrow())
+            .amount(12.0)
+            .build());
+    order = orders.saveAndFlush(order);
+
+    as(get("/api/v1/orders").param("size", "1"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(order.getId().toString()))
+        .andExpect(jsonPath("$.content[0].materials[0].currentStock").value(0.0));
+    as(get("/api/v1/orders/requested"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].materials[0].currentStock").value(0.0));
+    as(get("/api/v1/orders/by-number").param("number", order.getDisplayId().toString()), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(order.getId().toString()));
+    as(get("/api/v1/orders/" + order.getId()), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.redacted").doesNotExist())
+        .andExpect(jsonPath("$.materials[0].currentStock").value(0.0))
+        .andExpect(jsonPath("$.canEdit").value(false))
+        .andExpect(jsonPath("$.canManageAssignees").value(false));
+    as(get("/api/v1/orders/" + order.getId() + "/claims"), null).andExpect(status().isOk());
+    as(get("/api/v1/orders/" + order.getId() + "/allocations/orphaned"), null)
+        .andExpect(status().isOk());
+    as(post("/api/v1/orders/" + order.getId() + "/assignees/" + caller), null)
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void unitWorkCapabilityAdmitsOrdinaryUnitReadersWithoutConferringWrites() throws Exception {
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .handle("Unit work capabilities")
+                .build());
+    as(get("/api/v1/me/capabilities"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewOrderWorkspace").value(true))
+        .andExpect(jsonPath("$.canViewOrderUnitWork").value(true))
+        .andExpect(jsonPath("$.isLogisticianOrAbove").value(false))
+        .andExpect(jsonPath("$.canCreateJobOrders").value(false));
+    as(get("/api/v1/orders").param("toProcess", "true"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].canEdit").value(false));
+
+    memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
+    memberships.flush();
+    as(get("/api/v1/me/capabilities"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewOrderWorkspace").value(true))
+        .andExpect(jsonPath("$.canViewOrderUnitWork").value(false));
+    as(get("/api/v1/orders").param("toProcess", "true"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+
+    as(get("/api/v1/me/capabilities"), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewJobOrders").value(false))
+        .andExpect(jsonPath("$.canViewOrderWorkspace").value(true))
+        .andExpect(jsonPath("$.canViewOrderUnitWork").value(true));
+    as(get("/api/v1/orders").param("toProcess", "true"), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].id").value(order.getId().toString()));
+  }
+
+  @Test
+  void sharedReferenceLookupKeepsPriorityAndNewestNumberOrdering() throws Exception {
+    memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
+    memberships.flush();
+    JobOrder oldest =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .priority(2)
+                .handle("Older reference")
+                .build());
+    JobOrder first =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .priority(1)
+                .handle("Priority reference")
+                .build());
+    JobOrder newest =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .priority(2)
+                .handle("Newer reference")
+                .build());
+    JobOrder withoutPriority =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .handle("Unprioritized reference")
+                .build());
+
+    as(get("/api/v1/orders/lookup"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(4))
+        .andExpect(jsonPath("$[0].id").value(first.getId().toString()))
+        .andExpect(jsonPath("$[1].id").value(newest.getId().toString()))
+        .andExpect(jsonPath("$[2].id").value(oldest.getId().toString()))
+        .andExpect(jsonPath("$[3].id").value(withoutPriority.getId().toString()));
+  }
+
+  @Test
+  void directProfitAreaProducerPanelIncludesItsMembersChildrenAndExplicitGlobalSharersOnly()
+      throws Exception {
+    User areaOwner = users.findById(caller).orElseThrow();
+    join(areaOwner, profit);
+    blueprintOwner("Squadron producer", responsible, false);
+    blueprintOwner("Command producer", processingUnit(), false);
+    User globalOwner = blueprintOwner("Global producer", requester, true);
+    blueprintOwner("Private outsider", requester, false);
+    Squadron inactiveChild = squadron("Inactive producer " + UUID.randomUUID(), profit);
+    blueprintOwner("Inactive child producer", inactiveChild, false);
+    inactiveChild.setActive(false);
+    squadrons.saveAndFlush(inactiveChild);
+    personalBlueprints.saveAndFlush(
+        PersonalBlueprint.builder()
+            .ownerUserId(caller)
+            .productKey("area-producer")
+            .productName(gameItems.findById(gameItemId).orElseThrow().getName())
+            .build());
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(profit)
+            .requestingOrgUnit(requester)
+            .type(JobOrderType.ITEM)
+            .build();
+    order.addItem(
+        JobOrderItem.builder()
+            .blueprint(blueprints.findById(blueprintId).orElseThrow())
+            .gameItem(gameItems.findById(gameItemId).orElseThrow())
+            .amount(2)
+            .build());
+    order = orders.saveAndFlush(order);
+
+    as(get("/api/v1/orders/" + order.getId() + "/item-blueprint-owners"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.requiredBlueprints[0].ownerCount").value(5))
+        .andExpect(jsonPath("$.owners.length()").value(5));
+    caller = globalOwner.getId();
+    as(get("/api/v1/orders/" + order.getId()), null).andExpect(status().isOk());
+    as(get("/api/v1/orders/" + order.getId() + "/item-blueprint-owners"), null)
+        .andExpect(status().isForbidden());
+  }
+
+  private User blueprintOwner(String name, OrgUnit unit, boolean global) {
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    user.setUsername(name + UUID.randomUUID());
+    user = users.saveAndFlush(user);
+    join(user, unit);
+    personalBlueprints.saveAndFlush(
+        PersonalBlueprint.builder()
+            .ownerUserId(user.getId())
+            .productKey("producer")
+            .productName(gameItems.findById(gameItemId).orElseThrow().getName())
+            .build());
+    if (global) {
+      sharings.update(user.getId(), true, 0L);
+    }
+    return user;
+  }
+
+  @Test
+  void kindFilterNarrowsEveryWorkspaceScopeAndItsDatabasePageCount() throws Exception {
+    JobOrder item = null;
+    for (JobOrderType kind : JobOrderType.values()) {
+      JobOrder order =
+          JobOrder.builder()
+              .type(kind)
+              .responsibleOrgUnit(responsible)
+              .requestingOrgUnit(requester)
+              .build();
+      order.addAssignee(
+          JobOrderAssignee.builder().user(users.findById(caller).orElseThrow()).build());
+      order = orders.saveAndFlush(order);
+      if (kind == JobOrderType.ITEM) {
+        item = order;
+      }
+    }
+    for (String endpoint :
+        List.of(
+            "/api/v1/orders",
+            "/api/v1/orders/requested",
+            "/api/v1/orders?toProcess=true",
+            "/api/v1/orders?assignedToMe=true")) {
+      as(get(endpoint).param("type", "ITEM").param("size", "1"), null)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.totalElements").value(1))
+          .andExpect(jsonPath("$.content[0].type").value("ITEM"))
+          .andExpect(jsonPath("$.content[0].id").value(item.getId().toString()));
+    }
+    as(
+            get("/api/v1/orders")
+                .param("type", "ITEM")
+                .param("squadronId", UUID.randomUUID().toString()),
+            null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+  }
+
+  @Test
+  void requesterReadsTheSameOrderInDemandLookupCollectionAndPersistedReports() throws Exception {
+    memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
+    memberships.flush();
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requester)
+            .handle("Shared read representations")
+            .build();
+    order.addMaterial(
+        JobOrderMaterial.builder()
+            .material(materials.findById(material).orElseThrow())
+            .qualityTier(tiers.findByMinQuality(0).orElseThrow())
+            .amount(12.0)
+            .build());
+    JobOrderHandover handover =
+        JobOrderHandover.builder()
+            .handoverTime(Instant.now())
+            .recipientHandle("Shared recipient")
+            .build();
+    handover.addItem(
+        JobOrderHandoverItem.builder()
+            .material(materials.findById(material).orElseThrow())
+            .amount(2.0)
+            .quality(650)
+            .locationName("Shared hangar")
+            .build());
+    handover.setJobOrder(order);
+    order.getHandovers().add(handover);
+    order = orders.saveAndFlush(order);
+
+    as(get("/api/v1/orders/material-demand"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.groups.length()").value(1))
+        .andExpect(jsonPath("$.groups[0].orgUnit.id").value(responsible.getId().toString()));
+    as(get("/api/v1/orders/lookup"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(order.getId().toString()));
+    as(get("/api/v1/orders/" + order.getId() + "/materials/" + material + "/inventory"), null)
+        .andExpect(status().isOk());
+    as(get("/api/v1/orders/" + order.getId() + "/materials/" + material + "/attribution"), null)
+        .andExpect(status().isOk());
+    as(get("/api/v1/orders/" + order.getId() + "/material-collection"), null)
+        .andExpect(status().isOk());
+    as(get("/api/v1/orders/" + order.getId() + "/handovers/" + handover.getId() + "/report"), null)
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void contextualRequesterWriterWithoutMembershipGetsTheConcreteWorkspaceCapability()
+      throws Exception {
+    memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
+    memberships.deleteById(new OrgUnitMembershipId(caller, requester.getId()));
+    memberships.flush();
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .build());
+
+    as(get("/api/v1/me/capabilities"), requester.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewJobOrders").value(false))
+        .andExpect(jsonPath("$.canViewOwnJobOrders").value(true));
+    as(get("/api/v1/orders/requested"), requester.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].id").value(order.getId().toString()));
+    as(get("/api/v1/orders"), requester.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].id").value(order.getId().toString()));
+  }
+
+  @Test
+  void observedFormerResponsibleUnitRetainsOnlyConcreteReadThroughCurrentMembership()
+      throws Exception {
+    memberships.deleteById(new OrgUnitMembershipId(caller, requester.getId()));
+    memberships.flush();
+    Squadron customer = squadron("Historical customer " + UUID.randomUUID(), null);
+    Squadron target = squadron("Historical target " + UUID.randomUUID(), profit);
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(customer)
+                .originalProfitOrgUnitId(profit.getId())
+                .build());
+
+    as(
+            patch("/api/v1/orders/" + order.getId() + "/responsible-org-unit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"responsibleOrgUnitId\":\"" + target.getId() + "\"}"),
+            responsible.getId())
+        .andExpect(status().isOk());
+    hierarchy.setParent(responsible.getId(), null, responsible.getVersion());
+    JobOrder unrelated =
+        orders.saveAndFlush(
+            JobOrder.builder().responsibleOrgUnit(target).requestingOrgUnit(customer).build());
+
+    as(get("/api/v1/orders").param("size", "1"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(order.getId().toString()));
+    as(get("/api/v1/orders/by-number").param("number", order.getDisplayId().toString()), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(order.getId().toString()));
+    as(get("/api/v1/orders/" + order.getId()), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canEdit").value(false))
+        .andExpect(jsonPath("$.canManageAssignees").value(false))
+        .andExpect(jsonPath("$.canTransferResponsibility").value(false));
+    as(get("/api/v1/orders/" + unrelated.getId()), null).andExpect(status().isForbidden());
+    as(post("/api/v1/orders/" + order.getId() + "/assignees/" + caller), null)
+        .andExpect(status().isForbidden());
+    memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
+    memberships.flush();
+    as(get("/api/v1/orders/" + order.getId()), null).andExpect(status().isForbidden());
+    as(get("/api/v1/orders"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+  }
+
+  @Test
+  void observedFormerRequesterRetainsAllReadWithoutCurrentRequesterWritesOrMineScope()
+      throws Exception {
+    memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
+    memberships.flush();
+    Squadron newRequester = squadron("New customer " + UUID.randomUUID(), null);
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .originalProfitOrgUnitId(profit.getId())
+                .build());
+    String payload =
+        createBody().replace(requester.getId().toString(), newRequester.getId().toString());
+    payload =
+        payload.substring(0, payload.length() - 1) + ",\"version\":" + order.getVersion() + "}";
+
+    as(
+            put("/api/v1/orders/" + order.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload),
+            responsible.getId())
+        .andExpect(status().isOk());
+
+    as(get("/api/v1/orders/" + order.getId()), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canEdit").value(false))
+        .andExpect(jsonPath("$.canEditAsRequester").value(false));
+    as(get("/api/v1/orders"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1));
+    as(get("/api/v1/orders/requested"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+  }
+
+  @Test
+  void requesterAndPersonalAssignmentReadDoNotBecomeOwnProcessingUnits() throws Exception {
+    memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
+    memberships.flush();
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .build());
+    as(get("/api/v1/orders"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1));
+    as(
+            get("/api/v1/orders")
+                .param("toProcess", "true")
+                .param("orgUnitId", responsible.getId().toString()),
+            null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    as(get("/api/v1/orders").param("assignedToMe", "true"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    order.addAssignee(
+        JobOrderAssignee.builder().user(users.findById(caller).orElseThrow()).build());
+    orders.saveAndFlush(order);
+    as(get("/api/v1/orders").param("assignedToMe", "true"), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1));
+    as(
+            get("/api/v1/orders")
+                .param("toProcess", "true")
+                .param("orgUnitId", responsible.getId().toString()),
+            null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
   }
 
   @Test
@@ -305,12 +739,12 @@ class JobOrderHierarchyAuthorityIntegrationTest {
 
     as(get(endpoint), requester.getId())
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.redacted").value(true))
+        .andExpect(jsonPath("$.redacted").doesNotExist())
         .andExpect(jsonPath("$.canEdit").value(false))
         .andExpect(jsonPath("$.canEditAsRequester").value(true));
     as(get(endpoint), null)
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.redacted").value(true))
+        .andExpect(jsonPath("$.redacted").doesNotExist())
         .andExpect(jsonPath("$.canEdit").value(false))
         .andExpect(jsonPath("$.canEditAsRequester").value(false));
     JobOrderHandover delivery =
@@ -359,6 +793,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
                 .material(materials.getReferenceById(material))
                 .qualityTier(quality)
                 .claimingOrgUnit(responsible)
+                .participation(participation(order, responsible))
                 .amount(2.0)
                 .build());
     MaterialClaim foreignClaim =
@@ -368,6 +803,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
                 .material(materials.getReferenceById(material))
                 .qualityTier(quality)
                 .claimingOrgUnit(foreign)
+                .participation(participation(order, foreign))
                 .amount(3.0)
                 .build());
     String path = "/api/v1/orders/" + order.getId();
@@ -408,12 +844,13 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             JobOrder.builder()
                 .responsibleOrgUnit(foreign)
                 .requestingOrgUnit(foreign)
-                .handle("Unrelated private order")
+                .handle("Foreign readable order")
                 .build());
     as(
             get("/api/v1/orders/" + privateOrder.getId() + "/claims/claiming-options"),
             responsible.getId())
-        .andExpect(status().isForbidden());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isEmpty());
   }
 
   @ParameterizedTest
@@ -466,10 +903,34 @@ class JobOrderHierarchyAuthorityIntegrationTest {
                 .material(materials.getReferenceById(material))
                 .qualityTier(tiers.findByCode("GOOD").orElseThrow())
                 .claimingOrgUnit(responsible)
+                .participation(participation(order, responsible))
                 .amount(3.0)
                 .claimedByUser(users.getReferenceById(caller))
                 .endedAt(Instant.now())
                 .build());
+    UUID creditId = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO material_provision_credit (id, job_order_id, claim_id, participation_id,"
+            + " claiming_org_unit_id, material_id, quality_tier_id, source_row_id, amount)"
+            + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        creditId,
+        order.getId(),
+        archived.getId(),
+        archived.getParticipation().getId(),
+        responsible.getId(),
+        material,
+        archived.getQualityTier().getId(),
+        UUID.randomUUID(),
+        3.0);
+    jdbc.update(
+        "INSERT INTO material_provision_fragment (credit_id, origin, from_quanta, to_quanta)"
+            + " VALUES (?, ?, 0, 3000)",
+        creditId,
+        UUID.randomUUID());
+    var creditHistory =
+        jdbc.queryForMap("SELECT * FROM material_provision_credit WHERE id = ?", creditId);
+    var fragmentHistory =
+        jdbc.queryForMap("SELECT * FROM material_provision_fragment WHERE credit_id = ?", creditId);
     if (!validResponsibility) {
       hierarchy.setParent(processing.getId(), null, processing.getVersion());
     }
@@ -485,6 +946,14 @@ class JobOrderHierarchyAuthorityIntegrationTest {
 
     orders.flush();
     assertThat(orders.existsById(order.getId())).isEqualTo(!validResponsibility);
+    assertThat(jdbc.queryForMap("SELECT * FROM material_provision_credit WHERE id = ?", creditId))
+        .isEqualTo(creditHistory);
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT * FROM material_provision_fragment WHERE credit_id = ?", creditId))
+        .isEqualTo(fragmentHistory);
+    assertThat(participations.existsById(archived.getParticipation().getId()))
+        .isEqualTo(!validResponsibility);
     assertThat(
             jdbc.queryForObject(
                 "SELECT count(*) FROM audit_event WHERE subject_id = ? AND event_type ="
@@ -549,6 +1018,14 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         .andExpect(jsonPath("$.originalProfitBoundaryUnknown").value(true));
   }
 
+  private JobOrderParticipation participation(JobOrder order, OrgUnit unit) {
+    JobOrderParticipation row = new JobOrderParticipation();
+    row.setJobOrder(order);
+    row.setClaimingOrgUnit(unit);
+    row.setActive(true);
+    return participations.saveAndFlush(row);
+  }
+
   private SpecialCommand processingUnit() {
     String tag = UUID.randomUUID().toString();
     SpecialCommand unit = new SpecialCommand();
@@ -566,11 +1043,11 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     return squadrons.saveAndFlush(row);
   }
 
-  private void join(User user, Squadron unit) {
+  private void join(User user, OrgUnit unit) {
     OrgUnitMembership row = new OrgUnitMembership();
     row.setId(new OrgUnitMembershipId(user.getId(), unit.getId()));
     row.setUser(user);
-    row.setKind(OrgUnitKind.SQUADRON);
+    row.setKind(unit.getKind());
     row.setJoinedAt(Instant.now());
     memberships.saveAndFlush(row);
   }

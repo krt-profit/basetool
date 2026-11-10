@@ -47,7 +47,6 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -105,7 +104,6 @@ class JobOrderResponsibilityRecoveryMvcTest {
             List.of(),
             Instant.parse("2026-11-01T10:00:00Z"),
             4L,
-            false,
             false,
             false,
             true,
@@ -167,10 +165,9 @@ class JobOrderResponsibilityRecoveryMvcTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"true,true", "true,false", "false,true", "false,false"})
+  @ValueSource(booleans = {true, false})
   @WithMockUser(roles = "KRT_MEMBER")
-  void requesterEditControlsFollowExplicitBackendCapability(boolean mayEdit, boolean redacted)
-      throws Exception {
+  void requesterEditControlsFollowExplicitBackendCapability(boolean mayEdit) throws Exception {
     UUID id = UUID.randomUUID();
     JobOrderDto order =
         new JobOrderDto(
@@ -194,7 +191,6 @@ class JobOrderResponsibilityRecoveryMvcTest {
             4L,
             false,
             false,
-            redacted,
             false,
             true,
             false,
@@ -244,7 +240,6 @@ class JobOrderResponsibilityRecoveryMvcTest {
             List.of(),
             Instant.parse("2026-11-01T10:00:00Z"),
             5L,
-            false,
             false,
             false,
             false,
@@ -300,7 +295,6 @@ class JobOrderResponsibilityRecoveryMvcTest {
             4L,
             true,
             true,
-            false,
             false,
             false,
             true,

@@ -60,7 +60,10 @@ import org.springframework.context.ApplicationEventPublisher;
  * The pool and donation commands of the Lager (REQ-INV-057, REQ-INV-058): book-in and transfer into
  * an org unit's pool, the donation earmark and the protection it gives a row.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryPoolCommandsTest {
 
   private static final UUID DONOR = UUID.randomUUID();

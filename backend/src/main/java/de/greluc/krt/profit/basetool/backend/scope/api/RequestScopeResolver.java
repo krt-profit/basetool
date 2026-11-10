@@ -354,7 +354,8 @@ public class RequestScopeResolver {
     if (authHelper.isAdmin()) {
       return true;
     }
-    return !currentMemberOrgUnitIds().isEmpty();
+    return !currentMemberOrgUnitIds().isEmpty()
+        || !currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN).isEmpty();
   }
 
   /**

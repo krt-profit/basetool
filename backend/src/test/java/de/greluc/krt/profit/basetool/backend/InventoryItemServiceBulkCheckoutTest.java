@@ -64,7 +64,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 /** Unit tests for the bulk checkout functionality in {@link InventoryCheckoutService}. */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemServiceBulkCheckoutTest {
 
   @BeforeEach

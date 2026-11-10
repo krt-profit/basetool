@@ -57,4 +57,18 @@ public final class ScuAmounts {
   public static double roundToScuScale(double value) {
     return BigDecimal.valueOf(value).setScale(SCALE, RoundingMode.HALF_UP).doubleValue();
   }
+
+  /**
+   * Converts an amount to exact thousandths using the common storage rounding.
+   *
+   * @param value the raw amount
+   * @return the rounded integral quantity
+   * @throws ArithmeticException when the quantity does not fit a long
+   */
+  public static long toQuanta(double value) {
+    return BigDecimal.valueOf(value)
+        .movePointRight(SCALE)
+        .setScale(0, RoundingMode.HALF_UP)
+        .longValueExact();
+  }
 }

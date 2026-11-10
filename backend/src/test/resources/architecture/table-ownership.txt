@@ -58,6 +58,8 @@ job_order_item_handover joborder
 job_order_item_handover_entry joborder
 job_order_item_material joborder
 job_order_material joborder
+job_order_participation joborder
+job_order_unit_read_history joborder
 job_type catalogue
 jurisdiction catalogue
 kommando_group orgunit
@@ -67,6 +69,8 @@ manufacturer_uex_company catalogue
 material catalogue
 material_category catalogue
 material_claim joborder
+material_provision_credit joborder
+material_provision_fragment joborder
 material_exchange_interest materialexchange
 material_exchange_offer materialexchange
 material_exchange_request materialexchange

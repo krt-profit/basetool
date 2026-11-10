@@ -37,13 +37,16 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.type.SqlTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -93,6 +96,22 @@ public class MaterialClaim extends AbstractEntity<UUID> {
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
   @JoinColumn(name = "claiming_org_unit_id", nullable = false)
   private OrgUnit claimingOrgUnit;
+
+  /** The single Staffel participation that owns this material-quality contribution. */
+  @ManyToOne(optional = false, fetch = FetchType.LAZY)
+  @JoinColumn(name = "participation_id", nullable = false)
+  private JobOrderParticipation participation;
+
+  /** The historical truthful contribution, independent of remaining coverage. */
+  @Builder.Default
+  @Column(name = "credited_amount", nullable = false)
+  private Double creditedAmount = 0.0;
+
+  /** Ordered quantity changes with distinct causes and exact old/new facts. */
+  @Builder.Default
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "changes", nullable = false, columnDefinition = "jsonb")
+  private List<MaterialContributionChange> changes = List.of();
 
   /** End of the active promise; historical quantity and attribution remain unchanged. */
   @Column(name = "ended_at")

@@ -44,7 +44,14 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @param jobOrderId the order whose claims to load.
    * @return claims on the order, never {@code null}.
    */
-  @EntityGraph(attributePaths = {"material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
+  @EntityGraph(
+      attributePaths = {
+        "material",
+        "qualityTier",
+        "claimingOrgUnit",
+        "claimedByUser",
+        "participation"
+      })
   List<MaterialClaim> findByJobOrderIdOrderByCreatedAtDesc(UUID jobOrderId);
 
   /**
@@ -55,7 +62,14 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @param jobOrderIds the orders whose claims to load; an empty collection yields an empty list.
    * @return claims across the given orders, never {@code null}.
    */
-  @EntityGraph(attributePaths = {"material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
+  @EntityGraph(
+      attributePaths = {
+        "material",
+        "qualityTier",
+        "claimingOrgUnit",
+        "claimedByUser",
+        "participation"
+      })
   List<MaterialClaim> findByJobOrderIdInOrderByCreatedAtDesc(Collection<UUID> jobOrderIds);
 
   /**
@@ -92,7 +106,14 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @return active promises with notice facts fetched
    */
   @EntityGraph(
-      attributePaths = {"jobOrder", "material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
+      attributePaths = {
+        "jobOrder",
+        "material",
+        "qualityTier",
+        "claimingOrgUnit",
+        "claimedByUser",
+        "participation"
+      })
   List<MaterialClaim> findByClaimingOrgUnitIdInOrderById(
       Collection<UUID> unitIds, Pageable pageable);
 
@@ -118,7 +139,14 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @return ineligible active promises with audit and notice facts fetched
    */
   @EntityGraph(
-      attributePaths = {"jobOrder", "material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
+      attributePaths = {
+        "jobOrder",
+        "material",
+        "qualityTier",
+        "claimingOrgUnit",
+        "claimedByUser",
+        "participation"
+      })
   @Query(
       "SELECT c FROM MaterialClaim c WHERE c.jobOrder.id = :orderId"
           + " AND c.claimingOrgUnit.id NOT IN :eligibleIds ORDER BY c.id")

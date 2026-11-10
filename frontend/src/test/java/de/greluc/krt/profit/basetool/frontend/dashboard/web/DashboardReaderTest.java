@@ -278,7 +278,9 @@ class DashboardReaderTest {
   void offersTheOrderWidgetsByTheOrderFlags() {
     when(client.dashboard(DashboardMode.MEMBER)).thenReturn(stored(false));
     NavigationAccess queue =
-        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.JOB_ORDERS));
+        new NavigationAccess(
+            Set.of("KRT_MEMBER"),
+            Set.of(NavigationFlag.ORDER_WORKSPACE, NavigationFlag.ORDER_UNIT_WORK));
 
     assertThat(read(queue, null, List.of()).catalogue())
         .extracting(DashboardWidgetDescriptor::type)
@@ -286,6 +288,12 @@ class DashboardReaderTest {
     assertThat(read(MEMBER, null, List.of()).catalogue())
         .extracting(DashboardWidgetDescriptor::type)
         .doesNotContain(DashboardWidgetType.ORDERS_TO_PROCESS, DashboardWidgetType.MATERIAL_DEMAND);
+    NavigationAccess requester =
+        new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.ORDER_WORKSPACE));
+    assertThat(read(requester, null, List.of()).catalogue())
+        .extracting(DashboardWidgetDescriptor::type)
+        .contains(DashboardWidgetType.MATERIAL_DEMAND)
+        .doesNotContain(DashboardWidgetType.ORDERS_TO_PROCESS);
   }
 
   @Test

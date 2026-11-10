@@ -61,7 +61,10 @@ import org.springframework.context.ApplicationEventPublisher;
  * InventoryCheckoutService#deleteAllGlobalInventory}) of {@link InventoryCheckoutService}, pinning
  * the exact audit events each records.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryCheckoutServiceAuditTest {
 
   @BeforeEach

@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.app.web;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeLookup;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreationOptions;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWorkspaceAccess;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
@@ -81,6 +83,9 @@ public class MeController {
 
   /** Answers whether the caller holds a job-order assignee entry. */
   private final JobOrderAssigneeLookup jobOrderAssigneeLookup;
+
+  private final JobOrderCreationOptions jobOrderCreationOptions;
+  private final JobOrderWorkspaceAccess jobOrderWorkspaceAccess;
 
   /** Decides the supply tabs the caller may open. */
   private final SupplyTabAccess supplyTabAccess;
@@ -160,7 +165,10 @@ public class MeController {
         supplyTabs.stats(),
         purchasingTabs.partners(),
         purchasingTabs.delegates(),
-        purchasingTabs.report());
+        purchasingTabs.report(),
+        jobOrderWorkspaceAccess.canViewWorkspace(),
+        jobOrderWorkspaceAccess.canViewUnitWork(),
+        jobOrderCreationOptions.canCreate());
   }
 
   /**
@@ -302,6 +310,9 @@ public class MeController {
    * @param canViewPurchasingReport whether the purchasing report is offered: the purchasing surface
    *     is on and the caller is a delegate, the governing leadership, bank staff or the lead or a
    *     Logistician of a unit
+   * @param canViewOrderWorkspace whether the shared permitted-order workspace is offered
+   * @param canViewOrderUnitWork whether current units have a responsible or supporting work view
+   * @param canCreateJobOrders whether the current context has at least one authorized create pair
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -324,7 +335,10 @@ public class MeController {
       boolean canViewSupplyStats,
       boolean canViewPurchasingPartners,
       boolean canViewPurchasingDelegates,
-      boolean canViewPurchasingReport) {}
+      boolean canViewPurchasingReport,
+      boolean canViewOrderWorkspace,
+      boolean canViewOrderUnitWork,
+      boolean canCreateJobOrders) {}
 
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.

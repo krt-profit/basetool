@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
@@ -55,6 +56,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
@@ -129,8 +132,76 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
   @Getter(onMethod_ = @__(@Override))
   @Min(0)
   @Column(nullable = false)
-  @Setter(onParam_ = @__(@Nullable))
+  @Setter(AccessLevel.NONE)
   private Double amount;
+
+  /** The durable quantity intervals currently represented by this storage row. */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "quantity_provenance", nullable = false, columnDefinition = "jsonb")
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
+  private List<StockQuantityFragment> quantityProvenance = List.of();
+
+  /**
+   * Changes physical amount while retaining known quantity identity through reductions.
+   *
+   * @param amount the resulting physical amount
+   */
+  public void setAmount(@NotNull Double amount) {
+    List<StockQuantityFragment> existing = getQuantityProvenance();
+    quantityProvenance =
+        InventoryQuantityComposition.resized(existing, ScuAmounts.toQuanta(amount));
+    this.amount = amount;
+  }
+
+  /**
+   * Returns the immutable physical composition independently of current earmarks and placement.
+   *
+   * @return the current durable quantity intervals
+   */
+  public @NotNull List<StockQuantityFragment> getQuantityProvenance() {
+    if (quantityProvenance.isEmpty() && amount != null && ScuAmounts.toQuanta(amount) > 0) {
+      quantityProvenance =
+          List.of(
+              new StockQuantityFragment(
+                  id == null ? UUID.randomUUID() : id, 0, ScuAmounts.toQuanta(amount)));
+    }
+    return List.copyOf(quantityProvenance);
+  }
+
+  /**
+   * Assigns a journaled or transformed composition without inventing new physical quantity.
+   *
+   * @param fragments the exact surviving intervals
+   */
+  void replaceQuantityProvenance(@NotNull List<StockQuantityFragment> fragments) {
+    quantityProvenance = InventoryQuantityComposition.canonical(fragments);
+  }
+
+  /**
+   * Moves the deterministic leading quantity into an unsaved split row.
+   *
+   * @param target the split row
+   * @param amount the quantity moved
+   */
+  void moveQuantityTo(@NotNull InventoryItem target, double amount) {
+    InventoryQuantityComposition.Partition partition =
+        InventoryQuantityComposition.partition(
+            getQuantityProvenance(), ScuAmounts.toQuanta(amount));
+    quantityProvenance = partition.remaining();
+    target.replaceQuantityProvenance(partition.taken());
+  }
+
+  /**
+   * Retains a merge victim's physical quantity intervals on this surviving row.
+   *
+   * @param victim the row that will be removed
+   */
+  void mergeQuantityFrom(@NotNull InventoryItem victim) {
+    List<StockQuantityFragment> combined = new ArrayList<>(getQuantityProvenance());
+    combined.addAll(victim.getQuantityProvenance());
+    quantityProvenance = InventoryQuantityComposition.canonical(combined);
+  }
 
   @Getter(onMethod_ = @__(@Override))
   @Column(nullable = false)

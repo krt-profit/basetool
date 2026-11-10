@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
@@ -50,11 +51,15 @@ public interface PoolEntryCommands {
    * @param holderLots the lots a batch books into, by holder
    * @param entryIds the entries a batch writes; an unknown id is left out
    * @param relocations the lots a batch moves entries into; one of an unknown entry is left out
+   * @param requestedScopes material scopes introduced by initial book-ins
+   * @param allocationTargets job-order targets introduced by allocation writes
    */
   void lockLots(
       @NotNull Map<UUID, List<StockLot>> holderLots,
       @NotNull Collection<UUID> entryIds,
-      @NotNull Collection<PoolRelocation> relocations);
+      @NotNull Collection<PoolRelocation> relocations,
+      @NotNull Collection<OrderMaterialScope> requestedScopes,
+      @NotNull Collection<PoolAllocationTarget> allocationTargets);
 
   /**
    * Books stock in as a new shared entry of the pool held by {@code holder}, as the Lager's
@@ -378,6 +383,14 @@ public interface PoolEntryCommands {
   }
 
   /**
+   * A requested job-order allocation resolved against its current entry before stock locks.
+   *
+   * @param entryId the current stock entry
+   * @param orderId the requested target job order
+   */
+  record PoolAllocationTarget(@NotNull UUID entryId, @NotNull UUID orderId) {}
+
+  /**
    * The lot an entry of a batch is moved or remarked into, for {@link #lockLots}.
    *
    * @param entryId the entry
@@ -515,6 +528,7 @@ public interface PoolEntryCommands {
    * @param version its version
    * @param jobOrders its job-order earmarks by order
    * @param missions its mission earmarks by mission
+   * @param quantityProvenance its durable physical quantity composition
    */
   record PoolEntryState(
       @NotNull UUID id,
@@ -524,5 +538,17 @@ public interface PoolEntryCommands {
       double amount,
       long version,
       @NotNull Map<UUID, Double> jobOrders,
-      @NotNull Map<UUID, Double> missions) {}
+      @NotNull Map<UUID, Double> missions,
+      @NotNull List<StockQuantityFragment> quantityProvenance) {
+
+    /** Normalizes an absent composition to the journaled physical row identity. */
+    public PoolEntryState {
+      quantityProvenance =
+          quantityProvenance == null
+              ? amount > 0
+                  ? List.of(new StockQuantityFragment(id, 0, ScuAmounts.toQuanta(amount)))
+                  : List.of()
+              : List.copyOf(quantityProvenance);
+    }
+  }
 }

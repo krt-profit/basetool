@@ -409,8 +409,8 @@ function initOrdersDetailEdit2() {
             showFrontendErrorToast(MSG_MATERIAL_INVALID);
             return;
         }
-        const requesterView = form.getAttribute('data-requester-view') === 'true';
-        const updateUrl = requesterView
+        const requesterEdit = form.getAttribute('data-requester-edit') === 'true';
+        const updateUrl = requesterEdit
             ? `/orders/${orderId}/requested-update`
             : `/orders/${orderId}/update`;
         await krtOrderWrite({

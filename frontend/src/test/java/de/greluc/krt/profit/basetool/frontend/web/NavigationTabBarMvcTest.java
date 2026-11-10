@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
@@ -40,6 +41,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.Arrays;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
@@ -133,6 +135,8 @@ class NavigationTabBarMvcTest {
   @Test
   @DisplayName("an unedited bar shows the three defaults, then Meldungen and Menü")
   void defaultBar() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.orderAccess(false, true, false));
     stored(List.of(), TabBarResponse.AUTOMATIC, TabBarResponse.AUTOMATIC);
 
     String tabBar = bar(page(member(), "/impressum"));
@@ -141,7 +145,7 @@ class NavigationTabBarMvcTest {
         .containsSubsequence(
             "data-testid=\"mobile-tab-missions.list\"",
             "data-testid=\"mobile-tab-storage.overview\"",
-            "data-testid=\"mobile-tab-orders.create\"",
+            "data-testid=\"mobile-tab-orders.list\"",
             "data-testid=\"mobile-tab-notifications\"",
             "data-testid=\"mobile-tab-menu\"");
     assertThat(tabBar).doesNotContain("data-tabbar-mode=\"admin\"");
@@ -157,7 +161,7 @@ class NavigationTabBarMvcTest {
             "data-testid=\"mobile-tab-refinery.orders\"",
             "data-testid=\"mobile-tab-missions.list\"",
             "data-testid=\"mobile-tab-storage.overview\"")
-        .doesNotContain("mobile-tab-orders.create");
+        .doesNotContain("mobile-tab-hangar.overview");
   }
 
   @Test
@@ -165,13 +169,13 @@ class NavigationTabBarMvcTest {
   void storedBarIgnoresTheFavourites() throws Exception {
     stored(
         List.of("refinery.orders"),
-        bar(5, "storage.overview", "orders.create", "missions.list"),
+        bar(5, "storage.overview", "hangar.overview", "missions.list"),
         TabBarResponse.AUTOMATIC);
 
     assertThat(memberSlots(bar(page(member(), "/impressum"))))
         .containsSubsequence(
             "data-testid=\"mobile-tab-storage.overview\"",
-            "data-testid=\"mobile-tab-orders.create\"",
+            "data-testid=\"mobile-tab-hangar.overview\"",
             "data-testid=\"mobile-tab-missions.list\"")
         .doesNotContain("mobile-tab-refinery.orders")
         .doesNotContain("is-standin");
@@ -250,8 +254,7 @@ class NavigationTabBarMvcTest {
     String html = page(member(), "/impressum");
 
     assertThat(bar(html))
-        .containsSubsequence(
-            "mobile-tab-missions.list", "mobile-tab-storage.overview", "mobile-tab-orders.create");
+        .containsSubsequence("mobile-tab-missions.list", "mobile-tab-storage.overview");
     assertThat(html)
         .doesNotContain("data-testid=\"nav-tabbar-edit\"")
         .doesNotContain("tabbar-picker-item");

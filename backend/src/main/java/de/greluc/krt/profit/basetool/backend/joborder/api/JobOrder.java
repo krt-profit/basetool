@@ -75,19 +75,13 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Generated
   private Integer displayId;
 
-  /**
-   * The active Profit-hierarchy squadron or Spezialkommando that processes this order. It governs
-   * visibility: a squadron-responsible order is private to that squadron and admins, an
-   * SK-responsible order is public. Changed only via {@code PATCH
-   * /api/v1/orders/{id}/responsible-org-unit}.
-   */
+  /** The current Profit-hierarchy processing unit, changed through the responsibility endpoint. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "responsible_org_unit_id", nullable = false)
   private OrgUnit responsibleOrgUnit;
 
   /**
-   * The org unit that placed the order and receives the goods; any squadron or Spezialkommando.
-   * Mandatory and editable by Logistician+, but it grants no visibility.
+   * The customer unit granting complete order read and its current writer's requester capability.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requesting_org_unit_id", nullable = false)
@@ -144,12 +138,7 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private Set<JobOrderMaterial> materials = new HashSet<>();
 
-  /**
-   * Users who signed up to work on this order (the "Bearbeiter"), each as a {@link
-   * JobOrderAssignee} edge that additionally carries the assignee's optional note. A
-   * {@code @OneToMany} child collection (not a plain {@code @ManyToMany}) since the V147 promotion
-   * so the per-assignee note + version live on the edge.
-   */
+  /** Personal assignee edges carrying independently versioned optional notes. */
   @OneToMany(
       mappedBy = "jobOrder",
       cascade = CascadeType.ALL,

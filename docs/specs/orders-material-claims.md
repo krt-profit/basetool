@@ -155,3 +155,25 @@ active-context check `canActAsLogisticianIn(Staffel)`. The complete shared write
 resolve that distinction against REQ-ORDERS-053 and the canonical leadership/context rules.
 `JobOrderHierarchyAuthorityIntegrationTest` and the frontend `JobOrderClaimControlsMvcTest` cover
 the current options, positive own-Staffel writes and foreign/ordinary/invalid denials.
+
+## Material implementation foundation
+
+The current implementation groups all material-quality promises of one order/Staffel under
+`JobOrderParticipation`. Empty or fulfilled open amounts do not end support. Outstanding capacity
+uses unmanufactured ITEM demand and the canonical once-only quality coverage. The material guard
+spans every quality tier; Inventory plans actual source/destination scopes before lot/row locks
+and rejects a changed plan instead of acquiring another guard after stock locks.
+
+`CreateClaimDto.version` is absent for a first promise and mandatory for an existing quantity edit.
+Duplicate first creation conflicts; meaningful edits do not retry as last-writer-wins. The returned
+claim version includes its flushed history change. An explicit `provision` selection in the ordinary
+Inventory allocation/check-in payload identifies a matching permitted promise and its version.
+Only the action's genuinely new quantity budget can create credit; unchanged allocation relabelling
+has no new budget. Inventory carries exact known physical origin intervals through transforms;
+JobOrder keeps processed intervals independently of deletable stock, allocation and order rows.
+No legacy stock creates inferred Staffel performance.
+
+The focused implementation checks currently establish version conflicts, SCU proportional demand
+reduction, selected provision before cuts, and known split/merge/loss/restore identity. The complete
+correction, public history/UI, grouped notices and cross-path race acceptance above remains pending;
+this foundation is not evidence that the complete shared workflow has shipped.

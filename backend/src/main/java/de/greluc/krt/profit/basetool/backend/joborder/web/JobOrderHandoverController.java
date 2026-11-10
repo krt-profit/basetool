@@ -196,12 +196,7 @@ public class JobOrderHandoverController {
     @ApiResponse(responseCode = "403", description = "Forbidden"),
     @ApiResponse(responseCode = "404", description = "Job order or item handover not found")
   })
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,
@@ -235,12 +230,7 @@ public class JobOrderHandoverController {
     @ApiResponse(responseCode = "403", description = "Forbidden"),
     @ApiResponse(responseCode = "404", description = "Job order or handover not found")
   })
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,

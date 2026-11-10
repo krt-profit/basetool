@@ -30,7 +30,12 @@ import java.util.UUID;
  * @param targetId the earmarked job order or mission id.
  * @param amount the slice amount (add/change only).
  * @param version the owning entry's optimistic-lock version, echoed for the 409 check.
+ * @param provision an explicitly selected matching unit promise, or null for unattributed stock
  */
 @DtoMirror
 public record InventoryAllocationWriteDto(
-    InventoryAllocationDimension field, UUID targetId, Double amount, Long version) {}
+    InventoryAllocationDimension field,
+    UUID targetId,
+    Double amount,
+    Long version,
+    MaterialProvisionSelection provision) {}

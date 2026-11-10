@@ -35,6 +35,7 @@ import java.util.UUID;
  * @param quantity the entry's total physical stock in whole units
  * @param allocatedQuantity the whole-unit slice earmarked to this order
  * @param delivered whether this order's slice is marked delivered
+ * @param canEdit whether the current caller has Inventory write authority for this row
  */
 @DtoMirror
 public record JobOrderItemStockEntryDto(
@@ -46,4 +47,5 @@ public record JobOrderItemStockEntryDto(
     UUID locationId,
     long quantity,
     long allocatedQuantity,
-    boolean delivered) {}
+    boolean delivered,
+    boolean canEdit) {}

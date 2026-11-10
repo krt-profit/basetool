@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -79,7 +80,6 @@ public class JobOrderQueryService {
   private final MaterialRepository materialRepository;
   private final StockReads stockReads;
   private final RequestScopeResolver requestScopeResolver;
-  private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final JobOrderMapper jobOrderMapper;
   private final SquadronMapper squadronMapper;
   private final JobOrderItemService jobOrderItemService;
@@ -103,9 +103,8 @@ public class JobOrderQueryService {
    * Paged list with optional status and squadron display filters, always constrained to the
    * caller's visibility scope.
    *
-   * <p>SK-responsible orders are public, squadron-responsible orders private to that squadron and
-   * admins; a caller outside the order workflow ({@link RequestScopeResolver#canViewJobOrders()})
-   * gets an empty page. {@code squadronIds} can only narrow the result.
+   * <p>Current contextual, personal and observed historical relationships determine the complete
+   * read set (REQ-ORDERS-052). {@code squadronIds} can only narrow the result.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param squadronIds optional display filter matching the responsible or requesting side;
@@ -124,11 +123,9 @@ public class JobOrderQueryService {
    * Paged list with optional status, squadron and processing filters, always constrained to the
    * caller's visibility scope.
    *
-   * <p>With {@code toProcess} only orders whose active Profit-hierarchy responsible unit is one of
-   * the caller's processing units remain, the "Zu bearbeiten" queue (REQ-ORDERS-040): the pinned
-   * org unit when one is active, otherwise the caller's direct memberships. The filter only narrows
-   * the scoped result; a caller with no processing unit gets an empty page. Without it the scope
-   * also holds the orders the caller is an assignee of (REQ-ORDERS-047).
+   * <p>With {@code toProcess}, only orders of current responsible or active supporting units in the
+   * caller's context and reach remain (REQ-ORDERS-040). This read filter grants no command
+   * authority; a caller with no current work unit gets an empty page.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param squadronIds optional display filter matching the responsible or requesting side;
@@ -167,20 +164,35 @@ public class JobOrderQueryService {
       boolean toProcess,
       @Nullable UUID processingOrgUnitId,
       Pageable pageable) {
-    if (!requestScopeResolver.canViewJobOrders()) {
-      return toProcess
-          ? Page.empty(pageable)
-          : assignedOnly(statusesOrAll(statuses), squadronIds, pageable);
-    }
+    return getAllJobOrders(statuses, squadronIds, toProcess, processingOrgUnitId, null, pageable);
+  }
+
+  /**
+   * Narrows the shared permitted order page by kind and the existing workspace filters.
+   *
+   * @param statuses lifecycle values, absent for all
+   * @param squadronIds optional requesting or responsible unit filter
+   * @param toProcess whether to keep current processing units
+   * @param processingOrgUnitId optional processing unit within the current scope
+   * @param types order kinds, absent for all
+   * @param pageable the bounded page
+   * @return permitted orders with the database count of matching rows
+   */
+  public Page<JobOrderDto> getAllJobOrders(
+      @Nullable List<JobOrderStatus> statuses,
+      @Nullable Collection<UUID> squadronIds,
+      boolean toProcess,
+      @Nullable UUID processingOrgUnitId,
+      @Nullable List<JobOrderType> types,
+      Pageable pageable) {
     List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     Set<UUID> processingOrgUnitIds = Set.of(NIL_ID);
     if (toProcess) {
-      UUID pinnedUnit = requestScopeResolver.currentScopePredicate().activeOrgUnitId();
       processingOrgUnitIds =
-          pinnedUnit != null
-              ? Set.of(pinnedUnit)
-              : requestScopeResolver.currentDirectMembershipOrgUnitIds();
+          scope.activeOrgUnitId() != null
+              ? Set.of(scope.activeOrgUnitId())
+              : scope.memberOrgUnitIds();
       if (processingOrgUnitId != null) {
         processingOrgUnitIds =
             processingOrgUnitIds.contains(processingOrgUnitId)
@@ -192,52 +204,21 @@ public class JobOrderQueryService {
       }
     }
     boolean noSquadronFilter = squadronIds == null || squadronIds.isEmpty();
-    Collection<UUID> effectiveSquadronIds = noSquadronFilter ? Set.of(NIL_ID) : squadronIds;
     Page<JobOrder> page =
         jobOrderRepository.findScopedJobOrders(
             effectiveStatuses,
             noSquadronFilter,
-            effectiveSquadronIds,
+            noSquadronFilter ? Set.of(NIL_ID) : squadronIds,
             toProcess,
             processingOrgUnitIds,
-            scope.adminAllScope(),
+            scope.adminAllScope()
+                || (!authHelper.isAdmin() && requestScopeResolver.canViewJobOrders()),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
             authHelper.currentUserId().orElse(NIL_ID),
+            typesOrAll(types),
             pageable);
-
     return jobOrderStockProjectionService.mapPageWithStock(page);
-  }
-
-  /**
-   * The concrete recovery and assignment list outside general Profit access.
-   *
-   * <p>Current unit/leadership readers retain their own responsible orders; unrelated queue and
-   * reduced external exchange authority are unchanged.
-   *
-   * @param statuses the status filter, never empty
-   * @param squadronIds optional display filter; null/empty means no restriction
-   * @param pageable page request
-   * @return the caller's assigned orders, an empty page for an unidentified caller
-   */
-  private Page<JobOrderDto> assignedOnly(
-      List<JobOrderStatus> statuses, @Nullable Collection<UUID> squadronIds, Pageable pageable) {
-    UUID callerId = authHelper.currentUserId().orElse(null);
-    if (callerId == null) {
-      return Page.empty(pageable);
-    }
-    boolean noSquadronFilter = squadronIds == null || squadronIds.isEmpty();
-    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
-    return jobOrderStockProjectionService.mapPageWithStock(
-        jobOrderRepository.findConcreteRecoveryAndAssignedOrders(
-            statuses,
-            noSquadronFilter,
-            noSquadronFilter ? Set.of(NIL_ID) : squadronIds,
-            scope.adminAllScope(),
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            callerId,
-            pageable));
   }
 
   /**
@@ -251,13 +232,29 @@ public class JobOrderQueryService {
    */
   public Page<JobOrderDto> getAssignedJobOrders(
       @Nullable List<JobOrderStatus> statuses, Pageable pageable) {
+    return getAssignedJobOrders(statuses, null, pageable);
+  }
+
+  /**
+   * Lists personal assignments narrowed by kind and lifecycle.
+   *
+   * @param statuses lifecycle values, absent for all
+   * @param types kinds, absent for all
+   * @param pageable the bounded page
+   * @return only the caller's assigned matching orders
+   */
+  public Page<JobOrderDto> getAssignedJobOrders(
+      @Nullable List<JobOrderStatus> statuses,
+      @Nullable List<JobOrderType> types,
+      Pageable pageable) {
     UUID callerId = authHelper.currentUserId().orElse(null);
     if (callerId == null) {
       return Page.empty(pageable);
     }
     List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
     return jobOrderStockProjectionService.mapPageWithStock(
-        jobOrderRepository.findAssignedJobOrders(effectiveStatuses, callerId, pageable));
+        jobOrderRepository.findAssignedJobOrders(
+            effectiveStatuses, callerId, typesOrAll(types), pageable));
   }
 
   /**
@@ -269,13 +266,33 @@ public class JobOrderQueryService {
    * @return paged job orders requested by the caller's org units
    */
   public Page<JobOrderDto> getRequestedJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
-    Set<UUID> requesterOrgUnitIds = requestScopeResolver.currentDirectMembershipOrgUnitIds();
+    return getRequestedJobOrders(statuses, null, pageable);
+  }
+
+  /**
+   * Lists requested orders of the caller's current units and leadership reach, narrowed by kind.
+   *
+   * @param statuses lifecycle values, absent for all
+   * @param types kinds, absent for all
+   * @param pageable the bounded page
+   * @return complete matching requested orders
+   */
+  public Page<JobOrderDto> getRequestedJobOrders(
+      @Nullable List<JobOrderStatus> statuses,
+      @Nullable List<JobOrderType> types,
+      Pageable pageable) {
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    Set<UUID> requesterOrgUnitIds =
+        scope.activeOrgUnitId() == null
+            ? scope.memberOrgUnitIds()
+            : Set.of(scope.activeOrgUnitId());
     if (requesterOrgUnitIds.isEmpty()) {
       return Page.empty(pageable);
     }
     List<JobOrderStatus> effectiveStatuses = statusesOrAll(statuses);
     Page<JobOrder> page =
-        jobOrderRepository.findRequestedOrders(effectiveStatuses, requesterOrgUnitIds, pageable);
+        jobOrderRepository.findRequestedOrders(
+            effectiveStatuses, requesterOrgUnitIds, typesOrAll(types), pageable);
     return jobOrderStockProjectionService.mapPageWithStock(page);
   }
 
@@ -298,7 +315,7 @@ public class JobOrderQueryService {
     return jobOrderRepository
         .findVisibleByNumberPrefix(
             numberPrefix,
-            requestScopeResolver.canViewJobOrders(),
+            !authHelper.isAdmin() && requestScopeResolver.canViewJobOrders(),
             scope.adminAllScope(),
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
@@ -308,6 +325,10 @@ public class JobOrderQueryService {
         .map(o ->
             new JobOrderNumberHitDto(o.getId(), o.getDisplayId(), o.getStatus(), o.getCreatedAt()))
         .toList();
+  }
+
+  private static List<JobOrderType> typesOrAll(@Nullable List<JobOrderType> types) {
+    return types == null || types.isEmpty() ? List.of(JobOrderType.values()) : types;
   }
 
   private static @NotNull List<JobOrderStatus> statusesOrAll(
@@ -323,13 +344,14 @@ public class JobOrderQueryService {
    * @return active job orders the caller may see, as reference DTOs
    */
   public List<JobOrderReferenceDto> findAllActiveReference(boolean withNeeds) {
-    if (!requestScopeResolver.canViewJobOrders()) {
-      return List.of();
-    }
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
     List<JobOrder> visible =
-        jobOrderRepository.findAllActiveWithMaterials().stream()
-            .filter(jobOrderAccessPolicy::canSeeJobOrderInScope)
-            .toList();
+        jobOrderRepository.findReadableActiveWithMaterials(
+            scope.adminAllScope()
+                || (!authHelper.isAdmin() && requestScopeResolver.canViewJobOrders()),
+            scope.activeOrgUnitId(),
+            scope.memberOrgUnitIds(),
+            authHelper.currentUserId().orElse(NIL_ID));
     List<UUID> needIds = withNeeds ? visible.stream().map(JobOrder::getId).toList() : List.of();
     OrderLinkedStockIndex stockIndex =
         jobOrderStockProjectionService.loadOrderLinkedStockIndex(needIds);
@@ -460,8 +482,7 @@ public class JobOrderQueryService {
   public JobOrderDto getJobOrderById(UUID id) {
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-    JobOrderDto dto = jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
-    return jobOrderAccessPolicy.canSeeJobOrder(jobOrder) ? dto : dto.withRedacted(true);
+    return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
   }
 
   /**

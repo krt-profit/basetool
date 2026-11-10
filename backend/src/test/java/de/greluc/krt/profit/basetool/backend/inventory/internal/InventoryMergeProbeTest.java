@@ -51,7 +51,10 @@ import org.springframework.security.access.AccessDeniedException;
 /**
  * Covers {@link InventoryItemService#hasMergeCandidates}, the Einbuchen merge probe (REQ-INV-026).
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryMergeProbeTest {
 
   private static final UUID CALLER = UUID.randomUUID();
@@ -107,7 +110,9 @@ class InventoryMergeProbeTest {
         null,
         null,
         null,
-        new InventoryProperties(enabled));
+        new InventoryProperties(enabled),
+        new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
+            null));
   }
 
   @Test

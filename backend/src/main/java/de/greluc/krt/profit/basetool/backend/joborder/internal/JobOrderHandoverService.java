@@ -92,6 +92,7 @@ public class JobOrderHandoverService {
   static final String ERROR_QUALITY_TIER_NOT_ON_ORDER = "error.job_order.quality_tier_not_on_order";
 
   private final JobOrderRepository jobOrderRepository;
+  private final MaterialPromiseCoordinator materialPromises;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final StockCommands stockCommands;
@@ -224,6 +225,7 @@ public class JobOrderHandoverService {
    */
   @Transactional
   public JobOrderHandoverDto createHandover(UUID jobOrderId, JobOrderHandoverCreateDto dto) {
+    materialPromises.lockOrder(jobOrderId);
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
     responsibilityGuard.assertWritable(jobOrder);

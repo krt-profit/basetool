@@ -42,7 +42,6 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
@@ -53,13 +52,13 @@ import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
-import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -77,7 +76,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -135,7 +133,6 @@ public class JobOrderWriteController {
   @PostMapping("/items")
   public String createItemOrder(
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
-      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       RedirectAttributes redirectAttributes) {
     try {
       List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
@@ -155,15 +152,11 @@ public class JobOrderWriteController {
               form.getComment(),
               lines,
               form.getVersion());
-      jobOrderClient.createItemOrder(dto);
+      JobOrderDto created = jobOrderClient.createItemOrder(dto);
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      if (!canViewJobOrders) {
-        return "redirect:/orders/create"
-            + (form.getSource() != null ? "?source=" + form.getSource() : "");
-      }
-      return "redirect:/orders";
+      return "redirect:" + postCreateTarget(created);
     } catch (Exception e) {
       log.error("Failed to create item order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
@@ -209,16 +202,12 @@ public class JobOrderWriteController {
    * as JSON; empty lines yield 400.
    *
    * @param form the bound item-order form
-   * @param canViewJobOrders whether the caller may browse the order queue
-   * @param principal the authenticated caller, or null for a guest
    * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/items", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
   public ResponseEntity<Object> createItemOrderAjax(
-      @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
-      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
-      @AuthenticationPrincipal OidcUser principal) {
+      @ModelAttribute("jobOrderItemForm") JobOrderItemForm form) {
     List<CreateJobOrderItemLineDto> lines = buildItemLineDtos(form);
     if (lines.isEmpty()) {
       return ResponseEntity.badRequest().build();
@@ -235,10 +224,9 @@ public class JobOrderWriteController {
                   form.getComment(),
                   lines,
                   form.getVersion());
-          jobOrderClient.createItemOrder(dto);
+          JobOrderDto created = jobOrderClient.createItemOrder(dto);
           liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
-          return ResponseEntity.ok(
-              Map.of("targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+          return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
   }
 
@@ -320,16 +308,14 @@ public class JobOrderWriteController {
 
   /**
    * Persists a new job order. Validation failures re-render inline so the BindingResult stays
-   * request-scoped. The source parameter determines the post-save redirect target.
+   * request-scoped. Successful creation enters the returned order identity's detail page.
    *
    * @return inline form view on failure, otherwise redirect
    */
   @NotNull
   @PostMapping("/create")
   public String createOrder(
-      @ModelAttribute("jobOrderForm") JobOrderForm form,
-      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
-      RedirectAttributes redirectAttributes) {
+      @ModelAttribute("jobOrderForm") JobOrderForm form, RedirectAttributes redirectAttributes) {
     try {
       List<CreateJobOrderMaterialDto> materials =
           form.getMaterials().stream()
@@ -354,18 +340,11 @@ public class JobOrderWriteController {
               form.getComment(),
               materials,
               form.getVersion());
-      jobOrderClient.createOrder(dto);
+      JobOrderDto created = jobOrderClient.createOrder(dto);
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      if (!canViewJobOrders) {
-        return "redirect:/orders/create"
-            + (form.getSource() != null ? "?source=" + form.getSource() : "");
-      }
-      if ("index".equals(form.getSource())) {
-        return "redirect:/orders";
-      }
-      return "redirect:/orders";
+      return "redirect:" + postCreateTarget(created);
     } catch (Exception e) {
       log.error("Failed to create order", e);
       log.error("Failed to create job order", e);
@@ -377,21 +356,14 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Returns the post-create navigation target: the order list for queue viewers, otherwise the
-   * create form.
+   * Returns the created order's central detail target.
    *
-   * @param principal the caller; {@code null} is treated as a non-viewer
-   * @param canViewJobOrders whether the caller may browse the order queue
-   * @param source the create-page source param to carry on the stay-on-create target
-   * @return the URL the AJAX caller should navigate to on success
+   * @param created the persisted backend answer
+   * @return the common detail URL of its non-null identity
    */
   @NotNull
-  private static String postCreateTarget(
-      OidcUser principal, boolean canViewJobOrders, String source) {
-    if (principal == null || !canViewJobOrders) {
-      return "/orders/create" + (source != null ? "?source=" + source : "");
-    }
-    return "/orders";
+  private static String postCreateTarget(@NotNull JobOrderDto created) {
+    return "/orders/" + Objects.requireNonNull(created.id());
   }
 
   /**
@@ -414,16 +386,11 @@ public class JobOrderWriteController {
    * as JSON; empty materials yield 400.
    *
    * @param form the bound material-order form
-   * @param canViewJobOrders whether the caller may browse the order queue (decides the target)
-   * @param principal the authenticated caller, or null for a guest
    * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/create", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
-  public ResponseEntity<Object> createOrderAjax(
-      @ModelAttribute("jobOrderForm") JobOrderForm form,
-      @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
-      @AuthenticationPrincipal OidcUser principal) {
+  public ResponseEntity<Object> createOrderAjax(@ModelAttribute("jobOrderForm") JobOrderForm form) {
     List<CreateJobOrderMaterialDto> materials = buildMaterialDtos(form);
     if (materials.isEmpty()) {
       return ResponseEntity.badRequest().build();
@@ -440,10 +407,9 @@ public class JobOrderWriteController {
                   form.getComment(),
                   materials,
                   form.getVersion());
-          jobOrderClient.createOrder(dto);
+          JobOrderDto created = jobOrderClient.createOrder(dto);
           liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
-          return ResponseEntity.ok(
-              Map.of("targetUrl", postCreateTarget(principal, canViewJobOrders, form.getSource())));
+          return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
   }
 
@@ -489,27 +455,6 @@ public class JobOrderWriteController {
         () -> {
           JobOrderDto result = jobOrderClient.updatePriority(id, priority);
           return ResponseEntity.ok(result);
-        });
-  }
-
-  /**
-   * Relays a responsibility transfer under the backend's current writer or recovery authority.
-   *
-   * @param id the order
-   * @param request the valid target unit
-   * @return the updated order or the backend error
-   */
-  @PatchMapping("/{id}/responsible-org-unit")
-  @ResponseBody
-  public ResponseEntity<Object> transferResponsibility(
-      @PathVariable UUID id, @RequestBody @Valid ReassignResponsibleOrgUnitRequest request) {
-    return relay(
-        log,
-        "transfer order responsibility",
-        () -> {
-          JobOrderDto order = jobOrderClient.transferResponsibility(id, request);
-          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
-          return ResponseEntity.ok(order);
         });
   }
 
@@ -727,12 +672,12 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #updateOrderAsRequester}: returns the updated redacted order for an
+   * AJAX twin of {@link #updateOrderAsRequester}: returns the updated complete order for an
    * in-place re-render; an empty material list yields 400.
    *
    * @param id the order to update
    * @param form the edit payload (comment, version, materials[])
-   * @return the updated redacted order on success, or the propagated RFC 7807 backend error
+   * @return the updated complete order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/requested-update", consumes = MediaType.APPLICATION_JSON_VALUE)
   @ResponseBody

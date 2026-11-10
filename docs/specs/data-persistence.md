@@ -712,7 +712,7 @@ centralised:
   its return type diverges (`Optional<T>` for a unique name, `List<GameItem>` for
   `GameItemRepository`, whose `name` is not unique), and a base interface method can only declare one
   return type.
-- **One `static final String` JPQL fragment per aggregate, beside the aggregate's repository** (since 2026-10-12, option B1 confirmed by the owner): `mission.api.MissionScope#PREDICATE`, `hangar.api.ShipScope#TRIPLE`, `joborder.api.JobOrderScope#PREDICATE` and `inventory.api.InventoryScope#TRIPLE` (the Materialbörse's offer repository splices the Lager's, so it is published), and `RefineryAccessPolicy#REFINERY_ORDER_SCOPE_TRIPLE` and `OperationAccessPolicy#OPERATION_SCOPE_PREDICATE` inside their access policies (their repositories are `internal`). `ScopeSpecifications` is gone. The fragments are
+- **One `static final String` JPQL fragment per aggregate, beside the aggregate's repository** (since 2026-10-12, option B1 confirmed by the owner): `mission.api.MissionScope#PREDICATE`, `hangar.api.ShipScope#TRIPLE`, `joborder.api.JobOrderScope#READ_PREDICATE` and `inventory.api.InventoryScope#TRIPLE` (the Materialbörse's offer repository splices the Lager's, so it is published), and `RefineryAccessPolicy#REFINERY_ORDER_SCOPE_TRIPLE` and `OperationAccessPolicy#OPERATION_SCOPE_PREDICATE` inside their access policies (their repositories are `internal`). `ScopeSpecifications` is gone. The fragments are
   referenced from each repository's `@Query` value via compile-time constant-expression concatenation
   (JLS 15.28/4.12.4 — the same technique REQ-SEC-002a's `Roles.X` constants use inside
   `@PreAuthorize`, since an annotation value cannot invoke a method). The alias is baked into each
@@ -1136,7 +1136,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `inventory` | 4 | `inventory_item`, `inventory_item_donation_allocation`, `inventory_item_job_order_allocation`, `inventory_item_mission_allocation` |
 | `mission` | 12 | `mission`, `mission_crew`, `mission_crew_job_types`, `mission_finance_entry`, `mission_frequency`, `mission_managers`, `mission_objective`, `mission_ownership`, `mission_participant`, `mission_participant_org_unit`, `mission_step`, `mission_unit` |
 | `refinery` | 2 | `refinery_good`, `refinery_order` |
-| `joborder` | 10 | `job_order`, `job_order_assignees`, `job_order_handover`, `job_order_handover_item`, `job_order_item`, `job_order_item_handover`, `job_order_item_handover_entry`, `job_order_item_material`, `job_order_material`, `material_claim` |
+| `joborder` | 14 | `job_order`, `job_order_assignees`, `job_order_handover`, `job_order_handover_item`, `job_order_item`, `job_order_item_handover`, `job_order_item_handover_entry`, `job_order_item_material`, `job_order_material`, `job_order_participation`, `job_order_unit_read_history`, `material_claim`, `material_provision_credit`, `material_provision_fragment` |
 | `materialexchange` | 4 | `material_exchange_interest`, `material_exchange_offer`, `material_exchange_request`, `material_exchange_request_interest` |
 | `operation` | 2 | `operation`, `operation_payout_status` |
 | `bank` | 10 | `bank_account`, `bank_account_approval_limit`, `bank_account_grant`, `bank_account_view_grant`, `bank_audit_event`, `bank_booking_request`, `bank_holder`, `bank_holder_posting`, `bank_posting`, `bank_transaction` |

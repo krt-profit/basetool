@@ -30,10 +30,6 @@ import java.util.UUID;
  * Frontend mirror of the backend {@code JobOrderDto} for both order kinds: {@code MATERIAL} orders
  * fill {@code materials} and {@code handovers}; {@code ITEM} orders fill {@code items}, {@code
  * aggregatedMaterials} and {@code itemHandovers}. The other kind's lists are empty.
- *
- * <p>{@code canManageAssignees} is resolved on the detail and assignee reads only; {@code redacted}
- * is {@code true} when the caller sees the order only as a member of the requesting org unit
- * (REQ-ORDERS-023).
  */
 @DtoMirror
 public record JobOrderDto(
@@ -57,7 +53,6 @@ public record JobOrderDto(
     Long version,
     Boolean canEdit,
     Boolean canManageAssignees,
-    boolean redacted,
     boolean responsibilityInvalid,
     boolean originalProfitBoundaryUnknown,
     Boolean canTransferResponsibility,

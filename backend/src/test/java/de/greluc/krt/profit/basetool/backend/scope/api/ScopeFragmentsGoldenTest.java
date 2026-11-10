@@ -50,7 +50,7 @@ class ScopeFragmentsGoldenTest {
             "INVENTORY_ITEM_SCOPE_TRIPLE", BASE + "inventory.api.InventoryScope", "TRIPLE"
           },
           new String[] {
-            "JOB_ORDER_SCOPE_PREDICATE", BASE + "joborder.api.JobOrderScope", "PREDICATE"
+            "JOB_ORDER_READ_PREDICATE", BASE + "joborder.api.JobOrderScope", "READ_PREDICATE"
           },
           new String[] {
             "REFINERY_ORDER_SCOPE_TRIPLE",

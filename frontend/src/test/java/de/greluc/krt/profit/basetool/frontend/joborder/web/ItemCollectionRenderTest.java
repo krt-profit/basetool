@@ -30,6 +30,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -43,6 +44,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -96,6 +99,83 @@ class ItemCollectionRenderTest {
     return new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
   }
 
+  /** Item collection mutations follow the backend row capability rather than a global role. */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void collectionControlsUseCurrentBackendStockAuthority(boolean canEdit) throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
+        .thenReturn(
+            new JobOrderDto(
+                orderId,
+                1,
+                null,
+                null,
+                "Reader",
+                null,
+                1,
+                "OPEN",
+                "ITEM",
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                java.time.Instant.now(),
+                0L,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false));
+    when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
+        .thenReturn(
+            List.of(
+                new JobOrderItemStockGroupDto(
+                    new InventoryGameItemReferenceDto(UUID.randomUUID(), "Item", null, null),
+                    3,
+                    0,
+                    3L,
+                    List.of(
+                        new JobOrderItemStockEntryDto(
+                            UUID.randomUUID(),
+                            0L,
+                            "Alice",
+                            UUID.randomUUID(),
+                            "Lorville",
+                            locationId,
+                            3L,
+                            3L,
+                            false,
+                            canEdit)))));
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
+        .thenReturn(List.of(new LocationReferenceDto(locationId, "Lorville")));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId + "/item-collection")
+                    .with(authentication(logisticianToken(UUID.randomUUID()))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    for (String control : List.of("owner-select", "location-select", "delivered-checkbox")) {
+      String disabled =
+          "<(?:select|input)(?=[^>]*class=\"" + control + ")(?=[^>]*disabled=\"disabled\")";
+      if (canEdit) {
+        assertThat(html).doesNotContainPattern(disabled);
+      } else {
+        assertThat(html).containsPattern(disabled);
+      }
+    }
+  }
+
   @Test
   void itemCollection_rendersEarmarkedStockRows() throws Exception {
     UUID orderId = UUID.randomUUID();
@@ -113,7 +193,7 @@ class ItemCollectionRenderTest {
             3L,
             List.of(
                 new JobOrderItemStockEntryDto(
-                    entryId, 7L, "Alice", ownerId, "Lorville", locationId, 4L, 3L, false)));
+                    entryId, 7L, "Alice", ownerId, "Lorville", locationId, 4L, 3L, false, false)));
     when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(group));
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
@@ -195,6 +275,7 @@ class ItemCollectionRenderTest {
                     locationId,
                     1L,
                     1L,
+                    false,
                     false)));
     when(backendApiClient.get(contains("/item-stock"), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of(group));

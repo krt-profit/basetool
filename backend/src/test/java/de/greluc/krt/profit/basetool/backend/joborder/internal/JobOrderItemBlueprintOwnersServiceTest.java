@@ -84,7 +84,8 @@ class JobOrderItemBlueprintOwnersServiceTest {
             userRepository,
             memberBlueprintSharings,
             new BlueprintVariantFamilyResolver(
-                new BlueprintNameNormalizer(), new BlueprintVariantAliasOverrides()));
+                new BlueprintNameNormalizer(), new BlueprintVariantAliasOverrides()),
+            null);
   }
 
   private static final UUID ORDER_ID = UUID.randomUUID();

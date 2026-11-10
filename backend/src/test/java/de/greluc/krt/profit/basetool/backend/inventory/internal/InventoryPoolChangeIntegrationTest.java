@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -27,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitReferenceDto;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.ArrayList;
@@ -63,6 +65,7 @@ class InventoryPoolChangeIntegrationTest {
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private UserRepository userRepository;
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private final List<UUID> users = new ArrayList<>();
   private final List<UUID> orgUnits = new ArrayList<>();
@@ -81,6 +84,9 @@ class InventoryPoolChangeIntegrationTest {
     holder = user("Holder");
     alpha = orgUnit("Alpha");
     bravo = orgUnit("Bravo");
+    UUID profit = persistedProfitArea(orgUnitRepository).getId();
+    jdbc.update(
+        "UPDATE org_unit SET parent_org_unit_id = ? WHERE id IN (?, ?)", profit, alpha, bravo);
     joins(holder, alpha);
     joins(holder, bravo);
   }

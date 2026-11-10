@@ -84,7 +84,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemServiceTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -188,7 +191,9 @@ class InventoryItemServiceTest {
             auditService,
             realAggregationService,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false),
+            new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
+                null));
   }
 
   @Test
@@ -758,7 +763,9 @@ class InventoryItemServiceTest {
             auditService,
             realAggregationService,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(true));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(true),
+            new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
+                null));
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -821,9 +828,9 @@ class InventoryItemServiceTest {
             null,
             null,
             java.util.List.of(
-                new InventoryAllocationInput(orderAId, 3.0),
-                new InventoryAllocationInput(orderBId, 4.0)),
-            java.util.List.of(new InventoryAllocationInput(missionXId, 5.0)));
+                new InventoryAllocationInput(orderAId, 3.0, null),
+                new InventoryAllocationInput(orderBId, 4.0, null)),
+            java.util.List.of(new InventoryAllocationInput(missionXId, 5.0, null)));
 
     User user = new User();
     user.setId(userId);
@@ -890,8 +897,8 @@ class InventoryItemServiceTest {
             null,
             null,
             java.util.List.of(
-                new InventoryAllocationInput(orderAId, 8.0),
-                new InventoryAllocationInput(orderBId, 5.0)),
+                new InventoryAllocationInput(orderAId, 8.0, null),
+                new InventoryAllocationInput(orderBId, 5.0, null)),
             null);
 
     User user = new User();
@@ -940,8 +947,8 @@ class InventoryItemServiceTest {
             null,
             null,
             java.util.List.of(
-                new InventoryAllocationInput(orderAId, 3.0),
-                new InventoryAllocationInput(orderAId, 4.0)),
+                new InventoryAllocationInput(orderAId, 3.0, null),
+                new InventoryAllocationInput(orderAId, 4.0, null)),
             null);
 
     User user = new User();
@@ -985,7 +992,7 @@ class InventoryItemServiceTest {
             null,
             null,
             null,
-            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 3.0)),
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 3.0, null)),
             null);
 
     User user = new User();
@@ -1414,7 +1421,7 @@ class InventoryItemServiceTest {
             locationId,
             null,
             null,
-            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0)));
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0, null)));
     stubItemCreateResolution(userId, gameItemId, locationId);
 
     assertThrows(
@@ -1434,7 +1441,7 @@ class InventoryItemServiceTest {
             gameItemId,
             locationId,
             null,
-            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0, null)),
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
     JobOrder jobOrder = new JobOrder();
@@ -1459,7 +1466,7 @@ class InventoryItemServiceTest {
             gameItemId,
             locationId,
             null,
-            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0, null)),
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
     JobOrder materialOrder = new JobOrder();
@@ -1484,7 +1491,7 @@ class InventoryItemServiceTest {
             gameItemId,
             locationId,
             null,
-            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0, null)),
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
     JobOrder itemOrder = new JobOrder();
@@ -1516,7 +1523,7 @@ class InventoryItemServiceTest {
             gameItemId,
             locationId,
             null,
-            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.5)),
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.5, null)),
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
 

@@ -139,7 +139,6 @@ class JobOrderPaginationMvcTest extends JobOrderPageMvcTestBase {
             null,
             false,
             false,
-            false,
             null,
             false);
     int totalPages = (int) Math.ceil((double) total / 100);

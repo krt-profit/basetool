@@ -30,10 +30,9 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderPrefill;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderKind;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
@@ -69,7 +68,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Spring MVC controller for the read side of the job-order pages ({@code /orders}, {@code
- * /orders/{id}}, {@code /orders/create}): page and fragment renders plus read-only JSON proxies.
+ * /orders/{id}}): page and fragment renders plus read-only JSON proxies.
  *
  * <p>Mutations live in {@link JobOrderWriteController}. The class-level {@code isAuthenticated()}
  * gate is the floor; method-level gates take precedence (REQ-SEC-052).
@@ -87,9 +86,6 @@ public class JobOrderPageController {
 
   /** Reads the backend data of each job-order page with its defaults and section fallbacks. */
   private final JobOrderPageReader pageReader;
-
-  /** Answers the pin-aware Logistician capability of the active context. */
-  private final LogisticianGate logisticianGate;
 
   private final QualityTierCatalog qualityTierCatalog;
   private final JobOrderItemLines jobOrderItemLines;
@@ -114,9 +110,10 @@ public class JobOrderPageController {
    * <p>Invalid or missing statuses fall back to {@code OPEN} + {@code IN_PROGRESS}; an empty
    * squadron selection means all squadrons (REQ-ORDERS-027). The caller chooses a segment with
    * {@code scope} among those {@link OrderListScope#offered} to them (REQ-ORDERS-040): the
-   * own-orders segment reads the requester-redacted list, the to-process segment the queue of the
-   * caller's own units, the assigned segment the orders the caller is an assignee of; all three
-   * ignore the squadron filter. A member who only holds an assignee entry gets that segment alone.
+   * own-orders segment reads the requester list, the to-process segment the queue of the caller's
+   * own units, the assigned segment the orders the caller is an assignee of; all three ignore the
+   * squadron filter. The unit-work capability offers its read view independently of command
+   * authority; every permitted reader can select Alle.
    *
    * @param status optional explicit status filter
    * @param squadronId optional repeatable squadron display filter (empty = all squadrons)
@@ -127,6 +124,7 @@ public class JobOrderPageController {
    *     #DEFAULT_PAGE_SIZE}
    * @param fragment when {@code "results"}, only the results-table fragment is rendered
    *     (REQ-FE-005); otherwise the full page
+   * @param type optional implemented kind filter
    * @param model Thymeleaf model populated with the orders, page envelope, page sizes, pagination
    *     base URL, scope, selected filters and aging thresholds
    * @return the {@code orders-index} view name, or its {@code ordersResults} fragment selector
@@ -140,30 +138,41 @@ public class JobOrderPageController {
       @ModelAttribute("canViewJobOrders") boolean canViewJobOrders,
       @ModelAttribute("canViewOwnJobOrders") boolean canViewOwnJobOrders,
       @ModelAttribute("canViewAssignedJobOrders") boolean canViewAssignedJobOrders,
+      @ModelAttribute("canViewOrderWorkspace") boolean canViewOrderWorkspace,
+      @ModelAttribute("canViewOrderUnitWork") boolean canViewOrderUnitWork,
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String fragment,
+      @RequestParam(required = false) List<String> type,
       Model model) {
-    if (!canViewJobOrders && !canViewOwnJobOrders && !canViewAssignedJobOrders) {
-      return "redirect:/orders/create";
+    if (!canViewOrderWorkspace) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
     List<OrderListScope> offeredScopes =
-        OrderListScope.offered(canViewJobOrders, canViewOwnJobOrders, canViewAssignedJobOrders);
+        OrderListScope.offered(
+            canViewJobOrders, canViewOwnJobOrders, canViewAssignedJobOrders, canViewOrderUnitWork);
     OrderListScope effectiveScope =
         OrderListScope.resolve(
             OrderListScope.parseOrNull(scope),
             canViewJobOrders,
             canViewOwnJobOrders,
-            canViewAssignedJobOrders);
-    boolean requesterView =
-        effectiveScope == OrderListScope.MINE && !canViewJobOrders && !canViewAssignedJobOrders;
-    boolean ownScope = effectiveScope == OrderListScope.MINE;
-    model.addAttribute("requesterView", requesterView);
+            canViewAssignedJobOrders,
+            canViewOrderUnitWork);
     model.addAttribute("scopeOptions", scopeOptions(offeredScopes));
     model.addAttribute("squadronFilterAvailable", canViewJobOrders);
-    model.addAttribute("ownScope", ownScope);
     model.addAttribute("squadronFilterHidden", effectiveScope != OrderListScope.ALL);
     model.addAttribute("scope", effectiveScope.name());
+    List<String> selectedTypes =
+        type == null
+            ? List.of()
+            : type.stream()
+                .map(OrderKind::parseOrNull)
+                .filter(Objects::nonNull)
+                .map(OrderKind::name)
+                .distinct()
+                .toList();
+    model.addAttribute("orderKinds", List.of(OrderKind.values()));
+    model.addAttribute("selectedTypes", selectedTypes);
     List<String> requestedStatuses = (status == null) ? List.of() : status;
     List<String> validStatuses =
         requestedStatuses.stream().filter(VALID_STATUSES::contains).toList();
@@ -183,7 +192,8 @@ public class JobOrderPageController {
                 effectiveSize,
                 statuses,
                 selectedSquadronIds,
-                canViewJobOrders));
+                canViewJobOrders,
+                selectedTypes));
     if (!list.ordersAvailable()) {
       model.addAttribute("error", "error.joborder.load");
     }
@@ -200,7 +210,8 @@ public class JobOrderPageController {
             effectiveScope == OrderListScope.ALL ? selectedSquadronIds : List.of(),
             !offeredScopes.isEmpty() && effectiveScope != OrderListScope.ALL
                 ? effectiveScope
-                : null));
+                : null,
+            selectedTypes));
     model.addAttribute("selectedStatuses", statuses);
     if (canViewJobOrders) {
       model.addAttribute("squadrons", list.activeSquadrons());
@@ -237,7 +248,8 @@ public class JobOrderPageController {
   private static String buildPaginationBaseUrl(
       @NotNull List<String> status,
       @NotNull List<UUID> squadronIds,
-      @Nullable OrderListScope scope) {
+      @Nullable OrderListScope scope,
+      @NotNull List<String> types) {
     List<String> queryParts = new ArrayList<>();
     if (scope != null) {
       queryParts.add("scope=" + scope.name());
@@ -247,6 +259,9 @@ public class JobOrderPageController {
     }
     for (UUID sid : squadronIds) {
       queryParts.add("squadronId=" + sid);
+    }
+    for (String kind : types) {
+      queryParts.add("type=" + kind);
     }
     return "/orders?" + String.join("&", queryParts);
   }
@@ -310,8 +325,6 @@ public class JobOrderPageController {
     JobOrderPageReader.OrderDetailPage detail =
         pageReader.readOrderDetail(id, orderCaller(principal), fragment);
     JobOrderDto order = detail.order();
-    boolean requesterView = order.redacted();
-    model.addAttribute("requesterView", requesterView);
     model.addAttribute("order", order);
     model.addAttribute("currentUserId", detail.currentUserId().orElse(null));
     model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));
@@ -330,7 +343,7 @@ public class JobOrderPageController {
         detail.claimingOptions().stream()
             .map(OrgUnitMembershipOptionDto::orgUnitId)
             .collect(Collectors.toUnmodifiableSet()));
-    model.addAttribute("canManageAssignees", !requesterView && order.callerMayManageAssignees());
+    model.addAttribute("canManageAssignees", order.callerMayManageAssignees());
     if (canEditAsRequester || canAssign) {
       model.addAttribute("qualityTiers", qualityTierCatalog.all());
     }
@@ -390,57 +403,12 @@ public class JobOrderPageController {
    * Describes who looks at an order page for the reader.
    *
    * @param principal the caller, or {@code null} for anonymous
-   * @return the caller's sign-in state, token user id and Logistician flag
+   * @return the caller's sign-in state and token user id
    */
   @NotNull
   private JobOrderPageReader.OrderCaller orderCaller(@Nullable OidcUser principal) {
     return new JobOrderPageReader.OrderCaller(
-        principal != null,
-        principal != null ? CurrentUser.userId(principal) : null,
-        logisticianGate.isGranted());
-  }
-
-  /**
-   * Renders the create-order form ({@code /orders/create}) with the material and orderable-item
-   * catalogs and both owner-pickers (ADR-0149).
-   *
-   * @param source optional origin marker for the post-save redirect
-   * @param prefill optional material or item line and requesting unit to start the form with
-   * @param model Thymeleaf model populated with form and reference catalogs
-   * @return the {@code order-create} view name
-   */
-  @NotNull
-  @GetMapping("/create")
-  public String viewCreateForm(
-      @RequestParam(required = false) String source, JobOrderPrefill prefill, Model model) {
-    if (!model.containsAttribute("jobOrderForm")) {
-      JobOrderForm form = new JobOrderForm();
-      form.setSource(source);
-      prefill.applyTo(form);
-      model.addAttribute("jobOrderForm", form);
-    } else {
-      JobOrderForm form = (JobOrderForm) model.getAttribute("jobOrderForm");
-      if (form != null && form.getSource() == null) {
-        form.setSource(source);
-      }
-    }
-    if (!model.containsAttribute("jobOrderItemForm")) {
-      JobOrderItemForm itemForm = new JobOrderItemForm();
-      itemForm.setSource(source);
-      prefill.applyTo(itemForm);
-      model.addAttribute("jobOrderItemForm", itemForm);
-    }
-    if (prefill.itemOrder()) {
-      model.addAttribute("startInItemMode", true);
-      model.addAttribute("editItems", List.of(prefill.itemLine()));
-    }
-    JobOrderPageReader.OrderCreatePage create = pageReader.readOrderCreate();
-    model.addAttribute("materials", create.materials());
-    model.addAttribute("hasOrderableItems", create.hasOrderableItems());
-    model.addAttribute("squadrons", create.squadrons());
-    model.addAttribute("qualityTiers", qualityTierCatalog.all());
-    applyOwnerPickerOptions(model, create.requestingOptions(), create.responsibleOptions());
-    return "joborder/orders-create";
+        principal != null, principal != null ? CurrentUser.userId(principal) : null);
   }
 
   /**
@@ -622,8 +590,7 @@ public class JobOrderPageController {
    * pieces, and the claim and handover counts.
    *
    * <p>A material order's requirement is the still-open line amount plus what its handovers
-   * delivered, per unit; the progress is withheld when the order is redacted for its requester,
-   * whose view carries no handovers. Missing stock or claims in that view count as zero.
+   * delivered, per unit, for every permitted order reader. Missing stock or claims count as zero.
    *
    * @param order the loaded order (any kind)
    * @return an insertion-ordered map of KPI values keyed for the fragment ({@code fulfilled},
@@ -794,7 +761,7 @@ public class JobOrderPageController {
     kpi.put("deliveredPiece", deliveredPiece);
     kpi.put("requiredPiece", requiredPiece);
     kpi.put("progressPct", progressPct);
-    kpi.put("showProgress", !order.redacted() && (requiredScu > 0 || requiredPiece > 0));
+    kpi.put("showProgress", requiredScu > 0 || requiredPiece > 0);
   }
 
   /**

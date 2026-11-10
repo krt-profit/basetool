@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -55,11 +56,13 @@ public class JobOrderEditor {
 
   private final JobOrderRepository jobOrderRepository;
   private final ProfitHierarchyService profitHierarchy;
+  private final MaterialPromiseCoordinator materialPromises;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
   private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
+  private final JobOrderUnitHistory unitHistory;
 
   /**
    * Runs a versioned edit and projects the result.
@@ -129,6 +132,7 @@ public class JobOrderEditor {
       @Nullable Long expectedVersion,
       @NotNull Function<JobOrder, JobOrderEdit> mutation) {
     profitHierarchy.lockForOrderWrite();
+    materialPromises.lockOrder(id);
     JobOrder order =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     if (gate != JobOrderGate.TRANSFER) {
@@ -140,8 +144,11 @@ public class JobOrderEditor {
     if (versioned) {
       OptimisticLock.check(order.getVersion(), expectedVersion, JobOrder.class, id);
     }
+    Set<UUID> previousParties = JobOrderUnitHistory.partyIds(order);
     JobOrderEdit edit = mutation.apply(order);
     JobOrder result = edit.order();
+    materialPromises.reconcileOrder(id);
+    unitHistory.retainObservedParties(result, previousParties);
     if (edit.type() != null) {
       auditRecorder.record(
           edit.type(), result.getId(), JobOrderAuditLabel.of(result), null, edit.details());

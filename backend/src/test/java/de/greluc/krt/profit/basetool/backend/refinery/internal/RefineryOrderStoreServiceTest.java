@@ -86,7 +86,10 @@ import org.springframework.security.access.AccessDeniedException;
  * lookups, assignee resolution, one new inventory row per output, note normalisation, output
  * quantity conversion and the transition to {@link RefineryOrderStatus#COMPLETED}.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class RefineryOrderStoreServiceTest {
 
   @Mock private RefineryOrderRepository refineryOrderRepository;
@@ -251,7 +254,7 @@ class RefineryOrderStoreServiceTest {
         new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     jobOrder.setId(JOB_ORDER_ID);
     when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderVisibility.canSeeJobOrderInScope(jobOrder)).thenReturn(true);
+    when(jobOrderVisibility.canSeeJobOrder(jobOrder)).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
 
     assertThrows(
@@ -277,7 +280,7 @@ class RefineryOrderStoreServiceTest {
         new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     jobOrder.setId(JOB_ORDER_ID);
     when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderVisibility.canSeeJobOrderInScope(jobOrder)).thenReturn(false);
+    when(jobOrderVisibility.canSeeJobOrder(jobOrder)).thenReturn(false);
 
     NotFoundException ex =
         assertThrows(

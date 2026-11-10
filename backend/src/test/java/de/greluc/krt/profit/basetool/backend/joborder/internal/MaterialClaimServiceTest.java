@@ -250,7 +250,7 @@ class MaterialClaimServiceTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
 
-      CreateClaimDto dto = new CreateClaimDto(UUID.randomUUID(), "GOOD", SQUADRON_A, 5.0);
+      CreateClaimDto dto = new CreateClaimDto(UUID.randomUUID(), "GOOD", SQUADRON_A, 5.0, null);
       assertThrows(BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto));
       verify(materialClaimRepository, never()).save(any());
     }
@@ -263,9 +263,9 @@ class MaterialClaimServiceTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
 
-      CreateClaimDto dto = new CreateClaimDto(MATERIAL_ID, "NONE", SQUADRON_A, 5.0);
+      CreateClaimDto dto = new CreateClaimDto(MATERIAL_ID, "NONE", SQUADRON_A, 5.0, null);
       assertThrows(BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto));
-      verify(jobOrderRepository, never()).lockForClaimUpsert(any());
+
       verify(materialClaimRepository, never()).save(any());
     }
 
@@ -287,7 +287,7 @@ class MaterialClaimServiceTest {
       when(materialClaimRepository.save(any(MaterialClaim.class)))
           .thenAnswer(inv -> inv.getArgument(0));
 
-      service.upsertClaim(ORDER_ID, new CreateClaimDto(MATERIAL_ID, "good", SQUADRON_A, 4.0));
+      service.upsertClaim(ORDER_ID, new CreateClaimDto(MATERIAL_ID, "good", SQUADRON_A, 4.0, null));
 
       ArgumentCaptor<MaterialClaim> saved = ArgumentCaptor.forClass(MaterialClaim.class);
       verify(materialClaimRepository).save(saved.capture());
@@ -785,7 +785,7 @@ class MaterialClaimServiceTest {
   }
 
   private CreateClaimDto dto(UUID claimingOrgUnitId, double amount) {
-    return new CreateClaimDto(MATERIAL_ID, "GOOD", claimingOrgUnitId, amount);
+    return new CreateClaimDto(MATERIAL_ID, "GOOD", claimingOrgUnitId, amount, null);
   }
 
   private JobOrder materialOrder(

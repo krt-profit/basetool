@@ -29,6 +29,7 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
@@ -74,6 +75,33 @@ class MaterialCollectionRenderTest {
    */
   private @NotNull String render(@NotNull List<MaterialCollectionEntryDto> entries)
       throws Exception {
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(ORDER_ID)))
+        .thenReturn(
+            new JobOrderDto(
+                ORDER_ID,
+                1,
+                null,
+                null,
+                "Reader",
+                null,
+                1,
+                "OPEN",
+                "MATERIAL",
+                false,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                java.time.Instant.now(),
+                0L,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false));
     when(backendApiClient.get(contains("/material-collection"), anyTypeRef(), any(Object[].class)))
         .thenReturn(entries);
     when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
@@ -109,7 +137,8 @@ class MaterialCollectionRenderTest {
         512.0,
         allocated + 2,
         allocated,
-        delivered);
+        delivered,
+        false);
   }
 
   /** Entries render grouped per material with the delivered share, on the list pattern. */
@@ -152,6 +181,50 @@ class MaterialCollectionRenderTest {
         .contains("von 5 im Bestand")
         .doesNotContain("data-testid=\"empty-state\"");
     assertThat(html.split("collection-group__head", -1)).hasSize(3);
+  }
+
+  /** A concrete reader sees stock facts while every unauthorized stock mutation is disabled. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void aReadOnlyCollectionDisablesEveryStockMutation() throws Exception {
+    String html = render(List.of(entry(UUID.randomUUID(), "Laranite", 3.0, false)));
+
+    assertThat(html)
+        .contains("Alice", "Lorville", "Laranite")
+        .containsPattern("<select(?=[^>]*class=\"owner-select)(?=[^>]*disabled=\"disabled\")")
+        .containsPattern("<select(?=[^>]*class=\"location-select)(?=[^>]*disabled=\"disabled\")")
+        .containsPattern("<input(?=[^>]*class=\"delivered-checkbox)(?=[^>]*disabled=\"disabled\")");
+  }
+
+  /** The row capability can offer stock edits to an owner without a global Logistician role. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void backendRowAuthorityOffersItsStockControlsIndependentlyOfTheOrderRole() throws Exception {
+    MaterialCollectionEntryDto writable =
+        new MaterialCollectionEntryDto(
+            UUID.randomUUID(),
+            1L,
+            "Alice",
+            UUID.randomUUID(),
+            "Lorville",
+            LOCATION_ID,
+            "Laranite",
+            500.0,
+            3.0,
+            3.0,
+            false,
+            null,
+            true);
+
+    String html = render(List.of(writable));
+
+    assertThat(html)
+        .contains("Alice", "Lorville", "Laranite")
+        .doesNotContainPattern("<select(?=[^>]*class=\"owner-select)(?=[^>]*disabled=\"disabled\")")
+        .doesNotContainPattern(
+            "<select(?=[^>]*class=\"location-select)(?=[^>]*disabled=\"disabled\")")
+        .doesNotContainPattern(
+            "<input(?=[^>]*class=\"delivered-checkbox)(?=[^>]*disabled=\"disabled\")");
   }
 
   /** No entries render the empty state and no table. */

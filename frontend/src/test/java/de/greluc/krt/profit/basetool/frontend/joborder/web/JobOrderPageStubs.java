@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.joborder.web;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateUnitOptionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
@@ -269,8 +271,7 @@ final class JobOrderPageStubs {
   static JobOrderPageReader.OrderCreatePage create(
       @NotNull List<MaterialDto> materials,
       @NotNull List<OrgUnitMembershipOptionDto> requestingOptions) {
-    return new JobOrderPageReader.OrderCreatePage(
-        materials, true, List.of(), requestingOptions, List.of());
+    return create(materials, requestingOptions, List.of());
   }
 
   /**
@@ -287,6 +288,30 @@ final class JobOrderPageStubs {
       @NotNull List<OrgUnitMembershipOptionDto> requestingOptions,
       @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions) {
     return new JobOrderPageReader.OrderCreatePage(
-        materials, true, List.of(), requestingOptions, responsibleOptions);
+        materials,
+        true,
+        List.of(),
+        new JobOrderCreateOptionsDto(
+            true,
+            responsibleOptions.stream()
+                .map(option ->
+                    new JobOrderCreateUnitOptionDto(
+                        option.orgUnitId(),
+                        option.orgUnitName(),
+                        option.orgUnitShorthand(),
+                        option.kind(),
+                        false))
+                .toList(),
+            requestingOptions.stream()
+                .map(option ->
+                    new JobOrderCreateUnitOptionDto(
+                        option.orgUnitId(),
+                        option.orgUnitName(),
+                        option.orgUnitShorthand(),
+                        option.kind(),
+                        true))
+                .toList(),
+            null,
+            null));
   }
 }

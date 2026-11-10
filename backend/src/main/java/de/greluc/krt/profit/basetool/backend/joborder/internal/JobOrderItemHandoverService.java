@@ -70,6 +70,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderItemHandoverService {
 
   private final JobOrderRepository jobOrderRepository;
+  private final MaterialPromiseCoordinator materialPromises;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
@@ -114,6 +115,7 @@ public class JobOrderItemHandoverService {
   @Transactional
   public JobOrderItemHandoverDto createItemHandover(
       UUID jobOrderId, JobOrderItemHandoverCreateDto dto) {
+    materialPromises.lockOrder(jobOrderId);
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);

@@ -56,8 +56,6 @@ import org.jetbrains.annotations.NotNull;
  * @param originalProfitBoundaryUnknown whether the original Profit boundary is unverifiable
  * @param canTransferResponsibility whether current-unit recovery authority permits a transfer
  * @param canEditAsRequester whether the current requesting-unit writer may edit requested need
- * @param redacted {@code true} when this is the requesting-owner view with processing-side data
- *     stripped (REQ-ORDERS-023)
  */
 public record JobOrderDto(
     UUID id,
@@ -80,7 +78,6 @@ public record JobOrderDto(
     Long version,
     Boolean canEdit,
     Boolean canManageAssignees,
-    boolean redacted,
     boolean responsibilityInvalid,
     boolean originalProfitBoundaryUnknown,
     Boolean canTransferResponsibility,
@@ -115,43 +112,6 @@ public record JobOrderDto(
         version,
         canEdit,
         canManageAssignees,
-        redacted,
-        responsibilityInvalid,
-        originalProfitBoundaryUnknown,
-        canTransferResponsibility,
-        canEditAsRequester);
-  }
-
-  /**
-   * Returns a copy of this DTO with the {@link #redacted()} flag replaced.
-   *
-   * @param value the new {@code redacted} flag
-   * @return a copy differing only in {@code redacted}
-   */
-  @NotNull
-  public JobOrderDto withRedacted(boolean value) {
-    return new JobOrderDto(
-        id,
-        displayId,
-        responsibleOrgUnit,
-        requestingOrgUnit,
-        handle,
-        comment,
-        priority,
-        status,
-        type,
-        countBlueprintsWithVariants,
-        materials,
-        items,
-        aggregatedMaterials,
-        assignees,
-        handovers,
-        itemHandovers,
-        createdAt,
-        version,
-        canEdit,
-        canManageAssignees,
-        value,
         responsibilityInvalid,
         originalProfitBoundaryUnknown,
         canTransferResponsibility,
@@ -187,7 +147,6 @@ public record JobOrderDto(
         version,
         canEdit,
         value,
-        redacted,
         responsibilityInvalid,
         originalProfitBoundaryUnknown,
         canTransferResponsibility,
