@@ -122,9 +122,7 @@ class JobOrderHandoverQualityTierTest {
     item.setQuality(quality);
     item.setAmount(amount);
     InventoryAllocations.addJobOrder(item, order.getId(), amount, false);
-    lenient()
-        .when(inventoryItemRepository.findByIdForUpdate(item.getId()))
-        .thenReturn(Optional.of(item));
+    lenient().when(inventoryItemRepository.lockById(item.getId())).thenReturn(Optional.of(item));
     lenient().when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
     return item;
   }

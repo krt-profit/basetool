@@ -37,35 +37,23 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.support.LockRace;
+import de.greluc.krt.profit.basetool.backend.support.LockRace.Caller;
+import de.greluc.krt.profit.basetool.backend.support.LockRace.Held;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Two transactions on PostgreSQL: a Materialbörse release or deactivation on a Lager row, and a
@@ -78,12 +66,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  */
 @SpringBootTest
 class MaterialExchangeOfferDeleteRaceIntegrationTest {
-
-  /** How long a step may take to reach its lock wait or its end. */
-  private static final Duration STEP_TIMEOUT = Duration.ofSeconds(30);
-
-  /** How often the lock-wait probe looks at {@code pg_stat_activity}. */
-  private static final Duration PROBE_INTERVAL = Duration.ofMillis(20);
 
   private static final double STOCK = 20.0;
   private static final double OFFERED = 5.0;
@@ -99,8 +81,7 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private JdbcTemplate jdbc;
 
-  private final ExecutorService pool = Executors.newFixedThreadPool(2);
-
+  private LockRace race;
   private User owner;
   private User admin;
   private UUID unitId;
@@ -110,6 +91,7 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
 
   @BeforeEach
   void setUp() {
+    race = new LockRace(transactionTemplate, jdbc);
     String tag = UUID.randomUUID().toString().substring(0, 8);
     owner = user("race-owner-" + tag);
     admin = user("race-admin-" + tag);
@@ -141,7 +123,7 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
 
   @AfterEach
   void tearDown() {
-    pool.shutdownNow();
+    race.close();
     jdbc.update("DELETE FROM material_exchange_offer WHERE owner_id = ?", owner.getId());
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", owner.getId());
     jdbc.update(
@@ -162,20 +144,12 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
 
   @Test
   void anOfferReleasedWhileTheWipeWaitsForTheRowIsAuditedAsRemoved() throws Exception {
-    CountDownLatch released = new CountDownLatch(1);
-    CountDownLatch commit = new CountDownLatch(1);
-    Future<MaterialExchangeOfferDto> release =
-        run(owner, Roles.KRT_MEMBER, null, () -> held(released, commit, this::release));
-    await(released);
-    int waitingBefore = lockWaiters();
+    Held<MaterialExchangeOfferDto> release = race.hold(asOwner(), this::release);
 
-    Future<Integer> wipe =
-        run(admin, Roles.ADMIN, unitId, () -> checkoutService.deleteAllGlobalInventory());
-    awaitLockWaiters(waitingBefore + 1);
-    commit.countDown();
+    Future<Integer> wipe = race.startWaiting(asAdmin(), checkoutService::deleteAllGlobalInventory);
 
-    UUID offerId = finish(release).id();
-    assertThat(finish(wipe)).isEqualTo(1);
+    UUID offerId = release.commit().id();
+    assertThat(LockRace.finish(wipe)).isEqualTo(1);
     assertThat(details("MARKET_OFFER_RELEASED", offerId)).hasSize(1);
     assertThat(details("MARKET_OFFER_REMOVED", offerId))
         .containsExactly("kind=MATERIAL reason=wipe");
@@ -184,23 +158,12 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
 
   @Test
   void aReleaseOnARowTheWipeHoldsIsRefusedOnceTheWipeCommits() throws Exception {
-    CountDownLatch wiped = new CountDownLatch(1);
-    CountDownLatch commit = new CountDownLatch(1);
-    Future<Integer> wipe =
-        run(
-            admin,
-            Roles.ADMIN,
-            unitId,
-            () -> held(wiped, commit, checkoutService::deleteAllGlobalInventory));
-    await(wiped);
-    int waitingBefore = lockWaiters();
+    Held<Integer> wipe = race.hold(asAdmin(), checkoutService::deleteAllGlobalInventory);
 
-    Future<MaterialExchangeOfferDto> release = run(owner, Roles.KRT_MEMBER, null, this::release);
-    awaitLockWaiters(waitingBefore + 1);
-    commit.countDown();
+    Future<MaterialExchangeOfferDto> release = race.startWaiting(asOwner(), this::release);
 
-    assertThat(finish(wipe)).isEqualTo(1);
-    assertThatThrownBy(() -> finish(release))
+    assertThat(wipe.commit()).isEqualTo(1);
+    assertThatThrownBy(() -> LockRace.finish(release))
         .isInstanceOf(ExecutionException.class)
         .hasCauseInstanceOf(NotFoundException.class);
     assertThat(offersOnTheRow()).isZero();
@@ -209,19 +172,12 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
 
   @Test
   void anOfferReleasedWhileTheBulkCheckoutWaitsForTheRowIsAuditedAsRemoved() throws Exception {
-    CountDownLatch released = new CountDownLatch(1);
-    CountDownLatch commit = new CountDownLatch(1);
-    Future<MaterialExchangeOfferDto> release =
-        run(owner, Roles.KRT_MEMBER, null, () -> held(released, commit, this::release));
-    await(released);
-    int waitingBefore = lockWaiters();
+    Held<MaterialExchangeOfferDto> release = race.hold(asOwner(), this::release);
 
-    Future<Boolean> checkout = run(owner, Roles.KRT_MEMBER, null, this::bulkCheckout);
-    awaitLockWaiters(waitingBefore + 1);
-    commit.countDown();
+    Future<Boolean> checkout = race.startWaiting(asOwner(), this::bulkCheckout);
 
-    UUID offerId = finish(release).id();
-    assertThat(finish(checkout)).isTrue();
+    UUID offerId = release.commit().id();
+    assertThat(LockRace.finish(checkout)).isTrue();
     assertThat(details("MARKET_OFFER_REMOVED", offerId))
         .containsExactly("kind=MATERIAL reason=bulk-checkout");
     assertThat(offerRepository.existsById(offerId)).isFalse();
@@ -231,23 +187,13 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
   void anOfferDeactivatedWhileTheBulkCheckoutWaitsForTheRowIsNotReportedAsRemoved()
       throws Exception {
     UUID offerId = activeOffer();
-    CountDownLatch deactivated = new CountDownLatch(1);
-    CountDownLatch commit = new CountDownLatch(1);
-    Future<MaterialExchangeOfferDto> deactivate =
-        run(
-            owner,
-            Roles.KRT_MEMBER,
-            null,
-            () -> held(deactivated, commit, () -> exchangeService.deactivate(offerId)));
-    await(deactivated);
-    int waitingBefore = lockWaiters();
+    Held<MaterialExchangeOfferDto> deactivate =
+        race.hold(asOwner(), () -> exchangeService.deactivate(offerId));
 
-    Future<Boolean> checkout = run(owner, Roles.KRT_MEMBER, null, this::bulkCheckout);
-    awaitLockWaiters(waitingBefore + 1);
-    commit.countDown();
+    Future<Boolean> checkout = race.startWaiting(asOwner(), this::bulkCheckout);
 
-    finish(deactivate);
-    assertThat(finish(checkout)).isTrue();
+    deactivate.commit();
+    assertThat(LockRace.finish(checkout)).isTrue();
     assertThat(details("MARKET_OFFER_DEACTIVATED", offerId)).hasSize(1);
     assertThat(details("MARKET_OFFER_REMOVED", offerId)).isEmpty();
     assertThat(offerRepository.existsById(offerId)).isFalse();
@@ -294,117 +240,21 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
   }
 
   /**
-   * Runs a step in a transaction it holds open: signals {@code done} once the step returned, and
-   * commits only when {@code commit} is counted down.
+   * The fixture's owner, signed in without an active org unit.
    *
-   * @param done counted down after the step
-   * @param commit awaited before the commit
-   * @param step the step
-   * @param <T> the step's result
-   * @return the step's result
+   * @return the caller
    */
-  private <T> T held(
-      @NotNull CountDownLatch done, @NotNull CountDownLatch commit, @NotNull Supplier<T> step) {
-    return transactionTemplate.execute(_ -> {
-      T result = step.get();
-      done.countDown();
-      await(commit);
-      return result;
-    });
+  private @NotNull Caller asOwner() {
+    return Caller.of(owner.getId(), Roles.KRT_MEMBER);
   }
 
   /**
-   * Runs work on a worker thread as the given member, inside a request that pins the given org
-   * unit.
+   * The fixture's admin, with the fixture's org unit active.
    *
-   * @param user the member
-   * @param role the member's role code
-   * @param activeUnit the org unit the request pins, or {@code null}
-   * @param work the work
-   * @param <T> the work's result
-   * @return the pending result
+   * @return the caller
    */
-  private <T> Future<T> run(
-      @NotNull User user, @NotNull String role, @Nullable UUID activeUnit, Supplier<T> work) {
-    return pool.submit(() -> {
-      MockHttpServletRequest request = new MockHttpServletRequest();
-      if (activeUnit != null) {
-        request.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, activeUnit.toString());
-      }
-      RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-      SecurityContextHolder.getContext()
-          .setAuthentication(
-              new JwtAuthenticationToken(
-                  Jwt.withTokenValue("race")
-                      .header("alg", "none")
-                      .subject(user.getId().toString())
-                      .build(),
-                  List.of(new SimpleGrantedAuthority(Roles.authority(role)))));
-      try {
-        return work.get();
-      } finally {
-        SecurityContextHolder.clearContext();
-        RequestContextHolder.resetRequestAttributes();
-      }
-    });
-  }
-
-  /**
-   * Waits for a worker's result.
-   *
-   * @param future the worker
-   * @param <T> the result
-   * @return the result
-   * @throws Exception when the worker failed or did not finish in time
-   */
-  private static <T> T finish(@NotNull Future<T> future) throws Exception {
-    return future.get(STEP_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-  }
-
-  /**
-   * Waits for a latch, failing the test when it is not counted down in time.
-   *
-   * @param latch the latch
-   */
-  private static void await(@NotNull CountDownLatch latch) {
-    try {
-      assertThat(latch.await(STEP_TIMEOUT.toSeconds(), TimeUnit.SECONDS))
-          .as("step reached in time")
-          .isTrue();
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException(interrupted);
-    }
-  }
-
-  /**
-   * Counts the sessions of this database that wait for a lock.
-   *
-   * @return the waiting sessions
-   */
-  private int lockWaiters() {
-    Integer count =
-        jdbc.queryForObject(
-            "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
-                + " AND datname = current_database()",
-            Integer.class);
-    return count == null ? 0 : count;
-  }
-
-  /**
-   * Waits until at least {@code expected} sessions wait for a lock.
-   *
-   * @param expected the waiting sessions to reach
-   * @throws InterruptedException when the probe is interrupted
-   */
-  private void awaitLockWaiters(int expected) throws InterruptedException {
-    Instant deadline = Instant.now().plus(STEP_TIMEOUT);
-    while (lockWaiters() < expected && Instant.now().isBefore(deadline)) {
-      Thread.sleep(PROBE_INTERVAL);
-    }
-    assertThat(lockWaiters())
-        .as("the second transaction waits for the row")
-        .isGreaterThanOrEqualTo(expected);
+  private @NotNull Caller asAdmin() {
+    return new Caller(admin.getId(), Roles.ADMIN, unitId);
   }
 
   /**

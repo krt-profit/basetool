@@ -1,6 +1,8 @@
 # ADR-0362 — An offer write and a Lager delete take turns on the row lock
 
-- **Status:** Accepted
+- **Status:** Accepted — the `StockCommands.lockRow` consequence is **amended by
+  [ADR-0363](0363-a-lager-row-is-locked-in-one-statement-without-a-join.md)** (every single-row
+  Lager lock is join-free)
 - **Date:** 2026-11-10
 - **Deciders:** @greluc
 - **Related:** spec [`materialboerse.md`](../specs/materialboerse.md) (REQ-MARKET-013) ·

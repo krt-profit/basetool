@@ -104,8 +104,9 @@ not want booked out of stock). The service:
   (`materialId`, `demand`, `consumed`), `MATERIAL_NOT_REQUIRED` (`materialId`, `consumed`),
   `OVER_ORDER_SLICE` (`materialId`, `inventoryItemId`, `consumed`, `slice`) and `OVER_STOCK`
   (`materialId`, `inventoryItemId`, `consumed`, `stock`).
-- For **each consumption entry**, under a pessimistic write lock
-  (`inventoryItemRepository.findByIdForUpdate`): checks the entry's own optimistic lock
+- For **each consumption entry**, under a pessimistic write lock (`StockCommands.lockRow`, one
+  statement without a join; an entry deleted while the lock waited is a `404`, REQ-INV-071):
+  checks the entry's own optimistic lock
   (`OptimisticLock.check`, stale → 409); requires the entry to be **earmarked to this order**
   (`InventoryAllocations.jobOrderSlice`, else `BadRequestException`
   `error.job_order.inventory_item_not_linked` → 400 — an `IllegalStateException` until 2026-09-22,

@@ -276,6 +276,6 @@ class InventoryOrgUnitChangeServiceTest {
    * @param row the row
    */
   private void stubRow(@NotNull InventoryItem row) {
-    when(inventoryItemRepository.findByIdForRebook(row.getId())).thenReturn(Optional.of(row));
+    when(inventoryItemRepository.lockById(row.getId())).thenReturn(Optional.of(row));
   }
 }

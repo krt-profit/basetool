@@ -98,8 +98,7 @@ public class InventoryStolenMarkService {
     requireEnabled();
     InventoryItem item =
         Entities.require(
-            inventoryItemRepository.findByIdForRebook(itemId),
-            () -> "Inventory item not found: " + itemId);
+            inventoryItemRepository.lockById(itemId), () -> "Inventory item not found: " + itemId);
     boolean isOwner = item.getUser() != null && callerId.equals(item.getUser().getId());
     if (!isOwner && !isLogistician) {
       throw new AccessDeniedException("You are not allowed to mark this inventory item: " + itemId);
@@ -139,7 +138,7 @@ public class InventoryStolenMarkService {
     for (UUID itemId : orderedIds) {
       InventoryItem item =
           Entities.require(
-              inventoryItemRepository.findByIdForRebook(itemId),
+              inventoryItemRepository.lockById(itemId),
               () -> "Inventory item not found: " + itemId);
       if (item.getUser() == null || !callerId.equals(item.getUser().getId())) {
         throw new AccessDeniedException(

@@ -160,7 +160,8 @@ allows** (§4.5, §6.3). The specific traps — the `kernel.OptimisticLock` help
 manual per-section counters and their DB-enforced atomic bump (also a ship's org-unit counter,
 ADR-0258), pessimistic locking for bulk
 reorders and bulk selections (locked in ascending id order), the Lager row lock that a
-Materialbörse offer write and a Lager delete take turns on (ADR-0362), the `…WithinTransaction`
+Materialbörse offer write and a Lager delete take turns on (ADR-0362), a pessimistic lock taken in
+its own join-free statement rather than as Hibernate follow-on locking (ADR-0363), the `…WithinTransaction`
 pattern, bulk updates inside loops, and the find-or-create retry
 — are enumerated in [`backend-concurrency.md`](../agents/backend-concurrency.md). **Read that before touching any
 multi-step transaction.** The frontend half — propagating the new version to every DOM element that

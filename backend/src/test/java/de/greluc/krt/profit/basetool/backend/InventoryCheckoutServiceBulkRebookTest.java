@@ -142,7 +142,7 @@ class InventoryCheckoutServiceBulkRebookTest {
 
   /** Registers {@code item} with the locking loader so the service can load it. */
   private void given(InventoryItem item) {
-    when(inventoryItemRepository.findByIdForRebook(item.getId())).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.lockById(item.getId())).thenReturn(Optional.of(item));
   }
 
   private static BulkRebookRequest toLocation(List<UUID> ids, UUID targetLocationId) {
@@ -185,7 +185,7 @@ class InventoryCheckoutServiceBulkRebookTest {
   void bulkRebook_location_ontoAPlaceNoPickerOffers_isRefusedBeforeAnyWrite(Location there) {
     InventoryItem moving = row(UUID.randomUUID(), location(UUID.randomUUID(), "Area18"), 12.0);
     lenient()
-        .when(inventoryItemRepository.findByIdForRebook(moving.getId()))
+        .when(inventoryItemRepository.lockById(moving.getId()))
         .thenReturn(Optional.of(moving));
     when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
 
@@ -313,7 +313,7 @@ class InventoryCheckoutServiceBulkRebookTest {
   @Test
   void bulkRebook_unknownIdAbortsBeforeAnyWrite() {
     UUID missing = UUID.randomUUID();
-    when(inventoryItemRepository.findByIdForRebook(missing)).thenReturn(Optional.empty());
+    when(inventoryItemRepository.lockById(missing)).thenReturn(Optional.empty());
 
     assertThrows(
         NotFoundException.class,

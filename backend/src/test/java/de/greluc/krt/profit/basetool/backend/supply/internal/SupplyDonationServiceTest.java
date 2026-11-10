@@ -499,6 +499,7 @@ class SupplyDonationServiceTest {
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
     when(stockReads.findRow(rowId)).thenReturn(Optional.of(row));
+    when(stockCommands.lockRow(rowId)).thenReturn(Optional.of(row));
     when(row.getId()).thenReturn(rowId);
     when(donationRepository.saveAndFlush(donation)).thenReturn(donation);
 
@@ -514,6 +515,35 @@ class SupplyDonationServiceTest {
             eq(location),
             eq(StockBookingReason.DONATION));
     verify(stockCommands, never()).bookIntoPool(any(), any(), any(), anyDouble(), any());
+  }
+
+  @Test
+  void aReceiptWhoseEarmarkedRowWasDeletedWhileItsLockWaitedBooksIntoThePool() {
+    SupplyDonation donation = pledged(4.0);
+    UUID rowId = UUID.randomUUID();
+    donation.setSourceInventoryItemId(rowId);
+    StockRow row = org.mockito.Mockito.mock(StockRow.class);
+    when(row.getMaterial()).thenReturn(material);
+    when(row.getLocation()).thenReturn(location);
+    when(row.getQuality()).thenReturn(500);
+    when(row.getStolen()).thenReturn(false);
+    callerIs(HOLDER);
+    when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
+    when(accessPolicy.canManageUnit(unit.getId())).thenReturn(true);
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+    when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
+    when(stockReads.findRow(rowId)).thenReturn(Optional.of(row));
+    when(stockCommands.lockRow(rowId)).thenReturn(Optional.empty());
+    when(row.getId()).thenReturn(rowId);
+    when(donationRepository.saveAndFlush(donation)).thenReturn(donation);
+
+    service.receive(donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L));
+
+    verify(stockCommands)
+        .bookIntoPool(eq(HOLDER), eq(unit), any(), eq(4.0), eq(StockBookingReason.DONATION));
+    verify(stockCommands, never()).releaseDonationEarmark(any());
+    verify(stockCommands, never()).transferToPool(any(), anyDouble(), any(), any(), any(), any());
+    assertThat(donation.getStatus()).isEqualTo(DonationStatus.RECEIVED);
   }
 
   @Test

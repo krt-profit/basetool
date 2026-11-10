@@ -897,7 +897,7 @@ public class InventoryCheckoutService {
     for (UUID itemId : request.itemIds()) {
       InventoryItem item =
           Entities.require(
-              inventoryItemRepository.findByIdForUpdate(itemId),
+              inventoryItemRepository.lockById(itemId),
               () -> "Inventory item not found: " + itemId);
 
       if (!item.getUser().getId().equals(currentUserId)) {
@@ -1000,7 +1000,7 @@ public class InventoryCheckoutService {
     for (UUID itemId : orderedIds) {
       InventoryItem item =
           Entities.require(
-              inventoryItemRepository.findByIdForRebook(itemId),
+              inventoryItemRepository.lockById(itemId),
               () -> "Inventory item not found: " + itemId);
       if (!item.getUser().getId().equals(currentUserId)) {
         log.warn(

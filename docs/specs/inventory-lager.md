@@ -163,8 +163,8 @@ display-and-expand only; it carries no aggregate mutation. Optimistic locking an
 The two **bulk** actions — bulk check-out and bulk rebooking (REQ-INV-034 / REQ-INV-036) — are the
 deliberate exception: they act on a list of the caller's own entry ids, which the bulk bar and the
 server-resolved select-all set hold without versions, so each listed row is loaded under a
-pessimistic write lock (`InventoryItemRepository#findByIdForUpdate` / `#findByIdForRebook`) instead
-of an optimistic `version` check. They are still per-entry: each listed row is checked out or moved
+pessimistic write lock (`InventoryRowLockRepository#lockById`, REQ-INV-071) instead of an
+optimistic `version` check. They are still per-entry: each listed row is checked out or moved
 on its own, never a stack aggregate.
 
 **Acceptance**
@@ -1007,7 +1007,7 @@ something is marked.*
 `InventoryPageControllerMvcTest`
 (`viewMyInventory_rendersBulkRebookButtonAndModalWithAllThreeModes`) · **Code:**
 `InventoryCheckoutService#bulkRebook`, `InventoryItemService#bulkRebook`,
-`InventoryItemController#bulkRebook`, `InventoryItemRepository#findByIdForRebook`,
+`InventoryItemController#bulkRebook`, `InventoryRowLockRepository#lockById` (REQ-INV-071),
 `BulkRebookRequest` / `BulkRebookResultDto` / `BulkRebookMode`,
 `InventoryWriteController#bulkRebook`, `templates/inventory/inventory-my.html`,
 `static/js/inventory/inventory-my.js` · **Issues:** — · **ADR:** ADR-0124
@@ -1897,6 +1897,47 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 `inventory/web/StockLevelPageController`, `StockLevelProxyController`,
 `templates/inventory/stock-levels.html`, `static/js/inventory/stock-levels.js` · **Related:** REQ-INV-067, REQ-NOTIF-030, REQ-SUP-003, REQ-UI-026, REQ-UI-034, REQ-AUDIT-001,
 REQ-OBS-011 · **Decision:** ADR-0302
+
+### REQ-INV-071 — A single-row Lager lock is one statement without a join
+
+Every Lager write that locks one row by its id takes the lock through
+`InventoryRowLockRepository#lockById`: one `SELECT … FOR NO KEY UPDATE` on `inventory_item` alone.
+That covers the bulk check-out and the bulk rebooking (REQ-INV-034, REQ-INV-036), the stolen
+marking (REQ-INV-053), the org-unit and pool changes, the org-stock entry commands of the exchange,
+and `StockCommands.lockRow` for the material handover, the production consumption (REQ-INV-032) and
+the donation pledge and receipt (REQ-SUP-008, REQ-SUP-009). The row's associations load on first
+use.
+
+- **A row deleted while the lock waited reads as absent.** The write answers its not-found for an
+  unknown row: `404 Inventory item not found`, `Stock row not found` for a pledge, the refusal
+  `NOT_PERMITTED` for an org-stock entry command. A receipt books the received amount into the pool,
+  as it does for a source row gone before it started.
+- **A row the transaction already read is locked too.** When another transaction committed a newer
+  version of it meanwhile, the lock raises the optimistic-lock conflict (`409`).
+- **No pessimistic lock of a repository needs follow-on locking.** A `@Lock(PESSIMISTIC_*)` query
+  carries no `@EntityGraph`, no outer join, no `DISTINCT`, `GROUP BY`, `HAVING` or aggregate, and
+  reads a single-table entity, so Hibernate locks in the query's own statement (ADR-0363).
+
+**Acceptance**
+
+- [x] The bulk check-out, the bulk rebooking, the single and bulk stolen marking, the single and
+  bulk org-unit change, the pool change, the handover, the production consumption and the pledge
+  answer their not-found when another transaction deletes their row while their lock waits.
+  *`InventoryRowLockRaceIntegrationTest`, `JobOrderStockLockRaceIntegrationTest`,
+  `SupplyDonationStockLockRaceIntegrationTest`.*
+- [x] A receipt whose source row is deleted while its lock waits books into the pool.
+  *`SupplyDonationStockLockRaceIntegrationTest`, `SupplyDonationServiceTest`.*
+- [x] `lockRow` answers empty for a row deleted while it waited, reads what a concurrent writer
+  committed, holds the lock on a row its transaction already read and raises the conflict for one
+  read at an older version. *`InventoryRowLockRaceIntegrationTest`.*
+- [x] No repository's pessimistic lock carries a follow-on shape. *`PessimisticLockShapeTest`.*
+
+**Enforced by:** `InventoryRowLockRaceIntegrationTest`, `JobOrderStockLockRaceIntegrationTest`,
+`SupplyDonationStockLockRaceIntegrationTest`, `PessimisticLockShapeTest` · **Code:**
+`inventory/internal/InventoryRowLockRepository#lockById`, `InventoryStockCommands#lockRow`,
+`InventoryCheckoutService`, `InventoryStolenMarkService`, `InventoryOrgUnitChangeService`,
+`InventoryPoolChangeService`, `InventoryPoolEntryCommands`, `supply/internal/SupplyDonationService#receive`
+· **Related:** REQ-MARKET-013, REQ-INV-044 · **Decision:** ADR-0363
 
 ## Out of scope
 

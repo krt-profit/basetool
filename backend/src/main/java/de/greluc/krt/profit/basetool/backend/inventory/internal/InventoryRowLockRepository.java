@@ -36,19 +36,22 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 /**
- * Supplies the row locks a Lager delete and a Materialbörse offer write take before they read the
- * rows, and the delete of exactly the rows a bulk delete locked (ADR-0362).
+ * Supplies the row locks a Lager write, a Lager delete and a Materialbörse offer write take, and
+ * the delete of exactly the rows a bulk delete locked (ADR-0362, ADR-0363).
  */
 @NoRepositoryBean
 interface InventoryRowLockRepository extends Repository<InventoryItem, UUID> {
 
   /**
-   * Locks one row with a single locking statement and no join, so a row another transaction deleted
-   * while the lock waited reads as absent; the associations stay lazy. A row already in the
-   * persistence context is not re-read, so callers lock before they read.
+   * Locks one row with a single locking statement and no join, the one single-row lock of the Lager
+   * (ADR-0363); the associations stay lazy. A row another transaction deleted while the lock waited
+   * reads as absent. A row the persistence context already holds keeps its state, and a newer
+   * committed version of it raises the optimistic-lock conflict.
    *
    * @param id the inventory row id.
    * @return the locked row, or empty when unknown or deleted while the lock waited.
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the persistence
+   *     context holds the row at an older version than the one the lock read
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")

@@ -62,11 +62,14 @@ public interface StockCommands {
   List<StockRow> lockLotRows(@NotNull UUID member, @NotNull StockLot lot);
 
   /**
-   * Locks one row for a write that follows (a handover or a production consumption), with its
-   * material, owner, location and owning org unit loaded.
+   * Locks one row for a write that follows (a handover, a production consumption or a donation), in
+   * one statement without a join (ADR-0363); its associations load on first use.
    *
    * @param rowId the row
-   * @return the row under a pessimistic write lock, or empty when unknown
+   * @return the row under a pessimistic write lock, or empty when unknown or deleted while the lock
+   *     waited
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the caller's
+   *     transaction already holds the row at an older version than the one the lock read
    */
   @NotNull
   Optional<StockRow> lockRow(@NotNull UUID rowId);

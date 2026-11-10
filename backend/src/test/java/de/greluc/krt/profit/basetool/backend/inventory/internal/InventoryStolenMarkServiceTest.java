@@ -131,7 +131,7 @@ class InventoryStolenMarkServiceTest {
    * @param item the locked row
    */
   private void stubRow(InventoryItem item) {
-    when(inventoryItemRepository.findByIdForRebook(item.getId())).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.lockById(item.getId())).thenReturn(Optional.of(item));
   }
 
   /** Makes save and merge return their argument. */
@@ -404,7 +404,7 @@ class InventoryStolenMarkServiceTest {
     User other = new User();
     other.setId(UUID.randomUUID());
     foreign.setUser(other);
-    when(inventoryItemRepository.findByIdForRebook(any()))
+    when(inventoryItemRepository.lockById(any()))
         .thenAnswer(inv -> Optional.of(inv.getArgument(0).equals(own.getId()) ? own : foreign));
 
     assertThatThrownBy(() ->

@@ -115,12 +115,13 @@ the need or the Lager row names it (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 
 A pledge from a Lager row earmarks the pledged amount on the row in the same transaction
 (REQ-INV-057, REQ-INV-058). The earmarked amount cannot be sold, discarded, transferred or pledged again
-until the pledge is received, declined or withdrawn. The pledge takes the row's lot lock first. The
-personal Lager row offers „Spenden" (a dialog for the receiving unit, the amount up to the free
+until the pledge is received, declined or withdrawn. The pledge takes the row's lot lock first, then
+the row's lock; a row deleted while that lock waits is a `404` „Stock row not found" (REQ-INV-071).
+The personal Lager row offers „Spenden" (a dialog for the receiving unit, the amount up to the free
 remainder) and shows the pledged slice as a chip (REQ-INV-058).
 
 **Enforced by:** `SupplyDonationServiceTest`, `InventoryPoolCommandsTest`, `InventorySupplyRenderTest`,
-`SupplyPledgeReceiveE2eTest` · **Code:** `supply/internal/SupplyDonationService`,
+`SupplyPledgeReceiveE2eTest`, `SupplyDonationStockLockRaceIntegrationTest` · **Code:** `supply/internal/SupplyDonationService`,
 `supply/internal/SupplyDonationEarmarks`, `inventory/api/StockCommands`, `static/js/supply/supply-lager.js`
 
 ### REQ-SUP-009 — Receive
@@ -129,11 +130,14 @@ The lead or a Logistician of the receiving unit, or an admin, confirms a pledge 
 between zero and the pledged amount and a location. In the same transaction the received amount moves
 into the unit's pool — from the earmarked row by `transferToPool`, otherwise by `bookIntoPool` — the
 donation becomes `RECEIVED` or `PARTIALLY_RECEIVED`, and the credited need's progress includes it.
+An earmarked row deleted while the receipt waits for its lock counts as gone: the amount is booked
+by `bookIntoPool` (REQ-INV-071).
 
 **Storage place (REQ-P4K-039):** the receipt books into only a place a picker offers; a hidden or
 reference-only one is a `400` `LOCATION_NOT_OFFERED`.
 
-**Enforced by:** `SupplyDonationServiceTest` · **Code:** `supply/internal/SupplyDonationService#receive`
+**Enforced by:** `SupplyDonationServiceTest`, `SupplyDonationStockLockRaceIntegrationTest` ·
+**Code:** `supply/internal/SupplyDonationService#receive`
 
 ### REQ-SUP-010 — Decline and withdraw
 

@@ -855,27 +855,6 @@ public interface InventoryItemRepository
       @Param("jobOrderId") UUID jobOrderId, @Param("gameItemId") UUID gameItemId);
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code IdForUpdate}. Acquires a
-   * pessimistic write lock for the duration of the surrounding transaction.
-   */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @EntityGraph(attributePaths = {"material", "user", "location", "owningOrgUnit"})
-  @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
-  Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
-
-  /**
-   * Loads one row of a bulk rebooking (REQ-INV-036) under a pessimistic write lock, with material
-   * and game item fetched.
-   *
-   * @param id the inventory row id.
-   * @return the locked row, or empty when unknown.
-   */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @EntityGraph(attributePaths = {"material", "gameItem", "user", "location", "owningOrgUnit"})
-  @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
-  Optional<InventoryItem> findByIdForRebook(@Param("id") UUID id);
-
-  /**
    * Loads the rows sharing a stock's physical identity (user, catalog reference, location, quality,
    * personal, stolen, owning org unit), oldest first and pessimistically locked, as merge
    * candidates (REQ-INV-026).

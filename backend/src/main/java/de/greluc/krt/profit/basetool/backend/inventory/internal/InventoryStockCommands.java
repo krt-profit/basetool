@@ -174,7 +174,7 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Optional<StockRow> lockRow(@NotNull UUID rowId) {
-    return inventoryRepository.findByIdForUpdate(rowId).map(StockRow.class::cast);
+    return inventoryRepository.lockById(rowId).map(StockRow.class::cast);
   }
 
   @Override
