@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
+import de.greluc.krt.profit.basetool.testsupport.process.OwnedProcessTree;
 import de.greluc.krt.profit.basetool.testsupport.redis.RedisAclTemplate;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +31,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
@@ -136,6 +137,9 @@ public final class E2eStackExtension implements BeforeAllCallback {
 
   /** Max time to wait for {@code docker compose down}. */
   private static final Duration DOWN_TIMEOUT = Duration.ofMinutes(3);
+
+  /** Upper bound for stopping a timed-out or interrupted subprocess tree. */
+  private static final Duration STOP_BUDGET = Duration.ofSeconds(30);
 
   /**
    * The four stacked compose files, in precedence order (base -> test -> build -> e2e isolation).
@@ -278,7 +282,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
     context
         .getRoot()
         .getStore(ExtensionContext.Namespace.GLOBAL)
-        .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
+        .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root, ""));
     ServedBuildCheck.assertServesThisCheckout(
         EPHEMERAL_BASE_URL, root, BackendSeeder.trustingTestCa());
     BackendSeeder seeder = new BackendSeeder();
@@ -417,27 +421,44 @@ public final class E2eStackExtension implements BeforeAllCallback {
     String buildFlag = prebuilt() ? "--no-build" : "--build";
     Exception lastFailure = null;
     for (int attempt = 1; attempt <= COMPOSE_UP_ATTEMPTS; attempt++) {
+      String suffix = attemptSuffix(attempt);
       try {
         runProcess(
             root,
-            "compose-up",
+            "compose-up" + suffix,
             composeCommand("up", "-d", buildFlag, "--wait", "--wait-timeout", "360"),
             throwawayEnv(),
             UP_TIMEOUT);
         return;
+      } catch (InterruptedException interrupted) {
+        throw interrupted;
       } catch (Exception up) {
         lastFailure = up;
-        captureComposeLogs(root);
+        captureComposeLogs(root, suffix);
+        if (OwnedProcessTree.leftProcessesAlive(up)) {
+          throw up;
+        }
         if (attempt < COMPOSE_UP_ATTEMPTS) {
           System.out.printf(
               "[E2E] compose up failed (attempt %d of %d); tearing down and retrying.%n%s%n",
               attempt, COMPOSE_UP_ATTEMPTS, up.getMessage());
-          composeDown(root);
+          composeDown(root, suffix);
           sleepBackoff(attempt);
         }
       }
     }
     throw lastFailure;
+  }
+
+  /**
+   * The log-label suffix of one attempt, so every attempt writes its own files under {@code
+   * build/e2e/}.
+   *
+   * @param attempt the 1-based attempt number
+   * @return {@code -attempt-<n>}
+   */
+  private static String attemptSuffix(int attempt) {
+    return "-attempt-" + attempt;
   }
 
   /**
@@ -451,10 +472,20 @@ public final class E2eStackExtension implements BeforeAllCallback {
     Exception lastFailure = null;
     for (int attempt = 1; attempt <= PULL_ATTEMPTS; attempt++) {
       try {
-        runProcess(root, "compose-pull", composeCommand("pull"), throwawayEnv(), PULL_TIMEOUT);
+        runProcess(
+            root,
+            "compose-pull" + attemptSuffix(attempt),
+            composeCommand("pull"),
+            throwawayEnv(),
+            PULL_TIMEOUT);
         return;
+      } catch (InterruptedException interrupted) {
+        throw interrupted;
       } catch (Exception pull) {
         lastFailure = pull;
+        if (OwnedProcessTree.leftProcessesAlive(pull)) {
+          throw pull;
+        }
         if (attempt < PULL_ATTEMPTS) {
           System.out.printf(
               "[E2E] image pull failed (attempt %d of %d); retrying.%n%s%n",
@@ -479,17 +510,18 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Best-effort dump of the stack's container logs to {@code build/e2e/compose-logs.log} for
-   * post-mortem diagnostics when {@link #composeUp} fails. Never throws — the original bring-up
+   * Best-effort dump of the stack's container logs to {@code build/e2e/compose-logs<suffix>.log}
+   * for post-mortem diagnostics when {@link #composeUp} fails. Never throws — the original bring-up
    * failure is the one that should propagate.
    *
    * @param root the repository root the compose files live in
+   * @param suffix the attempt's log-label suffix
    */
-  private void captureComposeLogs(Path root) {
+  private void captureComposeLogs(Path root, String suffix) {
     try {
       runProcess(
           root,
-          "compose-logs",
+          "compose-logs" + suffix,
           composeCommand("logs", "--no-color", "--tail", "300"),
           throwawayEnv(),
           Duration.ofMinutes(2));
@@ -504,16 +536,17 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * fail the build (the test outcome has already been decided).
    *
    * @param root the repository root the compose files live in
+   * @param suffix the log-label suffix: an attempt's between retries, empty at the final teardown
    */
-  private void composeDown(Path root) {
-    captureServiceLog(root, "backend-dev", "backend");
-    captureServiceLog(root, "frontend-dev", "frontend");
-    captureServiceLog(root, "ingest-dev", "ingest");
-    captureServiceLog(root, "keycloak-dev", "keycloak");
+  private void composeDown(Path root, String suffix) {
+    captureServiceLog(root, "backend-dev", "backend" + suffix);
+    captureServiceLog(root, "frontend-dev", "frontend" + suffix);
+    captureServiceLog(root, "ingest-dev", "ingest" + suffix);
+    captureServiceLog(root, "keycloak-dev", "keycloak" + suffix);
     try {
       runProcess(
           root,
-          "compose-down",
+          "compose-down" + suffix,
           composeCommand("down", "--volumes", "--remove-orphans"),
           throwawayEnv(),
           DOWN_TIMEOUT);
@@ -626,11 +659,15 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * Runs an external process, streaming its combined output to {@code <workingDir>/build/e2e/
    * <label>.log}, and fails with the log tail if it exits non-zero or exceeds {@code timeout}.
    *
+   * <p>On a timeout or interrupt the process tree it started is stopped before this returns
+   * (REQ-OPS-056); processes that outlive {@link #STOP_BUDGET} are attached to the failure.
+   *
    * @param workingDir the process working directory
    * @param label short name used for the per-process log file and error messages
    * @param command the argument vector
    * @param extraEnv environment variables to add on top of the inherited environment
    * @param timeout how long to wait before treating the process as hung
+   * @throws InterruptedException if the thread is interrupted while the process runs
    * @throws Exception if the process fails to start, times out, or exits non-zero
    */
   private void runProcess(
@@ -650,13 +687,13 @@ public final class E2eStackExtension implements BeforeAllCallback {
             .redirectErrorStream(true)
             .redirectOutput(log.toFile());
     pb.environment().putAll(extraEnv);
-    Process process = pb.start();
-    if (!process.waitFor(timeout.toSeconds(), TimeUnit.SECONDS)) {
-      process.destroyForcibly();
+    int exit;
+    try {
+      exit = OwnedProcessTree.run(pb, timeout, STOP_BUDGET);
+    } catch (TimeoutException timedOut) {
       throw new IllegalStateException(
-          label + " timed out after " + timeout.toMinutes() + " min; see " + log);
+          label + " timed out after " + timeout.toMinutes() + " min; see " + log, timedOut);
     }
-    int exit = process.exitValue();
     if (exit != 0) {
       throw new IllegalStateException(
           label + " failed (exit " + exit + "). Last log lines:\n" + tail(log, 25));

@@ -3509,6 +3509,36 @@ Coding agents of every vendor read the same instructions (ADR-0327).
 [ADR-0327](../adr/0327-agents-md-is-the-vendor-neutral-agent-instructions.md) ·
 **Related:** REQ-OPS-051
 
+### REQ-OPS-056 — The E2E harness stops the processes it started before it retries or fails
+
+A timed-out or interrupted step of the E2E stack bring-up never leaves a writer behind that
+competes with the next attempt for the Docker VM or its log.
+
+- **The owned tree is stopped first.** When a subprocess of `E2eStackExtension` times out or the
+  bring-up thread is interrupted, `OwnedProcessTree.run` forcibly stops the root and every
+  descendant seen while one of its members was alive, re-reading descendants each round, within a
+  bounded stop budget (30 s), before the failure is thrown.
+- **Only owned processes.** Nothing is stopped by name, and no Docker or Gradle daemon is touched;
+  a `ProcessHandle` carries its start time, so a reused PID is never taken for an owned one.
+- **The original failure stays.** The timeout or `InterruptedException` is what propagates;
+  processes that outlive the budget are attached to it as a suppressed
+  `UnstoppedProcessesException`, and the harness then starts no further attempt.
+- **An interrupt is not retried.** `composeUp` and `prePullImages` rethrow an
+  `InterruptedException` at once.
+- **Every attempt has its own logs.** `compose-up`, `compose-pull`, `compose-logs` and the
+  between-attempt teardown logs carry `-attempt-<n>` under `frontend/build/e2e/`.
+
+**Acceptance**
+
+- [x] `OwnedProcessTreeTest` starts a root, child and grandchild JVM, lets the root time out and
+  checks that all three are gone when `run` returns, while an unrelated sentinel JVM still runs.
+- [x] The same test interrupts the waiting thread and checks the tree is gone and the
+  `InterruptedException` propagates; a survivor marker is found through a wrapping failure.
+- [x] The test runs in `:test-support:test` on Windows and on the Linux CI runners.
+
+**Enforced by:** `OwnedProcessTreeTest` (`:test-support:test`) · **Runbook:**
+[`docs/e2e-test/README.md`](../e2e-test/README.md) · **Related:** REQ-OPS-041
+
 ## Open questions
 
 - Deepening the infra health gate beyond `redis-cli ping` / `pg_isready` (which do not
