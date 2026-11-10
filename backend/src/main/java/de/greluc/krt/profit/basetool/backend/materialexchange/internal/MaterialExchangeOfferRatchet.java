@@ -36,7 +36,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -46,9 +45,11 @@ import org.springframework.transaction.annotation.Transactional;
  * Keeps Materialbörse offers in step with the Lager rows they stand on, and audits every offer a
  * stock change lowers or removes (REQ-MARKET-013, REQ-AUDIT-001).
  *
- * <p>Every path that lowers a Lager row calls {@link #lower}; every path that deletes one calls a
- * {@code beforeDelete…} method before the delete, whose {@code ON DELETE CASCADE} then removes the
- * offers. Each method must run in the stock-changing transaction.
+ * <p>Every path that lowers a Lager row calls {@link #lower}; every path that deletes one calls
+ * {@link #beforeDelete} or {@link #removeOffersOnRowsOf} before the delete, whose {@code ON DELETE
+ * CASCADE} then removes the offers. Each method must run in the stock-changing transaction, after
+ * the rows are locked: an offer write locks its row first, so the offers read here are the ones the
+ * delete removes (ADR-0362).
  */
 @Service
 @RequiredArgsConstructor
@@ -99,7 +100,7 @@ public class MaterialExchangeOfferRatchet implements StockChangeObserver {
   /**
    * Records {@code MARKET_OFFER_REMOVED} for every active offer on Lager rows about to be deleted.
    *
-   * @param inventoryItemIds the rows to be deleted
+   * @param inventoryItemIds the rows to be deleted, locked by the caller
    * @param reason the stock change
    * @return the number of offers the delete will remove
    */
@@ -114,29 +115,10 @@ public class MaterialExchangeOfferRatchet implements StockChangeObserver {
   }
 
   /**
-   * Records {@code MARKET_OFFER_REMOVED} for every active offer on the non-personal rows the global
-   * wipe is about to delete in the given scope.
-   *
-   * @param adminAllScope whether the wipe covers every org unit
-   * @param activeOrgUnitId the pinned org unit, or {@code null}
-   * @param memberOrgUnitIds the caller's org units when neither of the above applies
-   * @return the number of offers the wipe will remove
-   */
-  @Override
-  @Transactional(propagation = Propagation.MANDATORY)
-  public int beforeWipe(
-      boolean adminAllScope, @Nullable UUID activeOrgUnitId, @NotNull Set<UUID> memberOrgUnitIds) {
-    return removed(
-        offerRepository.findActiveStockOnNonPersonalRows(
-            adminAllScope, activeOrgUnitId, memberOrgUnitIds),
-        StockChangeReason.WIPE);
-  }
-
-  /**
    * Records {@code MARKET_OFFER_REMOVED} for every active offer on the rows of a member whose
    * account is about to be deleted.
    *
-   * @param userId the member
+   * @param userId the member, whose rows the caller has locked
    * @return the number of offers the purge will remove
    */
   @Transactional(propagation = Propagation.MANDATORY)

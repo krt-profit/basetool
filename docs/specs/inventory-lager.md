@@ -449,7 +449,9 @@ silently degenerate to a permanent no-op.
 [`materialboerse.md`](materialboerse.md)). A row that backs *any* `MaterialExchangeOffer` (any status)
 is excluded from the merge — it is never a survivor whose amount changes and never folded away: the
 `inventory_item` FK is `ON DELETE CASCADE` (V210), so deleting such a row would silently destroy the
-offer. The offered quantity is therefore never increased by a merge.
+offer. The offered quantity is therefore never increased by a merge. The locking read excludes the
+offer-backed rows it sees, and the merge asks again once the group is locked, since a release locks
+its row (ADR-0362) and an offer released while the merge waited is not seen by the locking read.
 
 **Concurrency.** The merge group is loaded `FOR UPDATE` (pessimistic write lock) so two racing
 same-stack writers serialise instead of double-counting or losing stock — this re-introduces, **only
@@ -489,7 +491,8 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 **Code:** `InventoryCheckoutService#mergeStockIfRequested`,
 `InventoryItemRepository#findMergeGroupForUpdate`, `InventoryItemService#hasMergeCandidates`,
 `InventoryItemRepository#countMergeCandidates`,
-`MaterialExchangeOfferRepository#existsByInventoryItemId`, `InventoryItemService`,
+`MaterialExchangeOfferRepository#existsByInventoryItemId` / `#findOfferedInventoryItemIds`,
+`InventoryItemService`,
 `V216__merge_piece_inventory_rows.sql`, `inventory/inventory-input.html` / `inventory-input.js`,
 `inventory/inventory-my.html` / `inventory-my.js`, `inventory/inventory-admin.html` / `inventory-admin.js`
 · **Issues:** #1182 · **ADR:** ADR-0097
@@ -1323,8 +1326,11 @@ REQ-INV-037)
 The shared "Globales Lager" page (`/inventory/all`) offers an admin a **"Globales Lager leeren"**
 entry in the page head's „⋯" menu (since 2026-10-03, website overhaul phase 3; it was a button in
 the action bar above the table) behind a danger confirmation modal. It deletes every **non-personal** Lager row inside the
-caller's current org-unit scope in one statement; personal rows (`personal = true`) are never
-touched. The scope is the standard predicate triple
+caller's current org-unit scope; personal rows (`personal = true`) are never touched. The wipe
+first locks those rows (`PESSIMISTIC_WRITE`, ascending id), then audits the Materialbörse offers on
+exactly the locked rows (REQ-MARKET-013) and deletes exactly them in one statement, so a row booked
+into the scope while the wipe runs survives it and no offer appears on a locked row in between
+(ADR-0362). The scope is the standard predicate triple
 ([`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-003): an admin in all-scope wipes the shared
 stock of every org unit, an admin pinned to one org unit wipes only that unit's. The rows' job-order
 / mission allocations and any Materialbörse offer they back go with them through the
@@ -1347,15 +1353,18 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
   the backend, and sees no button.
 - [ ] The wipe records exactly one `INVENTORY_WIPED` audit event with the scope and the removed-row
   count.
+- [ ] The rows the wipe audits and deletes are the rows it locked; an offer released on one of them
+  while the wipe waits for its lock is audited as removed.
 
 **Enforced by:** `InventoryItemServiceTest` (`deleteAllGlobalInventory_*`),
-`InventoryCheckoutServiceAuditTest#deleteAllGlobalInventory_recordsWipedAuditWithScopeAndCount`,
+`InventoryCheckoutServiceAuditTest#deleteAllGlobalInventory_locksAuditsAndDeletesTheSameRowsAndRecordsWipedAudit`,
+`MaterialExchangeOfferDeleteRaceIntegrationTest`,
 `InventoryItemControllerTest#deleteAllGlobalInventory_returns204_andDelegatesToService`,
 `InventoryDeleteAllProxyControllerTest` (backend 403 propagated) — the two `hasRole('ADMIN')` gates
 themselves are not yet pinned by a test · **Code:**
 `InventoryItemController#deleteAllGlobalInventory`, `InventoryCheckoutService#deleteAllGlobalInventory`,
-`InventoryItemRepository#deleteAllNonPersonal`, `InventoryDeleteAllProxyController`,
-`templates/inventory/inventory-admin.html`, `static/js/inventory/inventory-admin.js` · **Issues:** — · **ADR:** —
+`InventoryItemRepository#lockNonPersonalIdsInScope` / `#deleteAllByIdIn`, `InventoryDeleteAllProxyController`,
+`templates/inventory/inventory-admin.html`, `static/js/inventory/inventory-admin.js` · **Issues:** #3261 · **ADR:** ADR-0362
 
 ### REQ-INV-052 — A member can change the org unit of their own personal row afterwards
 

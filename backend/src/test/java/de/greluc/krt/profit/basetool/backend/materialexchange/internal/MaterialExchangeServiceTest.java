@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -45,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRowLocks;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -77,6 +79,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -97,6 +100,7 @@ class MaterialExchangeServiceTest {
   @Mock private MaterialExchangeOfferRepository offerRepository;
   @Mock private MaterialExchangeInterestRepository interestRepository;
   @Mock private StockReads stockReads;
+  @Mock private StockRowLocks stockRowLocks;
   @Mock private UserRepository userRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private AuditService auditService;
@@ -127,7 +131,7 @@ class MaterialExchangeServiceTest {
         new MaterialExchangeService(
             offerRepository,
             interestRepository,
-            stockReads,
+            stockRowLocks,
             userRepository,
             authHelperService,
             auditService,
@@ -255,7 +259,8 @@ class MaterialExchangeServiceTest {
   void release_notItemOwner_forbidden() {
     UUID itemId = rows.get(offer.getInventoryItemId()).getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
+    when(stockRowLocks.lockRowForOfferWrite(itemId))
+        .thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
 
     assertThatThrownBy(() ->
             service.release(new MaterialExchangeReleaseRequest(itemId, 120.0, "tausche gegen X")))
@@ -272,7 +277,8 @@ class MaterialExchangeServiceTest {
   void release_partialAmount_storesOfferedAmountAndExposesAvailableToOwner() {
     UUID itemId = rows.get(offer.getInventoryItemId()).getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
+    when(stockRowLocks.lockRowForOfferWrite(itemId))
+        .thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
     when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.empty());
     when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -293,7 +299,8 @@ class MaterialExchangeServiceTest {
   void release_amountExceedsStock_badRequest() {
     UUID itemId = rows.get(offer.getInventoryItemId()).getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
+    when(stockRowLocks.lockRowForOfferWrite(itemId))
+        .thenReturn(Optional.of(rows.get(offer.getInventoryItemId())));
 
     assertThatThrownBy(
             () -> service.release(new MaterialExchangeReleaseRequest(itemId, 999.0, "zu viel")))
@@ -584,7 +591,7 @@ class MaterialExchangeServiceTest {
     offer.setReleasedAt(past);
     offer.setOfferedAmount(340.0);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(item));
+    when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.of(item));
     when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
         .thenReturn(Optional.of(offer));
     when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -737,6 +744,69 @@ class MaterialExchangeServiceTest {
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
+  /** A release whose row a Lager delete removed while the lock waited is a not-found. */
+  @Test
+  void release_rowDeletedWhileTheLockWaited_notFound() {
+    UUID itemId = rows.get(offer.getInventoryItemId()).getId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.release(new MaterialExchangeReleaseRequest(itemId, 5.0, "x")))
+        .isInstanceOf(NotFoundException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /** Deactivating a stock-backed offer locks its row before it reads the offer (ADR-0362). */
+  @Test
+  void deactivate_stockBackedOffer_locksTheRowBeforeReadingTheOffer() {
+    UUID itemId = offer.getInventoryItemId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findInventoryItemIdById(offerId)).thenReturn(Optional.of(itemId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.of(offer));
+
+    service.deactivate(offerId);
+
+    InOrder order = inOrder(stockRowLocks, offerRepository);
+    order.verify(stockRowLocks).lockRowForOfferWrite(itemId);
+    order.verify(offerRepository).findById(offerId);
+    assertThat(offer.getStatus()).isEqualTo(MaterialExchangeOfferStatus.DEACTIVATED);
+  }
+
+  /**
+   * A deactivation whose row a Lager delete removed while the lock waited finds the offer gone with
+   * it, a not-found that records nothing.
+   */
+  @Test
+  void deactivate_rowDeletedWhileTheLockWaited_notFound() {
+    UUID itemId = offer.getInventoryItemId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findInventoryItemIdById(offerId)).thenReturn(Optional.of(itemId));
+    when(offerRepository.findById(offerId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> service.deactivate(offerId)).isInstanceOf(NotFoundException.class);
+    verify(stockRowLocks).lockRowForOfferWrite(itemId);
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+    verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  /** Un-releasing a Lager row locks the row before it reads the row's active offer. */
+  @Test
+  void deactivateForItem_locksTheRowBeforeReadingItsOffer() {
+    UUID itemId = offer.getInventoryItemId();
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
+        .thenReturn(Optional.of(offer));
+
+    service.deactivateForItem(itemId);
+
+    InOrder order = inOrder(stockRowLocks, offerRepository);
+    order.verify(stockRowLocks).lockRowForOfferWrite(itemId);
+    order
+        .verify(offerRepository)
+        .findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE);
+  }
+
   /**
    * Releasing a game-item Lager row creates a stock-backed ITEM offer with whole-unit quantity and
    * no {@code offeredAmount} (REQ-MARKET-014).
@@ -746,8 +816,9 @@ class MaterialExchangeServiceTest {
     GameItem gameItem = gameItem("Quantum Drive");
     InventoryItem row = itemStockRow(owner, gameItem, 8.0);
     UUID itemId = row.getId();
+    rows.put(itemId, row);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(row));
+    when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.of(row));
     when(blueprintProductService.resolveByGameItem(gameItem.getId()))
         .thenReturn(
             Optional.of(new ResolvedProduct("quantum drive", "Quantum Drive", gameItem.getId())));
@@ -785,7 +856,7 @@ class MaterialExchangeServiceTest {
     InventoryItem row = itemStockRow(owner, gameItem, 3.0);
     UUID itemId = row.getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(row));
+    when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.of(row));
 
     assertThatThrownBy(
             () -> service.release(new MaterialExchangeReleaseRequest(itemId, 5.0, "zu viel")))
@@ -801,7 +872,7 @@ class MaterialExchangeServiceTest {
     InventoryItem row = itemStockRow(owner, gameItem, 6.0);
     UUID itemId = row.getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(row));
+    when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.of(row));
 
     assertThatThrownBy(
             () -> service.release(new MaterialExchangeReleaseRequest(itemId, 2.5, "krumm")))
@@ -816,7 +887,7 @@ class MaterialExchangeServiceTest {
     InventoryItem row = itemStockRow(owner, gameItem, 4.0);
     UUID itemId = row.getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(row));
+    when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.of(row));
     when(blueprintProductService.resolveByGameItem(gameItem.getId())).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.release(new MaterialExchangeReleaseRequest(itemId, 2.0, "x")))
@@ -836,7 +907,7 @@ class MaterialExchangeServiceTest {
     UUID itemId = row.getId();
     MaterialExchangeOffer existing = stockBackedItemOffer(offerId, row, owner, 4);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
-    when(stockReads.findRow(itemId)).thenReturn(Optional.of(row));
+    when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.of(row));
     when(blueprintProductService.resolveByGameItem(gameItem.getId()))
         .thenReturn(Optional.of(new ResolvedProduct("prod-key", "Power Plant", gameItem.getId())));
     when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))

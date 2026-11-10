@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.List;

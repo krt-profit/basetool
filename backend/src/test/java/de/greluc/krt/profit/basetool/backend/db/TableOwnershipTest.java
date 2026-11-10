@@ -283,6 +283,12 @@ class TableOwnershipTest {
               Set.of(
                   "city", "game_item", "location", "material", "space_station", "starmap_object"),
               "The keyed variant of findExchangeOrgLots; the same downward read into catalogue."),
+          "MaterialExchangeOfferRepository#findActiveStockByInventoryItemIdArray",
+          new Crossing(
+              Set.of("inventory_item", "material"),
+              "Reads the active offers on the Lager rows a delete holds, with their material names,"
+                  + " binding the row ids as one array however many a wipe locks; a downward read"
+                  + " into inventory and catalogue (ADR-0362)."),
           "PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers",
           new Crossing(
               Set.of("app_user"),

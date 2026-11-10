@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.catalogue.internal;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -27,22 +27,23 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Renders UUIDs as one PostgreSQL array literal ({@code {a,NULL,b}}), the text a native statement
- * casts to {@code uuid[]} to write many rows with one {@code unnest(...)} instead of one statement
- * per row.
+ * casts to {@code uuid[]}, so a statement over many rows binds one parameter however many rows it
+ * names.
  */
-final class UuidArrayLiteral {
+public final class UuidArrayLiteral {
 
   /** Non-instantiable holder of a static helper. */
   private UuidArrayLiteral() {}
 
   /**
-   * Renders UUIDs in their order; a {@code null} element renders as SQL {@code NULL}.
+   * Renders UUIDs in their order; a {@code null} element renders as SQL {@code NULL}, an empty
+   * collection as {@code {}}.
    *
    * @param uuids the UUIDs
    * @return the array literal
    */
   @NotNull
-  static String of(@NotNull Collection<UUID> uuids) {
+  public static String of(@NotNull Collection<UUID> uuids) {
     return uuids.stream()
         .map(uuid -> Objects.toString(uuid, "NULL"))
         .collect(Collectors.joining(",", "{", "}"));

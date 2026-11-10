@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
+import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,6 +37,16 @@ public interface StockOfferLookup {
    * @return {@code true} when an offer references the row
    */
   boolean isOffered(@NotNull UUID inventoryItemId);
+
+  /**
+   * Returns which of the given rows an offer, of any status, stands on. Called after the rows are
+   * locked, it also sees an offer released while the caller waited for the locks.
+   *
+   * @param inventoryItemIds the Lager rows
+   * @return the rows an offer references
+   */
+  @NotNull
+  Set<UUID> offeredRows(@NotNull Collection<UUID> inventoryItemIds);
 
   /**
    * Returns how much of a row its active offer promises: its SCU for a material offer, its whole
