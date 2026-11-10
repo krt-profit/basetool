@@ -1272,7 +1272,7 @@
         "inputQuantity": {
           "type": "integer",
           "minimum": 0,
-          "description": "Whole units, 100 to the SCU."
+          "description": "Whole units, 100 to the SCU; 0 when the input amount is not known."
         },
         "outputQuantity": {
           "type": "integer",
@@ -1600,11 +1600,13 @@
             },
             "inputQuantity": {
               "type": "integer",
-              "minimum": 0
+              "minimum": 0,
+              "description": "Whole units, 100 to the SCU; 0 when the input amount is not known."
             },
             "outputQuantity": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "description": "The yield in whole units, 100 to the SCU."
             },
             "quality": {
               "$ref": "quality.schema.json"

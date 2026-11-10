@@ -1159,6 +1159,28 @@ class ExchangeRefineryOrderWriteControllerTest {
   }
 
   @Test
+  void aGoodWithAnUnknownInputAmountIsWrittenAsZeroButAZeroYieldIsRefused() throws Exception {
+    String body =
+        changes(client, createWith("z-1", refineryRef(), unit, "[" + good(0, 900) + "]"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applied").value(1))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String id = JsonPath.read(body, "$.orders[0].id");
+
+    assertThat(inputQuantities(JsonPath.read(body, "$.orders[0].goods"))).containsExactly(0);
+    String snapshot = relayed(get(FEED), client).andReturn().getResponse().getContentAsString();
+    assertThat(
+            JsonPath.<List<Integer>>read(
+                snapshot, "$.items[?(@.id == '" + id + "')].goods[0].inputQuantity"))
+        .containsExactly(0);
+
+    changes(client, createWith("z-2", refineryRef(), unit, "[" + good(0, 0) + "]"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void aCreateWithoutGoodsAndARemovalOfAnOrdersLastGoodAreGoodsRequired() throws Exception {
     String created = changes(client, create("g-1")).andReturn().getResponse().getContentAsString();
     String id = JsonPath.read(created, "$.orders[0].id");

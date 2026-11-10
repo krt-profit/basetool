@@ -3397,6 +3397,9 @@ web.
   row by its existing id, and a row of another order is `GOOD_UNKNOWN`. A `good-remove` of the
   order's last good is `GOODS_REQUIRED`. A good stored without its materials is neither served nor
   removed by a goods op; a quantity or quality stored as none reads as 0.
+- **Input amount.** A good's `inputQuantity` is required and at least 0; `0` marks an input amount
+  the client does not know, as the web's empty input does (REQ-REFINERY-025). `outputQuantity` is
+  at least 1. The published contract states both.
 - **Section counters.** An op echoes the counter of each section it touches (REQ-REFINERY-029):
   `gameData` for the location, method, timer, status, the goods ops, `pickup` and `cancel`;
   `finances` for `expenses`, `otherExpenses` and `oreSales`; both for `delete`. A stale counter is
@@ -3439,6 +3442,8 @@ web.
 - [x] Two references that name one material alike resolve, and a create lists its new goods rows in
   the order of its goods. *`ExchangeRefineryOrderWriteControllerTest`.*
 - [x] A create without goods and a removal of an order's last good are `GOODS_REQUIRED`.
+  *`ExchangeRefineryOrderWriteControllerTest`.*
+- [x] A good with `inputQuantity: 0` is written and read back as 0; a yield of 0 is `400`.
   *`ExchangeRefineryOrderWriteControllerTest`.*
 - [x] A set never locks another member's order; a create waits for a concurrent create under its
   key and then answers `ALREADY_EXISTS` with that order's id; a second create under a refused

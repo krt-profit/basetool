@@ -224,8 +224,10 @@ Three write routes under `exchange.bank.request`, relayed from `/exchange/v1/ban
   validation (`CreateBankBookingRequest`, `UpdateBankBookingRequest`) and the web's raise and
   correction paths of `OrgUnitBankRequestService` for the actor `BankActors.forExchange` without a
   pin: approval routing (limits, KRT bands, exemption), the justification guard, self-transfer and
-  re-routing on correction. The exchange adds no rule of its own. A deposit may target any active
-  account (REQ-BANK-042); a withdrawal or transfer needs an account the policy admits.
+  re-routing on correction. The exchange adds no rule of its own. `sourceAccountId` is the
+  request's account for every type — a deposit's target, a withdrawal's or transfer's source — and
+  the published contract says so. A deposit may target any active account (REQ-BANK-042); a
+  withdrawal or transfer needs an account the policy admits.
 - **Which requests.** Correction and cancel act on every own pending request, the web's included.
   A correction keeps the counterparty a web request names, with its stored org unit, even after the
   counterparty left that unit. A purpose-bound request keeps its
