@@ -866,11 +866,16 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Deletes all listed inventory items owned by the caller in one batch, after locking and
-   * ownership-checking each row. Their earmarks are removed by cascade.
+   * Deletes all listed inventory items owned by the caller in one batch, after locking,
+   * ownership-checking and donation-checking each row. Their job-order and mission earmarks are
+   * removed by cascade.
    *
    * @param request the bulk checkout request containing item IDs
    * @param currentUserId the UUID of the authenticated user (JWT sub)
+   * @throws NotFoundException when an id is unknown
+   * @throws AccessDeniedException when a listed row belongs to another user
+   * @throws OverAllocationException when a listed row still carries a pledged donation
+   *     (REQ-INV-058); nothing is removed
    */
   @Transactional
   public void bulkCheckout(@NotNull BulkCheckoutRequest request, UUID currentUserId) {
@@ -894,6 +899,7 @@ public class InventoryCheckoutService {
         throw new AccessDeniedException(
             "You are not allowed to check out inventory item: " + itemId);
       }
+      InventoryDonationGuards.requireNoDonation(item);
 
       toDelete.add(itemId);
     }

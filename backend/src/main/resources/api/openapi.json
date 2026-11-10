@@ -23025,6 +23025,9 @@
             },
             "description" : "Conflict"
           },
+          "422" : {
+            "description" : "An item still carries a pledged donation; nothing is removed"
+          },
           "429" : {
             "content" : {
               "application/problem+json" : {
