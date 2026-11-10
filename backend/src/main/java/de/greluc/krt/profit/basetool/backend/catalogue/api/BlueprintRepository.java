@@ -352,4 +352,106 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
       UUID itemP4kUuid,
       Integer itemUexId,
       String itemNameKey) {}
+
+  /**
+   * Reads current scalar facts of every explicitly selected item-order recipe.
+   *
+   * @param ids the selected blueprint identities
+   * @return the recipe facts, ordered by identity
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$Recipe(
+        b.id, oi.id, b.outputName, b.scwikiKey, b.requiredGroupCount,
+        CASE WHEN b.p4kDeletedAt IS NOT NULL OR b.p4kHiddenAt IS NOT NULL THEN true ELSE false END,
+        b.version)
+      FROM Blueprint b LEFT JOIN b.outputItem oi WHERE b.id IN :ids ORDER BY b.id
+      """)
+  List<ItemOrderRecipeFacts.Recipe> findItemOrderRecipes(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Reads current group order and optional-cost policy without initializing managed bags.
+   *
+   * @param ids the selected blueprint identities
+   * @return the recipe-ordered group facts
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$Group(
+        g.id, g.blueprint.id, g.orderIndex, g.optional, g.version)
+      FROM BlueprintRequirementGroup g WHERE g.blueprint.id IN :ids
+      ORDER BY g.blueprint.id, g.orderIndex, g.id
+      """)
+  List<ItemOrderRecipeFacts.Group> findItemOrderGroups(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Reads every derivation input of the selected recipes as fresh scalar rows.
+   *
+   * @param ids the selected blueprint identities
+   * @return the recipe-ordered ingredient facts
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$Ingredient(
+        i.id, i.blueprint.id, i.orderIndex, i.kind, g.id, m.id, m.quantityType, gi.id,
+        gi.name, i.wikiNameSnapshot, i.quantityScu, i.quantityUnits, i.minQuality, i.version)
+      FROM BlueprintIngredient i LEFT JOIN i.requirementGroup g
+      LEFT JOIN i.material m LEFT JOIN i.gameItem gi WHERE i.blueprint.id IN :ids
+      ORDER BY i.blueprint.id, i.orderIndex, i.id
+      """)
+  List<ItemOrderRecipeFacts.Ingredient> findItemOrderIngredients(
+      @Param("ids") Collection<UUID> ids);
+
+  /**
+   * Reads exact active listed output matches, including retained ingredient identities.
+   *
+   * @param ids the selected blueprint identities whose ITEM costs are inspected
+   * @return one row for every ingredient and matching recipe
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$Output(
+        i.id, b.id, b.outputName, b.scwikiKey, b.version)
+      FROM BlueprintIngredient i JOIN i.gameItem gi, Blueprint b
+      WHERE i.blueprint.id IN :ids AND b.scwikiDeletedAt IS NULL AND
+      """
+          + LISTED_BLUEPRINT
+          + "AND (b.outputItem.id = gi.id OR b.outputItem.id ="
+          + " (SELECT r.canonicalItem.id FROM GameItemRedirect r WHERE r.id = gi.id))"
+          + " ORDER BY i.id, b.id")
+  List<ItemOrderRecipeFacts.Output> findItemOrderOutputs(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Reads current selectable-item facts for direct submitted identities.
+   *
+   * @param ids the submitted local game-item identities
+   * @return each directly matching item
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$OrderedItem(
+        gi.id, gi.id,
+        CASE WHEN gi.p4kDeletedAt IS NOT NULL OR gi.p4kHiddenAt IS NOT NULL THEN true ELSE false END,
+        gi.version)
+      FROM GameItem gi WHERE gi.id IN :ids ORDER BY gi.id
+      """)
+  List<ItemOrderRecipeFacts.OrderedItem> findItemOrderDirectItems(
+      @Param("ids") Collection<UUID> ids);
+
+  /**
+   * Reads current selectable-item facts for retained submitted identities.
+   *
+   * @param ids the submitted local game-item identities
+   * @return each matching retained identity and its surviving item
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$OrderedItem(
+        r.id, gi.id,
+        CASE WHEN gi.p4kDeletedAt IS NOT NULL OR gi.p4kHiddenAt IS NOT NULL THEN true ELSE false END,
+        gi.version)
+      FROM GameItemRedirect r JOIN r.canonicalItem gi WHERE r.id IN :ids ORDER BY r.id
+      """)
+  List<ItemOrderRecipeFacts.OrderedItem> findItemOrderRetainedItems(
+      @Param("ids") Collection<UUID> ids);
 }

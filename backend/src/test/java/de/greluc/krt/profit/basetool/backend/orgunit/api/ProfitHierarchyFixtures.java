@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 
 /** Constructs explicit synthetic Profit hierarchy graphs without granting caller authority. */
@@ -64,6 +65,7 @@ public final class ProfitHierarchyFixtures {
   public static @NotNull Bereich persistedProfitArea(@NotNull OrgUnitRepository repository) {
     List<Bereich> roots =
         repository.findAll().stream()
+            .map(unit -> Hibernate.unproxy(unit, OrgUnit.class))
             .filter(Bereich.class::isInstance)
             .map(Bereich.class::cast)
             .filter(unit -> unit.getDepartment() == Department.PROFIT)

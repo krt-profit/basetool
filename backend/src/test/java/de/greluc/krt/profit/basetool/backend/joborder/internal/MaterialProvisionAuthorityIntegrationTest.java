@@ -74,7 +74,9 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
             target.id(),
             target.version(),
             List.of(),
-            null);
+            null,
+            null,
+            List.of());
 
     mvc()
         .perform(
@@ -164,7 +166,9 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
             null,
             null,
             List.of(),
-            null);
+            null,
+            null,
+            List.of());
     String deniedWrite =
         mvc()
             .perform(
@@ -191,7 +195,9 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
             null,
             null,
             List.of(),
-            null);
+            null,
+            null,
+            List.of());
     mvc()
         .perform(
             post(
@@ -260,7 +266,9 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
             null,
             null,
             List.of(),
-            null);
+            null,
+            null,
+            List.of());
     mvc()
         .perform(
             post(
@@ -273,6 +281,98 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
                 .content(json.writeValueAsString(correction)))
         .andExpect(status().isForbidden());
     assertThat(contributionHistory(fixture.orderId(), original.id())).isEqualTo(retained);
+  }
+
+  @Test
+  void freshProvisionChoicesUseDeclaredMaterialQualityAndTheCurrentStaffelGrant() throws Exception {
+    Fixture fixture = seed();
+    ClaimDto own =
+        materialClaimService.upsertClaim(
+            fixture.orderId(), claim(fixture.materialId(), fixture.squadronAId(), 4.0));
+    ClaimDto foreign =
+        materialClaimService.upsertClaim(
+            fixture.orderId(), claim(fixture.materialId(), fixture.squadronBId(), 6.0));
+    UUID actor = writer(fixture.squadronAId());
+
+    String choices =
+        mvc()
+            .perform(
+                get("/api/v1/orders/{order}/claims/provision-options", fixture.orderId())
+                    .param("materialId", fixture.materialId().toString())
+                    .param("quality", "650")
+                    .with(asWriter(actor, fixture.squadronAId()))
+                    .header("X-Active-Org-Unit-Id", fixture.squadronAId()))
+            .andExpect(status().isOk())
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.length()")
+                    .value(1))
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$[0].claimId")
+                    .value(own.id().toString()))
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$[0].openAmount")
+                    .value(4.0))
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$[0].minQuality")
+                    .value(650))
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$[0].wholePieces")
+                    .value(false))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(choices).contains(fixture.squadronAId().toString());
+    assertThat(choices).doesNotContain(foreign.id().toString(), fixture.squadronBId().toString());
+    assertThat(json.readTree(choices).get(0).get("claimVersion").asLong()).isEqualTo(own.version());
+  }
+
+  @Test
+  void freshProvisionChoicesExcludeUnsuitableDeclarationsAndFulfilledPromises() throws Exception {
+    Fixture fixture = seed();
+    ClaimDto own =
+        materialClaimService.upsertClaim(
+            fixture.orderId(), claim(fixture.materialId(), fixture.squadronAId(), 4.0));
+    UUID actor = writer(fixture.squadronAId());
+
+    assertThat(json.readTree(provisionChoices(fixture, actor, fixture.materialId(), 649)).size())
+        .isZero();
+    assertThat(json.readTree(provisionChoices(fixture, actor, UUID.randomUUID(), 650)).size())
+        .isZero();
+    StockFixture stock = stock(fixture, 4.0);
+    provide(fixture, own, stock, 4.0);
+
+    mvc()
+        .perform(
+            get("/api/v1/orders/{order}/claims/provision-options", fixture.orderId())
+                .param("materialId", fixture.materialId().toString())
+                .param("quality", "650")
+                .with(asWriter(actor, fixture.squadronAId()))
+                .header("X-Active-Org-Unit-Id", fixture.squadronAId()))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().json("[]"));
+  }
+
+  /** Reads current backend-authorized targets for one declared provision. */
+  private String provisionChoices(Fixture fixture, UUID actor, UUID materialId, int quality)
+      throws Exception {
+    return mvc()
+        .perform(
+            get("/api/v1/orders/{order}/claims/provision-options", fixture.orderId())
+                .param("materialId", materialId.toString())
+                .param("quality", Integer.toString(quality))
+                .with(asWriter(actor, fixture.squadronAId()))
+                .header("X-Active-Org-Unit-Id", fixture.squadronAId()))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
   }
 
   private UUID writer(UUID unitId) {

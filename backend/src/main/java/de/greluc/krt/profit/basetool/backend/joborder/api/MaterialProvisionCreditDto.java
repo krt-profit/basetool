@@ -20,7 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * An explicitly attributed provision, separate from current stock coverage.
@@ -31,7 +34,10 @@ import java.util.UUID;
  * @param quantityAmount observed total or verified credited subset, distinguished by evidence
  * @param providedAt original provision instant
  * @param canCorrect whether the actor may correct the original attribution
- * @param evidence the verified scope of retained physical provision facts
+ * @param evidence the verified scope of retained physical quantity and composition
+ * @param suppliedQuality exact declared original quality, absent when only its floor is known
+ * @param minimumSuppliedQuality the verified original quality floor
+ * @param factChanges retained original declarations and explicit corrections
  */
 public record MaterialProvisionCreditDto(
     UUID id,
@@ -40,4 +46,25 @@ public record MaterialProvisionCreditDto(
     double quantityAmount,
     Instant providedAt,
     boolean canCorrect,
-    MaterialProvisionEvidence evidence) {}
+    MaterialProvisionEvidence evidence,
+    @Nullable Integer suppliedQuality,
+    int minimumSuppliedQuality,
+    @NotNull List<MaterialProvisionFactChange> factChanges) {
+  /**
+   * Retains immutable receipt declarations independently of transport collections.
+   *
+   * @param id the receipt identity
+   * @param version the observed receipt version
+   * @param amount truthful credited quantity
+   * @param quantityAmount observed total or known credited subset
+   * @param providedAt original provision instant
+   * @param canCorrect current correction permission
+   * @param evidence retained quantity and composition evidence
+   * @param suppliedQuality exact original quality when known
+   * @param minimumSuppliedQuality verified original quality floor
+   * @param factChanges ordered original and corrected declarations
+   */
+  public MaterialProvisionCreditDto {
+    factChanges = List.copyOf(factChanges);
+  }
+}

@@ -152,9 +152,9 @@ class JobOrderStatusQueueRaceIntegrationTest {
         assertThat(first.get(15, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
         assertThat(second.get(15, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);
       }
-      assertThat(readOrder(fixture, fixture.first()).path("status").asText())
+      assertThat(readOrder(fixture, fixture.first()).path("status").asString())
           .isEqualTo("COMPLETED");
-      assertThat(readOrder(fixture, fixture.second()).path("status").asText())
+      assertThat(readOrder(fixture, fixture.second()).path("status").asString())
           .isEqualTo("COMPLETED");
     } finally {
       try {

@@ -345,7 +345,7 @@ public class SupplyDonationService {
     Location location =
         OfferedLocations.require(
             locationRepository.findById(request.locationId()), "Location not found");
-    OrgUnit unit = requireUnit(unitId);
+    final OrgUnit unit = requireUnit(unitId);
 
     boolean sourceBacked = donation.getSourceInventoryItemId() != null;
     List<UUID> sourceRows =
@@ -353,9 +353,30 @@ public class SupplyDonationService {
     if (sourceBacked && sourceRows.size() != 1) {
       throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, donation.getId());
     }
-    StockLot targetLot =
-        new StockLot(
-            donation.getMaterial(), donation.getGameItem(), location, donation.getQuality(), false);
+    StockLot targetLot;
+    if (sourceBacked) {
+      StockRow carrier =
+          stockReads
+              .findRow(sourceRows.getFirst())
+              .orElseThrow(() ->
+                  new ObjectOptimisticLockingFailureException(
+                      SupplyDonation.class, donation.getId()));
+      targetLot =
+          new StockLot(
+              carrier.getMaterial(),
+              carrier.getGameItem(),
+              location,
+              carrier.getQuality(),
+              Boolean.TRUE.equals(carrier.getStolen()));
+    } else {
+      targetLot =
+          new StockLot(
+              donation.getMaterial(),
+              donation.getGameItem(),
+              location,
+              donation.getQuality(),
+              false);
+    }
     stockCommands.prepareWrites(
         sourceRows,
         List.of(

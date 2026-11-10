@@ -88,6 +88,7 @@ class InventoryStockMergeTest {
             null,
             null,
             auditService,
+            new InventoryCheckoutAudits(auditService),
             eventPublisher);
   }
 

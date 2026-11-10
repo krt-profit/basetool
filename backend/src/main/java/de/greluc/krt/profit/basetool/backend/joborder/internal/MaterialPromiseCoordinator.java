@@ -84,7 +84,9 @@ public class MaterialPromiseCoordinator {
             .filter(scope -> !coordination.scopes.contains(scope))
             .sorted(Comparator.comparingLong(MaterialPromiseCoordinator::lockKey))
             .toList();
-    if (coordination.stockPhase && !added.isEmpty()) {
+    if (!added.isEmpty()
+        && (coordination.stockPhase || !coordination.scopes.isEmpty())
+        && !profitHierarchy.holdsInitialExclusiveLock()) {
       throw new de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException(
           "error.inventory.concurrent_scope_changed");
     }
@@ -259,9 +261,9 @@ public class MaterialPromiseCoordinator {
     for (int i = 0; i < shares.size(); i++) {
       Share share = shares.get(i);
       double amount =
-          MaterialQuantityArithmetic.multiply(
-                  MaterialQuantityArithmetic.add(share.units(), i < left ? 1L : 0L), quantum)
-              / 1000.0;
+          de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts.fromQuanta(
+              MaterialQuantityArithmetic.multiply(
+                  MaterialQuantityArithmetic.add(share.units(), i < left ? 1L : 0L), quantum));
       if (Double.compare(amount, share.claim().getAmount()) != 0) {
         double previous = share.claim().getAmount();
         share.claim().setAmount(amount);

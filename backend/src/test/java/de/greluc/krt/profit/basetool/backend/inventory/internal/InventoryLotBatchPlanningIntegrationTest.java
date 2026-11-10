@@ -83,12 +83,12 @@ class InventoryLotBatchPlanningIntegrationTest {
   void planningReadsOfferFactsInBatchesAsThePhysicalLotGrows() {
     Fixture few = seed();
     Fixture many = seed();
-    seedOfferedRows(few, 3);
-    seedOfferedRows(many, 30);
     var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
     boolean enabled = statistics.isStatisticsEnabled();
-    statistics.setStatisticsEnabled(true);
     try {
+      seedOfferedRows(few, 3);
+      seedOfferedRows(many, 30);
+      statistics.setStatisticsEnabled(true);
       statistics.clear();
       inspect(few, 3);
       long fewStatements = statistics.getPrepareStatementCount();
@@ -105,6 +105,10 @@ class InventoryLotBatchPlanningIntegrationTest {
       assertThat(historical.activeAmount()).isZero();
     } finally {
       statistics.setStatisticsEnabled(enabled);
+      jdbc.update(
+          "DELETE FROM material_exchange_offer WHERE owner_id IN (?, ?)",
+          few.holder(),
+          many.holder());
     }
   }
 
@@ -116,9 +120,11 @@ class InventoryLotBatchPlanningIntegrationTest {
           List.of(
               new StockLotWritePlans.SetLotAmount(
                   0, fixture.lot(), current, current.add(BigDecimal.ONE)));
-      var prepared = plans.prepareLotBatch(fixture.holder(), List.of(fixture.lot()), intents);
+      var prepared =
+          plans.prepareLotBatch(
+              fixture.holder(), List.of(fixture.lot()), List.of(), List.of(), intents);
       assertThat(prepared.lockedRows().get(fixture.lot().key())).hasSize(expectedRows);
-      plans.confirmLotBatch(prepared, intents, true);
+      plans.confirmLotBatch(prepared, List.of(), intents, true);
     });
   }
 
@@ -204,8 +210,10 @@ class InventoryLotBatchPlanningIntegrationTest {
                   0, fixture.lot(), new BigDecimal("2"), new BigDecimal("5")),
               new StockLotWritePlans.SetLotAmount(
                   1, fixture.lot(), new BigDecimal("5"), new BigDecimal("4")));
-      var prepared = plans.prepareLotBatch(fixture.holder(), List.of(fixture.lot()), intents);
-      var confirmed = plans.confirmLotBatch(prepared, intents, false);
+      var prepared =
+          plans.prepareLotBatch(
+              fixture.holder(), List.of(fixture.lot()), List.of(), List.of(), intents);
+      var confirmed = plans.confirmLotBatch(prepared, List.of(), intents, false);
       plans.executePreparedLot(confirmed, 0, false);
       plans.executePreparedLot(confirmed, 1, false);
     });
@@ -260,8 +268,10 @@ class InventoryLotBatchPlanningIntegrationTest {
         List.of(
             new StockLotWritePlans.SetLotAmount(
                 0, fixture.lot(), new BigDecimal(observed), new BigDecimal(target)));
-    var prepared = plans.prepareLotBatch(fixture.holder(), List.of(fixture.lot()), intents);
-    var confirmed = plans.confirmLotBatch(prepared, intents, dryRun);
+    var prepared =
+        plans.prepareLotBatch(
+            fixture.holder(), List.of(fixture.lot()), List.of(), List.of(), intents);
+    var confirmed = plans.confirmLotBatch(prepared, List.of(), intents, dryRun);
     plans.executePreparedLot(confirmed, 0, dryRun);
     return confirmed;
   }

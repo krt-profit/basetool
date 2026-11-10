@@ -60,6 +60,11 @@ public class JobOrderMentionSource implements PersonMentionSource {
 
   @Override
   public @NotNull Set<String> exemptColumns() {
-    return Set.of("job_order.status", "job_order.type", "job_order_handover_item.location_name");
+    return Set.of(
+        "job_order.status",
+        "job_order.type",
+        "job_order_handover_item.location_name",
+        // The database accepts only the MaterialProvisionEvidence enum codes.
+        "material_provision_credit.evidence");
   }
 }

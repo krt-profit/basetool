@@ -46,6 +46,8 @@ public enum AuditEventType {
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
   /** A false original physical quantity and its connected retained stock facts were corrected. */
   INVENTORY_QUANTITY_CORRECTED(AuditDomain.INVENTORY),
+  /** An explicitly selected connected stock portion's false current quality was corrected. */
+  INVENTORY_QUALITY_CORRECTED(AuditDomain.INVENTORY),
   /**
    * A warehouse inventory row's associations / quality / amount were edited.
    *

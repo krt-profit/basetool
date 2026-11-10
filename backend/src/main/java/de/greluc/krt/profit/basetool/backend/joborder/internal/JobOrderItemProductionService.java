@@ -255,7 +255,7 @@ public class JobOrderItemProductionService {
       stockCommands.requireRowVersion(c.inventoryItemId(), c.version());
 
       if (!inventoryItem.isEarmarkedForJobOrder(jobOrderId)) {
-        throw new BadRequestException(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER);
+        throw new BadRequestException(JobOrderStockErrors.ITEM_NOT_LINKED_TO_ORDER);
       }
       if (inventoryItem.getMaterial() == null
           || !inventoryItem.getMaterial().getId().equals(c.materialId())) {
@@ -264,7 +264,7 @@ public class JobOrderItemProductionService {
       }
       if (Quality.orMin(inventoryItem.getQuality())
           < floorByMaterial.getOrDefault(c.materialId(), Quality.MIN)) {
-        throw new BadRequestException(JobOrderHandoverService.ERROR_QUALITY_BELOW_FLOOR);
+        throw new BadRequestException(JobOrderStockErrors.QUALITY_BELOW_FLOOR);
       }
 
       double consumed = c.amount() == null ? 0.0 : c.amount();

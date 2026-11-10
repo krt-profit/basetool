@@ -75,24 +75,46 @@ public final class EarmarkTargets {
     Map<UUID, JobOrderEarmark> jobOrders(@NotNull Collection<UUID> ids);
 
     /**
-     * Returns the materials a job order requires, for the Lager's link check (REQ-ORDERS-018).
+     * Returns required materials under common order readership (REQ-ORDERS-018, REQ-ORDERS-052).
      *
      * @param jobOrderId the job order
      * @return the required materials, or {@code null} when the order does not exist or lies outside
-     *     the caller's tenancy scope (REQ-ORG-003)
+     *     the caller's permitted order readership
      */
     @Nullable
     Set<UUID> requiredMaterialIds(@NotNull UUID jobOrderId);
 
     /**
-     * Returns the game items a job order requests, for the Lager's link check (REQ-INV-031); a
+     * Returns requested game items under common order readership (REQ-INV-031, REQ-ORDERS-052); a
      * material order requests none.
      *
      * @param jobOrderId the job order
      * @return the requested game items, or {@code null} when the order does not exist or lies
-     *     outside the caller's tenancy scope (REQ-ORG-003)
+     *     outside the caller's permitted order readership
      */
     @Nullable
     Set<UUID> requiredGameItemIds(@NotNull UUID jobOrderId);
+
+    /**
+     * Returns required materials within reduced tenancy scope for external pool links
+     * (REQ-ORG-003).
+     *
+     * @param jobOrderId the job order
+     * @return the required materials, or {@code null} when the order does not exist or lies outside
+     *     the caller's reduced tenancy scope
+     */
+    @Nullable
+    Set<UUID> requiredMaterialIdsInScope(@NotNull UUID jobOrderId);
+
+    /**
+     * Returns requested game items within reduced tenancy scope for external pool links
+     * (REQ-ORG-003); a material order requests none.
+     *
+     * @param jobOrderId the job order
+     * @return the requested game items, or {@code null} when the order does not exist or lies
+     *     outside the caller's reduced tenancy scope
+     */
+    @Nullable
+    Set<UUID> requiredGameItemIdsInScope(@NotNull UUID jobOrderId);
   }
 }

@@ -53,6 +53,11 @@ class InventoryItemMapperTest {
         public boolean mayEditInventoryItem(java.util.UUID inventoryItemId, UUID ownerId) {
           return true;
         }
+
+        @Override
+        public boolean mayEditInventoryIdentity(UUID ownerId, UUID owningOrgUnitId) {
+          return true;
+        }
       };
 
   private InventoryItemMapper mapper;
@@ -212,6 +217,11 @@ class InventoryItemMapperTest {
             asked[1] = rowOwnerId;
             return false;
           }
+
+          @Override
+          public boolean mayEditInventoryIdentity(UUID rowOwnerId, UUID owningOrgUnitId) {
+            return false;
+          }
         });
     User owner = new User();
     owner.setId(ownerId);
@@ -236,6 +246,11 @@ class InventoryItemMapperTest {
         new StockViewerAccess() {
           @Override
           public boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId) {
+            throw new AssertionError("an id-less row must not reach the gate");
+          }
+
+          @Override
+          public boolean mayEditInventoryIdentity(UUID ownerId, UUID owningOrgUnitId) {
             throw new AssertionError("an id-less row must not reach the gate");
           }
         });

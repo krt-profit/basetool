@@ -52,7 +52,9 @@ public interface InventoryItemRepository
     extends JpaRepository<InventoryItem, UUID>,
         InventoryLotLockRepository,
         InventoryOrderAllocationQueries,
-        InventoryQuantityQueries {
+        InventoryQuantityQueries,
+        InventoryQuantityEvidenceLockRepository,
+        InventoryRestoreQueries {
 
   /**
    * Returns one snapshot page of a member's lots, ordered by their lowest row id.
@@ -756,56 +758,14 @@ public interface InventoryItemRepository
   List<InventoryItem> findGameItemRowsByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Deletes the order's allocations on the prepared source rows; the inventory entries stay
-   * (REQ-INV-027).
+   * Loads the already locked stock entries with their complete job-order slice collections.
    *
-   * @param jobOrderId the order whose allocations to drop.
-   * @param rowIds the complete prepared physical source set
+   * @param rowIds the exact prepared physical source set
+   * @return managed entries with audit label associations fetched, ordered by id
    */
-  @Modifying
-  @Query(
-      "DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId AND"
-          + " a.inventoryItem.id IN :rowIds")
-  void deleteJobOrderAllocationsByJobOrder(
-      @Param("jobOrderId") UUID jobOrderId, @Param("rowIds") Collection<UUID> rowIds);
-
-  /**
-   * Deletes the order's job-order allocations on entries of one material; the entries themselves
-   * stay (REQ-INV-027). Flushes before and clears the persistence context after.
-   *
-   * @param jobOrderId the order whose allocations to drop.
-   * @param materialId the material to restrict the drop to.
-   * @param rowIds the complete prepared physical source set
-   */
-  @Modifying(clearAutomatically = true, flushAutomatically = true)
-  @Query(
-      """
-      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId AND a.inventoryItem.id IN :rowIds AND
-      a.inventoryItem.id IN (SELECT i.id FROM InventoryItem i WHERE i.material.id = :materialId)
-      """)
-  void deleteJobOrderAllocationsByJobOrderAndMaterial(
-      @Param("jobOrderId") UUID jobOrderId,
-      @Param("materialId") UUID materialId,
-      @Param("rowIds") Collection<UUID> rowIds);
-
-  /**
-   * Deletes the order's job-order allocations on entries of one game item; the entries themselves
-   * stay (REQ-INV-031). Flushes before and clears the persistence context after.
-   *
-   * @param jobOrderId the order whose allocations to drop.
-   * @param gameItemId the game item to restrict the drop to.
-   * @param rowIds the complete prepared physical source set
-   */
-  @Modifying(clearAutomatically = true, flushAutomatically = true)
-  @Query(
-      """
-      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId AND a.inventoryItem.id IN :rowIds AND
-      a.inventoryItem.id IN (SELECT i.id FROM InventoryItem i WHERE i.gameItem.id = :gameItemId)
-      """)
-  void deleteJobOrderAllocationsByJobOrderAndGameItem(
-      @Param("jobOrderId") UUID jobOrderId,
-      @Param("gameItemId") UUID gameItemId,
-      @Param("rowIds") Collection<UUID> rowIds);
+  @EntityGraph(attributePaths = {"jobOrderAllocations", "material", "gameItem", "location"})
+  @Query("SELECT DISTINCT i FROM InventoryItem i WHERE i.id IN :rowIds ORDER BY i.id")
+  List<InventoryItem> findAllForJobOrderAllocationRelease(@Param("rowIds") Collection<UUID> rowIds);
 
   /**
    * Derived Spring-Data query - returns entities matching {@code IdForUpdate}. Acquires a
@@ -1078,6 +1038,17 @@ public interface InventoryItemRepository
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT i FROM InventoryItem i WHERE i.id IN :ids ORDER BY i.id")
   List<InventoryItem> lockAllByIdOrderById(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Locks stock rows in ascending id order without loading managed entities.
+   *
+   * @param ids the complete named row set
+   * @return the existing row ids locked for the transaction
+   */
+  @Query(
+      value = "SELECT id FROM inventory_item WHERE id IN (:ids) ORDER BY id FOR UPDATE",
+      nativeQuery = true)
+  List<UUID> lockRowIdsOrderById(@Param("ids") Collection<UUID> ids);
 
   /**
    * Counts the shared entries of one org unit's pool.

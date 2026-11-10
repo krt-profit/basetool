@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS · **Related ADRs:** [ADR-0359](../adr/0359-orders-record-money-operations-and-replay-their-outcomes.md), [ADR-0358](../adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)
 > **Status:** Owner-approved target; implementation pending. Every acceptance item below is a required future check, not evidence of shipped behavior.
 
@@ -232,6 +232,14 @@ remaining money/repayment, not another state machine or work queue. Early reject
 with the responsible side. Terminal conditions end open commitments as in REQ-ORDERS-059.
 MATERIAL/ITEM's early manual completion remains a separate rule.
 
+Administrator hard-delete is allowed only before any monetary operation has ever reached its
+accepted, durable submission boundary. An immediate Bank-free booking or submission for optional
+Bank handling permanently closes that deletion path. Pending, rejected, withdrawn or replaced
+Bank attempts, later corrections and a return to zero balances do not restore it. Unsent form
+input and a validation/authorisation refusal before durable submission do not count as a submitted
+operation. After that boundary use cancellation and linked corrections; preserve the order and
+operation history under the existing privacy/anonymisation contracts in REQ-ORDERS-064.
+
 **Acceptance**
 
 - [ ] The last effective part-handover completes automatically; held money or a pending Bank action alone does not.
@@ -239,6 +247,9 @@ MATERIAL/ITEM's early manual completion remains a separate rule.
 - [ ] Cancellation with holdings preserves them; new normal procurement needs explicit reopening.
 - [ ] A refund below target reopens a completed order, but does not reactivate a cancelled one.
 - [ ] Invalid responsibility blocks even reopening, correction and coupled settlement until transfer.
+- [ ] Only an administrator can hard-delete an eligible aUEC order before its first accepted monetary submission; unsent input and pre-submission validation failures do not close that path.
+- [ ] A Bank-free booking or Bank-coupled submission prevents hard-delete, including after rejection, withdrawal, replacement, correction or settlement to zero.
+- [ ] Concurrent first submission and hard-delete yield one coherent permitted outcome without losing a submitted operation or committing a booking against a deleted order.
 
 **Enforced by:** Required future target/lifecycle and selected-Bank timing checks.
 
@@ -351,8 +362,16 @@ exception workflow is required.
 
 Before one save show net principal, source charge, fee and payer, recipient/purpose and important
 derived consequences. Additional provision is an explicit choice. Changed relevant basis/rate
-must not be silently substituted after preview. On a new operation the Bank option is off; selecting
-it reveals authorised Bank fields and whether it posts directly or waits, without bypassing approval.
+must not be silently substituted after preview. Each new monetary operation starts with Bank
+handling enabled and shows the authorised Bank fields and whether it posts directly or waits.
+Bank-free handling requires a conscious selection for that operation; do not carry a previous
+opt-out forward as the next operation's default. Missing Bank data, denied authority, unavailable
+Bank handling or a refused attempt never silently falls back to Bank-free booking. Existing Bank
+funding approvals and all other Bank controls remain binding.
+
+This is the existing per-operation choice, not a persistent operating mode of the order or another
+mode-switch workflow. Retry and outcome recovery retain the recorded operation's terms under
+REQ-ORDERS-065; a new default does not reinterpret a submitted operation or replace its attempt.
 
 Use the existing live-update/section framework for own and peer changes across every authorised
 audience. Preserve dirty input in the open form while refreshing server basis/other sections.
@@ -369,7 +388,9 @@ every participant.
 
 - [ ] Create without holder, Bank or collection account reaches detail with the required minimal fields.
 - [ ] Provision/movement/correction handles normal and settlement cases without a new process per exception.
-- [ ] Preview shows exact cost and optional funding before one save; default Bank selection is off.
+- [ ] Preview shows exact cost and optional funding before one save; every new monetary operation defaults to Bank handling.
+- [ ] Bank-free handling is explicitly selected per operation, remains fully usable without Bank prerequisites, and does not become a remembered default.
+- [ ] Missing or denied Bank handling does not book Bank-free effects; retry/recovery preserves the existing submitted terms.
 - [ ] A peer change and a real 409 preserve an open input; unrelated sections continue refreshing.
 - [ ] All admitted requester/helper/holder/payee rooms receive permitted refreshes, with current access checks.
 - [ ] A completed order with residual money or Bank clarification still shows those facts.
@@ -416,7 +437,7 @@ from the order.
 **Acceptance**
 
 - [ ] Run every fee-free row and the nonzero-fee reconciliation with exact totals and no double credit.
-- [ ] Run the complete no-Bank journey without Bank accounts, holders, roles, requests or service prerequisites.
+- [ ] Run the complete no-Bank journey with explicit Bank-free selection at every new monetary operation, without Bank accounts, holders, roles, requests or service prerequisites.
 - [ ] Run the selected-Bank matrix in REQ-ORDERS-069…076, including actual payment with a rejected wrong-account request and a corrected retry without another game transfer.
 - [ ] Cover underfunding, multiple orders/holders, returns, overpayment, cancellation, corrections, accountless identity and unauthorised access.
 - [ ] Verify mutation audit, grouped notices and peer updates against the same operation cause.

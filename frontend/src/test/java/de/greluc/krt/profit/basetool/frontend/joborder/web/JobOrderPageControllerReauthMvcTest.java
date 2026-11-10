@@ -83,6 +83,8 @@ class JobOrderPageControllerReauthMvcTest {
         .perform(
             get("/orders")
                 .param("canViewJobOrders", "true")
+                .param("canViewOrderWorkspace", "true")
+                .param("canViewOrderUnitWork", "false")
                 .param("canViewOwnJobOrders", "false")
                 .param("canViewAssignedJobOrders", "false"))
         .andExpect(redirectsToLogin());

@@ -232,12 +232,14 @@ class ExchangeOrgStockWriteControllerTest {
     assertThat(stockReads.exchangeOrgEntries(List.of(pool), lots))
         .extracting(row -> row.amount())
         .containsExactlyInAnyOrder(2.0, 3.0);
-    assertThat(stockReads.materialRowsOfOrder(invalidOrder))
-        .singleElement()
-        .satisfies(row -> {
-          assertThat(row.id()).isEqualTo(unrelated);
-          assertThat(row.amount()).isEqualTo(2.0);
-        });
+    assertThat(
+            jdbc.queryForList(
+                "SELECT inventory_item_id FROM inventory_item_job_order_allocation"
+                    + " WHERE job_order_id = ?",
+                UUID.class,
+                invalidOrder))
+        .containsExactly(unrelated);
+    assertThat(amountOf(unrelated)).isEqualTo(2.0);
   }
 
   @Test
@@ -1509,6 +1511,67 @@ class ExchangeOrgStockWriteControllerTest {
                 personal,
                 inPlain))
         .isZero();
+  }
+
+  /** Reduced exchange scope refuses a foreign Staffel's order in previews and writes. */
+  @Test
+  void aProfitPoolWriterCannotEarmarkStockToAnotherStaffelsOrder() throws Exception {
+    UUID pool = orgUnit("SQUADRON");
+    UUID foreignUnit = orgUnit("SQUADRON");
+    reachesTheJobOrderQueue(pool);
+    reachesTheJobOrderQueue(foreignUnit);
+    joins(member, pool, true);
+    joins(holder, pool, false);
+    UUID titanium = material("SCU");
+    UUID entry = stock(holder, titanium, location(), 10, pool, false);
+    UUID ownOrder = jobOrder(pool, titanium, "OPEN");
+    UUID foreignOrder = jobOrder(foreignUnit, titanium, "OPEN");
+
+    String targets =
+        mockMvc
+            .perform(
+                relayed(
+                    get(TARGETS)
+                        .param("unit", pool.toString())
+                        .param("material", titanium.toString()),
+                    WRITE))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(JsonPath.<List<String>>read(targets, "$.jobOrders[*].id"))
+        .contains(ownOrder.toString())
+        .doesNotContain(foreignOrder.toString());
+
+    String changeSet =
+        ops(allocation("allocation-add", pool, entry, 0, toJobOrder(foreignOrder), "4"));
+    for (boolean dryRun : List.of(true, false)) {
+      mockMvc
+          .perform(
+              relayed(post(CHANGES), WRITE)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(withSuffix(changeSet, ",\"dryRun\":" + dryRun + "}")))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.dryRun").value(dryRun))
+          .andExpect(jsonPath("$.applied").value(0))
+          .andExpect(jsonPath("$.unchanged").value(0))
+          .andExpect(jsonPath("$.notApplied").value(1))
+          .andExpect(jsonPath("$.results.length()").value(1))
+          .andExpect(jsonPath("$.results[0].result").value("rejected"))
+          .andExpect(jsonPath("$.results[0].reason").value("EARMARK_TARGET_INVALID"));
+
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM inventory_item_job_order_allocation"
+                      + " WHERE inventory_item_id = ? AND job_order_id = ?",
+                  Long.class,
+                  entry,
+                  foreignOrder))
+          .isZero();
+      assertThat(versionOf(entry)).isZero();
+      assertThat(amountOf(entry)).isEqualTo(10);
+    }
   }
 
   @Test

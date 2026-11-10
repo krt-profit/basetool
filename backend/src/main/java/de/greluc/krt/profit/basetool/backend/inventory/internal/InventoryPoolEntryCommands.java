@@ -48,7 +48,6 @@ import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,16 +77,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   private final InventoryEarmarkLookup earmarkLookup;
   private final StockOfferLookup stockOfferLookup;
   private final InventoryProperties inventoryProperties;
-  private final InventoryPoolRestorer restorer;
   private final InventoryPoolLotLocks lotLocks;
-
-  @Override
-  @Transactional(propagation = Propagation.MANDATORY)
-  public @NotNull @Unmodifiable List<PoolRestoreResult> restore(
-      @NotNull Map<UUID, ? extends Collection<String>> lots, @NotNull List<PoolRestore> restores) {
-    orderWrites.lockEligibility();
-    return restorer.restore(lots, restores);
-  }
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
@@ -568,7 +558,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   }
 
   /**
-   * Whether an earmark's target exists and, for a job order, needs the entry's material or item.
+   * Whether a target exists and, for a job order, lies in reduced scope and needs the stock.
    *
    * @param row the entry
    * @param targetId the job order or mission
@@ -582,8 +572,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     }
     Set<UUID> needed =
         row.getMaterial() != null
-            ? jobOrders.requiredMaterialIds(targetId)
-            : jobOrders.requiredGameItemIds(targetId);
+            ? jobOrders.requiredMaterialIdsInScope(targetId)
+            : jobOrders.requiredGameItemIdsInScope(targetId);
     UUID catalogueId =
         row.getMaterial() != null
             ? row.getMaterial().getId()
@@ -677,9 +667,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   }
 
   /**
-   * Checks a book-in's earmarks as the Lager's Einbuchen does: each target once, a job order that
-   * needs the material or item, an existing mission, no mission on item stock, and per dimension no
-   * more than the amount.
+   * Checks external pool book-in targets, required materials or items, and per-dimension totals.
+   * Job orders must lie in the caller's reduced tenancy scope.
    *
    * @param bookIn the book-in
    * @return the refusal, or {@code null} when the earmarks are valid
@@ -707,8 +696,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     for (PoolEarmark earmark : bookIn.jobOrders()) {
       Set<UUID> needed =
           lot.material() != null
-              ? jobOrders.requiredMaterialIds(earmark.targetId())
-              : jobOrders.requiredGameItemIds(earmark.targetId());
+              ? jobOrders.requiredMaterialIdsInScope(earmark.targetId())
+              : jobOrders.requiredGameItemIdsInScope(earmark.targetId());
       UUID catalogueId =
           lot.material() != null
               ? lot.material().getId()
@@ -884,7 +873,8 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
         row.getVersion() == null ? 0L : row.getVersion(),
         InventoryAllocations.jobOrderEarmarks(row),
         InventoryAllocations.missionEarmarks(row),
-        row.getQuantityProvenance());
+        row.getQuantityProvenance(),
+        row.getQuantityComposition());
   }
 
   /**

@@ -109,6 +109,72 @@ class JobOrderItemHandoverPlanningIntegrationTest extends MaterialContributionTe
         });
   }
 
+  @Test
+  void terminalHandoverReleasesRemainingMaterialStockAndCompletesBothDeliveredLines()
+      throws Exception {
+    Fixture fixture = seed();
+    List<Source> sources = seedFinishedStock(fixture);
+    StockFixture spare = stock(fixture, 1.0);
+    transactionTemplate.executeWithoutResult(_ -> {
+      var order = jobOrderRepository.findById(fixture.orderId()).orElseThrow();
+      order.getItems().forEach(line -> line.setAmount(2));
+      var row = inventory.findById(spare.rowId()).orElseThrow();
+      InventoryAllocations.addJobOrder(row, fixture.orderId(), 1.0, false);
+      inventory.saveAndFlush(row);
+      jobOrderRepository.saveAndFlush(order);
+    });
+    var request =
+        new JobOrderItemHandoverCreateDto(
+            Instant.now(),
+            "Handover recipient",
+            sources.stream()
+                .map(source -> new JobOrderItemHandoverEntryCreateDto(source.lineId(), 2))
+                .toList());
+
+    mvc()
+        .perform(
+            post("/api/v1/orders/{id}/item-handovers", fixture.orderId())
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(sources.getFirst().holderId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(request)))
+        .andExpect(result ->
+            assertThat(result.getResponse().getStatus())
+                .as(result.getResponse().getContentAsString())
+                .isEqualTo(201));
+
+    for (Source source : sources) {
+      assertThat(stockReads.findRow(source.rowId())).isEmpty();
+    }
+    transactionTemplate.executeWithoutResult(_ -> {
+      var remaining = stockReads.findRow(spare.rowId()).orElseThrow();
+      assertThat(remaining.getAmount()).isEqualTo(1.0);
+      assertThat(remaining.isEarmarkedForJobOrder(fixture.orderId())).isFalse();
+    });
+    String body =
+        mvc()
+            .perform(
+                get("/api/v1/orders/{id}", fixture.orderId())
+                    .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(
+                org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    var current =
+        json.readValue(body, de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto.class);
+    assertThat(current.status().name()).isEqualTo("COMPLETED");
+    assertThat(current.items())
+        .hasSize(2)
+        .allSatisfy(line -> {
+          assertThat(line.amount()).isEqualTo(2);
+          assertThat(line.manufacturedAmount()).isEqualTo(2);
+          assertThat(line.deliveredAmount()).isEqualTo(2);
+        });
+  }
+
   private List<Source> seedFinishedStock(Fixture fixture) {
     return transactionTemplate.execute(_ -> {
       var order = jobOrderRepository.findById(fixture.orderId()).orElseThrow();

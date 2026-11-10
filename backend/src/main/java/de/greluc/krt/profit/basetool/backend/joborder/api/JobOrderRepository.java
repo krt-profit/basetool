@@ -468,6 +468,23 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Query("SELECT o FROM JobOrder o ORDER BY o.id")
   List<JobOrder> lockAllJobOrders();
 
+  /** The two-key PostgreSQL advisory namespace of an order's ITEM fulfillment section. */
+  int ITEM_FULFILLMENT_LOCK_SPACE = 0x4A4F4946;
+
+  /**
+   * Serializes item fulfillment before any line snapshot, stock resource or priority queue lock.
+   *
+   * @param id the order whose item section is changing
+   * @return always one
+   */
+  @Query(
+      value =
+          "SELECT 1 FROM pg_advisory_xact_lock("
+              + ITEM_FULFILLMENT_LOCK_SPACE
+              + ", hashtext(CAST(:id AS text)))",
+      nativeQuery = true)
+  int lockItemFulfillment(@Param("id") UUID id);
+
   /** Returns every job order the given user is an assignee of. */
   @Query("SELECT j FROM JobOrder j JOIN j.assignees a WHERE a.user.id = :userId")
   List<JobOrder> findByAssigneeId(@Param("userId") UUID userId);

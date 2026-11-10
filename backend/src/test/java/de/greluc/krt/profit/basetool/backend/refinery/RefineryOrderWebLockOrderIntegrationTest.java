@@ -39,7 +39,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryJobOrderAllocation;
@@ -126,7 +125,6 @@ class RefineryOrderWebLockOrderIntegrationTest {
   @Autowired private OrgUnitRepository orgUnits;
   @Autowired private QualityTierRepository qualityTiers;
   @Autowired private JobOrderRepository jobOrders;
-  @Autowired private StockReads stock;
   @Autowired private InventoryItemRepository inventory;
   private final List<UUID> linkedOrders = new ArrayList<>();
   private final List<UUID> responsibleUnits = new ArrayList<>();
@@ -341,9 +339,7 @@ class RefineryOrderWebLockOrderIntegrationTest {
                 .content(body.toString()))
         .andExpect(status().isOk());
 
-    assertThat(stock.materialRowsOfOrder(target))
-        .hasSize(2)
-        .allSatisfy(row -> assertThat(row.amount()).isEqualTo(3.0));
+    assertThat(materialAmountsOfOrder(target)).containsExactlyInAnyOrder(3.0, 3.0);
   }
 
   @Test
@@ -414,12 +410,23 @@ class RefineryOrderWebLockOrderIntegrationTest {
                 .as(result.getResponse().getContentAsString())
                 .isEqualTo(200));
 
-    assertThat(stock.materialRowsOfOrder(targets.getFirst()))
-        .singleElement()
-        .satisfies(row -> assertThat(row.amount()).isEqualTo(2.0));
-    assertThat(stock.materialRowsOfOrder(targets.getLast()))
-        .singleElement()
-        .satisfies(row -> assertThat(row.amount()).isEqualTo(3.0));
+    assertThat(materialAmountsOfOrder(targets.getFirst())).containsExactly(2.0);
+    assertThat(materialAmountsOfOrder(targets.getLast())).containsExactly(3.0);
+  }
+
+  /**
+   * Reads the physical amounts of material rows allocated to one fixture order.
+   *
+   * @param target the linked order
+   * @return the allocated material rows' physical amounts
+   */
+  private @NotNull List<Double> materialAmountsOfOrder(UUID target) {
+    return jdbc.queryForList(
+        "SELECT i.amount FROM inventory_item i"
+            + " JOIN inventory_item_job_order_allocation a ON a.inventory_item_id = i.id"
+            + " WHERE a.job_order_id = ? AND i.material_id IS NOT NULL",
+        Double.class,
+        target);
   }
 
   /**

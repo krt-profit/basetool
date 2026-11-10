@@ -23,10 +23,21 @@ import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyF
 import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityProvenance;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
@@ -34,12 +45,28 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 
 /**
@@ -47,8 +74,17 @@ import org.springframework.security.test.context.support.WithMockUser;
  * rejection, and claim preservation across {@link JobOrderService#reassignResponsibleOrgUnit}.
  */
 @SpringBootTest
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 @WithMockUser(roles = {"ADMIN"})
 class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
+  /** Prepares and confirms complete physical stock actions through Inventory. */
+  private final StockLotWritePlans lotPlans;
+
+  /** Reads exact physical origins retained by the owning stock commands. */
+  private final StockQuantityProvenance quantity;
+
+  /** Acquires the public hierarchy and material prerequisites before physical stock locks. */
+  private final OrderLinkedStockWriteObserver stockWrites;
 
   @Test
   void upsert_persistsThenUpdatesInPlace_oneRowPerBucket() {
@@ -167,6 +203,219 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
         .singleElement()
         .extracting(c -> c.amount())
         .isEqualTo(6.0);
+  }
+
+  @Test
+  void aNewOrderScopeDiscoveredAfterWaitingForALotDoesNotAcquireAnotherMaterialLock()
+      throws Exception {
+    Fixture fixture = seed();
+    StockFixture stock = stock(fixture, 5.0);
+    long rowVersion = stockReads.findRow(stock.rowId()).orElseThrow().getVersion();
+    AtomicInteger waitingPid = new AtomicInteger();
+    AtomicReference<Set<String>> expectedLocksAfterWait = new AtomicReference<>();
+    AtomicReference<Set<String>> locksAfterDiscovery = new AtomicReference<>();
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      Future<?> waiting =
+          transactionTemplate.execute(_ -> {
+            stockCommands.prepareWrites(
+                List.of(stock.rowId()),
+                List.of(),
+                List.of(new OrderMaterialScope(fixture.orderId(), fixture.materialId())));
+            int blockingPid = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+            Future<?> submitted =
+                executor.submit(() ->
+                    transactionTemplate.execute(_ -> {
+                      int pid = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+                      waitingPid.set(pid);
+                      try {
+                        stockCommands.prepareWrites(List.of(stock.rowId()), List.of(), List.of());
+                      } finally {
+                        locksAfterDiscovery.set(advisoryLocks(pid, true));
+                      }
+                      return null;
+                    }));
+            await()
+                .atMost(Duration.ofSeconds(10))
+                .until(() ->
+                    waitingPid.get() != 0
+                        && Boolean.TRUE.equals(
+                            jdbc.queryForObject(
+                                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid = ?"
+                                    + " AND locktype = 'advisory' AND NOT granted"
+                                    + " AND ? = ANY(pg_blocking_pids(pid)))",
+                                Boolean.class,
+                                waitingPid.get(),
+                                blockingPid)));
+            Set<String> heldAndAwaited = new HashSet<>(advisoryLocks(waitingPid.get(), true));
+            heldAndAwaited.addAll(advisoryLocks(waitingPid.get(), false));
+            expectedLocksAfterWait.set(Set.copyOf(heldAndAwaited));
+            jdbc.update(
+                "INSERT INTO inventory_item_job_order_allocation (id, inventory_item_id,"
+                    + " job_order_id, amount, version, delivered, created_at, updated_at) VALUES"
+                    + " (?, ?, ?, 1, 0, false, now(), now())",
+                UUID.randomUUID(),
+                stock.rowId(),
+                fixture.orderId());
+            return submitted;
+          });
+
+      assertThatThrownBy(() -> waiting.get(15, TimeUnit.SECONDS))
+          .isInstanceOf(ExecutionException.class)
+          .satisfies(failure ->
+              assertThat(failure.getCause())
+                  .isInstanceOfAny(
+                      BusinessConflictException.class,
+                      ObjectOptimisticLockingFailureException.class));
+      assertThat(locksAfterDiscovery.get()).isEqualTo(expectedLocksAfterWait.get());
+      var unchanged = stockReads.findRow(stock.rowId()).orElseThrow();
+      assertThat(unchanged.getAmount()).isEqualTo(5.0);
+      assertThat(unchanged.getVersion()).isEqualTo(rowVersion);
+      assertThat(
+              jdbc.queryForList(
+                  "SELECT amount FROM inventory_item_job_order_allocation"
+                      + " WHERE inventory_item_id = ? AND job_order_id = ?",
+                  Double.class,
+                  stock.rowId(),
+                  fixture.orderId()))
+          .containsExactly(1.0);
+    }
+  }
+
+  @Test
+  void aRestoreCanBeDroppedAfterAMaterialWaitWithoutChangingNewerStock() throws Exception {
+    Fixture fixture = seed();
+    StockFixture stock = stock(fixture, 5.0);
+    long initialVersion = stockReads.findRow(stock.rowId()).orElseThrow().getVersion();
+    mvc()
+        .perform(
+            post("/api/v1/inventory/{id}/allocation", stock.rowId())
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(stock.holderId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"field\":\"JOB_ORDER\",\"targetId\":\""
+                        + fixture.orderId()
+                        + "\",\"amount\":1,\"version\":"
+                        + initialVersion
+                        + "}"))
+        .andExpect(status().isOk());
+    StockLot lot =
+        transactionTemplate.execute(_ -> {
+          var row = stockReads.findRow(stock.rowId()).orElseThrow();
+          return new StockLot(
+              materialRepository.findById(fixture.materialId()).orElseThrow(),
+              null,
+              locations.findById(row.getLocation().getId()).orElseThrow(),
+              row.getQuality(),
+              row.getStolen());
+        });
+    long originalVersion = stockReads.findRow(stock.rowId()).orElseThrow().getVersion();
+    var originalQuantity = quantity.quantityOf(stock.rowId());
+    assertThat(originalQuantity).hasSize(1);
+    assertThat(originalQuantity.getFirst().fromQuanta()).isZero();
+    assertThat(originalQuantity.getFirst().toQuanta()).isEqualTo(5000L);
+    List<StockLotWritePlans.Intent> intents =
+        List.of(
+            new StockLotWritePlans.RestoreLot(
+                0,
+                lot,
+                List.of(),
+                new BigDecimal("4"),
+                new StockLotWritePlans.ExactQuantity(
+                    StockQuantityComposition.known(
+                        List.of(
+                            new StockQuantityFragment(
+                                originalQuantity.getFirst().origin(), 0L, 4000L))))));
+    AtomicInteger waitingPid = new AtomicInteger();
+    AtomicReference<Double> observedAfterWait = new AtomicReference<>();
+    AtomicReference<UUID> added = new AtomicReference<>();
+    try (var executor = Executors.newSingleThreadExecutor()) {
+      Future<?> waiting =
+          transactionTemplate.execute(_ -> {
+            stockWrites.beforeOrderLinkedStockWrite(List.of(fixture.orderId()));
+            stockWrites.beforeOrderLinkedMaterialWrite(
+                List.of(new OrderMaterialScope(fixture.orderId(), fixture.materialId())));
+            int blockingPid = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+            Future<?> submitted =
+                executor.submit(() ->
+                    transactionTemplate.executeWithoutResult(_ -> {
+                      waitingPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                      var prepared =
+                          lotPlans.prepareLotBatch(
+                              stock.holderId(),
+                              List.of(lot),
+                              List.of(),
+                              List.of(),
+                              intents,
+                              selection -> {
+                                double current =
+                                    stockReads
+                                        .lotRows(stock.holderId(), List.of(lot))
+                                        .values()
+                                        .stream()
+                                        .flatMap(List::stream)
+                                        .mapToDouble(row -> row.getAmount())
+                                        .sum();
+                                observedAfterWait.set(current);
+                                return current == 5.0
+                                    ? selection
+                                    : new StockLotWritePlans.Selection(
+                                        selection.entryRestores(), List.of());
+                              });
+                      lotPlans.confirmLotBatch(prepared, List.of(), List.of(), false);
+                    }));
+            await()
+                .atMost(Duration.ofSeconds(10))
+                .until(() ->
+                    waitingPid.get() != 0
+                        && Boolean.TRUE.equals(
+                            jdbc.queryForObject(
+                                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE pid = ?"
+                                    + " AND locktype = 'advisory' AND NOT granted"
+                                    + " AND ? = ANY(pg_blocking_pids(pid)))",
+                                Boolean.class,
+                                waitingPid.get(),
+                                blockingPid)));
+            added.set(stockCommands.bookIn(stock.holderId(), lot, 1.0));
+            return submitted;
+          });
+      waiting.get(15, TimeUnit.SECONDS);
+    }
+
+    assertThat(observedAfterWait.get()).isEqualTo(6.0);
+    transactionTemplate.executeWithoutResult(_ -> {
+      assertThat(stockReads.lotRows(stock.holderId(), List.of(lot)).get(lot.key()))
+          .extracting(row -> row.getId())
+          .containsExactlyInAnyOrder(stock.rowId(), added.get());
+      var unchanged = stockReads.findRow(stock.rowId()).orElseThrow();
+      assertThat(unchanged.getAmount()).isEqualTo(5.0);
+      assertThat(unchanged.getVersion()).isEqualTo(originalVersion);
+      assertThat(unchanged.jobOrderSliceAmount(fixture.orderId())).isEqualTo(1.0);
+      assertThat(quantity.quantityOf(stock.rowId())).containsExactlyElementsOf(originalQuantity);
+      var newRow = stockReads.findRow(added.get()).orElseThrow();
+      assertThat(newRow.getAmount()).isEqualTo(1.0);
+      assertThat(newRow.getPersonal()).isTrue();
+      assertThat(quantity.quantityOf(added.get()))
+          .singleElement()
+          .satisfies(fragment -> {
+            assertThat(fragment.origin()).isNotEqualTo(originalQuantity.getFirst().origin());
+            assertThat(fragment.fromQuanta()).isZero();
+            assertThat(fragment.toQuanta()).isEqualTo(1000L);
+          });
+    });
+  }
+
+  /** Returns the exact transaction advisory lock identities visible for one connection. */
+  private Set<String> advisoryLocks(int pid, boolean granted) {
+    return Set.copyOf(
+        jdbc.queryForList(
+            "SELECT classid::text || ':' || objid::text || ':' || objsubid::text || ':' || mode"
+                + " FROM pg_locks WHERE pid = ? AND locktype = 'advisory' AND granted = ?",
+            String.class,
+            pid,
+            granted));
   }
 
   @Test

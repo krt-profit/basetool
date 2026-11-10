@@ -22,14 +22,18 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryQualityCorrectionOptionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryQuantityCorrectionOptionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryRowVersionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityCorrections;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragments;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
@@ -56,9 +60,10 @@ public class InventoryQuantityCorrections implements StockQuantityCorrections {
   private final InventoryItemRepository rows;
   private final tools.jackson.databind.ObjectMapper json;
   private final InventoryOrderWrites orderWrites;
-  private final InventoryAccessPolicy access;
+  private final StockViewerAccess access;
   private final StockChangeObserver stockChanges;
   private final AuditRecorder audit;
+  private final InventoryQualityCorrections qualityCorrections;
 
   @Override
   @Transactional(readOnly = true)
@@ -128,21 +133,24 @@ public class InventoryQuantityCorrections implements StockQuantityCorrections {
       throw new BusinessConflictException("orders.claim.correction.connected_stock_required");
     }
     for (InventoryItem row : locked) {
-      final List<StockQuantityFragment> remaining =
-          StockQuantityFragments.subtract(row.getQuantityProvenance(), removed);
+      final StockQuantityComposition remaining =
+          InventoryQuantityComposition.subtract(
+              row.getQuantityComposition(), StockQuantityComposition.known(List.copyOf(removed)));
       long corrected = removedFrom(row, removed);
       if (corrected == 0L) {
         continue;
       }
-      double amount = corrected / 1000.0;
+      double amount = ScuAmounts.fromQuanta(corrected);
       final double before = row.getAmount();
       AllocationReductions.applyPlan(
           row, AllocationReductions.resolveReductionPlan(row, null, amount, true), true);
       AllocationReductions.applyPlan(
           row, AllocationReductions.resolveReductionPlan(row, null, amount, false), false);
       orderWrites.assertRow(row);
-      double after = Math.subtractExact(ScuAmounts.toQuanta(before), corrected) / 1000.0;
-      LotRows.lowerKnownQuantity(rows, stockChanges, row, after, remaining);
+      double after =
+          ScuAmounts.fromQuanta(Math.subtractExact(ScuAmounts.toQuanta(before), corrected));
+      LotRows.lowerExactQuantity(
+          rows, stockChanges, row, after, remaining, StockChangeReason.CORRECTION);
       audit.record(
           AuditEventType.INVENTORY_QUANTITY_CORRECTED,
           row.getId(),
@@ -204,12 +212,13 @@ public class InventoryQuantityCorrections implements StockQuantityCorrections {
     final List<StockQuantityFragment> beforeQuantity = row.getQuantityProvenance();
     double before = row.getAmount();
     long after = Math.addExact(ScuAmounts.toQuanta(before), additionalQuanta);
-    row.setAmount(after / 1000.0);
+    row.setAmount(ScuAmounts.fromQuanta(after));
     var originalAllocation = InventoryAllocations.jobOrderSlice(row, provisionScope.orderId());
     if (originalAllocation != null) {
       originalAllocation.setAmount(
-          Math.addExact(ScuAmounts.toQuanta(originalAllocation.getAmount()), additionalQuanta)
-              / 1000.0);
+          ScuAmounts.fromQuanta(
+              Math.addExact(
+                  ScuAmounts.toQuanta(originalAllocation.getAmount()), additionalQuanta)));
     }
     orderWrites.assertRow(row);
     rows.saveAndFlush(row);
@@ -233,14 +242,34 @@ public class InventoryQuantityCorrections implements StockQuantityCorrections {
 
   private static long removedFrom(InventoryItem row, Collection<StockQuantityFragment> removed) {
     return Math.subtractExact(
-        StockQuantityFragments.total(row.getQuantityProvenance()),
-        StockQuantityFragments.total(
-            StockQuantityFragments.subtract(row.getQuantityProvenance(), removed)));
+        row.getQuantityComposition().totalQuanta(),
+        InventoryQuantityComposition.subtract(
+                row.getQuantityComposition(), StockQuantityComposition.known(List.copyOf(removed)))
+            .totalQuanta());
   }
 
   private void requireEditable(InventoryItem row) {
-    if (!access.canEditInventoryItem(row.getId())) {
+    if (!access.mayEditInventoryItem(row.getId(), row.getUser().getId())) {
       throw new AccessDeniedException("orders.claim.correction.stock_forbidden");
     }
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<InventoryQualityCorrectionOptionDto> currentQualityRows(
+      Collection<StockQuantityFragment> known) {
+    return qualityCorrections.currentRows(known);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void correctKnownQuality(
+      Collection<StockQuantityFragment> known,
+      List<UUID> selectedRows,
+      int quality,
+      List<InventoryRowVersionDto> versions,
+      OrderMaterialScope provisionScope,
+      UUID factId) {
+    qualityCorrections.correct(known, selectedRows, quality, versions, provisionScope, factId);
   }
 }

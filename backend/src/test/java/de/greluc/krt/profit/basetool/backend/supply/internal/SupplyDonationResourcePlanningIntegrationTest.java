@@ -272,7 +272,8 @@ class SupplyDonationResourcePlanningIntegrationTest {
     AtomicReference<Future<Void>> contender = new AtomicReference<>();
     try (var worker = Executors.newSingleThreadExecutor()) {
       transactions.executeWithoutResult(_ -> {
-        lotPlans.prepareLotBatch(fixture.holder(), List.of(lot(fixture)), List.of());
+        lotPlans.prepareLotBatch(
+            fixture.holder(), List.of(lot(fixture)), List.of(), List.of(), List.of());
         contender.set(
             worker.submit(() -> {
               transactions.executeWithoutResult(_ -> {

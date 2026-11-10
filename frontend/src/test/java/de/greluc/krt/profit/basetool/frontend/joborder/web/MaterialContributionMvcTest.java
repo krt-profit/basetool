@@ -31,8 +31,12 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialContributio
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialContributionHistoryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialProvisionCreditDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialProvisionEvidence;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialProvisionFact;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialProvisionFactChange;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import java.time.Instant;
 import java.util.List;
@@ -54,12 +58,15 @@ import org.springframework.web.context.WebApplicationContext;
 class MaterialContributionMvcTest {
   private static final UUID ORDER = UUID.fromString("caa631f2-c5ed-41b3-8ad9-8b458e967d93");
   @Autowired private WebApplicationContext context;
-  @MockitoBean private BackendApiClient backend;
+  @MockitoBean private BackendApiClient backendApiClient;
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
   private MockMvc mvc;
 
   @BeforeEach
   void setUp() {
+    doReturn(new MeLayoutResponse(null, List.of(), CapabilitiesResponse.NONE, 0L))
+        .when(backendApiClient)
+        .get("/api/v1/me/layout", MeLayoutResponse.class);
     mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
@@ -67,7 +74,7 @@ class MaterialContributionMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void readableEmptyHistoryHasNoCorrectionControls() throws Exception {
     doReturn(List.of())
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/history"),
             org.mockito.ArgumentMatchers.<ParameterizedTypeReference<List<Object>>>any(),
@@ -119,9 +126,12 @@ class MaterialContributionMvcTest {
                     3d,
                     Instant.parse("2026-11-01T08:00:00Z"),
                     false,
-                    MaterialProvisionEvidence.OBSERVED)));
+                    MaterialProvisionEvidence.OBSERVED,
+                    650,
+                    650,
+                    List.of())));
     doReturn(List.of(contribution))
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/history"),
             org.mockito.ArgumentMatchers
@@ -151,7 +161,7 @@ class MaterialContributionMvcTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void deniedConcreteOrderReadReturnsNoHistory() throws Exception {
     org.mockito.Mockito.doThrow(new BackendServiceException("denied", null, 403))
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/history"),
             org.mockito.ArgumentMatchers
@@ -172,7 +182,7 @@ class MaterialContributionMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void staleCorrectionReturnsConflictWithoutDiscardingTheSubmittedFacts() throws Exception {
     org.mockito.Mockito.doThrow(new BackendServiceException("stale", null, 409))
-        .when(backend)
+        .when(backendApiClient)
         .post(
             eq("/api/v1/orders/{id}/claims/provisions/{creditId}/correction"),
             any(),
@@ -220,9 +230,12 @@ class MaterialContributionMvcTest {
                     3d,
                     Instant.parse("2026-11-01T08:00:00Z"),
                     true,
-                    MaterialProvisionEvidence.OBSERVED)));
+                    MaterialProvisionEvidence.OBSERVED,
+                    650,
+                    650,
+                    List.of())));
     doReturn(List.of(contribution))
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/history"),
             org.mockito.ArgumentMatchers
@@ -232,7 +245,7 @@ class MaterialContributionMvcTest {
         new de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialAttributionTargetDto(
             target, 12L, new SquadronReferenceDto(target, "Ended Staffel B", "B"), true, 0d, 3d);
     doReturn(List.of(allowed))
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/provisions/{creditId}/attribution-options"),
             org.mockito.ArgumentMatchers.<ParameterizedTypeReference<List<Object>>>any(),
@@ -259,59 +272,56 @@ class MaterialContributionMvcTest {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void freshProvisionChooserOffersOnlyWritableMatchingOpenPromises() throws Exception {
-    UUID foreign = UUID.fromString("b1a631f2-c5ed-41b3-8ad9-8b458e967d93");
-    var material =
-        new de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto(
-            ORDER, "Torite", null, "SCU", null, null, null, null, null, null, null, true, null,
-            true, 0L);
-    var own =
-        new de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto(
-            ORDER,
-            new SquadronReferenceDto(ORDER, "Permitted Staffel", "A"),
-            3d,
-            null,
-            Instant.now(),
-            6L);
-    var other =
-        new de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto(
-            foreign,
-            new SquadronReferenceDto(foreign, "Foreign Staffel", "B"),
-            7d,
-            null,
-            Instant.now(),
-            9L);
-    var bucket =
-        new de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimBucketDto(
-            material, "BASE", null, 10d, 10d, 0d, List.of(own, other));
-    doReturn(List.of(bucket))
-        .when(backend)
+  void freshProvisionChooserRendersTheAuthoritativeBackendTargetsAndVersions() throws Exception {
+    var allowed =
+        new de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialProvisionTargetDto(
+            ORDER, 6L, new SquadronReferenceDto(ORDER, "Permitted Staffel", "A"), 3d, 650, false);
+    doReturn(List.of(allowed))
+        .when(backendApiClient)
         .get(
-            eq("/api/v1/orders/{id}/claims"),
+            eq(
+                "/api/v1/orders/{id}/claims/provision-options?materialId={materialId}&quality={quality}"),
             org.mockito.ArgumentMatchers.<ParameterizedTypeReference<List<Object>>>any(),
-            eq(ORDER));
-    doReturn(
-            List.of(
-                new de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto(
-                    ORDER, "Permitted Staffel", "A", "SQUADRON")))
-        .when(backend)
-        .get(
-            eq("/api/v1/orders/{id}/claims/claiming-options"),
-            org.mockito.ArgumentMatchers.<ParameterizedTypeReference<List<Object>>>any(),
-            eq(ORDER));
+            eq(ORDER),
+            eq(ORDER),
+            eq(750));
     String html =
         mvc.perform(
                 get("/orders/{id}/claims/provision-options", ORDER)
                     .param("materialId", ORDER.toString())
-                    .param("quality", "100")
-                    .header("X-Requested-With", "XMLHttpRequest"))
+                    .param("quality", "750")
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .param("lang", "en"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertThat(html)
-        .contains("Permitted Staffel", "data-provision-version=\"6\"")
-        .doesNotContain("Foreign Staffel", foreign.toString());
+    assertThat(html).contains("Permitted Staffel", "data-provision-version=\"6\"", "3.000", "650");
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void deniedBackendProvisionChoicesReturnNoContributionOption() throws Exception {
+    org.mockito.Mockito.doThrow(new BackendServiceException("denied", null, 403))
+        .when(backendApiClient)
+        .get(
+            eq(
+                "/api/v1/orders/{id}/claims/provision-options?materialId={materialId}&quality={quality}"),
+            org.mockito.ArgumentMatchers.<ParameterizedTypeReference<List<Object>>>any(),
+            eq(ORDER),
+            eq(ORDER),
+            eq(650));
+    String body =
+        mvc.perform(
+                get("/orders/{id}/claims/provision-options", ORDER)
+                    .param("materialId", ORDER.toString())
+                    .param("quality", "650")
+                    .header("X-Requested-With", "XMLHttpRequest"))
+            .andExpect(status().isForbidden())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(body).doesNotContain("data-provision-version", "Permitted Staffel");
   }
 
   @Test
@@ -341,9 +351,12 @@ class MaterialContributionMvcTest {
                     3d,
                     Instant.parse("2026-11-01T08:00:00Z"),
                     false,
-                    MaterialProvisionEvidence.OBSERVED)));
+                    MaterialProvisionEvidence.OBSERVED,
+                    650,
+                    650,
+                    List.of())));
     doReturn(List.of(contribution))
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/history"),
             org.mockito.ArgumentMatchers
@@ -368,7 +381,7 @@ class MaterialContributionMvcTest {
             .InventoryQuantityCorrectionOptionDto(
             ORDER, 9L, "Permitted location", "Permitted holder", "Permitted pool", false, 6d, 750);
     doReturn(List.of(row))
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/provisions/{creditId}/correction-options"),
             org.mockito.ArgumentMatchers.<ParameterizedTypeReference<List<Object>>>any(),
@@ -394,8 +407,7 @@ class MaterialContributionMvcTest {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void creditedSubsetKeepsUnknownPhysicalFactsHonestAndOffersOnlyAttributionCorrection()
-      throws Exception {
+  void creditedSubsetKeepsUnknownQuantityAndAllowsOriginalQualityCorrection() throws Exception {
     var contribution =
         new MaterialContributionHistoryDto(
             ORDER,
@@ -420,16 +432,19 @@ class MaterialContributionMvcTest {
                     3d,
                     Instant.parse("2026-11-01T08:00:00Z"),
                     true,
-                    MaterialProvisionEvidence.CREDITED_SUBSET)));
+                    MaterialProvisionEvidence.CREDITED_SUBSET,
+                    null,
+                    650,
+                    List.of())));
     doReturn(List.of(contribution))
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/history"),
             org.mockito.ArgumentMatchers
                 .<ParameterizedTypeReference<List<MaterialContributionHistoryDto>>>any(),
             eq(ORDER));
     doReturn(List.of())
-        .when(backend)
+        .when(backendApiClient)
         .get(
             eq("/api/v1/orders/{id}/claims/provisions/{creditId}/attribution-options"),
             org.mockito.ArgumentMatchers.<ParameterizedTypeReference<List<Object>>>any(),
@@ -446,7 +461,9 @@ class MaterialContributionMvcTest {
             .getContentAsString();
     assertThat(history)
         .contains(
-            "Known credited portion", "original total quantity and physical quality are unknown")
+            "Known credited portion",
+            "original total quantity and composition are unknown",
+            "Original quality unknown; verified minimum: 650")
         .doesNotContain("Original physical quantity");
     String editor =
         mvc.perform(
@@ -458,7 +475,174 @@ class MaterialContributionMvcTest {
             .getResponse()
             .getContentAsString();
     assertThat(editor)
-        .contains("data-contribution-correction", "value=\"ATTRIBUTION\"")
-        .doesNotContain("value=\"QUANTITY\"", "data-correction-stock");
+        .contains(
+            "data-contribution-correction",
+            "value=\"ATTRIBUTION\"",
+            "value=\"QUALITY\"",
+            "data-correction-supplied-quality")
+        .doesNotContain("value=\"QUANTITY\"", "data-correction-stock", "value=\"650\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void receiptHistoryShowsPriorAndCorrectedQualityAndUnitWithoutExtraActions() throws Exception {
+    UUID former = UUID.fromString("d0a631f2-c5ed-41b3-8ad9-8b458e967d93");
+    Instant providedAt = Instant.parse("2026-11-01T08:00:00Z");
+    var previous =
+        new MaterialProvisionFact(
+            3d, MaterialProvisionEvidence.OBSERVED, 650, 650, former, former, former, former, 3d);
+    var current =
+        new MaterialProvisionFact(
+            3d, MaterialProvisionEvidence.OBSERVED, 700, 700, ORDER, ORDER, ORDER, ORDER, 3d);
+    var receipt =
+        new MaterialProvisionCreditDto(
+            ORDER,
+            3L,
+            3d,
+            3d,
+            providedAt,
+            false,
+            MaterialProvisionEvidence.OBSERVED,
+            700,
+            700,
+            List.of(
+                new MaterialProvisionFactChange(
+                    MaterialProvisionFactChange.Reason.PROVISION_RECORDED,
+                    null,
+                    previous,
+                    providedAt),
+                new MaterialProvisionFactChange(
+                    MaterialProvisionFactChange.Reason.FALSE_FACT_CORRECTED,
+                    previous,
+                    current,
+                    Instant.parse("2026-11-01T09:00:00Z"))));
+    var formerContribution =
+        new MaterialContributionHistoryDto(
+            former,
+            4L,
+            former,
+            false,
+            new SquadronReferenceDto(former, "Earlier Staffel A", "A"),
+            ORDER,
+            "Torite",
+            "SCU",
+            "GOOD",
+            650,
+            0d,
+            0d,
+            null,
+            List.of(),
+            List.of());
+    var currentContribution =
+        new MaterialContributionHistoryDto(
+            ORDER,
+            8L,
+            ORDER,
+            true,
+            new SquadronReferenceDto(ORDER, "Current Staffel B", "B"),
+            ORDER,
+            "Torite",
+            "SCU",
+            "EXCELLENT",
+            700,
+            0d,
+            3d,
+            null,
+            List.of(),
+            List.of(receipt));
+    doReturn(List.of(formerContribution, currentContribution))
+        .when(backendApiClient)
+        .get(
+            eq("/api/v1/orders/{id}/claims/history"),
+            org.mockito.ArgumentMatchers
+                .<ParameterizedTypeReference<List<MaterialContributionHistoryDto>>>any(),
+            eq(ORDER));
+
+    String html =
+        mvc.perform(
+                get("/orders/{id}/claims/history", ORDER)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .param("lang", "en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .contains(
+            "data-provision-fact-change",
+            "data-fact-state=\"previous\"",
+            "data-fact-state=\"current\"",
+            "Declared original quality: 650",
+            "Declared original quality: 700",
+            "Credited to Earlier Staffel A: 3.000 SCU",
+            "Credited to Current Staffel B: 3.000 SCU")
+        .doesNotContain("data-contribution-correction", "??orders.claim.history.");
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
+  void originalQualityUsesTheExistingCorrectionEditorAndLeavesCurrentStockOptional()
+      throws Exception {
+    var contribution =
+        new MaterialContributionHistoryDto(
+            ORDER,
+            7L,
+            ORDER,
+            false,
+            new SquadronReferenceDto(ORDER, "Staffel A", "A"),
+            ORDER,
+            "Torite",
+            "SCU",
+            "BASE",
+            0,
+            0d,
+            3d,
+            null,
+            List.of(),
+            List.of(
+                new MaterialProvisionCreditDto(
+                    ORDER,
+                    2L,
+                    3d,
+                    3d,
+                    Instant.parse("2026-11-01T08:00:00Z"),
+                    true,
+                    MaterialProvisionEvidence.OBSERVED,
+                    650,
+                    650,
+                    List.of())));
+    doReturn(List.of(contribution))
+        .when(backendApiClient)
+        .get(
+            eq("/api/v1/orders/{id}/claims/history"),
+            org.mockito.ArgumentMatchers
+                .<ParameterizedTypeReference<List<MaterialContributionHistoryDto>>>any(),
+            eq(ORDER));
+    doReturn(List.of())
+        .when(backendApiClient)
+        .get(
+            eq("/api/v1/orders/{id}/claims/provisions/{creditId}/attribution-options"),
+            org.mockito.ArgumentMatchers.<ParameterizedTypeReference<List<Object>>>any(),
+            eq(ORDER),
+            eq(ORDER));
+    String html =
+        mvc.perform(
+                get("/orders/{id}/claims/provisions/{creditId}/editor", ORDER, ORDER)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .param("lang", "en"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .contains(
+            "data-contribution-correction",
+            "value=\"QUALITY\"",
+            "data-correction-quality",
+            "data-correction-supplied-quality",
+            "value=\"650\"",
+            "data-correction-quality-stock",
+            "data-current-claim-id=\"" + ORDER + "\"")
+        .doesNotContain("checked=\"checked\"");
   }
 }

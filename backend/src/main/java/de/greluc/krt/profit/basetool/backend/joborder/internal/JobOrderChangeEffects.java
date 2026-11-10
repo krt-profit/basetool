@@ -102,6 +102,17 @@ public class JobOrderChangeEffects {
   }
 
   /**
+   * Groups a real receipt declaration correction even when promise and credit totals stay equal.
+   *
+   * @param claim a currently authorized contribution whose receipt facts changed
+   */
+  public void receiptFactChanged(@NotNull MaterialClaim claim) {
+    group(claim.getJobOrder(), NoticeKind.CHANGED, claim.getClaimingOrgUnit().getId())
+        .materials
+        .add(claim.getMaterial().getName());
+  }
+
+  /**
    * Groups an actual ineligibility ending even when the participation has no open material line.
    *
    * @param order the affected order

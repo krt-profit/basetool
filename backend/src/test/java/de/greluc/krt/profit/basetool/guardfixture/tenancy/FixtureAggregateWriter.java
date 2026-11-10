@@ -55,4 +55,29 @@ public class FixtureAggregateWriter {
     }
     repository.save(repository.findById(id).orElseThrow());
   }
+
+  /** Enters a scope-checked write through private preparation. */
+  public void touchViaGateway(UUID id) {
+    prepareChecked(id);
+  }
+
+  /** Prepares the scope-checked mutation. */
+  private void prepareChecked(UUID id) {
+    applyChecked(id);
+  }
+
+  /** Applies the checked mutation through its owning gate. */
+  private void applyChecked(UUID id) {
+    touchChecked(id);
+  }
+
+  /** Forms an unguarded recursive delegation for the static scope rule. */
+  public void cycleOne(UUID id) {
+    cycleTwo(id);
+  }
+
+  /** Continues an unguarded recursive delegation for the static scope rule. */
+  private void cycleTwo(UUID id) {
+    cycleOne(id);
+  }
 }

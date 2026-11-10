@@ -476,7 +476,7 @@ unrelated unit is insufficient. Rights combine only through legitimate current r
 | Personal Bearbeiter without another grant | Full relevant read, own note and self-removal; no general processing or monetary authority. |
 | Correctly linked aUEC holder/payee | The agreed own holding/movement/handover/return and correction scope. Extra provision for somebody else needs unit authority. A genuine own outgoing transfer may create its receiving counterparty with exactly that credit; it cannot designate an unauthorised requester recipient. |
 | Any app-authorised full order reader | Explicit self-provision creates the own linked holder, without prior Bearbeiter enrolment or another approval. This does not authorise standalone balances for other people. |
-| Admin | Existing order/recovery authority under the same monetary, eligibility and history constraints. An order relationship creates no additional Bank right. |
+| Admin | Existing order/recovery authority under the same monetary, eligibility and history constraints. For aUEC, hard-delete only before the first accepted monetary submission (REQ-ORDERS-063); later rejection or zero balances do not restore it. An order relationship creates no additional Bank right. |
 | Named person without a Basetool account | May be recorded as holder/recipient through an authorised action; a raw name creates no login, personal permission or Inbox. |
 
 Read-only linked holder/payee history survives a zero holding or order completion while the
@@ -516,7 +516,7 @@ linked specifications. The following table and footnotes are the **current imple
 | Reassign the responsible unit (`PATCH /{id}/responsible-org-unit`)                                                                                                                                                                                                                                                                                                       |   ❌    |  ✅²  |  ❌  |   ✅²    |   ✅   |
 | Maintain outstanding material promises on SK orders (observed version required) (`hasRole('LOGISTICIAN')` + `canViewJobOrders`)                                                                                                                                                                                                                                                                            |   ❌    |  ✅³  |  ❌  |   ✅³    |   ✅   |
 | Read material contribution and provision history (`GET /api/v1/orders/{id}/claims/history`; common concrete-order read gate) | ✅³ | ✅³ | ✅³ | ✅³ | ✅ |
-| Correct recorded material provision quantity or attribution (current claim-management gate; connected Inventory grants for quantity changes) | ❌ | ✅³ | ❌ | ✅³ | ✅ |
+| Correct recorded material provision quantity, attribution or original quality (current contribution authority; current Inventory rights and row versions for physical changes) | ❌ | ✅³ | ❌ | ✅³ | ✅ |
 | **Delete** job order (`hasRole('ADMIN')`)                                                                                                                                                                                                                                                                                                                                |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
 | Wipe the whole Lager (`DELETE /api/v1/inventory/all`, `hasRole('ADMIN')`)                                                                                                                                                                                                                                                                                                |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
 
@@ -565,12 +565,22 @@ permits the matching Staffel's promises, with its observed version; it does not 
 order processing. Explicit provision attribution additionally needs the actual stock action's
 Inventory rights. Read access alone does not permit attribution or correction.
 
+The optional provision picker uses the declared material and quality to read only currently
+permitted matching open promises from the backend. Its concrete-order read and existing
+claim-workflow grants grant no additional stock authority; final booking revalidates the
+current contribution and Inventory permissions and independent versions.
+
 A false attribution may be corrected through the current original and target Staffel grants or
 responsible-unit coordination, even after the original stock row was consumed. A quantity
 correction also requires current rights over every actually affected stock row and the connected
 orders/contributions; it cannot use a former stock permission as authority. Historical records
 that prove only a credited subset do not establish an original full quantity for a physical
 quantity correction. The invalid-responsibility gate applies throughout.
+
+Historical original-quality correction uses the current contribution authority and remains
+available after stock consumption without Inventory writes. Changing a selected retained current
+portion in the same action additionally requires its ordinary current Inventory write rights and
+observed row version. Only its known receipt intersection changes; unrelated stock stays intact.
 
 The full common support/lifecycle and contextual-writer conversion remains the accepted target
 of [REQ-ORDERS-050/-051/-053/-054](docs/specs/orders-core.md). This material workflow does not yet

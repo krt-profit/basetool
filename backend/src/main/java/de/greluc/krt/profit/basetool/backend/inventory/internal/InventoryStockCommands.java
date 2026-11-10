@@ -40,17 +40,18 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockConsumption;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -101,29 +102,6 @@ public class InventoryStockCommands implements StockCommands {
     orderWrites.prepareWrites(sourceRowIds, bookings, requiredScopes);
   }
 
-  @Override
-  @Transactional(propagation = Propagation.MANDATORY)
-  public void lockLots(@NotNull UUID member, @NotNull Collection<String> lotKeys) {
-    orderWrites.lockEligibility();
-    orderWrites.lockHolderLots(member, lotKeys);
-    Set<Long> keys = new TreeSet<>();
-    for (String lotKey : lotKeys) {
-      keys.add(lotLockKey(member, lotKey));
-    }
-    orderWrites.lockStockLots(keys);
-  }
-
-  /**
-   * Takes the advisory locks of the given keys in ascending order (ADR-0229).
-   *
-   * @param repository the repository that takes a lock
-   * @param keys the lock keys
-   */
-  static void lockInOrder(
-      @NotNull InventoryItemRepository repository, @NotNull Collection<Long> keys) {
-    new TreeSet<>(keys).forEach(repository::lockExchangeLot);
-  }
-
   /**
    * Attempts globally ordered lot locks without waiting; a false result requires rollback.
    *
@@ -155,34 +133,6 @@ public class InventoryStockCommands implements StockCommands {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public @NotNull List<StockRow> lockLotRows(@NotNull UUID member, @NotNull StockLot lot) {
-    orderWrites.lockEligibility();
-    orderWrites.lockHolderLots(member, List.of(lot.key()));
-    List<InventoryItem> rows =
-        new ArrayList<>(
-            lot.material() != null
-                ? inventoryRepository.lockMaterialLot(
-                    member,
-                    lot.material().getId(),
-                    lot.location().getId(),
-                    lot.quality() == null ? 0 : lot.quality(),
-                    lot.stolen())
-                : inventoryRepository.lockItemLot(
-                    member,
-                    Objects.requireNonNull(lot.gameItem()).getId(),
-                    lot.location().getId(),
-                    lot.stolen()));
-    orderWrites.validateRows(rows.stream().map(InventoryItem::getId).toList());
-    rows.sort(
-        Comparator.comparingInt((InventoryItem r) -> Boolean.TRUE.equals(r.getPersonal()) ? 0 : 1)
-            .thenComparingInt(r -> r.getOwningOrgUnit() == null ? 0 : 1)
-            .thenComparing(
-                InventoryItem::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder())));
-    return new ArrayList<StockRow>(rows);
-  }
-
-  @Override
-  @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Optional<StockRow> lockRow(@NotNull UUID rowId) {
     orderWrites.lockEligibility();
     orderWrites.prepareWrites(List.of(rowId), List.of(), List.of());
@@ -210,6 +160,12 @@ public class InventoryStockCommands implements StockCommands {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull UUID bookIn(@NotNull UUID member, @NotNull StockLot lot, double amount) {
+    return bookIn(member, lot, amount, null);
+  }
+
+  /** Uses the one owning personal booking with optional complete restoration evidence. */
+  private @NotNull UUID bookIn(
+      UUID member, StockLot lot, double amount, @Nullable StockQuantityComposition restored) {
     orderWrites.lockEligibility();
     orderWrites.lockBookIn(
         new StockBookInScope(
@@ -227,7 +183,11 @@ public class InventoryStockCommands implements StockCommands {
     item.setGameItem(lot.gameItem());
     item.setLocation(lot.location());
     item.setQuality(lot.material() == null ? null : lot.quality() == null ? 0 : lot.quality());
-    item.setAmount(ScuAmounts.roundToScuScale(amount));
+    if (restored == null) {
+      item.setAmount(ScuAmounts.roundToScuScale(amount));
+    } else {
+      item.replaceQuantity(amount, restored);
+    }
     item.setPersonal(true);
     item.setStolen(lot.stolen());
     orderWrites.assertRow(item);
@@ -243,11 +203,30 @@ public class InventoryStockCommands implements StockCommands {
     return checkoutService.mergeStockIfRequested(saved, false).getId();
   }
 
+  /** Books confirmed restored quantity through the one owning personal stock writer. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @NotNull
+  UUID bookInRestoredQuantity(
+      @NotNull UUID member, @NotNull StockLot lot, @NotNull StockQuantityComposition quantity) {
+    if (quantity.totalQuanta() <= 0L) {
+      throw new IllegalArgumentException("A restored booking requires positive physical quantity");
+    }
+    orderWrites.requireRestorationEvidence(InventoryLotRestoreProofs.identities(quantity.parts()));
+    return bookIn(member, lot, ScuAmounts.fromQuanta(quantity.totalQuanta()), quantity);
+  }
+
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull StockChangeEffects bookOutRow(
       @NotNull UUID member, @NotNull UUID rowId, double amount) {
+    return bookOutRow(member, rowId, amount, null);
+  }
+
+  /** Uses the one owning discard path after a complete source-row plan. */
+  private @NotNull StockChangeEffects bookOutRow(
+      UUID member, UUID rowId, double amount, @Nullable StockQuantityComposition exactRemaining) {
     orderWrites.lockEligibility();
+    orderWrites.prepareWrites(List.of(rowId), List.of(), List.of());
     InventoryItem row = managedRow(rowId);
     return checkoutService.bookOutForClient(
         row.getId(),
@@ -263,7 +242,28 @@ public class InventoryStockCommands implements StockCommands {
             null,
             null,
             null),
-        member);
+        member,
+        exactRemaining);
+  }
+
+  /** Removes confirmed exact parts through the one owning discard writer. */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @NotNull
+  StockChangeEffects bookOutExactQuantity(
+      @NotNull UUID member, @NotNull UUID rowId, @NotNull StockQuantityComposition removed) {
+    if (removed.parts().isEmpty()) {
+      return StockChangeEffects.NONE;
+    }
+    orderWrites.lockEligibility();
+    orderWrites.prepareWrites(List.of(rowId), List.of(), List.of());
+    InventoryItem row = managedRow(rowId);
+    StockQuantityComposition current = row.getQuantityComposition();
+    StockQuantityComposition remaining = InventoryQuantityComposition.subtract(current, removed);
+    if (Math.subtractExact(current.totalQuanta(), remaining.totalQuanta()) != removed.totalQuanta()
+        || current.totalQuanta() != ScuAmounts.toQuanta(row.getAmount())) {
+      throw new BusinessConflictException("error.inventory.concurrent_scope_changed");
+    }
+    return bookOutRow(member, rowId, ScuAmounts.fromQuanta(removed.totalQuanta()), remaining);
   }
 
   @Override
@@ -613,10 +613,7 @@ public class InventoryStockCommands implements StockCommands {
   public void releaseJobOrderEarmarks(@NotNull UUID jobOrderId) {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
-    List<UUID> rowIds = prepareAllocationRelease(jobOrderId, null, null);
-    if (!rowIds.isEmpty()) {
-      inventoryRepository.deleteJobOrderAllocationsByJobOrder(jobOrderId, rowIds);
-    }
+    releasePreparedEarmarks(jobOrderId, prepareAllocationRelease(jobOrderId, null, null));
   }
 
   @Override
@@ -625,7 +622,7 @@ public class InventoryStockCommands implements StockCommands {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
     orderWrites.prepareWrites(List.of(rowId), List.of(), List.of());
-    managedRow(rowId).getJobOrderAllocations().removeIf(a -> jobOrderId.equals(a.getJobOrderId()));
+    releasePreparedEarmarks(jobOrderId, List.of(rowId));
   }
 
   @Override
@@ -633,11 +630,7 @@ public class InventoryStockCommands implements StockCommands {
   public void releaseJobOrderMaterialEarmarks(@NotNull UUID jobOrderId, @NotNull UUID materialId) {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
-    List<UUID> rowIds = prepareAllocationRelease(jobOrderId, materialId, null);
-    if (!rowIds.isEmpty()) {
-      inventoryRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(
-          jobOrderId, materialId, rowIds);
-    }
+    releasePreparedEarmarks(jobOrderId, prepareAllocationRelease(jobOrderId, materialId, null));
   }
 
   @Override
@@ -645,10 +638,43 @@ public class InventoryStockCommands implements StockCommands {
   public void releaseJobOrderGameItemEarmarks(@NotNull UUID jobOrderId, @NotNull UUID gameItemId) {
     orderWrites.lockEligibility();
     orderWrites.assertOrders(List.of(jobOrderId));
-    List<UUID> rowIds = prepareAllocationRelease(jobOrderId, null, gameItemId);
-    if (!rowIds.isEmpty()) {
-      inventoryRepository.deleteJobOrderAllocationsByJobOrderAndGameItem(
-          jobOrderId, gameItemId, rowIds);
+    releasePreparedEarmarks(jobOrderId, prepareAllocationRelease(jobOrderId, null, gameItemId));
+  }
+
+  private void releasePreparedEarmarks(@NotNull UUID jobOrderId, @NotNull List<UUID> rowIds) {
+    if (rowIds.isEmpty()) {
+      return;
+    }
+    List<InventoryItem> rows = inventoryRepository.findAllForJobOrderAllocationRelease(rowIds);
+    if (!Set.copyOf(rowIds).equals(Set.copyOf(rows.stream().map(InventoryItem::getId).toList()))) {
+      throw new ObjectOptimisticLockingFailureException(InventoryItem.class, jobOrderId);
+    }
+    boolean changed = false;
+    for (InventoryItem row : rows) {
+      List<InventoryJobOrderAllocation> removed =
+          row.getJobOrderAllocations().stream()
+              .filter(slice -> jobOrderId.equals(slice.getJobOrderId()))
+              .toList();
+      if (removed.isEmpty()) {
+        continue;
+      }
+      row.getJobOrderAllocations().removeAll(removed);
+      row.setUpdatedAt(Instant.now());
+      orderWrites.assertRow(row);
+      for (InventoryJobOrderAllocation slice : removed) {
+        auditRecorder.record(
+            AuditEventType.INVENTORY_ALLOCATION_REMOVED,
+            row.getId(),
+            InventoryAuditLabels.label(row),
+            row.getUser().getId(),
+            AuditDetails.of("dim", "JOB_ORDER")
+                .with("ref", jobOrderId)
+                .with("qty", slice.getAmount()));
+      }
+      changed = true;
+    }
+    if (changed) {
+      inventoryRepository.flush();
     }
   }
 

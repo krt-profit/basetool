@@ -160,24 +160,6 @@ public interface PoolEntryCommands {
   PoolOutcome allocate(@NotNull PoolAllocation allocation, boolean dryRun);
 
   /**
-   * Sets shared entries back to journaled states for the undo of a connected application's writes
-   * (REQ-XCH-046): an entry is removed, recreated under its own id, or given back its holder, pool,
-   * lot, amount and job-order and mission earmarks, and each change is audited as {@code
-   * INVENTORY_ITEM_RESTORED}. Every lot involved, and every further lot the caller names, takes its
-   * advisory lock first in one ascending pass, then the entries' rows in ascending id order
-   * (ADR-0229). The note, the donation pledges and the Materialbörse offers are not restored; an
-   * offer above a lowered amount is lowered with it.
-   *
-   * @param lots further lots the caller writes in the same transaction, as lot keys by holder
-   * @param restores the entries, each with the state the writes left it in and the state to restore
-   * @return the result of each restore, in the given order
-   */
-  @NotNull
-  @Unmodifiable
-  List<PoolRestoreResult> restore(
-      @NotNull Map<UUID, ? extends Collection<String>> lots, @NotNull List<PoolRestore> restores);
-
-  /**
    * One shared entry to set back.
    *
    * @param entryId the entry
@@ -526,7 +508,8 @@ public interface PoolEntryCommands {
    * @param version its version
    * @param jobOrders its job-order earmarks by order
    * @param missions its mission earmarks by mission
-   * @param quantityProvenance its durable physical quantity composition
+   * @param quantityProvenance its proved physical intervals, excluding unverifiable quantity
+   * @param completeQuantity its complete ordered proof, or null for an unproved positive old state
    */
   record PoolEntryState(
       @NotNull UUID id,
@@ -537,16 +520,28 @@ public interface PoolEntryCommands {
       long version,
       @NotNull Map<UUID, Double> jobOrders,
       @NotNull Map<UUID, Double> missions,
-      @NotNull List<StockQuantityFragment> quantityProvenance) {
+      @NotNull List<StockQuantityFragment> quantityProvenance,
+      @Nullable StockQuantityComposition completeQuantity) {
 
-    /** Normalizes an absent composition to the journaled physical row identity. */
+    /** Freezes allocations and retains the distinction between known zero and absent proof. */
     public PoolEntryState {
-      quantityProvenance =
-          quantityProvenance == null
-              ? amount > 0
-                  ? List.of(new StockQuantityFragment(id, 0, ScuAmounts.toQuanta(amount)))
-                  : List.of()
-              : List.copyOf(quantityProvenance);
+      jobOrders = Map.copyOf(jobOrders);
+      missions = Map.copyOf(missions);
+      List<StockQuantityFragment> supplied =
+          quantityProvenance == null ? List.of() : List.copyOf(quantityProvenance);
+      if (completeQuantity == null && (amount == 0.0 || !supplied.isEmpty())) {
+        completeQuantity = StockQuantityComposition.known(supplied);
+      }
+      if (completeQuantity != null) {
+        if (completeQuantity.totalQuanta() != ScuAmounts.toQuanta(amount)
+            || (quantityProvenance != null && !completeQuantity.knownPhysical().equals(supplied))) {
+          throw new IllegalArgumentException(
+              "A complete snapshot must describe its exact quantity");
+        }
+        quantityProvenance = completeQuantity.knownPhysical();
+      } else {
+        quantityProvenance = supplied;
+      }
     }
   }
 }

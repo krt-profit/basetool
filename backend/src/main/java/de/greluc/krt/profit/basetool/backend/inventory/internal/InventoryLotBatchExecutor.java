@@ -24,7 +24,10 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -46,13 +49,23 @@ final class InventoryLotBatchExecutor {
   private final RebookCommands rebooks;
   private final InventoryStockPlanningReads reads;
   private final OrgUnitMembershipQueryService memberships;
+  private final InventoryItemRepository rows;
+  private final InventoryStockCommands quantityCommands;
 
   /** Applies the confirmed stolen prelude once, after the calling mass-change decision. */
   void markPrelude(UUID holder, List<InventoryLotBatchProgram.Mark> prelude, Execution execution) {
     for (var mark : prelude) {
       UUID source = execution.id(mark.source());
       var observed = stockRow(holder, source);
+      var sourceQuantity = quantity(source);
+      var selectedQuantity =
+          mark.whole()
+              ? sourceQuantity
+              : InventoryQuantityComposition.partition(
+                      sourceQuantity, mark.amount().movePointRight(3).longValueExact())
+                  .taken();
       if (observed.getOffer().offered()
+          || !selectedQuantity.equals(mark.quantity())
           || (mark.whole()
               && BigDecimal.valueOf(observed.getAmount()).compareTo(mark.amount()) != 0)) {
         throw conflict();
@@ -71,10 +84,20 @@ final class InventoryLotBatchExecutor {
           observed.getOwningOrgUnit() == null ? null : observed.getOwningOrgUnit().getId(),
           mark.victims(),
           execution);
+      var victims = quantity(mark.victims(), execution);
       execution.bind(
           mark.target(),
           stock.markStolen(
-              holder, source, mark.stolen(), mark.whole() ? null : mark.amount().doubleValue()));
+              holder,
+              source,
+              mark.stolen(),
+              mark.whole()
+                  ? null
+                  : ScuAmounts.fromQuanta(mark.amount().movePointRight(3).longValueExact())));
+      if (!InventoryQuantityComposition.subtract(quantity(execution.id(mark.target())), victims)
+          .equals(mark.quantity())) {
+        throw conflict();
+      }
       requireDeleted(holder, target, mark.victims(), execution);
     }
   }
@@ -82,8 +105,30 @@ final class InventoryLotBatchExecutor {
   /** Runs one exact ordered physical step, or asks the ordinary owning commands in dry mode. */
   StockLotWritePlans.Outcome execute(
       UUID holder, InventoryLotBatchProgram.Step step, Execution execution, boolean dryRun) {
+    if (step.intent() instanceof StockLotWritePlans.RestoreLot restore) {
+      var refusal = checkRestore(restore);
+      var expected =
+          step.mutations().stream()
+              .filter(InventoryLotBatchProgram.Rebooking.class::isInstance)
+              .map(InventoryLotBatchProgram.Rebooking.class::cast)
+              .map(InventoryLotBatchProgram.Rebooking::refusal)
+              .filter(Objects::nonNull)
+              .findFirst()
+              .orElse(null);
+      if (refusal != expected) {
+        throw conflict();
+      }
+      if (refusal != null || dryRun) {
+        return new StockLotWritePlans.Outcome(refusal, StockChangeEffects.NONE, null);
+      }
+    }
     if (!dryRun && step.intent() instanceof StockLotWritePlans.SetLotAmount set) {
       requireBookOutPrefix(holder, set.lot(), step.mutations(), execution);
+    }
+    String key = InventoryLotQuantityLedger.key(step.intent());
+    final var before = execution.quantity.quantity(key);
+    if (!dryRun) {
+      execution.quantity.begin(step.intent());
     }
     StockChangeEffects effects = StockChangeEffects.NONE;
     RebookCommands.RebookRefusal refusal = null;
@@ -92,16 +137,63 @@ final class InventoryLotBatchExecutor {
         case InventoryLotBatchProgram.BookIn booking -> {
           if (!dryRun) {
             requireMerge(holder, booking.lot(), true, null, booking.victims(), execution);
+            var victims = quantity(booking.victims(), execution);
             execution.bind(
                 booking.target(),
-                stock.bookIn(holder, booking.lot(), booking.amount().doubleValue()));
+                stock.bookIn(
+                    holder,
+                    booking.lot(),
+                    ScuAmounts.fromQuanta(booking.amount().movePointRight(3).longValueExact())));
+            var added =
+                InventoryQuantityComposition.subtract(
+                    quantity(execution.id(booking.target())), victims);
+            if (added.totalQuanta() != booking.amount().movePointRight(3).longValueExact()) {
+              throw conflict();
+            }
+            execution.quantity.add(key, added);
             requireDeleted(holder, booking.lot(), booking.victims(), execution);
           }
         }
         case InventoryLotBatchProgram.BookOut take -> {
           if (!dryRun) {
+            var removed =
+                InventoryQuantityComposition.partition(
+                        quantity(execution.id(take.source())),
+                        take.amount().movePointRight(3).longValueExact())
+                    .taken();
             var changed =
-                stock.bookOutRow(holder, execution.id(take.source()), take.amount().doubleValue());
+                stock.bookOutRow(
+                    holder,
+                    execution.id(take.source()),
+                    ScuAmounts.fromQuanta(take.amount().movePointRight(3).longValueExact()));
+            execution.quantity.remove(key, removed);
+            effects =
+                new StockChangeEffects(
+                    effects.reduced() + changed.reduced(), effects.removed() + changed.removed());
+          }
+        }
+        case InventoryLotBatchProgram.RestoredBookIn booking -> {
+          if (!dryRun) {
+            requireMerge(holder, booking.lot(), true, null, booking.victims(), execution);
+            var victims = quantity(booking.victims(), execution);
+            execution.bind(
+                booking.target(),
+                quantityCommands.bookInRestoredQuantity(holder, booking.lot(), booking.quantity()));
+            if (!InventoryQuantityComposition.subtract(
+                    quantity(execution.id(booking.target())), victims)
+                .equals(booking.quantity())) {
+              throw conflict();
+            }
+            execution.quantity.add(key, booking.quantity());
+            requireDeleted(holder, booking.lot(), booking.victims(), execution);
+          }
+        }
+        case InventoryLotBatchProgram.ExactBookOut take -> {
+          if (!dryRun) {
+            var changed =
+                quantityCommands.bookOutExactQuantity(
+                    holder, execution.id(take.source()), take.quantity());
+            execution.quantity.remove(key, take.quantity());
             effects =
                 new StockChangeEffects(
                     effects.reduced() + changed.reduced(), effects.removed() + changed.removed());
@@ -113,13 +205,25 @@ final class InventoryLotBatchExecutor {
             throw new IllegalStateException("Markers belong to the prelude");
       }
     }
-    String key =
-        switch (step.intent()) {
-          case StockLotWritePlans.SetLotAmount set -> set.lot().key();
-          case StockLotWritePlans.RebookLot rebook -> rebook.request().lot().key();
-        };
     execution.touched.add(key);
-    return new StockLotWritePlans.Outcome(refusal, effects);
+    return new StockLotWritePlans.Outcome(
+        refusal,
+        effects,
+        dryRun || refusal != null
+            ? null
+            : new StockLotWritePlans.QuantityChange(before, execution.quantity.quantity(key)));
+  }
+
+  /** Checks every inverse against the same current state before any group mutation. */
+  private @Nullable RebookCommands.RebookRefusal checkRestore(
+      StockLotWritePlans.RestoreLot restore) {
+    for (var inverse : restore.inversePoolMoves()) {
+      var refusal = rebooks.rebook(inverse, true).refusal();
+      if (refusal != null) {
+        return refusal;
+      }
+    }
+    return null;
   }
 
   /**
@@ -182,14 +286,19 @@ final class InventoryLotBatchExecutor {
       var observed = reads.read(holder, List.of(expected.request().lot()));
       var actual =
           new InventoryLotBatchSimulation(
-                  observed, memberships.findDirectMembershipOrgUnitIds(holder))
+                  observed,
+                  memberships.findDirectMembershipOrgUnitIds(holder),
+                  quantities(observed),
+                  holder,
+                  new InventoryPoolRestoreProgram(
+                      List.of(), Set.of(), Set.of(), Set.of(), Set.of()))
               .simulate(List.of(new StockLotWritePlans.RebookLot(step, expected.request())));
       var selected =
           (InventoryLotBatchProgram.Rebooking)
               Objects.requireNonNull(actual.steps().get(step)).mutations().getFirst();
       if (selected.refusal() != expected.refusal()
           || !normalized(expected.takes(), execution)
-              .equals(normalized(selected.takes(), new Execution()))) {
+              .equals(normalized(selected.takes(), new Execution(Map.of(), List.of())))) {
         throw conflict();
       }
     }
@@ -340,6 +449,45 @@ final class InventoryLotBatchExecutor {
         .orElseThrow(InventoryLotBatchExecutor::conflict);
   }
 
+  /** Reads complete evidence of already named rows in one owning entity batch. */
+  private Map<UUID, StockQuantityComposition> quantities(
+      InventoryStockPlanningReads.LotRows observed) {
+    var result = new HashMap<UUID, StockQuantityComposition>();
+    for (var row : rows.findAllById(observed.entries().stream().map(StockRow::getId).toList())) {
+      result.put(row.getId(), checkedQuantity(row));
+    }
+    if (result.size() != observed.entries().size()) {
+      throw conflict();
+    }
+    return Map.copyOf(result);
+  }
+
+  /** Reads actual complete merge-victim evidence without a query per victim. */
+  private StockQuantityComposition quantity(
+      Set<InventoryLotBatchProgram.RowKey> victims, Execution execution) {
+    var ids = victims.stream().map(execution::id).toList();
+    var actual = rows.findAllById(ids);
+    if (actual.size() != ids.size()) {
+      throw conflict();
+    }
+    return InventoryQuantityComposition.canonical(
+        actual.stream().flatMap(row -> checkedQuantity(row).parts().stream()).toList());
+  }
+
+  /** Reads the actual command result without introducing a lock or a quantity identity. */
+  private StockQuantityComposition quantity(UUID id) {
+    return checkedQuantity(rows.findById(id).orElseThrow(InventoryLotBatchExecutor::conflict));
+  }
+
+  /** Requires complete persisted evidence to describe the actual physical amount. */
+  private static StockQuantityComposition checkedQuantity(InventoryItem row) {
+    var quantity = InventoryQuantityComposition.validated(row.getQuantityComposition());
+    if (quantity.totalQuanta() != ScuAmounts.toQuanta(row.getAmount())) {
+      throw conflict();
+    }
+    return quantity;
+  }
+
   /** Returns the normal retry conflict for an altered physical selection. */
   private static BusinessConflictException conflict() {
     return new BusinessConflictException("error.inventory.concurrent_scope_changed");
@@ -362,9 +510,17 @@ final class InventoryLotBatchExecutor {
 
   /** Private transaction-local result bindings and already executed lot dependencies. */
   static final class Execution {
+    private final InventoryLotQuantityLedger quantity;
     private final Map<InventoryLotBatchProgram.RowKey, UUID> created = new HashMap<>();
     private final Set<String> touched = new HashSet<>();
     private final Map<String, RebookCommands.RebookRefusal> refused = new HashMap<>();
+
+    /** Retains actual initial evidence and the confirmed logical marker assignments. */
+    Execution(
+        Map<String, StockQuantityComposition> quantities,
+        List<InventoryLotBatchProgram.Mark> prelude) {
+      quantity = new InventoryLotQuantityLedger(quantities, prelude);
+    }
 
     /** Resolves a real source or an actual survivor returned by an earlier owning command. */
     UUID id(InventoryLotBatchProgram.RowKey key) {

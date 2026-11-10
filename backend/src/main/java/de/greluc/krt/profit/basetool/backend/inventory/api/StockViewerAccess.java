@@ -42,4 +42,13 @@ public interface StockViewerAccess {
    * @return {@code true} iff the current caller may write to it.
    */
   boolean mayEditInventoryItem(UUID inventoryItemId, @Nullable UUID ownerId);
+
+  /**
+   * Reports full ordinary write authority for current scalar stock ownership.
+   *
+   * @param ownerId actual current per-user owner, or null when absent
+   * @param owningOrgUnitId actual current owning pool, or null for ownerless stock
+   * @return whether both current Inventory action gates permit the write
+   */
+  boolean mayEditInventoryIdentity(@Nullable UUID ownerId, @Nullable UUID owningOrgUnitId);
 }

@@ -141,6 +141,7 @@ public class AdminAuditLogPageController {
                   "MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED",
                   "INVENTORY_ITEM_UPDATED",
                   "INVENTORY_QUANTITY_CORRECTED",
+                  "INVENTORY_QUALITY_CORRECTED",
                   "INVENTORY_ITEM_MERGED",
                   "INVENTORY_ITEM_NOTE_UPDATED",
                   "INVENTORY_ALLOCATION_ADDED",

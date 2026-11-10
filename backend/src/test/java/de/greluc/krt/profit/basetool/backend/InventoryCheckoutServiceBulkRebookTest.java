@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutAudits;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
@@ -122,6 +123,7 @@ class InventoryCheckoutServiceBulkRebookTest {
             null,
             orgUnitStampingService,
             auditService,
+            new InventoryCheckoutAudits(auditService),
             eventPublisher);
     lenient()
         .when(inventoryItemRepository.save(any(InventoryItem.class)))

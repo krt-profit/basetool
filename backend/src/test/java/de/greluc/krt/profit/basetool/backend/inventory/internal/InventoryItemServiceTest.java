@@ -118,12 +118,14 @@ class InventoryItemServiceTest {
 
   private InventoryAggregationService realAggregationService;
   private InventoryCheckoutService realCheckoutService;
+  private InventoryOrderWrites orderWrites;
 
   @BeforeEach
   void wireDelegates() {
-    lenient()
-        .when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class)))
-        .thenReturn(true);
+    orderWrites =
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class));
+    lenient().when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
     lenient()
         .when(stockLevelService.lowSubjects())
         .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
@@ -155,12 +157,11 @@ class InventoryItemServiceTest {
             requestScopeResolver,
             orgUnitStampingService,
             auditService,
+            new InventoryCheckoutAudits(auditService),
             eventPublisher);
     inventoryItemService =
         new InventoryItemService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            orderWrites,
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -193,7 +194,7 @@ class InventoryItemServiceTest {
             realCheckoutService,
             new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false),
             new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-                null));
+                orderWrites));
   }
 
   @Test
@@ -730,9 +731,7 @@ class InventoryItemServiceTest {
   void createInventoryItem_stolenIsStoredWhenTheMarkerIsSwitchedOn() {
     InventoryItemService switchedOn =
         new InventoryItemService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            orderWrites,
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -765,7 +764,7 @@ class InventoryItemServiceTest {
             realCheckoutService,
             new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(true),
             new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-                null));
+                orderWrites));
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -1271,8 +1270,12 @@ class InventoryItemServiceTest {
     target.setId(targetUserId);
     when(inventoryAccessPolicy.mayBookInFor(targetUserId)).thenReturn(true);
     when(userRepository.findById(targetUserId)).thenReturn(Optional.of(target));
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
-    when(locationRepository.findById(locationId)).thenReturn(Optional.of(new Location()));
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
 
     inventoryItemService.createInventoryItem(dto, currentUserId);
@@ -2220,8 +2223,12 @@ class InventoryItemServiceTest {
     User user = new User();
     user.setId(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
-    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
+    Material material = new Material();
+    material.setId(dto.materialId());
+    Location location = new Location();
+    location.setId(dto.locationId());
+    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
+    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
 
     Squadron resolved = new Squadron();
     resolved.setId(pickedOrgUnitId);

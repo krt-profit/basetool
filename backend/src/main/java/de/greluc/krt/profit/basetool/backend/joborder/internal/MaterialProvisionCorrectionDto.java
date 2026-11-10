@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryRowVersionDto;
+import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -28,7 +29,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A scoped correction of a false original attribution or known physical quantity.
+ * A scoped correction of false original attribution, quality or known physical quantity.
  *
  * @param kind the false fact being corrected
  * @param version the observed provision version
@@ -38,6 +39,8 @@ import org.jetbrains.annotations.Nullable;
  * @param targetClaimVersion the observed corrected contribution version
  * @param stockVersions observed connected stock versions for a physical correction
  * @param targetStockRowId retained connected row selected for a truthful upward correction
+ * @param suppliedQuality the explicitly corrected original quality
+ * @param qualityStockRowIds consciously selected current rows whose known receipt portion is wrong
  */
 public record MaterialProvisionCorrectionDto(
     @NotNull Kind kind,
@@ -47,12 +50,21 @@ public record MaterialProvisionCorrectionDto(
     @Nullable UUID targetClaimId,
     @Nullable Long targetClaimVersion,
     @NotNull List<@Valid InventoryRowVersionDto> stockVersions,
-    @Nullable UUID targetStockRowId) {
+    @Nullable UUID targetStockRowId,
+    @Nullable @QualityValue Integer suppliedQuality,
+    List<UUID> qualityStockRowIds) {
+  /** Freezes the current-stock selection without an implicit choice. */
+  public MaterialProvisionCorrectionDto {
+    qualityStockRowIds = qualityStockRowIds == null ? List.of() : List.copyOf(qualityStockRowIds);
+  }
+
   /** The distinct ownership boundaries of connected false facts. */
   public enum Kind {
     /** Only the historically credited Staffel is wrong. */
     ATTRIBUTION,
     /** The original physical provision quantity is wrong. */
-    QUANTITY
+    QUANTITY,
+    /** The original supplied quality is wrong. */
+    QUALITY
   }
 }

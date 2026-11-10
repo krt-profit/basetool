@@ -77,6 +77,7 @@ web, naming its client (REQ-AUDIT-005):
   books the seller-chosen per-mission `INCOME` attributions, REQ-INV-027) / **quantity-split
   assignment** (add / change amount / remove a job-order or mission allocation —
   `INVENTORY_ALLOCATION_ADDED` / `INVENTORY_ALLOCATION_CHANGED` / `INVENTORY_ALLOCATION_REMOVED`,
+  including each actual job-order slice removal in single and bulk implicit releases,
   Variante C, REQ-INV-027) / personal-marker rebooking (Umbuchung — `INVENTORY_ITEM_DEPERSONALIZED`
   for personal→shared, `INVENTORY_ITEM_PERSONALIZED` for shared→personal, REQ-INV-007) / write-time
   stock merge (`INVENTORY_ITEM_MERGED` — `PIECE` automatically, `SCU` on the per-action opt-in,
@@ -95,8 +96,13 @@ web, naming its client (REQ-AUDIT-005):
   the „gestohlen“ marker (`INVENTORY_STOLEN_MARKED` / `INVENTORY_STOLEN_UNMARKED` per row or split,
   with the amount and whether it split; a selection writes one `INVENTORY_BULK_STOLEN_CHANGED`
   summary; an unchanged row records nothing, REQ-INV-053) /
+  connected false original material quantity corrections (`INVENTORY_QUANTITY_CORRECTED`, with
+  provision identity, old/new quantity and bounded reason; ordinary true later loss stays distinct)
+  and explicitly selected current-quality corrections (`INVENTORY_QUALITY_CORRECTED` per actually
+  changed connected source portion, with provision identity, old/new quality, affected quantity and
+  actual surviving row identity; a physical quality no-op emits neither a correction row nor a
+  routine notice; the independent historical correction stays in JobOrder audit and fact history) /
   an exchange client's stock write (REQ-XCH-016: a book-in `INVENTORY_ITEM_CREATED`, a book-out the
-  Connected false original material quantity corrections emit `INVENTORY_QUANTITY_CORRECTED` with the provision identity, old/new quantity and bounded reason; ordinary true later loss remains distinct.
   Lager's own `DISCARD` book-out, `INVENTORY_ITEM_CONSUMED`, a stolen flip the marker events above, each under the client's id) /
   the undo of a client's org-stock writes (`INVENTORY_ITEM_RESTORED` per shared row it removed,
   recreated or set back, with the amount afterwards and whether it was removed; an entry already as

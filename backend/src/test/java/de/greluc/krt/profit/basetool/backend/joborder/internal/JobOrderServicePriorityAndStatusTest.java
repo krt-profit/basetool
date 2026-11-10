@@ -91,6 +91,7 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private LiveSyncPublisher liveSyncPublisher;
 
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderItemFulfillmentGuard itemFulfillment;
   @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -129,6 +130,7 @@ class JobOrderServicePriorityAndStatusTest {
     service =
         new JobOrderService(
             jobOrderRepository,
+            itemFulfillment,
             profitHierarchy,
             responsibilityGuard,
             jobOrderAccessPolicy,
@@ -163,6 +165,7 @@ class JobOrderServicePriorityAndStatusTest {
             effects,
             materialClaimService,
             auditService,
+            null,
             null,
             jobOrderStockProjectionService,
             jobOrderPriorityService,
@@ -352,7 +355,7 @@ class JobOrderServicePriorityAndStatusTest {
           "un-completion sets priority = findMaxPriority + 1 = 6; "
               + "normalize doesn't see this order in lockAllJobOrders stub");
       verify(inventoryItemRepository, never())
-          .deleteJobOrderAllocationsByJobOrder(any(), org.mockito.ArgumentMatchers.anyCollection());
+          .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
       verify(effects, never()).publish(any(Object.class));
     }
@@ -386,7 +389,7 @@ class JobOrderServicePriorityAndStatusTest {
       assertNull(o.getPriority());
       verify(jobOrderRepository, never()).lockAllJobOrders();
       verify(inventoryItemRepository, never())
-          .deleteJobOrderAllocationsByJobOrder(any(), org.mockito.ArgumentMatchers.anyCollection());
+          .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
       verify(effects, never()).publish(any(Object.class));
     }
 
@@ -579,7 +582,7 @@ class JobOrderServicePriorityAndStatusTest {
       service.deleteJobOrder(ORDER_ID);
 
       verify(jobOrderRepository).delete(o);
-      verify(jobOrderRepository, times(1)).lockAllJobOrders();
+      verify(jobOrderRepository, never()).lockAllJobOrders();
       verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
     }
   }
@@ -648,7 +651,7 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository, never()).flush();
       verify(jobOrderRepository, never()).lockAllJobOrders();
       verify(inventoryItemRepository, never())
-          .deleteJobOrderAllocationsByJobOrder(any(), org.mockito.ArgumentMatchers.anyCollection());
+          .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
       verify(effects, never()).publish(any(Object.class));
     }
 

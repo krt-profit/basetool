@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.Rebook
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.RebookRefusal;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans.Intent;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,11 @@ import org.jetbrains.annotations.Nullable;
 
 /** The exact prospective physical operations and existing resources of one holder action. */
 record InventoryLotBatchProgram(
-    List<Mark> prelude, Map<Integer, Step> steps, Set<UUID> resources, Set<Integer> unavailable) {
+    List<Mark> prelude,
+    Map<Integer, Step> steps,
+    Set<UUID> resources,
+    Set<Integer> unavailable,
+    Map<RowKey, StockQuantityComposition> finalQuantities) {
 
   /** A real row identity or an action-local prospective result, never a quantity origin. */
   sealed interface RowKey permits Existing, Created {}
@@ -44,7 +49,8 @@ record InventoryLotBatchProgram(
   record Created(int step, int sequence) implements RowKey {}
 
   /** A physical command whose sources and destinations have already been selected. */
-  sealed interface Mutation permits BookIn, BookOut, Mark, Rebooking {}
+  sealed interface Mutation
+      permits BookIn, BookOut, RestoredBookIn, ExactBookOut, Mark, Rebooking {}
 
   /** A personal booking with its actual merge victims. */
   record BookIn(StockLot lot, BigDecimal amount, RowKey target, Set<RowKey> victims)
@@ -53,6 +59,14 @@ record InventoryLotBatchProgram(
   /** A free-stock deduction from one selected row. */
   record BookOut(RowKey source, BigDecimal amount) implements Mutation {}
 
+  /** An exact historical booking without a new physical origin. */
+  record RestoredBookIn(
+      StockLot lot, StockQuantityComposition quantity, RowKey target, Set<RowKey> victims)
+      implements Mutation {}
+
+  /** Exact existing parts removed through the ordinary owning discard rules. */
+  record ExactBookOut(RowKey source, StockQuantityComposition quantity) implements Mutation {}
+
   /** A whole-row marker change or an unearmarked split with its actual merge victims. */
   record Mark(
       RowKey source,
@@ -60,7 +74,11 @@ record InventoryLotBatchProgram(
       boolean stolen,
       BigDecimal amount,
       boolean whole,
-      Set<RowKey> victims)
+      Set<RowKey> victims,
+      StockQuantityComposition quantity,
+      int fallStep,
+      int riseStep,
+      Map<RowKey, Set<Integer>> restoreDependencies)
       implements Mutation {}
 
   /** One exact owning rebooking take and its resulting target. */
@@ -71,5 +89,6 @@ record InventoryLotBatchProgram(
       implements Mutation {}
 
   /** The immutable command sequence belonging to one final calling-policy operation. */
-  record Step(Intent intent, List<Mutation> mutations) {}
+  record Step(
+      Intent intent, List<Mutation> mutations, Map<RowKey, Set<Integer>> restoreDependencies) {}
 }

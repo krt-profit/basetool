@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInRule;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.StockBookInScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import java.util.List;
 import java.util.Optional;
@@ -53,11 +54,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
-/**
- * Pins the ADR-0229 lot-lock protocol as the Lager's stock commands take it: the key derivation is
- * unchanged by its move out of the exchange, the locks go in ascending key order, once per lot, and
- * a book-in records its audit event.
- */
+/** Verifies deterministic public stock preparation and ordinary owning command effects. */
 @ExtendWith({
   MockitoExtension.class,
   de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
@@ -102,11 +99,33 @@ class InventoryStockCommandsTest {
 
   @Test
   void theLocksAreTakenOncePerLotInAscendingKeyOrder() {
-    commands.lockLots(MEMBER, List.of("i:z|l:y|q:0|s:1", "m:x|l:y|q:0|s:0", "i:z|l:y|q:0|s:1"));
+    Material material = new Material();
+    material.setId(UUID.fromString("00000000-0000-0000-0000-000000000002"));
+    Location location = new Location();
+    location.setId(UUID.fromString("00000000-0000-0000-0000-000000000003"));
+    StockBookInScope lowerQuality =
+        new StockBookInScope(
+            MEMBER,
+            new StockLot(material, null, location, 600, false),
+            List.of(),
+            true,
+            null,
+            false);
+    StockBookInScope higherQuality =
+        new StockBookInScope(
+            MEMBER,
+            new StockLot(material, null, location, 700, false),
+            List.of(),
+            true,
+            null,
+            false);
+
+    commands.prepareWrites(
+        List.of(), List.of(lowerQuality, higherQuality, lowerQuality), List.of());
 
     InOrder order = inOrder(inventoryRepository);
-    order.verify(inventoryRepository).lockExchangeLot(-7584263154457246965L);
-    order.verify(inventoryRepository).lockExchangeLot(2346076593993176679L);
+    order.verify(inventoryRepository).lockExchangeLot(-2114118908776333092L);
+    order.verify(inventoryRepository).lockExchangeLot(5187390203041980872L);
     verify(inventoryRepository, times(2)).lockExchangeLot(anyLong());
   }
 

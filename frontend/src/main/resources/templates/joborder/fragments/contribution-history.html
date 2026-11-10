@@ -39,6 +39,26 @@
             <p><span th:text="#{orders.claim.history.credited}"></span>: <span th:text="${#numbers.formatDecimal(provision.amount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}"></span></p>
             <p><span th:text="${observed ? #messages.msg('orders.claim.history.physical') : #messages.msg('orders.claim.history.knownPortion')}"></span>: <span th:text="${#numbers.formatDecimal(provision.quantityAmount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}"></span></p>
             <p class="text-muted" th:unless="${observed}" th:text="#{orders.claim.history.unknownPhysical}"></p>
+            <p data-provision-quality th:if="${provision.suppliedQuality != null}" th:text="#{orders.claim.history.originalQuality(${provision.suppliedQuality})}"></p>
+            <p data-provision-quality th:unless="${provision.suppliedQuality != null}" th:text="#{orders.claim.history.unknownQuality(${provision.minimumSuppliedQuality})}"></p>
+            <p class="text-muted" th:if="${provision.factChanges.isEmpty()}" th:text="#{orders.claim.history.unavailableFacts}"></p>
+            <div th:unless="${provision.factChanges.isEmpty()}">
+                <h5 th:text="#{orders.claim.history.recordedFacts}"></h5>
+                <div class="table-responsive"><table class="data-table">
+                    <thead><tr><th th:text="#{orders.claim.history.when}"></th><th th:text="#{orders.claim.history.reason}"></th><th th:text="#{orders.claim.history.beforeFact}"></th><th th:text="#{orders.claim.history.afterFact}"></th></tr></thead>
+                    <tbody><tr data-provision-fact-change th:each="change : ${provision.factChanges}">
+                        <td><time th:datetime="${change.recordedAt}" th:text="${change.recordedAt}"></time></td>
+                        <td th:text="#{__${'orders.claim.history.factReason.' + change.reason}__}"></td>
+                        <td>
+                            <span th:if="${change.previous == null}" th:text="#{orders.claim.history.initialFact}"></span>
+                            <th:block th:if="${change.previous != null}">
+                                <div th:replace="~{joborder/fragments/contribution-history :: provisionFact(fact=${change.previous}, quantityType=${contribution.quantityType}, state='previous')}"></div>
+                            </th:block>
+                        </td>
+                        <td><div th:replace="~{joborder/fragments/contribution-history :: provisionFact(fact=${change.current}, quantityType=${contribution.quantityType}, state='current')}"></div></td>
+                    </tr></tbody>
+                </table></div>
+            </div>
             <button th:if="${provision.canCorrect}" type="button" class="btn btn-ghost" data-open-contribution-correction th:data-credit-id="${provision.id}" th:text="#{orders.claim.correction.open}"></button>
             <div data-correction-editor></div>
         </details>
@@ -47,30 +67,37 @@
 </th:block>
 <th:block th:fragment="editor">
 <form data-contribution-correction th:with="observed=${provision.evidence != null and provision.evidence.name() == 'OBSERVED'}" th:data-evidence="${provision.evidence}" th:data-order-id="${contributionOrderId}" th:data-credit-id="${provision.id}"
-      th:data-credit-version="${provision.version}" th:data-claim-version="${contribution.version}"
+      th:data-current-claim-id="${contribution.id}" th:data-credit-version="${provision.version}" th:data-claim-version="${contribution.version}"
       th:data-quantity-amount="${observed ? provision.quantityAmount : null}" th:data-credit-amount="${provision.amount}" th:data-piece="${contribution.quantityType == 'PIECE'}"
       th:data-error="#{orders.claim.correction.error}" th:data-success="#{orders.claim.correction.success}"
-      th:data-conflict="#{orders.claim.correction.conflict}">
+      th:data-conflict="#{orders.claim.correction.conflict}" th:data-stale="#{orders.claim.correction.staleChoice}">
     <p class="text-muted" th:text="#{orders.claim.correction.explanation}"></p>
     <p class="text-muted" th:unless="${observed}" th:text="#{orders.claim.correction.attributionOnly}"></p>
     <label class="form-group"><span th:text="#{orders.claim.correction.kind}"></span>
-        <select data-correction-kind><option value="ATTRIBUTION" th:text="#{orders.claim.correction.attribution}"></option><option th:if="${observed}" value="QUANTITY" th:text="#{orders.claim.correction.quantity}"></option></select>
+        <select data-correction-kind><option value="ATTRIBUTION" th:text="#{orders.claim.correction.attribution}"></option><option value="QUALITY" th:text="#{orders.claim.correction.quality}"></option><option th:if="${observed}" value="QUANTITY" th:text="#{orders.claim.correction.quantity}"></option></select>
     </label>
+    <div data-correction-quality hidden>
+        <label class="form-group"><span th:text="#{orders.claim.correction.suppliedQuality}"></span>
+            <input type="text" inputmode="numeric" data-number-input min="0" max="1000" step="1" data-correction-supplied-quality
+                   th:value="${provision.suppliedQuality}">
+        </label>
+        <p class="text-muted" th:text="#{orders.claim.correction.qualityHint}"></p>
+    </div>
     <label class="form-group" data-correction-attribution><span th:text="#{orders.claim.correction.target}"></span>
-        <select data-correction-target>
-            <option value="" th:text="#{orders.claim.correction.remove}"></option>
-            <option th:each="target : ${attributionTargets}" th:value="${target.claimId}" th:data-version="${target.claimVersion}"
-                    th:data-ended="${target.ended}" th:data-max="${target.maxAmount}"
-                    th:text="|${target.claimingOrgUnit.name} · ${target.ended ? #messages.msg('orders.claim.history.ended') : #messages.msg('orders.claim.history.open')} · ${#messages.msg('orders.claim.correction.maximum', #numbers.formatDecimal(target.maxAmount, 1, 'DEFAULT', contribution.quantityType == 'PIECE' ? 0 : 3, 'DEFAULT'))}|"></option>
-        </select>
+        <th:block th:replace="~{joborder/fragments/contribution-history :: attributionOptions}"></th:block>
     </label>
     <div th:if="${observed}" data-correction-stock hidden></div>
     <label class="form-group"><span th:text="#{orders.claim.correction.amount}"></span>
         <input type="text" inputmode="decimal" data-number-input data-correction-amount required value="0" min="0" th:step="${contribution.quantityType == 'PIECE' ? '1' : '0.001'}">
     </label>
+    <details data-correction-quality-stock hidden>
+        <summary th:text="#{orders.claim.correction.qualityStock}"></summary>
+        <p class="text-muted" th:text="#{orders.claim.correction.qualityStockHint}"></p>
+        <div data-correction-quality-stock-options></div>
+    </details>
     <p class="text-muted" data-correction-message role="status"></p>
     <button type="button" class="btn btn-ghost" data-correction-cancel th:text="#{general.cancel}"></button>
-    <button type="submit" class="btn btn--cta" th:text="#{orders.claim.correction.submit}"></button>
+    <button type="submit" formnovalidate class="btn btn--cta" th:text="#{orders.claim.correction.submit}"></button>
 </form>
 </th:block>
 <th:block th:fragment="quantityOptions">
@@ -84,5 +111,34 @@
 </label>
 <p class="text-muted" th:text="#{orders.claim.correction.stockTarget.hint}"></p>
 </th:block>
+<th:block th:fragment="attributionOptions">
+        <select data-correction-target>
+            <option value="" th:text="#{orders.claim.correction.remove}"></option>
+            <option th:each="target : ${attributionTargets}" th:value="${target.claimId}" th:data-version="${target.claimVersion}"
+                    th:data-ended="${target.ended}" th:data-max="${target.maxAmount}"
+                    th:text="|${target.claimingOrgUnit.name} · ${target.ended ? #messages.msg('orders.claim.history.ended') : #messages.msg('orders.claim.history.open')} · ${#messages.msg('orders.claim.correction.maximum', #numbers.formatDecimal(target.maxAmount, 1, 'DEFAULT', target.maxAmount % 1 == 0 ? 0 : 3, 'DEFAULT'))}|"></option>
+        </select>
+</th:block>
+<th:block th:fragment="qualityOptions">
+<p class="text-muted" th:if="${qualityOptions.isEmpty()}" th:text="#{orders.claim.correction.qualityStockEmpty}"></p>
+<div class="list-panel" th:each="row : ${qualityOptions}">
+    <label class="form-group">
+        <input type="checkbox" data-quality-stock-row th:value="${row.id}" th:data-version="${row.version}">
+        <span th:text="${row.holderDisplayName}"></span>
+        <span th:text="${row.locationName}"></span>
+        <span th:if="${row.owningOrgUnitName != null}" th:text="${row.owningOrgUnitName}"></span>
+        <span th:text="${row.personal ? #messages.msg('orders.claim.correction.poolPersonal') : #messages.msg('orders.claim.correction.poolOrg')}"></span>
+        <span th:if="${row.quality != null}" th:text="#{orders.claim.history.quality(${row.quality})}"></span>
+        <span th:text="#{orders.claim.correction.qualityStockAmount(${#numbers.formatDecimal(row.affectedAmount, 1, 'DEFAULT', 3, 'DEFAULT')}, ${#numbers.formatDecimal(row.amount, 1, 'DEFAULT', 3, 'DEFAULT')})}"></span>
+    </label>
+</div>
+</th:block>
+<div th:fragment="provisionFact(fact, quantityType, state)" th:data-fact-state="${state}"
+     th:with="unitName=${provisionUnitNames[fact.claimingOrgUnitId]}, quantityUnit=${quantityType == 'PIECE' ? #messages.msg('material.quantity.piece') : #messages.msg('material.quantity.scu')}">
+    <p><span th:text="${fact.quantityEvidence.name() == 'OBSERVED' ? #messages.msg('orders.claim.history.physical') : #messages.msg('orders.claim.history.knownPortion')}"></span>: <span th:text="|${#numbers.formatDecimal(fact.quantityAmount, 1, 'DEFAULT', quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')} ${quantityUnit}|"></span></p>
+    <p th:if="${fact.suppliedQuality != null}" th:text="#{orders.claim.history.originalQuality(${fact.suppliedQuality})}"></p>
+    <p th:unless="${fact.suppliedQuality != null}" th:text="#{orders.claim.history.unknownQuality(${fact.minimumSuppliedQuality})}"></p>
+    <p th:text="#{orders.claim.history.attributed(${unitName != null ? unitName : #messages.msg('orders.claim.history.unknownUnit')}, ${#numbers.formatDecimal(fact.creditedAmount, 1, 'DEFAULT', quantityType == 'PIECE' ? 0 : 3, 'DEFAULT')}, ${quantityUnit})}"></p>
+</div>
 </body>
 </html>

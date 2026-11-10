@@ -71,6 +71,9 @@ public class JobOrderEditor {
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
   private final JobOrderUnitHistory unitHistory;
 
+  /** The checked order and first captured mutation after exact resource revalidation. */
+  private record PreparedEdit(@NotNull JobOrder order, @NotNull JobOrderEditPlan plan) {}
+
   /**
    * Runs a versioned edit and projects the result.
    *
@@ -156,7 +159,45 @@ public class JobOrderEditor {
     run(id, gate, false, null, _ -> JobOrderEditPlan.of(mutation));
   }
 
+  /**
+   * Deletes an authorized order after the same complete resource preparation as ordinary edits.
+   *
+   * @param id the order to delete
+   * @param planner the complete release resources and deletion mutation
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
+   *     unknown
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when responsibility is
+   *     ineligible
+   * @throws AccessDeniedException when the caller is not an administrator
+   * @throws BusinessConflictException when the complete resource plan changes while waiting
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void deletePlanned(
+      @NotNull UUID id, @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
+    PreparedEdit prepared = prepare(id, JobOrderGate.ADMIN_DELETE, false, null, planner);
+    JobOrderEdit edit = prepared.plan().mutation().apply(prepared.order());
+    recordOutcome(edit);
+  }
+
   private JobOrder run(
+      @NotNull UUID id,
+      @NotNull JobOrderGate gate,
+      boolean versioned,
+      @Nullable Long expectedVersion,
+      @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
+    PreparedEdit prepared = prepare(id, gate, versioned, expectedVersion, planner);
+    JobOrder order = prepared.order();
+    JobOrderEditPlan planned = prepared.plan();
+    Set<UUID> previousParties = JobOrderUnitHistory.partyIds(order);
+    JobOrderEdit edit = planned.mutation().apply(order);
+    JobOrder result = edit.order();
+    materialPromises.reconcileOrder(id);
+    unitHistory.retainObservedParties(result, previousParties);
+    recordOutcome(edit);
+    return result;
+  }
+
+  private PreparedEdit prepare(
       @NotNull UUID id,
       @NotNull JobOrderGate gate,
       boolean versioned,
@@ -183,17 +224,16 @@ public class JobOrderEditor {
         || !Set.copyOf(scopes).equals(Set.copyOf(scopesOf(id, current.materialIds())))) {
       throw new BusinessConflictException("error.inventory.concurrent_scope_changed");
     }
-    Set<UUID> previousParties = JobOrderUnitHistory.partyIds(order);
-    JobOrderEdit edit = current.mutation().apply(order);
-    JobOrder result = edit.order();
-    materialPromises.reconcileOrder(id);
-    unitHistory.retainObservedParties(result, previousParties);
+    return new PreparedEdit(order, planned);
+  }
+
+  private void recordOutcome(@NotNull JobOrderEdit edit) {
     if (edit.type() != null) {
+      JobOrder affected = edit.order();
       auditRecorder.record(
-          edit.type(), result.getId(), JobOrderAuditLabel.of(result), null, edit.details());
+          edit.type(), affected.getId(), JobOrderAuditLabel.of(affected), null, edit.details());
     }
     edit.notices().forEach(effects::publish);
-    return result;
   }
 
   private List<OrderMaterialScope> scopesOf(@NotNull UUID id, @NotNull Set<UUID> materialIds) {

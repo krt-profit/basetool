@@ -1,6 +1,6 @@
 # ADR-0360 — Material promises track uncovered demand and explicit provision
 
-- **Status:** Accepted — planned, not implemented
+- **Status:** Accepted — S04 implementation under review
 - **Date:** 2026-11-09
 - **Deciders:** Repository owner (@greluc)
 - **Related:** [REQ-ORDERS-024](../specs/orders-material-claims.md) · REQ-ORDERS-025/-036/-037/-046 · [ADR-0356](0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md) · amendment to ADR-0092 · issues #3207, #3202, #3203
@@ -47,6 +47,12 @@ PostgreSQL exclusion constraint prevents overlapping credit for the same origin,
 or unrelated intervals remain independent. This is narrow known-quantity provenance, not a
 performance ledger or a workflow to verify quantities inside the game.
 
+Older exchange journals without recoverable physical composition retain their ordinary quantity
+undo under REQ-XCH-022. Restored unknown portions still cover demand but cannot create new Staffel
+credit. Inventory distinguishes that ineligibility from known restored composition and genuine new
+manual provision; it does not invent a new origin eligible for attribution. This introduces no
+additional user action and does not reject an otherwise valid legacy undo.
+
 A receipt separates its known actual composition from its clipped current attribution and its
 immutable processed-once evidence. Excess is not fictitious fulfillment. Connected downward
 correction adjusts every exact intersecting retained fact atomically under current authority;
@@ -65,12 +71,41 @@ changes. Historical quality/credit correction survives consumption without rever
 unknown historical quantity/composition remains unknown. This decision adds no correction of
 original material or other provision fields.
 
+The same action distinguishes the historical declaration from an explicit declaration that a
+selected current portion is also recorded at the wrong quality. Inventory changes only the known
+receipt intersection of that selected row, preserving unrelated full quantity evidence and other
+receipts. It reports the affected quantity and checks current authority and selected versions.
+Empty selection leaves current stock alone. Current equality and other historical receipts do
+not establish a quality timeline. Existing fungible allocation, donation coverage and mandatory
+PIECE merge rules still govern the physical action.
+
 Planning declares the full sorted order/material set before any stock lot/row lock, then locks all
 physical resources in the common deterministic order. Post-lock changes to source placement,
 allocation targets, merge candidates or connected receipt intersections conflict rather than
 acquire a late guard. Every capacity calculation observes the completed demand/stock action;
 intermediate states cannot proportionally cancel promises. Independently scoped client versions
 remain meaningful for each deliberately edited contribution and current Inventory resource.
+
+ITEM completion additionally has a per-order fulfillment section guard, acquired after hierarchy
+stabilization and before completion snapshots, material guards, stock and the priority sequence.
+Handover, item replacement and ITEM administrative deletion share it. Queue-affecting writes take
+the existing sorted priority sequence after complete physical preparation and before dirtying
+their order or children. Ordinary material planning closes its first nonempty complete set.
+Sequential independent order plans during hierarchy maintenance require proof from the owning
+service that this transaction acquired the exclusive hierarchy lock first. A later lock upgrade
+does not qualify. Every ordinary stock writer takes the shared hierarchy prerequisite before any
+lot or row, including an unlinked lot, so maintenance holds that resource order for its full run.
+
+Historical restoration uses the order hierarchy, complete material set, complete sorted restoration
+evidence guards, fresh global presence/placement validation, complete sorted physical lots and
+deterministic rows, in that order. Typed known-origin and real legacy-journal-reference identities
+remain separate from their deduplicated hashed advisory keys. Declare every possible accepted
+addition before the first guard; confirmation may narrow it but cannot add another identity.
+Even an empty closed set belongs to the originating transaction synchronization. A handle cannot
+be reused by a suspended or nested transaction. Recheck global evidence after guard/lot waits and
+validate final uniqueness; the guard alone does not prove absence. Every historical reintroduction
+writer joins this protocol. Ordinary atomic transforms retain their existing complete source and
+destination locks and preserve evidence. Genuine new manual provision adds no restoration identity.
 
 Migration distinguishes observed actual receipt facts from a legacy credited subset and its
 known quality lower bound. Unknown total or original quality stays unknown. Immutable applied

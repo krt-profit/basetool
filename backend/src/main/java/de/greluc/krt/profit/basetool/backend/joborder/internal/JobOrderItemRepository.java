@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Repository for the ordered finished-item lines of {@code ITEM} job orders. */
@@ -49,4 +51,19 @@ public interface JobOrderItemRepository extends JpaRepository<JobOrderItem, UUID
       ORDER BY o.displayId, gi.name
       """)
   List<JobOrderItemBlueprintDrift> findBlueprintOutputDrift();
+
+  /**
+   * Reads fresh complete delivery and manufacturing counters without managed collection reuse.
+   *
+   * @param orderId the owning item order
+   * @return current item-line facts in identity order
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.joborder.internal.ItemHandoverRequirement(
+          i.id, i.version, g.id, i.amount, i.manufacturedAmount, i.deliveredAmount)
+      FROM JobOrderItem i LEFT JOIN i.gameItem g
+      WHERE i.jobOrder.id = :orderId ORDER BY i.id
+      """)
+  List<ItemHandoverRequirement> handoverRequirements(@Param("orderId") @NotNull UUID orderId);
 }

@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutAudits;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
@@ -88,6 +89,7 @@ class InventoryItemServiceBulkCheckoutTest {
             null,
             null,
             auditService,
+            new InventoryCheckoutAudits(auditService),
             eventPublisher);
   }
 
@@ -123,8 +125,8 @@ class InventoryItemServiceBulkCheckoutTest {
   @Test
   void bulkCheckout_successfullyRemovesMultipleItems() {
     UUID userId = UUID.randomUUID();
-    UUID itemId1 = UUID.randomUUID();
-    UUID itemId2 = UUID.randomUUID();
+    UUID itemId1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID itemId2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     InventoryItem item1 = itemOwnedBy(itemId1, userId);
     InventoryItem item2 = itemOwnedBy(itemId2, userId);
@@ -250,8 +252,8 @@ class InventoryItemServiceBulkCheckoutTest {
   void bulkCheckout_stopsImmediately_whenFirstItemBelongsToOtherUser() {
     UUID currentUserId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
-    UUID itemId1 = UUID.randomUUID();
-    UUID itemId2 = UUID.randomUUID();
+    UUID itemId1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID itemId2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     InventoryItem foreignItem = itemOwnedBy(itemId1, otherUserId);
     when(inventoryItemRepository.findByIdForUpdate(itemId1)).thenReturn(Optional.of(foreignItem));

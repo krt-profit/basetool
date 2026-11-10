@@ -29,6 +29,12 @@ original client versions are now stale. Incompatible terms under the same submit
 conflict. A deliberate correction or replacement preserves lineage; a genuinely new payment is
 another operation. An authorised outcome lookup supports unknown browser results and reload.
 
+The first accepted, durable monetary submission also closes administrator hard-delete of the
+aUEC order. This includes a Bank-coupled request before approval and remains true if an attempt
+is later rejected, withdrawn or replaced. Empty balances or corrections do not reopen deletion;
+use cancellation and preserve the operation lineage. REQ-ORDERS-063 owns this lifecycle boundary,
+including its race with first submission, and REQ-ORDERS-064 retains the privacy contract.
+
 Keep independent client versions for the data actually edited or relied upon. Protect related
 holder effects and target/net-handover/lifecycle derivation through narrow internal guards,
 without using a screen-wide client version. Financial legs, explicit provision, commitment

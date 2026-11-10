@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -40,12 +41,17 @@ final class InventoryLotProspectiveRows {
   private final Map<InventoryLotBatchProgram.RowKey, Row> rows = new LinkedHashMap<>();
   private final Set<UUID> resources = new HashSet<>();
   private final Map<Integer, Integer> sequences = new HashMap<>();
-  private final Instant creationFloor = Instant.now();
+  private final Instant creationFloor;
+  private final Map<InventoryLotBatchProgram.RowKey, Set<Integer>> selectedDependencies =
+      new LinkedHashMap<>();
   private int creationOrder;
   private int step;
 
   /** Creates independent prospective state from immutable scalar observations. */
-  InventoryLotProspectiveRows(InventoryStockPlanningReads.LotRows observed) {
+  InventoryLotProspectiveRows(
+      InventoryStockPlanningReads.LotRows observed,
+      Map<UUID, StockQuantityComposition> quantities) {
+    creationFloor = Instant.now();
     for (InventoryStockRowSnapshot row : observed.entries()) {
       var key = new InventoryLotBatchProgram.Existing(row.getId());
       rows.put(
@@ -67,8 +73,16 @@ final class InventoryLotProspectiveRows {
               row.donationReserved(),
               row.getOffer().offered(),
               row.getOffer().activeAmount(),
-              row.getCreatedAt()));
+              row.getCreatedAt(),
+              quantities.get(row.getId()),
+              Set.of()));
     }
+  }
+
+  /** Copies immutable quantity proof and independent mutable physical selection facts. */
+  private InventoryLotProspectiveRows(InventoryLotProspectiveRows source) {
+    creationFloor = source.creationFloor;
+    adopt(source);
   }
 
   /** Returns the existing physical resources selected by all simulated mutations. */
@@ -79,6 +93,97 @@ final class InventoryLotProspectiveRows {
   /** Selects the stable action step that owns subsequent prospective creates. */
   void beginStep(int nextStep) {
     step = nextStep;
+    selectedDependencies.clear();
+  }
+
+  /** Returns immutable accepted-prefix facts for the sources actually selected by this step. */
+  Map<InventoryLotBatchProgram.RowKey, Set<Integer>> selectedDependencies() {
+    return Map.copyOf(selectedDependencies);
+  }
+
+  /** Copies the physical state for effect-free whole-group prechecks. */
+  InventoryLotProspectiveRows fork() {
+    return new InventoryLotProspectiveRows(this);
+  }
+
+  /** Retains the complete state only after every operation of a candidate group is accepted. */
+  void adopt(InventoryLotProspectiveRows candidate) {
+    rows.clear();
+    candidate.rows.forEach((key, row) -> rows.put(key, row.copy()));
+    resources.clear();
+    resources.addAll(candidate.resources);
+    sequences.clear();
+    sequences.putAll(candidate.sequences);
+    selectedDependencies.clear();
+    selectedDependencies.putAll(candidate.selectedDependencies);
+    creationOrder = candidate.creationOrder;
+    step = candidate.step;
+  }
+
+  /** Applies only actual accepted historical writes to the declared personal lot world. */
+  void applyEntryPrefix(UUID holder, InventoryPoolRestoreProgram prefix, Set<String> declaredLots) {
+    for (var entry : prefix.steps()) {
+      if (!entry.decision().changes()) {
+        continue;
+      }
+      var key = new InventoryLotBatchProgram.Existing(entry.intent().request().entryId());
+      rows.remove(key);
+      var target = entry.decision().targetState();
+      if (target == null
+          || !holder.equals(target.holder())
+          || !declaredLots.contains(target.lotKey())) {
+        continue;
+      }
+      var before = entry.before();
+      var resolved = Objects.requireNonNull(entry.decision().target());
+      double donations = before.map(value -> value.row().donationReserved()).orElse(0.0);
+      boolean offered = before.map(value -> value.row().getOffer().offered()).orElse(false);
+      double activeOffer = before.map(value -> value.row().getOffer().activeAmount()).orElse(0.0);
+      Instant created = before.map(value -> value.row().getCreatedAt()).orElse(null);
+      rows.put(
+          key,
+          new Row(
+              key,
+              resolved.lot(),
+              false,
+              target.poolUnitId(),
+              BigDecimal.valueOf(target.amount()),
+              new HashMap<>(target.jobOrders()),
+              target.missions().values().stream().mapToDouble(Double::doubleValue).sum(),
+              !target.missions().isEmpty(),
+              donations,
+              offered,
+              Math.min(activeOffer, target.amount()),
+              created,
+              Objects.requireNonNull(target.completeQuantity()),
+              Set.of(entry.intent().step())));
+    }
+  }
+
+  /**
+   * Selects the actual leading proof of a source without creating a prospective physical origin.
+   */
+  @Nullable
+  StockQuantityComposition quantityPrefix(Row row, BigDecimal amount) {
+    return row.quantity == null
+        ? null
+        : InventoryQuantityComposition.partition(
+                row.quantity, amount.movePointRight(3).longValueExact())
+            .taken();
+  }
+
+  /**
+   * Returns complete current proof for a restoration source that cannot contain a new manual row.
+   */
+  StockQuantityComposition requireQuantity(Row row) {
+    return Objects.requireNonNull(row.quantity);
+  }
+
+  /** Returns the complete evidence of every surviving row in the supported restoration form. */
+  Map<InventoryLotBatchProgram.RowKey, StockQuantityComposition> quantities() {
+    Map<InventoryLotBatchProgram.RowKey, StockQuantityComposition> result = new LinkedHashMap<>();
+    rows.forEach((key, row) -> result.put(key, requireQuantity(row)));
+    return Map.copyOf(result);
   }
 
   /** Returns the currently live row identified by a real or prospective key. */
@@ -112,7 +217,13 @@ final class InventoryLotProspectiveRows {
   }
 
   /** Creates a prospective unearmarked row with an action-local result key. */
-  Row create(StockLot lot, boolean personal, @Nullable UUID unit, BigDecimal amount) {
+  Row create(
+      StockLot lot,
+      boolean personal,
+      @Nullable UUID unit,
+      BigDecimal amount,
+      @Nullable StockQuantityComposition quantity,
+      Set<Integer> restoredBy) {
     int sequence = sequences.merge(step, 1, Integer::sum) - 1;
     Row row =
         new Row(
@@ -127,7 +238,9 @@ final class InventoryLotProspectiveRows {
             0.0,
             false,
             0.0,
-            creationFloor);
+            creationFloor,
+            quantity,
+            restoredBy);
     row.creationOrder = creationOrder++;
     rows.put(row.key, row);
     return row;
@@ -135,7 +248,19 @@ final class InventoryLotProspectiveRows {
 
   /** Marks an actual mutation resource and reduces its quantity, retaining its reservations. */
   void lower(Row row, BigDecimal amount) {
+    StockQuantityComposition remaining =
+        row.quantity == null
+            ? null
+            : InventoryQuantityComposition.partition(
+                    row.quantity, amount.movePointRight(3).longValueExact())
+                .remaining();
+    lower(row, amount, remaining);
+  }
+
+  /** Retains reservations and records the actual selected prefix dependencies. */
+  private void lower(Row row, BigDecimal amount, @Nullable StockQuantityComposition remaining) {
     touch(row);
+    row.quantity = remaining;
     row.amount = row.amount.subtract(amount);
     row.activeOffer = Math.min(row.activeOffer, row.amount.doubleValue());
     if (row.amount.signum() == 0) {
@@ -143,8 +268,20 @@ final class InventoryLotProspectiveRows {
     }
   }
 
+  /** Removes exact actual intervals without substituting an arbitrary physical prefix. */
+  void lowerExact(Row row, StockQuantityComposition removed) {
+    StockQuantityComposition before = requireQuantity(row);
+    StockQuantityComposition remaining = InventoryQuantityComposition.subtract(before, removed);
+    if (Math.subtractExact(before.totalQuanta(), remaining.totalQuanta())
+        != removed.totalQuanta()) {
+      throw new IllegalArgumentException("An exact source must contain every requested interval");
+    }
+    lower(row, BigDecimal.valueOf(removed.totalQuanta(), 3), remaining);
+  }
+
   /** Marks a selected source without assigning it a new physical or quantity identity. */
   void touch(Row row) {
+    selectedDependencies.put(row.key, row.restoredBy);
     if (row.key instanceof InventoryLotBatchProgram.Existing existing) {
       resources.add(existing.id());
     }
@@ -164,7 +301,7 @@ final class InventoryLotProspectiveRows {
       return Set.of();
     }
     Set<InventoryLotBatchProgram.RowKey> victims = new HashSet<>();
-    for (Row row : new ArrayList<>(rows.values())) {
+    for (Row row : rows.values().stream().sorted(mergeOrder()).toList()) {
       if (row == survivor
           || row.offered
           || row.personal != survivor.personal
@@ -176,6 +313,16 @@ final class InventoryLotProspectiveRows {
       touch(survivor);
       victims.add(row.key);
       survivor.amount = survivor.amount.add(row.amount);
+      if (survivor.quantity == null || row.quantity == null) {
+        survivor.quantity = null;
+      } else {
+        var combined = new ArrayList<>(survivor.quantity.parts());
+        combined.addAll(row.quantity.parts());
+        survivor.quantity = InventoryQuantityComposition.canonical(combined);
+      }
+      Set<Integer> dependencies = new HashSet<>(survivor.restoredBy);
+      dependencies.addAll(row.restoredBy);
+      survivor.restoredBy = Set.copyOf(dependencies);
       row.orders.forEach((order, amount) -> survivor.orders.merge(order, amount, Double::sum));
       survivor.missions += row.missions;
       survivor.missionPresent |= row.missionPresent;
@@ -191,26 +338,37 @@ final class InventoryLotProspectiveRows {
   private static Comparator<Row> oldest(boolean javaIds) {
     return Comparator.comparing(
             (Row row) -> row.createdAt, Comparator.nullsFirst(Comparator.naturalOrder()))
-        .thenComparing((left, right) -> {
-          if (left.key instanceof InventoryLotBatchProgram.Existing a
-              && right.key instanceof InventoryLotBatchProgram.Existing b) {
-            if (javaIds) {
-              return a.id().compareTo(b.id());
-            }
-            int first =
-                Long.compareUnsigned(
-                    a.id().getMostSignificantBits(), b.id().getMostSignificantBits());
-            return first == 0
-                ? Long.compareUnsigned(
-                    a.id().getLeastSignificantBits(), b.id().getLeastSignificantBits())
-                : first;
-          }
-          if (left.key instanceof InventoryLotBatchProgram.Created
-              && right.key instanceof InventoryLotBatchProgram.Created) {
-            return Integer.compare(left.creationOrder, right.creationOrder);
-          }
-          return left.key instanceof InventoryLotBatchProgram.Existing ? -1 : 1;
-        });
+        .thenComparing(identityOrder(javaIds));
+  }
+
+  /** Matches the owning SQL merge order, including its nullable creation timestamp. */
+  private static Comparator<Row> mergeOrder() {
+    return Comparator.comparing(
+            (Row row) -> row.createdAt, Comparator.nullsLast(Comparator.naturalOrder()))
+        .thenComparing(identityOrder(false));
+  }
+
+  /** Retains the owning UUID convention and relative order of action-local created rows. */
+  private static Comparator<Row> identityOrder(boolean javaIds) {
+    return (left, right) -> {
+      if (left.key instanceof InventoryLotBatchProgram.Existing a
+          && right.key instanceof InventoryLotBatchProgram.Existing b) {
+        if (javaIds) {
+          return a.id().compareTo(b.id());
+        }
+        int first =
+            Long.compareUnsigned(a.id().getMostSignificantBits(), b.id().getMostSignificantBits());
+        return first == 0
+            ? Long.compareUnsigned(
+                a.id().getLeastSignificantBits(), b.id().getLeastSignificantBits())
+            : first;
+      }
+      if (left.key instanceof InventoryLotBatchProgram.Created
+          && right.key instanceof InventoryLotBatchProgram.Created) {
+        return Integer.compare(left.creationOrder, right.creationOrder);
+      }
+      return left.key instanceof InventoryLotBatchProgram.Existing ? -1 : 1;
+    };
   }
 
   /**
@@ -230,6 +388,8 @@ final class InventoryLotProspectiveRows {
     private final boolean offered;
     private double activeOffer;
     private final @Nullable Instant createdAt;
+    private @Nullable StockQuantityComposition quantity;
+    private Set<Integer> restoredBy;
     private int creationOrder;
 
     /** Constructs independent physical planning facts. */
@@ -245,7 +405,9 @@ final class InventoryLotProspectiveRows {
         double donations,
         boolean offered,
         double activeOffer,
-        @Nullable Instant createdAt) {
+        @Nullable Instant createdAt,
+        @Nullable StockQuantityComposition quantity,
+        Set<Integer> restoredBy) {
       this.key = key;
       this.lot = lot;
       this.personal = personal;
@@ -258,6 +420,30 @@ final class InventoryLotProspectiveRows {
       this.offered = offered;
       this.activeOffer = activeOffer;
       this.createdAt = createdAt;
+      this.quantity = quantity;
+      this.restoredBy = Set.copyOf(restoredBy);
+    }
+
+    /** Copies physical facts without sharing mutable allocation or dependency containers. */
+    private Row copy() {
+      Row copy =
+          new Row(
+              key,
+              lot,
+              personal,
+              unit,
+              amount,
+              new HashMap<>(orders),
+              missions,
+              missionPresent,
+              donations,
+              offered,
+              activeOffer,
+              createdAt,
+              quantity,
+              restoredBy);
+      copy.creationOrder = creationOrder;
+      return copy;
     }
 
     /** Returns the canonical quantity facts used by free-prefix and stolen selection. */

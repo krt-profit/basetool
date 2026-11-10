@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
-import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryQuantityCorrectionOptionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AssigneeNoteRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto;
@@ -45,12 +44,9 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGr
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderNumberHitDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttributionDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialAttributionTargetDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialContributionHistoryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandSummaryDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialProvisionCorrectionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
@@ -131,87 +127,6 @@ public class JobOrderBackendClient {
 
   private static final ParameterizedTypeReference<List<JobOrderNumberHitDto>> LIST_OF_NUMBER_HIT =
       new ParameterizedTypeReference<>() {};
-
-  /** Retained current and ended material contribution facts. */
-  private static final ParameterizedTypeReference<List<MaterialContributionHistoryDto>>
-      LIST_OF_CONTRIBUTION_HISTORY = new ParameterizedTypeReference<>() {};
-
-  /**
-   * Reads current and ended facts through the backend's order-specific read authorization.
-   *
-   * @param id the concrete readable order
-   * @return retained contributions, or null when the backend sends no body
-   */
-  @Nullable
-  public List<MaterialContributionHistoryDto> contributionHistory(@NotNull UUID id) {
-    return backendApiClient.get(
-        "/api/v1/orders/{id}/claims/history", LIST_OF_CONTRIBUTION_HISTORY, id);
-  }
-
-  /**
-   * Corrects a false retained provision through current backend authority and scoped versions.
-   *
-   * @param id the order
-   * @param creditId the provision
-   * @param correction the truthful connected facts
-   * @return refreshed contribution history, or null when no response body was sent
-   */
-  @Nullable
-  public List<MaterialContributionHistoryDto> correctProvision(
-      @NotNull UUID id,
-      @NotNull UUID creditId,
-      @NotNull MaterialProvisionCorrectionDto correction) {
-    var result =
-        backendApiClient.post(
-            "/api/v1/orders/{id}/claims/provisions/{creditId}/correction",
-            correction,
-            MaterialContributionHistoryDto[].class,
-            id,
-            creditId);
-    return result == null ? null : List.of(result);
-  }
-
-  /** Authorized historical attribution targets. */
-  private static final ParameterizedTypeReference<List<MaterialAttributionTargetDto>>
-      LIST_OF_ATTRIBUTION_TARGET = new ParameterizedTypeReference<>() {};
-
-  /** Connected physical rows whose current Inventory grants permit correction. */
-  private static final ParameterizedTypeReference<List<InventoryQuantityCorrectionOptionDto>>
-      LIST_OF_QUANTITY_OPTION = new ParameterizedTypeReference<>() {};
-
-  /**
-   * Reads existing historical contribution targets authorized for this original provision.
-   *
-   * @param id the readable order
-   * @param creditId the original provision
-   * @return permitted existing targets, including ended contributions
-   */
-  @Nullable
-  public List<MaterialAttributionTargetDto> attributionOptions(
-      @NotNull UUID id, @NotNull UUID creditId) {
-    return backendApiClient.get(
-        "/api/v1/orders/{id}/claims/provisions/{creditId}/attribution-options",
-        LIST_OF_ATTRIBUTION_TARGET,
-        id,
-        creditId);
-  }
-
-  /**
-   * Reads connected stock rows after current Inventory correction grants are checked.
-   *
-   * @param id the order
-   * @param creditId the original provision
-   * @return permitted retained physical rows
-   */
-  @Nullable
-  public List<InventoryQuantityCorrectionOptionDto> quantityCorrectionOptions(
-      @NotNull UUID id, @NotNull UUID creditId) {
-    return backendApiClient.get(
-        "/api/v1/orders/{id}/claims/provisions/{creditId}/correction-options",
-        LIST_OF_QUANTITY_OPTION,
-        id,
-        creditId);
-  }
 
   /** Current promise buckets used by the ordinary Inventory provision picker. */
   private static final ParameterizedTypeReference<List<ClaimBucketDto>> LIST_OF_CLAIM_BUCKET =

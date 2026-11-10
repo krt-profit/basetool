@@ -494,6 +494,10 @@ class SupplyDonationServiceTest {
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
     when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
     when(stockReads.donationEarmarkedRowIds(donation.getId())).thenReturn(List.of(rowId));
+    StockRow carrier = org.mockito.Mockito.mock(StockRow.class);
+    when(carrier.getMaterial()).thenReturn(material);
+    when(carrier.getQuality()).thenReturn(donation.getQuality());
+    when(stockReads.findRow(rowId)).thenReturn(Optional.of(carrier));
     when(donationRepository.saveAndFlush(donation)).thenReturn(donation);
 
     service.receive(donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L));

@@ -19,12 +19,13 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
-import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.RebookDirection;
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands.RebookRefusal;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans.Intent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans.RebookLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans.RestoreLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans.SetLotAmount;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,15 +43,23 @@ import java.util.UUID;
 final class InventoryLotBatchSimulation {
   private final InventoryLotProspectiveRows rows;
   private final Set<UUID> memberships;
+  private final boolean hasEntryPrefix;
   private final Map<Integer, BigDecimal> flipped = new HashMap<>();
   private final List<InventoryLotBatchProgram.Mark> prelude = new ArrayList<>();
   private final Map<String, RebookRefusal> refusedLots = new HashMap<>();
   private final Set<Integer> unavailable = new HashSet<>();
 
   /** Creates independent physical state for one preliminary or final operation sequence. */
-  InventoryLotBatchSimulation(InventoryStockPlanningReads.LotRows observed, Set<UUID> memberships) {
-    rows = new InventoryLotProspectiveRows(observed);
+  InventoryLotBatchSimulation(
+      InventoryStockPlanningReads.LotRows observed,
+      Set<UUID> memberships,
+      Map<UUID, StockQuantityComposition> quantities,
+      UUID holder,
+      InventoryPoolRestoreProgram entryPrefix) {
+    rows = new InventoryLotProspectiveRows(observed, quantities);
+    rows.applyEntryPrefix(holder, entryPrefix, observed.rows().keySet());
     this.memberships = memberships;
+    hasEntryPrefix = !entryPrefix.steps().isEmpty();
   }
 
   /** Returns the complete physical program, including its once-only stolen prelude. */
@@ -64,14 +73,29 @@ final class InventoryLotBatchSimulation {
           switch (intent) {
             case SetLotAmount set -> unavailable.contains(set.step()) ? List.of() : setAmount(set);
             case RebookLot rebook -> List.of(rebook(rebook));
+            case RestoreLot restore -> {
+              var restored = InventoryLotRestoreSimulation.select(restore, rows, memberships);
+              if (restored.unavailable()) {
+                unavailable.add(restore.step());
+              }
+              yield restored.mutations();
+            }
           };
-      if (steps.putIfAbsent(intent.step(), new InventoryLotBatchProgram.Step(intent, mutations))
+      if (steps.putIfAbsent(
+              intent.step(),
+              new InventoryLotBatchProgram.Step(intent, mutations, rows.selectedDependencies()))
           != null) {
         throw new IllegalArgumentException("Stock action step identities must be unique");
       }
     }
     return new InventoryLotBatchProgram(
-        List.copyOf(prelude), Map.copyOf(steps), rows.resources(), Set.copyOf(unavailable));
+        List.copyOf(prelude),
+        Map.copyOf(steps),
+        rows.resources(),
+        Set.copyOf(unavailable),
+        hasEntryPrefix || intents.stream().anyMatch(RestoreLot.class::isInstance)
+            ? rows.quantities()
+            : Map.of());
   }
 
   /** Leaves stale total-driven intents unexecuted so the calling policy can decide its refusal. */
@@ -145,12 +169,21 @@ final class InventoryLotBatchSimulation {
         BigDecimal marked = BigDecimal.ZERO;
         for (var draw : draws) {
           var source = rows.require(draw.key());
+          StockQuantityComposition markedQuantity =
+              Objects.requireNonNull(rows.quantityPrefix(source, draw.amount()));
           InventoryLotProspectiveRows.Row target;
           if (draw.whole()) {
             rows.place(source, rise.lot(), source.isPersonal(), source.getUnit());
             target = source;
           } else {
-            target = rows.create(rise.lot(), source.isPersonal(), source.getUnit(), draw.amount());
+            target =
+                rows.create(
+                    rise.lot(),
+                    source.isPersonal(),
+                    source.getUnit(),
+                    draw.amount(),
+                    markedQuantity,
+                    source.getRestoredBy());
             rows.lower(source, draw.amount());
           }
           var victims = rows.merge(target, whole(rise.lot()));
@@ -161,7 +194,11 @@ final class InventoryLotBatchSimulation {
                   rise.lot().stolen(),
                   draw.amount(),
                   draw.whole(),
-                  victims));
+                  victims,
+                  markedQuantity,
+                  fall.step(),
+                  rise.step(),
+                  rows.selectedDependencies()));
           marked = marked.add(draw.amount());
         }
         left = left.subtract(marked);
@@ -180,7 +217,7 @@ final class InventoryLotBatchSimulation {
       return List.of();
     }
     if (delta.signum() > 0) {
-      var target = rows.create(set.lot(), true, null, booked);
+      var target = rows.create(set.lot(), true, null, booked, null, Set.of());
       var victims = rows.merge(target, whole(set.lot()));
       return List.of(
           new InventoryLotBatchProgram.BookIn(set.lot(), booked, target.getKey(), victims));
@@ -206,47 +243,18 @@ final class InventoryLotBatchSimulation {
     return List.copyOf(mutations);
   }
 
-  /** Simulates the owning canonical rebooking decision and exact destination survivor. */
+  /** Preserves the ordinary earlier-refusal dependency around the shared owning selection. */
   private InventoryLotBatchProgram.Rebooking rebook(RebookLot intent) {
     var request = intent.request();
     if (refusedLots.containsKey(request.lot().key())) {
       return new InventoryLotBatchProgram.Rebooking(
           request, refusedLots.get(request.lot().key()), List.of());
     }
-    boolean toPool = request.direction() == RebookDirection.TO_POOL;
-    if (toPool && !memberships.contains(request.poolUnitId())) {
-      refusedLots.put(request.lot().key(), RebookRefusal.NOT_A_MEMBER);
-      return new InventoryLotBatchProgram.Rebooking(request, RebookRefusal.NOT_A_MEMBER, List.of());
-    }
-    var sources =
-        rows.rebookSources(request.lot(), request.poolUnitId(), toPool).stream()
-            .map(InventoryLotProspectiveRows.Row::rebookSource)
-            .toList();
-    var selected =
-        InventoryStockDecisions.selectRebookSources(
-            sources, request.amount(), toPool, whole(request.lot()));
+    var selected = InventoryLotRebookSimulation.select(intent, rows, memberships);
     if (selected.refusal() != null) {
       refusedLots.put(request.lot().key(), selected.refusal());
     }
-    List<InventoryLotBatchProgram.Transfer> takes = new ArrayList<>();
-    for (var take : selected.takes()) {
-      var source = rows.require(take.key());
-      BigDecimal amount = BigDecimal.valueOf(take.amount());
-      InventoryLotProspectiveRows.Row target;
-      if (toPool && !source.isPersonal() && amount.compareTo(source.getAmount()) == 0) {
-        rows.place(source, request.lot(), false, request.poolUnitId());
-        target = source;
-      } else {
-        target =
-            rows.create(
-                request.lot(), !toPool, toPool ? request.poolUnitId() : source.getUnit(), amount);
-        rows.lower(source, amount);
-      }
-      var victims = rows.merge(target, whole(request.lot()));
-      takes.add(
-          new InventoryLotBatchProgram.Transfer(source.getKey(), target.getKey(), amount, victims));
-    }
-    return new InventoryLotBatchProgram.Rebooking(request, selected.refusal(), List.copyOf(takes));
+    return selected;
   }
 
   /** Returns the owning whole-unit merge and quantity policy of a physical lot. */

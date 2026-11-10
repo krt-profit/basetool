@@ -705,7 +705,9 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
             target == null ? null : target.id(),
             target == null ? null : target.version(),
             List.of(),
-            null);
+            null,
+            null,
+            List.of());
     mvc()
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(

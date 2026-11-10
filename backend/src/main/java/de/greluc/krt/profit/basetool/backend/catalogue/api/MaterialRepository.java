@@ -274,4 +274,34 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
    * @return the raw materials, in no particular order
    */
   List<Material> findAllByRefinedMaterialIdIn(Collection<UUID> refinedMaterialIds);
+
+  /**
+   * Resolves ITEM cost names with the same database UPPER comparison as a single-name lookup.
+   *
+   * @param ids the selected blueprint identities
+   * @return every exact ingredient-name match; callers decide which cost lines count
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$MaterialBridge(
+        i.id, m.id, m.quantityType, m.version)
+      FROM BlueprintIngredient i JOIN i.gameItem gi JOIN Material m ON
+        UPPER(m.name) = UPPER(CASE WHEN gi.name IS NOT NULL THEN gi.name ELSE i.wikiNameSnapshot END)
+      WHERE i.blueprint.id IN :ids ORDER BY i.id, m.id
+      """)
+  List<ItemOrderRecipeFacts.MaterialBridge> findItemOrderBridges(
+      @Param("ids") Collection<UUID> ids);
+
+  /**
+   * Loads selected material references and their mapped catalogue relationships in one batch.
+   *
+   * @param ids the selected material identities
+   * @return the matching managed material references
+   */
+  @Query(
+      """
+      SELECT m FROM Material m LEFT JOIN FETCH m.category
+      LEFT JOIN FETCH m.refinedMaterial r LEFT JOIN FETCH r.category WHERE m.id IN :ids
+      """)
+  List<Material> findItemOrderReferences(@Param("ids") Collection<UUID> ids);
 }

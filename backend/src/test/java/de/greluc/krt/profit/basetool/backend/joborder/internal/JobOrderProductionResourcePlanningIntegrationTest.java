@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
@@ -53,14 +55,19 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LivesyncMetricNames;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -68,6 +75,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,6 +100,8 @@ class JobOrderProductionResourcePlanningIntegrationTest {
   @Autowired private TransactionTemplate transactions;
   @Autowired private OrgUnitRepository orgUnits;
   @Autowired private UserRepository users;
+  @Autowired private RoleRepository roles;
+  @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private LocationRepository locations;
   @Autowired private CityRepository cities;
   @Autowired private MaterialRepository materials;
@@ -117,6 +127,9 @@ class JobOrderProductionResourcePlanningIntegrationTest {
       UUID holderId,
       UUID locationId,
       List<Source> sources) {}
+
+  /** The sole membership and immutable stock versions before its public removal. */
+  private record RestampFixture(UUID membershipUnitId, List<Source> sources) {}
 
   @BeforeEach
   void setUp() {
@@ -144,6 +157,63 @@ class JobOrderProductionResourcePlanningIntegrationTest {
       assertThat(remaining.jobOrderSliceAmount(fixture.orderId())).isEqualTo(2.0);
     });
     assertThat(orderFrames()).isGreaterThan(before);
+  }
+
+  @Test
+  void losingTheLastMembershipPreservesUnassignedRowsAndPublishesOneCommittedOrderRefresh()
+      throws Exception {
+    Fixture fixture = seed();
+    RestampFixture restamp = seedRestamp(fixture);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM material_claim WHERE job_order_id = ?",
+                Integer.class,
+                fixture.orderId()))
+        .isZero();
+    double before = orderFrames();
+
+    mvc.perform(
+            delete(
+                    "/api/v1/special-commands/{unit}/members/{member}",
+                    restamp.membershipUnitId(),
+                    fixture.holderId())
+                .with(
+                    jwt()
+                        .jwt(token ->
+                            token
+                                .subject(fixture.holderId().toString())
+                                .claim("azp", "basetool-frontend"))
+                        .authorities(
+                            new SimpleGrantedAuthority(Roles.authority(Roles.ADMIN)),
+                            new SimpleGrantedAuthority(Roles.authority(Roles.KRT_MEMBER)))))
+        .andExpect(result ->
+            assertThat(result.getResponse().getStatus())
+                .as(result.getResponse().getContentAsString())
+                .isEqualTo(200));
+
+    transactions.executeWithoutResult(_ -> {
+      List<UUID> ids = restamp.sources().stream().map(Source::rowId).toList();
+      var remaining = stock.findRowsWithMaterial(ids);
+      assertThat(remaining).extracting(row -> row.getId()).containsExactlyInAnyOrderElementsOf(ids);
+      for (Source source : restamp.sources()) {
+        var row =
+            remaining.stream()
+                .filter(candidate -> candidate.getId().equals(source.rowId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(row.getUser().getId()).isEqualTo(fixture.holderId());
+        assertThat(row.getOwningOrgUnit()).isNull();
+        assertThat(row.getPersonal()).isFalse();
+        assertThat(row.getMaterial().getId()).isEqualTo(source.materialId());
+        assertThat(row.getLocation().getId()).isEqualTo(fixture.locationId());
+        assertThat(row.getQuality()).isEqualTo(100);
+        assertThat(row.getStolen()).isFalse();
+        assertThat(row.getAmount()).isEqualTo(3.0);
+        assertThat(row.jobOrderSliceAmount(fixture.orderId())).isEqualTo(3.0);
+        assertThat(row.getVersion()).isEqualTo(source.version() + 1);
+      }
+    });
+    assertThat(orderFrames()).isEqualTo(before + 1);
   }
 
   @Test
@@ -196,8 +266,9 @@ class JobOrderProductionResourcePlanningIntegrationTest {
           List.of(
               new StockLotWritePlans.SetLotAmount(
                   0, lot, new BigDecimal("3"), new BigDecimal("2")));
-      var prepared = lotPlans.prepareLotBatch(fixture.holderId(), List.of(lot), intents);
-      lotPlans.confirmLotBatch(prepared, List.of(), false);
+      var prepared =
+          lotPlans.prepareLotBatch(fixture.holderId(), List.of(lot), List.of(), List.of(), intents);
+      lotPlans.confirmLotBatch(prepared, List.of(), List.of(), false);
     });
     transactions.executeWithoutResult(_ -> {
       StockLot lot = sourceLot(fixture, source);
@@ -205,8 +276,9 @@ class JobOrderProductionResourcePlanningIntegrationTest {
           List.of(
               new StockLotWritePlans.SetLotAmount(
                   0, lot, new BigDecimal("3"), new BigDecimal("4")));
-      var prepared = lotPlans.prepareLotBatch(fixture.holderId(), List.of(lot), intents);
-      var confirmed = lotPlans.confirmLotBatch(prepared, intents, true);
+      var prepared =
+          lotPlans.prepareLotBatch(fixture.holderId(), List.of(lot), List.of(), List.of(), intents);
+      var confirmed = lotPlans.confirmLotBatch(prepared, List.of(), intents, true);
       lotPlans.executePreparedLot(confirmed, 0, true);
     });
 
@@ -276,11 +348,12 @@ class JobOrderProductionResourcePlanningIntegrationTest {
                           new StockLotWritePlans.SetLotAmount(
                               0, lot, new BigDecimal("3"), new BigDecimal("2")));
                   var prepared =
-                      lotPlans.prepareLotBatch(fixture.holderId(), List.of(lot), intents);
+                      lotPlans.prepareLotBatch(
+                          fixture.holderId(), List.of(lot), List.of(), List.of(), intents);
                   assertThat(prepared.lockedRows().get(lot.key()))
                       .singleElement()
                       .satisfies(row -> assertThat(row.getAmount()).isEqualTo(2.0));
-                  lotPlans.confirmLotBatch(prepared, List.of(), false);
+                  lotPlans.confirmLotBatch(prepared, List.of(), List.of(), false);
                 });
                 return null;
               } catch (RuntimeException conflict) {
@@ -512,6 +585,46 @@ class JobOrderProductionResourcePlanningIntegrationTest {
     assertThat(stock.gameItemRowsOfOrder(fixture.orderId()))
         .singleElement()
         .satisfies(row -> assertThat(row.amount()).isEqualTo(1.0));
+  }
+
+  /** Seeds the holder's sole membership and three separately allocated shared rows. */
+  private @NotNull RestampFixture seedRestamp(@NotNull Fixture fixture) {
+    return transactions.execute(_ -> {
+      User holder = users.findById(fixture.holderId()).orElseThrow();
+      holder.getRoles().add(roles.findByCode(Roles.ADMIN).orElseThrow());
+      holder.getRoles().add(roles.findByCode(Roles.KRT_MEMBER).orElseThrow());
+      users.saveAndFlush(holder);
+      SpecialCommand unit = new SpecialCommand();
+      unit.setName("Restamp membership " + UUID.randomUUID());
+      unit.setShorthand("RM" + UUID.randomUUID().toString().substring(0, 6));
+      unit = orgUnits.saveAndFlush(unit);
+      OrgUnitMembership membership = new OrgUnitMembership();
+      membership.setId(new OrgUnitMembershipId(holder.getId(), unit.getId()));
+      membership.setUser(holder);
+      membership.setJoinedAt(Instant.now());
+      memberships.saveAndFlush(membership);
+      List<InventoryItem> rows = new ArrayList<>();
+      for (Source source : fixture.sources()) {
+        InventoryItem row = inventory.findById(source.rowId()).orElseThrow();
+        row.setOwningOrgUnit(unit);
+        rows.add(row);
+      }
+      InventoryItem sibling = new InventoryItem();
+      sibling.setUser(holder);
+      sibling.setMaterial(rows.getFirst().getMaterial());
+      sibling.setLocation(locations.findById(fixture.locationId()).orElseThrow());
+      sibling.setQuality(100);
+      sibling.setAmount(3.0);
+      sibling.setPersonal(false);
+      sibling.setOwningOrgUnit(unit);
+      InventoryAllocations.addJobOrder(sibling, fixture.orderId(), 3.0, false);
+      rows.add(inventory.saveAndFlush(sibling));
+      return new RestampFixture(
+          unit.getId(),
+          rows.stream()
+              .map(row -> new Source(row.getId(), row.getMaterial().getId(), row.getVersion()))
+              .toList());
+    });
   }
 
   private Fixture seed() {

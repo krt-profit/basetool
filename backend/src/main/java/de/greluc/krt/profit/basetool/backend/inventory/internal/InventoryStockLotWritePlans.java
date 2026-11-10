@@ -19,18 +19,24 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRestoreResult;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityEvidence;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -45,73 +51,238 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Transactional(propagation = Propagation.MANDATORY)
 public class InventoryStockLotWritePlans implements StockLotWritePlans {
   private final InventoryOrderWrites orderWrites;
-  private final InventoryItemRepository rows;
   private final InventoryStockPlanningReads planningReads;
   private final OrgUnitMembershipQueryService memberships;
   private final InventoryLotBatchExecutor executor;
+  private final InventoryPoolRestoreFacts restoreFacts;
+  private final InventoryPoolRestoreDecisions restoreDecisions;
+  private final InventoryPoolRestorer restorer;
+  private final InventoryLotRestoreProofs proofs;
 
   @Override
   public @NotNull Prepared prepareLotBatch(
       @NotNull UUID holder,
       @NotNull Collection<StockLot> readLots,
+      @NotNull List<EntryRestore> declaredHistoricalEntries,
+      @NotNull List<EntryRestore> preliminaryEntryRestores,
       @NotNull List<Intent> preliminaryIntents) {
-    orderWrites.lockEligibility();
+    return prepareLotBatch(
+        holder,
+        readLots,
+        declaredHistoricalEntries,
+        preliminaryEntryRestores,
+        preliminaryIntents,
+        UnaryOperator.identity());
+  }
+
+  @Override
+  public @NotNull Prepared prepareLotBatch(
+      @NotNull UUID holder,
+      @NotNull Collection<StockLot> readLots,
+      @NotNull List<EntryRestore> declaredHistoricalEntries,
+      @NotNull List<EntryRestore> preliminaryEntryRestores,
+      @NotNull List<Intent> preliminaryIntents,
+      @NotNull UnaryOperator<Selection> afterResourceWaits) {
     List<StockLot> lots = List.copyOf(readLots);
-    validate(holder, lots, preliminaryIntents);
+    List<EntryRestore> declared = List.copyOf(declaredHistoricalEntries);
+    Selection original = new Selection(preliminaryEntryRestores, preliminaryIntents);
+    final Form form =
+        validate(holder, lots, declared, original.entryRestores(), original.intents());
+    orderWrites.lockEligibility();
     Set<UUID> directUnits = memberships.findDirectMembershipOrgUnitIds(holder);
     var observed = planningReads.read(holder, lots);
+    var observedFacts = restoreFacts.read(namedRows(observed, declared));
+    var prefix =
+        InventoryPoolRestoreProgram.plan(original.entryRestores(), observedFacts, restoreDecisions);
     var preliminary =
-        new InventoryLotBatchSimulation(observed, directUnits).simulate(preliminaryIntents);
-    orderWrites.prepareObservedAction(
-        preliminary.resources(),
-        lots.stream().map(lot -> InventoryLotLockRepository.lotKey(holder, lot.key())).toList());
-    if (!lots.isEmpty()) {
-      orderWrites.lockObservedRows(
-          rows.findRowsInHolderLots(holder, lots.stream().map(StockLot::key).toList()));
+        simulate(holder, observed, observedFacts, prefix, directUnits, original.intents());
+    var interest = proofs.interest(prefix, preliminary);
+    Set<UUID> overlaps = proofs.overlapping(interest);
+    Set<UUID> named = new HashSet<>(observedFacts.keySet());
+    named.addAll(overlaps);
+    var allObservedFacts = new HashMap<>(restoreFacts.read(named));
+    allObservedFacts.putAll(observedFacts);
+    Set<Long> lotKeys = lotKeys(holder, lots, declared, prefix, allObservedFacts);
+    Set<UUID> resources = resources(prefix, preliminary);
+    var evidence = proofs.additions(prefix, preliminary);
+    orderWrites.prepareRestorationResources(resources, prefix.targetScopes(), evidence);
+    Selection selected = narrow(original, afterResourceWaits);
+    if (form == Form.RESTORE) {
+      if (!overlaps.equals(proofs.overlapping(interest))) {
+        throw conflict();
+      }
+      var afterEvidence = planningReads.read(holder, lots);
+      named.addAll(namedRows(afterEvidence, declared));
+      var afterEvidenceFacts = restoreFacts.read(named);
+      var afterEvidencePrefix =
+          InventoryPoolRestoreProgram.plan(
+              selected.entryRestores(), afterEvidenceFacts, restoreDecisions);
+      var afterEvidenceProgram =
+          simulate(
+              holder,
+              afterEvidence,
+              afterEvidenceFacts,
+              afterEvidencePrefix,
+              directUnits,
+              selected.intents());
+      var currentEvidence = proofs.additions(afterEvidencePrefix, afterEvidenceProgram);
+      if (!resources.containsAll(resources(afterEvidencePrefix, afterEvidenceProgram))
+          || !evidence.containsAll(currentEvidence)
+          || !lotKeys.containsAll(
+              lotKeys(holder, lots, declared, afterEvidencePrefix, afterEvidenceFacts))) {
+        throw conflict();
+      }
+      orderWrites.prepareRestorationResources(
+          resources(afterEvidencePrefix, afterEvidenceProgram),
+          afterEvidencePrefix.targetScopes(),
+          currentEvidence);
     }
+    orderWrites.lockStockLots(lotKeys);
+    selected = narrow(selected, afterResourceWaits);
+
+    var afterLots = planningReads.read(holder, lots);
+    named.addAll(namedRows(afterLots, declared));
+    var afterLotFacts = restoreFacts.read(named);
+    var afterLotPrefix =
+        InventoryPoolRestoreProgram.plan(selected.entryRestores(), afterLotFacts, restoreDecisions);
+    var afterLotProgram =
+        simulate(holder, afterLots, afterLotFacts, afterLotPrefix, directUnits, selected.intents());
+    if (!overlaps.equals(proofs.overlapping(interest))
+        || !resources.containsAll(resources(afterLotPrefix, afterLotProgram))
+        || !evidence.containsAll(proofs.additions(afterLotPrefix, afterLotProgram))) {
+      throw conflict();
+    }
+    orderWrites.requireRestorationEvidence(proofs.additions(afterLotPrefix, afterLotProgram));
+    orderWrites.revalidateObservedResources(
+        resources(afterLotPrefix, afterLotProgram),
+        lotKeys(holder, lots, declared, afterLotPrefix, afterLotFacts),
+        afterLotPrefix.targetScopes());
+    orderWrites.lockObservedRows(named);
     var locked = planningReads.read(holder, lots);
+    named.addAll(namedRows(locked, declared));
+    var lockedFacts = restoreFacts.read(named);
     PreparedAction action =
-        new PreparedAction(holder, lots, observed, locked, preliminary, directUnits);
+        new PreparedAction(
+            holder,
+            lots,
+            form,
+            declared,
+            selected.entryRestores(),
+            selected.intents(),
+            Map.copyOf(allObservedFacts),
+            locked,
+            lockedFacts,
+            prefix,
+            preliminary,
+            directUnits,
+            evidence,
+            interest,
+            overlaps);
     TransactionSynchronizationManager.registerSynchronization(action);
     return action;
   }
 
   @Override
   public @NotNull Confirmed confirmLotBatch(
-      @NotNull Prepared prepared, @NotNull List<Intent> finalOrderedIntents, boolean dryRun) {
+      @NotNull Prepared prepared,
+      @NotNull List<EntryRestore> finalEntryRestores,
+      @NotNull List<Intent> finalOrderedIntents,
+      boolean dryRun) {
     if (!(prepared instanceof PreparedAction action) || !current(action) || action.confirmed) {
       throw conflict();
     }
-    validate(action.holder, action.lots, finalOrderedIntents);
-    var confirmed =
-        new InventoryLotBatchSimulation(action.locked, action.memberships)
-            .simulate(finalOrderedIntents);
-    if (!confirmed.unavailable().isEmpty()
-        || !action.preliminary.resources().containsAll(confirmed.resources())
-        || !action.preliminary.prelude().containsAll(confirmed.prelude())) {
+    Form form =
+        validate(
+            action.holder,
+            action.lots,
+            action.entryRequests,
+            finalEntryRestores,
+            finalOrderedIntents);
+    if ((form != Form.EMPTY && form != action.form)
+        || !orderedSubset(action.acceptedEntryRequests, finalEntryRestores)
+        || !orderedSubset(action.intents, finalOrderedIntents)) {
       throw conflict();
     }
+    var prefix =
+        InventoryPoolRestoreProgram.plan(finalEntryRestores, action.lockedFacts, restoreDecisions);
+    var confirmed =
+        simulate(
+            action.holder,
+            action.locked,
+            action.lockedFacts,
+            prefix,
+            action.memberships,
+            finalOrderedIntents);
+    if (!confirmed.unavailable().isEmpty()
+        || !resources(action.prefix, action.preliminary).containsAll(resources(prefix, confirmed))
+        || !action.preliminary.prelude().containsAll(confirmed.prelude())
+        || !action.evidence.containsAll(proofs.additions(prefix, confirmed))
+        || !action.overlaps.equals(proofs.overlapping(action.interest))) {
+      throw conflict();
+    }
+    orderWrites.requireRestorationEvidence(proofs.additions(prefix, confirmed));
     for (var step : confirmed.steps().entrySet()) {
       if (!Objects.equals(action.preliminary.steps().get(step.getKey()), step.getValue())) {
         throw conflict();
       }
     }
-    Map<UUID, InventoryStockRowSnapshot> before = byId(action.observed);
-    Map<UUID, InventoryStockRowSnapshot> after = byId(action.locked);
-    for (UUID resource : confirmed.resources()) {
-      if (!Objects.equals(before.get(resource), after.get(resource))) {
+    for (var step : prefix.steps()) {
+      if (step.decision().changes()
+          && action.prefix.steps().stream().noneMatch(step::sameSelection)) {
         throw conflict();
       }
     }
+    for (UUID resource : resources(prefix, confirmed)) {
+      if (!Objects.equals(action.observedFacts.get(resource), action.lockedFacts.get(resource))) {
+        throw conflict();
+      }
+    }
+    var startingRows =
+        new InventoryLotProspectiveRows(action.locked, quantities(action.lockedFacts));
+    startingRows.applyEntryPrefix(action.holder, prefix, action.locked.rows().keySet());
+    if (form == Form.RESTORE && !resources(prefix, confirmed).isEmpty()) {
+      proofs.requireUnique(
+          action.lockedFacts, prefix, confirmed, startingRows.quantities().keySet());
+    }
     if (!dryRun) {
-      orderWrites.assertRows(confirmed.resources());
+      orderWrites.assertRows(resources(prefix, confirmed));
+      orderWrites.assertObservedTargets(prefix.targetOrders(), prefix.targetScopes());
+    }
+    Map<String, StockQuantityComposition> initial = new HashMap<>();
+    for (var lot : action.lots) {
+      initial.put(
+          lot.key(),
+          InventoryQuantityComposition.canonical(
+              startingRows.lot(lot).stream()
+                  .flatMap(row -> startingRows.requireQuantity(row).parts().stream())
+                  .toList()));
     }
     action.confirmed = true;
     ConfirmedAction result =
         new ConfirmedAction(
-            action, confirmed, finalOrderedIntents.stream().map(Intent::step).toList(), dryRun);
+            action,
+            prefix,
+            confirmed,
+            finalOrderedIntents.stream().map(Intent::step).toList(),
+            dryRun,
+            new InventoryLotBatchExecutor.Execution(initial, confirmed.prelude()));
+    result.prefixExecuted = prefix.steps().isEmpty();
     TransactionSynchronizationManager.registerSynchronization(result);
     return result;
+  }
+
+  @Override
+  public @NotNull List<PoolRestoreResult> executePreparedEntryRestores(
+      @NotNull Confirmed confirmed) {
+    if (!(confirmed instanceof ConfirmedAction action)
+        || !current(action)
+        || !current(action.prepared)
+        || action.prefixExecuted
+        || action.next != 0) {
+      throw conflict();
+    }
+    action.prefixExecuted = true;
+    return action.dryRun ? action.prefix.results() : restorer.restorePrepared(action.prefix);
   }
 
   @Override
@@ -120,6 +291,7 @@ public class InventoryStockLotWritePlans implements StockLotWritePlans {
     if (!(confirmed instanceof ConfirmedAction action)
         || !current(action)
         || !current(action.prepared)
+        || !action.prefixExecuted
         || dryRun != action.dryRun
         || action.next >= action.steps.size()
         || action.steps.get(action.next) != step) {
@@ -135,11 +307,87 @@ public class InventoryStockLotWritePlans implements StockLotWritePlans {
         dryRun);
   }
 
-  /** Validates holder ownership, unique operation identities and complete declared read lots. */
-  private static void validate(UUID holder, Collection<StockLot> lots, List<Intent> intents) {
+  /** Simulates the exact supported operation form from complete immutable quantity facts. */
+  private static InventoryLotBatchProgram simulate(
+      UUID holder,
+      InventoryStockPlanningReads.LotRows observed,
+      Map<UUID, Optional<InventoryPoolRestoreFacts.Entry>> facts,
+      InventoryPoolRestoreProgram prefix,
+      Set<UUID> memberships,
+      List<Intent> intents) {
+    return new InventoryLotBatchSimulation(observed, memberships, quantities(facts), holder, prefix)
+        .simulate(intents);
+  }
+
+  /** Returns complete present quantity proof without treating absence as an empty composition. */
+  private static Map<UUID, StockQuantityComposition> quantities(
+      Map<UUID, Optional<InventoryPoolRestoreFacts.Entry>> facts) {
+    Map<UUID, StockQuantityComposition> result = new HashMap<>();
+    facts.forEach((id, value) -> value.ifPresent(entry -> result.put(id, entry.quantity())));
+    return Map.copyOf(result);
+  }
+
+  /** Collects physical read observations and every explicit historical row identity. */
+  private static Set<UUID> namedRows(
+      InventoryStockPlanningReads.LotRows lots, List<EntryRestore> entries) {
+    Set<UUID> named = new HashSet<>();
+    lots.entries().forEach(row -> named.add(row.getId()));
+    entries.forEach(entry -> named.add(entry.request().entryId()));
+    return named;
+  }
+
+  /** Combines actual mutations without attaching eligibility to observation-only resources. */
+  private static Set<UUID> resources(
+      InventoryPoolRestoreProgram prefix, InventoryLotBatchProgram program) {
+    Set<UUID> result = new HashSet<>(prefix.resources());
+    result.addAll(program.resources());
+    return Set.copyOf(result);
+  }
+
+  /** Collects all current, historical and explicit destination lots before physical locks. */
+  private Set<Long> lotKeys(
+      UUID holder,
+      List<StockLot> lots,
+      List<EntryRestore> declared,
+      InventoryPoolRestoreProgram prefix,
+      Map<UUID, Optional<InventoryPoolRestoreFacts.Entry>> facts) {
+    Set<Long> keys = new HashSet<>(prefix.lotKeys());
+    keys.addAll(proofs.lots(facts));
+    for (var entry : declared) {
+      var expected = entry.request().expected();
+      if (expected != null) {
+        keys.add(InventoryLotLockRepository.lotKey(expected.holder(), expected.lotKey()));
+      }
+      var target = entry.request().target();
+      if (target != null) {
+        keys.add(InventoryLotLockRepository.lotKey(target.holder(), target.lotKey()));
+      }
+    }
+    lots.forEach(lot -> keys.add(InventoryLotLockRepository.lotKey(holder, lot.key())));
+    return Set.copyOf(keys);
+  }
+
+  /** Validates the two actual producer forms and unique names before acquiring any lock. */
+  private static Form validate(
+      UUID holder,
+      Collection<StockLot> lots,
+      List<EntryRestore> declared,
+      List<EntryRestore> accepted,
+      List<Intent> intents) {
+    if (!orderedSubset(declared, accepted)) {
+      throw conflict();
+    }
     Set<String> keys = new HashSet<>();
     lots.forEach(lot -> keys.add(lot.key()));
     Set<Integer> steps = new HashSet<>();
+    Set<UUID> named = new HashSet<>();
+    for (var entry : declared) {
+      if (!steps.add(entry.step()) || !named.add(entry.request().entryId())) {
+        throw conflict();
+      }
+    }
+    boolean restore = !declared.isEmpty();
+    boolean ordinary = false;
     for (Intent intent : intents) {
       StockLot lot =
           switch (intent) {
@@ -150,20 +398,53 @@ public class InventoryStockLotWritePlans implements StockLotWritePlans {
               }
               yield rebook.request().lot();
             }
+            case RestoreLot restored -> {
+              if (restored.inversePoolMoves().stream()
+                  .anyMatch(move ->
+                      !holder.equals(move.member())
+                          || !restored.lot().key().equals(move.lot().key()))) {
+                throw conflict();
+              }
+              yield restored.lot();
+            }
           };
+      restore |= intent instanceof RestoreLot;
+      ordinary |= !(intent instanceof RestoreLot);
       if (!steps.add(intent.step()) || !keys.contains(lot.key())) {
         throw conflict();
       }
     }
+    if (restore && ordinary) {
+      throw conflict();
+    }
+    return restore ? Form.RESTORE : ordinary ? Form.ORDINARY : Form.EMPTY;
   }
 
-  /** Returns immutable scalar observations indexed by physical row identity. */
-  private static Map<UUID, InventoryStockRowSnapshot> byId(
-      InventoryStockPlanningReads.LotRows observed) {
-    return observed.entries().stream()
-        .collect(
-            java.util.stream.Collectors.toUnmodifiableMap(
-                InventoryStockRowSnapshot::getId, java.util.function.Function.identity()));
+  /** Admits only an unchanged ordered subset of the preceding read-only policy selection. */
+  private static @NotNull Selection narrow(
+      @NotNull Selection current, @NotNull UnaryOperator<Selection> afterResourceWaits) {
+    Selection selected = afterResourceWaits.apply(current);
+    if (selected == null
+        || !orderedSubset(current.entryRestores(), selected.entryRestores())
+        || !orderedSubset(current.intents(), selected.intents())) {
+      throw conflict();
+    }
+    return selected;
+  }
+
+  /** Retains the originally declared relative order and exact immutable operation values. */
+  private static <T> boolean orderedSubset(List<T> declared, List<T> selected) {
+    int cursor = 0;
+    for (T value : selected) {
+      while (cursor < declared.size() && !declared.get(cursor).equals(value)) {
+        cursor++;
+      }
+      if (cursor == declared.size()) {
+        return false;
+      }
+      cursor++;
+    }
+    return true;
   }
 
   /** Reports whether a handle belongs to the currently active originating transaction. */
@@ -172,20 +453,39 @@ public class InventoryStockLotWritePlans implements StockLotWritePlans {
         && TransactionSynchronizationManager.getSynchronizations().contains(handle);
   }
 
-  /** Returns the normal conflict for a changed or unplanned physical action. */
+  /** Returns the normal conflict for an altered or unplanned physical action. */
   private static BusinessConflictException conflict() {
     return new BusinessConflictException("error.inventory.concurrent_scope_changed");
   }
 
-  /** The immutable observations and preliminary closed resources of one originating transaction. */
+  /** Supported ordinary writes, historical restoration, or a neutral empty action. */
+  private enum Form {
+    /** No physical operation. */
+    EMPTY,
+    /** The ordinary quantity and rebooking batch. */
+    ORDINARY,
+    /** The historical entry prefix and personal lot groups. */
+    RESTORE
+  }
+
+  /** Complete preliminary observations and the fresh locked calling-policy facts. */
   @RequiredArgsConstructor
   private static final class PreparedAction implements Prepared, TransactionSynchronization {
     private final UUID holder;
     private final List<StockLot> lots;
-    private final InventoryStockPlanningReads.LotRows observed;
+    private final Form form;
+    private final List<EntryRestore> entryRequests;
+    private final List<EntryRestore> acceptedEntryRequests;
+    private final List<Intent> intents;
+    private final Map<UUID, Optional<InventoryPoolRestoreFacts.Entry>> observedFacts;
     private final InventoryStockPlanningReads.LotRows locked;
+    private final Map<UUID, Optional<InventoryPoolRestoreFacts.Entry>> lockedFacts;
+    private final InventoryPoolRestoreProgram prefix;
     private final InventoryLotBatchProgram preliminary;
     private final Set<UUID> memberships;
+    private final Set<InventoryQuantityEvidenceLockRepository.Identity> evidence;
+    private final List<StockQuantityEvidence> interest;
+    private final Set<UUID> overlaps;
     private boolean confirmed;
 
     @Override
@@ -195,17 +495,34 @@ public class InventoryStockLotWritePlans implements StockLotWritePlans {
       }
       return locked.views();
     }
+
+    @Override
+    public @NotNull Map<UUID, Optional<EntryState>> lockedEntries() {
+      if (!current(this)) {
+        throw conflict();
+      }
+      Map<UUID, Optional<EntryState>> result = new HashMap<>();
+      entryRequests.forEach(entry -> {
+        UUID id = entry.request().entryId();
+        result.put(
+            id,
+            Objects.requireNonNull(lockedFacts.get(id))
+                .map(value -> new EntryState(value.sharedState())));
+      });
+      return Map.copyOf(result);
+    }
   }
 
-  /** The confirmed ordered action and its private transaction-local execution cursor. */
+  /** Fixed ordered execution and originating-transaction resource ownership. */
   @RequiredArgsConstructor
   private static final class ConfirmedAction implements Confirmed, TransactionSynchronization {
     private final PreparedAction prepared;
+    private final InventoryPoolRestoreProgram prefix;
     private final InventoryLotBatchProgram program;
     private final List<Integer> steps;
     private final boolean dryRun;
-    private final InventoryLotBatchExecutor.Execution execution =
-        new InventoryLotBatchExecutor.Execution();
+    private final InventoryLotBatchExecutor.Execution execution;
+    private boolean prefixExecuted;
     private int next;
   }
 }

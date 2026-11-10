@@ -738,8 +738,7 @@ class RefineryOrderTest {
    * answers 404 like an unknown id and books nothing (REQ-REFINERY-022, REQ-ORG-003).
    */
   @Test
-  void storeRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne() throws Exception {
-    letIridiumReachTheJobOrderQueue();
+  void storeRefusesAJobOrderOutsideTheCallersReadScopeLikeAnUnknownOne() throws Exception {
     Squadron foreign = new Squadron();
     foreign.setName("Refinery-Foreign");
     foreign.setShorthand("RFX");

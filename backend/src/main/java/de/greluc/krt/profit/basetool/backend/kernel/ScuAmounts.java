@@ -28,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 public final class ScuAmounts {
 
   private static final int SCALE = 3;
+  private static final String UNREPRESENTABLE = "SCU quantity cannot be represented exactly";
 
   private ScuAmounts() {}
 
@@ -70,5 +71,24 @@ public final class ScuAmounts {
         .movePointRight(SCALE)
         .setScale(0, RoundingMode.HALF_UP)
         .longValueExact();
+  }
+
+  /**
+   * Converts exact thousandths only when the amount preserves every quantum on round trip.
+   *
+   * @param quanta the signed exact quantity
+   * @return the representable amount in units
+   * @throws IllegalArgumentException when the numeric amount cannot preserve the exact quantity
+   */
+  public static double fromQuanta(long quanta) {
+    double amount = BigDecimal.valueOf(quanta, SCALE).doubleValue();
+    try {
+      if (toQuanta(amount) != quanta) {
+        throw new IllegalArgumentException(UNREPRESENTABLE);
+      }
+    } catch (ArithmeticException | NumberFormatException failure) {
+      throw new IllegalArgumentException(UNREPRESENTABLE, failure);
+    }
+    return amount;
   }
 }

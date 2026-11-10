@@ -283,8 +283,7 @@ public class MaterialClaimService implements ClaimBucketSource {
   }
 
   /**
-   * Performs one claim-upsert attempt in its own {@code REQUIRES_NEW} transaction, locking the
-   * order before summing its claims. Called only through {@link #upsertClaim}.
+   * Applies one versioned promise mutation in its own material-scope transaction.
    *
    * @param jobOrderId the order.
    * @param dto the claim payload.

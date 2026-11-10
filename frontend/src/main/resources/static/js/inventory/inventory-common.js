@@ -1559,7 +1559,12 @@ function createLager(cfg) {
      * @returns {Promise<void>} settles after current permitted choices are loaded
      */
     function refreshAllocationProvision(split, pop, refreshObserved = false) {
-        return refreshProvisionPicker(
+        /** Re-anchors the retained allocation popover while it is visible and connected. */
+        function repositionPop() {
+            if (pop instanceof HTMLElement && pop.isConnected && !pop.hidden) assocPositionPop(pop);
+        }
+
+        const refresh = refreshProvisionPicker(
             pop,
             split?.getAttribute('data-assoc-field') === 'JOB_ORDER'
                 ? pop.getAttribute('data-assoc-target') || ''
@@ -1568,6 +1573,8 @@ function createLager(cfg) {
             split?.getAttribute('data-provision-quality') || '',
             refreshObserved,
         );
+        repositionPop();
+        return refresh.finally(repositionPop);
     }
 
     /**

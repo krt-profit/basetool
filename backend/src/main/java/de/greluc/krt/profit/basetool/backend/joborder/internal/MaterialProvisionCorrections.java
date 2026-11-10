@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts.fromQuanta;
+
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityCorrections;
@@ -29,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionHistoryDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialProvisionFact;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -40,6 +43,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class MaterialProvisionCorrections {
   private final MaterialProvisionCreditRepository provisions;
+  private final MaterialProvisionCredits credits;
   private final MaterialProvisionConnections connections;
   private final StockQuantityCorrections stockCorrections;
   private final MaterialClaimRepository contributions;
@@ -57,6 +63,7 @@ public class MaterialProvisionCorrections {
   private final MaterialPromiseCoordinator coordinator;
   private final MaterialPromiseCapacity capacity;
   private final MaterialContributionHistory history;
+  private final JobOrderChangeEffects effects;
   private final EntityManager entityManager;
 
   /**
@@ -126,6 +133,15 @@ public class MaterialProvisionCorrections {
         stockCorrections.removeKnownQuantity(
             removed, correction.stockVersions(), connected.scopes(), credit.getId());
       }
+    } else if (correction.kind() == MaterialProvisionCorrectionDto.Kind.QUALITY
+        && !correction.qualityStockRowIds().isEmpty()) {
+      stockCorrections.correctKnownQuality(
+          quantityOf(credit),
+          correction.qualityStockRowIds(),
+          requiredQuality(correction),
+          correction.stockVersions(),
+          scope,
+          credit.getId());
     } else {
       coordinator.lock(List.of(scope));
     }
@@ -155,24 +171,74 @@ public class MaterialProvisionCorrections {
       if (desired == 0L && correction.targetClaimId() == null && credit.getAmount() == 0.0) {
         return history.read(orderId);
       }
-      correctAttribution(order, credit, original, correction);
+      MaterialClaim target = attributionTarget(order, credit, original, correction);
+      MaterialProvisionFact before = credit.snapshotFact();
+      correctAttribution(order, credit, original, correction, target);
+      if (recordReceiptCorrection(credit, before, original) && target != null) {
+        effects.receiptFactChanged(target);
+      }
+    } else if (correction.kind() == MaterialProvisionCorrectionDto.Kind.QUALITY) {
+      correctQuality(order, credit, original, correction);
     } else {
+      List<ReceiptBefore> before =
+          connected == null
+              ? List.of(new ReceiptBefore(credit, credit.snapshotFact(), original))
+              : connected.facts().stream()
+                  .map(fact ->
+                      new ReceiptBefore(
+                          fact.receipt(), fact.receipt().snapshotFact(), fact.claim()))
+                  .toList();
       if (connected != null) {
         correctConnectedQuantity(connected);
       } else {
         correctExtraQuantity(credit, original, desired, added);
       }
+      before.forEach(fact -> recordReceiptCorrection(fact.receipt(), fact.before(), fact.claim()));
     }
     coordinator.reconcileOrder(orderId);
     entityManager.flush();
     return history.read(orderId);
   }
 
-  private void correctAttribution(
+  private boolean recordReceiptCorrection(
+      @NotNull MaterialProvisionCredit receipt,
+      @NotNull MaterialProvisionFact before,
+      @NotNull MaterialClaim claim) {
+    if (!receipt.recordFactCorrection(before)) {
+      return false;
+    }
+    effects.receiptFactChanged(claim);
+    return true;
+  }
+
+  /**
+   * One authorized receipt declaration captured before a connected correction.
+   *
+   * @param receipt the managed receipt whose facts may change
+   * @param before the authorized current fact snapshot
+   * @param claim the affected retained contribution
+   */
+  private record ReceiptBefore(
+      @NotNull MaterialProvisionCredit receipt,
+      @NotNull MaterialProvisionFact before,
+      @NotNull MaterialClaim claim) {}
+
+  private @Nullable MaterialClaim attributionTarget(
       JobOrder order,
       MaterialProvisionCredit credit,
       MaterialClaim original,
       MaterialProvisionCorrectionDto correction) {
+    return attributionTarget(
+        order, credit, original, correction, credit.getSuppliedQuality(), false);
+  }
+
+  private @Nullable MaterialClaim attributionTarget(
+      JobOrder order,
+      MaterialProvisionCredit credit,
+      MaterialClaim original,
+      MaterialProvisionCorrectionDto correction,
+      int suppliedQuality,
+      boolean allowCurrent) {
     if (!Double.isFinite(correction.amount()) || correction.amount() < 0.0) {
       throw new BadRequestException("orders.claim.correction.amount_invalid");
     }
@@ -183,7 +249,8 @@ public class MaterialProvisionCorrections {
         || desired % quantum != 0L
         || (correction.targetClaimId() == null && desired != 0L)
         || (correction.targetClaimId() != null
-            && correction.targetClaimId().equals(original.getId()))) {
+            && correction.targetClaimId().equals(original.getId())
+            && !allowCurrent)) {
       throw new BadRequestException("orders.claim.correction.amount_invalid");
     }
     MaterialClaim target =
@@ -197,19 +264,137 @@ public class MaterialProvisionCorrections {
           target.getId());
       if (!target.getJobOrder().getId().equals(order.getId())
           || !target.getMaterial().getId().equals(credit.getMaterialId())
-          || target.getQualityTier().getMinQuality() > credit.getSuppliedQuality()) {
+          || target.getQualityTier().getMinQuality() > suppliedQuality) {
         throw new BadRequestException("orders.claim.correction.not_matching");
       }
     }
-    var foreign =
-        provisions.processedQuantityExcept(
-            credit.getQuantityFragments().stream()
-                .map(StockQuantityFragment::origin)
-                .distinct()
-                .toList(),
-            credit.getId());
-    List<StockQuantityFragment> eligible =
-        StockQuantityFragments.subtract(credit.getQuantityFragments(), foreign);
+    return target;
+  }
+
+  private void correctQuality(
+      JobOrder order,
+      MaterialProvisionCredit credit,
+      MaterialClaim original,
+      MaterialProvisionCorrectionDto correction) {
+    int suppliedQuality = requiredQuality(correction);
+    MaterialClaim target =
+        attributionTarget(order, credit, original, correction, suppliedQuality, true);
+    if (credit.isSuppliedQualityKnown()
+        && credit.getSuppliedQuality() == suppliedQuality
+        && credit.getAmount().doubleValue() == correction.amount()
+        && (target == null ? credit.getAmount() == 0.0 : target.getId().equals(original.getId()))) {
+      return;
+    }
+    MaterialProvisionFact before = credit.snapshotFact();
+    credit.setSuppliedQuality(suppliedQuality);
+    credit.setSuppliedQualityKnown(true);
+    if (target != null && target.getId().equals(original.getId())) {
+      correctRetainedAttribution(order, credit, original, correction, before);
+    } else {
+      correctAttribution(order, credit, original, correction, target);
+    }
+    if (recordReceiptCorrection(credit, before, original) && target != null) {
+      effects.receiptFactChanged(target);
+    }
+  }
+
+  private static int requiredQuality(MaterialProvisionCorrectionDto correction) {
+    Integer quality = correction.suppliedQuality();
+    if (quality == null
+        || !de.greluc.krt.profit.basetool.backend.kernel.Quality.isInRange(quality)) {
+      throw new BadRequestException("orders.claim.correction.quality_required");
+    }
+    return quality;
+  }
+
+  private void correctRetainedAttribution(
+      JobOrder order,
+      MaterialProvisionCredit credit,
+      MaterialClaim original,
+      MaterialProvisionCorrectionDto correction,
+      MaterialProvisionFact before) {
+    final double previous = original.getAmount();
+    long desired = MaterialQuantityArithmetic.quanta(correction.amount());
+    long old = MaterialQuantityArithmetic.quanta(credit.getAmount());
+    if (desired != old) {
+      selectAttribution(credit, desired);
+      long delta = Math.subtractExact(desired, old);
+      original.setCreditedAmount(
+          fromQuanta(
+              Math.addExact(
+                  MaterialQuantityArithmetic.quanta(original.getCreditedAmount()), delta)));
+      if (delta > 0L && original.getEndedAt() == null) {
+        original.setAmount(
+            fromQuanta(
+                Math.max(
+                    0L, Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), delta))));
+      } else if (delta < 0L) {
+        long quantum = original.getMaterial().getQuantityType() == QuantityType.PIECE ? 1000L : 1L;
+        restoreRunningPromise(order, original, Math.negateExact(delta), quantum);
+      }
+      credit.setAmount(fromQuanta(desired));
+    }
+    if (!credit.snapshotFact().equals(before)) {
+      coordinator.record(
+          original,
+          MaterialContributionChange.Reason.FALSE_FACT_CORRECTED,
+          previous,
+          fromQuanta(Math.subtractExact(desired, old)),
+          credit.getId());
+    }
+  }
+
+  private void correctAttribution(
+      JobOrder order,
+      MaterialProvisionCredit credit,
+      MaterialClaim original,
+      MaterialProvisionCorrectionDto correction,
+      @Nullable MaterialClaim target) {
+    long desired = MaterialQuantityArithmetic.quanta(correction.amount());
+    final long quantum =
+        original.getMaterial().getQuantityType() == QuantityType.PIECE ? 1000L : 1L;
+    selectAttribution(credit, desired);
+    long old = MaterialQuantityArithmetic.quanta(credit.getAmount());
+    final double beforeOriginal = original.getAmount();
+    original.setCreditedAmount(
+        fromQuanta(
+            Math.subtractExact(
+                MaterialQuantityArithmetic.quanta(original.getCreditedAmount()), old)));
+    if (target != null) {
+      double previous = target.getAmount();
+      if (target.getEndedAt() == null) {
+        target.setAmount(
+            fromQuanta(
+                Math.max(
+                    0L, Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), desired))));
+      }
+      target.setCreditedAmount(
+          fromQuanta(
+              MaterialQuantityArithmetic.add(
+                  MaterialQuantityArithmetic.quanta(target.getCreditedAmount()), desired)));
+      credit.setClaimId(target.getId());
+      credit.setParticipationId(target.getParticipation().getId());
+      credit.setClaimingOrgUnitId(target.getClaimingOrgUnit().getId());
+      credit.setQualityTierId(target.getQualityTier().getId());
+      coordinator.record(
+          target,
+          MaterialContributionChange.Reason.FALSE_FACT_CORRECTED,
+          previous,
+          fromQuanta(desired),
+          credit.getId());
+    }
+    credit.setAmount(fromQuanta(desired));
+    restoreRunningPromise(order, original, old, quantum);
+    coordinator.record(
+        original,
+        MaterialContributionChange.Reason.FALSE_FACT_CORRECTED,
+        beforeOriginal,
+        fromQuanta(Math.negateExact(old)),
+        credit.getId());
+  }
+
+  private void selectAttribution(MaterialProvisionCredit credit, long desired) {
+    List<StockQuantityFragment> eligible = credits.availableForAttribution(credit);
     if (desired > StockQuantityFragments.total(eligible)) {
       throw new de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException(
           "orders.claim.correction.quantity_already_credited");
@@ -229,41 +414,6 @@ public class MaterialProvisionCorrections {
                     fragment.origin(), fragment.fromQuanta(), fragment.toQuanta())));
     credit.setFragments(retained);
     credit.setAttributedFragments(selection);
-    long old = MaterialQuantityArithmetic.quanta(credit.getAmount());
-    final double beforeOriginal = original.getAmount();
-    original.setCreditedAmount(
-        Math.subtractExact(MaterialQuantityArithmetic.quanta(original.getCreditedAmount()), old)
-            / 1000.0);
-    if (target != null) {
-      double previous = target.getAmount();
-      if (target.getEndedAt() == null) {
-        target.setAmount(
-            Math.max(0L, Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), desired))
-                / 1000.0);
-      }
-      target.setCreditedAmount(
-          MaterialQuantityArithmetic.add(
-                  MaterialQuantityArithmetic.quanta(target.getCreditedAmount()), desired)
-              / 1000.0);
-      credit.setClaimId(target.getId());
-      credit.setParticipationId(target.getParticipation().getId());
-      credit.setClaimingOrgUnitId(target.getClaimingOrgUnit().getId());
-      credit.setQualityTierId(target.getQualityTier().getId());
-      coordinator.record(
-          target,
-          MaterialContributionChange.Reason.FALSE_FACT_CORRECTED,
-          previous,
-          desired / 1000.0,
-          credit.getId());
-    }
-    credit.setAmount(desired / 1000.0);
-    restoreRunningPromise(order, original, old, quantum);
-    coordinator.record(
-        original,
-        MaterialContributionChange.Reason.FALSE_FACT_CORRECTED,
-        beforeOriginal,
-        -old / 1000.0,
-        credit.getId());
   }
 
   private void correctConnectedQuantity(MaterialProvisionConnections.Plan plan) {
@@ -282,14 +432,14 @@ public class MaterialProvisionCorrections {
               StockQuantityFragments.total(receipt.getAttributedFragments()),
               StockQuantityFragments.total(attributed));
       receipt.setQuantityFragments(actual);
-      receipt.setQuantityAmount(StockQuantityFragments.total(actual) / 1000.0);
+      receipt.setQuantityAmount(fromQuanta(StockQuantityFragments.total(actual)));
       receipt.setAttributedFragments(attributed);
-      receipt.setAmount(StockQuantityFragments.total(attributed) / 1000.0);
+      receipt.setAmount(fromQuanta(StockQuantityFragments.total(attributed)));
       fact.claim()
           .setCreditedAmount(
-              Math.subtractExact(
-                      MaterialQuantityArithmetic.quanta(fact.claim().getCreditedAmount()), lost)
-                  / 1000.0);
+              fromQuanta(
+                  Math.subtractExact(
+                      MaterialQuantityArithmetic.quanta(fact.claim().getCreditedAmount()), lost)));
       losses.add(new CorrectionLoss(fact, lost));
     }
     List<JobOrder> affectedOrders =
@@ -330,14 +480,14 @@ public class MaterialProvisionCorrections {
         long room = Math.max(0L, Math.subtractExact(bucket.availableQuanta(), outstanding));
         long restore = Math.min(loss.quanta(), room) / quantum * quantum;
         claim.setAmount(
-            Math.addExact(MaterialQuantityArithmetic.quanta(previous), restore) / 1000.0);
+            fromQuanta(Math.addExact(MaterialQuantityArithmetic.quanta(previous), restore)));
         promised.put(key, Math.addExact(outstanding, restore));
       }
       coordinator.record(
           claim,
           MaterialContributionChange.Reason.FALSE_FACT_CORRECTED,
           previous,
-          -loss.quanta() / 1000.0,
+          fromQuanta(Math.negateExact(loss.quanta())),
           loss.fact().receipt().getId());
     }
     affectedOrders.forEach(order -> coordinator.reconcileOrder(order.getId()));
@@ -364,13 +514,15 @@ public class MaterialProvisionCorrections {
     double previous = original.getAmount();
     if (original.getEndedAt() == null) {
       original.setAmount(
-          Math.max(0L, Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), fulfilled))
-              / 1000.0);
+          fromQuanta(
+              Math.max(
+                  0L, Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), fulfilled))));
     }
-    original.setCreditedAmount(Math.addExact(credited, fulfilled) / 1000.0);
+    original.setCreditedAmount(fromQuanta(Math.addExact(credited, fulfilled)));
     credit.setAmount(
-        Math.addExact(MaterialQuantityArithmetic.quanta(credit.getAmount()), fulfilled) / 1000.0);
-    credit.setQuantityAmount(desired / 1000.0);
+        fromQuanta(
+            Math.addExact(MaterialQuantityArithmetic.quanta(credit.getAmount()), fulfilled)));
+    credit.setQuantityAmount(fromQuanta(desired));
     List<StockQuantityFragment> actual = new ArrayList<>(credit.getQuantityFragments());
     actual.addAll(added);
     credit.setQuantityFragments(List.copyOf(actual));
@@ -388,7 +540,7 @@ public class MaterialProvisionCorrections {
         original,
         MaterialContributionChange.Reason.FALSE_FACT_CORRECTED,
         previous,
-        fulfilled / 1000.0,
+        fromQuanta(fulfilled),
         credit.getId());
   }
 
@@ -436,9 +588,9 @@ public class MaterialProvisionCorrections {
     long room = Math.max(0L, Math.subtractExact(bucket.availableQuanta(), promised));
     long restore = Math.min(wronglyRemoved, room) / quantum * quantum;
     original.setAmount(
-        MaterialQuantityArithmetic.add(
-                MaterialQuantityArithmetic.quanta(original.getAmount()), restore)
-            / 1000.0);
+        fromQuanta(
+            MaterialQuantityArithmetic.add(
+                MaterialQuantityArithmetic.quanta(original.getAmount()), restore)));
   }
 
   private MaterialClaim historicalClaim(UUID id) {

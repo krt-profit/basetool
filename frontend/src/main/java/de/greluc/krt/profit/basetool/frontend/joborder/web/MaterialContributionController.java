@@ -19,36 +19,34 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
-import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.MaterialContributionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialContributionHistoryDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialProvisionCorrectionDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ResponseStatusException;
 
 /** Renders facts authorized by the backend's concrete order read policy. */
 @Controller
+@UsesLayoutModel
 @RequestMapping("/orders/{id}/claims")
 @PreAuthorize("isAuthenticated()")
 @RequiredArgsConstructor
 public class MaterialContributionController {
-  /** Relays the caller to the backend's canSeeJobOrder check without a local authority cache. */
-  private final JobOrderBackendClient orders;
+  /** Reads retained contribution facts under the backend grants. */
+  private final MaterialContributionBackendClient contributions;
 
   /**
    * Renders retained facts only after the backend authorizes the concrete order read.
@@ -59,27 +57,19 @@ public class MaterialContributionController {
    */
   @GetMapping(value = "/history", headers = "X-Requested-With=XMLHttpRequest")
   public String history(@PathVariable UUID id, Model model) {
-    var history = orders.contributionHistory(id);
-    model.addAttribute("contributionHistory", history == null ? List.of() : history);
+    var history = contributions.contributionHistory(id);
+    List<MaterialContributionHistoryDto> retained = history == null ? List.of() : history;
+    model.addAttribute("contributionHistory", retained);
+    model.addAttribute(
+        "provisionUnitNames",
+        retained.stream()
+            .collect(
+                Collectors.toUnmodifiableMap(
+                    contribution -> contribution.claimingOrgUnit().id(),
+                    contribution -> contribution.claimingOrgUnit().name(),
+                    (first, _) -> first)));
     model.addAttribute("contributionOrderId", id);
     return "joborder/fragments/contribution-history :: history";
-  }
-
-  /**
-   * Relays a deliberately submitted correction; the backend rechecks current writer grants.
-   *
-   * @param id the order
-   * @param creditId the retained provision
-   * @param correction observed versions and truthful replacement facts
-   * @return refreshed facts; backend denials and conflicts retain their original status
-   */
-  @PostMapping("/provisions/{creditId}/correction")
-  @ResponseBody
-  public List<MaterialContributionHistoryDto> correct(
-      @PathVariable UUID id,
-      @PathVariable UUID creditId,
-      @RequestBody MaterialProvisionCorrectionDto correction) {
-    return orders.correctProvision(id, creditId, correction);
   }
 
   /**
@@ -92,7 +82,7 @@ public class MaterialContributionController {
    */
   @GetMapping(value = "/provisions/{creditId}/editor", headers = "X-Requested-With=XMLHttpRequest")
   public String editor(@PathVariable UUID id, @PathVariable UUID creditId, Model model) {
-    var history = orders.contributionHistory(id);
+    var history = contributions.contributionHistory(id);
     var contribution =
         Objects.requireNonNull(history).stream()
             .filter(
@@ -110,7 +100,7 @@ public class MaterialContributionController {
     model.addAttribute("contributionOrderId", id);
     model.addAttribute("contribution", contribution);
     model.addAttribute("provision", credit);
-    model.addAttribute("attributionTargets", orders.attributionOptions(id, creditId));
+    model.addAttribute("attributionTargets", contributions.attributionOptions(id, creditId));
     return "joborder/fragments/contribution-history :: editor";
   }
 
@@ -126,8 +116,46 @@ public class MaterialContributionController {
       value = "/provisions/{creditId}/quantity-options",
       headers = "X-Requested-With=XMLHttpRequest")
   public String quantityOptions(@PathVariable UUID id, @PathVariable UUID creditId, Model model) {
-    model.addAttribute("quantityOptions", orders.quantityCorrectionOptions(id, creditId));
+    model.addAttribute("quantityOptions", contributions.quantityCorrectionOptions(id, creditId));
     return "joborder/fragments/contribution-history :: quantityOptions";
+  }
+
+  /**
+   * Refreshes the attribution choices while retaining the editor's deliberate selection.
+   *
+   * @param id the readable order
+   * @param creditId the retained provision
+   * @param suppliedQuality corrected original quality, or null for attribution-only choices
+   * @param model the current authoritative choices
+   * @return the attribution select fragment
+   */
+  @GetMapping(
+      value = "/provisions/{creditId}/attribution-options",
+      headers = "X-Requested-With=XMLHttpRequest")
+  public String attributionOptions(
+      @PathVariable UUID id,
+      @PathVariable UUID creditId,
+      @RequestParam(required = false) @Nullable Integer suppliedQuality,
+      Model model) {
+    model.addAttribute(
+        "attributionTargets", contributions.attributionOptions(id, creditId, suppliedQuality));
+    return "joborder/fragments/contribution-history :: attributionOptions";
+  }
+
+  /**
+   * Renders selectable current placements for an optional physical quality correction.
+   *
+   * @param id the readable order
+   * @param creditId the retained provision
+   * @param model permitted row labels, versions and server-known affected quantities
+   * @return the current quality correction choices
+   */
+  @GetMapping(
+      value = "/provisions/{creditId}/quality-options",
+      headers = "X-Requested-With=XMLHttpRequest")
+  public String qualityOptions(@PathVariable UUID id, @PathVariable UUID creditId, Model model) {
+    model.addAttribute("qualityOptions", contributions.qualityCorrectionOptions(id, creditId));
+    return "joborder/fragments/contribution-history :: qualityOptions";
   }
 
   /**
@@ -145,18 +173,7 @@ public class MaterialContributionController {
       @RequestParam UUID materialId,
       @RequestParam int quality,
       Model model) {
-    var buckets =
-        Objects.requireNonNull(orders.claimBuckets(id)).stream()
-            .filter(bucket -> materialId.equals(bucket.material().id()))
-            .filter(bucket ->
-                bucket.qualityTier() == null || bucket.qualityTier().minQuality() <= quality)
-            .toList();
-    var writable =
-        Objects.requireNonNull(orders.claimingOptions(id)).stream()
-            .map(OrgUnitMembershipOptionDto::orgUnitId)
-            .collect(Collectors.toSet());
-    model.addAttribute("provisionBuckets", buckets);
-    model.addAttribute("provisionWritableIds", writable);
+    model.addAttribute("provisionTargets", contributions.provisionOptions(id, materialId, quality));
     return "joborder/fragments/provision-options :: options";
   }
 }

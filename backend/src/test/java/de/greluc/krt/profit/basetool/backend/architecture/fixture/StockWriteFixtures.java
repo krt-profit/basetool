@@ -76,13 +76,9 @@ public final class StockWriteFixtures {
       InventoryAllocations.addJobOrder(item, order.getId(), 1.0, false);
     }
 
-    /**
-     * Releases an order's earmarks with a bulk statement.
-     *
-     * @param jobOrderId the order
-     */
-    public void releasesInBulk(UUID jobOrderId) {
-      repository.deleteJobOrderAllocationsByJobOrder(jobOrderId, java.util.List.of());
+    /** Deletes stock rows through the repository's bulk operation. */
+    public void releasesInBulk() {
+      repository.deleteAllInBatch();
     }
 
     /**

@@ -102,12 +102,16 @@ and reduced Exchange keep their independent gates.
 
 Material promises and explicit provision credit use the [material contribution contract](docs/specs/orders-material-claims.md).
 Outstanding promises follow uncovered demand; capacity reductions are not fulfilled contributions.
-Connected corrections preserve recorded facts and current Inventory grants. Legacy history states
-only its verifiable credited subset rather than inventing full original quantities or quality.
+The ordinary provision picker renders backend-authorized matching open promises with their current versions.
+Connected quantity, attribution and original-quality corrections retain their recorded facts.
+A quality correction changes current stock only for explicitly selected retained portions, with
+current Inventory write rights and row versions. Historical-only correction remains available
+after stock consumption. Legacy history states only its verifiable credited subset rather than
+inventing full original quantities or quality.
 The claim entry remains the existing SK workflow; the broader all-kind writer and lifecycle
 conversion is part of the remaining shared workflow below.
 
-> **Implementation and acceptance scope:** The hierarchy and shared MATERIAL/ITEM reader foundations are implemented. Material-contribution implementation and verification are under review against its owning requirement. The remaining shared writer/lifecycle conversion, [aUEC procurement](docs/specs/orders-auec.md) and [optional bank coupling](docs/specs/orders-auec-bank.md) remain accepted/planned. These records are not a release announcement, and acceptance stays unchecked until its evidence is produced.
+> **Implementation and acceptance scope:** The hierarchy and shared MATERIAL/ITEM reader foundations are implemented. Material-contribution implementation and verification are under review against its owning requirement. The remaining shared writer/lifecycle conversion, [aUEC procurement](docs/specs/orders-auec.md) and [Bank handling selected by default with an explicit choice per operation to work without Bank](docs/specs/orders-auec-bank.md) remain accepted/planned. These records are not a release announcement, and acceptance stays unchecked until its evidence is produced.
 
 The README is the overview; everything else lives in dedicated, versioned docs:
 

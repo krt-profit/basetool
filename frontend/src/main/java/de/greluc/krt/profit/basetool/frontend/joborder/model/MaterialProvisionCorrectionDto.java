@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Scoped correction of false original attribution or physical provision quantity.
+ * Scoped correction of false original attribution, quality or physical provision quantity.
  *
  * @param kind the false fact being corrected
  * @param version observed provision version
@@ -36,6 +36,8 @@ import java.util.UUID;
  * @param targetClaimVersion observed attribution target version
  * @param stockVersions observed connected rows for a physical correction
  * @param targetStockRowId explicit connected row receiving a physical quantity increase
+ * @param suppliedQuality corrected original quality, or null for other correction kinds
+ * @param qualityStockRowIds deliberately selected current rows, or empty for historical facts only
  */
 @DtoMirror
 public record MaterialProvisionCorrectionDto(
@@ -46,4 +48,11 @@ public record MaterialProvisionCorrectionDto(
     UUID targetClaimId,
     Long targetClaimVersion,
     List<InventoryRowVersionDto> stockVersions,
-    UUID targetStockRowId) {}
+    UUID targetStockRowId,
+    Integer suppliedQuality,
+    List<UUID> qualityStockRowIds) {
+  /** Retains the selected current rows without requiring a physical correction. */
+  public MaterialProvisionCorrectionDto {
+    qualityStockRowIds = qualityStockRowIds == null ? List.of() : List.copyOf(qualityStockRowIds);
+  }
+}

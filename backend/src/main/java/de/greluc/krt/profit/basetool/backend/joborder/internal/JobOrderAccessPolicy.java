@@ -156,6 +156,7 @@ public class JobOrderAccessPolicy
     }
     return switch (gate) {
       case TRANSFER -> canTransferResponsibility(order);
+      case ADMIN_DELETE -> authHelper.isAdmin();
       case EDIT -> canEditJobOrderRow(order);
       case REQUESTER -> isRequesterWriter(order) && !orderHasAnyDelivery(order.getId());
     };

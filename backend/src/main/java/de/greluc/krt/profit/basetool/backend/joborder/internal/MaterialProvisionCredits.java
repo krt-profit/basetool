@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts.fromQuanta;
+
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialProvision;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
@@ -31,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Quality;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -100,33 +103,56 @@ public class MaterialProvisionCredits {
     credit.setMaterialId(provision.materialId());
     credit.setQualityTierId(claim.getQualityTier().getId());
     credit.setSourceRowId(provision.rowId());
-    credit.setAmount(selectedQuanta / 1000.0);
-    credit.setQuantityAmount(actualQuantity / 1000.0);
+    credit.setAmount(fromQuanta(selectedQuanta));
+    credit.setQuantityAmount(fromQuanta(actualQuantity));
     credit.setQuantityFragments(provided);
     credit.setEvidence(
         de.greluc.krt.profit.basetool.backend.joborder.api.MaterialProvisionEvidence.OBSERVED);
     credit.setAttributedFragments(selected);
     credit.setSuppliedQuality(Quality.orMin(provision.quality()));
+    credit.setSuppliedQualityKnown(true);
     credit.setFragments(
         selected.stream()
             .map(fragment ->
                 new MaterialProvisionFragment(
                     fragment.origin(), fragment.fromQuanta(), fragment.toQuanta()))
             .toList());
+    credit.recordInitialFact();
     credits.save(credit);
     double previous = claim.getAmount();
     claim.setAmount(
-        Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), selectedQuanta) / 1000.0);
+        fromQuanta(
+            Math.subtractExact(MaterialQuantityArithmetic.quanta(previous), selectedQuanta)));
     claim.setCreditedAmount(
-        MaterialQuantityArithmetic.add(
-                MaterialQuantityArithmetic.quanta(claim.getCreditedAmount()), selectedQuanta)
-            / 1000.0);
+        fromQuanta(
+            MaterialQuantityArithmetic.add(
+                MaterialQuantityArithmetic.quanta(claim.getCreditedAmount()), selectedQuanta)));
     coordinator.record(
         claim,
         MaterialContributionChange.Reason.PROVISION_CREDITED,
         previous,
-        selectedQuanta / 1000.0,
+        fromQuanta(selectedQuanta),
         credit.getId());
+  }
+
+  /**
+   * Reads this receipt's known quantity after excluding intervals processed by other receipts.
+   *
+   * @param credit the retained provision whose own processed intervals remain eligible
+   * @return exact known intervals available to its corrected historical attribution
+   */
+  @Transactional(readOnly = true, propagation = Propagation.MANDATORY)
+  @NotNull
+  public List<StockQuantityFragment> availableForAttribution(
+      @NotNull MaterialProvisionCredit credit) {
+    List<StockQuantityFragment> foreign =
+        credits.processedQuantityExcept(
+            credit.getQuantityFragments().stream()
+                .map(StockQuantityFragment::origin)
+                .distinct()
+                .toList(),
+            credit.getId());
+    return StockQuantityFragments.subtract(credit.getQuantityFragments(), foreign);
   }
 
   private static List<StockQuantityFragment> takeUncredited(

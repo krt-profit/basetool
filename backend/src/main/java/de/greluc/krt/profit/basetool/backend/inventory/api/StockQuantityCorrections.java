@@ -66,4 +66,31 @@ public interface StockQuantityCorrections {
       List<InventoryRowVersionDto> versions,
       OrderMaterialScope provisionScope,
       UUID factId);
+
+  /**
+   * Reads editable current placements and the exact receipt-known quantity each contains.
+   *
+   * @param known original known physical intervals
+   * @return permitted independently versioned rows with their affected amount
+   */
+  List<InventoryQualityCorrectionOptionDto> currentQualityRows(
+      Collection<StockQuantityFragment> known);
+
+  /**
+   * Corrects only explicitly selected current intersections of the original known quantity.
+   *
+   * @param known original known physical intervals
+   * @param selectedRows explicitly selected current stock rows
+   * @param quality declared truthful current quality for those intervals
+   * @param versions independently observed selected row versions
+   * @param provisionScope original provision order and material
+   * @param factId connected historical provision identity for audit
+   */
+  void correctKnownQuality(
+      Collection<StockQuantityFragment> known,
+      List<UUID> selectedRows,
+      int quality,
+      List<InventoryRowVersionDto> versions,
+      OrderMaterialScope provisionScope,
+      UUID factId);
 }

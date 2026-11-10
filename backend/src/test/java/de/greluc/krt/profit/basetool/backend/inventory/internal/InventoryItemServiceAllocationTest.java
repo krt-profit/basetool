@@ -95,11 +95,12 @@ class InventoryItemServiceAllocationTest {
   /** Wires the job-order requirement lookup over the mocked order repository and item service. */
   @BeforeEach
   void wireJobOrders() {
+    InventoryOrderWrites orderWrites =
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class));
     service =
         new InventoryItemService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            orderWrites,
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -119,10 +120,8 @@ class InventoryItemServiceAllocationTest {
             inventoryCheckoutService,
             null,
             new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-                null));
-    lenient()
-        .when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class)))
-        .thenReturn(true);
+                orderWrites));
+    lenient().when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
   }
 
   private final UUID itemId = UUID.randomUUID();

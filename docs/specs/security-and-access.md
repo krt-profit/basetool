@@ -4811,17 +4811,21 @@ read it as it stands; it is the same document as the compact serialisation.
 > hand the two export coverage gates statements they do not check.
 
 The `materialClaims` section selects only contributions directly linked by
-`claimed_by_user_id`. It includes their stored promise and credited amounts, ordered quantity-change
-history and directly linked receipt facts: receipt identity, credited amount, evidence kind,
-creation instant and, only when fully observed, physical provision amount and supplied quality.
-A credited lower bound does not claim an observed physical total or actual quality. Receipts are
-matched by both order and contribution identity. The projection does not read current private
-stock, disclose source rows or physical provenance, or infer a person from unit membership,
+`claimed_by_user_id`. It includes stored promise and credited amounts, ordered contribution changes
+and directly linked receipt facts: receipt identity, credited amount, quantity evidence, creation
+instant, verified quality floor and retained original/corrected declarations. The physical total
+appears only when fully observed. Exact original supplied quality appears only when explicitly
+known, independently of quantity evidence: a declared quality correction can make quality known
+while a legacy total and composition remain unknown. A credited lower bound never claims an
+observed physical total. Missing older declarations remain missing; corrections retain their
+actual before/after quantity scope, quality knowledge and explicit unit attribution.
+Receipts are matched by both order and contribution identity. The projection does not read current
+private stock, disclose source rows or physical provenance, or infer a person from unit membership,
 ownership or recorded names. Explicit order deletion removes its claim rows and their personal
-association; the independent once-only physical evidence has no person identifier and is not
+association; independent once-only physical evidence contains no person identifier and is not
 exported as a personal performance history. Existing deletion and retention rules remain unchanged.
-`DataExportMaterialClaimSectionIntegrationTest` covers active and ended facts, evidence limits,
-foreign-record exclusion and removal of the personal link.
+`DataExportMaterialClaimSectionIntegrationTest` covers active and ended facts, corrections,
+independent quality/quantity evidence, foreign-record exclusion and removal of the personal link.
 
 **What the sections cover beyond the core tables.** The account section lists the optional RSI
 handle, and as a name spelling it is scrubbed from other members' free text (REQ-SEC-072); the

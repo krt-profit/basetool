@@ -24,11 +24,8 @@ import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOp
 import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOps.round;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
@@ -53,12 +50,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -87,7 +82,6 @@ public class ExchangeStockWriteService
   /** The share of a lot a batch may take within the window before it counts as a removal. */
   private static final BigDecimal REMOVAL_SHARE = new BigDecimal("0.1");
 
-  private static final Pattern LOT_KEY_SEPARATOR = Pattern.compile("\\|");
   private static final String CLIENT_CHANNEL = "client";
 
   /** The refusal of a quantity whose unit is not the material's. */
@@ -109,10 +103,7 @@ public class ExchangeStockWriteService
   static final String STOLEN_MARKING_DISABLED = "STOLEN_MARKING_DISABLED";
 
   private final ExchangeLotCatalogue lotCatalogue;
-  private final MaterialRepository materialRepository;
-  private final GameItemRepository gameItemRepository;
   private final ExchangeLocationResolver locationResolver;
-  private final LocationRepository locationRepository;
   private final StockReads stockReads;
   private final StockLotWritePlans lotWritePlans;
   private final ExchangeStockShares shares;
@@ -225,7 +216,7 @@ public class ExchangeStockWriteService
             offers.reduced += outcome.offers().reduced();
             offers.removed += outcome.offers().removed();
             if (!dryRun) {
-              journal(caller, batch, change, moves);
+              journal(caller, batch, change, moves, Objects.requireNonNull(outcome.quantity()));
             }
             touched.add(change.lot().key());
             yield Outcome.APPLIED;
@@ -243,98 +234,6 @@ public class ExchangeStockWriteService
         liveSync.stockChanged(offers.reduced + offers.removed > 0);
       }
     };
-  }
-
-  /**
-   * Sets one of the member's lots back to a quantity for an undo, through the same book-in and
-   * book-out as a client write; offers a book-out lowers are not raised again.
-   *
-   * @param member the member
-   * @param lotKey the lot's key as the journal and the change feed record it
-   * @param target the quantity to restore
-   * @param unit the lot's unit
-   * @return whether the lot could be restored; {@code false} when its material, item or location is
-   *     gone or the key is not a lot key
-   */
-  @Transactional(propagation = Propagation.MANDATORY)
-  public boolean restoreLot(
-      @NotNull UUID member,
-      @NotNull String lotKey,
-      @NotNull BigDecimal target,
-      @NotNull String unit) {
-    Optional<Lot> parsed = parseLot(lotKey, unit);
-    if (parsed.isEmpty()) {
-      return false;
-    }
-    Lot lot = parsed.get();
-    BigDecimal current =
-        round(
-            sum(
-                Objects.requireNonNull(
-                    stockReads.lotRows(member, List.of(lot.stock())).get(lotKey))),
-            unit);
-    var prepared =
-        lotWritePlans.prepareLotBatch(
-            member,
-            List.of(lot.stock()),
-            current.compareTo(target) == 0
-                ? List.of()
-                : List.of(
-                    new StockLotWritePlans.SetLotAmount(
-                        0, lot.stock(), current, round(target, unit))));
-    BigDecimal lockedCurrent =
-        round(sum(Objects.requireNonNull(prepared.lockedRows().get(lotKey))), unit);
-    List<StockLotWritePlans.Intent> intents =
-        lockedCurrent.compareTo(target) == 0
-            ? List.of()
-            : List.of(
-                new StockLotWritePlans.SetLotAmount(
-                    0, lot.stock(), lockedCurrent, round(target, unit)));
-    var confirmed = lotWritePlans.confirmLotBatch(prepared, intents, false);
-    if (!intents.isEmpty()) {
-      lotWritePlans.executePreparedLot(confirmed, 0, false);
-    }
-    return true;
-  }
-
-  /**
-   * Reads a lot key back into its lot.
-   *
-   * @param lotKey the key
-   * @param unit the lot's unit
-   * @return the lot, or empty when the key is malformed or names something that no longer exists
-   */
-  private @NotNull Optional<Lot> parseLot(@NotNull String lotKey, @NotNull String unit) {
-    List<String> parts = LOT_KEY_SEPARATOR.splitAsStream(lotKey).toList();
-    if (parts.size() != 4
-        || !parts.get(1).startsWith("l:")
-        || !parts.get(2).startsWith("q:")
-        || !parts.get(3).startsWith("s:")) {
-      return Optional.empty();
-    }
-    try {
-      UUID catalogueId = UUID.fromString(parts.get(0).substring(2));
-      Optional<Location> location =
-          locationRepository.findById(UUID.fromString(parts.get(1).substring(2)));
-      int quality = Integer.parseInt(parts.get(2).substring(2));
-      boolean stolen = "1".equals(parts.get(3).substring(2));
-      if (location.isEmpty()) {
-        return Optional.empty();
-      }
-      if (parts.get(0).startsWith("m:")) {
-        return materialRepository
-            .findById(catalogueId)
-            .map(m -> new Lot(m, null, location.get(), quality, stolen, unit));
-      }
-      if (parts.get(0).startsWith("i:")) {
-        return gameItemRepository
-            .findById(catalogueId)
-            .map(i -> new Lot(null, i, location.get(), null, stolen, unit));
-      }
-      return Optional.empty();
-    } catch (IllegalArgumentException _) {
-      return Optional.empty();
-    }
   }
 
   /**
@@ -392,11 +291,11 @@ public class ExchangeStockWriteService
     var preliminary = decide(caller, ops, catalogue, early, lots, observed);
     var prepared =
         lotWritePlans.prepareLotBatch(
-            caller.member(), readLots, intents(caller.member(), preliminary));
+            caller.member(), readLots, List.of(), List.of(), intents(caller.member(), preliminary));
     var finalPlan = decide(caller, ops, catalogue, early, lots, prepared.lockedRows());
     var confirmed =
         lotWritePlans.confirmLotBatch(
-            prepared, intents(caller.member(), finalPlan), changeSet.dryRun());
+            prepared, List.of(), intents(caller.member(), finalPlan), changeSet.dryRun());
     return finalPlan.stream()
         .map(planned -> {
           if (planned instanceof Write<StockWrite>(StockWrite write)) {
@@ -573,7 +472,15 @@ public class ExchangeStockWriteService
       return Outcome.rejected(VERSION_CONFLICT);
     }
     if (!(dryRun && touched.contains(key))) {
-      String refusal = shares.record(caller, batch, rebooking.move(), dryRun, outcome.refusal());
+      String refusal =
+          shares.record(
+              caller,
+              batch,
+              rebooking.step(),
+              rebooking.move(),
+              dryRun,
+              outcome.refusal(),
+              outcome.quantity());
       if (refusal != null) {
         refused.add(key);
         return Outcome.rejected(refusal);
@@ -581,28 +488,6 @@ public class ExchangeStockWriteService
     }
     touched.add(key);
     return Outcome.APPLIED;
-  }
-
-  /**
-   * Sets a lot's pools back for an undo; all or nothing.
-   *
-   * @param member the member
-   * @param lotKey the lot's key as the journal records it
-   * @param unit the lot's unit
-   * @param pools the net amount the client moved into each pool
-   * @return whether every pool could be set back; {@code false} writes nothing
-   */
-  @Transactional(propagation = Propagation.MANDATORY)
-  public boolean restorePools(
-      @NotNull UUID member,
-      @NotNull String lotKey,
-      @NotNull String unit,
-      @NotNull Map<UUID, BigDecimal> pools) {
-    Optional<Lot> parsed = parseLot(lotKey, unit);
-    if (parsed.isEmpty()) {
-      return false;
-    }
-    return shares.takeBack(member, parsed.get().stock(), pools);
   }
 
   /**
@@ -730,19 +615,29 @@ public class ExchangeStockWriteService
             lotKey,
             clock.instant().minus(ExchangeMassChangeGuard.WINDOW))
         .map(ExchangeJournalEntry::getBeforeState)
-        .map(json -> ExchangeStockJournal.State.read(objectMapper.readTree(json)).quantity());
+        .map(json ->
+            ExchangeStockJournal.State.read(objectMapper, objectMapper.readTree(json)).quantity());
   }
 
   /** Journals one quantity change after its confirmed owning physical execution. */
-  private void journal(ExchangeCaller caller, UUID batch, Change change, Set<Change> moves) {
+  private void journal(
+      ExchangeCaller caller,
+      UUID batch,
+      Change change,
+      Set<Change> moves,
+      StockLotWritePlans.QuantityChange quantity) {
     journalService.record(
         caller,
         batch,
         ExchangeJournalAction.STOCK_SET_QUANTITY,
         change.lot().key(),
         isRemoval(caller, change, moves),
-        ExchangeStockJournal.State.of(change.current(), change.lot().unit()).toJournal(),
-        ExchangeStockJournal.State.of(change.target(), change.lot().unit()).toJournal());
+        ExchangeStockJournal.State.of(
+                change.current(), change.lot().unit(), quantity.before(), change.step())
+            .toJournal(),
+        ExchangeStockJournal.State.of(
+                change.target(), change.lot().unit(), quantity.after(), change.step())
+            .toJournal());
   }
 
   /**

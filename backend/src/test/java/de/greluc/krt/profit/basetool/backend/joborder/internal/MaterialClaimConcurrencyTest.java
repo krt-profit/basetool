@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
@@ -48,26 +49,29 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Races two concurrent first claims on one material bucket against the real Postgres container
- * (REQ-ORDERS-024, ADR-0092).
+ * Verifies serialized first claims and overclaim rejection against real PostgreSQL.
  *
- * <p>Same squadron: both writers succeed and exactly one row remains (last writer wins). Different
- * squadrons past the required amount: exactly one wins and the other gets a {@link
- * BadRequestException}. Not {@code @Transactional}, so each worker runs its own session.
+ * <p>Each worker uses its own transaction through the public claim service.
  */
 @SpringBootTest
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 @WithMockUser(roles = {"ADMIN"})
 class MaterialClaimConcurrencyTest {
+  /** Removes managed participation dependents before deleting their fixture units. */
+  private final JobOrderParticipationRepository participations;
 
   @Autowired private OrgUnitRepository orgUnitRepository;
 
@@ -117,6 +121,8 @@ class MaterialClaimConcurrencyTest {
     transactionTemplate.executeWithoutResult(st -> {
       materialClaimRepository.deleteAll(
           materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId()));
+      participations.deleteAll(
+          participations.findByJobOrderIdOrderById(fixture.orderId(), Pageable.unpaged()));
       jobOrderRepository.deleteById(fixture.orderId());
       squadronRepository.deleteById(fixture.squadronId());
       if (fixture.squadronBId() != null) {
@@ -129,13 +135,12 @@ class MaterialClaimConcurrencyTest {
   }
 
   /**
-   * Two threads lodge the first claim for the same squadron in lockstep; neither throws, and
-   * exactly one claim with one of the two amounts remains.
+   * Two first writes create one promise; the losing meaningful edit requires a deliberate retry.
    *
    * @throws Exception if a worker future does not complete within the timeout
    */
   @Test
-  void firstClaimRace_sameSquadron_lastWriterWins_noServerError() throws Exception {
+  void firstClaimsRequireAFreshVersionForTheLosingWriter() throws Exception {
     fixture = seed();
     final List<CreateClaimDto> payloads = List.of(claim(AMOUNT_A), claim(AMOUNT_B));
 
@@ -143,7 +148,8 @@ class MaterialClaimConcurrencyTest {
 
     CountDownLatch ready = new CountDownLatch(THREADS);
     CountDownLatch go = new CountDownLatch(1);
-    AtomicInteger successCount = new AtomicInteger();
+    List<ClaimDto> successes = new CopyOnWriteArrayList<>();
+    List<CreateClaimDto> conflicts = new CopyOnWriteArrayList<>();
     AtomicInteger otherErrorCount = new AtomicInteger();
     List<Throwable> unexpectedErrors = new CopyOnWriteArrayList<>();
 
@@ -161,8 +167,9 @@ class MaterialClaimConcurrencyTest {
                   otherErrorCount.incrementAndGet();
                   return;
                 }
-                materialClaimService.upsertClaim(fixture.orderId(), payload);
-                successCount.incrementAndGet();
+                successes.add(materialClaimService.upsertClaim(fixture.orderId(), payload));
+              } catch (ObjectOptimisticLockingFailureException conflict) {
+                conflicts.add(payload);
               } catch (Throwable t) {
                 otherErrorCount.incrementAndGet();
                 unexpectedErrors.add(t);
@@ -185,24 +192,39 @@ class MaterialClaimConcurrencyTest {
       pool.awaitTermination(5, TimeUnit.SECONDS);
     }
 
-    assertThat(otherErrorCount.get())
-        .as(
-            "the losing first-claim writer must retry in a fresh transaction, never surface a"
-                + " 500 / propagated conflict — got: %s",
-            unexpectedErrors)
-        .isZero();
-    assertThat(successCount.get())
-        .as("both concurrent same-squadron upserts must complete (last-writer-wins)")
-        .isEqualTo(THREADS);
-
+    assertThat(otherErrorCount.get()).as("unexpected worker errors: %s", unexpectedErrors).isZero();
+    assertThat(successes).hasSize(1);
+    assertThat(conflicts).hasSize(1);
+    ClaimDto winner = successes.getFirst();
+    CreateClaimDto loser = conflicts.getFirst();
     List<MaterialClaim> rows =
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId());
-    assertThat(rows)
-        .as("the same-squadron upsert must collapse to exactly one row for the bucket")
-        .hasSize(1);
-    assertThat(rows.get(0).getAmount())
-        .as("the surviving row carries one of the two racing writers' amounts (last-writer-wins)")
-        .isIn(AMOUNT_A, AMOUNT_B);
+    assertThat(rows).hasSize(1);
+    assertThat(rows.getFirst().getId()).isEqualTo(winner.id());
+    assertThat(rows.getFirst().getAmount()).isEqualTo(winner.amount());
+    assertThat(rows.getFirst().getVersion()).isEqualTo(winner.version());
+    assertThat(loser.amount()).isNotEqualTo(winner.amount());
+
+    ClaimDto retried =
+        materialClaimService.upsertClaim(
+            fixture.orderId(),
+            new CreateClaimDto(
+                loser.materialId(),
+                loser.qualityRequirement(),
+                loser.claimingOrgUnitId(),
+                loser.amount(),
+                winner.version()));
+    assertThat(retried.id()).isEqualTo(winner.id());
+    assertThat(retried.amount()).isEqualTo(loser.amount());
+    assertThat(retried.version()).isGreaterThan(winner.version());
+    assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId()))
+        .hasSize(1)
+        .first()
+        .satisfies(row -> {
+          assertThat(row.getId()).isEqualTo(retried.id());
+          assertThat(row.getAmount()).isEqualTo(retried.amount());
+          assertThat(row.getVersion()).isEqualTo(retried.version());
+        });
   }
 
   /**

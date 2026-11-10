@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.CheckoutType;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutAudits;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryEarmarkLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
@@ -110,12 +111,14 @@ class InventoryItemServiceVersionFlushTest {
             requestScopeResolver,
             orgUnitStampingService,
             auditService,
+            new InventoryCheckoutAudits(auditService),
             eventPublisher);
+    InventoryOrderWrites orderWrites =
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class));
     inventoryItemService =
         new InventoryItemService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            orderWrites,
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -147,7 +150,7 @@ class InventoryItemServiceVersionFlushTest {
             realCheckoutService,
             new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false),
             new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-                null));
+                orderWrites));
   }
 
   private User userWithId(UUID id) {

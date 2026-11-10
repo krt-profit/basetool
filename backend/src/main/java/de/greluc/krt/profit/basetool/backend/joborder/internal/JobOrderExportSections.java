@@ -60,8 +60,10 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                          'id', p.id, 'creditedAmount', p.amount, 'evidence', p.evidence,
                          'quantityAmount', CASE WHEN p.evidence = 'OBSERVED'
                            THEN p.quantity_amount END,
-                         'suppliedQuality', CASE WHEN p.evidence = 'OBSERVED'
+                         'suppliedQuality', CASE WHEN p.supplied_quality_known
                            THEN p.supplied_quality END,
+                         'minimumSuppliedQuality', p.supplied_quality,
+                         'factChanges', p.fact_history,
                          'createdAt', p.created_at) ORDER BY p.created_at, p.id)
                          FROM material_provision_credit p
                          WHERE p.job_order_id = c.job_order_id AND p.claim_id = c.id),

@@ -22,7 +22,8 @@ import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
-/** @param {HTMLFormElement} form the retained correction form
+/** Returns a required input or select from the retained correction form.
+ * @param {HTMLFormElement} form the retained correction form
  * @param {string} selector the control selector
  * @returns {HTMLInputElement | HTMLSelectElement} the required control
  */
@@ -34,14 +35,16 @@ function control(form, selector) {
     return element;
 }
 
-/** @param {HTMLFormElement} form the editor
+/** Builds the provision's authorized frontend endpoint prefix.
+ * @param {HTMLFormElement} form the editor
  * @returns {string} its provision endpoint prefix
  */
 function provisionUrl(form) {
     return `/orders/${encodeURIComponent(form.dataset.orderId || '')}/claims/provisions/${encodeURIComponent(form.dataset.creditId || '')}`;
 }
 
-/** @param {HTMLFormElement} form the retained editor
+/** Shows a localized result in the retained correction form.
+ * @param {HTMLFormElement} form the retained editor
  * @param {string} text localized result or error
  */
 function message(form, text) {
@@ -49,7 +52,8 @@ function message(form, text) {
     if (status) status.textContent = text;
 }
 
-/** @param {string} url the authorized server fragment
+/** Loads an authorized same-origin correction fragment.
+ * @param {string} url the authorized server fragment
  * @param {string} fallback localized failure
  * @returns {Promise<string>} its markup
  */
@@ -63,14 +67,37 @@ async function fragment(url, fallback) {
     return response.text();
 }
 
-/** @param {HTMLFormElement} form the correction editor
+/** Activates only the controls belonging to the selected correction kind.
+ * @param {HTMLFormElement} form the correction editor
  */
 function validateControls(form) {
-    const quantity = control(form, '[data-correction-kind]').value === 'QUANTITY';
+    const kind = control(form, '[data-correction-kind]').value;
+    const quantity = kind === 'QUANTITY';
+    const quality = kind === 'QUALITY';
+    const qualityFields = form.querySelector('[data-correction-quality]');
+    const qualityStock = form.querySelector('[data-correction-quality-stock]');
+    const suppliedQuality = form.querySelector('[data-correction-supplied-quality]');
+    if (qualityFields instanceof HTMLElement) qualityFields.hidden = !quality;
+    if (qualityStock instanceof HTMLElement) {
+        qualityStock.hidden = !quality;
+        qualityStock.querySelectorAll('[data-quality-stock-row]').forEach((row) => {
+            if (row instanceof HTMLInputElement) row.disabled = !quality;
+        });
+    }
+    if (suppliedQuality instanceof HTMLInputElement) {
+        suppliedQuality.required = quality;
+        suppliedQuality.disabled = !quality;
+    }
     const attribution = form.querySelector('[data-correction-attribution]');
     const stock = form.querySelector('[data-correction-stock]');
     if (attribution instanceof HTMLElement) attribution.hidden = quantity;
-    if (stock instanceof HTMLElement) stock.hidden = !quantity;
+    if (stock instanceof HTMLElement) {
+        stock.hidden = !quantity;
+        stock.querySelectorAll('input, select').forEach((input) => {
+            if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement)
+                input.disabled = !quantity;
+        });
+    }
     const amount = control(form, '[data-correction-amount]');
     const target = control(form, '[data-correction-target]');
     if (amount instanceof HTMLInputElement) {
@@ -86,7 +113,8 @@ function validateControls(form) {
     }
 }
 
-/** @param {HTMLFormElement} form the retained form
+/** Refreshes quantity choices without silently replacing a retained selection.
+ * @param {HTMLFormElement} form the retained form
  * @returns {Promise<void>} resolves after current physical versions are loaded
  */
 async function loadQuantityOptions(form) {
@@ -112,13 +140,162 @@ async function loadQuantityOptions(form) {
     validateControls(form);
 }
 
-/** @param {HTMLFormElement} form the dirty form whose values must survive a conflict
- * @returns {Promise<void>} resolves after a deliberate retry has current scoped versions
+/** Loads current attribution choices while preserving deliberate edits.
+ * @param {HTMLFormElement} form the retained correction editor
+ * @param {boolean} keepCurrent whether to offer the existing attribution as the initial choice
+ * @returns {Promise<boolean>} whether choices for the current declared quality were applied
+ */
+async function loadAttributionOptions(form, keepCurrent) {
+    const target = control(form, '[data-correction-target]');
+    if (!(target instanceof HTMLSelectElement)) return false;
+    const kind = control(form, '[data-correction-kind]').value;
+    const qualityInput = form.querySelector('[data-correction-supplied-quality]');
+    const quality =
+        kind === 'QUALITY' && qualityInput instanceof HTMLInputElement
+            ? qualityInput.valueAsNumber
+            : NaN;
+    if (
+        kind === 'QUALITY' &&
+        (!(qualityInput instanceof HTMLInputElement) ||
+            !Number.isFinite(quality) ||
+            !qualityInput.checkValidity())
+    )
+        return false;
+    const observedTarget = target.value;
+    const value = keepCurrent ? form.dataset.currentClaimId || '' : observedTarget;
+    const label =
+        (target.value && target.selectedOptions[0]?.textContent) || form.dataset.stale || '';
+    const generation = String(Number(form.dataset.optionsGeneration || '0') + 1);
+    form.dataset.optionsGeneration = generation;
+    form.dataset.attributionLoading = 'true';
+    const current = () =>
+        form.isConnected &&
+        form.dataset.optionsGeneration === generation &&
+        control(form, '[data-correction-kind]').value === kind &&
+        (kind !== 'QUALITY' ||
+            (qualityInput instanceof HTMLInputElement && qualityInput.valueAsNumber === quality));
+    try {
+        const query =
+            kind === 'QUALITY' ? `?suppliedQuality=${encodeURIComponent(String(quality))}` : '';
+        const html = await fragment(
+            `${provisionUrl(form)}/attribution-options${query}`,
+            form.dataset.error || '',
+        );
+        if (!current()) return false;
+        const document = krtFetch.parseTrustedDocument(html);
+        const replacement = document.querySelector('[data-correction-target]');
+        if (!(replacement instanceof HTMLSelectElement)) throw new Error(form.dataset.error || '');
+        const retained = target.value !== observedTarget ? target.value : value;
+        const retainedLabel = (target.value && target.selectedOptions[0]?.textContent) || label;
+        target.replaceChildren(...Array.from(replacement.options));
+        target.value = retained;
+        if (retained && target.value !== retained) {
+            const stale = new Option(retainedLabel, retained, true, true);
+            stale.disabled = true;
+            target.appendChild(stale);
+            target.setCustomValidity(form.dataset.stale || form.dataset.error || '');
+        } else target.setCustomValidity('');
+        if (keepCurrent) {
+            if (!form.dataset.amountDirty && retained === value)
+                control(form, '[data-correction-amount]').value = String(
+                    Number(form.dataset.creditAmount || '0'),
+                );
+            form.dataset.qualityTargetInitialized = 'true';
+        }
+        validateControls(form);
+        return true;
+    } catch (error) {
+        if (!current()) return false;
+        form.dataset.unavailable = 'true';
+        message(form, error instanceof Error ? error.message : form.dataset.error || '');
+        return false;
+    } finally {
+        if (current()) delete form.dataset.attributionLoading;
+    }
+}
+/** Lists the explicitly selected current stock portions.
+ * @param {HTMLFormElement} form the correction editor
+ * @returns {HTMLInputElement[]} its explicitly selected current stock portions
+ */
+function selectedQualityRows(form) {
+    return Array.from(form.querySelectorAll('[data-quality-stock-row]:checked')).filter(
+        (row) => row instanceof HTMLInputElement,
+    );
+}
+
+/** Loads authorized current stock choices when requested in the editor.
+ * @param {HTMLFormElement} form the retained editor
+ * @param {boolean} refresh whether to reload displayed stock versions
+ * @returns {Promise<boolean>} whether current authorized stock choices were applied
+ */
+async function loadQualityOptions(form, refresh = false) {
+    const options = form.querySelector('[data-correction-quality-stock-options]');
+    if (
+        !(options instanceof HTMLElement) ||
+        (options.dataset.loaded === 'true' && !refresh) ||
+        form.dataset.qualityStockLoading ||
+        control(form, '[data-correction-kind]').value !== 'QUALITY'
+    )
+        return false;
+    const current = () =>
+        form.isConnected && control(form, '[data-correction-kind]').value === 'QUALITY';
+    form.dataset.qualityStockLoading = 'true';
+    try {
+        const html = await fragment(
+            `${provisionUrl(form)}/quality-options`,
+            form.dataset.error || '',
+        );
+        if (!current()) return false;
+        const retained = selectedQualityRows(form).map((row) => ({
+            row,
+            panel: row.closest('.list-panel') || row,
+        }));
+        krtFetch.setTrustedHtml(options, html);
+        const currentRows = Array.from(options.querySelectorAll('[data-quality-stock-row]')).filter(
+            (row) => row instanceof HTMLInputElement,
+        );
+        for (const { row, panel } of retained) {
+            const current = currentRows.find((candidate) => candidate.value === row.value);
+            if (current) current.checked = true;
+            else {
+                row.dataset.unavailable = 'true';
+                row.setCustomValidity(form.dataset.stale || form.dataset.error || '');
+                options.appendChild(panel);
+            }
+        }
+        options.dataset.loaded = 'true';
+        validateControls(form);
+        return true;
+    } catch (error) {
+        if (!current()) return false;
+        if (refresh) form.dataset.unavailable = 'true';
+        message(form, error instanceof Error ? error.message : form.dataset.error || '');
+        return false;
+    } finally {
+        delete form.dataset.qualityStockLoading;
+    }
+}
+
+/** Refreshes required correction context while retaining deliberate edits.
+ * @param {HTMLFormElement} form the dirty form whose values must survive a refresh
+ * @returns {Promise<void>} settles after required current context reads
  */
 async function refreshCorrection(form) {
+    const kind = control(form, '[data-correction-kind]').value;
+    const qualityInput = form.querySelector('[data-correction-supplied-quality]');
+    const quality = qualityInput instanceof HTMLInputElement ? qualityInput.valueAsNumber : NaN;
+    let generation = form.dataset.optionsGeneration;
+    const current = () =>
+        form.isConnected &&
+        form.dataset.optionsGeneration === generation &&
+        control(form, '[data-correction-kind]').value === kind &&
+        (kind !== 'QUALITY' ||
+            (qualityInput instanceof HTMLInputElement && qualityInput.valueAsNumber === quality));
     form.dataset.refreshing = 'true';
+    form.dataset.unavailable = 'true';
     try {
         const html = await fragment(`${provisionUrl(form)}/editor`, form.dataset.error || '');
+        if (!current()) return;
         const document = krtFetch.parseTrustedDocument(html);
         const fresh = document.querySelector('form');
         if (!fresh) throw new Error(form.dataset.error || '');
@@ -128,7 +305,7 @@ async function refreshCorrection(form) {
             target instanceof HTMLSelectElement ? target.selectedOptions[0]?.textContent : '';
         const replacement = fresh.querySelector('[data-correction-target]');
         if (!(target instanceof HTMLSelectElement) || !(replacement instanceof HTMLSelectElement))
-            return;
+            throw new Error(form.dataset.error || '');
         target.replaceChildren(...Array.from(replacement.options));
         target.value = value;
         if (value && target.value !== value) {
@@ -138,15 +315,30 @@ async function refreshCorrection(form) {
             target.setCustomValidity(form.dataset.error || '');
         } else target.setCustomValidity('');
         form.dataset.creditVersion = fresh.dataset.creditVersion;
+        form.dataset.currentClaimId = fresh.dataset.currentClaimId;
         form.dataset.claimVersion = fresh.dataset.claimVersion;
         if (fresh.dataset.quantityAmount === undefined) delete form.dataset.quantityAmount;
         else form.dataset.quantityAmount = fresh.dataset.quantityAmount;
         form.dataset.creditAmount = fresh.dataset.creditAmount;
-        if (control(form, '[data-correction-kind]').value === 'QUANTITY')
-            await loadQuantityOptions(form);
+        if (kind === 'QUANTITY') await loadQuantityOptions(form);
+        else if (kind === 'QUALITY') {
+            const attribution = loadAttributionOptions(form, false);
+            generation = form.dataset.optionsGeneration;
+            if (!(await attribution) || !current()) return;
+            const details = form.querySelector('[data-correction-quality-stock]');
+            if (
+                ((details instanceof HTMLDetailsElement && details.open) ||
+                    selectedQualityRows(form).length) &&
+                !(await loadQualityOptions(form, true))
+            )
+                return;
+        }
+        if (!current()) return;
         validateControls(form);
+        delete form.dataset.unavailable;
         message(form, form.dataset.conflict || '');
     } catch (error) {
+        if (!current()) return;
         form.dataset.unavailable = 'true';
         message(form, error instanceof Error ? error.message : form.dataset.error || '');
     } finally {
@@ -154,16 +346,27 @@ async function refreshCorrection(form) {
     }
 }
 
-/** @param {HTMLFormElement} form the deliberately submitted correction
+/** Submits a deliberately checked correction through the shared order writer.
+ * @param {HTMLFormElement} form the deliberately submitted correction
  * @returns {Promise<void>} settles after the public write
  */
 async function submitCorrection(form) {
-    if (form.dataset.refreshing || form.dataset.unavailable || !joborderHooks.writeOrder) return;
+    if (
+        form.dataset.refreshing ||
+        form.dataset.attributionLoading ||
+        form.dataset.qualityStockLoading ||
+        !joborderHooks.writeOrder
+    )
+        return;
+    if (form.dataset.unavailable) {
+        await refreshCorrection(form);
+        return;
+    }
     const kind = control(form, '[data-correction-kind]').value;
+    const qualityInput = form.querySelector('[data-correction-supplied-quality]');
     const target = control(form, '[data-correction-target]');
     const amountInput = control(form, '[data-correction-amount]');
-    const amount =
-        kind === 'ATTRIBUTION' && !target.value ? 0 : krtScuInput.parse(amountInput.value);
+    const amount = kind !== 'QUANTITY' && !target.value ? 0 : krtScuInput.parse(amountInput.value);
     if (
         !Number.isFinite(amount) ||
         amount < 0 ||
@@ -178,13 +381,17 @@ async function submitCorrection(form) {
         return;
     const selected = target instanceof HTMLSelectElement ? target.selectedOptions[0] : null;
     const stockTarget = form.querySelector('[data-correction-stock-target]');
+    const qualityRows = kind === 'QUALITY' ? selectedQualityRows(form) : [];
     const stockVersions =
         kind === 'QUANTITY'
             ? Array.from(form.querySelectorAll('[data-stock-version]')).map((row) => ({
                   id: row.getAttribute('data-id'),
                   version: Number(row.getAttribute('data-version')),
               }))
-            : [];
+            : qualityRows.map((row) => ({
+                  id: row.value,
+                  version: Number(row.dataset.version),
+              }));
     await joborderHooks.writeOrder({
         method: 'POST',
         url: `${provisionUrl(form)}/correction`,
@@ -193,10 +400,15 @@ async function submitCorrection(form) {
             version: Number(form.dataset.creditVersion),
             claimVersion: Number(form.dataset.claimVersion),
             amount,
-            targetClaimId: kind === 'ATTRIBUTION' ? target.value || null : null,
+            targetClaimId: kind !== 'QUANTITY' ? target.value || null : null,
             targetClaimVersion:
-                kind === 'ATTRIBUTION' && target.value ? Number(selected?.dataset.version) : null,
+                kind !== 'QUANTITY' && target.value ? Number(selected?.dataset.version) : null,
             stockVersions,
+            suppliedQuality:
+                kind === 'QUALITY' && qualityInput instanceof HTMLInputElement
+                    ? qualityInput.valueAsNumber
+                    : null,
+            qualityStockRowIds: qualityRows.map((row) => row.value),
             targetStockRowId:
                 kind === 'QUANTITY' &&
                 amount > Number(form.dataset.quantityAmount) &&
@@ -224,7 +436,8 @@ async function submitCorrection(form) {
     });
 }
 
-/** @param {ParentNode} root the page or refreshed order section
+/** Loads retained contribution histories into their authorized slots.
+ * @param {ParentNode} root the page or refreshed order section
  */
 function loadHistory(root) {
     root.querySelectorAll('[data-contribution-history-slot]').forEach((slot) => {
@@ -243,6 +456,21 @@ function loadHistory(root) {
 /** Installs history and correction controls without replacing dirty forms on peer updates. */
 export function initContributionHistory() {
     loadHistory(document);
+    document.addEventListener(
+        'toggle',
+        (event) => {
+            const details = event.target;
+            if (
+                !(details instanceof HTMLDetailsElement) ||
+                !details.matches('[data-correction-quality-stock]') ||
+                !details.open
+            )
+                return;
+            const form = details.closest('form[data-contribution-correction]');
+            if (form instanceof HTMLFormElement) loadQualityOptions(form);
+        },
+        true,
+    );
     document.addEventListener('krt:swapped', (event) => {
         const container = event.detail.container;
         if (container && !container.matches('[data-contribution-history-slot]'))
@@ -281,26 +509,40 @@ export function initContributionHistory() {
             button.disabled = false;
         }
     });
-    document.addEventListener('input', (event) => {
+    document.addEventListener('input', async (event) => {
         const target = event.target instanceof Element ? event.target : null;
         const form = target?.closest('form[data-contribution-correction]');
         if (!(form instanceof HTMLFormElement)) return;
         form.dataset.dirty = 'true';
         if (target?.matches('[data-correction-amount]')) form.dataset.amountDirty = 'true';
         validateControls(form);
+        if (target?.matches('[data-correction-supplied-quality]')) {
+            await loadAttributionOptions(form, !form.dataset.qualityTargetInitialized);
+        }
     });
     document.addEventListener('change', async (event) => {
         const target = event.target instanceof Element ? event.target : null;
         const form = target?.closest('form[data-contribution-correction]');
         if (!(form instanceof HTMLFormElement)) return;
         form.dataset.dirty = 'true';
-        delete form.dataset.unavailable;
         const amount = control(form, '[data-correction-amount]');
         if (target?.matches('[data-correction-kind]')) {
-            const quantity = control(form, '[data-correction-kind]').value === 'QUANTITY';
+            const kind = control(form, '[data-correction-kind]').value;
+            const quantity = kind === 'QUANTITY';
+            form.dataset.optionsGeneration = String(
+                Number(form.dataset.optionsGeneration || '0') + 1,
+            );
+            delete form.dataset.attributionLoading;
+            delete form.dataset.qualityTargetInitialized;
             amount.value = quantity ? form.dataset.quantityAmount || '0' : '0';
             delete form.dataset.amountDirty;
-            if (quantity) {
+            validateControls(form);
+            if (kind === 'QUALITY') {
+                await loadAttributionOptions(form, true);
+                const details = form.querySelector('[data-correction-quality-stock]');
+                if (details instanceof HTMLDetailsElement && details.open)
+                    await loadQualityOptions(form);
+            } else if (quantity) {
                 try {
                     await loadQuantityOptions(form);
                 } catch (error) {
@@ -310,10 +552,16 @@ export function initContributionHistory() {
                         error instanceof Error ? error.message : form.dataset.error || '',
                     );
                 }
-            }
+            } else await loadAttributionOptions(form, false);
         }
         if (target instanceof HTMLSelectElement && target.matches('[data-correction-stock-target]'))
             target.setCustomValidity('');
+        if (target instanceof HTMLInputElement && target.matches('[data-quality-stock-row]'))
+            target.setCustomValidity(
+                target.checked && target.dataset.unavailable
+                    ? form.dataset.stale || form.dataset.error || ''
+                    : '',
+            );
         if (target instanceof HTMLSelectElement && target.matches('[data-correction-target]')) {
             target.setCustomValidity('');
             if (!target.value) amount.value = '0';

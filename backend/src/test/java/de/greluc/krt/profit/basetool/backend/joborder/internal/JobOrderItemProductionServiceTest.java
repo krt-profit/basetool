@@ -461,7 +461,7 @@ class JobOrderItemProductionServiceTest {
 
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage(JobOrderHandoverService.ERROR_QUALITY_BELOW_FLOOR);
+        .hasMessage(JobOrderStockErrors.QUALITY_BELOW_FLOOR);
     assertThat(line.getManufacturedAmount()).isZero();
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
@@ -502,7 +502,7 @@ class JobOrderItemProductionServiceTest {
 
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER);
+        .hasMessage(JobOrderStockErrors.ITEM_NOT_LINKED_TO_ORDER);
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
   }

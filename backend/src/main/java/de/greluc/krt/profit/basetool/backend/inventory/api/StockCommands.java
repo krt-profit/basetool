@@ -32,12 +32,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The writes another module may ask of the Lager for a member's lots (plan §5.3, ADR-0229). Every
- * command joins the caller's transaction ({@code MANDATORY}).
+ * The writes another module may ask of the Lager for a member's lots (ADR-0229). Every command
+ * joins the caller's transaction ({@code MANDATORY}).
  *
- * <p>The lot-lock protocol is the Lager's: a writer takes the advisory lock of every lot it will
- * touch with {@link #lockLots} before it reads any row, then each lot's rows with {@link
- * #lockLotRows} in the order of the lots' keys, and only then books.
+ * <p>A multi-row writer declares every actual source and destination with {@link #prepareWrites}
+ * before it locks a row or mutates stock. Historical lot programs use {@link StockLotWritePlans}.
  */
 public interface StockCommands {
   /**
@@ -81,26 +80,6 @@ public interface StockCommands {
       @NotNull Collection<UUID> sourceRowIds,
       @NotNull Collection<StockBookInScope> bookings,
       @NotNull Collection<OrderMaterialScope> requiredScopes);
-
-  /**
-   * Takes the transaction-scoped advisory lock of each of a member's lots, in ascending order of
-   * the lock keys, before any of their rows is read.
-   *
-   * @param member the member
-   * @param lotKeys the lots' keys as the change feed records them
-   */
-  void lockLots(@NotNull UUID member, @NotNull Collection<String> lotKeys);
-
-  /**
-   * Locks the member's rows of a lot, personal and shared, in the order a book-out takes them: the
-   * personal rows first, then the rows without an org unit, then the oldest.
-   *
-   * @param member the member
-   * @param lot the lot
-   * @return the rows, locked for this transaction
-   */
-  @NotNull
-  List<StockRow> lockLotRows(@NotNull UUID member, @NotNull StockLot lot);
 
   /**
    * Locks one row for a write that follows (a handover or a production consumption), with its
@@ -218,8 +197,8 @@ public interface StockCommands {
   /**
    * Books stock in as a shared row of an org unit's pool, held by {@code holder}, and merges it
    * into the holder's existing pool row of the same lot (REQ-INV-057). Records {@code
-   * INVENTORY_ITEM_CREATED} with the booking reason. The caller has taken the holder's lot lock
-   * ({@link #lockLots}, {@link StockLot#key}) first.
+   * INVENTORY_ITEM_CREATED} with the booking reason. A multi-row caller has prepared every source
+   * and destination through {@link #prepareWrites} first.
    *
    * @param holder the member who holds the pool row, recorded as the actor
    * @param poolUnit the org unit whose pool receives the stock

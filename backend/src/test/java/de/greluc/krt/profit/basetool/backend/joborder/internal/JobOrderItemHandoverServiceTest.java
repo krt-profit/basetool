@@ -85,6 +85,7 @@ class JobOrderItemHandoverServiceTest {
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
 
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderItemFulfillmentGuard itemFulfillment;
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -106,27 +107,61 @@ class JobOrderItemHandoverServiceTest {
 
   @BeforeEach
   void setUp() {
+    var promises = org.mockito.Mockito.mock(MaterialPromiseCoordinator.class);
+    var commands =
+        new InventoryStockCommands(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            null,
+            null,
+            null,
+            auditService,
+            null,
+            offerRatchet,
+            null);
+    var itemReads = org.mockito.Mockito.mock(JobOrderItemRepository.class);
+    lenient()
+        .when(itemReads.handoverRequirements(any()))
+        .thenAnswer(_ -> {
+          order
+              .getItems()
+              .forEach(item -> {
+                if (item.getVersion() == null) {
+                  item.setVersion(0L);
+                }
+              });
+          return order.getItems().stream()
+              .map(item ->
+                  new ItemHandoverRequirement(
+                      item.getId(),
+                      item.getVersion(),
+                      item.getGameItem() == null ? null : item.getGameItem().getId(),
+                      item.getAmount(),
+                      item.getManufacturedAmount(),
+                      item.getDeliveredAmount()))
+              .sorted(java.util.Comparator.comparing(ItemHandoverRequirement::id))
+              .toList();
+        });
     service =
         new JobOrderItemHandoverService(
             jobOrderRepository,
-            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
+            itemFulfillment,
+            promises,
             responsibilityGuard,
             jobOrderItemHandoverRepository,
             jobOrderItemHandoverMapper,
-            new InventoryStockCommands(
-                new InventoryOrderWrites(
-                    inventoryItemRepository,
-                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
-                inventoryItemRepository,
-                null,
-                null,
-                null,
-                auditService,
-                null,
-                offerRatchet,
-                null),
-            org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.inventory.api.StockReads.class),
+            commands,
+            new ItemHandoverPlanner(
+                itemReads,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockReads.class),
+                commands,
+                jobOrderRepository,
+                org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
+                responsibilityGuard,
+                promises),
             jobOrderService,
             userService,
             null,
@@ -228,7 +263,7 @@ class JobOrderItemHandoverServiceTest {
 
     assertThatThrownBy(() -> service.createItemHandover(orderId, payload(lineId, 6)))
         .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("manufactured");
+        .hasMessage(JobOrderStockErrors.INSUFFICIENT_MANUFACTURED_ITEMS);
     assertThat(line.getDeliveredAmount()).isZero();
   }
 
@@ -239,7 +274,7 @@ class JobOrderItemHandoverServiceTest {
 
     assertThatThrownBy(() -> service.createItemHandover(orderId, payload(lineId, 3)))
         .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("manufactured");
+        .hasMessage(JobOrderStockErrors.INSUFFICIENT_MANUFACTURED_ITEMS);
     assertThat(line.getDeliveredAmount()).isZero();
   }
 
@@ -249,7 +284,7 @@ class JobOrderItemHandoverServiceTest {
 
     assertThatThrownBy(() -> service.createItemHandover(orderId, payload(UUID.randomUUID(), 1)))
         .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("does not belong");
+        .hasMessage(JobOrderStockErrors.FOREIGN_ITEM_LINE);
   }
 
   @Test
@@ -259,7 +294,7 @@ class JobOrderItemHandoverServiceTest {
 
     assertThatThrownBy(() -> service.createItemHandover(orderId, payload(lineId, 1)))
         .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("not an item order");
+        .hasMessage(JobOrderStockErrors.ITEM_ORDER_REQUIRED);
   }
 
   @Test

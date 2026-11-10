@@ -92,6 +92,20 @@ class MeControllerTest {
   }
 
   @Test
+  void getCapabilities_orderViewsAndCreationFollowTheirIndependentAnswers() {
+    when(jobOrderWorkspaceAccess.canViewWorkspace()).thenReturn(true);
+    when(jobOrderWorkspaceAccess.canViewUnitWork()).thenReturn(true);
+
+    MeController.CapabilitiesResponse reader = controller.getCapabilities();
+    assertTrue(reader.canViewOrderWorkspace());
+    assertTrue(reader.canViewOrderUnitWork());
+    assertFalse(reader.canCreateJobOrders());
+
+    when(jobOrderCreationOptions.canCreate()).thenReturn(true);
+    assertTrue(controller.getCapabilities().canCreateJobOrders());
+  }
+
+  @Test
   void getCapabilities_supplyTabFlagsAreTheSupplyModulesAnswer() {
     when(supplyTabAccess.current()).thenReturn(new SupplyTabGrants(true, false));
     MeController.CapabilitiesResponse incomingOnly = controller.getCapabilities();

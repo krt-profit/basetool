@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationWriteDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
@@ -74,6 +75,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Pageable;
@@ -90,10 +92,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * A Lager earmark names only a job order the caller sees within the tenancy scope; one of another
- * org unit is refused like an unknown id (REQ-ORDERS-018, REQ-ORG-003). A member of two Staffeln
- * earmarks the stock of one to an order of the other, which is how a cross-Staffel supply reaches
- * an order (UC-08, UC-09).
+ * Web earmarks accept commonly readable orders under independent stock ownership gates and refuse
+ * unreadable or unknown targets atomically (REQ-ORDERS-018, REQ-ORDERS-052, REQ-ORG-003).
  */
 @SpringBootTest
 @Transactional
@@ -166,12 +166,15 @@ class InventoryJobOrderScopeIntegrationTest {
         .andExpect(jsonPath("$.exists").value(false));
   }
 
-  @Test
-  void createRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void createRefusesAnUnreadableJobOrderLikeAnUnknownOne(boolean unknownTarget) throws Exception {
     JobOrder foreignOrder = openJobOrderNeeding(foreign);
+    iridium.setParent(null);
+    squadronRepository.saveAndFlush(iridium);
+    UUID targetId = unknownTarget ? UUID.randomUUID() : foreignOrder.getId();
 
-    create(foreignOrder.getId()).andExpect(status().isNotFound());
-    create(UUID.randomUUID()).andExpect(status().isNotFound());
+    create(targetId).andExpect(status().isNotFound());
 
     assertThat(inventoryItemRepository.findMaterialRowsByUser(member, Pageable.unpaged()))
         .as("nothing is booked for a refused earmark")
@@ -179,27 +182,32 @@ class InventoryJobOrderScopeIntegrationTest {
   }
 
   @Test
-  void createEarmarksAJobOrderOfTheCallersOwnSquadron() throws Exception {
-    JobOrder ownOrder = openJobOrderNeeding(iridium);
+  void createEarmarksACommonlyReadableJobOrderOfAnotherSquadron() throws Exception {
+    JobOrder foreignOrder = openJobOrderNeeding(foreign);
 
-    create(ownOrder.getId())
+    create(foreignOrder.getId())
         .andExpect(status().isOk())
         .andExpect(
-            jsonPath("$.jobOrderAllocations[0].jobOrderId").value(ownOrder.getId().toString()));
+            jsonPath("$.jobOrderAllocations[0].jobOrderId").value(foreignOrder.getId().toString()));
   }
 
-  @Test
-  void addAllocationRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void addAllocationRefusesAnUnreadableJobOrderLikeAnUnknownOne(boolean unknownTarget)
+      throws Exception {
     JobOrder foreignOrder = openJobOrderNeeding(foreign);
+    iridium.setParent(null);
+    squadronRepository.saveAndFlush(iridium);
     JsonNode row = unearmarkedRow();
     UUID id = UUID.fromString(row.get("id").asString());
     long version = row.get("version").asLong();
+    UUID targetId = unknownTarget ? UUID.randomUUID() : foreignOrder.getId();
 
-    addAllocation(id, foreignOrder.getId(), version).andExpect(status().isNotFound());
-    addAllocation(id, UUID.randomUUID(), version).andExpect(status().isNotFound());
+    addAllocation(id, targetId, version).andExpect(status().isNotFound());
 
     assertThat(inventoryItemRepository.findById(id).orElseThrow().getJobOrderAllocations())
         .isEmpty();
+    assertThat(inventoryItemRepository.findById(id).orElseThrow().getVersion()).isEqualTo(version);
   }
 
   @Test
@@ -396,12 +404,14 @@ class InventoryJobOrderScopeIntegrationTest {
   }
 
   private @NotNull JsonNode unearmarkedRow(@NotNull OrgUnit owner) throws Exception {
-    return json.readTree(
-        create(null, owner.getId())
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString());
+    InventoryItem item = new InventoryItem();
+    item.setUser(member);
+    item.setOwningOrgUnit(owner);
+    item.setMaterial(material);
+    item.setLocation(location);
+    item.setQuality(QUALITY);
+    item.setAmount(5.0);
+    return ownRow(inventoryItemRepository.saveAndFlush(item).getId());
   }
 
   private @NotNull JobOrder openJobOrderNeeding(@NotNull OrgUnit responsible) {

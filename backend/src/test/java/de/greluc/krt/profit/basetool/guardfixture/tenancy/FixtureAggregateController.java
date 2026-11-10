@@ -94,7 +94,7 @@ public class FixtureAggregateController {
    */
   @PostMapping("/{id}/checked")
   public void serviceChecked(@PathVariable UUID id) {
-    writer.touchChecked(id);
+    writer.touchViaGateway(id);
   }
 
   /**

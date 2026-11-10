@@ -24,8 +24,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialProvisionEvidence;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialProvisionFact;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialProvisionFactChange;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -111,9 +115,21 @@ class DataExportMaterialClaimSectionIntegrationTest {
             + "\"creditDelta\":2,\"recordedAt\":\"2026-05-05T12:00:00Z\",\"creditId\":null}]");
     UUID observed = UUID.randomUUID();
     UUID subset = UUID.randomUUID();
-    provision(observed, order, claim, participation, unit, material, "OBSERVED", 2.0, 3.0, 780);
+    UUID correctedSubset = UUID.randomUUID();
     provision(
-        subset, order, claim, participation, unit, material, "CREDITED_SUBSET", 0.0, 1.0, 650);
+        observed, order, claim, participation, unit, material, "OBSERVED", 2.0, 3.0, 780, true);
+    provision(
+        subset,
+        order,
+        claim,
+        participation,
+        unit,
+        material,
+        "CREDITED_SUBSET",
+        0.0,
+        1.0,
+        650,
+        false);
     provision(
         UUID.randomUUID(),
         order,
@@ -124,7 +140,8 @@ class DataExportMaterialClaimSectionIntegrationTest {
         "OBSERVED",
         99.0,
         99.0,
-        900);
+        900,
+        true);
     provision(
         UUID.randomUUID(),
         UUID.randomUUID(),
@@ -135,8 +152,86 @@ class DataExportMaterialClaimSectionIntegrationTest {
         "OBSERVED",
         88.0,
         88.0,
-        900);
+        900,
+        true);
 
+    provision(
+        correctedSubset,
+        order,
+        claim,
+        participation,
+        unit,
+        material,
+        "CREDITED_SUBSET",
+        0.0,
+        1.0,
+        700,
+        true);
+    var previousObserved =
+        new MaterialProvisionFact(
+            4.0,
+            MaterialProvisionEvidence.OBSERVED,
+            780,
+            780,
+            claim,
+            participation,
+            unit,
+            GOOD_TIER,
+            2.0);
+    var currentObserved =
+        new MaterialProvisionFact(
+            3.0,
+            MaterialProvisionEvidence.OBSERVED,
+            780,
+            780,
+            claim,
+            participation,
+            unit,
+            GOOD_TIER,
+            2.0);
+    var previousSubset =
+        new MaterialProvisionFact(
+            1.0,
+            MaterialProvisionEvidence.CREDITED_SUBSET,
+            null,
+            650,
+            claim,
+            participation,
+            unit,
+            GOOD_TIER,
+            0.0);
+    var currentSubset =
+        new MaterialProvisionFact(
+            1.0,
+            MaterialProvisionEvidence.CREDITED_SUBSET,
+            700,
+            700,
+            claim,
+            participation,
+            unit,
+            GOOD_TIER,
+            0.0);
+    Instant correctedAt = Instant.parse("2026-05-05T12:05:00Z");
+    jdbc.update(
+        "UPDATE material_provision_credit SET fact_history = CAST(? AS jsonb) WHERE id = ?",
+        json.writeValueAsString(
+            List.of(
+                new MaterialProvisionFactChange(
+                    MaterialProvisionFactChange.Reason.FALSE_FACT_CORRECTED,
+                    previousObserved,
+                    currentObserved,
+                    correctedAt))),
+        observed);
+    jdbc.update(
+        "UPDATE material_provision_credit SET fact_history = CAST(? AS jsonb) WHERE id = ?",
+        json.writeValueAsString(
+            List.of(
+                new MaterialProvisionFactChange(
+                    MaterialProvisionFactChange.Reason.FALSE_FACT_CORRECTED,
+                    previousSubset,
+                    currentSubset,
+                    correctedAt))),
+        correctedSubset);
     List<Map<String, Object>> rows = sectionRows(subject);
 
     assertThat(rows).hasSize(1);
@@ -151,19 +246,43 @@ class DataExportMaterialClaimSectionIntegrationTest {
     assertThat(changes.get(0).path("previousAmount").asDouble()).isEqualTo(14.0);
     assertThat(changes.get(0).path("amount").asDouble()).isEqualTo(12.0);
     var provisions = json.readTree(rows.getFirst().get("provisions").toString());
-    assertThat(provisions.size()).isEqualTo(2);
+    assertThat(provisions.size()).isEqualTo(3);
     for (var receipt : provisions) {
       assertThat(receipt.propertyNames())
           .containsExactlyInAnyOrder(
-              "id", "creditedAmount", "evidence", "quantityAmount", "suppliedQuality", "createdAt");
+              "id",
+              "creditedAmount",
+              "evidence",
+              "quantityAmount",
+              "suppliedQuality",
+              "minimumSuppliedQuality",
+              "factChanges",
+              "createdAt");
       if (receipt.path("id").asString().equals(observed.toString())) {
         assertThat(receipt.path("creditedAmount").asDouble()).isEqualTo(2.0);
         assertThat(receipt.path("quantityAmount").asDouble()).isEqualTo(3.0);
         assertThat(receipt.path("suppliedQuality").asInt()).isEqualTo(780);
+        assertThat(receipt.path("minimumSuppliedQuality").asInt()).isEqualTo(780);
+        var correction = receipt.path("factChanges").get(0);
+        assertThat(correction.path("previous").path("quantityAmount").asDouble()).isEqualTo(4.0);
+        assertThat(correction.path("current").path("quantityAmount").asDouble()).isEqualTo(3.0);
+      } else if (receipt.path("id").asString().equals(correctedSubset.toString())) {
+        assertThat(receipt.path("quantityAmount").isNull()).isTrue();
+        assertThat(receipt.path("evidence").asString()).isEqualTo("CREDITED_SUBSET");
+        assertThat(receipt.path("suppliedQuality").asInt()).isEqualTo(700);
+        assertThat(receipt.path("minimumSuppliedQuality").asInt()).isEqualTo(700);
+        var correction = receipt.path("factChanges").get(0);
+        assertThat(correction.path("previous").path("suppliedQuality").isNull()).isTrue();
+        assertThat(correction.path("current").path("suppliedQuality").asInt()).isEqualTo(700);
+        assertThat(correction.path("current").path("quantityEvidence").asString())
+            .isEqualTo("CREDITED_SUBSET");
       } else {
         assertThat(receipt.path("id").asString()).isEqualTo(subset.toString());
         assertThat(receipt.path("quantityAmount").isNull()).isTrue();
         assertThat(receipt.path("suppliedQuality").isNull()).isTrue();
+        assertThat(receipt.path("minimumSuppliedQuality").asInt()).isEqualTo(650);
+        assertThat(receipt.path("factChanges").isArray()).isTrue();
+        assertThat(receipt.path("factChanges").size()).isZero();
       }
     }
     assertThat(rows.getFirst().keySet())
@@ -192,12 +311,13 @@ class DataExportMaterialClaimSectionIntegrationTest {
       String evidence,
       double amount,
       double quantity,
-      int quality) {
+      int quality,
+      boolean qualityKnown) {
     jdbc.update(
         "INSERT INTO material_provision_credit (id, job_order_id, claim_id, participation_id,"
             + " claiming_org_unit_id, material_id, quality_tier_id, source_row_id, amount,"
-            + " quantity_amount, supplied_quality, evidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
-            + " ?, ?)",
+            + " quantity_amount, supplied_quality, evidence, supplied_quality_known) VALUES (?, ?,"
+            + " ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         id,
         order,
         claim,
@@ -209,7 +329,8 @@ class DataExportMaterialClaimSectionIntegrationTest {
         amount,
         quantity,
         quality,
-        evidence);
+        evidence,
+        qualityKnown);
   }
 
   private @NotNull List<Map<String, Object>> sectionRows(@NotNull UUID subject) {

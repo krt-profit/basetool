@@ -57,7 +57,9 @@ class MaterialQuantityBoundsIntegrationTest extends MaterialContributionTestSupp
             null,
             null,
             List.of(new InventoryRowVersionDto(stock.rowId(), rowVersion)),
-            stock.rowId());
+            stock.rowId(),
+            null,
+            List.of());
 
     mvc()
         .perform(
@@ -83,7 +85,9 @@ class MaterialQuantityBoundsIntegrationTest extends MaterialContributionTestSupp
             null,
             null,
             List.of(new InventoryRowVersionDto(stock.rowId(), rowVersion)),
-            stock.rowId());
+            stock.rowId(),
+            null,
+            List.of());
     mvc()
         .perform(
             post(
@@ -99,5 +103,78 @@ class MaterialQuantityBoundsIntegrationTest extends MaterialContributionTestSupp
     assertThat(after.creditedAmount()).isEqualTo(4.0);
     assertThat(after.provisions().getFirst().quantityAmount()).isEqualTo(4.0);
     assertThat(stockReads.findRow(stock.rowId()).orElseThrow().getAmount()).isEqualTo(4.0);
+  }
+
+  @Test
+  void unrepresentableProportionalResultRefusesTheWholeAllocationWithoutRoundingAboveCapacity()
+      throws Exception {
+    Fixture fixture = seed();
+    transactionTemplate.executeWithoutResult(_ -> {
+      var order = jobOrderRepository.findById(fixture.orderId()).orElseThrow();
+      order.getMaterials().iterator().next().setAmount(2.0e13);
+      jobOrderRepository.saveAndFlush(order);
+    });
+    var first =
+        materialClaimService.upsertClaim(
+            fixture.orderId(), claim(fixture.materialId(), fixture.squadronAId(), 1.0e13));
+    var second =
+        materialClaimService.upsertClaim(
+            fixture.orderId(), claim(fixture.materialId(), fixture.squadronBId(), 1.0e13));
+    StockFixture stock = stock(fixture, 0.001);
+    var beforeFirst = contributionHistory(fixture.orderId(), first.id());
+    var beforeSecond = contributionHistory(fixture.orderId(), second.id());
+    long stockVersion = stockReads.findRow(stock.rowId()).orElseThrow().getVersion();
+    var allocation =
+        json.createObjectNode()
+            .put("field", "JOB_ORDER")
+            .put("targetId", fixture.orderId().toString())
+            .put("amount", 0.001)
+            .put("version", stockVersion);
+    mvc()
+        .perform(
+            post("/api/v1/inventory/{id}/allocation", stock.rowId())
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(stock.holderId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(allocation.toString()))
+        .andExpect(status().isBadRequest());
+    assertThat(contributionHistory(fixture.orderId(), first.id())).isEqualTo(beforeFirst);
+    assertThat(contributionHistory(fixture.orderId(), second.id())).isEqualTo(beforeSecond);
+    var unchanged = stockReads.findRow(stock.rowId()).orElseThrow();
+    assertThat(unchanged.getVersion()).isEqualTo(stockVersion);
+    transactionTemplate.executeWithoutResult(_ ->
+        assertThat(stockReads.findRow(stock.rowId()).orElseThrow().jobOrderReserved()).isZero());
+    var reduced =
+        new CreateClaimDto(
+            fixture.materialId(),
+            "GOOD",
+            fixture.squadronAId(),
+            9_999_999_999_999.0,
+            beforeFirst.version());
+    mvc()
+        .perform(
+            post("/api/v1/orders/{order}/claims", fixture.orderId())
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(stock.holderId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(reduced)))
+        .andExpect(status().isCreated());
+    mvc()
+        .perform(
+            post("/api/v1/inventory/{id}/allocation", stock.rowId())
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(stock.holderId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(allocation.toString()))
+        .andExpect(status().isOk());
+    transactionTemplate.executeWithoutResult(_ ->
+        assertThat(stockReads.findRow(stock.rowId()).orElseThrow().jobOrderReserved())
+            .isEqualTo(0.001));
   }
 }

@@ -24,14 +24,14 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
-/** Supplies the durable physical quantity composition of current Inventory stock. */
+/** Supplies proved physical intervals eligible for an actual new contribution budget. */
 public interface StockQuantityProvenance {
 
   /**
    * Reads quantity intervals independently of a stock row's holder, placement and earmarks.
    *
    * @param rowId the existing stock row
-   * @return its immutable quantity composition
+   * @return immutable proved intervals, excluding unverifiable restored quantity
    */
   @NotNull
   @Unmodifiable

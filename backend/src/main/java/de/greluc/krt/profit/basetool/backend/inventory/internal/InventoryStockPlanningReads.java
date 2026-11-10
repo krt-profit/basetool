@@ -82,6 +82,34 @@ public class InventoryStockPlanningReads {
       result.replaceAll((_, _) -> List.of());
       return new LotRows(Map.copyOf(result));
     }
+    for (InventoryStockRowSnapshot row : readRows(ids)) {
+      String key =
+          StockLot.key(
+              row.getMaterial() == null ? null : row.getMaterial().getId(),
+              row.getGameItem() == null ? null : row.getGameItem().getId(),
+              row.getLocation().getId(),
+              row.getQuality(),
+              row.getStolen());
+      List<InventoryStockRowSnapshot> lotRows = result.get(key);
+      if (lotRows == null) {
+        throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
+            InventoryItem.class, row.getId());
+      }
+      lotRows.add(row);
+    }
+    result.replaceAll((_, entries) -> {
+      entries.sort(sourceOrder());
+      return List.copyOf(entries);
+    });
+    return new LotRows(Map.copyOf(result));
+  }
+
+  /** Reads fresh scalar snapshots of named rows without refreshing a managed stock entity. */
+  List<InventoryStockRowSnapshot> readRows(@NotNull Collection<UUID> ids) {
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    List<InventoryStockRowSnapshot> snapshots = new ArrayList<>();
     Map<UUID, Map<UUID, Double>> orders = new HashMap<>();
     for (var allocation : rows.findOrderAllocationFacts(ids)) {
       orders
@@ -92,19 +120,7 @@ public class InventoryStockPlanningReads {
     Map<UUID, Double> donations = reservations(rows.findPlanningDonationReservations(ids));
     var offerFacts = offers.offerFacts(ids);
     for (InventoryOrderAllocationQueries.RowLot row : rows.findRowLots(ids)) {
-      String key =
-          StockLot.key(
-              row.getMaterialId(),
-              row.getGameItemId(),
-              row.getLocationId(),
-              row.getQuality(),
-              Boolean.TRUE.equals(row.getStolen()));
-      List<InventoryStockRowSnapshot> lotRows = result.get(key);
-      if (lotRows == null) {
-        throw new org.springframework.orm.ObjectOptimisticLockingFailureException(
-            InventoryItem.class, row.getId());
-      }
-      lotRows.add(
+      snapshots.add(
           new InventoryStockRowSnapshot(
               row.getId(),
               Objects.requireNonNull(row.getVersion()),
@@ -130,11 +146,7 @@ public class InventoryStockPlanningReads {
               row.getCreatedAt(),
               offerFacts.getOrDefault(row.getId(), StockOfferLookup.StockOfferFact.NONE)));
     }
-    result.replaceAll((_, entries) -> {
-      entries.sort(sourceOrder());
-      return List.copyOf(entries);
-    });
-    return new LotRows(Map.copyOf(result));
+    return List.copyOf(snapshots);
   }
 
   private static Map<UUID, Double> reservations(

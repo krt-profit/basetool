@@ -107,6 +107,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private LiveSyncPublisher liveSyncPublisher;
 
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderItemFulfillmentGuard itemFulfillment;
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private OrderLinkedStockRows orderLinkedStockRows;
@@ -150,6 +151,7 @@ class JobOrderServiceAssigneeAndListTest {
     service =
         new JobOrderService(
             jobOrderRepository,
+            itemFulfillment,
             profitHierarchy,
             responsibilityGuard,
             jobOrderAccessPolicy,
@@ -185,6 +187,7 @@ class JobOrderServiceAssigneeAndListTest {
             materialClaimService,
             auditService,
             jobOrderItemService,
+            new JobOrderItemReconciliation(jobOrderItemService),
             jobOrderStockProjectionService,
             null,
             actingUserService(),

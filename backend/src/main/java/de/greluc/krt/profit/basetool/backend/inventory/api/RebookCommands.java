@@ -29,8 +29,8 @@ import org.jetbrains.annotations.Unmodifiable;
 /**
  * The rebooking of a member's own stock of one lot between personal and one org unit's pool, the
  * Lager's Umbuchung of REQ-INV-007 addressed by lot (REQ-INV-060). The command joins the caller's
- * transaction ({@code MANDATORY}); the caller has taken the member's lot lock with {@link
- * StockCommands#lockLots} first.
+ * transaction ({@code MANDATORY}); the caller has prepared every actual source and destination
+ * through {@link StockCommands#prepareWrites} or a confirmed {@link StockLotWritePlans} action.
  *
  * <p>A refusal is answered instead of thrown, so the caller can report it per op and go on.
  */

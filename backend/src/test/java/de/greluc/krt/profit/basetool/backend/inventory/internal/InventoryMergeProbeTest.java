@@ -78,9 +78,11 @@ class InventoryMergeProbeTest {
   }
 
   private InventoryItemService serviceWithStolenMarking(boolean enabled) {
-    return new InventoryItemService(
+    InventoryOrderWrites orderWrites =
         new InventoryOrderWrites(
-            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class));
+    return new InventoryItemService(
+        orderWrites,
         inventoryItemRepository,
         userRepository,
         null,
@@ -112,7 +114,7 @@ class InventoryMergeProbeTest {
         null,
         new InventoryProperties(enabled),
         new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-            null));
+            orderWrites));
   }
 
   @Test

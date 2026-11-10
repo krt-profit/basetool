@@ -37,12 +37,12 @@ class JobOrderContributionBackendClientTest {
   private static final UUID ORDER = UUID.fromString("caa631f2-c5ed-41b3-8ad9-8b458e967d93");
   private static final UUID CREDIT = UUID.fromString("a1a631f2-c5ed-41b3-8ad9-8b458e967d93");
   private BackendClientHarness backend;
-  private JobOrderBackendClient client;
+  private MaterialContributionBackendClient client;
 
   @BeforeEach
   void setUp() {
     backend = BackendClientHarness.start();
-    client = new JobOrderBackendClient(backend.backendApiClient());
+    client = new MaterialContributionBackendClient(backend.backendApiClient());
   }
 
   @AfterEach
@@ -58,14 +58,14 @@ class JobOrderContributionBackendClientTest {
                 ORDER,
                 CREDIT,
                 new MaterialProvisionCorrectionDto(
-                    "ATTRIBUTION", 2L, 7L, 3d, ORDER, 12L, List.of(), null)))
+                    "ATTRIBUTION", 2L, 7L, 3d, ORDER, 12L, List.of(), null, null, List.of())))
         .isEmpty();
     backend.expect(
         "POST",
         "/api/v1/orders/" + ORDER + "/claims/provisions/" + CREDIT + "/correction",
         "{\"kind\":\"ATTRIBUTION\",\"version\":2,\"claimVersion\":7,\"amount\":3.0,\"targetClaimId\":\""
             + ORDER
-            + "\",\"targetClaimVersion\":12,\"stockVersions\":[],\"targetStockRowId\":null}");
+            + "\",\"targetClaimVersion\":12,\"stockVersions\":[],\"targetStockRowId\":null,\"suppliedQuality\":null,\"qualityStockRowIds\":[]}");
   }
 
   @Test
@@ -82,7 +82,9 @@ class JobOrderContributionBackendClientTest {
             null,
             null,
             List.of(new InventoryRowVersionDto(ORDER, 9L)),
-            ORDER));
+            ORDER,
+            null,
+            List.of()));
     backend.expect(
         "POST",
         "/api/v1/orders/" + ORDER + "/claims/provisions/" + CREDIT + "/correction",
@@ -90,7 +92,7 @@ class JobOrderContributionBackendClientTest {
             + ORDER
             + "\",\"version\":9}],\"targetStockRowId\":\""
             + ORDER
-            + "\"}");
+            + "\",\"suppliedQuality\":null,\"qualityStockRowIds\":[]}");
   }
 
   @Test
@@ -125,7 +127,8 @@ class JobOrderContributionBackendClientTest {
           "changes":[{"reason":"CAPACITY_REDUCED","previousAmount":4,"amount":1,
             "creditDelta":0,"recordedAt":"2026-11-01T09:00:00Z"}],
           "provisions":[{"id":"%s","version":2,"amount":3,"quantityAmount":3,
-            "providedAt":"2026-11-01T08:00:00Z","canCorrect":true,"evidence":"CREDITED_SUBSET"}]}]
+            "providedAt":"2026-11-01T08:00:00Z","canCorrect":true,"evidence":"CREDITED_SUBSET",
+            "suppliedQuality":null,"minimumSuppliedQuality":650,"factChanges":[]}]}]
         """
             .formatted(ORDER, CREDIT));
     var history = client.contributionHistory(ORDER).getFirst();

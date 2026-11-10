@@ -70,19 +70,19 @@ class V380MaterialReceiptMigrationTest {
   @TempDir Path directory;
 
   @Test
-  void restrictedOwnerMigratesThrough381AndFlywayValidatesCanonicalLineEndings() throws Exception {
+  void restrictedOwnerMigratesThrough382AndFlywayValidatesCanonicalLineEndings() throws Exception {
     OwnerDatabase database = ownerDatabase();
     Path raw = Files.createDirectory(directory.resolve("raw"));
     Path canonical = Files.createDirectory(directory.resolve("canonical-lf"));
     copyMigrations(raw, canonical);
-    Flyway original = flyway(database, "filesystem:" + raw.toString().replace('\\', '/'), "381");
+    Flyway original = flyway(database, "filesystem:" + raw.toString().replace('\\', '/'), "382");
     original.migrate();
-    assertThat(original.info().current().getVersion().getVersion()).isEqualTo("381");
+    assertThat(original.info().current().getVersion().getVersion()).isEqualTo("382");
     assertRestrictedOwnerAndInstalledGuard(database);
     Map<String, Integer> applied = checksums(database);
 
     Flyway normalized =
-        flyway(database, "filesystem:" + canonical.toString().replace('\\', '/'), "381");
+        flyway(database, "filesystem:" + canonical.toString().replace('\\', '/'), "382");
     var validation = normalized.validateWithResult();
     assertThat(validation.validationSuccessful).isTrue();
     assertThat(validation.invalidMigrations).isEmpty();
@@ -92,7 +92,8 @@ class V380MaterialReceiptMigrationTest {
         List.of(
             Map.entry("379", "V379__material_provision_truthful_quantity.sql"),
             Map.entry("380", "V380__material_receipt_quantity_provenance.sql"),
-            Map.entry("381", "V381__material_contribution_notification_causes.sql"))) {
+            Map.entry("381", "V381__material_contribution_notification_causes.sql"),
+            Map.entry("382", "V382__material_provision_fact_history.sql"))) {
       String version = migration.getKey();
       String name = migration.getValue();
       evidence
@@ -109,6 +110,63 @@ class V380MaterialReceiptMigrationTest {
     Files.writeString(directory.resolve("validation-proof.txt"), evidence, StandardCharsets.UTF_8);
     System.out.println("Migration evidence directory: " + directory);
     System.out.print(evidence);
+  }
+
+  @Test
+  void upgradeKeepsKnownQualitySeparateFromLegacyFloorWithoutInventingFactHistory()
+      throws Exception {
+    OwnerDatabase database = ownerDatabase();
+    flyway(database, "classpath:db/migration", "381").migrate();
+    UUID observed = UUID.randomUUID();
+    UUID legacy = UUID.randomUUID();
+    Map<UUID, UUID> origins = Map.of(observed, UUID.randomUUID(), legacy, UUID.randomUUID());
+    try (Connection connection = database.connect();
+        PreparedStatement facts =
+            connection.prepareStatement(
+                "UPDATE material_provision_credit SET evidence = ?, supplied_quality = ?,"
+                    + " quantity_fragments = CAST(? AS jsonb),"
+                    + " attributed_fragments = CAST(? AS jsonb) WHERE id = ?")) {
+      for (var entry : origins.entrySet()) {
+        insertCredit(connection, entry.getKey(), true);
+        insertFragment(connection, entry.getKey(), entry.getValue(), 0L, 3000L);
+        String quantity =
+            """
+            [{"origin":"%s","fromQuanta":0,"toQuanta":3000}]
+            """
+                .formatted(entry.getValue());
+        facts.setString(1, entry.getKey().equals(observed) ? "OBSERVED" : "CREDITED_SUBSET");
+        facts.setInt(2, entry.getKey().equals(observed) ? 700 : 650);
+        facts.setString(3, quantity);
+        facts.setString(4, quantity);
+        facts.setObject(5, entry.getKey());
+        assertThat(facts.executeUpdate()).isEqualTo(1);
+      }
+    }
+
+    flyway(database, "classpath:db/migration", "382").migrate();
+    try (Connection connection = database.connect();
+        Statement sql = connection.createStatement();
+        ResultSet rows =
+            sql.executeQuery(
+                "SELECT id, supplied_quality, supplied_quality_known,"
+                    + " jsonb_array_length(fact_history), amount, quantity_amount,"
+                    + " quantity_fragments = attributed_fragments,"
+                    + " quantity_fragments->0->>'origin' FROM material_provision_credit")) {
+      int checked = 0;
+      while (rows.next()) {
+        UUID receipt = rows.getObject(1, UUID.class);
+        assertThat(origins).containsKey(receipt);
+        assertThat(rows.getInt(2)).isEqualTo(receipt.equals(observed) ? 700 : 650);
+        assertThat(rows.getBoolean(3)).isEqualTo(receipt.equals(observed));
+        assertThat(rows.getInt(4)).isZero();
+        assertThat(rows.getDouble(5)).isEqualTo(3.0);
+        assertThat(rows.getDouble(6)).isEqualTo(3.0);
+        assertThat(rows.getBoolean(7)).isTrue();
+        assertThat(rows.getString(8)).isEqualTo(origins.get(receipt).toString());
+        checked++;
+      }
+      assertThat(checked).isEqualTo(2);
+    }
   }
 
   @Test
@@ -309,12 +367,12 @@ class V380MaterialReceiptMigrationTest {
         ResultSet row =
             sql.executeQuery(
                 "SELECT version, checksum FROM flyway_schema_history WHERE version IN ('379',"
-                    + " '380', '381') AND success ORDER BY version")) {
+                    + " '380', '381', '382') AND success ORDER BY version")) {
       while (row.next()) {
         values.put(row.getString(1), row.getInt(2));
       }
     }
-    assertThat(values).containsOnlyKeys("379", "380", "381");
+    assertThat(values).containsOnlyKeys("379", "380", "381", "382");
     return values;
   }
 

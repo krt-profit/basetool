@@ -128,7 +128,10 @@ public class MaterialContributionHistory {
                           credit.getQuantityAmount(),
                           credit.getCreatedAt(),
                           canCorrect,
-                          credit.getEvidence()))
+                          credit.getEvidence(),
+                          credit.isSuppliedQualityKnown() ? credit.getSuppliedQuality() : null,
+                          credit.getSuppliedQuality(),
+                          credit.getFactChanges()))
                   .toList());
         })
         .toList();

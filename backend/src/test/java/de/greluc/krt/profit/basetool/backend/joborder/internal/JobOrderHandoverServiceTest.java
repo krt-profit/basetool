@@ -85,24 +85,34 @@ class JobOrderHandoverServiceTest {
 
   @BeforeEach
   void setUp() {
+    var promises = org.mockito.Mockito.mock(MaterialPromiseCoordinator.class);
+    var stockCommands =
+        new InventoryStockCommands(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            null,
+            null,
+            null,
+            auditService,
+            null,
+            offerRatchet,
+            null);
     service =
         new JobOrderHandoverService(
             jobOrderRepository,
-            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
+            promises,
             responsibilityGuard,
-            jobOrderHandoverRepository,
-            new InventoryStockCommands(
-                new InventoryOrderWrites(
-                    inventoryItemRepository,
-                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            MaterialHandoverPlannerFixtures.planner(
+                () -> order,
                 inventoryItemRepository,
-                null,
-                null,
-                null,
-                auditService,
-                null,
-                offerRatchet,
-                null),
+                stockCommands,
+                jobOrderRepository,
+                responsibilityGuard,
+                promises),
+            jobOrderHandoverRepository,
+            stockCommands,
             jobOrderHandoverMapper,
             jobOrderService,
             userService,
@@ -173,8 +183,7 @@ class JobOrderHandoverServiceTest {
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(inventoryItemRepository, never())
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(
-            any(), any(), org.mockito.ArgumentMatchers.anyCollection());
+        .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
     verify(jobOrderHandoverRepository).save(any(JobOrderHandover.class));
     verify(jobOrderRepository, times(2)).findById(orderId);
@@ -280,7 +289,7 @@ class JobOrderHandoverServiceTest {
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
-    assertTrue(ex.getMessage().contains("earmarked to this job order"));
+    assertTrue(ex.getMessage().equals(JobOrderStockErrors.INSUFFICIENT_ALLOCATION));
     assertEquals(100.0, inventoryItem.getAmount());
     assertEquals(2, inventoryItem.getJobOrderAllocations().size());
     verify(inventoryItemRepository, never()).save(any());
@@ -345,7 +354,7 @@ class JobOrderHandoverServiceTest {
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
-    assertTrue(ex.getMessage().contains("Cannot hand over more than the available amount"));
+    assertTrue(ex.getMessage().equals(JobOrderStockErrors.INSUFFICIENT_STOCK));
   }
 
   @Test
@@ -366,7 +375,7 @@ class JobOrderHandoverServiceTest {
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
-    assertEquals(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER, ex.getMessage());
+    assertEquals(JobOrderStockErrors.ITEM_NOT_LINKED_TO_ORDER, ex.getMessage());
   }
 
   @Test
@@ -534,8 +543,7 @@ class JobOrderHandoverServiceTest {
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(inventoryItemRepository, never())
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(
-            any(), any(), org.mockito.ArgumentMatchers.anyCollection());
+        .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
     verify(jobOrderService, never()).completeJobOrderWithinTransaction(any());
   }
 
@@ -561,7 +569,7 @@ class JobOrderHandoverServiceTest {
 
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
-    assertEquals(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER, ex.getMessage());
+    assertEquals(JobOrderStockErrors.ITEM_NOT_LINKED_TO_ORDER, ex.getMessage());
   }
 
   @Test
@@ -580,7 +588,7 @@ class JobOrderHandoverServiceTest {
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(
-        ex.getMessage().contains("Cannot hand over more than the available amount"),
+        ex.getMessage().equals(JobOrderStockErrors.INSUFFICIENT_STOCK),
         "Exception message must indicate amount exceeds available stock");
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
@@ -661,7 +669,7 @@ class JobOrderHandoverServiceTest {
     BadRequestException ex =
         assertThrows(BadRequestException.class, () -> service.createHandover(orderId, createDto));
     assertTrue(
-        ex.getMessage().contains("Amount must be a whole number for PIECE materials"),
+        ex.getMessage().equals(JobOrderStockErrors.WHOLE_PIECE_REQUIRED),
         "Exception message must indicate that only integers are allowed for PIECE materials");
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
@@ -877,8 +885,7 @@ class JobOrderHandoverServiceTest {
     verify(inventoryItemRepository).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(inventoryItemRepository, never())
-        .deleteJobOrderAllocationsByJobOrderAndMaterial(
-            any(), any(), org.mockito.ArgumentMatchers.anyCollection());
+        .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_HANDED_OVER),

@@ -130,7 +130,7 @@ public class ProfitHierarchyService {
     }
     orgUnitRepository.lockProfitHierarchyShared(ELIGIBILITY_LOCK);
     TransactionSynchronizationManager.registerSynchronization(
-        new EligibilityCoordination(false, null));
+        new EligibilityCoordination(false, false, null));
   }
 
   /** Keeps all affected eligibility stable while an organisational change is applied. */
@@ -143,11 +143,22 @@ public class ProfitHierarchyService {
     orgUnitRepository.lockProfitHierarchyExclusive(ELIGIBILITY_LOCK);
     if (current == null) {
       TransactionSynchronizationManager.registerSynchronization(
-          new EligibilityCoordination(true, null));
+          new EligibilityCoordination(true, true, null));
     } else {
       current.exclusive = true;
       current.snapshot = null;
     }
+  }
+
+  /**
+   * Reports this transaction's exclusive-first hierarchy ownership for sequential maintenance.
+   *
+   * @return whether the owning transaction acquired its exclusive hierarchy lock first
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public boolean holdsInitialExclusiveLock() {
+    EligibilityCoordination current = coordination();
+    return current != null && current.initiallyExclusive;
   }
 
   private static @Nullable EligibilityCoordination coordination() {
@@ -167,6 +178,7 @@ public class ProfitHierarchyService {
   @AllArgsConstructor
   private static final class EligibilityCoordination implements TransactionSynchronization {
     private boolean exclusive;
+    private final boolean initiallyExclusive;
     private @Nullable ProfitHierarchySnapshot snapshot;
   }
 }
