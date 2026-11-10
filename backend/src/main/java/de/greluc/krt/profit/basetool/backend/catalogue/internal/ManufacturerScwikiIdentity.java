@@ -41,7 +41,7 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>The row whose UUID equals {@code manufacturer.scwiki_uuid} is the primary link; every other
  * row of the same manufacturer is a Wiki duplicate kept as an alias, so Wiki items naming either
- * UUID resolve to the same manufacturer (ADR-0356). Only the Wiki manufacturer sync and the admin
+ * UUID resolve to the same manufacturer (ADR-0361). Only the Wiki manufacturer sync and the admin
  * primary choice write it; the sync is serialised, so there is no version column.
  */
 @Entity

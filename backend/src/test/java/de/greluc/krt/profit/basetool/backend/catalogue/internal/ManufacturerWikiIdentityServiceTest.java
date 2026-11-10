@@ -47,7 +47,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
-/** The admin primary choice between a manufacturer's SC Wiki entries (ADR-0356). */
+/** The admin primary choice between a manufacturer's SC Wiki entries (ADR-0361). */
 @ExtendWith(MockitoExtension.class)
 class ManufacturerWikiIdentityServiceTest {
 

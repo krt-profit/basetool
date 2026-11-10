@@ -30,7 +30,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/** Spring Data repository for the {@link ManufacturerScwikiIdentity} rows (ADR-0356). */
+/** Spring Data repository for the {@link ManufacturerScwikiIdentity} rows (ADR-0361). */
 @Repository
 public interface ManufacturerScwikiIdentityRepository
     extends JpaRepository<ManufacturerScwikiIdentity, UUID> {

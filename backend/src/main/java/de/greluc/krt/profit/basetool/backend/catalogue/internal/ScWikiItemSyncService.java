@@ -856,7 +856,7 @@ public class ScWikiItemSyncService {
      * @param runId the sync-report run id
      * @param now the shared {@code scwiki_synced_at} timestamp
      * @param manufacturers every manufacturer row, loaded once
-     * @param identities every Wiki manufacturer UUID with its manufacturer id (ADR-0356)
+     * @param identities every Wiki manufacturer UUID with its manufacturer id (ADR-0361)
      * @param uuidlessUexRows the uuid-less {@code UEX_ONLY} rows to index for reconciliation (empty
      *     when reconciliation is disabled)
      * @param allUexRows every UEX source row, including variants already linked to Wiki identities

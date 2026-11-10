@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * AJAX endpoint of the SC Wiki sync-report tab that chooses the primary Wiki entry of a
- * manufacturer the Wiki lists more than once (ADR-0356).
+ * manufacturer the Wiki lists more than once (ADR-0361).
  */
 @RestController
 @RequiredArgsConstructor

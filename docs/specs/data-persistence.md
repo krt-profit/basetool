@@ -1642,7 +1642,7 @@ Wiki UUID that a complete census no longer carries moves to a known alias, or to
 name equals its name and whose code equals its stored `scwiki_code`, both unique in the census
 (`MANUFACTURER_RELINKED`); any other differing link stays a `MANUFACTURER_MISMATCH` and blocks the
 census. A complete census deletes the identities it no longer carries
-([ADR-0356](../adr/0356-a-wiki-manufacturer-follows-its-uuid-change-and-a-wiki-duplicate-becomes-an-alias.md),
+([ADR-0361](../adr/0361-a-wiki-manufacturer-follows-its-uuid-change-and-a-wiki-duplicate-becomes-an-alias.md),
 `ScWikiManufacturerSyncServiceTest`, `ManufacturerWikiIdentityServiceTest`,
 `AdminSyncReportsPageControllerMvcTest`).
 

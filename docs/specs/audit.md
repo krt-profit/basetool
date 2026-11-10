@@ -527,7 +527,7 @@ The coverage list holds the **Katalog** area
     back, REQ-P4K-024/025); manufacturer, ship-type and terminal visibility
     (`*_VISIBILITY_CHANGED`, `hidden=`); the admin choice of a manufacturer's primary SC Wiki entry
     among its Wiki duplicates (`CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED` with `from=` and `to=`
-    the Wiki UUIDs, ADR-0356); locations (`CATALOGUE_LOCATION_*`); the loading-dock
+    the Wiki UUIDs, ADR-0361); locations (`CATALOGUE_LOCATION_*`); the loading-dock
     overrides on terminals, cities, outposts, POIs and space stations
     (`CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDDEN` with `hasLoadingDock=`,
     `CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDE_CLEARED`) and the terminal auto-load override

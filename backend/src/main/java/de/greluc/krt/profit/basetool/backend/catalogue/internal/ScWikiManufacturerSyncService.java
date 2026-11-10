@@ -53,7 +53,7 @@ import org.springframework.util.StringUtils;
  * complete census no longer carries the link and the Wiki row is a known alias or repeats the row's
  * name and stored Wiki code, the row moves to the new UUID ({@link
  * SyncEventType#MANUFACTURER_RELINKED}); otherwise it is a conflict ({@link
- * SyncEventType#MANUFACTURER_MISMATCH}, REQ-DATA-033, ADR-0356). Gated behind {@code
+ * SyncEventType#MANUFACTURER_MISMATCH}, REQ-DATA-033, ADR-0361). Gated behind {@code
  * krt.scwiki.manufacturer-sync-enabled} (default {@code false}).
  */
 @Slf4j

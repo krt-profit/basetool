@@ -1,5 +1,5 @@
 -- Every SC Wiki manufacturer row that resolves to a local manufacturer: the primary link
--- (manufacturer.scwiki_uuid) and the Wiki duplicates of the same company (ADR-0356, REQ-DATA-033).
+-- (manufacturer.scwiki_uuid) and the Wiki duplicates of the same company (ADR-0361, REQ-DATA-033).
 CREATE TABLE manufacturer_scwiki_identity (
     scwiki_uuid     UUID PRIMARY KEY,
     manufacturer_id UUID         NOT NULL REFERENCES manufacturer (id) ON DELETE CASCADE,

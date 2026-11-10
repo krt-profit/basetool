@@ -1,4 +1,4 @@
-# ADR-0356 — A Wiki manufacturer follows its UUID change, and a Wiki duplicate becomes an alias
+# ADR-0361 — A Wiki manufacturer follows its UUID change, and a Wiki duplicate becomes an alias
 
 - **Status:** Accepted
 - **Date:** 2026-11-10

@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Admin-only surface for manufacturers the SC Wiki lists more than once, backing the duplicate
- * section of {@code /admin/sync-reports/scwiki} (ADR-0356).
+ * section of {@code /admin/sync-reports/scwiki} (ADR-0361).
  */
 @RestController
 @RequestMapping("/api/v1/catalog/admin/manufacturer-wiki-duplicates")

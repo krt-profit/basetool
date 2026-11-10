@@ -110,7 +110,7 @@ public class SyncReportBackendClient {
   }
 
   /**
-   * Reads every manufacturer the SC Wiki lists more than once (ADR-0356).
+   * Reads every manufacturer the SC Wiki lists more than once (ADR-0361).
    *
    * @return the duplicated manufacturers, or {@code null} when the backend sent no body
    */

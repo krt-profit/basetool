@@ -40,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Lists the manufacturers the SC Wiki carries more than once and lets an admin choose which Wiki
- * entry is the primary link; the others stay aliases (ADR-0356).
+ * entry is the primary link; the others stay aliases (ADR-0361).
  */
 @Service
 @RequiredArgsConstructor
