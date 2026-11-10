@@ -226,8 +226,10 @@ class JobOrderSharedWorkspaceE2eTest {
 
   private static void rememberNarrowing(Page queue, BrowserContext requester, String base) {
     queue.getByTestId("segment-scope-mine").click();
+    E2eSupport.openFilterPanel(queue);
     queue.locator("#orders-type-filter").selectOption("ITEM");
     assertThat(queue.locator(row(orderId))).hasCount(0);
+    E2eSupport.openFilterPanel(queue);
     queue.locator("#orders-type-filter").selectOption("MATERIAL");
     assertThat(queue.locator(row(orderId))).isVisible();
     assertEquals(Boolean.TRUE, queue.evaluate("window.__workspaceNoReload === true"));

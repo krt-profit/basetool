@@ -29,7 +29,9 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import java.net.URI;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -99,7 +101,8 @@ class JobOrderCreateE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
         page.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
-        page.locator("#handle").fill("E2E Contact");
+        String handle = "E2E Contact " + UUID.randomUUID();
+        page.locator("#handle").fill(handle);
         E2eSupport.selectComboboxFirstOption(page.getByTestId("order-material-select"));
         page.getByTestId("order-material-amount").fill("100");
         var created =
@@ -109,14 +112,25 @@ class JobOrderCreateE2eTest {
                         && "POST".equals(response.request().method()),
                 () -> page.getByTestId("order-submit").click());
         assertEquals(200, created.status());
-        String target =
-            JsonParser.parseString(created.text()).getAsJsonObject().get("targetUrl").getAsString();
+        page.waitForURL(url ->
+            url.startsWith(baseUrl + "/orders/")
+                && URI.create(url).getPath().matches("/orders/[0-9a-f-]{36}"));
+        String target = URI.create(page.url()).getPath();
         assertTrue(target.matches("/orders/[0-9a-f-]{36}"));
-        page.waitForURL(baseUrl + target);
-        assertThat(page.locator("#order-header-results")).containsText("E2E Contact");
+        assertThat(page.locator("#order-header-results")).containsText(handle);
+        String createdId = target.substring("/orders/".length());
+        if (STACK.managesStack()) {
+          var persisted =
+              JsonParser.parseString(
+                      new BackendSeeder()
+                          .getBody(USERNAME, PASSWORD, "/api/v1/orders/" + createdId))
+                  .getAsJsonObject();
+          assertEquals(createdId, persisted.get("id").getAsString());
+          assertEquals(handle, persisted.get("handle").getAsString());
+        }
+        E2eSupport.capture(page, "joborder-created-detail");
 
         E2eSupport.navigate(page, baseUrl + "/orders");
-        String createdId = target.substring("/orders/".length());
         assertThat(page.locator("[data-testid='order-row'][data-id='" + createdId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
