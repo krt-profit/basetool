@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 
 import java.io.OutputStream;
 import java.util.function.Consumer;
-import org.springframework.http.HttpHeaders;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpHeaders;
 
 /** Streams one authorized backend download without retaining its complete body. */
 @FunctionalInterface

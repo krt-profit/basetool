@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import java.util.Arrays;
 import java.util.HashSet;

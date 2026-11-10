@@ -48,32 +48,37 @@ class LeitungViewQueryCountIntegrationTest {
   @Test
   void oneAndOneHundredTwentyFiveInactiveParentsUseTheSameStatementCount() {
     Pair first = createPair();
-    Statistics statistics = entityManager.getEntityManagerFactory()
-        .unwrap(SessionFactory.class).getStatistics();
+    Statistics statistics =
+        entityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
     boolean enabled = statistics.isStatisticsEnabled();
     statistics.setStatisticsEnabled(true);
     try {
       entityManager.flush();
       entityManager.clear();
       statistics.clear();
-      LeitungViewDto small = service.buildView(SecurityContextHolder.getContext().getAuthentication());
+      LeitungViewDto small =
+          service.buildView(SecurityContextHolder.getContext().getAuthentication());
       long smallStatements = statistics.getPrepareStatementCount();
-      assertThat(small.squadrons()).anySatisfy(unit -> {
-        assertThat(unit.id()).isEqualTo(first.child());
-        assertThat(unit.bereichName()).isEqualTo(first.parentName());
-        assertThat(unit.department()).isEqualTo(Department.PROFIT);
-      });
+      assertThat(small.squadrons())
+          .anySatisfy(unit -> {
+            assertThat(unit.id()).isEqualTo(first.child());
+            assertThat(unit.bereichName()).isEqualTo(first.parentName());
+            assertThat(unit.department()).isEqualTo(Department.PROFIT);
+          });
       for (int i = 1; i < 125; i++) {
         createPair();
       }
       entityManager.flush();
       entityManager.clear();
       statistics.clear();
-      LeitungViewDto large = service.buildView(SecurityContextHolder.getContext().getAuthentication());
+      LeitungViewDto large =
+          service.buildView(SecurityContextHolder.getContext().getAuthentication());
       long largeStatements = statistics.getPrepareStatementCount();
       assertThat(large.squadrons()).hasSize(small.squadrons().size() + 124);
       assertThat(largeStatements).isEqualTo(smallStatements);
-      System.out.printf("LEITUNG_QUERY_PROFILE inactive_parents=1 statements=%d inactive_parents=125 statements=%d%n",
+      System.out.printf(
+          "LEITUNG_QUERY_PROFILE inactive_parents=1 statements=%d inactive_parents=125"
+              + " statements=%d%n",
           smallStatements, largeStatements);
     } finally {
       statistics.setStatisticsEnabled(enabled);

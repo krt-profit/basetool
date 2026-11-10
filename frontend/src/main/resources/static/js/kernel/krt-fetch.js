@@ -447,6 +447,7 @@ async function getJson(url, opts) {
             url,
             Object.assign({}, options, { accept: 'application/json', key: undefined, signal }),
         );
+        signal?.throwIfAborted();
         if (!response) {
             throw readError(url, 0, 'refused', null);
         }
@@ -455,8 +456,19 @@ async function getJson(url, opts) {
             if (isJsonResponse(response)) {
                 try {
                     problem = await response.json();
-                } catch (_unparsable) {}
+                } catch (unparsable) {
+                    signal?.throwIfAborted();
+                    if (
+                        unparsable &&
+                        typeof unparsable === 'object' &&
+                        'name' in unparsable &&
+                        unparsable.name === 'AbortError'
+                    ) {
+                        throw unparsable;
+                    }
+                }
             }
+            signal?.throwIfAborted();
             throw readError(url, response.status, 'status', problem);
         }
         if (response.status === 204) {

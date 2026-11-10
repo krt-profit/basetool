@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
@@ -90,7 +92,7 @@ class MissionListLiveSyncPublishTest {
   @Test
   void deleteMission_onBackendFailure_doesNotPublish() {
     UUID id = UUID.randomUUID();
-    doThrow(new RuntimeException("backend down"))
+    doThrow(new BackendServiceException("backend down", null, 503))
         .when(backendApiClient)
         .delete(anyString(), any(), any(Object[].class));
 
@@ -98,5 +100,16 @@ class MissionListLiveSyncPublishTest {
 
     assertThat(view).isEqualTo("redirect:/missions/" + id);
     verify(liveSyncLocalBus, never()).publish(anyString(), any());
+  }
+
+  @Test
+  void deleteMission_onUnexpectedFailure_propagatesWithoutPublishing() {
+    RuntimeException failure = new IllegalStateException("unexpected");
+    doThrow(failure).when(backendApiClient).delete(anyString(), any(), any(Object[].class));
+
+    assertThatThrownBy(() -> controller.deleteMission(UUID.randomUUID(), redirectAttributes))
+        .isSameAs(failure);
+    verify(liveSyncLocalBus, never()).publish(anyString(), any());
+    assertThat(redirectAttributes.getFlashAttributes()).isEmpty();
   }
 }

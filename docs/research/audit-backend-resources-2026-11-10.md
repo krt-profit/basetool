@@ -89,3 +89,8 @@ ACLs; unsupported filesystems fail closed. Available disk must hold every concur
 PDF until its request completes. A process termination can interrupt in-process cleanup; normal
 runtime temporary-directory housekeeping remains necessary. No additional production host setting
 or host write is required by this change.
+
+## DPoP saturated-refusal profile
+
+The canonical DPoP measurements, reproduction command and model limitations are recorded in the
+[request buffering characterization](audit-3267-request-buffering.md#saturated-dpop-replay-storage).

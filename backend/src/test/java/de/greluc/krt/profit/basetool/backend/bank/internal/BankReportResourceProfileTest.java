@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.persistence.EntityManagerFactory;
 import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
 import java.math.BigDecimal;
@@ -34,14 +35,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import jakarta.persistence.EntityManagerFactory;
-import org.hibernate.SessionFactory;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /** Opt-in synthetic concurrent long-period profile of the bounded snapshot and PDF working sets. */
@@ -75,7 +75,8 @@ class BankReportResourceProfileTest {
     holderRepository.save(holder);
     transactions.executeWithoutResult(_ -> {
       for (int i = 0; i < 1001; i++) {
-        ledger.bookDeposit(new BankDepositRequest(account.getId(), holder.getId(), BigDecimal.ONE, null));
+        ledger.bookDeposit(
+            new BankDepositRequest(account.getId(), holder.getId(), BigDecimal.ONE, null));
       }
     });
     var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
@@ -84,7 +85,8 @@ class BankReportResourceProfileTest {
     try (BankReportSpool spool = BankReportSpool.create(properties)) {
       statistics.clear();
       long started = System.nanoTime();
-      BankReportSpool.Section section = snapshotReader.statement(spool, account.getId(), FROM, TO, false);
+      BankReportSpool.Section section =
+          snapshotReader.statement(spool, account.getId(), FROM, TO, false);
       long snapshotNanos = System.nanoTime() - started;
       long statements = statistics.getPrepareStatementCount();
       assertThat(section.rows()).isEqualTo(1001);
@@ -93,10 +95,13 @@ class BankReportResourceProfileTest {
       started = System.nanoTime();
       renderer.statement(spool, section, FROM, TO, null, false);
       long renderNanos = System.nanoTime() - started;
-      System.out.printf("BANK_EXPORT_DB_PROFILE rows=1001 snapshot_transaction_ms=%d prepared_statements=%d "
-          + "detached_render_ms=%d snapshot_bytes=%d pdf_bytes=%d%n",
-          TimeUnit.NANOSECONDS.toMillis(snapshotNanos), statements,
-          TimeUnit.NANOSECONDS.toMillis(renderNanos), Files.size(spool.file("rows-0")),
+      System.out.printf(
+          "BANK_EXPORT_DB_PROFILE rows=1001 snapshot_transaction_ms=%d prepared_statements=%d "
+              + "detached_render_ms=%d snapshot_bytes=%d pdf_bytes=%d%n",
+          TimeUnit.NANOSECONDS.toMillis(snapshotNanos),
+          statements,
+          TimeUnit.NANOSECONDS.toMillis(renderNanos),
+          Files.size(spool.file("rows-0")),
           Files.size(spool.file("report.pdf")));
     } finally {
       statistics.setStatisticsEnabled(enabled);

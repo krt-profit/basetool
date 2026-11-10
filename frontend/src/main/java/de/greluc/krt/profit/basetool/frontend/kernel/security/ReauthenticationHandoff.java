@@ -59,7 +59,15 @@ final class ReauthenticationHandoff {
       response.setCharacterEncoding(StandardCharsets.UTF_8.name());
       JSON.writeValue(
           response.getWriter(),
-          Map.of("code", "REAUTH_REQUIRED", "status", HttpServletResponse.SC_UNAUTHORIZED, "reauthenticate", true, "location", path));
+          Map.of(
+              "code",
+              "REAUTH_REQUIRED",
+              "status",
+              HttpServletResponse.SC_UNAUTHORIZED,
+              "reauthenticate",
+              true,
+              "location",
+              path));
     } else {
       response.sendRedirect(path);
     }

@@ -581,18 +581,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
    */
   private void captureServiceLog(Path root, String service, String label) {
     try {
-      java.util.ArrayList<String> cmd = new java.util.ArrayList<>(List.of("docker", "compose"));
-      String environmentFile = System.getenv("E2E_ENV_PATH");
-      if (environmentFile != null && !environmentFile.isBlank()) {
-        cmd.add("--env-file");
-        cmd.add(environmentFile);
-      }
-      for (String f : COMPOSE_FILES) {
-        cmd.add("-f");
-        cmd.add(f);
-      }
-      cmd.add("--profile");
-      cmd.add("dev");
+      java.util.ArrayList<String> cmd = new java.util.ArrayList<>(composeBaseCommand());
       cmd.addAll(List.of("logs", "--no-color", "--no-log-prefix", service));
       runProcess(root, label, cmd, throwawayEnv(), Duration.ofMinutes(2));
     } catch (Exception ignored) {
@@ -608,19 +597,30 @@ public final class E2eStackExtension implements BeforeAllCallback {
    * @return the full argument vector to hand to {@link ProcessBuilder}
    */
   private List<String> composeCommand(String... verbAndArgs) {
-    java.util.ArrayList<String> cmd = new java.util.ArrayList<>(List.of("docker", "compose"));
-    for (String f : COMPOSE_FILES) {
-      cmd.add("-f");
-      cmd.add(f);
-    }
-    cmd.add("--profile");
-    cmd.add("dev");
+    java.util.ArrayList<String> cmd = new java.util.ArrayList<>(composeBaseCommand());
     cmd.addAll(List.of(verbAndArgs));
     if ("up".equals(verbAndArgs[0]) || "logs".equals(verbAndArgs[0])) {
       cmd.addAll(SERVICES);
     } else if ("pull".equals(verbAndArgs[0])) {
       cmd.addAll(PULLED_SERVICES);
     }
+    return cmd;
+  }
+
+  /** Builds the isolated compose invocation with an optional explicit test environment. */
+  private List<String> composeBaseCommand() {
+    java.util.ArrayList<String> cmd = new java.util.ArrayList<>(List.of("docker", "compose"));
+    String environmentFile = System.getenv("E2E_ENV_PATH");
+    if (environmentFile != null && !environmentFile.isBlank()) {
+      cmd.add("--env-file");
+      cmd.add(environmentFile);
+    }
+    for (String file : COMPOSE_FILES) {
+      cmd.add("-f");
+      cmd.add(file);
+    }
+    cmd.add("--profile");
+    cmd.add("dev");
     return cmd;
   }
 

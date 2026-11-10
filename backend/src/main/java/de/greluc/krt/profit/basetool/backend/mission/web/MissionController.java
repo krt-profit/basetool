@@ -201,7 +201,8 @@ public class MissionController {
   @Operation(summary = "Create a sub-mission")
   public MissionDto createSubMission(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull CreateMissionRequest request) {
-    return projection.cleanupForPeer(missionMapper.toDto(missionService.addSubMission(id, request)));
+    return projection.cleanupForPeer(
+        missionMapper.toDto(missionService.addSubMission(id, request)));
   }
 
   /**

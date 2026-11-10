@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.client.CatalogueBackendClient;
@@ -35,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEvict
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.Comparator;

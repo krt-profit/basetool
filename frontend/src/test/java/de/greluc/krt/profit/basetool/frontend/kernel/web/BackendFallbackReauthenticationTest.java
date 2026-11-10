@@ -51,9 +51,9 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEvict
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.MissionManagerGate;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.OrgUnitContextAdvice;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
@@ -115,7 +115,11 @@ class BackendFallbackReauthenticationTest {
   }
 
   private static <T> T rejecting(Class<T> type, RuntimeException failure) {
-    return mock(type, _ -> { throw failure; });
+    return mock(
+        type,
+        _ -> {
+          throw failure;
+        });
   }
 
   private static FrontendAuthHelperService authenticated() {
@@ -147,75 +151,117 @@ class BackendFallbackReauthenticationTest {
     Runnable action(RuntimeException failure, RedirectAttributesModelMap attributes) {
       return switch (this) {
         case BANK ->
-            () -> new AdminBankPageController(rejecting(BankBackendClient.class, failure))
-                .wipeReset("WIPE", attributes);
+            () ->
+                new AdminBankPageController(rejecting(BankBackendClient.class, failure))
+                    .wipeReset("WIPE", attributes);
         case BLUEPRINT ->
-            () -> new AdminPersonalBlueprintsPageController(rejecting(BlueprintBackendClient.class, failure))
-                .delete(ID, ID, attributes);
+            () ->
+                new AdminPersonalBlueprintsPageController(
+                        rejecting(BlueprintBackendClient.class, failure))
+                    .delete(ID, ID, attributes);
         case CATALOGUE ->
-            () -> new AdminLocationsPageController(
-                    rejecting(CatalogueBackendClient.class, failure),
-                    mock(CatalogueCacheEviction.class), mock(CatalogueListBackendClient.class))
-                .toggleHomeLocation(ID, true, attributes);
+            () ->
+                new AdminLocationsPageController(
+                        rejecting(CatalogueBackendClient.class, failure),
+                        mock(CatalogueCacheEviction.class),
+                        mock(CatalogueListBackendClient.class))
+                    .toggleHomeLocation(ID, true, attributes);
         case HANGAR ->
-            () -> new HangarPageController(rejecting(HangarBackendClient.class, failure),
-                    new ParallelPageLoader(), mock(CachedCatalogListLoader.class))
-                .deleteShip(ID, attributes);
+            () ->
+                new HangarPageController(
+                        rejecting(HangarBackendClient.class, failure),
+                        new ParallelPageLoader(),
+                        mock(CachedCatalogListLoader.class))
+                    .deleteShip(ID, attributes);
         case IDENTITY ->
-            () -> new MemberManagementController(rejecting(IdentityBackendClient.class, failure),
-                    mock(MessageSource.class), mock(LiveSyncLocalBus.class))
-                .deleteMember(ID, attributes);
-        case INVENTORY -> () -> {
-          InventoryForm form = new InventoryForm();
-          form.setGameItemId(ID);
-          form.setLocationId(ID);
-          form.setAmount(1.0);
-          new InventoryWriteController(rejecting(InventoryBackendClient.class, failure),
-                  mock(InventoryInputPageController.class), mock(InventoryListPageController.class))
-              .addInventoryItem(form, new BeanPropertyBindingResult(form, "inventoryForm"),
-                  new ConcurrentModel(), attributes);
-        };
+            () ->
+                new MemberManagementController(
+                        rejecting(IdentityBackendClient.class, failure),
+                        mock(MessageSource.class),
+                        mock(LiveSyncLocalBus.class))
+                    .deleteMember(ID, attributes);
+        case INVENTORY ->
+            () -> {
+              InventoryForm form = new InventoryForm();
+              form.setGameItemId(ID);
+              form.setLocationId(ID);
+              form.setAmount(1.0);
+              new InventoryWriteController(
+                      rejecting(InventoryBackendClient.class, failure),
+                      mock(InventoryInputPageController.class),
+                      mock(InventoryListPageController.class))
+                  .addInventoryItem(
+                      form,
+                      new BeanPropertyBindingResult(form, "inventoryForm"),
+                      new ConcurrentModel(),
+                      attributes);
+            };
         case JOB_ORDER ->
-            () -> new JobOrderWriteController(rejecting(JobOrderBackendClient.class, failure),
-                    mock(LogisticianGate.class), new MutationResponseHelper(), mock(LiveSyncLocalBus.class))
-                .unlinkMaterial(ID, ID, attributes);
+            () ->
+                new JobOrderWriteController(
+                        rejecting(JobOrderBackendClient.class, failure),
+                        mock(LogisticianGate.class),
+                        new MutationResponseHelper(),
+                        mock(LiveSyncLocalBus.class))
+                    .unlinkMaterial(ID, ID, attributes);
         case MISSION ->
-            () -> new MissionFinancePageController(rejecting(MissionBackendClient.class, failure),
-                    mock(MissionPageController.class))
-                .deleteFinanceEntry(ID, ID, attributes);
+            () ->
+                new MissionFinancePageController(
+                        rejecting(MissionBackendClient.class, failure),
+                        mock(MissionPageController.class))
+                    .deleteFinanceEntry(ID, ID, attributes);
         case NOTIFICATION ->
-            () -> new NotificationPreferenceProxyController(rejecting(NotificationBackendClient.class, failure))
-                .card(new ConcurrentModel());
+            () ->
+                new NotificationPreferenceProxyController(
+                        rejecting(NotificationBackendClient.class, failure))
+                    .card(new ConcurrentModel());
         case OPERATION ->
-            () -> new OperationPageController(rejecting(OperationBackendClient.class, failure),
-                    mock(MissionManagerGate.class), mock(MarkdownRenderer.class), new ParallelPageLoader())
-                .deleteOperation(ID, attributes);
+            () ->
+                new OperationPageController(
+                        rejecting(OperationBackendClient.class, failure),
+                        mock(MissionManagerGate.class),
+                        mock(MarkdownRenderer.class),
+                        new ParallelPageLoader())
+                    .deleteOperation(ID, attributes);
         case ORG_UNIT ->
-            () -> new AdminSpecialCommandsPageController(rejecting(OrgUnitBackendClient.class, failure),
-                    mock(CatalogueCacheEviction.class))
-                .deleteSpecialCommand(ID, attributes);
+            () ->
+                new AdminSpecialCommandsPageController(
+                        rejecting(OrgUnitBackendClient.class, failure),
+                        mock(CatalogueCacheEviction.class))
+                    .deleteSpecialCommand(ID, attributes);
         case PERSONAL_INVENTORY ->
-            () -> new AdminPersonalInventoryPageController(rejecting(PersonalInventoryBackendClient.class, failure))
-                .delete(ID, ID, attributes);
+            () ->
+                new AdminPersonalInventoryPageController(
+                        rejecting(PersonalInventoryBackendClient.class, failure))
+                    .delete(ID, ID, attributes);
         case REFINERY ->
-            () -> new RefineryOrderWriteController(rejecting(RefineryBackendClient.class, failure),
-                    mock(LiveSyncLocalBus.class))
-                .deleteOrder(ID, attributes);
+            () ->
+                new RefineryOrderWriteController(
+                        rejecting(RefineryBackendClient.class, failure),
+                        mock(LiveSyncLocalBus.class))
+                    .deleteOrder(ID, attributes);
         case SETTINGS ->
-            () -> new AdminSettingsPageController(rejecting(SettingsBackendClient.class, failure),
-                    mock(CatalogueCacheEviction.class), mock(MessageSource.class))
-                .updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, attributes);
+            () ->
+                new AdminSettingsPageController(
+                        rejecting(SettingsBackendClient.class, failure),
+                        mock(CatalogueCacheEviction.class),
+                        mock(MessageSource.class))
+                    .updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, attributes);
         case SUPPLY ->
             () -> new SupplyFeatureState(rejecting(SupplyBackendClient.class, failure)).enabled();
         case QUALITY_TIERS ->
             () -> new QualityTierCatalog(rejecting(BackendApiClient.class, failure)).all();
         case LAYOUT ->
-            () -> new LayoutContextLoader(rejecting(BackendApiClient.class, failure), authenticated())
-                .load(new MockHttpServletRequest());
+            () ->
+                new LayoutContextLoader(rejecting(BackendApiClient.class, failure), authenticated())
+                    .load(new MockHttpServletRequest());
         case SIDEBAR ->
-            () -> new OrgUnitContextAdvice(rejecting(BackendApiClient.class, failure),
-                    mock(LayoutContextLoader.class), authenticated())
-                .availableSquadrons(new MockHttpServletRequest());
+            () ->
+                new OrgUnitContextAdvice(
+                        rejecting(BackendApiClient.class, failure),
+                        mock(LayoutContextLoader.class),
+                        authenticated())
+                    .availableSquadrons(new MockHttpServletRequest());
       };
     }
   }

@@ -63,7 +63,8 @@ class HangarPageControllerReauthMvcTest {
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionOnTheUnitOverviewRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionOnTheUnitOverviewRedirectsToLogin(RuntimeException sessionFailure)
+      throws Exception {
     when(client.squadronOverview(anyInt(), anyInt(), any())).thenThrow(sessionFailure);
 
     mockMvc
@@ -73,7 +74,8 @@ class HangarPageControllerReauthMvcTest {
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionInTheParallelShipReadRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionInTheParallelShipReadRedirectsToLogin(RuntimeException sessionFailure)
+      throws Exception {
     when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
     when(client.myShips(anyInt(), anyInt(), any(), any())).thenThrow(sessionFailure);
 
@@ -82,7 +84,8 @@ class HangarPageControllerReauthMvcTest {
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionInTheParallelHomeLocationsReadRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionInTheParallelHomeLocationsReadRedirectsToLogin(
+      RuntimeException sessionFailure) throws Exception {
     when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
     when(client.homeLocations()).thenThrow(sessionFailure);
 
@@ -91,7 +94,8 @@ class HangarPageControllerReauthMvcTest {
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionOnTheOwnerOptionsRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionOnTheOwnerOptionsRedirectsToLogin(RuntimeException sessionFailure)
+      throws Exception {
     when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
     when(client.pickableOrgUnits()).thenThrow(sessionFailure);
 

@@ -3,6 +3,18 @@
  * Copyright (C) 2026 Lucas Greuloch
  *
  * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 package de.greluc.krt.profit.basetool.frontend.kernel.backend;
@@ -32,7 +44,8 @@ import reactor.core.publisher.Mono;
 class BackendPooledTransferTest {
 
   private static final Duration RELEASE_WAIT = Duration.ofSeconds(2);
-  private static final NettyDataBufferFactory BUFFERS = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
+  private static final NettyDataBufferFactory BUFFERS =
+      new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT);
 
   @Test
   void successfulOutputReleasesEveryPooledBuffer() throws Exception {
@@ -48,16 +61,21 @@ class BackendPooledTransferTest {
   @Test
   void aDisconnectedOutputReleasesCurrentQueuedAndUnrequestedPooledBuffers() throws Exception {
     List<NettyDataBuffer> buffers = List.of(buffer(), buffer(), buffer());
-    BackendBinaryTransfer transfer = client(Flux.<DataBuffer>fromIterable(buffers), Duration.ofSeconds(10))
-        .download("/export", web -> web.get().uri("/export"));
+    BackendBinaryTransfer transfer =
+        client(Flux.<DataBuffer>fromIterable(buffers), Duration.ofSeconds(10))
+            .download("/export", web -> web.get().uri("/export"));
 
-    assertThatThrownBy(() -> transfer.writeTo(new OutputStream() {
-      /** Models a browser connection that no longer accepts bytes. */
-      @Override
-      public void write(int value) throws IOException {
-        throw new IOException("Synthetic disconnected browser");
-      }
-    }, _ -> {})).isInstanceOf(BackendServiceException.class);
+    assertThatThrownBy(() ->
+            transfer.writeTo(
+                new OutputStream() {
+                  /** Models a browser connection that no longer accepts bytes. */
+                  @Override
+                  public void write(int value) throws IOException {
+                    throw new IOException("Synthetic disconnected browser");
+                  }
+                },
+                _ -> {}))
+        .isInstanceOf(BackendServiceException.class);
 
     assertReleased(buffers);
   }
@@ -65,13 +83,17 @@ class BackendPooledTransferTest {
   @Test
   void timeoutCancellationReleasesAPooledBufferWaitingUpstream() throws Exception {
     List<NettyDataBuffer> buffers = List.of(buffer(), buffer());
-    Flux<DataBuffer> body = Flux.concat(Mono.just(buffers.getFirst()),
-        Mono.just(buffers.getLast()).delayElement(Duration.ofSeconds(5)));
-    BackendBinaryTransfer transfer = client(body, Duration.ofMillis(100))
-        .download("/export", web -> web.get().uri("/export"));
+    Flux<DataBuffer> body =
+        Flux.concat(
+            Mono.just(buffers.getFirst()),
+            Mono.just(buffers.getLast()).delayElement(Duration.ofSeconds(5)));
+    BackendBinaryTransfer transfer =
+        client(body, Duration.ofMillis(100)).download("/export", web -> web.get().uri("/export"));
 
     assertThatThrownBy(() -> transfer.writeTo(OutputStream.nullOutputStream(), _ -> {}))
-        .isInstanceOfSatisfying(BackendServiceException.class, failure -> assertThat(failure.getStatusCode()).isEqualTo(504));
+        .isInstanceOfSatisfying(
+            BackendServiceException.class,
+            failure -> assertThat(failure.getStatusCode()).isEqualTo(504));
 
     assertReleased(buffers);
   }
@@ -84,10 +106,18 @@ class BackendPooledTransferTest {
 
   private static BackendApiClient client(Flux<DataBuffer> body, Duration budget) {
     AtomicBoolean subscribed = new AtomicBoolean();
-    Flux<DataBuffer> networkBody = Flux.defer(() -> subscribed.compareAndSet(false, true) ? body : Flux.empty());
-    WebClient transport = WebClient.builder().exchangeFunction(_ -> Mono.just(ClientResponse.create(HttpStatus.OK)
-        .body(networkBody).build())).build();
-    return new BackendApiClient(transport, transport, new SimpleMeterRegistry(), new NoOpCacheManager(),
+    Flux<DataBuffer> networkBody =
+        Flux.defer(() -> subscribed.compareAndSet(false, true) ? body : Flux.empty());
+    WebClient transport =
+        WebClient.builder()
+            .exchangeFunction(
+                _ -> Mono.just(ClientResponse.create(HttpStatus.OK).body(networkBody).build()))
+            .build();
+    return new BackendApiClient(
+        transport,
+        transport,
+        new SimpleMeterRegistry(),
+        new NoOpCacheManager(),
         BackendCallPolicyFixture.create(budget));
   }
 
@@ -97,6 +127,7 @@ class BackendPooledTransferTest {
         && System.nanoTime() < deadline) {
       Thread.sleep(5);
     }
-    assertThat(buffers).allSatisfy(buffer -> assertThat(buffer.getNativeBuffer().refCnt()).isZero());
+    assertThat(buffers)
+        .allSatisfy(buffer -> assertThat(buffer.getNativeBuffer().refCnt()).isZero());
   }
 }

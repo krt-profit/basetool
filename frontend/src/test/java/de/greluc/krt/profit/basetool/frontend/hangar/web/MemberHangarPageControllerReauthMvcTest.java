@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.hangar.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.redirectsToLogin;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -32,8 +32,8 @@ import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalogListLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
-import java.util.UUID;
 import java.util.ArrayList;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -54,8 +54,7 @@ class MemberHangarPageControllerReauthMvcTest {
   void setUp() {
     mockMvc =
         ReauthPageMvc.standalone(
-            new MemberHangarPageController(
-                client, new ParallelPageLoader(), catalogs));
+            new MemberHangarPageController(client, new ParallelPageLoader(), catalogs));
     ReauthPageMvc.signInMember("ADMIN");
   }
 
@@ -66,27 +65,32 @@ class MemberHangarPageControllerReauthMvcTest {
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionInTheParallelMemberReadRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionInTheParallelMemberReadRedirectsToLogin(RuntimeException sessionFailure)
+      throws Exception {
     when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
     when(client.member(any())).thenThrow(sessionFailure);
 
-    mockMvc.perform(get("/admin/members/{userId}/hangar", UUID.randomUUID()))
+    mockMvc
+        .perform(get("/admin/members/{userId}/hangar", UUID.randomUUID()))
         .andExpect(redirectsToLogin());
   }
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionInTheParallelOrgUnitReadRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionInTheParallelOrgUnitReadRedirectsToLogin(RuntimeException sessionFailure)
+      throws Exception {
     when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
     when(client.memberOrgUnits(any())).thenThrow(sessionFailure);
 
-    mockMvc.perform(get("/admin/members/{userId}/hangar", UUID.randomUUID()))
+    mockMvc
+        .perform(get("/admin/members/{userId}/hangar", UUID.randomUUID()))
         .andExpect(redirectsToLogin());
   }
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionOnTheMemberShipsRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionOnTheMemberShipsRedirectsToLogin(RuntimeException sessionFailure)
+      throws Exception {
     UUID memberId = UUID.randomUUID();
     when(client.memberShips(eq(memberId), anyInt(), anyInt())).thenThrow(sessionFailure);
 

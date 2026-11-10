@@ -51,8 +51,8 @@ import reactor.core.publisher.Mono;
  * transport failures (open circuit breaker, full bulkhead, timeout, {@code ConnectException}) into
  * {@link BackendServiceException}s.
  *
- * <p>The WebClient chain is mocked explicitly so {@code block()} throws; checked exceptions are
- * wrapped in a {@code RuntimeException} cause chain, as Reactor does.
+ * <p>The WebClient chain returns real failing publishers so the complete operation policy consumes
+ * the same signal path as a transport failure.
  */
 class BackendApiClientResilienceTest {
 
@@ -322,15 +322,13 @@ class BackendApiClientResilienceTest {
     WebClient.RequestBodySpec bodySpec = mock(WebClient.RequestBodySpec.class);
     WebClient.RequestHeadersSpec<?> headersSpec = mock(WebClient.RequestHeadersSpec.class);
     WebClient.ResponseSpec respSpec = mock(WebClient.ResponseSpec.class);
-    @SuppressWarnings("unchecked")
-    Mono<String> body = (Mono<String>) mock(Mono.class);
+    Mono<String> body = Mono.error(mock(CallNotPermittedException.class));
 
     when(webClient.post()).thenReturn(uriSpec);
     when(uriSpec.uri("/api/v1/x")).thenReturn(bodySpec);
     when(bodySpec.bodyValue("{}")).thenAnswer(inv -> headersSpec);
     when(headersSpec.retrieve()).thenReturn(respSpec);
     when(respSpec.bodyToMono(String.class)).thenReturn(body);
-    when(body.block()).thenThrow(mock(CallNotPermittedException.class));
 
     BackendServiceException ex =
         assertThrows(
@@ -345,11 +343,7 @@ class BackendApiClientResilienceTest {
     client.clearStaticDataCache();
   }
 
-  /**
-   * Stubs the GET fluent chain on the given WebClient so that {@code
-   * client.get().uri(uri).retrieve().bodyToMono(String.class).block()} throws the supplied
-   * exception.
-   */
+  /** Stubs the GET fluent chain with a publisher carrying the supplied failure. */
   @SuppressWarnings("unchecked")
   private static void stubGet(WebClient targetClient, String uri, Throwable toThrow) {
     stubGet(targetClient, uri, String.class, toThrow);
@@ -362,23 +356,21 @@ class BackendApiClientResilienceTest {
    * @param targetClient the WebClient mock to stub
    * @param uri the URI the call is expected to request
    * @param bodyType the type the call decodes
-   * @param toThrow what {@code block()} should raise
+   * @param toThrow the publisher's failure
    */
   private static void stubGet(
       WebClient targetClient, String uri, Class<?> bodyType, Throwable toThrow) {
     WebClient.RequestHeadersUriSpec<?> uriSpec = mock(WebClient.RequestHeadersUriSpec.class);
     WebClient.RequestHeadersSpec<?> headersSpec = mock(WebClient.RequestHeadersSpec.class);
     WebClient.ResponseSpec respSpec = mock(WebClient.ResponseSpec.class);
-    Mono<?> body = mock(Mono.class);
+    RuntimeException toThrowRuntime =
+        (toThrow instanceof RuntimeException re) ? re : new RuntimeException("test-wrap", toThrow);
+    Mono<?> body = Mono.error(toThrowRuntime);
 
     when(targetClient.get()).thenAnswer(inv -> uriSpec);
     when(uriSpec.uri(uri)).thenAnswer(inv -> headersSpec);
     when(headersSpec.retrieve()).thenReturn(respSpec);
     when(respSpec.bodyToMono(bodyType)).thenAnswer(inv -> body);
-
-    RuntimeException toThrowRuntime =
-        (toThrow instanceof RuntimeException re) ? re : new RuntimeException("test-wrap", toThrow);
-    when(body.block()).thenThrow(toThrowRuntime);
   }
 
   /** Self-referential cause chain (cause == this) to test the unwrap loop's termination guard. */

@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.shell.web;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.RequestHeaders.AJAX;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -29,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationReq
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessHit;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessSearchContributor;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessSearchKind;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.shell.web.QuickAccessSearchMetrics.Outcome;
 import java.time.Duration;
 import java.time.Instant;
@@ -232,5 +231,4 @@ public class QuickAccessSearchController {
                 h.date()))
         .toList();
   }
-
 }

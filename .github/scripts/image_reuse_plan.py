@@ -54,6 +54,8 @@ STATIC_SHARED = (
 
 MODULE_OWN = {
     "frontend/oss-bundled-components.json": "frontend",
+    "frontend/scripts/gen-wire-records.mjs": "frontend",
+    "backend/src/main/resources/api/openapi.json": "frontend",
 }
 
 LEGACY_OWN = {m: [f"{m}/Dockerfile"] for m in MODULES}
@@ -535,6 +537,10 @@ def selftest() -> int:
     configuration_change = decide(base, head, real, ["lombok.config"], old, old, True)
     check("a Lombok configuration change rebuilds every application image",
           configuration_change["rebuild"] == list(MODULES) and configuration_change["reuse"] == [])
+    for path in ("frontend/scripts/gen-wire-records.mjs", "backend/src/main/resources/api/openapi.json"):
+        generated_change = decide(base, head, real, [path], old, old, True)
+        check(f"wire record input {path} rebuilds the frontend",
+              "frontend" in generated_change["rebuild"])
     for path in MODULE_OWN:
         check(f"MODULE_OWN entry {path} is still a COPY source", path in real_sources)
 

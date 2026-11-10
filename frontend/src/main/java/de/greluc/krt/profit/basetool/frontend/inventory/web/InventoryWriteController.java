@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.inventory.web;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 
 import de.greluc.krt.profit.basetool.frontend.inventory.client.InventoryBackendClient;
@@ -41,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequ
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.LinkedHashMap;

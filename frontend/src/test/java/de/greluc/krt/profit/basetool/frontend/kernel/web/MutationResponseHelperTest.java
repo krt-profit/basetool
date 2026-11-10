@@ -19,9 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.expiredSession;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc.expiredSession;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
@@ -42,10 +42,15 @@ class MutationResponseHelperTest {
           wrapped ? new CompletionException(new IllegalStateException(reauth)) : reauth;
       RedirectAttributesModelMap attributes = new RedirectAttributesModelMap();
 
-      assertThatThrownBy(
-              () -> helper.mutate(attributes, "/orders", "success", "failure", () -> {
-                throw failure;
-              }))
+      assertThatThrownBy(() ->
+              helper.mutate(
+                  attributes,
+                  "/orders",
+                  "success",
+                  "failure",
+                  () -> {
+                    throw failure;
+                  }))
           .isSameAs(reauth);
       assertThat(attributes.getFlashAttributes()).isEmpty();
     }

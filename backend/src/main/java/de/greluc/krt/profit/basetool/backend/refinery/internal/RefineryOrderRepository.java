@@ -59,13 +59,17 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
    * @return all four counts in one aggregate row
    */
   @Query(
-      "SELECT new"
-          + " de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderCountsDto(COALESCE(SUM(CASE"
-          + " WHEN r.status IN :activeStatuses THEN 1L ELSE 0L END), 0L), COALESCE(SUM(CASE WHEN"
-          + " r.status IN :activeStatuses AND (r.endsAt IS NULL OR r.endsAt <= :now) THEN 1L ELSE"
-          + " 0L END), 0L), COALESCE(SUM(CASE WHEN r.status = :completedStatus THEN 1L ELSE 0L"
-          + " END), 0L), COUNT(r)) FROM RefineryOrder r WHERE (:onlyMine = true AND r.owner.id ="
-          + " :ownerId) OR (:onlyMine = false AND "
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderCountsDto(
+        COALESCE(SUM(CASE WHEN r.status IN :activeStatuses THEN 1L ELSE 0L END), 0L),
+        COALESCE(SUM(CASE
+          WHEN r.status IN :activeStatuses AND (r.endsAt IS NULL OR r.endsAt <= :now)
+          THEN 1L ELSE 0L END), 0L),
+        COALESCE(SUM(CASE WHEN r.status = :completedStatus THEN 1L ELSE 0L END), 0L),
+        COUNT(r))
+      FROM RefineryOrder r
+      WHERE (:onlyMine = true AND r.owner.id = :ownerId) OR (:onlyMine = false AND
+      """
           + RefineryAccessPolicy.REFINERY_ORDER_SCOPE_TRIPLE
           + ")")
   RefineryOrderCountsDto countSegments(

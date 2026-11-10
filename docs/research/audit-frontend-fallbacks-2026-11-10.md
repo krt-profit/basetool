@@ -50,3 +50,11 @@ without flash feedback; an ordinary backend 503 must retain the local fallback. 
 parallel Hangar/member/catalogue, mission option-list and quick-access tests cover the common and
 asynchronous seams. Existing controller tests retain known 403/409 and classic form behavior; the
 per-file broad-catch ratchet prevents new catch-all handling.
+
+The session-write scan contains 309 sites. Its four removed sites were the duplicate generic-error
+flash branches of mission `addParticipant` (`error.mission.participant.add`), `setPartyLead`
+(`error.mission.party_lead.update`), `checkInParticipant` and `checkOutParticipant` (both
+`error.mission.participant.update`). Their typed backend-error feedback remains in the participant
+and leadership controllers; unexpected failures and session loss use the central mapping. Splitting
+the mission controller moves the remaining flash sites without removing them. The session-type
+closure and exact allow-list checks are unchanged.

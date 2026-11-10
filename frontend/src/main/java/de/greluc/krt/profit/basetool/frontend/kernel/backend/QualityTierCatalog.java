@@ -19,9 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.QualityTierDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

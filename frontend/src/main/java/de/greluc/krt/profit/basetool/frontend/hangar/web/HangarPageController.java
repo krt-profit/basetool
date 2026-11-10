@@ -193,7 +193,7 @@ public class HangarPageController {
             : parallelPageLoader
                 .<Long>loadAsync(() -> totalOf(hangarClient.squadronOverview(0, 1, null)))
                 .exceptionally(e -> {
-              SectionFallback.rethrowIfReauthenticationRequired(e);
+                  SectionFallback.rethrowIfReauthenticationRequired(e);
                   log.warn("Failed to count the org-unit overview for the hangar tab", e);
                   return null;
                 });
@@ -454,7 +454,7 @@ public class HangarPageController {
             : parallelPageLoader
                 .<Long>loadAsync(() -> totalOf(hangarClient.myShips(0, 1, null, null)))
                 .exceptionally(e -> {
-              SectionFallback.rethrowIfReauthenticationRequired(e);
+                  SectionFallback.rethrowIfReauthenticationRequired(e);
                   log.warn("Failed to count my ships for the hangar tab", e);
                   return null;
                 });

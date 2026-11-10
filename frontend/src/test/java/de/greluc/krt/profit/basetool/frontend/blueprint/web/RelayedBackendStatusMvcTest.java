@@ -214,7 +214,7 @@ class RelayedBackendStatusMvcTest {
             "OrgUnitBankProxyController#downloadStatement",
             wc ->
                 new OrgUnitBankProxyController(
-                    new BankBackendClient(RealBackendApiClient.mockExecutingOver(wc))),
+                    new BankBackendClient(RealBackendApiClient.over(wc))),
             get("/api/proxy/org-units/bank/accounts/" + id + "/statement")
                 .param("from", FROM)
                 .param("to", TO)),

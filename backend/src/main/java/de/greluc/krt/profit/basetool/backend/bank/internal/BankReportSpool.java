@@ -34,7 +34,7 @@ import java.nio.file.attribute.AclEntry;
 import java.nio.file.attribute.AclEntryFlag;
 import java.nio.file.attribute.AclEntryPermission;
 import java.nio.file.attribute.AclEntryType;
-import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.EnumSet;
@@ -80,27 +80,35 @@ public final class BankReportSpool implements AutoCloseable {
     Path created = null;
     try {
       Files.createDirectories(properties.directory());
-      if (Files.getFileStore(properties.directory()).supportsFileAttributeView("posix")) {
+      var store = Files.getFileStore(properties.directory());
+      if (store.supportsFileAttributeView("posix")) {
         created =
             Files.createTempDirectory(
                 properties.directory(),
                 "bank-export-",
                 PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+      } else if (store.supportsFileAttributeView("acl")) {
+        var owner =
+            properties
+                .directory()
+                .getFileSystem()
+                .getUserPrincipalLookupService()
+                .lookupPrincipalByName(System.getProperty("user.name"));
+        created =
+            Files.createTempDirectory(
+                properties.directory(),
+                "bank-export-",
+                new InitialAcl(
+                    List.of(
+                        AclEntry.newBuilder()
+                            .setType(AclEntryType.ALLOW)
+                            .setPrincipal(owner)
+                            .setPermissions(EnumSet.allOf(AclEntryPermission.class))
+                            .setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT)
+                            .build())));
       } else {
-        created = Files.createTempDirectory(properties.directory(), "bank-export-");
-        AclFileAttributeView acl = Files.getFileAttributeView(created, AclFileAttributeView.class);
-        if (acl == null) {
-          throw new IOException(
-              "Private Bank export storage requires POSIX permissions or filesystem ACLs");
-        }
-        acl.setAcl(
-            List.of(
-                AclEntry.newBuilder()
-                    .setType(AclEntryType.ALLOW)
-                    .setPrincipal(Files.getOwner(created))
-                    .setPermissions(EnumSet.allOf(AclEntryPermission.class))
-                    .setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT)
-                    .build()));
+        throw new IOException(
+            "Private Bank export storage requires POSIX permissions or filesystem ACLs");
       }
       return new BankReportSpool(created);
     } catch (IOException | RuntimeException failure) {
@@ -112,6 +120,19 @@ public final class BankReportSpool implements AutoCloseable {
         }
       }
       throw new ReportGenerationException("Bank export storage initialization failed", failure);
+    }
+  }
+
+  /**
+   * The owner-only ACL applied atomically when a filesystem creates the directory.
+   *
+   * @param value its inheritable owner entry
+   */
+  private record InitialAcl(List<AclEntry> value) implements FileAttribute<List<AclEntry>> {
+    /** Returns the filesystem's initial ACL attribute name. */
+    @Override
+    public String name() {
+      return "acl:acl";
     }
   }
 

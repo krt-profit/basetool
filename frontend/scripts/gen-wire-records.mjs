@@ -59,5 +59,5 @@ for (const [name, model] of Object.entries(models)) {
     const source = `/*\n * Profit Basetool - squadron-management web app.\n * Copyright (C) 2026 Lucas Greuloch\n *\n * SPDX-License-Identifier: GPL-3.0-only\n */\n\npackage ${packageName};\n\nimport de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;\nimport jakarta.validation.constraints.NotNull;\n\n/**\n * ${model.summary}\n *\n${properties.map(([field]) => ` * @param ${field} ${model.fields[field]}`).join('\n')}\n */\n@DtoMirror\npublic record ${name}(${components.join(', ')}) {}\n`;
     const directory = path.join(outputDirectory, ...packageName.split('.'));
     mkdirSync(directory, { recursive: true });
-    writeFileSync(path.join(directory, name + '.java'), source);
+    writeFileSync(path.join(directory, `${name}.java`), source);
 }

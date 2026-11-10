@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import de.greluc.krt.profit.basetool.backend.platform.internal.CacheValueWeight;
 import java.time.Duration;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.CacheManager;

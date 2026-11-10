@@ -191,7 +191,10 @@ class AdminNotificationRuleOptionListsTest {
    * @throws IOException when the bundle cannot be read
    */
   private static Properties loadBundle(String name) throws IOException {
-    Path direct = Path.of("src", "main", "resources", name);
+    Path direct =
+        "messages.properties".equals(name)
+            ? Path.of("build", "generated", "default-messages", name)
+            : Path.of("src", "main", "resources", name);
     Path path = Files.exists(direct) ? direct : Path.of("frontend").resolve(direct);
     Properties properties = new Properties();
     try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {

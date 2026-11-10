@@ -61,6 +61,8 @@ import org.junit.jupiter.api.io.TempDir;
 class DtoMirrorConsistencyTest {
 
   private static final Path FRONTEND_SOURCE_ROOT = resolveModuleRelative("src/main/java");
+  private static final Path GENERATED_SOURCE_ROOT =
+      resolveModuleRelative("build/generated/wire-records");
   private static final List<Path> BACKEND_SOURCE_ROOTS = backendSourceRoots(FRONTEND_SOURCE_ROOT);
 
   /** The number of mirrors paired today; fewer means the scan lost its sources. */
@@ -180,7 +182,13 @@ class DtoMirrorConsistencyTest {
 
     List<Path> mirrors =
         DtoMirrorScan.topLevelTypes().stream()
-            .map(type -> FRONTEND_SOURCE_ROOT.resolve(type.getName().replace('.', '/') + ".java"))
+            .map(type -> {
+              String relative = type.getName().replace('.', '/') + ".java";
+              Path handwritten = FRONTEND_SOURCE_ROOT.resolve(relative);
+              return Files.isRegularFile(handwritten)
+                  ? handwritten
+                  : GENERATED_SOURCE_ROOT.resolve(relative);
+            })
             .toList();
     assertThat(mirrors).as("@DtoMirror sources").allMatch(Files::isRegularFile);
 

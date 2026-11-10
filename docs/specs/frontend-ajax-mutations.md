@@ -2844,6 +2844,8 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   status/model contract calls `SectionFallback.rethrowIfReauthenticationRequired(failure)` before
   logging or publishing feedback. The same guard applies inside `CompletableFuture.exceptionally`
   callbacks; nested wrappers never convert session loss into an unavailable counter or empty list.
+  The central `CompletionException` mapping delegates a joined failure to the same reauthentication
+  response, because a future can wrap the signal again after its fallback callback propagates it.
 - **A page reader is the place a page's section fallbacks live.** Where a page has section
   fallbacks, defaults or parallel loads, a per-domain page reader above the typed client reads it as
   one immutable record (ADR-0291; the job-order pages are the pilot, `JobOrderPageReader`). The

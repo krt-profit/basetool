@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedCityCommands;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedCityQueries;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures.PlantedModuleCache;
@@ -105,6 +107,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -217,7 +220,8 @@ class CachedCatalogueEntityInvariantTest {
             """
             DELETE FROM audit_event WHERE actor_user_id IS NULL AND occurred_at >= ?
               AND event_type IN ('REFINERY_METHOD_CREATED', 'REFINERY_METHOD_UPDATED',
-                                 'REFINERY_METHOD_DELETED', 'ROLE_PERMISSIONS_CHANGED')
+                                 'REFINERY_METHOD_DELETED', 'ROLE_PERMISSIONS_CHANGED',
+                                 'ROLE_DESCRIPTION_CHANGED')
             """,
             Timestamp.from(startedAt));
     clearCaches();
@@ -264,18 +268,29 @@ class CachedCatalogueEntityInvariantTest {
   @Test
   @DisplayName("proof: a command editing another bean's cached instance is reported")
   void aPlantedSplitEditingTheCachedInstanceIsReported() {
-    City city = new City();
-    city.setName("G19 planted " + tag);
-    city.setHasLoadingDock(false);
-    UUID id = track(cityRepository, cityRepository.save(city)).getId();
+    CaffeineCacheManager manager = (CaffeineCacheManager) cacheManager;
+    manager.registerCustomCache(
+        CachedEntityFixtures.PLANTED_CITY_CACHE, Caffeine.newBuilder().maximumSize(1).build());
+    try {
+      City city = new City();
+      city.setName("G19 planted " + tag);
+      city.setHasLoadingDock(false);
+      UUID id = track(cityRepository, cityRepository.save(city)).getId();
 
-    List<String> changes =
-        changesMadeBy(
-            new Case(
-                () -> plantedCityQueries.find(id),
-                () -> plantedCityCommands.toggleLoadingDock(id)));
+      List<String> changes =
+          changesMadeBy(
+              new Case(
+                  () -> {
+                    City cached = plantedCityQueries.find(id);
+                    assertThat(plantedCityQueries.find(id)).isSameAs(cached);
+                    return cached;
+                  },
+                  () -> plantedCityCommands.toggleLoadingDock(id)));
 
-    assertThat(changes).anySatisfy(change -> assertThat(change).contains("hasLoadingDock"));
+      assertThat(changes).anySatisfy(change -> assertThat(change).contains("hasLoadingDock"));
+    } finally {
+      manager.removeCache(CachedEntityFixtures.PLANTED_CITY_CACHE);
+    }
   }
 
   private Map<String, Supplier<Case>> cases() {

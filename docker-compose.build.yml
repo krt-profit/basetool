@@ -34,6 +34,10 @@ x-frontend-watch: &frontend-watch
       - action: rebuild
         path: ./frontend/build.gradle.kts
       - action: rebuild
+        path: ./frontend/scripts/gen-wire-records.mjs
+      - action: rebuild
+        path: ./backend/src/main/resources/api/openapi.json
+      - action: rebuild
         path: ./build.gradle.kts
       - action: rebuild
         path: ./gradle/libs.versions.toml

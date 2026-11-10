@@ -280,9 +280,16 @@ class QuickAccessSearchControllerTest {
 
   @Test
   void aNestedSessionLossWithoutAnOAuthCausePropagates() {
-    ReauthenticationRequiredException failure = new ReauthenticationRequiredException("no token", null);
-    QuickAccessSearchController controller = controller(contributor(QuickAccessSearchKind.MISSION,
-        (q, limit) -> { throw new IllegalStateException(new java.util.concurrent.CompletionException(failure)); }));
+    ReauthenticationRequiredException failure =
+        new ReauthenticationRequiredException("no token", null);
+    QuickAccessSearchController controller =
+        controller(
+            contributor(
+                QuickAccessSearchKind.MISSION,
+                (q, limit) -> {
+                  throw new IllegalStateException(
+                      new java.util.concurrent.CompletionException(failure));
+                }));
 
     assertThatThrownBy(() -> controller.search("mm", null)).isSameAs(failure);
   }

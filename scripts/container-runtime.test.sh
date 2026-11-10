@@ -208,6 +208,11 @@ detect_bridge() {
   (
     set +e
     : > "${WORK}/sudo.log"
+    : > "${WORK}/detect-waits.log"
+    sleep() {
+      printf '%s\n' "$*" >> "${WORK}/detect-waits.log"
+      command sleep "$@"
+    }
     PATH="${BRIDGE}:${MINIMAL}"
     unset RT_BACKEND RT_CLI RT_SYSTEMCTL RT_UNIT_DIR
     RT_LINGER_DIR="${LINGER_SVC}"
@@ -222,89 +227,96 @@ detect_bridge() {
   )
 }
 detect_err() { tr '\n' ' ' < "${WORK}/detect.err"; }
+detect_waits() {
+  local count=0 interval
+  while IFS= read -r interval; do
+    [[ "${interval}" == 1 ]] || { printf '%s' -1; return; }
+    count=$(( count + 1 ))
+  done < "${WORK}/detect-waits.log"
+  printf '%s' "${count}"
+}
 
 rm -rf "${RUNDIR:?}"
 export STUB_READY_DIR="${RUNDIR}"
 ( sleep 3; mkdir -p "${RUNDIR}" ) &
-started=$SECONDS
 got="$(detect_bridge 15)"
-elapsed=$(( SECONDS - started ))
+waits="$(detect_waits)"
 wait
-if [[ "$got" == "podman|sudo -n -u svcuser podman" ]] && grep -q "runtime answered after" "${WORK}/detect.err"; then
-  ok "a runtime that comes up late is waited for, and then found (${elapsed}s)"
+if [[ "$got" == "podman|sudo -n -u svcuser podman" && $waits -ge 1 && $waits -le 15 ]] \
+   && grep -q "runtime answered after" "${WORK}/detect.err"; then
+  ok "a runtime that comes up late is waited for, and then found (${waits} polls)"
 else
-  bad "the boot race is not waited out: got '${got}' after ${elapsed}s -- $(detect_err)"
+  bad "the boot race is not waited out: got '${got}' after ${waits} polls -- $(detect_err)"
 fi
 
 rm -rf "${RUNDIR:?}"
-started=$SECONDS
 got="$(detect_bridge 3)"
-elapsed=$(( SECONDS - started ))
-if [[ -z "$got" && $elapsed -ge 3 && $elapsed -lt 10 ]] && grep -q "after waiting" "${WORK}/detect.err" \
+waits="$(detect_waits)"
+if [[ -z "$got" && $waits -eq 3 ]] && grep -q "after waiting 3s" "${WORK}/detect.err" \
    && grep -q "never became visible" "${WORK}/detect.err"; then
-  ok "...and the wait is bounded: it refuses after ${elapsed}s, says it waited and that the runtime never showed"
+  ok "...and the wait is bounded: it refuses after three polls and says the runtime never showed"
 else
-  bad "a runtime that never comes up was not refused within the bound: got '${got}' after ${elapsed}s -- $(detect_err)"
+  bad "a runtime that never comes up was not refused within the bound: got '${got}' after ${waits} polls -- $(detect_err)"
 fi
 
 mkdir -p "${RUNBASE}/4242"
 export STUB_READY_DIR="${RUNBASE}/4242"
-started=$SECONDS
 got="$(STUB_SVC_UID=4242 detect_bridge 3)"
-elapsed=$(( SECONDS - started ))
+waits="$(detect_waits)"
 rm -rf "${RUNBASE:?}/4242"
-if [[ -z "$got" && $elapsed -ge 3 ]] && ! grep -q "podman" "${WORK}/sudo.log" \
+if [[ -z "$got" && $waits -eq 3 ]] && ! grep -q "podman" "${WORK}/sudo.log" \
    && grep -q "20-service-user.conf" "${WORK}/detect.err"; then
-  ok "a runtime directory the service user does not own is not a runtime: no podman, and the refusal names the ordering"
+  ok "a runtime directory the service user does not own is not a runtime: three polls, no podman, and the refusal names the ordering"
 else
-  bad "the bare mount point was taken for a runtime: got '${got}' after ${elapsed}s, sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log") -- $(detect_err)"
+  bad "the bare mount point was taken for a runtime: got '${got}' after ${waits} polls, sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log") -- $(detect_err)"
 fi
 
 mkdir -p "${RUNDIR}"
 export STUB_READY_DIR="${WORK}/first-container"
 rm -rf "${STUB_READY_DIR:?}"
 ( sleep 3; mkdir -p "${WORK}/first-container" ) &
-started=$SECONDS
 got="$(STUB_MANAGER_STATE=starting detect_bridge 15)"
-elapsed=$(( SECONDS - started ))
+waits="$(detect_waits)"
 wait
-if [[ "$got" == "podman|sudo -n -u svcuser podman" && $elapsed -lt 10 ]] \
+if [[ "$got" == "podman|sudo -n -u svcuser podman" && $waits -ge 1 && $waits -le 15 ]] \
    && grep -q "runtime answered after" "${WORK}/detect.err" \
-   && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -ge 2 ]]; then
-  ok "a visible runtime that refuses while its manager is STARTING is waited out, and then found (${elapsed}s)"
+   && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq $(( waits + 1 )) ]]; then
+  ok "a visible runtime that refuses while its manager is STARTING is waited out, and then found (${waits} polls)"
 else
-  bad "the 2026-09-25 boot shape is not waited out: got '${got}' after ${elapsed}s -- $(detect_err)"
+  bad "the visible starting manager is not waited out: got '${got}' after ${waits} polls -- $(detect_err)"
 fi
 rm -rf "${WORK}/first-container"
 
 export STUB_READY_DIR="${WORK}/never-ready"
-started=$SECONDS
 got="$(STUB_MANAGER_STATE=- detect_bridge 3)"
-elapsed=$(( SECONDS - started ))
-if [[ -z "$got" && $elapsed -ge 3 && $elapsed -lt 10 ]] && grep -q "after waiting" "${WORK}/detect.err" \
+waits="$(detect_waits)"
+if [[ -z "$got" && $waits -eq 3 ]] && grep -q "after waiting 3s" "${WORK}/detect.err" \
+   && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq 4 ]] \
    && grep -q "podman said: Error: set sticky bit on" "${WORK}/detect.err"; then
   ok "...bounded too, for a manager that never answers, and the refusal quotes podman"
 else
-  bad "a manager that never finishes coming up was not refused within the bound: got '${got}' after ${elapsed}s -- $(detect_err)"
+  bad "a manager that never finishes coming up was not refused within the bound: got '${got}' after ${waits} polls -- $(detect_err)"
 fi
 
 for state in running degraded; do
-  started=$SECONDS
   got="$(STUB_MANAGER_STATE=${state} detect_bridge 15)"
-  elapsed=$(( SECONDS - started ))
-  if [[ -z "$got" && $elapsed -lt 3 ]] && grep -q "podman said:" "${WORK}/detect.err"; then
-    ok "a runtime whose manager is ${state} but refuses is answered at once, with podman's reason (${elapsed}s)"
+  waits="$(detect_waits)"
+  if [[ -z "$got" && $waits -eq 0 ]] && grep -q "podman said:" "${WORK}/detect.err" \
+     && [[ "$(grep -c 'podman ps' "${WORK}/sudo.log")" -eq 1 ]]; then
+    ok "a runtime whose manager is ${state} but refuses is answered without waiting, with podman's reason"
   else
-    bad "detection waited on a runtime that was already ${state}: got '${got}' after ${elapsed}s -- $(detect_err)"
+    bad "detection waited on a runtime that was already ${state}: got '${got}' after ${waits} polls -- $(detect_err)"
   fi
 done
 
 export STUB_READY_DIR="${RUNDIR}"
 got="$(detect_bridge 15)"
-if [[ "$got" == "podman|sudo -n -u svcuser podman" ]] && ! grep -q "is-system-running" "${WORK}/sudo.log"; then
+waits="$(detect_waits)"
+if [[ "$got" == "podman|sudo -n -u svcuser podman" && $waits -eq 0 ]] \
+   && ! grep -q "is-system-running" "${WORK}/sudo.log"; then
   ok "a runtime that answers is used at once, without asking the manager anything"
 else
-  bad "the steady-state probe changed: got '${got}', sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log")"
+  bad "the steady-state probe changed: got '${got}' after ${waits} polls, sudo calls: $(tr '\n' ';' < "${WORK}/sudo.log")"
 fi
 unset STUB_READY_DIR
 

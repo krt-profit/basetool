@@ -34,8 +34,12 @@ import java.io.EOFException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.AclEntryFlag;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -55,8 +59,36 @@ class BankReportSpoolTest {
       if (Files.getFileStore(directory).supportsFileAttributeView("posix")) {
         assertThat(Files.getPosixFilePermissions(directory))
             .isEqualTo(PosixFilePermissions.fromString("rwx------"));
+      } else {
+        var owner = Files.getOwner(directory);
+        var acl =
+            Objects.requireNonNull(
+                    Files.getFileAttributeView(directory, AclFileAttributeView.class))
+                .getAcl();
+        assertThat(acl)
+            .isNotEmpty()
+            .allSatisfy(entry -> {
+              assertThat(entry.principal()).isEqualTo(owner);
+              assertThat(entry.type()).isEqualTo(AclEntryType.ALLOW);
+            });
+        assertThat(acl)
+            .anySatisfy(entry ->
+                assertThat(entry.flags())
+                    .contains(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT));
       }
-      Files.write(spool.file("rows"), new byte[] {1});
+      Path file = spool.file("rows");
+      Files.write(file, new byte[] {1});
+      if (Files.getFileStore(directory).supportsFileAttributeView("acl")) {
+        var owner = Files.getOwner(directory);
+        assertThat(
+                Objects.requireNonNull(Files.getFileAttributeView(file, AclFileAttributeView.class))
+                    .getAcl())
+            .isNotEmpty()
+            .allSatisfy(entry -> {
+              assertThat(entry.principal()).isEqualTo(owner);
+              assertThat(entry.type()).isEqualTo(AclEntryType.ALLOW);
+            });
+      }
       spool.close();
       spool.close();
       assertThat(directory).doesNotExist();

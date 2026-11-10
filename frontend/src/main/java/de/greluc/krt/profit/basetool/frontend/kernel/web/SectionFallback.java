@@ -175,8 +175,7 @@ public final class SectionFallback {
    * @param failure the caught failure
    * @throws ReauthenticationRequiredException when {@code failure}'s cause chain carries the signal
    */
-  private static void rethrowReauthSignal(
-      @NotNull String section, @NotNull Throwable failure) {
+  private static void rethrowReauthSignal(@NotNull String section, @NotNull Throwable failure) {
     Throwable current = failure;
     for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
       if (current instanceof ReauthenticationRequiredException reauth) {

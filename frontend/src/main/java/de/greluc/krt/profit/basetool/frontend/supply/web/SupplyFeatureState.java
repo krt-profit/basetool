@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.frontend.supply.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyStateDto;
 import java.time.Duration;

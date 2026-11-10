@@ -167,7 +167,8 @@ class BackendRoleSyncReauthenticationTest {
     consent.doFilter(request, response, chain);
 
     assertHandoff(format, response);
-    assertThat(request.getSession().getAttribute(TermsAcceptanceGateFilter.SESSION_ACCEPTED)).isNull();
+    assertThat(request.getSession().getAttribute(TermsAcceptanceGateFilter.SESSION_ACCEPTED))
+        .isNull();
     assertThat(request.getSession().getAttribute(TermsAcceptanceGateFilter.SESSION_CHECKED_AT))
         .isNull();
     verify(chain, never()).doFilter(any(), any());
@@ -209,7 +210,8 @@ class BackendRoleSyncReauthenticationTest {
   }
 
   private static void assertNoSyncStamp(MockHttpServletRequest request) {
-    assertThat(request.getSession().getAttribute(BackendRoleSyncFilter.ROLES_SYNCED_AT_FLAG)).isNull();
+    assertThat(request.getSession().getAttribute(BackendRoleSyncFilter.ROLES_SYNCED_AT_FLAG))
+        .isNull();
     assertThat(request.getSession().getAttribute(BackendRoleSyncFilter.APPROVAL_CHECKED_AT_FLAG))
         .isNull();
     assertThat(request.getSession().getAttribute(BackendRoleSyncFilter.SYNCED_AUTHORITIES_FLAG))
@@ -227,7 +229,8 @@ class BackendRoleSyncReauthenticationTest {
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(response.getContentType()).startsWith("text/event-stream");
         assertThat(response.getHeader("Cache-Control")).isEqualTo("no-cache");
-        assertThat(response.getContentAsString()).isEqualTo("event: reauth\ndata: " + LOGIN + "\n\n");
+        assertThat(response.getContentAsString())
+            .isEqualTo("event: reauth\ndata: " + LOGIN + "\n\n");
         assertThat(response.getRedirectedUrl()).isNull();
       }
       case XHR, JSON, FETCH -> {
@@ -249,7 +252,8 @@ class BackendRoleSyncReauthenticationTest {
         .flatMap(read ->
             Stream.of(Format.values())
                 .flatMap(format ->
-                    Stream.of(Failure.values()).map(failure -> Arguments.of(read, format, failure))));
+                    Stream.of(Failure.values())
+                        .map(failure -> Arguments.of(read, format, failure))));
   }
 
   private static Stream<Arguments> cleanupCases() {

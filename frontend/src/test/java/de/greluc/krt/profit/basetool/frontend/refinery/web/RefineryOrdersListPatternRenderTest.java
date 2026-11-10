@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.refinery.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCountsDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderProvenanceDto;
 import java.time.Instant;
@@ -75,6 +77,8 @@ class RefineryOrdersListPatternRenderTest {
   /** Id of the order still running. */
   private static final UUID RUNNING_ID = UUID.fromString("00000000-0000-0000-0000-000000001051");
 
+  private static final String COUNTS = "/api/v1/refinery-orders/counts?onlyMine={onlyMine}";
+
   @Autowired private WebApplicationContext context;
 
   @MockitoBean private BackendApiClient backendApiClient;
@@ -101,6 +105,10 @@ class RefineryOrdersListPatternRenderTest {
    * @param page the page every non-ready list call returns
    */
   private void stubLists(@NotNull PageResponse<RefineryOrderListDto> page) {
+    when(backendApiClient.get(eq(COUNTS), eq(RefineryOrderCountsDto.class), anyBoolean()))
+        .thenReturn(
+            new RefineryOrderCountsDto(
+                page.totalElements(), page.totalElements() > 0 ? 1 : 0, 0, page.totalElements()));
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
     when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(page);
     when(backendApiClient.get(contains("ready=true"), anyTypeRef(), any(Object[].class)))
@@ -404,36 +412,18 @@ class RefineryOrdersListPatternRenderTest {
         .doesNotContain("data-refinery-store");
   }
 
-  /**
-   * The default segment is one backend page of the open orders by end, and every counter is a
-   * one-row request; nothing loads a large page to filter in memory.
-   */
+  /** The default segment loads one order page and one aggregate count response. */
   @Test
-  void runningSegmentFetchesOnePageByEndAndCountsWithOneRowRequests() throws Exception {
+  void runningSegmentFetchesOnePageByEndAndOneAggregateCount() throws Exception {
     render(twoOpenOrders(), "");
 
     String running =
         "/api/v1/refinery-orders/all?page={page}&size={size}&sort=endsAt,asc"
             + "&status=OPEN,IN_PROGRESS";
     verify(backendApiClient).get(eq(running), anyTypeRef(), eq(0), eq(50));
-    verify(backendApiClient).get(eq(running), anyTypeRef(), eq(0), eq(1));
-    verify(backendApiClient).get(eq(running + "&ready=true"), anyTypeRef(), eq(0), eq(1));
-    verify(backendApiClient)
-        .get(
-            eq(
-                "/api/v1/refinery-orders/all?page={page}&size={size}&sort=startedAt,desc"
-                    + "&status=COMPLETED"),
-            anyTypeRef(),
-            eq(0),
-            eq(1));
-    verify(backendApiClient)
-        .get(
-            eq(
-                "/api/v1/refinery-orders/all?page={page}&size={size}&sort=startedAt,desc"
-                    + "&status=OPEN,IN_PROGRESS,COMPLETED,CANCELED"),
-            anyTypeRef(),
-            eq(0),
-            eq(1));
+    verify(backendApiClient).get(eq(COUNTS), eq(RefineryOrderCountsDto.class), eq(false));
+    verify(backendApiClient, never())
+        .get(contains("/api/v1/refinery-orders/all?"), anyTypeRef(), any(), eq(1));
     verify(backendApiClient, never()).get(anyString(), anyTypeRef(), any(), eq(1000));
   }
 
@@ -475,6 +465,7 @@ class RefineryOrdersListPatternRenderTest {
             eq(0),
             eq(50),
             eq("taranite"));
+    verify(backendApiClient).get(eq(COUNTS), eq(RefineryOrderCountsDto.class), eq(true));
   }
 
   /** A former status filter stays exact and is kept by the pagination links. */

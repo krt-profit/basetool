@@ -25,16 +25,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Runs a Post/Redirect/Get mutation with success or failure feedback (REQ-FE-002).
- * Session loss propagates to the global reauthentication handler.
+ * Runs a Post/Redirect/Get mutation with success or failure feedback (REQ-FE-002). Session loss
+ * propagates to the global reauthentication handler.
  */
 @Component
 @Slf4j
 public class MutationResponseHelper {
 
-  /**
-   * A mutating backend interaction whose ordinary failure becomes an error toast.
-   */
+  /** A mutating backend interaction whose ordinary failure becomes an error toast. */
   @FunctionalInterface
   public interface MutationAction {
     /** Performs the backend mutation. */

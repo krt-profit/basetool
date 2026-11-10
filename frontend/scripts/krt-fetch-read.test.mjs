@@ -289,20 +289,68 @@ await test('unsafe login targets fall back and unsafe consent targets never navi
 
 await test('a keyed JSON read remains supersedable while its body is pending', async () => {
     let finishBody;
+    let bodyStarted;
+    const started = new Promise((resolve) => {
+        bodyStarted = resolve;
+    });
     const delayed = reply(200, '{}', JSON_TYPE);
     delayed.json = () =>
         new Promise((resolve) => {
             finishBody = resolve;
+            bodyStarted();
         });
     const h = harness([delayed, reply(200, '{"new":true}', JSON_TYPE)]);
     const first = h.krtFetch.getJson('/old', { key: 'search' });
-    await Promise.resolve();
-    await Promise.resolve();
+    await started;
     const rejected = assert.rejects(first, (error) => error.name === 'AbortError');
     const newest = await h.krtFetch.getJson('/new', { key: 'search' });
     finishBody({ old: true });
     await rejected;
     assert.deepEqual(newest, { new: true });
+});
+
+await test('a superseded error body cannot clear the results of a newer successful read', async () => {
+    for (const completion of ['resolve', 'abort', 'malformed']) {
+        let finishBody;
+        let bodyStarted;
+        const started = new Promise((resolve) => {
+            bodyStarted = resolve;
+        });
+        const delayed = reply(503, '{}', JSON_TYPE);
+        delayed.json = () => {
+            bodyStarted();
+            return new Promise((resolve, reject) => {
+                finishBody = () => {
+                    if (completion === 'abort') {
+                        reject(new DOMException('aborted', 'AbortError'));
+                    } else if (completion === 'malformed') {
+                        reject(new SyntaxError('invalid JSON'));
+                    } else {
+                        resolve({ detail: 'unavailable' });
+                    }
+                };
+            });
+        };
+        const h = harness([delayed, reply(200, '["newest"]', JSON_TYPE)]);
+        let results;
+        let olderFailure;
+        const old = h.krtFetch.getJson('/old', { key: 'search' }).then(
+            (body) => {
+                results = body;
+            },
+            (error) => {
+                olderFailure = error;
+                if (error.name !== 'AbortError') results = [];
+            },
+        );
+        await started;
+        results = await h.krtFetch.getJson('/new', { key: 'search' });
+        finishBody();
+        await old;
+
+        assert.equal(olderFailure.name, 'AbortError', completion);
+        assert.deepEqual(results, ['newest'], completion);
+    }
 });
 
 await test('failed success callbacks expose saved data and never resend the mutation', async () => {

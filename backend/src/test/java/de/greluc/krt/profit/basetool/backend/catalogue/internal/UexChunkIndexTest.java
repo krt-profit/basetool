@@ -58,4 +58,27 @@ class UexChunkIndexTest {
     assertThat(index.resolve(11, "Shared", Terminal::new)).isNotSameAs(unclaimed);
     assertThat(index.resolve(10, "Shared", Terminal::new)).isSameAs(unclaimed);
   }
+
+  @Test
+  void terminalNameAdoptionConsumesEveryUnclaimedCandidateInRepositoryOrder() {
+    Terminal first = new Terminal();
+    first.setName("Shared");
+    first.setHidden(true);
+    Terminal second = new Terminal();
+    second.setName("Shared");
+    second.setIsAutoLoadOverridden(true);
+    second.setIsAutoLoad(true);
+    UexChunkIndex<Terminal> index =
+        UexChunkIndex.of(List.of(first, second), Terminal::getIdTerminal, Terminal::getName, true);
+
+    assertThat(index.resolve(10, "Shared", Terminal::new)).isSameAs(first);
+    assertThat(index.resolve(11, "Shared", Terminal::new)).isSameAs(second);
+    first.setIdTerminal(10);
+    second.setIdTerminal(11);
+    assertThat(index.resolve(10, "Renamed", Terminal::new)).isSameAs(first);
+    assertThat(index.resolve(12, "Shared", Terminal::new)).isNotSameAs(first).isNotSameAs(second);
+    assertThat(first.getHidden()).isTrue();
+    assertThat(second.getIsAutoLoadOverridden()).isTrue();
+    assertThat(second.getIsAutoLoad()).isTrue();
+  }
 }

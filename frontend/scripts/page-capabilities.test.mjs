@@ -42,7 +42,7 @@ function contentsOf(view) {
         seen.add(item);
         const filename = item.startsWith('/js/')
             ? path.join(resources, 'static', item)
-            : path.join(templates, item + '.html');
+            : path.join(templates, `${item}.html`);
         const source = readFileSync(filename, 'utf8');
         parts.push(source);
         if (item.startsWith('/js/')) {
@@ -55,7 +55,7 @@ function contentsOf(view) {
         } else {
             pending.push(
                 ...Array.from(
-                    source.matchAll(/~\{\s*([A-Za-z][A-Za-z0-9_/\-]*)\s*(?:::|\})/g),
+                    source.matchAll(/~\{\s*([A-Za-z][A-Za-z0-9_/-]*)\s*(?:::|\})/g),
                     (match) => match[1],
                 ),
             );
@@ -70,7 +70,7 @@ function contentsOf(view) {
                         .filter(
                             (file) =>
                                 file.endsWith('.html') &&
-                                file.includes(path.sep + 'fragments' + path.sep),
+                                file.includes(`${path.sep}fragments${path.sep}`),
                         )
                         .map((file) =>
                             path.relative(templates, file).replaceAll(path.sep, '/').slice(0, -5),
@@ -89,7 +89,7 @@ for (const filename of filesBelow(templates).filter((file) => file.endsWith('.ht
     const view = path.relative(templates, filename).replaceAll(path.sep, '/').slice(0, -5);
     const contents = contentsOf(view);
     for (const [capability, marker] of Object.entries(capabilities)) {
-        if (source.includes(capability + '=false')) {
+        if (source.includes(`${capability}=false`)) {
             assert.equal(
                 marker.test(contents),
                 false,

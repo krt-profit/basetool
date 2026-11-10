@@ -86,8 +86,9 @@ class DpopProofReplayStoreTest {
       long indexedNanos = System.nanoTime() - started;
       assertThat(checksum).isEqualTo(2L * iterations * 31L);
       assertThat(indexed.size()).isEqualTo(capacity);
-      System.out.printf("DPOP_SATURATION_PROFILE entries=%d iterations=%d scan_model_ns_per_refusal=%d "
-          + "indexed_ns_per_refusal=%d scan_model_entries_visited_per_refusal=%d%n",
+      System.out.printf(
+          "DPOP_SATURATION_PROFILE entries=%d iterations=%d scan_model_ns_per_refusal=%d "
+              + "indexed_ns_per_refusal=%d scan_model_entries_visited_per_refusal=%d%n",
           capacity, iterations, scanNanos / iterations, indexedNanos / iterations, 2L * capacity);
     }
   }

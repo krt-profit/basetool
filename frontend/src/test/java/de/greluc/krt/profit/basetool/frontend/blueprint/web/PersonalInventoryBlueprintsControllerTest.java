@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintB
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.PersonalBlueprintRecipeDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +49,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
@@ -126,7 +126,7 @@ class PersonalInventoryBlueprintsControllerTest {
   }
 
   @Test
-  void addSelected_relaysBackendFailure_asProblemJson() throws Exception {
+  void addSelected_relaysBackendFailure_throughTheCentralJsonContract() throws Exception {
     when(backendApiClient.post(any(), any(), eq(PersonalBlueprintBatchResultDto.class)))
         .thenThrow(
             new BackendServiceException(
@@ -138,18 +138,17 @@ class PersonalInventoryBlueprintsControllerTest {
                 List.of(),
                 "Blueprint service unavailable"));
 
-    MockMvcBuilders.standaloneSetup(controller)
-        .build()
+    ReauthPageMvc.standalone(controller)
         .perform(
             post("/personal-inventory/blueprints/add-selected")
                 .header("X-Requested-With", "XMLHttpRequest")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("[\"a\"]"))
         .andExpect(status().isServiceUnavailable())
-        .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(content().contentType(MediaType.APPLICATION_JSON))
         .andExpect(jsonPath("$.code").value("SERVICE_UNAVAILABLE"))
         .andExpect(jsonPath("$.correlationId").value("batch-correlation"))
-        .andExpect(jsonPath("$.detail").value("Blueprint service unavailable"));
+        .andExpect(jsonPath("$.message").value("Blueprint service unavailable"));
   }
 
   @Test

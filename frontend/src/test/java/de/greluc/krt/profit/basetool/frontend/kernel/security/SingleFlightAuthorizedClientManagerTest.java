@@ -195,7 +195,8 @@ class SingleFlightAuthorizedClientManagerTest {
   @Test
   void endedSessionEvictsOnlyItsOwnClients() {
     OAuth2AuthorizedClientManager delegate = mock(OAuth2AuthorizedClientManager.class);
-    when(delegate.authorize(any())).thenReturn(clientExpiringIn(300));
+    OAuth2AuthorizedClient fresh = clientExpiringIn(300);
+    when(delegate.authorize(any())).thenReturn(fresh);
     SingleFlightAuthorizedClientManager manager = new SingleFlightAuthorizedClientManager(delegate);
     manager.authorize(requestForSession("ended"));
     manager.authorize(requestForSession("active"));

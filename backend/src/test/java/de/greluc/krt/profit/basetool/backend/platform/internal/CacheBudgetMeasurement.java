@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.platform.internal;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.TerminalDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.CacheValueWeight;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.HashMap;

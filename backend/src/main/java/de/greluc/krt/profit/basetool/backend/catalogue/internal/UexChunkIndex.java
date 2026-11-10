@@ -19,10 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ public final class UexChunkIndex<T> {
   private final Function<T, String> name;
   private final boolean unclaimedNameOnly;
   private final Map<Integer, T> byId = new HashMap<>();
-  private final Map<String, T> byName = new HashMap<>();
+  private final Map<String, Deque<T>> byName = new HashMap<>();
 
   /**
    * Indexes the rows selected for a chunk, preserving repository ordering for duplicate names.
@@ -60,7 +61,7 @@ public final class UexChunkIndex<T> {
         index.byId.put(id, row);
       }
       if (!unclaimedNameOnly || id == null) {
-        index.byName.putIfAbsent(name.apply(row), row);
+        index.byName.computeIfAbsent(name.apply(row), _ -> new ArrayDeque<>()).addLast(row);
       }
     }
     return index;
@@ -78,9 +79,9 @@ public final class UexChunkIndex<T> {
   T resolve(@NotNull Integer id, String incomingName, @NotNull Supplier<T> create) {
     T row = byId.get(id);
     if (row == null) {
-      row = byName.get(incomingName);
-      if (row != null && unclaimedNameOnly && externalId.apply(row) != null) {
-        row = null;
+      Deque<T> candidates = byName.get(incomingName);
+      if (candidates != null) {
+        row = candidates.peekFirst();
       }
     }
     if (row == null) {
@@ -90,12 +91,21 @@ public final class UexChunkIndex<T> {
     if (previousId != null && !previousId.equals(id)) {
       byId.remove(previousId, row);
     }
-    String previousName = name.apply(row);
-    if (!Objects.equals(previousName, incomingName)) {
-      byName.remove(previousName, row);
-    }
+    forgetName(name.apply(row), row);
     byId.put(id, row);
-    byName.put(incomingName, row);
+    if (!unclaimedNameOnly) {
+      byName.computeIfAbsent(incomingName, _ -> new ArrayDeque<>()).addFirst(row);
+    }
     return row;
+  }
+
+  private void forgetName(String previousName, T row) {
+    Deque<T> candidates = byName.get(previousName);
+    if (candidates != null) {
+      candidates.removeFirstOccurrence(row);
+      if (candidates.isEmpty()) {
+        byName.remove(previousName);
+      }
+    }
   }
 }

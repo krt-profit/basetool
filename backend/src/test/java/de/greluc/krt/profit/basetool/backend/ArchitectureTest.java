@@ -416,6 +416,7 @@ class ArchitectureTest {
           ExchangeMirrorProperties.class,
           HandleErasureCoverage.class,
           HandleSpellings.class,
+          de.greluc.krt.profit.basetool.backend.identity.api.UserHandleProjection.class,
           IngestGatewayProperties.class,
           InventoryAllocations.class,
           InventoryAuditLabels.class,
@@ -1294,7 +1295,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 92);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 93);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);

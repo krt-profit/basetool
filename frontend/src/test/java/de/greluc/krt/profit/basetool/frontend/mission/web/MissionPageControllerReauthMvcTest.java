@@ -60,7 +60,8 @@ class MissionPageControllerReauthMvcTest {
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionOnTheMissionsListRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionOnTheMissionsListRedirectsToLogin(RuntimeException sessionFailure)
+      throws Exception {
     when(missionClient.searchMissions(any())).thenThrow(sessionFailure);
 
     mockMvc.perform(get("/missions")).andExpect(redirectsToLogin());
@@ -68,7 +69,8 @@ class MissionPageControllerReauthMvcTest {
 
   @ParameterizedTest
   @MethodSource("de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc#sessionFailures")
-  void anExpiredSessionOnTheMissionDetailRedirectsToLogin(RuntimeException sessionFailure) throws Exception {
+  void anExpiredSessionOnTheMissionDetailRedirectsToLogin(RuntimeException sessionFailure)
+      throws Exception {
     when(missionClient.mission(any())).thenThrow(sessionFailure);
 
     mockMvc.perform(get("/missions/" + UUID.randomUUID())).andExpect(redirectsToLogin());
