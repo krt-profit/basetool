@@ -34,8 +34,10 @@ Mission write adapters each own one operation family, sharing conversion and bin
 
 The German bundle is canonical; Gradle copies it deterministically to the default runtime resource.
 A small OpenAPI-to-record pilot generates `PurchasingVersionRequest` into build output, preserving
-its package, validation and JSON shape. Existing DTO parity checks remain binding; unsupported
-generator shapes fail rather than erase types.
+its package, validation and JSON shape. Its typed Gradle task uses the JVM and Gradle's bundled JSON
+parser, so main-source generation has no platform-specific Node executable dependency. Existing DTO
+parity checks remain binding; unsupported generator shapes fail rather than erase types. The Alpine
+image check also runs when the generator implementation or frontend build registration changes.
 
 ## Consequences
 

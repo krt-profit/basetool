@@ -1,6 +1,7 @@
 import com.github.gradle.node.npm.task.NpmTask
 import com.github.gradle.node.npm.task.NpxTask
 import com.github.gradle.node.task.NodeTask
+import de.greluc.krt.profit.basetool.conventions.GenerateWireRecords
 import de.greluc.krt.profit.basetool.conventions.OssLicensePolicy
 import de.greluc.krt.profit.basetool.conventions.backendModuleDirectories
 import de.greluc.krt.profit.basetool.conventions.registerNodeScriptTest
@@ -710,17 +711,11 @@ tasks.register<NpxTask>("prettierApply") {
 val openApiSpec = layout.settingsDirectory.file("backend/src/main/resources/api/openapi.json")
 val generatedWireRecords = layout.buildDirectory.dir("generated/wire-records")
 val generateWireRecords =
-  tasks.register<NodeTask>("generateWireRecords") {
+  tasks.register<GenerateWireRecords>("generateWireRecords") {
     group = "build"
     description = "Generates the pilot frontend wire records from the backend OpenAPI contract."
-    dependsOn(tasks.named("npmSetup"))
-    script.set(layout.projectDirectory.file("scripts/gen-wire-records.mjs").asFile)
-    args.set(
-      listOf(openApiSpec.asFile.absolutePath, generatedWireRecords.get().asFile.absolutePath),
-    )
-    inputs.file(openApiSpec)
-    inputs.file(layout.projectDirectory.file("scripts/gen-wire-records.mjs"))
-    outputs.dir(generatedWireRecords)
+    openApiFile.set(openApiSpec)
+    outputDirectory.set(generatedWireRecords)
   }
 
 sourceSets.named("main") { java.srcDir(generateWireRecords) }

@@ -127,6 +127,7 @@ assert_host_scripts_current_or_die() {
     log "WARNING: host-scripts gate DISABLED (BASETOOL_REQUIRE_CURRENT_SCRIPTS=false), applying with [${apply}] that are not this release's"
     return 0
   fi
+  # shellcheck disable=SC2034
   PRE_GATE_GUARD=false
   rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
   write_deploy_metric failure

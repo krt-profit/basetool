@@ -401,6 +401,7 @@ def selftest() -> int:
           inside["backend-exchange"][1] == ("backend",) and inside["backend-bank"][1] == ("backend",))
     check("ingest-relay is shipped inside ingest", inside["ingest-relay"][1] == ("ingest",))
     check("logging-support keeps its explicit carriers", inside["logging-support"][1] == SHIPPED_INSIDE["logging-support"][1])
+    check("technical-support keeps its explicit carriers", inside["technical-support"][1] == SHIPPED_INSIDE["technical-support"][1])
     check("test-support is neither shipped nor inside", "test-support" not in shipped and "test-support" not in inside)
     check("an application's own name is not a library", library_carrier("backend") is None)
     check("a name without the hyphen boundary is not a library", library_carrier("backendx") is None)

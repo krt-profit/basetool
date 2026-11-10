@@ -209,6 +209,7 @@ detect_bridge() {
     set +e
     : > "${WORK}/sudo.log"
     : > "${WORK}/detect-waits.log"
+    # shellcheck disable=SC2329
     sleep() {
       printf '%s\n' "$*" >> "${WORK}/detect-waits.log"
       command sleep "$@"

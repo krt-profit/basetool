@@ -61,8 +61,10 @@ regression tests pin per-session single-flight refresh and session-specific inva
 ## Browser asset characterization
 
 The opt-in `assetProfileTest` uses the standard Playwright stack harness, fresh Chromium contexts
-and disabled browser caches. It compares `/privacy` with eager optional module tags and the pinned
-original stylesheet against the selective asset variant, with five alternating trials per variant.
+and disabled browser caches. It compares `/privacy` with eager current optional module tags and the
+pinned original stylesheet against the selective asset variant, with five alternating trials per
+variant. Both variants use the current controlled page DOM; this is not a comparison against a
+complete application binary from the baseline commit.
 It records actual decoded JS/CSS response-body bytes, request counts, Chromium `ScriptDuration`
 and full-page screenshots in the profile directory. The original CSS is minified with the same
 comment/whitespace transformation as `minifyStaticCss`; no bundler or dynamic import is involved.
@@ -70,9 +72,34 @@ comment/whitespace transformation as `minifyStaticCss`; no bundler or dynamic im
 ```powershell
 git show 5f0a2d0f1:frontend/src/main/resources/static/css/kernel/styles.css |
     Set-Content -LiteralPath 'D:\Coding\Agents\Temp\codex\basetool-audit-3267\frontend\profile\styles-baseline.css' -Encoding utf8
-.\gradlew.bat :frontend:assetProfileTest -Pe2e.browser=chromium -PresourceProfileOutput=D:/Coding/Agents/Temp/codex/basetool-audit-3267/frontend/profile -PassetProfileBaselineCss=D:/Coding/Agents/Temp/codex/basetool-audit-3267/frontend/profile/styles-baseline.css
+.\gradlew.bat :frontend:assetProfileTest '-Pe2e.browser=chromium' '-PresourceProfileOutput=D:/Coding/Agents/Temp/codex/basetool-audit-3267/frontend/profile' '-PassetProfileBaselineCss=D:/Coding/Agents/Temp/codex/basetool-audit-3267/frontend/profile/styles-baseline.css'
 ```
 
-Browser results are recorded after the isolated stack validation completes. A decoded-body byte
-comparison does not measure wire compression or HTTP header overhead; browser timing has its own
-run-to-run variance.
+The isolated Chromium characterization passed. Every trial of a variant recorded the same bytes
+and asset-request count in `frontend-assets.json`:
+
+| Variant | JavaScript bodies | CSS bodies | Combined bodies | Asset requests | Median ScriptDuration |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Eager tags and original CSS | 310,130 B | 176,413 B | 486,543 B | 42 | 14.213 ms |
+| Selective assets | 231,296 B | 170,971 B | 402,267 B | 31 | 4.497 ms |
+
+The selective variant loads 84,276 fewer decoded asset bytes (17.3%) and makes 11 fewer asset
+requests for this page. Chromium's scripting-time samples were:
+
+| Trial | Eager ScriptDuration | Selective ScriptDuration |
+| --- | ---: | ---: |
+| 1 | 38.158 ms | 4.502 ms |
+| 2 | 15.643 ms | 4.497 ms |
+| 3 | 14.213 ms | 4.427 ms |
+| 4 | 11.708 ms | 3.554 ms |
+| 5 | 11.580 ms | 5.143 ms |
+
+The full-page `privacy-eager.png` and `privacy-selective.png` screenshots are byte-identical: both
+are 1440 by 11582 pixels, 1,489,623 bytes, with SHA-256
+`D36E12A209E70040A4A3230ABB8E530C17877AE7DBB9EFB2270DA325EFCB0480`.
+
+These measurements characterize `/privacy` and the controlled asset selection only. Decoded-body
+bytes exclude wire compression and HTTP header overhead. `ScriptDuration` measures browser scripting
+time rather than a separate parser-only cost; its five local samples do not establish production
+latency or effects on other pages. The screenshot identity establishes the rendered result of this
+page under this fixture, alongside the independent capability inventory and interaction tests.

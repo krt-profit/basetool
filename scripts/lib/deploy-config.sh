@@ -196,6 +196,7 @@ install_quadlet_units() {
 assert_config_tree_writable() {
   local src="$1" me sub d parent bad count
   me="$(id -u)"
+  # shellcheck disable=SC2034
   DEPLOY_STEP="pre-flight: the config tree is writable"
   for d in "${COMPOSE_DIR}" "${RT_UNIT_DIR}"; do
     [[ -w "${d}" ]] \
@@ -277,6 +278,7 @@ swap_in_keycloak_spi_jar() {
     rm -f "${KEYCLOAK_SPI_PREVIOUS_JAR}"
     KEYCLOAK_SPI_HAD_PREVIOUS=false
   fi
+  # shellcheck disable=SC2034
   KEYCLOAK_SPI_TOUCHED=true
   install -D -m 0644 "${KEYCLOAK_SPI_STAGE_JAR}" "${KEYCLOAK_SPI_JAR}"
   rm -f "${KEYCLOAK_SPI_STAGE_JAR}"

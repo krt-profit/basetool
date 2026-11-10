@@ -3207,6 +3207,9 @@ always-run verification behavior. The included build resolves the Node plugin ma
 catalog; the frontend applies that already-versioned plugin by id. Configuration-cache reuse and
 the affected task graph are checked through the wrapper.
 
+The three application dev images watch `technical-support/` in the local Compose build setup, so
+changes to its main sources or module build metadata rebuild every image that carries the library.
+
 Operational subprocesses have explicit configurable budgets (`Kcadm.timeout`, default 60 seconds;
 GraphQL commit request, default 60 seconds; sandbox HTTP calls, default 120 seconds). A kcadm timeout
 kills/waits for the local child; an uncertain write is not retried automatically and names the need

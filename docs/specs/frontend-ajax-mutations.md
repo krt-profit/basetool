@@ -2583,8 +2583,12 @@ Their route gates, section versions and form/AJAX variants remain pinned by the 
 mission MVC tests. Shared JSON/date conversion and form trimming each have one narrow owner.
 
 `generateWireRecords` derives the `PurchasingVersionRequest` pilot from OpenAPI into build output.
-Its package, boxed version, required validation and JSON shape remain compatible. DTO parity tests
+The cacheable typed Gradle task runs entirely on the JVM with Gradle's bundled JSON parser; generating
+main Java sources requires no Node executable, including in the Alpine application builder. Its
+package, boxed version, required validation and JSON shape remain compatible. DTO parity tests
 continue to select it by `@DtoMirror`, alongside the manual models. Unsupported generator shapes fail.
+Changes to the generator implementation or frontend build registration trigger the Alpine image CI
+check alongside the regular generated-source parity checks.
 
 Since 2026-10-10 (plan §5.9, F4) a domain's frontend code lives in its own package tree:
 `frontend.<domain>.web` holds its controllers, view rows and view helpers, `frontend.<domain>.model`

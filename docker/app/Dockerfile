@@ -29,7 +29,6 @@ COPY ${MODULE}/src/main/ ${MODULE}/src/main/
 COPY logging-support/src/main/ logging-support/src/main/
 COPY technical-support/src/main/ technical-support/src/main/
 COPY frontend/oss-bundled-components.json frontend/oss-bundled-components.json
-COPY frontend/scripts/gen-wire-records.mjs frontend/scripts/gen-wire-records.mjs
 COPY backend/src/main/resources/api/openapi.json backend/src/main/resources/api/openapi.json
 
 RUN ./gradlew ":${MODULE}:bootJar" ${APP_VERSION:+-PappVersion=$APP_VERSION} --no-daemon --no-configuration-cache

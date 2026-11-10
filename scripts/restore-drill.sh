@@ -89,7 +89,7 @@ WORK="${WORK_BASE}/${TS}"
 mkdir -p "${WORK}"
 chmod 700 "${WORK}"
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 cleanup() {
   local rc=$?
   rt_rm_force "${CONTAINER}"

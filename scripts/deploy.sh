@@ -1,11 +1,11 @@
 #!/bin/bash
+# shellcheck source-path=SCRIPTDIR
 
 set -euo pipefail
 
 umask 022
 
 BASETOOL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
 . "${BASETOOL_SCRIPT_DIR}/lib/common.sh"
@@ -353,7 +353,7 @@ record_reapply_failure() {
   write_stack_health_metric restart_failed
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 on_pre_gate_exit() {
   local rc=$?
   [[ "${PRE_GATE_GUARD}" == "true" ]] || return 0

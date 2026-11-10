@@ -10,6 +10,7 @@ on:
       - frontend/oss-bundled-components.json
       - ingest/src/main/**
       - logging-support/src/main/**
+      - technical-support/src/main/**
       - keycloak-spi/src/main/**
       - keycloak-spi/lombok.config
       - keycloak-theme/**
@@ -31,6 +32,8 @@ on:
       - .github/workflows/sandbox-images.yml
   pull_request:
     paths:
+      - build-logic/src/main/kotlin/de/greluc/krt/profit/basetool/conventions/GenerateWireRecords.kt
+      - frontend/build.gradle.kts
       - docker/sandbox/**
       - docker-compose.sandbox-build.yml
       - scripts/build-sandbox-realm.py
