@@ -1564,7 +1564,9 @@ that lowers or moves the row:
 - the three slice sums are each checked against the row's amount (`InventoryAllocations.fits`) on
   every amount-lowering write, so book-out, sale, transfer, rebooking and the stolen split refuse a
   write that would leave a pledge uncovered (422);
-- a row that still carries a donation slice is neither depleted nor moved in full;
+- a row that still carries a donation slice is neither depleted nor moved in full: a depleting
+  book-out, the bulk check-out (REQ-INV-044) and the bulk rebooking (REQ-INV-036) refuse it (422)
+  and change nothing;
 - the exchange counts the donation slice in its free-stock calculation;
 - a stock merge unions the slices of the folded row into the survivor;
 - the row's DTO lists the slices as `donationAllocations` (the donation, the receiving unit's name,
@@ -1575,8 +1577,9 @@ that lowers or moves the row:
 Concurrent pledge and sale of the same row cannot both succeed: both take the row's lot lock first and
 the row's `@Version` guards the write.
 
-**Enforced by:** `InventoryPoolCommandsTest`, `InventoryItemMapperTest`, `SupplyDonationEarmarksTest`,
-`InventorySupplyRenderTest` · **Code:** `inventory/internal/InventoryAllocations`,
+**Enforced by:** `InventoryPoolCommandsTest`, `InventoryItemServiceBulkCheckoutTest`,
+`InventoryItemMapperTest`, `SupplyDonationEarmarksTest`, `InventorySupplyRenderTest` · **Code:**
+`inventory/internal/InventoryAllocations`, `inventory/internal/InventoryDonationGuards`,
 `inventory/internal/InventoryCheckoutService`, `inventory/internal/InventoryDonationAllocation`,
 `exchange/internal/ExchangeStockWriteService`
 

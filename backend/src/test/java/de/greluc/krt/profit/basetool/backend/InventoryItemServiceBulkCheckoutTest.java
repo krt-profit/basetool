@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkCheckoutRequest;
@@ -166,6 +167,31 @@ class InventoryItemServiceBulkCheckoutTest {
     inventoryItemService.bulkCheckout(request, userId);
 
     verify(inventoryItemRepository).deleteAllById(List.of(itemId));
+  }
+
+  @Test
+  void bulkCheckout_refusesARowWithAPledgedDonation_andRemovesNothing() {
+    UUID userId = UUID.randomUUID();
+    UUID freeItemId = UUID.randomUUID();
+    UUID pledgedItemId = UUID.randomUUID();
+
+    InventoryItem freeItem = itemOwnedBy(freeItemId, userId);
+    InventoryItem pledgedItem = itemOwnedBy(pledgedItemId, userId);
+    pledgedItem.setAmount(10.0);
+    InventoryAllocations.addDonation(pledgedItem, UUID.randomUUID(), 2.0);
+
+    when(inventoryItemRepository.findByIdForUpdate(freeItemId)).thenReturn(Optional.of(freeItem));
+    when(inventoryItemRepository.findByIdForUpdate(pledgedItemId))
+        .thenReturn(Optional.of(pledgedItem));
+
+    BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(freeItemId, pledgedItemId));
+
+    assertThrows(
+        OverAllocationException.class, () -> inventoryItemService.bulkCheckout(request, userId));
+
+    verify(offerRatchet, never()).beforeDelete(any(), any());
+    verify(inventoryItemRepository, never()).deleteAllById(any());
+    verifyNoInteractions(auditService);
   }
 
   @Test
