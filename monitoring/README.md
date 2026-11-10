@@ -365,7 +365,7 @@ section above.
 | **SessionTypeOutsideAllowList** | A session value names a class outside `SessionTypeAllowList` (the frontend WARN names it once per lifetime). `mode=report`: nothing broke, but enforcing would drop it — add a legitimate class to the list and keep reporting until this stays silent. `mode=enforce`: the attribute was refused, correct for a foreign class and a defect for a legitimate one (REQ-SEC-067). |
 | **RedisFanoutUnsubscribed** | A backend cross-instance pub/sub container has not been listening for 10 minutes; the backend stays healthy while cross-instance delivery is dead. Check the `redis` unit and `net-redis-backend`. |
 | **CsrfRejectionSpike** | CSRF rejections >0.1/s for 15m — likely a CSRF-wiring regression. Check recent security/template changes. |
-| **ClientErrorSpike** | The browser error beacon reports one `kind` at >20/h and >3x its 24h average. Check the last frontend deploy; raise `ClientErrorReportController` to DEBUG for the message and script URL (for `csp_violation` read `basetool_client_csp_violation_total` by `directive` and `code_origin` first, dashboard `07` panel 85 — `code_origin="extension"` is a browser extension, not our code; the DEBUG line then adds the blocked origin; a Trusted Types sink shows as `require-trusted-types-for Element innerHTML`, an unlisted policy as `trusted-types <name>`, ADR-0239). |
+| **ClientErrorSpike** | The browser error beacon reports one `kind` at >20/h and >3x its 24h average; a `csp_violation` counts only with `code_origin` `self` or `inline` (our own code), so extension and browser-translation code never wakes anyone. Check the last frontend deploy; raise `ClientErrorReportController` to DEBUG for the message and script URL (for `csp_violation` read `basetool_client_csp_violation_total` by `directive` and `code_origin` first, dashboard `07` panel 85 — `code_origin="extension"` is a browser extension, not our code; the DEBUG line then adds the blocked origin; a Trusted Types sink shows as `require-trusted-types-for Element innerHTML`, an unlisted policy as `trusted-types <name>`, ADR-0239). |
 | **DiscordPrecheckUnauthorizedSpike / DiscordPrecheckDisabledOnProd** | The Discord precheck is answering 401 at an elevated rate (secret guessing), or 503 with a blank secret (config drift — the SPI then fails open). |
 | **RateLimitRejectionRatioHigh** | More than 1% of rate-limit evaluations on one module/bucket are rejected. Check the source and whether the limit needs tuning. |
 | **KeycloakLoginErrorSpike / KeycloakErrorRateHigh / KeycloakEventMetricsAbsent** | Failed logins jumped, Keycloak is logging ERRORs (check the fail-open Discord SPI path first), or the event counter is missing while Keycloak serves token traffic (check `KC_METRICS_ENABLED=true` in `basetool.env` — the generated template defaults it to off). For the spike, `sum by (error) (rate(keycloak_user_events_total{event=~"login\|identity_provider_login", error!=""}[5m]))` names the cause: `invalid_user_credentials` points at password guessing, `cookie_not_found` at abandoned Discord logins (REQ-SEC-071). Keycloak has no `*_error` event names; a failure carries the base event name and a non-empty `error` label. |
@@ -481,6 +481,48 @@ q 'up == 0'
 ```
 
 For anything longer than a one-liner, use Grafana → Explore.
+
+### Read-only API access through a Grafana service account
+
+To query Prometheus or Loki from a workstation, for example as an agent analysing an alert, use a
+**Grafana service account with the role Viewer**. Do not use a second Prometheus user:
+
+- Prometheus' basic auth has no roles, and the unit starts it with `--web.enable-admin-api`. Every
+  Prometheus user can therefore also delete series, so a "read-only" Prometheus user is read-only by
+  convention only.
+- Prometheus publishes no host port, and entering the rootless network as `greluc` needs sudo
+  (see above), so a Prometheus user is not reachable from a workstation anyway.
+- A Viewer service account can query every provisioned datasource through Grafana's datasource
+  proxy and cannot change anything. Grafana's login runs through Keycloak, but service accounts are
+  Grafana's own: they need no Keycloak account and authenticate with a bearer token.
+
+**Create it** (once, as a Grafana server admin: a Keycloak user with the `grafana-admin` role):
+
+1. Sign in at `https://grafana.profit-base.online` with **Sign in with Keycloak**.
+2. **Administration → Users and access → Service accounts → Add service account**: display name
+   `claude-readonly` (or the agent's name), role **Viewer**, **Create**.
+3. **Add service account token**: a name for the purpose, an **expiration** (a few days for one
+   analysis), **Generate token**. Grafana shows the `glsa_…` token once.
+4. Paste it into a file on the workstation, never into a chat, an issue or a shell command line,
+   for example `D:\Coding\Agents\Temp\<agent>\grafana-ro\token.txt`. Clear the clipboard afterwards.
+
+**Use it.** The token goes into a request header read from that file, so it never appears on a
+command line or in output. The datasource uids are `prometheus`, `loki` and `tempo`
+(`grafana/provisioning/datasources/datasources.yaml`):
+
+```powershell
+$token = (Get-Content -Raw D:\Coding\Agents\Temp\claude\grafana-ro\token.txt).Trim()
+$query = [uri]::EscapeDataString('sum by (directive, code_origin) (increase(basetool_client_csp_violation_total[2h]))')
+Invoke-RestMethod -Headers @{ Authorization = "Bearer $token" } `
+  -Uri "https://grafana.profit-base.online/api/datasources/proxy/uid/prometheus/api/v1/query?query=$query&time=2026-11-09T22:30:00Z"
+Remove-Variable token
+```
+
+`query_range` works the same way (`start`, `end`, `step`). Loki is reached at
+`/api/datasources/proxy/uid/loki/loki/api/v1/query_range`.
+
+**Remove it** when the analysis is done: delete the token (or the whole service account) under
+**Service accounts**, and delete the token file. An expired token stops working on its own.
 
 ### Rebuilding the monitoring plane on a new host
 

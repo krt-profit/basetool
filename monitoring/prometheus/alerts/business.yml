@@ -791,17 +791,31 @@ groups:
           summary: "Elevated CSRF-token rejection rate"
           description: "The frontend has been rejecting CSRF tokens at more than 0.1/s for 15 minutes — likely a systematic CSRF-wiring regression rather than occasional stale tokens (which krtFetch self-heals). Check recent security/template changes and the /csrf endpoint."
 
+      # A csp_violation counts only when the page's own code caused it (code_origin self or
+      # inline); extension and browser-translation code stays in dashboard 07, panel 85.
+      - record: basetool:client_error_own_code:increase1h
+        expr: |
+          sum by (kind) (increase(basetool_client_error_total{kind!="csp_violation"}[1h]))
+          or
+          label_replace(sum(increase(basetool_client_csp_violation_total{code_origin=~"self|inline"}[1h])), "kind", "csp_violation", "", "")
+
+      - record: basetool:client_error_own_code:increase24h
+        expr: |
+          sum by (kind) (increase(basetool_client_error_total{kind!="csp_violation"}[24h]))
+          or
+          label_replace(sum(increase(basetool_client_csp_violation_total{code_origin=~"self|inline"}[24h])), "kind", "csp_violation", "", "")
+
       - alert: ClientErrorSpike
         expr: |
-          sum by (kind) (increase(basetool_client_error_total[1h])) > 20
+          basetool:client_error_own_code:increase1h > 20
           and
-          sum by (kind) (increase(basetool_client_error_total[1h])) > 3 * sum by (kind) (increase(basetool_client_error_total[24h])) / 24
+          basetool:client_error_own_code:increase1h > 3 * basetool:client_error_own_code:increase24h / 24
         for: 30m
         labels:
           severity: warning
         annotations:
           summary: "Browser client errors stepped up ({{ $labels.kind }})"
-          description: "The frontend's client-error beacon has reported {{ $labels.kind }} failures well above their own daily baseline for 30 minutes — the browser half of a page is throwing, which produces no server-side error of any kind. Check what shipped in the last frontend deploy; a script_error / unhandled_rejection step means a krtFetch handler is dying (live update silently stops working on that surface), a resource_error step means an asset the templates still reference is 404ing, a csp_violation step means a template or script now does something the Content-Security-Policy blocks (an inline script or style without the nonce, a new third-party host, a DOM sink written without a Trusted Types policy value) and that part of the page silently does not work, or under the report-only Trusted Types policy is reported while it still works, an i18n_missing step means a page stopped providing a localized string a script reads (the UI now shows the key name). For a csp_violation step read basetool_client_csp_violation_total by directive first (dashboard 07, panel 85): require-trusted-types-for or trusted-types is the report-only Trusted Types policy, script-src-* / style-src-* / img-src is the enforced policy. Raise ClientErrorReportController to DEBUG via /actuator/loggers to get the message and script URL for the duration of the investigation."
+          description: "The frontend's client-error beacon has reported {{ $labels.kind }} failures well above their own daily baseline for 30 minutes — the browser half of a page is throwing, which produces no server-side error of any kind. Check what shipped in the last frontend deploy; a script_error / unhandled_rejection step means a krtFetch handler is dying (live update silently stops working on that surface), a resource_error step means an asset the templates still reference is 404ing, a csp_violation step means a template or script now does something the Content-Security-Policy blocks (an inline script or style without the nonce, a new third-party host, a DOM sink written without a Trusted Types policy value) and that part of the page silently does not work, or under the report-only Trusted Types policy is reported while it still works, an i18n_missing step means a page stopped providing a localized string a script reads (the UI now shows the key name). A csp_violation step counts only violations by the page's own code (code_origin self or inline); extension and browser-translation code is excluded. For a csp_violation step read basetool_client_csp_violation_total by directive first (dashboard 07, panel 85): require-trusted-types-for or trusted-types is the report-only Trusted Types policy, script-src-* / style-src-* / img-src is the enforced policy. Raise ClientErrorReportController to DEBUG via /actuator/loggers to get the message and script URL for the duration of the investigation."
 
       - alert: DiscordPrecheckUnauthorizedSpike
         expr: sum(rate(basetool_discord_precheck_total{outcome="unauthorized"}[5m])) > 0.1
