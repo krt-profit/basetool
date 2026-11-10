@@ -50,6 +50,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -114,10 +115,11 @@ public class ScWikiClient {
   private ScWikiRequestExecutor requests;
 
   /**
-   * Jackson mapper that {@link #fetchOne} uses to unwrap the optional {@code {data: …}} envelope
-   * and bind the payload.
+   * Jackson mapper that binds pages and details. It reads an empty JSON array as an absent object,
+   * because the Wiki serialises an empty object field such as {@code quality_range} as {@code []}.
    */
-  private final ObjectMapper objectMapper = JsonMapper.builder().build();
+  private final ObjectMapper objectMapper =
+      JsonMapper.builder().enable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT).build();
 
   /**
    * Builds the {@link RestClient} once after dependency injection, with the {@link
@@ -308,6 +310,9 @@ public class ScWikiClient {
   /**
    * Enumerates one endpoint under the calling run's immutable game version.
    *
+   * <p>A walk the feed re-paginated under, with every page read, is repeated once; the repeat alone
+   * decides the census, while both walks count as fetched deliveries.
+   *
    * @param <T> row type
    * @param endpoint endpoint path
    * @param typeRef paginated response type
@@ -324,17 +329,52 @@ public class ScWikiClient {
       @Nullable String include,
       @Nullable Map<String, String> filters,
       @Nullable Integer pageSizeOverride) {
+    FetchErrorLatch errorLatch = new FetchErrorLatch();
+    ScWikiPageWalk<T> walk =
+        walkPages(endpoint, typeRef, resourceLabel, include, filters, pageSizeOverride, errorLatch);
+    if (walk.shifted()) {
+      log.info(
+          "SC Wiki {} shifted during the page walk; walking it once more for a stable census.",
+          resourceLabel);
+      syncRunProgress.fetched(walk.rows().size(), walk.validRows(), true);
+      walk =
+          walkPages(
+              endpoint, typeRef, resourceLabel, include, filters, pageSizeOverride, errorLatch);
+    }
+    syncRunProgress.fetched(walk.rows().size(), walk.validRows(), walk.complete());
+    return walk.complete() ? FetchResult.of(walk.rows()) : FetchResult.partial(walk.rows());
+  }
+
+  /**
+   * Walks every page of one endpoint once without reporting fetched rows to the run.
+   *
+   * @param <T> row type
+   * @param endpoint endpoint path
+   * @param typeRef paginated response type
+   * @param resourceLabel log label
+   * @param include eager-loaded relationships
+   * @param filters endpoint filters
+   * @param pageSizeOverride optional page size
+   * @param errorLatch the fetch's single error-counter latch, shared by a repeated walk
+   * @return the walk's rows and verdict
+   */
+  private <T extends ScWikiRow> ScWikiPageWalk<T> walkPages(
+      String endpoint,
+      ParameterizedTypeReference<ScWikiResponseDto<T>> typeRef,
+      String resourceLabel,
+      @Nullable String include,
+      @Nullable Map<String, String> filters,
+      @Nullable Integer pageSizeOverride,
+      FetchErrorLatch errorLatch) {
     log.info("Fetching all {} from SC Wiki API (paginated)", resourceLabel);
 
     int pageSize = effectivePageSize(pageSizeOverride);
     String firstPageUri = buildPagedUri(endpoint, 1, include, filters, pageSize);
-    FetchErrorLatch errorLatch = new FetchErrorLatch();
 
     ScWikiResponseDto<T> first =
         fetchSinglePage(firstPageUri, typeRef, resourceLabel, include, errorLatch);
     if (first == null) {
-      syncRunProgress.fetched(0, 0, false);
-      return FetchResult.partial(Collections.emptyList());
+      return new ScWikiPageWalk<>(Collections.emptyList(), 0, false, false);
     }
 
     List<T> accumulated = new ArrayList<>();
@@ -345,6 +385,7 @@ public class ScWikiClient {
     ScWikiMetaDto meta = first.meta();
     ScWikiMetaDto freshestMeta = meta;
     boolean complete = true;
+    boolean shifted = false;
     boolean walkAbandoned = false;
     int lastPage = 1;
     if (meta == null || meta.lastPage() == null) {
@@ -400,6 +441,7 @@ public class ScWikiClient {
           repeatedRows);
       recordCensusIncompleteOnce(errorLatch);
       complete = false;
+      shifted = true;
     }
 
     Integer announcedTotal = meta == null ? null : meta.total();
@@ -414,6 +456,7 @@ public class ScWikiClient {
           announcedTotal - distinctRows);
       recordCensusIncompleteOnce(errorLatch);
       complete = false;
+      shifted = true;
     } else if (announcedTotal != null && distinctRows > announcedTotal) {
       log.info(
           "SC Wiki {} page walk enumerated {} distinct row(s) while meta.total reports {} — every"
@@ -438,6 +481,7 @@ public class ScWikiClient {
           freshestMeta.lastPage() - lastPage);
       recordCensusIncompleteOnce(errorLatch);
       complete = false;
+      shifted = true;
     }
 
     long validRows =
@@ -459,9 +503,9 @@ public class ScWikiClient {
         pagesFetched,
         lastPage,
         complete);
-
-    syncRunProgress.fetched(accumulated.size(), validRows, complete);
-    return complete ? FetchResult.of(accumulated) : FetchResult.partial(accumulated);
+    boolean paginated = meta != null && meta.lastPage() != null;
+    return new ScWikiPageWalk<>(
+        accumulated, validRows, complete, shifted && paginated && !walkAbandoned);
   }
 
   /**

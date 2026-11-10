@@ -963,12 +963,19 @@ ingests the other categories but runs no sweep; a run in which a category answer
 zero rows still sweeps. (`StalePriceSweepTest`): the same rows are cleared as the `NOT IN` form
 cleared, no statement is issued when nothing is stale, and the ids arrive in bounded batches.
 
+**A feed that shifts under the walk is walked once more.** The Wiki re-paginates a large feed while
+it is read, so one walk can see a row twice and miss another. A walk that read every page but saw a
+repeated row, a shortfall against `meta.total` or a growing page count is repeated once, and the
+repeat alone decides the census; a repeat that shifts again stays `INCOMPLETE`. A walk without
+pagination metadata or with a failed page is not repeated. Both walks count as fetched deliveries
+(REQ-DATA-038) and share one fetch-error count.
+
 **Acceptance** (`ScWikiClientTest`): a walk whose distinct rows exceed `meta.total` stays
 `complete`, does not `WARN` and does not count; a walk in which one row arrives on two pages is
 `INCOMPLETE` **even when the merged size matches `meta.total` exactly**; a distinct-row shortfall is
-`INCOMPLETE`; a second page announcing a third page is `INCOMPLETE`; id-less rows do not read as
-duplicates; and a walk exhibiting two symptoms of one break still increments the fetch-error counter
-once.
+`INCOMPLETE`; a second page announcing a third page is `INCOMPLETE`; each of these is walked exactly
+twice, and a stable repeat is `complete`; id-less rows do not read as duplicates; and a walk
+exhibiting two symptoms of one break still increments the fetch-error counter once.
 
 **Acceptance** (`ScWikiItemSyncServiceBackfillTest`): a run in which one kind pass is INCOMPLETE but
 the residual `/api/items` pass returns a complete census containing every row that pass saw **does**
@@ -1622,6 +1629,15 @@ write transaction. A repeated canonical core in the Wiki feed is not a unique ma
 are reported as `SOURCE_IDENTITY_CONFLICT` or `MULTI_MATCH_AMBIGUOUS`; they do not rebind a row.
 Original UEX and Wiki names are retained separately from the canonical item name.
 
+A Wiki manufacturer name or code that several census rows share is ambiguous only while an
+unclaimed local row carries it. A local row whose P4K or Wiki UUID names another row of the same
+census belongs to that sibling, and a key no local row carries leaves the Wiki row unmatched; neither
+case blocks the manufacturer census (`ScWikiManufacturerSyncServiceTest`).
+
+UEX gives an item and a commodity terminal of one location the same name. The terminal sync adopts
+a row by name only while no UEX terminal claims it, so each UEX terminal keeps a row of its own and
+every commodity price resolves its terminal (`UexTerminalNameCollisionTest`).
+
 ### REQ-DATA-034 — equivalent existing catalogue rows converge without breaking references
 
 UEX-first and Wiki-first arrivals produce the same verified source link. Repairing already
@@ -1685,6 +1701,11 @@ ports/tags, lootability, images and related items/vehicles. Wiki-derived UEX inf
 `UEX_VIA_SC_WIKI` and is not an independent price authority. Enrichment never changes canonical
 identity or the per-area P4K precedence. Blueprint resource UUID and ore UUID remain distinct
 source facts; unlocking missions and loaded recipe sections retain their provenance.
+
+The Wiki serialises an empty object field as `[]` (for example a blueprint modifier's
+`quality_range`); the Wiki client reads such a field as absent. A Wiki commodity's `tier` is a
+rarity label stored as tier 1 (`common`) to 5 (`legendary`); an unknown label stores no tier and
+never fails the commodity page (`ScWikiClientTest`).
 
 ### REQ-DATA-038 — every attempted source sync has a durable, accurate outcome
 

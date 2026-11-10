@@ -37,11 +37,15 @@ import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.observation.DefaultMeterObservationHandler;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.observation.ObservationRegistry;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -382,6 +386,7 @@ class ScWikiClientTest {
   @Test
   void distinctRowsFallingShortOfMetaTotal_isIncomplete_andWarns() {
     server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 205, rows(1))));
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 205, rows(1))));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
@@ -390,6 +395,22 @@ class ScWikiClientTest {
         result.complete(), "a distinct-row count below meta.total is not a complete census");
     assertEquals(1, result.data().size(), "the fetched rows are still returned");
     assertEquals(1.0, fetchErrorCount(), "a total mismatch must count as a fetch error");
+    assertEquals(2, server.getRequestCount(), "a shortfall is walked once more, not twice");
+  }
+
+  @Test
+  void aWalkTheFeedReshuffledUnderIsRepeatedOnceAndTheStableRepeatDecides() {
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
+    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 3))));
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
+    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 4))));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(result.complete(), "the repeated walk enumerated every announced row once");
+    assertEquals(4, result.data().size(), "only the repeat's rows are returned");
+    assertEquals(4, server.getRequestCount());
   }
 
   @Test
@@ -432,8 +453,10 @@ class ScWikiClientTest {
 
   @Test
   void rowServedOnTwoPages_isIncomplete_evenWhenTheRowCountMatchesMetaTotal() {
-    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
-    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 3))));
+    for (int walk = 0; walk < 2; walk++) {
+      server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
+      server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 3))));
+    }
 
     List<ScWikiClient.FetchResult<ScWikiCommodityDto>> captured = new ArrayList<>();
     List<ILoggingEvent> events =
@@ -459,8 +482,10 @@ class ScWikiClientTest {
 
   @Test
   void feedAnnouncingMorePagesByTheEndOfTheWalk_isIncomplete() {
-    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(2))));
-    server.enqueue(jsonOk(pageBodyWithTotal(2, 3, 6, rows(2, 3))));
+    for (int walk = 0; walk < 2; walk++) {
+      server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(2))));
+      server.enqueue(jsonOk(pageBodyWithTotal(2, 3, 6, rows(2, 3))));
+    }
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
@@ -762,6 +787,56 @@ class ScWikiClientTest {
   }
 
   @Test
+  void commodityRarityLabelsRankOntoTiersAndAnUnknownLabelKeepsThePage() {
+    server.enqueue(
+        jsonOk(
+            pageBody(
+                1,
+                1,
+                """
+                {"uuid":"00000000-0000-0000-0000-000000000001","name":"Agricium","tier":"uncommon"},
+                {"uuid":"00000000-0000-0000-0000-000000000002","name":"Gold","tier":"Legendary"},
+                {"uuid":"00000000-0000-0000-0000-000000000003","name":"Iron","tier":"mythic"},
+                {"uuid":"00000000-0000-0000-0000-000000000004","name":"Tin","tier":null}
+                """)));
+
+    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
+        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
+
+    assertTrue(result.complete());
+    assertEquals(
+        Arrays.asList(2, 5, null, null),
+        result.data().stream().map(row -> row.miningData().tier()).toList());
+    assertEquals(0.0, fetchErrorCount());
+  }
+
+  @Test
+  void aBlueprintDetailWithEmptyArraysForAbsentRangesDecodes() throws Exception {
+    String captured;
+    try (InputStream input =
+        getClass().getResourceAsStream("/catalogue/scwiki-blueprint-detail.json")) {
+      assertNotNull(input);
+      captured = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    }
+    String withEmptyArrays =
+        captured
+            .replaceFirst("\"quality_range\": \\{[^}]*}", "\"quality_range\": []")
+            .replaceFirst("\"modifier_range\": \\{[^}]*}", "\"modifier_range\": []");
+    assertNotEquals(captured, withEmptyArrays, "the fixture must carry both ranges");
+    server.enqueue(jsonOk(withEmptyArrays));
+
+    var result =
+        client.fetchOneResult(
+            "/api/blueprints",
+            UUID.fromString("280f47b7-8434-410c-b854-380768fdccec"),
+            ScWikiBlueprintDto.class,
+            "blueprint");
+
+    assertEquals(ScWikiClient.DetailOutcome.FOUND, result.outcome());
+    assertEquals(0.0, fetchErrorCount());
+  }
+
+  @Test
   void aDetailFromAnotherPatchIsRejected() {
     server.enqueue(jsonOk("{\"data\":{\"game_version\":\"4.11.0-LIVE.1\"}}"));
 
@@ -885,6 +960,7 @@ class ScWikiClientTest {
   @Test
   void existenceCensusCannotVouchForMissingOrDuplicatedAssetIdentities() {
     server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 1, idlessRows(1))));
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 2, rows(1) + "," + rows(1))));
     server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 2, rows(1) + "," + rows(1))));
 
     ScWikiClient.ExistenceCensus missing = client.fetchExistenceCensus("/api/items", "items", 200);

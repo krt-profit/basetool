@@ -613,7 +613,8 @@ class UexUniverseSyncServiceTest {
             .build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
     when(terminalRepository.findByIdTerminal(80)).thenReturn(Optional.empty());
-    when(terminalRepository.findByName("Lorville TDD")).thenReturn(Optional.empty());
+    when(terminalRepository.findFirstByNameAndIdTerminalIsNullOrderByIdAsc("Lorville TDD"))
+        .thenReturn(Optional.empty());
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
@@ -639,7 +640,8 @@ class UexUniverseSyncServiceTest {
     UexTerminalDto blank = UexTerminalDto.builder().id(82).name("Blank").gameVersion("").build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto, blank)));
     when(terminalRepository.findByIdTerminal(any())).thenReturn(Optional.empty());
-    when(terminalRepository.findByName(any())).thenReturn(Optional.empty());
+    when(terminalRepository.findFirstByNameAndIdTerminalIsNullOrderByIdAsc(any()))
+        .thenReturn(Optional.empty());
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
@@ -829,7 +831,8 @@ class UexUniverseSyncServiceTest {
         UexTerminalDto.builder().id(81).name("Area 18 TDD").hasLoadingDock(1).isAutoLoad(0).build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
     when(terminalRepository.findByIdTerminal(81)).thenReturn(Optional.empty());
-    when(terminalRepository.findByName("Area 18 TDD")).thenReturn(Optional.empty());
+    when(terminalRepository.findFirstByNameAndIdTerminalIsNullOrderByIdAsc("Area 18 TDD"))
+        .thenReturn(Optional.empty());
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
@@ -848,7 +851,8 @@ class UexUniverseSyncServiceTest {
     UexTerminalDto dto = UexTerminalDto.builder().id(82).name("Empty Terminal").build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
     when(terminalRepository.findByIdTerminal(82)).thenReturn(Optional.empty());
-    when(terminalRepository.findByName("Empty Terminal")).thenReturn(Optional.empty());
+    when(terminalRepository.findFirstByNameAndIdTerminalIsNullOrderByIdAsc("Empty Terminal"))
+        .thenReturn(Optional.empty());
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
