@@ -228,8 +228,8 @@ Two binding rules shape every UI change:
   'script'; trusted-types krt-html krt-fragment`, report-only by default and enforced by
   `APP_SECURITY_TRUSTED_TYPES=enforce`; violations reach the client-error beacon as `csp_violation`
   with the sink or policy name and whether the code came from our origin or a browser extension
-  (REQ-SEC-064). The dialog page walk fails on any violation. Enforcing in production is the one
-  open step, an owner-approved configuration change.
+  (REQ-SEC-064). The dialog page walk fails on any violation. Production runs `enforce` since
+  2026-11-10.
 - **Scripts are ES modules behind a per-page import map** (ADR-0250, REQ-FE-035, 2026-10-12). Every
   script but the error beacon is `<script type="module">`; modules import statically by absolute
   `/js/<domain>/<file>.js` paths, only within their domain or the kernel (ESLint, `ModuleScriptsTest`).

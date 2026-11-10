@@ -5587,7 +5587,7 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
 
 > [!note] Amended 2026-10-04 — Trusted Types (ADR-0239)
 > The frontend sends the Trusted Types directives, report-only by default; the enforced mode is a
-> configuration switch. The only step left is the owner-approved switch of production to `enforce`.
+> configuration switch. Production runs `enforce` since 2026-11-10 (#2568).
 
 **Acceptance**
 
@@ -5595,8 +5595,7 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
   `form-action` origin, and every static header above.
 - [x] A frontend page carries the Trusted Types directives: report-only by default, in the enforced
   policy with `app.security.trusted-types=enforce`.
-- [ ] Production runs `enforce`. _(Pending the owner's approval after a quiet period with no
-  `csp_violation` report; see `deployment.md`.)_
+- [x] Production runs `enforce` (since 2026-11-10, #2568; see `deployment.md`).
 - [x] An API response carries the `default-src 'none'` policy and the static headers.
 - [x] The public edge sends HSTS on its first response; its absence raises `EdgeHstsHeaderMissing`.
 
