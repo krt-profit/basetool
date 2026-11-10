@@ -21,16 +21,20 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import org.jetbrains.annotations.NotNull;
 
-/**
- * The read API through which another module asks whether the current caller may see a job order;
- * the job-order module implements it with the rule its active-order lookup filters by
- * (REQ-ORG-003).
- */
+/** Separates common web order reading from the reduced external tenancy scope. */
 public interface JobOrderVisibility {
 
   /**
-   * Checks whether the order lies in the caller's tenancy read scope, the set the active-order
-   * lookup offers as earmark targets; the assignee grant does not count.
+   * Checks the complete permitted web order read, without granting stock or neighbouring data
+   * writes.
+   *
+   * @param order the loaded order
+   * @return whether the caller may read this order in the shared workspace
+   */
+  boolean canSeeJobOrder(@NotNull JobOrder order);
+
+  /**
+   * Checks the reduced external tenancy scope, independently of common web order reading.
    *
    * @param order the loaded order
    * @return {@code true} iff the caller sees the order within the tenancy scope

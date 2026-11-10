@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
@@ -96,11 +97,10 @@ class JobOrderScopeQueryIntegrationTest {
   }
 
   @Test
-  void memberOfSquadronA_seesOwnPrivateAndAllSk_butNotForeignPrivate() {
+  void requestingUnitReadsItsOrdersAcrossEveryResponsibleKind() {
     Set<UUID> visible = visibleIds(new ScopePredicate(false, null, Set.of(squadronAId)));
 
-    assertThat(visible).contains(orderRespA, orderRespSk);
-    assertThat(visible).doesNotContain(orderRespB);
+    assertThat(visible).contains(orderRespA, orderRespB, orderRespSk);
   }
 
   @Test
@@ -111,11 +111,10 @@ class JobOrderScopeQueryIntegrationTest {
   }
 
   @Test
-  void adminPinnedToSquadronA_seesPinnedPrivateAndAllSk_butNotForeignPrivate() {
+  void adminPinMatchesEitherResponsibleOrRequestingRelationship() {
     Set<UUID> visible = visibleIds(new ScopePredicate(false, squadronAId, Set.of()));
 
-    assertThat(visible).contains(orderRespA, orderRespSk);
-    assertThat(visible).doesNotContain(orderRespB);
+    assertThat(visible).contains(orderRespA, orderRespB, orderRespSk);
   }
 
   @Test
@@ -132,6 +131,7 @@ class JobOrderScopeQueryIntegrationTest {
                 null,
                 Set.of(),
                 new UUID(0L, 0L),
+                java.util.List.of(JobOrderType.values()),
                 ALL_ROWS)
             .stream()
             .map(JobOrder::getId)
@@ -199,15 +199,15 @@ class JobOrderScopeQueryIntegrationTest {
   }
 
   @Test
-  void processingFilter_neverWidensBeyondTheScope() {
+  void processingFilterNarrowsAReadableRequesterOrderByResponsibleUnit() {
     Set<UUID> visible =
         processingIds(new ScopePredicate(false, null, Set.of(squadronAId)), Set.of(squadronBId));
 
-    assertThat(visible).doesNotContain(orderRespA, orderRespB, orderRespSk);
+    assertThat(visible).contains(orderRespB).doesNotContain(orderRespA, orderRespSk);
   }
 
   @Test
-  void processingFilter_dropsOrdersOfANonProfitEligibleUnit() {
+  void processingFilterKeepsAnOwnInvalidOrderReadableForClarification() {
     UUID[] ids = new UUID[2];
     transactionTemplate.executeWithoutResult(_ -> {
       String tag = UUID.randomUUID().toString().substring(0, 8);
@@ -220,18 +220,17 @@ class JobOrderScopeQueryIntegrationTest {
 
     Set<UUID> visible = processingIds(new ScopePredicate(true, null, Set.of()), Set.of(ids[0]));
 
-    assertThat(visible).doesNotContain(ids[1]);
+    assertThat(visible).contains(ids[1]);
     assertThat(visibleIds(new ScopePredicate(true, null, Set.of()))).contains(ids[1]);
   }
 
   @Test
   void assigneeGrant_inAllNotInToProcess() {
     UUID assigneeId = assignNewUser(orderRespB);
-    ScopePredicate memberOfA = new ScopePredicate(false, null, Set.of(squadronAId));
+    ScopePredicate memberOfA = new ScopePredicate(false, null, Set.of());
 
     assertThat(visibleIds(memberOfA, assigneeId)).contains(orderRespB);
-    assertThat(processingIds(memberOfA, Set.of(squadronAId, squadronBId), assigneeId))
-        .doesNotContain(orderRespB);
+    assertThat(processingIds(memberOfA, Set.of(NIL), assigneeId)).doesNotContain(orderRespB);
   }
 
   @Test
@@ -248,7 +247,7 @@ class JobOrderScopeQueryIntegrationTest {
     assignNewUser(orderRespB);
     UUID unitMateId = newUser().getId();
 
-    assertThat(visibleIds(new ScopePredicate(false, null, Set.of(squadronAId)), unitMateId))
+    assertThat(visibleIds(new ScopePredicate(false, null, Set.of()), unitMateId))
         .doesNotContain(orderRespB);
   }
 
@@ -261,7 +260,7 @@ class JobOrderScopeQueryIntegrationTest {
       jobOrderRepository.saveAndFlush(order);
     });
 
-    assertThat(visibleIds(new ScopePredicate(false, null, Set.of(squadronAId)), assigneeId))
+    assertThat(visibleIds(new ScopePredicate(false, null, Set.of()), assigneeId))
         .doesNotContain(orderRespB);
   }
 
@@ -289,10 +288,16 @@ class JobOrderScopeQueryIntegrationTest {
 
     Page<JobOrder> open =
         jobOrderRepository.findAssignedJobOrders(
-            List.of(JobOrderStatus.OPEN), assigneeId, PageRequest.of(0, 1));
+            List.of(JobOrderStatus.OPEN),
+            assigneeId,
+            java.util.List.of(JobOrderType.values()),
+            PageRequest.of(0, 1));
     Page<JobOrder> completed =
         jobOrderRepository.findAssignedJobOrders(
-            List.of(JobOrderStatus.COMPLETED), assigneeId, ALL_ROWS);
+            List.of(JobOrderStatus.COMPLETED),
+            assigneeId,
+            java.util.List.of(JobOrderType.values()),
+            ALL_ROWS);
 
     assertThat(open.getContent()).hasSize(1);
     assertThat(open.getTotalElements()).isEqualTo(2);
@@ -320,12 +325,12 @@ class JobOrderScopeQueryIntegrationTest {
   }
 
   @Test
-  void numberPrefix_findsTheScopedOrderByItsNumber() {
+  void numberPrefixProfitReaderFindsEveryResponsibleKind() {
     ScopePredicate memberOfA = new ScopePredicate(false, null, Set.of(squadronAId));
 
     assertThat(numberHits(numberOf(orderRespA), true, memberOfA, NIL)).contains(orderRespA);
     assertThat(numberHits(numberOf(orderRespSk), true, memberOfA, NIL)).contains(orderRespSk);
-    assertThat(numberHits(numberOf(orderRespB), true, memberOfA, NIL)).doesNotContain(orderRespB);
+    assertThat(numberHits(numberOf(orderRespB), true, memberOfA, NIL)).contains(orderRespB);
   }
 
   @Test
@@ -354,10 +359,7 @@ class JobOrderScopeQueryIntegrationTest {
 
     assertThat(
             numberHits(
-                numberOf(orderRespB),
-                true,
-                new ScopePredicate(false, null, Set.of(squadronAId)),
-                unitMateId))
+                numberOf(orderRespB), false, new ScopePredicate(false, null, Set.of()), unitMateId))
         .doesNotContain(orderRespB);
   }
 
@@ -390,7 +392,10 @@ class JobOrderScopeQueryIntegrationTest {
   }
 
   private Set<UUID> assignedIds(UUID callerId, List<JobOrderStatus> statuses) {
-    return jobOrderRepository.findAssignedJobOrders(statuses, callerId, ALL_ROWS).stream()
+    return jobOrderRepository
+        .findAssignedJobOrders(
+            statuses, callerId, java.util.List.of(JobOrderType.values()), ALL_ROWS)
+        .stream()
         .map(JobOrder::getId)
         .collect(Collectors.toSet());
   }
@@ -429,6 +434,7 @@ class JobOrderScopeQueryIntegrationTest {
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
             callerId,
+            java.util.List.of(JobOrderType.values()),
             ALL_ROWS)
         .stream()
         .map(JobOrder::getId)
@@ -451,6 +457,7 @@ class JobOrderScopeQueryIntegrationTest {
             scope.activeOrgUnitId(),
             scope.memberOrgUnitIds(),
             callerId,
+            java.util.List.of(JobOrderType.values()),
             ALL_ROWS)
         .stream()
         .map(JobOrder::getId)

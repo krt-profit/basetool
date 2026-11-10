@@ -97,7 +97,6 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
         null,
         false,
         false,
-        false,
         null,
         false);
   }
@@ -148,7 +147,6 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false,
             false,
             false,
             null,
@@ -321,7 +319,6 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false,
             false,
             false,
             null,

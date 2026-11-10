@@ -69,3 +69,13 @@ Before application readiness, initial reconciliation takes the exclusive lock an
 orders with active promises. The same bounded claim-ending implementation preserves audit/history
 and groups one coordination cause per order across every claim page. The application cannot become
 ready after a failed reconciliation; repeated starts do not revive or re-end historical promises.
+
+## Observed concrete unit reading
+
+MATERIAL/ITEM web representations share one query-level reader predicate. Requester reduction is
+removed, while producer/mission/Inventory/Bank and the reduced Exchange retain independent gates.
+`job_order_unit_read_history` records only actually observed organisational parties, atomically with
+the existing authorised create/edit command. Its migration retains current parties and known claim
+units without reconstructing earlier transfers. A current membership, leadership or contextual read
+relationship to that unit is still required; the stored fact grants no unit write or global Profit
+capability. Active or ended participation supplies its own concrete support-history relationship.

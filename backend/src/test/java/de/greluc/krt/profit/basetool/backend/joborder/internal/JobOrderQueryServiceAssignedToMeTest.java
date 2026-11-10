@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
@@ -66,7 +67,8 @@ class JobOrderQueryServiceAssignedToMeTest {
     Page<JobOrder> page = new PageImpl<>(List.of(new JobOrder()), PAGEABLE, 1);
     Page<JobOrderDto> mapped = new PageImpl<>(List.of(), PAGEABLE, 1);
     when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-    when(jobOrderRepository.findAssignedJobOrders(ALL_STATUSES, CALLER_ID, PAGEABLE))
+    when(jobOrderRepository.findAssignedJobOrders(
+            ALL_STATUSES, CALLER_ID, java.util.List.of(JobOrderType.values()), PAGEABLE))
         .thenReturn(page);
     when(jobOrderStockProjectionService.mapPageWithStock(page)).thenReturn(mapped);
 
@@ -81,7 +83,10 @@ class JobOrderQueryServiceAssignedToMeTest {
     Page<JobOrder> page = new PageImpl<>(List.of(), PAGEABLE, 0);
     when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
     when(jobOrderRepository.findAssignedJobOrders(
-            List.of(JobOrderStatus.IN_PROGRESS), CALLER_ID, PAGEABLE))
+            List.of(JobOrderStatus.IN_PROGRESS),
+            CALLER_ID,
+            java.util.List.of(JobOrderType.values()),
+            PAGEABLE))
         .thenReturn(page);
     when(jobOrderStockProjectionService.mapPageWithStock(page))
         .thenReturn(new PageImpl<>(List.of(), PAGEABLE, 0));
@@ -89,7 +94,11 @@ class JobOrderQueryServiceAssignedToMeTest {
     queryService.getAssignedJobOrders(List.of(JobOrderStatus.IN_PROGRESS), PAGEABLE);
 
     verify(jobOrderRepository)
-        .findAssignedJobOrders(List.of(JobOrderStatus.IN_PROGRESS), CALLER_ID, PAGEABLE);
+        .findAssignedJobOrders(
+            List.of(JobOrderStatus.IN_PROGRESS),
+            CALLER_ID,
+            java.util.List.of(JobOrderType.values()),
+            PAGEABLE);
   }
 
   @Test

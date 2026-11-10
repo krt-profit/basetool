@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityProvenance;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -71,6 +72,7 @@ public class InventoryStockReads
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryStockSplitRepository splitRepository;
   private final InventoryDonationSourceRepository donationSourceRepository;
+  private final StockViewerAccess stockViewerAccess;
 
   @Override
   public @NotNull List<StockQuantityFragment> quantityOf(@NotNull UUID rowId) {
@@ -302,7 +304,7 @@ public class InventoryStockReads
    * @param gameItem the row's game-item reference, or {@code null} for a material row
    * @return the stock-view row
    */
-  private static @NotNull LinkedStockRow linkedRow(
+  private @NotNull LinkedStockRow linkedRow(
       @NotNull InventoryItem item,
       @NotNull UUID jobOrderId,
       @Nullable InventoryGameItemReferenceDto gameItem) {
@@ -323,6 +325,7 @@ public class InventoryStockReads
         gameItem,
         item.getAmount(),
         sliceAmount != null ? sliceAmount : item.getAmount(),
-        slice != null && Boolean.TRUE.equals(slice.getDelivered()));
+        slice != null && Boolean.TRUE.equals(slice.getDelivered()),
+        stockViewerAccess.mayEditInventoryItem(item.getId(), owner.getId()));
   }
 }

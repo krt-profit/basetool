@@ -258,7 +258,6 @@ public class JobOrderStockProjectionService {
         baseDto.version(),
         baseDto.canEdit(),
         baseDto.canManageAssignees(),
-        false,
         baseDto.responsibilityInvalid(),
         baseDto.originalProfitBoundaryUnknown(),
         baseDto.canTransferResponsibility(),

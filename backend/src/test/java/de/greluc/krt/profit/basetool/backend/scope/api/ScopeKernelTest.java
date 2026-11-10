@@ -230,7 +230,13 @@ class ScopeKernelTest {
             jobOrderRepository,
             responsibilityGuard,
             jobOrderHandoverRepository,
-            jobOrderItemHandoverRepository);
+            jobOrderItemHandoverRepository,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderUnitReadHistoryRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderParticipationRepository.class));
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -872,13 +878,13 @@ class ScopeKernelTest {
     }
 
     @Test
-    void squadronResponsibleOrder_invisibleToForeignSquadronMember() {
+    void profitMemberReadsAResponsibleOrderAcrossSquadrons() {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
       stubMemberInSquadronA();
 
-      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -929,8 +935,7 @@ class ScopeKernelTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
-      assertTrue(jobOrderPolicy.canSeeJobOrderAsRequester(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -941,7 +946,7 @@ class ScopeKernelTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(jobOrderPolicy.canSeeJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test

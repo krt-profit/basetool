@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthorityFlags;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -32,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -44,19 +44,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The job-order module's access policy: the read and edit gates of an order, of its owner panels
- * and of the requester side, evaluated on the scope kernel (plan §5.4, ADR-0236). It also decides
- * the Lager's earmarked stock of an order ({@link EarmarkTargetPolicy}) and answers other modules'
- * scope question on an order ({@link JobOrderVisibility}).
- *
- * <p>The list-side half of the scope rule is {@link JobOrderScope#PREDICATE}; the queue list adds
- * the assignee grant beside it ({@code JobOrderRepository#findScopedJobOrders}), so list and gate
- * widen together.
- *
- * <p>{@link JobOrderEditor} asks {@link #canEdit} on the loaded order; the remaining endpoints
- * invoke the id-based gates from SpEL as {@code @jobOrderAccessPolicy}. Unknown ids are refused.
- * The queue capability itself ({@code canViewJobOrders}) stays with the scope kernel, which the
- * identity and exchange modules ask too. Read-only transactional.
+ * Resolves complete order reading, independent producer visibility and current write capabilities.
  */
 @Service(JobOrderAccessPolicy.BEAN_NAME)
 @RequiredArgsConstructor
@@ -74,11 +62,12 @@ public class JobOrderAccessPolicy
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
+  private final JobOrderUnitReadHistoryRepository unitReadHistory;
+  private final JobOrderParticipationRepository participations;
 
   /**
-   * Checks whether the caller may read job order {@code jobOrderId}: the caller holds an assignee
-   * entry on it (REQ-ORDERS-047), or sees it within the tenancy scope ({@link
-   * #canSeeJobOrderInScope}).
+   * Checks complete current order reading, including personal and observed unit relationships
+   * (REQ-ORDERS-052).
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may read the order
@@ -93,11 +82,16 @@ public class JobOrderAccessPolicy
    * @param order the order to inspect; never {@code null}
    * @return {@code true} iff the caller may read the order
    */
+  @Override
   public boolean canSeeJobOrder(@NotNull JobOrder order) {
     return isAssigneeRow(order)
-        || canSeeJobOrderInScope(order)
+        || (!authHelper.isAdmin() && requestScopeResolver.canViewJobOrders())
+        || requestScopeResolver.currentScopePredicate().adminAllScope()
         || (order.getResponsibleOrgUnit() != null
-            && accessGateService.canSeeSquadron(order.getResponsibleOrgUnit().getId()));
+            && accessGateService.canSeeSquadronAsGrantee(
+                order.getResponsibleOrgUnit().getId(), Roles.LOGISTICIAN))
+        || isOrderRequesterRow(order)
+        || hasHistoricalUnitRead(order);
   }
 
   /**
@@ -137,8 +131,7 @@ public class JobOrderAccessPolicy
   }
 
   /**
-   * Checks whether the caller may edit job order {@code jobOrderId}: like {@link
-   * #canSeeJobOrderInScope} with the edit scope; the assignee grant opens no edit.
+   * Checks the current responsible-unit writer and valid responsibility for processing.
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the order
@@ -169,19 +162,8 @@ public class JobOrderAccessPolicy
   }
 
   /**
-   * Checks whether the caller may read job order {@code jobOrderId} as a member of the org unit
-   * that placed it (REQ-ORDERS-023), independent of the profit eligibility.
-   *
-   * @param jobOrderId the order to inspect; never {@code null}
-   * @return {@code true} iff the caller belongs to the requesting org unit
-   */
-  public boolean canSeeJobOrderAsRequester(@NotNull UUID jobOrderId) {
-    return jobOrderRepository.findById(jobOrderId).map(this::isOrderRequesterRow).orElse(false);
-  }
-
-  /**
-   * Checks whether the caller may edit job order {@code jobOrderId} as its requester: a member of
-   * the requesting org unit, while nothing has been delivered yet (REQ-ORDERS-023).
+   * Checks the current requesting-unit writer while the delivery restriction permits an edit
+   * (REQ-ORDERS-023).
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the order as its requester
@@ -276,6 +258,17 @@ public class JobOrderAccessPolicy
         || accessGateService.canActAsLogisticianIn(requesting.getId());
   }
 
+  private boolean hasHistoricalUnitRead(@NotNull JobOrder order) {
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    Set<UUID> units =
+        scope.activeOrgUnitId() == null
+            ? scope.memberOrgUnitIds()
+            : Set.of(scope.activeOrgUnitId());
+    return !units.isEmpty()
+        && (unitReadHistory.existsByJobOrderIdAndOrgUnitIdIn(order.getId(), units)
+            || participations.existsByJobOrderIdAndClaimingOrgUnitIdIn(order.getId(), units));
+  }
+
   private boolean isAssigneeRow(@NotNull JobOrder order) {
     return authHelper
         .currentUserId()
@@ -300,7 +293,7 @@ public class JobOrderAccessPolicy
   private boolean isOrderRequesterRow(@NotNull JobOrder order) {
     OrgUnit requesting = order.getRequestingOrgUnit();
     return requesting != null
-        && requestScopeResolver.currentUserIsMemberOfOrgUnit(requesting.getId());
+        && accessGateService.canSeeSquadronAsGrantee(requesting.getId(), Roles.LOGISTICIAN);
   }
 
   private boolean isRequesterWriter(@NotNull JobOrder order) {

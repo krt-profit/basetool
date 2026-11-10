@@ -68,7 +68,7 @@ import org.springframework.web.context.WebApplicationContext;
  * Renders the order detail page on the detail pattern (REQ-UI-027, REQ-ORDERS-026): the back-link
  * page head with the translated status badge, the delivered-against-required progress head, the
  * tabs filtered per order kind with the empty ones hidden, one primary action per tab, and the
- * requester-limited view (REQ-ORDERS-023).
+ * complete requester read (REQ-ORDERS-023).
  */
 @SpringBootTest
 class OrdersDetailPatternRenderTest {
@@ -189,9 +189,9 @@ class OrdersDetailPatternRenderTest {
         .doesNotContain("data-trigger=\"od-open-production\"");
   }
 
-  /** An ordinary requester reads demand without processing data or edit controls. */
+  /** An ordinary requester reads order progress and assignees without processing controls. */
   @Test
-  void requesterViewKeepsTheLimitedView() throws Exception {
+  void requesterReadsCompleteProgressWithoutProcessingOrEnrollmentControls() throws Exception {
     UUID orderId = UUID.randomUUID();
     stubOrder(
         order(
@@ -205,11 +205,13 @@ class OrdersDetailPatternRenderTest {
 
     String html = render(orderId, "ROLE_KRT_MEMBER");
 
-    assertThat(tabOrder(html)).containsExactly("tab-materials");
+    assertThat(tabOrder(html)).containsExactly("tab-materials", "tab-handovers", "tab-assignees");
     assertThat(html)
-        .doesNotContain("data-testid=\"order-progress\"")
-        .doesNotContain("id=\"order-handovers-results\"")
-        .doesNotContain("id=\"assignees-section\"")
+        .contains("data-testid=\"order-progress\"")
+        .contains("id=\"order-handovers-results\"")
+        .contains("id=\"assignees-section\"")
+        .contains("/orders/" + orderId + "/material-collection")
+        .doesNotContain("data-trigger=\"oa-add-me\"")
         .doesNotContain("id=\"status-select\"")
         .doesNotContain("id=\"order-menu\"")
         .doesNotContain("data-modal-id=\"edit-modal\"");
@@ -271,7 +273,7 @@ class OrdersDetailPatternRenderTest {
    * @param materials the material lines
    * @param items the item lines
    * @param handovers the material handovers
-   * @param redacted whether the backend redacted the order for its requester
+   * @param readOnly whether processing controls are unavailable
    * @return the order DTO
    */
   private static @NotNull JobOrderDto order(
@@ -281,7 +283,7 @@ class OrdersDetailPatternRenderTest {
       @NotNull List<JobOrderMaterialDto> materials,
       @NotNull List<JobOrderItemDto> items,
       @NotNull List<JobOrderHandoverDto> handovers,
-      boolean redacted) {
+      boolean readOnly) {
     return new JobOrderDto(
         orderId,
         7,
@@ -301,12 +303,11 @@ class OrdersDetailPatternRenderTest {
         List.of(),
         Instant.now(),
         1L,
-        !redacted,
+        !readOnly,
         null,
-        redacted,
         false,
         false,
-        !redacted,
+        !readOnly,
         false);
   }
 

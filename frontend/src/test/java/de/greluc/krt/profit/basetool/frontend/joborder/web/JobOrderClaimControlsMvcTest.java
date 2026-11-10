@@ -83,8 +83,30 @@ class JobOrderClaimControlsMvcTest {
     CapabilityStubs.report(
         backendApiClient,
         new CapabilitiesResponse(
-            false, true, false, false, true, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false));
+            false,
+            true,
+            false,
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            (true || false || false),
+            true,
+            false));
   }
 
   @Test
@@ -284,7 +306,6 @@ class JobOrderClaimControlsMvcTest {
         Instant.now(),
         1L,
         canEdit,
-        false,
         false,
         invalid,
         false,

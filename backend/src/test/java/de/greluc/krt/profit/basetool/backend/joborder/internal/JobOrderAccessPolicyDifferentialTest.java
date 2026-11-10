@@ -165,11 +165,7 @@ class JobOrderAccessPolicyDifferentialTest {
         new Gate(
             "canSeeJobOrderBlueprintOwners",
             ScopeHubJobOrderGates::canSeeJobOrderBlueprintOwners,
-            JobOrderAccessPolicy::canSeeJobOrderBlueprintOwners),
-        new Gate(
-            "canSeeJobOrderAsRequester",
-            ScopeHubJobOrderGates::canSeeJobOrderAsRequester,
-            JobOrderAccessPolicy::canSeeJobOrderAsRequester));
+            JobOrderAccessPolicy::canSeeJobOrderBlueprintOwners));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
@@ -272,7 +268,13 @@ class JobOrderAccessPolicyDifferentialTest {
               repository,
               org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class),
               handovers,
-              itemHandovers);
+              itemHandovers,
+              org.mockito.Mockito.mock(
+                  de.greluc.krt.profit.basetool.backend.joborder.internal
+                      .JobOrderUnitReadHistoryRepository.class),
+              org.mockito.Mockito.mock(
+                  de.greluc.krt.profit.basetool.backend.joborder.internal
+                      .JobOrderParticipationRepository.class));
     }
 
     private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(String label) {
@@ -318,10 +320,6 @@ class JobOrderAccessPolicyDifferentialTest {
 
     boolean canSeeJobOrderBlueprintOwners(UUID id) {
       return responsibleVisible(id);
-    }
-
-    boolean canSeeJobOrderAsRequester(UUID id) {
-      return orders.findById(id).map(this::requester).orElse(false);
     }
 
     boolean canEditJobOrderAsRequester(UUID id) {

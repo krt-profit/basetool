@@ -60,7 +60,7 @@
                 th:data-amount="${entry.quantity}"
                 th:data-allocated="${entry.allocatedQuantity}">
                 <td>
-                    <select th:disabled="${responsibilityInvalid}" class="owner-select krt-select collection-select"
+                    <select th:disabled="${responsibilityInvalid or !entry.canEdit}" class="owner-select krt-select collection-select"
                             data-role="owner-select" data-krt-combobox="remote-users"
                             th:data-inventory-id="${entry.inventoryEntryId}"
                             th:attr="aria-label=#{material.collection.col.owner}">
@@ -72,7 +72,7 @@
                     </select>
                 </td>
                 <td class="collection-location" th:attr="data-label=#{material.collection.col.location}">
-                    <select th:disabled="${responsibilityInvalid}" class="location-select krt-select collection-select"
+                    <select th:disabled="${responsibilityInvalid or !entry.canEdit}" class="location-select krt-select collection-select"
                             th:data-inventory-id="${entry.inventoryEntryId}"
                             th:attr="aria-label=#{material.collection.col.location}">
                         <option th:if="${entry.locationId == null}" selected disabled>—</option>
@@ -89,7 +89,7 @@
                           th:text="#{material.collection.quantity.ofStock(${entry.quantity})}">von 10 im Bestand</span>
                 </td>
                 <td class="cell-actions" th:attr="data-label=#{material.collection.col.delivered}">
-                    <input th:disabled="${responsibilityInvalid}" type="checkbox"
+                    <input th:disabled="${responsibilityInvalid or !entry.canEdit}" type="checkbox"
                            class="delivered-checkbox"
                            th:data-inventory-id="${entry.inventoryEntryId}"
                            th:data-job-order-id="${jobOrderId}"

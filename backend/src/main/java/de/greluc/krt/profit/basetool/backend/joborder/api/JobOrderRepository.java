@@ -108,6 +108,37 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   List<JobOrder> findAllActiveWithMaterials();
 
   /**
+   * Loads permitted active references in queue order with both material-requirement branches.
+   *
+   * @param isAdminAllScope whether the caller reads every order
+   * @param activeOrgUnitId the effective pinned unit, absent when unpinned
+   * @param memberOrgUnitIds the current authorized unit scope
+   * @param callerId the caller identity for personal assignments
+   * @return complete references ordered by priority, then newest number
+   */
+  @EntityGraph(
+      attributePaths = {
+        "materials",
+        "materials.material",
+        "items",
+        "items.gameItem",
+        "items.materials",
+        "items.materials.material",
+        "responsibleOrgUnit",
+        "requestingOrgUnit"
+      })
+  @Query(
+      "SELECT o FROM JobOrder o WHERE "
+          + JobOrderScope.READ_PREDICATE
+          + " AND o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.priority ASC NULLS LAST,"
+          + " o.displayId DESC")
+  List<JobOrder> findReadableActiveWithMaterials(
+      @Param("isAdminAllScope") boolean isAdminAllScope,
+      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("callerId") UUID callerId);
+
+  /**
    * Loads the orders in the given statuses that one of the given org units is responsible for, with
    * both kinds' requirement branches and both org units, for the exchange's org demand
    * (REQ-XCH-018, REQ-XCH-047).
@@ -175,7 +206,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   /**
    * Scoped, unpaged list of the orders in the given statuses with both kinds' material requirement
    * branches, for the cross-order material-demand overview (REQ-ORDERS-034). Scope is applied in
-   * SQL via {@link JobOrderScope#PREDICATE}, including the SK-public escape.
+   * SQL via {@link JobOrderScope#READ_PREDICATE}.
    *
    * <p>Unpaged because the result is aggregated into sums (ADR-0104); callers bound it by passing
    * only non-terminal statuses.
@@ -195,17 +226,19 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "items",
         "items.materials",
         "items.materials.material",
-        "responsibleOrgUnit"
+        "responsibleOrgUnit",
+        "requestingOrgUnit"
       })
   @Query(
       "SELECT o FROM JobOrder o WHERE "
-          + JobOrderScope.PREDICATE
+          + JobOrderScope.READ_PREDICATE
           + " AND o.status IN :statuses ORDER BY o.displayId ASC")
   List<JobOrder> findScopedOrdersWithMaterialRequirements(
       @Param("statuses") Collection<JobOrderStatus> statuses,
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("callerId") UUID callerId);
 
   /**
    * Unscoped list of the orders in the given statuses that the given units requested, with both
@@ -239,15 +272,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * Scoped, paged job-order list behind {@code GET /api/v1/orders}, combining visibility scope,
    * status filter and optional squadron display filter.
    *
-   * <p>An order responsible to a Spezialkommando is visible to everyone; a squadron-responsible one
-   * only to that squadron and admins (see {@link
-   * de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate}). The squadron filter matches
-   * the responsible or requesting side and only narrows the scoped result. The processing filter
-   * keeps only orders whose active Profit-hierarchy responsible unit is in {@code
-   * processingOrgUnitIds} (REQ-ORDERS-040) and likewise only narrows. Without the processing filter
-   * the scope is widened by the assignee grant: an order on which {@code callerId} holds an
-   * assignee entry is visible too (REQ-ORDERS-047). Only the two org units are fetched; collections
-   * batch-load (REQ-DATA-003).
+   * <p>All display filters narrow the common read predicate. Only the two org units are fetched;
+   * collections batch-load (REQ-DATA-003).
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
@@ -269,17 +295,13 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
-      "SELECT o FROM JobOrder o WHERE ("
-          + JobOrderScope.PREDICATE
-          + " OR (:processingFilter = FALSE AND EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE"
-          + " a.jobOrder = o AND a.user.id = :callerId)))"
-          + " AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR o.responsibleOrgUnit.id IN"
-          + " :squadronIds OR o.requestingOrgUnit.id IN :squadronIds) AND (:processingFilter ="
-          + " FALSE OR (o.responsibleOrgUnit.id IN :processingOrgUnitIds AND"
-          + " o.responsibleOrgUnit.active = TRUE AND EXISTS (SELECT p.id FROM OrgUnit p WHERE"
-          + " TYPE(p) = Bereich AND p.active = TRUE AND p.department ="
-          + " de.greluc.krt.profit.basetool.backend.orgunit.api.Department.PROFIT AND"
-          + " (o.responsibleOrgUnit.id = p.id OR o.responsibleOrgUnit.parent.id = p.id))))")
+      "SELECT o FROM JobOrder o WHERE "
+          + JobOrderScope.READ_PREDICATE
+          + " AND o.type IN :types AND o.status IN :statuses AND (:noSquadronFilter = TRUE OR"
+          + " o.responsibleOrgUnit.id IN :squadronIds OR o.requestingOrgUnit.id IN :squadronIds)"
+          + " AND (:processingFilter = FALSE OR o.responsibleOrgUnit.id IN :processingOrgUnitIds"
+          + " OR EXISTS (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o"
+          + " AND p.active = true AND p.claimingOrgUnit.id IN :processingOrgUnitIds))")
   Page<JobOrder> findScopedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("noSquadronFilter") boolean noSquadronFilter,
@@ -290,37 +312,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       @Param("callerId") UUID callerId,
-      Pageable pageable);
-
-  /**
-   * Lists only concrete responsible-unit recovery relationships and personal assignments.
-   *
-   * @param statuses the lifecycle filter
-   * @param noSquadronFilter whether the unit display filter is disabled
-   * @param squadronIds optional unit display identities
-   * @param isAdminAllScope whether the current scope is unrestricted administration
-   * @param activeOrgUnitId the current unit pin
-   * @param memberOrgUnitIds direct units and existing leadership reach
-   * @param callerId the personal assignee identity
-   * @param pageable the bounded result page
-   * @return concretely authorised rows without a general Profit queue grant
-   */
-  @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
-  @Query(
-      "SELECT o FROM JobOrder o WHERE o.status IN :statuses AND"
-          + " (:noSquadronFilter = true OR o.responsibleOrgUnit.id IN :squadronIds"
-          + " OR o.requestingOrgUnit.id IN :squadronIds) AND ("
-          + JobOrderScope.CONCRETE_RESPONSIBLE_PREDICATE
-          + " OR EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id ="
-          + " :callerId))")
-  Page<JobOrder> findConcreteRecoveryAndAssignedOrders(
-      @Param("statuses") List<JobOrderStatus> statuses,
-      @Param("noSquadronFilter") boolean noSquadronFilter,
-      @Param("squadronIds") @Nullable Collection<UUID> squadronIds,
-      @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
-      @Param("callerId") UUID callerId,
+      @Param("types") List<JobOrderType> types,
       Pageable pageable);
 
   /**
@@ -337,12 +329,13 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
       """
-      SELECT o FROM JobOrder o WHERE o.status IN :statuses AND EXISTS
+      SELECT o FROM JobOrder o WHERE o.type IN :types AND o.status IN :statuses AND EXISTS
       (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id = :callerId)
       """)
   Page<JobOrder> findAssignedJobOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("callerId") UUID callerId,
+      @Param("types") List<JobOrderType> types,
       Pageable pageable);
 
   /**
@@ -361,12 +354,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @Query(
       "SELECT o FROM JobOrder o WHERE CAST(o.displayId AS string) LIKE CONCAT(:numberPrefix, '%')"
-          + " AND ((:scoped = TRUE AND "
-          + JobOrderScope.PREDICATE
-          + ") OR "
-          + JobOrderScope.CONCRETE_RESPONSIBLE_PREDICATE
-          + " OR EXISTS (SELECT 1 FROM JobOrderAssignee a WHERE a.jobOrder = o AND a.user.id ="
-          + " :callerId)) ORDER BY o.displayId ASC")
+          + " AND (:scoped = true OR "
+          + JobOrderScope.READ_PREDICATE
+          + ") ORDER BY o.displayId ASC")
   List<JobOrder> findVisibleByNumberPrefix(
       @Param("numberPrefix") String numberPrefix,
       @Param("scoped") boolean scoped,
@@ -385,6 +375,14 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   boolean existsByAssigneesUserId(UUID userId);
 
   /**
+   * Tests whether a current unit scope owns an existing processing queue.
+   *
+   * @param unitIds the current authorized units, never empty
+   * @return whether at least one current responsibility matches
+   */
+  boolean existsByResponsibleOrgUnitIdIn(Collection<UUID> unitIds);
+
+  /**
    * Requester-side paged job-order list (REQ-ORDERS-023): orders whose {@code requestingOrgUnit} is
    * one of {@code requesterOrgUnitIds} and whose status is in {@code statuses}, regardless of the
    * responsible side. Sorted by the {@link Pageable}.
@@ -399,11 +397,12 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Query(
       """
       SELECT o FROM JobOrder o WHERE o.requestingOrgUnit.id IN :requesterOrgUnitIds
-      AND o.status IN :statuses
+      AND o.status IN :statuses AND o.type IN :types
       """)
   Page<JobOrder> findRequestedOrders(
       @Param("statuses") List<JobOrderStatus> statuses,
       @Param("requesterOrgUnitIds") Collection<UUID> requesterOrgUnitIds,
+      @Param("types") List<JobOrderType> types,
       Pageable pageable);
 
   /**
@@ -467,18 +466,6 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT o FROM JobOrder o ORDER BY o.id")
   List<JobOrder> lockAllJobOrders();
-
-  /**
-   * Takes a {@link LockModeType#PESSIMISTIC_WRITE} row lock on one job order so concurrent material
-   * claims on it serialise and each sees the others' committed claims (REQ-ORDERS-024, ADR-0092).
-   * Locks only this order's row.
-   *
-   * @param id the order to row-lock.
-   * @return the locked order, or {@link Optional#empty} when the id is unknown.
-   */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("SELECT o FROM JobOrder o WHERE o.id = :id")
-  Optional<JobOrder> lockForClaimUpsert(@Param("id") UUID id);
 
   /** Returns every job order the given user is an assignee of. */
   @Query("SELECT j FROM JobOrder j JOIN j.assignees a WHERE a.user.id = :userId")

@@ -302,7 +302,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Test
   void authorize_globalCapabilityGranted_allows_viaCapabilitiesEndpoint() throws Exception {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
-    server.enqueue(jsonResponse("{\"canViewJobOrders\":true}"));
+    server.enqueue(jsonResponse("{\"canViewOrderWorkspace\":true}"));
 
     assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
     RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
@@ -316,7 +316,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Test
   void authorize_ordersQueue_allowsAnAssigneeWithoutProfitAccess() {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
-    server.enqueue(jsonResponse("{\"canViewJobOrders\":false,\"canViewAssignedJobOrders\":true}"));
+    server.enqueue(jsonResponse("{\"canViewOrderWorkspace\":true,\"canViewJobOrders\":false}"));
 
     assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
   }
@@ -324,7 +324,7 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Test
   void authorize_ordersQueue_deniesWhenNeitherCapabilityIsGranted() {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
-    server.enqueue(jsonResponse("{\"canViewJobOrders\":false,\"canViewAssignedJobOrders\":false}"));
+    server.enqueue(jsonResponse("{\"canViewOrderWorkspace\":false,\"canViewJobOrders\":false}"));
 
     assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY);
   }

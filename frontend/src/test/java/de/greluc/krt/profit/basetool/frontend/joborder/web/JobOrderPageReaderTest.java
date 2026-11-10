@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandoverDto;
@@ -52,6 +53,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
+import de.greluc.krt.profit.basetool.frontend.support.OrderCreationOptionsFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -97,18 +99,18 @@ class JobOrderPageReaderTest {
   }
 
   private static JobOrderDto order(
-      String type, boolean redacted, List<JobOrderItemHandoverDto> handovers) {
-    return order(type, redacted, handovers, !redacted);
+      String type, boolean readOnly, List<JobOrderItemHandoverDto> handovers) {
+    return order(type, readOnly, handovers, !readOnly);
   }
 
   private static JobOrderDto order(
-      String type, boolean redacted, List<JobOrderItemHandoverDto> handovers, boolean canEdit) {
-    return order(type, redacted, handovers, canEdit, false);
+      String type, boolean readOnly, List<JobOrderItemHandoverDto> handovers, boolean canEdit) {
+    return order(type, readOnly, handovers, canEdit, false);
   }
 
   private static JobOrderDto order(
       String type,
-      boolean redacted,
+      boolean readOnly,
       List<JobOrderItemHandoverDto> handovers,
       boolean canEdit,
       boolean canEditAsRequester) {
@@ -133,7 +135,6 @@ class JobOrderPageReaderTest {
         1L,
         canEdit,
         null,
-        redacted,
         false,
         false,
         canEdit,
@@ -141,7 +142,7 @@ class JobOrderPageReaderTest {
   }
 
   private static JobOrderPageReader.OrderCaller logistician() {
-    return new JobOrderPageReader.OrderCaller(true, UUID.randomUUID(), true);
+    return new JobOrderPageReader.OrderCaller(true, UUID.randomUUID());
   }
 
   private static SquadronDto squadron(String name, boolean active) {
@@ -192,11 +193,24 @@ class JobOrderPageReaderTest {
 
   private static JobOrderPageReader.OrderListQuery listQuery(boolean withSquadronFilter) {
     return new JobOrderPageReader.OrderListQuery(
-        OrderListScope.ALL, 0, 100, List.of("OPEN"), List.of(), withSquadronFilter);
+        OrderListScope.ALL,
+        0,
+        100,
+        List.of("OPEN"),
+        List.of(),
+        withSquadronFilter,
+        java.util.List.of());
   }
 
   private void stubList(PageResponse<JobOrderDto> p) {
-    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any())).thenReturn(p);
+    when(client.orders(
+            any(OrderListScope.class),
+            anyInt(),
+            anyInt(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers.any()))
+        .thenReturn(p);
   }
 
   @Test
@@ -242,7 +256,13 @@ class JobOrderPageReaderTest {
 
   @Test
   void orderListIsUnavailableWhenTheOrdersFail() {
-    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any()))
+    when(client.orders(
+            any(OrderListScope.class),
+            anyInt(),
+            anyInt(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers.any()))
         .thenThrow(backendDown());
 
     JobOrderPageReader.OrderListPage list = reader.readOrderList(listQuery(false));
@@ -267,7 +287,13 @@ class JobOrderPageReaderTest {
 
   @Test
   void orderListPropagatesALostSession() {
-    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any()))
+    when(client.orders(
+            any(OrderListScope.class),
+            anyInt(),
+            anyInt(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers.any()))
         .thenThrow(lostSession());
 
     assertThatThrownBy(() -> reader.readOrderList(listQuery(false)))
@@ -413,7 +439,7 @@ class JobOrderPageReaderTest {
     when(client.orphanedInventory(ID)).thenThrow(backendDown());
 
     JobOrderPageReader.OrderDetailPage detail =
-        reader.readOrderDetail(ID, new JobOrderPageReader.OrderCaller(true, null, true), null);
+        reader.readOrderDetail(ID, new JobOrderPageReader.OrderCaller(true, null), null);
 
     assertThat(detail.currentUserId()).isEmpty();
     assertThat(detail.materials()).hasValue(List.of());
@@ -473,63 +499,55 @@ class JobOrderPageReaderTest {
     when(client.order(ID)).thenReturn(order("MATERIAL", false, List.of()));
     when(client.currentUser()).thenThrow(lostSession());
 
-    assertThatThrownBy(() ->
-            reader.readOrderDetail(ID, new JobOrderPageReader.OrderCaller(true, null, false), null))
+    assertThatThrownBy(
+            () -> reader.readOrderDetail(ID, new JobOrderPageReader.OrderCaller(true, null), null))
         .isInstanceOf(ReauthenticationRequiredException.class);
   }
 
   @Test
-  void createFormReadsEveryCatalog() {
+  void createFormReadsOptionalCatalogsAfterCurrentAuthority() {
+    JobOrderCreateOptionsDto options = OrderCreationOptionsFixtures.permitted(ID);
+    when(client.createOptions()).thenReturn(options);
     when(client.jobOrderMaterials()).thenReturn(List.of(material()));
     when(client.orderableItemProbe()).thenReturn(page(List.<InventoryGameItemReferenceDto>of()));
     when(client.squadrons()).thenReturn(page(List.of(squadron("a", true))));
-    when(client.activeOrgUnitsAllKinds()).thenReturn(List.of(option()));
 
     JobOrderPageReader.OrderCreatePage create = reader.readOrderCreate();
 
     assertThat(create.materials()).hasSize(1);
     assertThat(create.hasOrderableItems()).isFalse();
     assertThat(create.squadrons()).hasSize(1);
-    assertThat(create.requestingOptions()).hasSize(1);
+    assertThat(create.options()).isEqualTo(options);
     assertThat(appender.list).isEmpty();
-    verify(client, never()).activeOrgUnits();
   }
 
   @Test
-  void createFormDefaultsEveryCatalogAndFailsOpenOnTheProbe() {
+  void authorizedCreateFormDefaultsOptionalCatalogs() {
+    when(client.createOptions()).thenReturn(OrderCreationOptionsFixtures.permitted(ID));
     when(client.jobOrderMaterials()).thenThrow(backendDown());
     when(client.orderableItemProbe()).thenThrow(backendDown());
     when(client.squadrons()).thenThrow(backendDown());
-    when(client.activeOrgUnitsAllKinds()).thenThrow(backendDown());
-    when(client.activeOrgUnits()).thenThrow(backendDown());
 
     JobOrderPageReader.OrderCreatePage create = reader.readOrderCreate();
 
     assertThat(create.materials()).isEmpty();
     assertThat(create.hasOrderableItems()).isTrue();
     assertThat(create.squadrons()).isEmpty();
-    assertThat(create.requestingOptions()).isEmpty();
-    assertThat(appender.list).hasSize(5);
+    assertThat(appender.list).hasSize(3);
   }
 
   @Test
-  void createFormFallsBackToTheActiveUnitsWhenTheAllKindsReadFails() {
-    when(client.jobOrderMaterials()).thenReturn(List.of());
-    when(client.orderableItemProbe()).thenReturn(null);
-    when(client.squadrons()).thenReturn(null);
-    when(client.activeOrgUnitsAllKinds()).thenThrow(backendDown());
-    when(client.activeOrgUnits()).thenReturn(List.of(option()));
+  void creationAuthorityDoesNotFallBackToTheActiveUnitCatalog() {
+    when(client.createOptions())
+        .thenReturn(new JobOrderCreateOptionsDto(false, List.of(), List.of(), null, null));
 
-    JobOrderPageReader.OrderCreatePage create = reader.readOrderCreate();
-
-    assertThat(create.requestingOptions()).hasSize(1);
-    assertThat(create.hasOrderableItems()).isTrue();
-    assertOneLogLine("job-order-requesting-org-units");
+    assertThatThrownBy(reader::readOrderCreate)
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
   }
 
   @Test
-  void createFormPropagatesALostSession() {
-    when(client.jobOrderMaterials()).thenThrow(lostSession());
+  void createFormPropagatesALostSessionOnRequiredAuthority() {
+    when(client.createOptions()).thenThrow(lostSession());
 
     assertThatThrownBy(reader::readOrderCreate)
         .isInstanceOf(ReauthenticationRequiredException.class);

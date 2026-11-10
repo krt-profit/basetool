@@ -35,6 +35,7 @@ import org.jetbrains.annotations.Nullable;
  * @param quantity the entry's total physical stock in whole units
  * @param allocatedQuantity the whole-unit slice earmarked to this order, at most {@code quantity}
  * @param delivered whether this order's slice is marked delivered
+ * @param canEdit whether the current caller has Inventory write authority for this row
  */
 public record JobOrderItemStockEntryDto(
     UUID inventoryEntryId,
@@ -45,4 +46,5 @@ public record JobOrderItemStockEntryDto(
     @Nullable UUID locationId,
     long quantity,
     long allocatedQuantity,
-    boolean delivered) {}
+    boolean delivered,
+    boolean canEdit) {}

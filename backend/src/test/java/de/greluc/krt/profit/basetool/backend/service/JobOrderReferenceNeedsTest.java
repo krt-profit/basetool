@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,13 +52,14 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGameItemNeedDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialNeedDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.util.HashSet;
 import java.util.List;
@@ -99,7 +102,6 @@ class JobOrderReferenceNeedsTest {
   @Mock private OrderLinkedStockRows orderLinkedStockRows;
 
   @Mock private RequestScopeResolver requestScopeResolver;
-  @Mock private JobOrderAccessPolicy jobOrderAccessPolicy;
 
   @Mock private JobOrderMapper jobOrderMapper;
 
@@ -128,9 +130,14 @@ class JobOrderReferenceNeedsTest {
         new JobOrderQueryService(
             jobOrderRepository,
             null,
-            new InventoryStockReads(inventoryItemRepository, null, null, null),
+            new InventoryStockReads(
+                inventoryItemRepository,
+                null,
+                null,
+                null,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class)),
             requestScopeResolver,
-            jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
@@ -139,7 +146,8 @@ class JobOrderReferenceNeedsTest {
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
-    when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(true);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+        .thenReturn(new ScopePredicate(true, null, Set.of()));
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class))).thenReturn(Set.of());
     when(jobOrderItemService.requiredGameItemIds(any(JobOrder.class))).thenReturn(Set.of());
   }
@@ -341,7 +349,9 @@ class JobOrderReferenceNeedsTest {
    * @param orders the orders the lookup should see.
    */
   private void givenOrders(JobOrder... orders) {
-    when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(orders));
+    when(jobOrderRepository.findReadableActiveWithMaterials(
+            anyBoolean(), nullable(UUID.class), anyCollection(), any(UUID.class)))
+        .thenReturn(List.of(orders));
   }
 
   /**
@@ -352,7 +362,9 @@ class JobOrderReferenceNeedsTest {
    */
   private void givenOrders(JobOrder order, String quantityType) {
     when(materialMapper.toDto(any(Material.class))).thenReturn(materialDto(quantityType));
-    when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(order));
+    when(jobOrderRepository.findReadableActiveWithMaterials(
+            anyBoolean(), nullable(UUID.class), anyCollection(), any(UUID.class)))
+        .thenReturn(List.of(order));
   }
 
   /**

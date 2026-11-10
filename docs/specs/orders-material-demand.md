@@ -27,7 +27,9 @@ Tracked by [#1522](https://github.com/krt-profit/basetool/issues/1522).
 
 ### REQ-ORDERS-034 — Cross-order material demand, grouped by responsible org unit
 
-> **Approved target — implementation pending:** The approved target applies shared hierarchy-based responsibility and full permitted web reads from orders-core.md, including direct Profit-Bereich responsibility. Aggregate only active MATERIAL/ITEM material requirements, excluding cancelled and other terminal work; aUEC contributes no fictitious material rows. Outstanding physical demand minus suitable linked stock remains distinct from outstanding promises and historical credited provision. Use the uncovered-demand and credit-before-cut definitions of REQ-ORDERS-024, including ITEM material demand for unmanufactured items; the older claim/required arithmetic below is not the new promise rule. External exchange retains its reduced direct-membership contract.
+> **Implemented web-read contract:** Shared hierarchy-based responsibility and complete permitted MATERIAL/ITEM web reads follow orders-core.md, including direct Profit-Bereich responsibility.
+>
+> **Remaining material/money extension:** Aggregate only active MATERIAL/ITEM material requirements, excluding cancelled and other terminal work; aUEC contributes no fictitious material rows. Outstanding physical demand minus suitable linked stock remains distinct from outstanding promises and historical credited provision. Use the uncovered-demand and credit-before-cut definitions of REQ-ORDERS-024, including ITEM material demand for unmanufactured items; the older claim/required arithmetic below is not the new promise rule. External exchange retains its reduced direct-membership contract.
 >
 > The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
@@ -48,7 +50,7 @@ and an `ITEM` order's aggregation already scales each line by its not-yet-manufa
 
 **Grouping and rows.** The page MUST render one section per **responsible** org unit
 (`JobOrder.responsibleOrgUnit`, REQ-ORDERS-022 / REQ-ORG-003) — the unit that has to procure the
-material, and the side the job-order visibility scope keys on. Grouping on the *requesting* unit
+material, and the side the material-demand sections group on. Grouping on the *requesting* unit
 would answer a different question and is explicitly not what this page does. Within a section there
 is one row per `(material, quality tier)` bucket — the same bucket key the rest of the order
 domain uses ([`orders-quality-tiers.md`](orders-quality-tiers.md), REQ-ORDERS-036), so a `MATERIAL`
@@ -80,12 +82,14 @@ expanded buckets is persisted per browser in `localStorage` (bare key `orders_de
 REQ-ORDERS-027 / REQ-UI-017 idiom) and re-applied on load **and after every fragment swap**, so a
 live-sync refresh never closes what the user opened.
 
-**Scope and gating.** The page MUST show only orders within the caller's visibility scope. The scope
-is pushed into SQL through the job order's `JobOrderScope.PREDICATE` — including the
-SK-public escape — rather than filtered row-by-row afterwards, and the viewer-side profit gate
-(`canViewJobOrders`) is applied first, so a caller outside the order workflow gets the empty state
-rather than a partial aggregate. The nav entry is gated on the same capability as the order queue. The page states no
-order count: the figure said nothing the rows do not, and the projection carries no such field.
+**Scope and gating.** The page shows exactly the non-terminal MATERIAL/ITEM orders in the
+caller's current common web-read scope. `JobOrderScope.READ_PREDICATE` applies that scope in SQL,
+including requester, personal assignee and verifiable retained unit relations. General Profit
+membership is not a prerequisite for a concrete order's material facts. The navigation follows the
+shared workspace capability. Every stock/claim lookup is batched over those selected identities;
+there is no row-by-row permission filtering or extra unit privilege. Exchange keeps its separate
+reduced membership-only contract. The page states no order count: the projection carries no such
+field.
 The endpoint is deliberately **unpaged**: the response is a fold over the caller's whole visible
 queue, and paging the underlying orders would silently truncate the sums (ADR-0104, no silent caps).
 

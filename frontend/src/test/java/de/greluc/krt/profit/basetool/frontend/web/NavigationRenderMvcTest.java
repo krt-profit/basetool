@@ -161,9 +161,8 @@ class NavigationRenderMvcTest {
   }
 
   /**
-   * The quick access's own pages and actions follow the roles: every member may create orders,
-   * missions and refinery orders and book into the own stock, only a logistician into the global
-   * stock, and only an administrator gets the sync-report pages.
+   * Quick-access order creation follows the current backend capability; the remaining actions and
+   * private catalogue pages retain their independent role gates.
    *
    * @throws Exception if the page cannot be rendered
    */
@@ -180,7 +179,7 @@ class NavigationRenderMvcTest {
         .doesNotContain("data-entries-url")
         .contains("data-entity-search-url=\"/quick-access/search\"")
         .contains("data-prefix-kind=\"mission\"")
-        .contains("data-testid=\"palette-action-create-order\"")
+        .doesNotContain("data-testid=\"palette-action-create-order\"")
         .contains("data-testid=\"palette-action-create-mission\"")
         .contains("data-testid=\"palette-action-create-refinery\"")
         .contains("data-testid=\"palette-action-book-my\"")
@@ -193,8 +192,12 @@ class NavigationRenderMvcTest {
     assertThat(member.contains("data-testid=\"palette-action-lang-de\""))
         .as("exactly one language switch")
         .isNotEqualTo(member.contains("data-testid=\"palette-action-lang-en\""));
-    assertThat(logistician).contains("data-testid=\"palette-action-book-global\"");
+    assertThat(logistician)
+        .contains(
+            "data-testid=\"palette-action-book-global\"",
+            "data-testid=\"palette-action-create-order\"");
     assertThat(admin)
+        .doesNotContain("data-testid=\"palette-action-create-order\"")
         .contains("href=\"/admin/sync-reports/uex\"")
         .contains("href=\"/admin/sync-reports/scwiki\"");
   }
@@ -278,14 +281,14 @@ class NavigationRenderMvcTest {
         render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
 
     assertThat(section(SIDEBAR, assignee))
-        .containsPattern("href=\"/orders\"[^>]*data-testid=\"nav-orders-assigned\"")
-        .doesNotContain("data-testid=\"nav-orders\"")
+        .containsPattern("href=\"/orders\"[^>]*data-testid=\"nav-orders\"")
+        .doesNotContain("data-testid=\"nav-orders-assigned\"")
         .doesNotContain("data-testid=\"nav-orders-own\"");
     assertThat(assignee)
-        .containsPattern("href=\"/orders\"[^>]*data-testid=\"mobile-tab-orders.assigned\"");
+        .containsPattern("href=\"/orders\"[^>]*data-testid=\"mobile-tab-orders.list\"");
     assertThat(section(SIDEBAR, plainMember))
         .doesNotContain("data-testid=\"nav-orders-assigned\"")
-        .contains("data-testid=\"nav-orders-create\"");
+        .doesNotContain("data-testid=\"nav-orders-create\"");
   }
 
   /**

@@ -116,6 +116,7 @@ public class JobOrderService {
   private final JobOrderEditor jobOrderEditor;
 
   private final LiveSyncPublisher liveSyncPublisher;
+  private final JobOrderUnitHistory unitHistory;
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
@@ -157,6 +158,7 @@ public class JobOrderService {
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
+    unitHistory.retainObservedParties(jobOrder, Set.of());
     jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
     auditRecorder.record(
@@ -210,6 +212,7 @@ public class JobOrderService {
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
+    unitHistory.retainObservedParties(jobOrder, Set.of());
     jobOrderPriorityService.normalizePriorities();
     publishJobOrderCreated(jobOrder);
     auditRecorder.record(

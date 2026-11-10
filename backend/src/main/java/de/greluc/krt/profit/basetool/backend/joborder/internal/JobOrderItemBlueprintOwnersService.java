@@ -30,8 +30,11 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -67,6 +70,7 @@ public class JobOrderItemBlueprintOwnersService {
   private final UserRepository userRepository;
   private final MemberBlueprintSharings memberBlueprintSharings;
   private final BlueprintFamilies familyResolver;
+  private final OrgUnitRepository orgUnitRepository;
 
   /**
    * Builds the blueprint-coverage view for the given order, restricted to the responsible org
@@ -105,9 +109,14 @@ public class JobOrderItemBlueprintOwnersService {
     OrgUnit responsible = order.getResponsibleOrgUnit();
     Set<UUID> memberSubs = new LinkedHashSet<>();
     if (responsible != null) {
+      Set<UUID> producerUnits = new LinkedHashSet<>();
+      producerUnits.add(responsible.getId());
+      if (responsible.getKind() == OrgUnitKind.BEREICH
+          && responsible.getDepartment() == Department.PROFIT) {
+        producerUnits.addAll(orgUnitRepository.findChildOrgUnitIds(responsible.getId()));
+      }
       memberSubs.addAll(
-          orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(
-              Set.of(responsible.getId())));
+          orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(producerUnits));
     }
     Set<UUID> ownerUserIds = new LinkedHashSet<>(memberSubs);
     ownerUserIds.addAll(memberBlueprintSharings.userIdsSharingGlobally());

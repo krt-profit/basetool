@@ -230,7 +230,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             null,
             false,
             false,
-            false,
             null,
             false);
 
@@ -350,7 +349,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             null,
             false,
             false,
-            false,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -438,7 +436,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             null,
             false,
             false,
-            false,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -523,7 +520,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false,
             false,
             false,
             null,
@@ -628,7 +624,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             null,
             false,
             false,
-            false,
             null,
             false);
 
@@ -722,7 +717,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             null,
             false,
             false,
-            false,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -781,7 +775,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false,
             false,
             false,
             null,
@@ -851,7 +844,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false,
             false,
             false,
             null,
@@ -935,7 +927,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         1L,
         null,
         null,
-        false,
         false,
         false,
         null,
@@ -1130,6 +1121,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
                 UUID.randomUUID(),
                 4L,
                 3L,
+                false,
                 false)));
   }
 
@@ -1250,7 +1242,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             3L,
             List.of(
                 new de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockEntryDto(
-                    entryId, 7L, null, null, null, null, 4L, 3L, false)));
+                    entryId, 7L, null, null, null, null, 4L, 3L, false, false)));
     stubDetail(orderId, userId, oneLineItemOrder(orderId, gameItemId), List.of(withoutOwner));
 
     String html =
@@ -1431,7 +1423,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             null,
             false,
             false,
-            false,
             null,
             false);
     stubDetail(orderId, userId, order);
@@ -1503,7 +1494,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false,
             false,
             false,
             null,
@@ -1590,7 +1580,6 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false,
             false,
             false,
             null,

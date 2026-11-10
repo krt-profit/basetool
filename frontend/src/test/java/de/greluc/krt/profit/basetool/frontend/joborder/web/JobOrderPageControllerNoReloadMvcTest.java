@@ -138,7 +138,6 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
         canManageAssignees,
         false,
         false,
-        false,
         canEdit,
         false);
   }
@@ -529,6 +528,8 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createOrderAjax_ValidMaterial_ReturnsNavigationTarget() throws Exception {
+    when(backendApiClient.post(eq("/api/v1/orders"), any(), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(UUID.randomUUID(), 0L));
     mockMvc
         .perform(
             post("/orders/create")
@@ -561,6 +562,8 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createItemOrderAjax_ValidLine_ReturnsNavigationTarget() throws Exception {
+    when(backendApiClient.post(eq("/api/v1/orders/items"), any(), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(UUID.randomUUID(), 0L));
     mockMvc
         .perform(
             post("/orders/items")

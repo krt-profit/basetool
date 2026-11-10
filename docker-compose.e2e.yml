@@ -23,7 +23,7 @@ services:
           - keycloak
           - host.docker.internal
     volumes: !override
-      - ./realm-export.json:/opt/keycloak/data/import/realm-basetool.json:ro
+      - ${E2E_REALM_PATH:-./realm-export.json}:/opt/keycloak/data/import/realm-basetool.json:ro
   backend-dev:
     user: "0:0"
     environment:

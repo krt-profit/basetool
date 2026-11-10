@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
@@ -91,7 +92,6 @@ public abstract class JobOrderMapper {
   @Mapping(target = "items", ignore = true)
   @Mapping(target = "aggregatedMaterials", ignore = true)
   @Mapping(target = "itemHandovers", ignore = true)
-  @Mapping(target = "redacted", ignore = true)
   @Mapping(
       target = "responsibilityInvalid",
       expression = "java(authority.get(jobOrder.getId()).responsibilityInvalid())")
@@ -106,8 +106,9 @@ public abstract class JobOrderMapper {
       target = "canEditAsRequester",
       expression = "java(authority.get(jobOrder.getId()).canEditAsRequester())")
   @Mapping(target = "withAssignees", ignore = true)
-  @Mapping(target = "withRedacted", ignore = true)
-  @Mapping(target = "canManageAssignees", ignore = true)
+  @Mapping(
+      target = "canManageAssignees",
+      expression = "java(authority.get(jobOrder.getId()).canEdit())")
   @Mapping(target = "withCanManageAssignees", ignore = true)
   public abstract JobOrderDto toDtoWithAuthority(
       JobOrder jobOrder, @Context Map<UUID, JobOrderAuthorityFlags> authority);
@@ -139,7 +140,15 @@ public abstract class JobOrderMapper {
    * @param assignee the assignee edge; {@code null} returns {@code null}
    * @return the assignee DTO
    */
-  public abstract JobOrderAssigneeDto toDto(JobOrderAssignee assignee);
+  @Nullable
+  public JobOrderAssigneeDto toDto(@Nullable JobOrderAssignee assignee) {
+    return assignee == null
+        ? null
+        : new JobOrderAssigneeDto(
+            UserDtoRedaction.toPeerShape(assigneeUserMapper.toDto(assignee.getUser())),
+            assignee.getNote(),
+            assignee.getVersion());
+  }
 
   /**
    * Resolves current authority once for a page of orders.

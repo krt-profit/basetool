@@ -56,6 +56,9 @@ package de.greluc.krt.profit.basetool.frontend.kernel.model;
  * @param canViewBankStaff whether the caller holds {@code BANK_EMPLOYEE} or above
  * @param canManageBank whether the caller holds {@code BANK_MANAGEMENT}
  * @param isAdmin whether the caller holds {@code ADMIN}
+ * @param canViewOrderWorkspace whether the caller may open the shared order workspace
+ * @param canViewOrderUnitWork whether a current unit's responsible or supporting queue is offered
+ * @param canCreateJobOrders whether the current context offers an authorized create pair
  */
 @DtoMirror
 public record CapabilitiesResponse(
@@ -79,13 +82,16 @@ public record CapabilitiesResponse(
     boolean canViewPurchasingReport,
     boolean canViewBankStaff,
     boolean canManageBank,
-    boolean isAdmin) {
+    boolean isAdmin,
+    boolean canViewOrderWorkspace,
+    boolean canViewOrderUnitWork,
+    boolean canCreateJobOrders) {
 
   /** Every capability off: the fail-closed answer for an anonymous or unresolved caller. */
   public static final CapabilitiesResponse NONE =
       new CapabilitiesResponse(
           false, false, false, false, false, false, false, false, false, false, false, false, false,
-          false, false, false, false, false, false, false, false);
+          false, false, false, false, false, false, false, false, false, false, false);
 
   /**
    * Every role-derived capability on, as an admin passes each gate; the server switch, the tab
@@ -116,6 +122,9 @@ public record CapabilitiesResponse(
         backend.canViewPurchasingReport(),
         backend.canViewBankStaff(),
         backend.canManageBank(),
-        true);
+        true,
+        backend.canViewOrderWorkspace(),
+        backend.canViewOrderUnitWork(),
+        backend.canCreateJobOrders());
   }
 }

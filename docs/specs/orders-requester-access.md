@@ -1,103 +1,67 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
-> **Owner area:** ORDERS · **Related ADRs:** ADR-0091
+> **Doc type:** Living spec - complete MATERIAL/ITEM reading implemented; shared requester-write amendments pending. Last reviewed: 2026-11-09.
+> **Owner area:** ORDERS · **Related ADRs:** ADR-0091, ADR-0356
 
-# Requesting-owner (Auftraggeber) job-order access
-
-> **Status of the amendment:** Owner-approved target, implementation pending. REQ-ORDERS-023 below states the planned replacement explicitly; the remaining implementation narrative records the current runtime. New runtime acceptance is defined in [orders-core.md](orders-core.md) and [orders-auec.md](orders-auec.md) and remains unchecked.
+# Requesting-unit JobOrder access
 
 ## Context & goal
 
-Before this feature a job order's **requesting** org unit (the Auftraggeber / customer that placed
-the order) granted **no** visibility — only the **responsible** (processing) org unit did, and even
-that was gated behind the profit-eligibility viewer gate `canViewJobOrders`
-([`security-and-access.md`](security-and-access.md), REQ-SEC-009;
-[`org-unit-tenancy.md`](org-unit-tenancy.md), REQ-ORG-003). A member of a purely non-profit ordering
-unit could therefore **create** an order but could neither see nor track it afterwards — the same
-"submit but don't track" posture the public request form gave an anonymous visitor before ADR-0149
-removed it (#1186).
-
-This spec adds a **requester escape**: a member of an order's requesting org unit may view that order
-and, while it is still fully undelivered, edit it within limits — independent of the profit gate and
-independent of the LOGISTICIAN full-edit path used by the processing side. Ownership is defined at the
-**org-unit level** (membership in the requesting org unit), because a job order carries no per-user
-creator column — a legacy of the anonymous request form it once had; there is no schema change
-(ADR-0091).
+The requesting unit is the customer, separate from the current responsible Profit unit.
+[The shared JobOrder contract](orders-core.md) owns the complete reader audience, current unit
+writers and the accepted requester-write target. Reading does not depend on creation or processing
+permission, and no order stores a per-user creator identity as an authority relationship.
 
 ## Requirements
 
-### REQ-ORDERS-023 — Requesting-owner may view and edit their own order within limits
+### REQ-ORDERS-023 - Requesting-unit reading and current requester capability
 
-> **Approved planned JobOrder amendment (not implemented):** Replace requester-only redaction and the whole-order delivery freeze with [the shared JobOrder contract](orders-core.md). Requester members read the complete relevant order; only authorised requesting-unit writers make unit-side changes. They may safely edit remaining MATERIAL need or ITEM need after partial delivery under the preserved manufactured/delivered bounds, without deleting actual history. They also have the agreed cancellation/reopening rights; other MATERIAL/ITEM status actions remain responsible-side. aUEC target, recipients, own handovers/returns and corrections follow [the money contract](orders-auec.md) and role matrix, with no arbitrary foreign holding edits. Invalid responsibility blocks even correction/settlement/reopening until transfer. The former restricted read, any-member edit, post-handover freeze and listed exclusions below do not govern that future scope.
->
-> The following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance.
+Requesting-unit members and existing leadership/contextual reach read complete permitted order
+facts through the shared queue, requested scope, number search, detail and existing linked reads.
+They see collection progress, assignees and notes, material requirements, handovers and persisted
+reports, and the linked-stock owner/location. The DTO has no reduced-requester flag.
 
-A member of a job order's **requesting org unit** (Auftraggeber) MAY (both requester edits run through `JobOrderEditor` and require the order's `version`,
-[REQ-ORDERS-046](aggregate-edit-modules.md#req-orders-046--a-job-order-edit-that-carries-a-version-requires-it)):
+`canEdit` always means current responsible-side processing. `canEditAsRequester` separately
+reports the current requesting-unit writer under the shipped undelivered-order restriction.
+Ordinary membership alone grants reading. An observed former requesting unit retains only its
+concrete order read through current legitimate unit reach; it gains no current requester write.
 
-- **View** the order — reached via a dedicated `GET /api/v1/orders/requested` list (the "Meine
-  Aufträge" surface) and the order-detail page. The response is **redacted**: it drops the
-  **Bearbeiter** (assignee) section, the **materials summary** (aggregated materials + the per-line
-  collection-progress fields `currentStock` / `claims` / `openAmount`), the delivery events
-  (handovers / item-handovers) and the blueprint-coverage view. The ordered lines the requester
-  placed (materials with quantity + min-quality, or ordered items), the comment, the status and the
-  optimistic-lock version are preserved. The redacted `JobOrderDto` carries a **per-order `redacted`
-  flag** (`true` on this view, `false` on the full view), stamped server-side from the loaded entity;
-  the client keys its limited rendering off that flag rather than a global capability, so a member who
-  is both profit-eligible **and** the requester of a foreign-processed order sees the limited template
-  that matches the redacted data.
-- **Edit** the order — **only while it is still fully undelivered** (the *whole-order freeze*: the
-  order has no material handover and no item handover). Within that window the requester may change
-  quantities, add or remove material/item lines, change a material's min-quality within the fixed
-  choices (Keine / 650), and edit the comment. Removing a material/item **unlinks** the corresponding
-  linked inventory entries. The requester may **not** change the handle, the requesting/responsible
-  org unit, the status or the priority — those inputs are ignored server-side. Once any delivery is
-  recorded the order is frozen for the requester (HTTP 400).
+The producer panel retains REQ-ORDERS-016's independent viewer gate. Unreadable mission names and
+planned start remain anonymous in linked stock. Unrelated Inventory, private Bank data and the
+reduced external Exchange surface keep their own authority checks.
 
-The requester escape is **additive**: it never widens the general order queue (which stays
-responsible-scoped) and never grants the requester the blueprint-coverage view. A caller who is *also*
-a full viewer (responsible-side member / admin) keeps the complete, unredacted view and the
-LOGISTICIAN edit path. A stale write surfaces as HTTP 409; the edit is audited as `JOB_ORDER_UPDATED`
-/ `JOB_ORDER_ITEM_UPDATED` with a `byRequester=true` discriminator (REQ-AUDIT-001), and on commit the
-processing unit's officers/leads are notified (REQ-NOTIF-017).
+**Implemented requester writes.** A current requester writer may edit MATERIAL need/comment through
+`PUT /orders/{id}/requested` while neither material nor item handovers exist. The backend ITEM
+requester endpoint retains that same prerequisite. Writes require the relevant version through
+`JobOrderEditor`; a stale version returns 409. Invalid responsibility blocks these writes until a
+valid transfer. The MATERIAL editor uses `canEditAsRequester` rather than display reduction;
+ITEM processing editing continues to require `canEdit`.
 
-A caller who *is* a full viewer of the order (`canSeeJobOrder`), including any profit-eligible member
-on an **SK-public** order, sees the linked-inventory **owner identity and location** on the order's
-four inventory reads (Item-Bestand panel, material collection, the two pickers). See
-[`orders-item-production.md`](orders-item-production.md) `REQ-ORDERS-029` /
-[ADR-0350](../adr/0350-every-order-viewer-sees-the-linked-stock-owner-and-location.md).
+**Accepted subsequent write target.** Safe remaining MATERIAL/ITEM need edits after partial work,
+cancellation/reopening rights and the ITEM requester editor follow orders-core.md and their owning
+requester/lifecycle slice. They are not enabled by broader reading. Existing manufactured,
+delivered and historical facts must survive that implementation.
+
+Requester writes retain the existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` audit events
+with `byRequester=true` and requester-change notices. Read admission and retained unit relationships
+do not introduce a separate user mutation or a new notification audience.
 
 **Acceptance**
 
-- [ ] A non-profit member sees the orders their own org unit requested under "Meine Aufträge" and can
-  open their detail; the detail hides the Bearbeiter section and the materials summary.
-- [ ] The same member cannot see or edit an order requested by a different org unit (HTTP 403 on
-  read, 403 on write).
-- [ ] While the order has no delivery, the requester can change a quantity, add/remove a material,
-  and edit the comment; removing a material clears its linked inventory (`InventoryItem.jobOrder`).
-- [ ] Once a handover exists, a requester edit is rejected (HTTP 400).
-- [ ] A requester edit records a `byRequester=true` audit event and publishes a
-  `JobOrderUpdatedByRequesterEvent`.
+- [ ] Every currently admitted requester sees complete facts consistently across list/count,
+  number lookup, detail and its existing read representations.
+- [ ] A requester read grants neither processing nor assignee enrollment and preserves independent
+  producer/mission/Bank/Inventory gates.
+- [ ] Current unit authority governs requester edits; a former unit or plain member cannot write.
+- [ ] The later post-partial requester workflow preserves booked production, delivery and history.
 
-**Enforced by:** `ScopeKernelTest` (RequesterEscapeGateTests), `JobOrderServiceTest`
-(updateJobOrderAsRequester\_\*) · **Code:** `JobOrderAccessPolicy.canSeeJobOrderAsRequester` /
-`canEditJobOrderAsRequester` (via the private `isOrderRequesterRow` →
-`RequestScopeResolver.currentUserIsMemberOfOrgUnit`), `RequestScopeResolver`
-`currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders`,
-`JobOrderService.updateJobOrderAsRequester` / `updateItemJobOrderAsRequester`,
-`JobOrderQueryService.getRequestedJobOrders`, `JobOrderController` (`GET /requested`, `PUT /{id}/requested`,
-`PUT /{id}/items/requested`, `cleanupJobOrderForRequester`) · **Issues:** #1186
+**Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
+`JobOrderAssigneeGrantIntegrationTest`, `JobOrderMissionAllocationRedactorTest`,
+`OrdersDetailPatternRenderTest` and `JobOrderResponsibilityRecoveryMvcTest` cover current reading
+and capability boundaries; the post-partial workflow remains pending.
 
 ## Out of scope
 
-- Per-user ("only the person who created it") ownership — ownership is org-unit-level by design
-  (ADR-0091); a job order has no `created_by` column. Creating one requires a login since ADR-0149,
-  but that did not add authorship — access still follows the requesting org unit, not an author.
-- Changing the responsible org unit, status, priority or handle from the requester side — those stay
-  processing-side concerns (the reassignment endpoint owns the responsible unit).
-- An item-order requester **edit UI** — none exists yet (the frontend calls only
-  `PUT /{id}/requested`, from `JobOrderWriteController`); the backend endpoint
-  (`PUT /{id}/items/requested`) already enforces the same limits, and the requester can view item
-  orders. Material-order requester editing is the only shipped UI surface.
+Per-user creator ownership, general stock or Bank rights from an order read, and the independent
+private blueprint view. The shared requester/lifecycle slice owns the remaining write amendments.
 
 ## Open questions
 

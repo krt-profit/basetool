@@ -131,7 +131,9 @@ class ExchangeDemandParityTest {
             requirementResolver,
             stockProjectionService,
             materialClaimService,
-            squadronMapper);
+            squadronMapper,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     stock = mock(OrderLinkedStockIndex.class, withSettings().strictness(Strictness.LENIENT));
     lenient()
         .when(stock.bookedFor(any(), anyList()))
@@ -291,7 +293,7 @@ class ExchangeDemandParityTest {
     when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, units));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
-            any(), eq(false), eq(null), eq(units)))
+            any(), eq(false), eq(null), eq(units), org.mockito.ArgumentMatchers.any()))
         .thenReturn(list);
   }
 

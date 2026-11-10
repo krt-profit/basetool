@@ -19,13 +19,18 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +59,34 @@ class JobOrderCreatePublishMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = "ADMIN")
   void materialOrderCreateAjax_publishesQueueChange() throws Exception {
+    JobOrderDto created =
+        new JobOrderDto(
+            UUID.randomUUID(),
+            53,
+            null,
+            null,
+            "Creator",
+            null,
+            null,
+            "OPEN",
+            "MATERIAL",
+            false,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.parse("2026-11-09T10:00:00Z"),
+            0L,
+            true,
+            true,
+            false,
+            false,
+            true,
+            true);
+    when(backendApiClient.post(eq("/api/v1/orders"), any(), eq(JobOrderDto.class)))
+        .thenReturn(created);
     mockMvc
         .perform(
             post("/orders/create")

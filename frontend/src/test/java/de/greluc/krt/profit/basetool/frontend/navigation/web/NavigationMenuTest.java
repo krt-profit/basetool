@@ -34,50 +34,53 @@ class NavigationMenuTest {
 
   private final NavigationRegistry registry = new NavigationRegistry();
 
-  /** A member without the Job-Order area gets „Auftrag anlegen" in the menu. */
+  /** Without an order-reading context, creation is not offered as a substitute. */
   @Test
-  void memberWithoutOrdersGetsTheCreateLink() {
+  void aMemberWithoutOrderRightsGetsNoOrderOrCreationLink() {
     NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
 
+    assertThat(keys(menu, "logistics")).containsExactly("storage.overview", "refinery.orders");
+  }
+
+  /** A requesting-unit reader enters the same central workspace. */
+  @Test
+  void aRequestingUnitReaderGetsTheCentralOrdersLink() {
+    NavigationMenu menu =
+        resolve(Set.of(), Set.of(NavigationFlag.ORDER_WORKSPACE, NavigationFlag.OWN_JOB_ORDERS));
+
     assertThat(keys(menu, "logistics"))
-        .containsExactly("storage.overview", "refinery.orders", "orders.create");
-  }
-
-  /** The own-unit view stands in for the Job-Order area and its tab opens the orders page. */
-  @Test
-  void ownUnitViewStandsInForTheOrders() {
-    NavigationMenu menu = resolve(Set.of(), Set.of(NavigationFlag.OWN_JOB_ORDERS));
-
-    assertThat(keys(menu, "logistics")).contains("orders.own").doesNotContain("orders.create");
-  }
-
-  /** An assignee without any order list gets the „Aufträge" link and its tab opens the list. */
-  @Test
-  void assigneeWithoutProfitAccessGetsTheOrdersLink() {
-    NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.ASSIGNED_JOB_ORDERS));
-
-    assertThat(keys(menu, "logistics")).contains("orders.assigned", "orders.create");
-  }
-
-  /** A member who already reaches an order list gets no second „Aufträge" link for the entry. */
-  @Test
-  void anEntryAddsNoSecondOrdersLinkToAMemberWhoSeesTheQueueOrTheOwnList() {
-    assertThat(
-            keys(
-                resolve(
-                    Set.of(),
-                    Set.of(NavigationFlag.JOB_ORDERS, NavigationFlag.ASSIGNED_JOB_ORDERS)),
-                "logistics"))
         .contains("orders.list")
-        .doesNotContain("orders.assigned");
-    assertThat(
-            keys(
-                resolve(
-                    Set.of(),
-                    Set.of(NavigationFlag.OWN_JOB_ORDERS, NavigationFlag.ASSIGNED_JOB_ORDERS)),
-                "logistics"))
-        .contains("orders.own")
-        .doesNotContain("orders.assigned");
+        .doesNotContain("orders.own", "orders.create");
+  }
+
+  /** A personal assignee gets one central link without creation authority. */
+  @Test
+  void assigneeWithoutProfitAccessGetsTheCentralOrdersLink() {
+    NavigationMenu menu =
+        resolve(
+            Set.of("KRT_MEMBER"),
+            Set.of(NavigationFlag.ORDER_WORKSPACE, NavigationFlag.ASSIGNED_JOB_ORDERS));
+
+    assertThat(keys(menu, "logistics"))
+        .contains("orders.list")
+        .doesNotContain("orders.assigned", "orders.create");
+  }
+
+  /** Multiple read relationships keep one central drawer entry. */
+  @Test
+  void multipleReadRelationshipsDoNotDuplicateTheOrdersLink() {
+    NavigationMenu menu =
+        resolve(
+            Set.of(),
+            Set.of(
+                NavigationFlag.ORDER_WORKSPACE,
+                NavigationFlag.OWN_JOB_ORDERS,
+                NavigationFlag.ASSIGNED_JOB_ORDERS,
+                NavigationFlag.CREATE_JOB_ORDERS));
+
+    assertThat(keys(menu, "logistics"))
+        .contains("orders.list")
+        .doesNotContain("orders.own", "orders.assigned", "orders.create");
   }
 
   /** Without an entry the link is absent. */
@@ -118,7 +121,7 @@ class NavigationMenuTest {
   void aFullyEntitledMemberHasNineLinksAndBankStaffTen() {
     Set<NavigationFlag> flags =
         Set.of(
-            NavigationFlag.JOB_ORDERS,
+            NavigationFlag.ORDER_WORKSPACE,
             NavigationFlag.SUPPLY,
             NavigationFlag.PURCHASING,
             NavigationFlag.OPEN_LEITUNG);
@@ -231,7 +234,7 @@ class NavigationMenuTest {
   /** The member pages that merged sibling pages show them as tabs under their own labels. */
   @Test
   void mergedMemberPagesHaveTheirTabs() {
-    NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.JOB_ORDERS));
+    NavigationMenu menu = resolve(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.ORDER_WORKSPACE));
 
     assertThat(menu.pageTabs("missions.list", "/missions/new"))
         .extracting(tab -> tab.entry().key() + ":" + tab.current())

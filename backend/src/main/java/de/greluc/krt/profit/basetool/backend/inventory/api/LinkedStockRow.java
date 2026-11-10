@@ -40,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * @param allocatedAmount the order's slice of the row, or the whole stock when the row carries no
  *     slice of the order
  * @param delivered whether the order's slice is marked delivered
+ * @param canEdit whether the caller may write the Inventory row
  */
 public record LinkedStockRow(
     @NotNull UUID id,
@@ -54,4 +55,5 @@ public record LinkedStockRow(
     @Nullable InventoryGameItemReferenceDto gameItem,
     @NotNull Double amount,
     @NotNull Double allocatedAmount,
-    boolean delivered) {}
+    boolean delivered,
+    boolean canEdit) {}

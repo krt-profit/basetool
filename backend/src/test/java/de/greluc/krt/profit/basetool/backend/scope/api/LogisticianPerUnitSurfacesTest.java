@@ -230,7 +230,13 @@ class LogisticianPerUnitSurfacesTest {
             orders,
             responsibilityGuard,
             mock(JobOrderHandoverRepository.class),
-            mock(JobOrderItemHandoverRepository.class));
+            mock(JobOrderItemHandoverRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderUnitReadHistoryRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderParticipationRepository.class));
 
     assertReaches(
         caller,

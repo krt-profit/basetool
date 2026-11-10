@@ -98,7 +98,9 @@ public class NavigationAdvice {
     EnumSet<NavigationFlag> flags = EnumSet.noneOf(NavigationFlag.class);
     if (capabilities != null) {
       addIf(flags, capabilities.canSeeBlueprintOverview(), NavigationFlag.BLUEPRINT_OVERVIEW);
-      addIf(flags, capabilities.canViewJobOrders(), NavigationFlag.JOB_ORDERS);
+      addIf(flags, capabilities.canViewOrderWorkspace(), NavigationFlag.ORDER_WORKSPACE);
+      addIf(flags, capabilities.canViewOrderUnitWork(), NavigationFlag.ORDER_UNIT_WORK);
+      addIf(flags, capabilities.canCreateJobOrders(), NavigationFlag.CREATE_JOB_ORDERS);
       addIf(flags, capabilities.canViewOwnJobOrders(), NavigationFlag.OWN_JOB_ORDERS);
       addIf(flags, capabilities.canViewAssignedJobOrders(), NavigationFlag.ASSIGNED_JOB_ORDERS);
       addIf(flags, capabilities.isLogisticianOrAbove(), NavigationFlag.LOGISTICIAN_HERE);

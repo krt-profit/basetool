@@ -55,8 +55,30 @@ class JobOrderListAuthorityMvcTest extends JobOrderPageMvcTestBase {
     CapabilityStubs.report(
         backendApiClient,
         new CapabilitiesResponse(
-            false, true, false, false, true, false, false, false, false, false, false, false, false,
-            false, false, false, false, false, false, false, false));
+            false,
+            true,
+            false,
+            false,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            (true || false || false),
+            true,
+            false));
   }
 
   @ParameterizedTest
@@ -111,7 +133,6 @@ class JobOrderListAuthorityMvcTest extends JobOrderPageMvcTestBase {
         Instant.now(),
         1L,
         canEdit,
-        false,
         false,
         invalid,
         false,

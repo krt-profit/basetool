@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
@@ -123,6 +124,7 @@ public class JobOrderPageReader {
    * @param statuses the resolved status filter
    * @param squadronIds the selected squadron ids
    * @param withSquadronFilter whether the active squadrons of the filter picker are read
+   * @param types implemented kinds to keep, empty for all
    */
   public record OrderListQuery(
       @NotNull OrderListScope scope,
@@ -130,7 +132,8 @@ public class JobOrderPageReader {
       int size,
       @NotNull List<String> statuses,
       @NotNull List<UUID> squadronIds,
-      boolean withSquadronFilter) {}
+      boolean withSquadronFilter,
+      @NotNull List<String> types) {}
 
   /**
    * Everything the order list page renders.
@@ -173,10 +176,8 @@ public class JobOrderPageReader {
    *
    * @param authenticated whether the caller is signed in
    * @param tokenUserId the user id carried by the caller's token, or {@code null} when it has none
-   * @param logistician whether the caller reaches the Logistician authority
    */
-  public record OrderCaller(
-      boolean authenticated, @Nullable UUID tokenUserId, boolean logistician) {}
+  public record OrderCaller(boolean authenticated, @Nullable UUID tokenUserId) {}
 
   /**
    * Everything the order detail page renders. An empty {@link Optional} or an absent {@link Part}
@@ -216,20 +217,18 @@ public class JobOrderPageReader {
       @NotNull List<OrgUnitMembershipOptionDto> claimingOptions) {}
 
   /**
-   * Everything the create form renders.
+   * Everything the authorized creation form renders.
    *
    * @param materials the material catalog, empty when unavailable
-   * @param hasOrderableItems whether an orderable item exists; {@code true} when the probe failed
+   * @param hasOrderableItems whether an orderable item exists; true when the probe is unavailable
    * @param squadrons the squadron catalog, empty when unavailable
-   * @param responsibleOptions the currently eligible units in the actual Profit hierarchy
-   * @param requestingOptions the requesting org-unit options, empty when unavailable
+   * @param options authoritative current unit choices, writer flags and a valid proposed pair
    */
   public record OrderCreatePage(
       @NotNull List<MaterialDto> materials,
       boolean hasOrderableItems,
       @NotNull List<SquadronDto> squadrons,
-      @NotNull List<OrgUnitMembershipOptionDto> requestingOptions,
-      @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions) {}
+      @NotNull JobOrderCreateOptionsDto options) {}
 
   /** Why the item-order edit form is, or is not, offered. */
   public enum ItemEditAccess {
@@ -312,8 +311,7 @@ public class JobOrderPageReader {
   public OrderDetailPage readOrderDetail(
       @NotNull UUID id, @NotNull OrderCaller caller, @Nullable String fragment) {
     JobOrderDto order = jobOrderClient.order(id);
-    boolean requesterView = order.redacted();
-    boolean canAssign = !requesterView && caller.logistician() && order.callerMayEdit();
+    boolean canAssign = order.callerMayEdit();
     boolean itemOrder = TYPE_ITEM.equals(order.type());
     Optional<UUID> currentUserId = currentUserId(caller);
     DetailCatalogs catalogs = detailCatalogs(order.callerMayEditAsRequester(), canAssign);
@@ -333,15 +331,14 @@ public class JobOrderPageReader {
         itemOrder && (fragment == null || "blueprint-owners".equalsIgnoreCase(fragment))
             ? blueprintOwners(id)
             : Part.absent(),
-        itemOrder && !requesterView && (fragment == null || "items".equalsIgnoreCase(fragment))
+        itemOrder && (fragment == null || "items".equalsIgnoreCase(fragment))
             ? itemStock(id)
             : Part.absent(),
         fragment == null ? orphanedInventory(id) : Part.absent(),
         canAssign || Boolean.TRUE.equals(order.canTransferResponsibility())
             ? responsibleOptions()
             : List.of(),
-        !requesterView
-                && !order.responsibilityInvalid()
+        !order.responsibilityInvalid()
                 && (fragment == null
                     || "materials".equalsIgnoreCase(fragment)
                     || "aggregated".equalsIgnoreCase(fragment)
@@ -397,19 +394,20 @@ public class JobOrderPageReader {
   }
 
   /**
-   * Reads the create form: the material catalog, the orderable-item probe, the squadrons and the
-   * owner-picker options.
+   * Reads current creation authority before loading optional form catalogs.
    *
-   * @return the create page with every part defaulted when it is unavailable
+   * @return the authorized form, with optional catalogs defaulted when unavailable
    * @throws ReauthenticationRequiredException when the session is lost
+   * @throws org.springframework.security.access.AccessDeniedException when creation is not offered
    */
   @NotNull
   public OrderCreatePage readOrderCreate() {
-    List<MaterialDto> materials = materials();
-    boolean hasOrderableItems = hasOrderableItems();
-    List<SquadronDto> squadrons = squadrons();
-    return new OrderCreatePage(
-        materials, hasOrderableItems, squadrons, requestingOptions(), responsibleOptions());
+    JobOrderCreateOptionsDto options = jobOrderClient.createOptions();
+    if (options == null || !options.canCreate()) {
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Order creation is not permitted");
+    }
+    return new OrderCreatePage(materials(), hasOrderableItems(), squadrons(), options);
   }
 
   /**
@@ -478,7 +476,12 @@ public class JobOrderPageReader {
   private OrderListPage loadOrderList(@NotNull OrderListQuery query) {
     PageResponse<JobOrderDto> p =
         jobOrderClient.orders(
-            query.scope(), query.page(), query.size(), query.statuses(), query.squadronIds());
+            query.scope(),
+            query.page(),
+            query.size(),
+            query.statuses(),
+            query.squadronIds(),
+            query.types());
     List<JobOrderDto> orders = new ArrayList<>();
     if (p != null && p.content() != null) {
       orders = new ArrayList<>(p.content());
