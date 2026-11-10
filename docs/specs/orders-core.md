@@ -244,10 +244,14 @@ and money mutations must apply the same prerequisite.
 
 ### REQ-ORDERS-056 — One shared overview leads to a central detail
 
-**Implemented overview:** MATERIAL and ITEM share a server-side kind filter in every scope and
-its database page count. The browser remembers kind, scope, status and unit selections; an unset
-scope defaults to ALL for every permitted reader. The filter offers only implemented kinds.
-Creation and later money-specific operation recovery remain governed by the clauses below.
+**Implemented MATERIAL/ITEM workspace:** a server-side kind filter narrows every scope and its
+database page count. The browser remembers kind, scope, status and unit selections; an unset scope
+defaults to ALL for every permitted reader. Only implemented kinds are offered. Current responsible
+and active-support unit work are independent of command authority, and creation opens the central
+created-order identity. A managed Chromium journey uses distinct requester and processor accounts:
+it rejects an unrelated live room, observes peer queue updates without reload, preserves an open
+personal-note draft and its independent version, then saves and applies the deferred detail update.
+Money kinds and their submitted-operation retry remain pending.
 
 All kinds share the overview and a type filter. Its scopes are Meine (requesting units),
 Ich bearbeite (personal Bearbeiter), Zu bearbeiten (responsible or supporting own units under
@@ -267,7 +271,10 @@ Notification preferences, recipient deduplication and privacy gates remain; see
 - [ ] Creation opens the detail; peer updates preserve an open edit.
 - [ ] Retry after an unknown submitted money outcome cannot duplicate its effects.
 
-**Enforced by:** Pending implementation · **Issues:** #3201, #3202
+**Enforced by:** `JobOrderSupportReadIntegrationTest`, `JobOrderHierarchyAuthorityIntegrationTest`,
+`OrdersListPatternRenderTest`, `JobOrderCreationWorkspaceMvcTest`, `JobOrderCreateE2eTest` and
+`JobOrderSharedWorkspaceE2eTest` cover the implemented MATERIAL/ITEM workspace. Money-operation
+retry remains pending. **Issues:** #3201, #3202
 
 ## Out of scope
 
