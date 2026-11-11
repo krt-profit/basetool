@@ -3254,7 +3254,8 @@ opaque `BankLinkedAttempt`. V401 stores the attempt's identity, submitted rate a
 existing staff queue and detail show the frozen terms, with the actual counterparty separate from
 the applicant. A custody-only request uses its two registered custodians for the movement and Bank
 staff authority for the decision. A successful authorisation stores its principal, account,
-custodian and deciding actor in `bank_authorisation`. Staff see **Authorised** in the existing
+custodian and deciding actor in `bank_authorisation`. The deciding actor remains with the historical
+act during account merges. Staff see **Authorised** in the existing
 confirmed request set.
 
 **Target acceptance**

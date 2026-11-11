@@ -82,8 +82,9 @@ class UserReassignmentOrderTest {
               + "bank_account_approval_limit.grantee_user_id[account_id+grantee_kind],"
               + "bank_holder.user_id"
               + "|bank_audit_event.actor_user_id,bank_audit_event.target_user_id,"
-              + "bank_account_grant.granted_by,bank_booking_request.requested_by,"
-              + "bank_booking_request.decided_by,bank_booking_request.owner_approval_granted_by,"
+              + "bank_account_grant.granted_by,bank_authorisation.authorised_by,"
+              + "bank_booking_request.requested_by,bank_booking_request.decided_by,"
+              + "bank_booking_request.owner_approval_granted_by,"
               + "bank_booking_request.counterparty_user_id,bank_transaction.initiated_by,"
               + "bank_transaction.counterparty_user_id",
           "130:NotificationUserReassignment|notification.recipient_user_id,"
@@ -136,7 +137,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(81);
+    assertThat(all).doesNotHaveDuplicates().hasSize(82);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {
