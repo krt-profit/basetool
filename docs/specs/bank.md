@@ -3254,11 +3254,12 @@ opaque `BankLinkedAttempt`. V401 stores the attempt's identity, submitted rate a
 existing staff queue and detail show the frozen terms, with the actual counterparty separate from
 the applicant. A custody-only request uses its two registered custodians for the movement and Bank
 staff authority for the decision. A successful authorisation stores its principal, account,
-custodian and deciding actor in `bank_authorisation`. Staff see **Authorised** in the existing
-confirmed request set. A new Bank attempt must use the current configured rate. A replacement
-checks its basis against the exact failed Bank attempt so a setting change cannot reprice the same
-payment. The owning operation can verify that a selected active custodian matches its known
-registered member without obtaining Bank custody data.
+and deciding actor in `bank_authorisation`, with the custodian when applicable. The deciding
+actor remains with the historical act during account merges. Staff see **Authorised** in the
+existing confirmed request set. A new Bank attempt uses the current configured rate. A
+replacement checks its basis against the exact failed Bank attempt, retaining the same rate
+across a setting change. The owning operation can verify that a selected active custodian
+matches its known registered member without obtaining Bank custody data.
 
 A linked deposit into an Order account holding enters the ordinary staff queue. The request
 retains the actual depositor and leaves the receiving custodian for staff to select. Confirmation

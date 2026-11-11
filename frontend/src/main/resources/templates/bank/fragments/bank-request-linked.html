@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<th:block th:fragment="holderRoute(r)" th:text="${@handles.display(r.holderHandle())} + ' &#8594; ' + ${@handles.display(r.linked().destinationHolderHandle())}">nova &#8594; talon</th:block>
+<th:block th:fragment="holderRoute(r)" th:with="linked=${r.linked()}"
+          th:text="${@handles.display(r.holderHandle())} + ' &#8594; ' + ${@handles.display(linked.destinationHolderHandle())}">nova &#8594; talon</th:block>
 <span th:fragment="fee(r)" th:if="${r.linked() != null and r.type() != 'AUTHORISATION' and r.type() != 'DEPOSIT'}"
       class="cell-sub" data-linked-fee data-testid="bank-request-linked-fee"
       th:with="feeKey=${r.holderTransfer() ? 'bank.request.linked.krtFee' : 'bank.request.linked.fee'}"

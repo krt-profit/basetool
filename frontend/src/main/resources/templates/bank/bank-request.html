@@ -43,9 +43,9 @@
                     <span class="bank-detail-label" th:text="#{bank.field.holder}">Halter</span>
                     <span class="bank-detail-value" th:text="${@handles.display(r.holderHandle())}">nova</span>
                 </div>
-                <div class="bank-detail-item" th:if="${r.linked() != null and r.linked().destinationHolderHandle() != null}">
+                <div class="bank-detail-item" th:if="${r.linked() != null and r.linked().destinationHolderHandle() != null}" th:with="linked=${r.linked()}">
                     <span class="bank-detail-label" th:text="#{bank.field.holder.target}">Ziel-Halter</span>
-                    <span class="bank-detail-value" th:text="${@handles.display(r.linked().destinationHolderHandle())}">talon</span>
+                    <span class="bank-detail-value" th:text="${@handles.display(linked.destinationHolderHandle())}">talon</span>
                 </div>
                 <div class="bank-detail-item" th:if="${r.counterpartyHandle() != null}">
                     <span class="bank-detail-label"
