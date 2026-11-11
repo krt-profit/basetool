@@ -222,7 +222,19 @@ public class JobOrderPageReader {
       @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions,
       @NotNull List<OrgUnitMembershipOptionDto> claimingOptions,
       @NotNull Part<JobOrderSupportDto> support,
-      @NotNull Part<JobOrderMoneyView> money) {}
+      @NotNull Part<JobOrderMoneyView> money) {
+
+    /** Supplies the status badge class for the order detail and its fragments. */
+    @NotNull
+    String statusClass() {
+      return switch (order.status()) {
+        case "OPEN" -> "status-planned";
+        case "IN_PROGRESS" -> "status-active";
+        case "COMPLETED" -> "status-completed";
+        case null, default -> "status-cancelled";
+      };
+    }
+  }
 
   /**
    * Everything the authorized creation form renders.

@@ -333,14 +333,7 @@ public class JobOrderPageController {
     JobOrderDto order = detail.order();
     model.addAttribute("order", order);
     model.addAttribute("orderStatusKey", "status." + order.status());
-    model.addAttribute(
-        "orderStatusClass",
-        switch (order.status()) {
-          case "OPEN" -> "status-planned";
-          case "IN_PROGRESS" -> "status-active";
-          case "COMPLETED" -> "status-completed";
-          case null, default -> "status-cancelled";
-        });
+    model.addAttribute("orderStatusClass", detail.statusClass());
     model.addAttribute("currentUserId", detail.currentUserId().orElse(null));
     addPart(model, "money", detail.money());
     model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));
