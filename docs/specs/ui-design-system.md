@@ -2190,8 +2190,7 @@ REQ-UI-006, REQ-UI-009, REQ-UI-017, REQ-UI-022, REQ-FE-021
 
 Segment toggles, the filter button, the title count and row icon buttons stood as black boxes with a
 `#282828` hairline on black: 1.42:1, where WCAG 1.4.11 asks 3:1. The 2026-10 design system
-(krt-profit/design-system#7, `proposals/list-readability-claude-code-auftrag.md`) fixes it for the
-whole app.
+(krt-profit/design-system#7) fixes it for the whole app.
 
 1. **Tokens.** `:root` mirrors `--surface-canvas/-panel/-inset/-raised` and `--control-bg`,
    `--control-bg-hover`, `--control-border` (Grau 2), `--control-fg`, `--control-selected-bg/-border/-fg`;

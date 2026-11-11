@@ -7,11 +7,11 @@
 ## Context & goal
 
 The mission detail page (`/missions/{id}`) uses the **tab layout (Variante B)** approved in the
-DAS KARTELL design system. The binding visual sources are the mockups in the design-system
-submodule (`.claude/skills/das-kartell-design/proposals/mission-page-tabs-gesamt.html`,
-`mission-tab-crew-board.html`, `mission-tab-finanzen.html`, `mission-tab-uebersicht-verwaltung.html`,
-`mission-modals.html`) and the canonised components in `krt-components.css` (`.tab-nav`,
-`.facts-bar`, `.krt-modal*`, `.person-row`, `.drop-zone`, `.chip-select`).
+DAS KARTELL design system. The binding sources are this spec and the canonised components in the
+design-system submodule's `krt-components.css` (`.tab-nav`, `.facts-bar`, `.krt-modal*`,
+`.person-row`, `.drop-zone`, `.chip-select`), described in its README section "Mission page (tabs,
+modal, assign board)" and shown on the specimens `components/TabNav/`, `components/Modal/` and
+`components/AssignBoard/` (`preview.html` each) under `.claude/skills/das-kartell-design/`.
 
 The rebuild is a **pure presentation restructure**: every backend contract (endpoints, DTOs,
 optimistic-locking versions) and every permission gate of the previous panel layout is preserved.
