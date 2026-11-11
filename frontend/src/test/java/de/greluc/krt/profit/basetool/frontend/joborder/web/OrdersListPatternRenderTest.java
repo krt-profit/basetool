@@ -42,6 +42,8 @@ import java.util.Locale;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -148,10 +150,10 @@ class OrdersListPatternRenderTest {
     return new PageResponse<>(List.of(order), 0, 100, 1L, 1, List.of());
   }
 
-  @Test
+  @ParameterizedTest
+  @ValueSource(strings = {"ITEM", "AUEC"})
   @WithMockUser
-  void kindFilterUsesBackendNarrowingAndSurvivesPaginationWithoutAnUnfinishedKind()
-      throws Exception {
+  void kindFilterUsesBackendNarrowingAndSurvivesPagination(String kind) throws Exception {
     when(backendApiClient.get(
             eq(QUEUE_URL + "&type={type}"),
             anyTypeRef(),
@@ -159,10 +161,10 @@ class OrdersListPatternRenderTest {
             eq(100),
             eq("OPEN"),
             eq("IN_PROGRESS"),
-            eq("ITEM")))
+            eq(kind)))
         .thenReturn(new PageResponse<>(onePage("OPEN").content(), 0, 100, 300L, 3, List.of()));
 
-    String html = render(true, "type=ITEM");
+    String html = render(true, "type=" + kind);
 
     verify(backendApiClient)
         .get(
@@ -172,11 +174,11 @@ class OrdersListPatternRenderTest {
             eq(100),
             eq("OPEN"),
             eq("IN_PROGRESS"),
-            eq("ITEM"));
+            eq(kind));
     assertThat(html)
-        .containsPattern("<option value=\"ITEM\"[^>]*selected=\"selected\"")
-        .contains("type=ITEM")
-        .doesNotContain("<option value=\"AUEC\"");
+        .containsPattern("<option value=\"" + kind + "\"[^>]*selected=\"selected\"")
+        .contains("type=" + kind)
+        .contains("<option value=\"AUEC\"");
   }
 
   /** The list renders on the pattern: head, scope segment, popover, row link, status, foot. */

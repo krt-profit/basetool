@@ -25,11 +25,29 @@ import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 /** @typedef {ApiDto<'JobOrderMoneyOutcome'>} ProvisionOutcome */
 
 /**
+ * Identifies a permanently refused provision from its authoritative outcome.
+ *
+ * @param {unknown} status the HTTP status
+ * @param {unknown} problem the relayed problem document
+ * @returns {boolean} whether the original operation can never book
+ */
+function definitivelyRefused(status, problem) {
+    return (
+        status === 409 &&
+        problem !== null &&
+        typeof problem === 'object' &&
+        'code' in problem &&
+        problem.code === 'MONEY_PROVISION_REFUSED'
+    );
+}
+
+/**
  * Binds outcome recovery to the authenticated account and the current order.
  *
  * @param {HTMLElement} root the recovery controls and account scope
+ * @param {(terms: ProvisionTerms) => void} restoreRefused the editor for the refused terms
  */
-export function bindProvisionRecovery(root) {
+export function bindProvisionRecovery(root, restoreRefused) {
     const url = `/orders/${root.dataset.orderId}/money`;
     const key = `krt:order-provision:${root.dataset.accountId}:${root.dataset.orderId}`;
     const banner = root.querySelector('[data-money-recovery]');
@@ -52,16 +70,49 @@ export function bindProvisionRecovery(root) {
     }
 
     /**
+     * Clears only this resolved operation from the account's current order slot.
+     *
+     * @param {ProvisionTerms} terms the resolved submission
+     * @returns {Promise<boolean>} whether this operation still held the recovery slot
+     */
+    const forget = (terms) =>
+        navigator.locks.request(key, () => {
+            const matches = pending()?.operationId === terms.operationId;
+            if (matches) localStorage.removeItem(key);
+            banner.hidden = pending() === null;
+            return matches;
+        });
+
+    /** Reads the current holder and order state after a resolved submission. */
+    const refresh = () =>
+        joborderHooks.refreshOrderSection?.(['money', 'header', 'actions'], { broadcast: false });
+
+    /**
      * Removes a resolved operation and refreshes its visible effects.
      *
      * @param {ProvisionTerms} terms the submitted terms
      */
     const finish = async (terms) => {
-        if (pending()?.operationId === terms.operationId) localStorage.removeItem(key);
-        banner.hidden = pending() === null;
+        await forget(terms);
         showFrontendSuccessToast(root.dataset.recorded || '');
-        await joborderHooks.refreshOrderSection?.(['money', 'header', 'actions'], {
-            broadcast: false,
+        await refresh();
+    };
+
+    /**
+     * Restores the terms of a permanent refusal against the latest holder basis.
+     *
+     * @param {ProvisionTerms} terms the refused submission
+     */
+    const refuse = async (terms) => {
+        if (!(await forget(terms))) return;
+        await refresh();
+        await navigator.locks.request(key, () => {
+            if (pending()) {
+                banner.hidden = false;
+                return;
+            }
+            restoreRefused(terms);
+            showFrontendErrorToast(root.dataset.refused || '');
         });
     };
 
@@ -77,7 +128,12 @@ export function bindProvisionRecovery(root) {
             const outcome = await krtFetch.getJson(`${url}/operations/${terms.operationId}`);
             if (outcome?.operationId === terms.operationId) await finish(terms);
         } catch (error) {
-            retry.hidden = !(error instanceof Error && 'status' in error && error.status === 404);
+            if (!(error instanceof Error) || !('status' in error)) return;
+            if ('problem' in error && definitivelyRefused(error.status, error.problem)) {
+                await refuse(terms);
+                return;
+            }
+            retry.hidden = error.status !== 404;
         }
     };
 
@@ -125,14 +181,15 @@ export function bindProvisionRecovery(root) {
                 await finish(terms);
                 return true;
             }
+            if (definitivelyRefused(result.status, result.body)) {
+                await refuse(terms);
+                return false;
+            }
             if (!retrying && [400, 403, 409, 422].includes(result.status)) {
-                if (pending()?.operationId === terms.operationId) localStorage.removeItem(key);
-                banner.hidden = true;
+                await forget(terms);
                 showFrontendErrorToast(root.dataset.provideError || '');
                 if (result.status === 403 || result.status === 409) {
-                    await joborderHooks.refreshOrderSection?.(['money', 'header', 'actions'], {
-                        broadcast: false,
-                    });
+                    await refresh();
                 }
                 return false;
             }

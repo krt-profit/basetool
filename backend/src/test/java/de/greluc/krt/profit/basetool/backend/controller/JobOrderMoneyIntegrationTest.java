@@ -497,6 +497,74 @@ class JobOrderMoneyIntegrationTest {
   }
 
   @Test
+  void aRefusedOperationCanNeverBeAcceptedWithUpdatedTerms() throws Exception {
+    UUID order = createOrder();
+    UUID missing = UUID.randomUUID();
+    String refusedCode = "MONEY_PROVISION_REFUSED";
+    var outcome =
+        get("/api/v1/orders/{id}/money/operations/{operation}", order, missing).with(reader());
+    mvc.perform(outcome).andExpect(status().isNotFound());
+
+    provision(order, reader(), provisionTerms(UUID.randomUUID(), "7", 0))
+        .andExpect(status().isOk());
+    provision(order, reader(), provisionTerms(missing, "19", 0))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value(refusedCode));
+    mvc.perform(outcome)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value(refusedCode));
+    provision(order, reader(), provisionTerms(missing, "19", 1))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value(refusedCode));
+
+    provision(order, reader(), provisionTerms(UUID.randomUUID(), "19", 1))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("26"))
+        .andExpect(jsonPath("$.history.length()").value(2));
+    mvc.perform(provisionAudit())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(2));
+  }
+
+  @Test
+  void refusalWhileAnOrderIsClosedSurvivesReopening() throws Exception {
+    UUID order = createOrder();
+    UUID operation = UUID.randomUUID();
+    Map<String, ?> terms = provisionTerms(operation, "23", 0);
+    mvc.perform(
+            put("/api/v1/orders/{id}/status", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CANCELLED\",\"version\":0}"))
+        .andExpect(status().isOk());
+    provision(order, reader(), terms)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+
+    mvc.perform(
+            put("/api/v1/orders/{id}/status", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"OPEN\",\"version\":1}"))
+        .andExpect(status().isOk());
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, operation)
+                .with(reader()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+    provision(order, reader(), terms)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.history").isEmpty());
+    provision(order, reader(), provisionTerms(UUID.randomUUID(), "23", 0))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   @Timeout(60)
   void eligibleDeletionWinsAgainstWaitingFirstSubmission() throws Exception {
     UUID order = createOrder();
@@ -506,6 +574,14 @@ class JobOrderMoneyIntegrationTest {
         .andExpect(jsonPath("$.canDelete").value(true));
     provision(order, reader(), provisionTerms(operation, "0.5", 0))
         .andExpect(status().isBadRequest());
+    UUID refused = UUID.randomUUID();
+    provision(order, reader(), provisionTerms(refused, "12", 1))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(admin()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canDelete").value(true))
+        .andExpect(jsonPath("$.history").isEmpty());
 
     RaceResults race =
         serializeBehind(

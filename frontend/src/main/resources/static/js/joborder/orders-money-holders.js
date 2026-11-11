@@ -21,6 +21,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtSearchableSelect } from '/js/kernel/krt-searchable-select.js';
 
 /** @typedef {ApiDto<'JobOrderMoneyHolderCandidate'>} HolderCandidate */
+/** @typedef {ApiDto<'ProvideJobOrderMoneyDto'>} ProvisionTerms */
 /** @typedef {Pick<ApiDto<'PreviewJobOrderMoneyProvisionDto'>, 'holderId' | 'holderUserId' | 'holderName' | 'holderVersion'>} HolderSelection */
 
 const accountlessValue = 'accountless';
@@ -164,9 +165,36 @@ export function bindHolderChoices(form, root) {
     return {
         refresh,
         selection,
+        canProvide() {
+            return canSelf || canOnBehalf;
+        },
         reset() {
             choice.krtCombobox?.setValue('');
             refresh();
+        },
+        /**
+         * Reopens the selected party using its current authorized label and revision.
+         *
+         * @param {ProvisionTerms} terms the permanently refused submission
+         */
+        restore(terms) {
+            if (terms.holderId) {
+                mode.value = 'existing';
+                existing.value = terms.holderId;
+            } else if (terms.holderUserId) {
+                mode.value = 'new';
+                const holder = holders.find(
+                    (row) => row.getAttribute('data-user-id') === terms.holderUserId,
+                );
+                const label = holder?.getAttribute('data-holder-label');
+                if (label) choice.krtCombobox?.setValue(terms.holderUserId, label);
+            } else if (terms.holderName) {
+                mode.value = 'new';
+                const name = terms.holderName;
+                const label = freeTextLabel.replace('{0}', () => name);
+                choice.krtCombobox?.setValue(accountlessValue, label, { holderName: name });
+            }
+            sync();
         },
     };
 }

@@ -16,7 +16,7 @@
                 </div>
                 <div class="form-group">
                     <label for="auec-target" th:text="#{orders.money.target.withUnit}"></label>
-                    <input type="text" id="auec-target" name="target" inputmode="numeric"
+                    <input type="text" id="auec-target" name="target" inputmode="numeric" data-number-input="exact-whole"
                            data-testid="order-auec-target" th:data-invalid="#{orders.money.amount.invalid}" required>
                 </div>
             </div>

@@ -19,7 +19,7 @@
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { bindWholeAuec, readWholeAuec } from '/js/joborder/orders-money-amount.js';
+import { bindWholeAuec, formatWholeAuec, readWholeAuec } from '/js/joborder/orders-money-amount.js';
 import { bindHolderChoices } from '/js/joborder/orders-money-holders.js';
 import { bindProvisionPreview } from '/js/joborder/orders-money-preview.js';
 import { bindProvisionRecovery } from '/js/joborder/orders-money-recovery.js';
@@ -52,8 +52,9 @@ function bindProvisionForm(root, form) {
         throw new Error('The order provision form controls are missing');
     }
 
-    const recovery = bindProvisionRecovery(root);
     const holders = bindHolderChoices(form, root);
+    /** @type {ApiDto<'ProvideJobOrderMoneyDto'> | null} */
+    let refusedDraft = null;
     let basis = '';
     let saving = false;
     bindWholeAuec(input);
@@ -71,19 +72,48 @@ function bindProvisionForm(root, form) {
         if (!saving) preview.refresh();
     };
 
+    /**
+     * Opens a new draft or restores the refused terms for another explicit choice.
+     *
+     * @param {ApiDto<'ProvideJobOrderMoneyDto'> | null} [refused] the resolved stale submission
+     */
+    const open = (refused = null) => {
+        form.reset();
+        holders.reset();
+        preview.reset();
+        changed.hidden = refused === null;
+        amountError.hidden = true;
+        input.removeAttribute('aria-invalid');
+        if (refused?.amount) {
+            holders.restore(refused);
+            input.value = formatWholeAuec(refused.amount);
+        }
+        updateDraft();
+        krtModal.open(modalId);
+    };
+
+    const openPending = () => {
+        open(refusedDraft);
+        refusedDraft = null;
+    };
+
+    const recovery = bindProvisionRecovery(root, (refused) => {
+        refusedDraft = refused;
+        holders.refresh();
+        if (holders.canProvide()) {
+            openPending();
+        } else {
+            krtModal.close(modalId);
+            form.reset();
+            preview.reset();
+        }
+    });
     krtEvents.on('click', 'od-money-open', () => {
         if (recovery.pending()) {
             void recovery.recover();
             return;
         }
-        form.reset();
-        holders.reset();
-        preview.reset();
-        changed.hidden = true;
-        amountError.hidden = true;
-        input.removeAttribute('aria-invalid');
-        updateDraft();
-        krtModal.open(modalId);
+        openPending();
     });
     form.addEventListener('input', updateDraft);
     form.addEventListener('change', updateDraft);

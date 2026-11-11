@@ -33,10 +33,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /** Reads and records exact order-local monetary facts through the backend API. */
-@Component
+@Service
 @RequiredArgsConstructor
 public class JobOrderMoneyBackendClient {
 

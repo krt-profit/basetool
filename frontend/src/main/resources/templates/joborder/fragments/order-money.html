@@ -22,7 +22,8 @@
             <h3 id="order-money-holders" class="section-title" th:text="#{orders.money.holders}"></h3>
             <ul class="od-assignee-list">
                 <li class="od-assignee split" th:each="holder : ${money.holders}"
-                    th:with="label=${@handles.display(holder.displayName) ?: #messages.msg('orders.money.nameUnavailable')}"
+                    th:with="name=${@handles.display(holder.displayName) ?: #messages.msg('orders.money.nameUnavailable')},
+                             label=${#messages.msg(holder.userId != null ? 'orders.money.holder.linkedLabel' : 'orders.money.holder.accountlessLabel', name)}"
                     th:data-money-holder="${holder.id}" th:data-user-id="${holder.userId}"
                     th:data-version="${holder.version}" th:data-holder-label="${label}">
                     <span th:text="${label}"></span>
@@ -58,6 +59,7 @@
 <th:block th:fragment="provision">
     <div id="order-money-operation" th:data-account-id="${currentUserId}" th:data-order-id="${order.id}"
          th:data-recorded="#{orders.money.recorded}" th:data-storage-error="#{orders.money.storage.error}"
+         th:data-refused="#{orders.money.recovery.refused}"
          th:data-provide-error="#{orders.money.provide.error}">
         <div class="alert alert-warning" data-money-recovery hidden>
             <p data-testid="order-money-unknown" role="status" th:text="#{orders.money.recovery.unknown}"></p>
@@ -110,7 +112,7 @@
             </div>
             <div class="form-group">
                 <label for="order-money-amount" th:text="#{orders.money.amount.withUnit}"></label>
-                <input type="text" id="order-money-amount" name="amount" inputmode="numeric"
+                <input type="text" id="order-money-amount" name="amount" inputmode="numeric" data-number-input="exact-whole"
                        data-testid="order-money-amount" aria-describedby="order-money-amount-error" required>
                 <p id="order-money-amount-error" class="field-error" data-money-amount-error hidden
                    th:text="#{orders.money.amount.invalid}"></p>

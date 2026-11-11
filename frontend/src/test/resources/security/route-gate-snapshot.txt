@@ -497,6 +497,7 @@
 /operations/{id}/update POST -> OperationPageController#updateOperation gate=method:@missionManagerGate.isGranted() layout=yes
 /operations/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#updateOperationAjax gate=method:@missionManagerGate.isGranted() layout=yes
 /orders GET -> JobOrderPageController#viewOrders gate=class:isAuthenticated() layout=yes
+/orders/auec POST -> JobOrderMoneyProxyController#create gate=class:isAuthenticated() layout=no
 /orders/create GET -> JobOrderCreatePageController#viewCreateForm gate=class:isAuthenticated() layout=yes
 /orders/create POST -> JobOrderWriteController#createOrder gate=class:isAuthenticated() layout=yes
 /orders/create POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#createOrderAjax gate=class:isAuthenticated() layout=yes
@@ -537,6 +538,10 @@
 /orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
+/orders/{id}/money/holder-candidates GET -> JobOrderMoneyProxyController#holderCandidates gate=class:isAuthenticated() layout=no
+/orders/{id}/money/operations/{operation} GET -> JobOrderMoneyProxyController#outcome gate=class:isAuthenticated() layout=no
+/orders/{id}/money/provisions POST -> JobOrderMoneyProxyController#provide gate=class:isAuthenticated() layout=no
+/orders/{id}/money/provisions/preview POST -> JobOrderMoneyProxyController#preview gate=class:isAuthenticated() layout=no
 /orders/{id}/participations/{unitId} DELETE -> JobOrderResponsibilityProxyController#withdrawSupport gate=class:isAuthenticated() layout=no
 /orders/{id}/participations/{unitId} PUT -> JobOrderResponsibilityProxyController#enrollSupport gate=class:isAuthenticated() layout=no
 /orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes

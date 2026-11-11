@@ -31,9 +31,11 @@ import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -76,9 +78,9 @@ public class JobOrderMoneyCommands {
    *
    * @param orderId the aUEC order
    * @param dto the submitted provision and observed holder revision
-   * @return the recorded result of this operation
+   * @return the recorded result, or empty for a durable refusal with no monetary effect
    */
-  public JobOrderMoneyOutcome provide(UUID orderId, ProvideJobOrderMoneyDto dto) {
+  public Optional<JobOrderMoneyOutcome> provide(UUID orderId, ProvideJobOrderMoneyDto dto) {
     BigDecimal amount = WholeAuec.positive(dto.amount());
     JobOrderMoneySelection selection = dto.selection();
     UUID actor =
@@ -99,12 +101,20 @@ public class JobOrderMoneyCommands {
   public JobOrderMoneyProvisionPreview preview(UUID orderId, PreviewJobOrderMoneyProvisionDto dto) {
     JobOrder order = queries.requireReadableMoneyOrder(orderId);
     responsibility.assertWritable(order);
-    UUID actor = requireActor();
+    final UUID actor = requireActor();
     JobOrderMoneySelection selection = dto.selection();
     authorizeSelection(order, selection);
-    requireFreshProvision(order, dto.bankHandling());
+    requireBankFree(dto.bankHandling());
+    if (!order.getStatus().isActive()) {
+      throw new BusinessConflictException("orders.money.provision.inactive");
+    }
     BigDecimal amount = WholeAuec.positive(dto.amount());
-    JobOrderMoneyHolder holder = holderChoices.resolve(orderId, actor, selection);
+    JobOrderMoneyHolder holder;
+    try {
+      holder = holderChoices.resolve(orderId, actor, selection);
+    } catch (JobOrderMoneyHolders.UnavailableHolderException unavailable) {
+      throw unavailable.previewProblem();
+    }
     requireHolderVersion(holder, dto.holderVersion());
     BigDecimal current = holdingAmount(holder.getId());
     return new JobOrderMoneyProvisionPreview(
@@ -124,7 +134,7 @@ public class JobOrderMoneyCommands {
     }
   }
 
-  private JobOrderEditor.MoneyEdit<JobOrderMoneyOutcome> provideChecked(
+  private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> provideChecked(
       JobOrder order,
       ProvideJobOrderMoneyDto dto,
       UUID actor,
@@ -138,9 +148,21 @@ public class JobOrderMoneyCommands {
     if (existing.isPresent()) {
       return replay(order, existing.orElseThrow(), actor, amount, dto.bankHandling(), selection);
     }
-    requireFreshProvision(order, dto.bankHandling());
-    JobOrderMoneyHolder holder = holderChoices.resolve(order.getId(), actor, selection);
-    requireHolderVersion(holder, dto.holderVersion());
+    if (operations.isRefused(order.getId(), dto.operationId())) {
+      return refused(order);
+    }
+    requireBankFree(dto.bankHandling());
+    if (!order.getStatus().isActive()) {
+      return reserveRefusal(order, dto.operationId());
+    }
+    JobOrderMoneyHolder holder;
+    try {
+      holder = holderChoices.resolve(order.getId(), actor, selection);
+      requireHolderVersion(holder, dto.holderVersion());
+    } catch (ObjectOptimisticLockingFailureException
+        | JobOrderMoneyHolders.UnavailableHolderException unavailableBasis) {
+      return reserveRefusal(order, dto.operationId());
+    }
     boolean newLinkedHolder = holder.getId() == null && holder.getUserId() != null;
     holder.recordChange();
     UUID holderId = Objects.requireNonNull(holders.save(holder).getId());
@@ -164,7 +186,18 @@ public class JobOrderMoneyCommands {
             order,
             AuditEventType.JOB_ORDER_MONEY_PROVIDED,
             AuditDetails.of("operationId", operation.getOperationId()).with("amount", amount));
-    return new JobOrderEditor.MoneyEdit<>(queries.projectOutcome(operation, holder), audit);
+    return new JobOrderEditor.MoneyEdit<>(
+        Optional.of(queries.projectOutcome(operation, holder)), audit);
+  }
+
+  private static JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> refused(JobOrder order) {
+    return new JobOrderEditor.MoneyEdit<>(Optional.empty(), JobOrderEdit.unchanged(order));
+  }
+
+  private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> reserveRefusal(
+      JobOrder order, UUID operationId) {
+    operations.reserveRefusal(order.getId(), operationId);
+    return refused(order);
   }
 
   private UUID requireActor() {
@@ -182,12 +215,9 @@ public class JobOrderMoneyCommands {
     }
   }
 
-  private static void requireFreshProvision(JobOrder order, boolean bankHandling) {
+  private static void requireBankFree(boolean bankHandling) {
     if (bankHandling) {
       throw new BadRequestException("orders.money.bankHandling.unavailable");
-    }
-    if (!order.getStatus().isActive()) {
-      throw new BusinessConflictException("orders.money.provision.inactive");
     }
   }
 
@@ -195,7 +225,7 @@ public class JobOrderMoneyCommands {
     OptimisticLock.check(holder.getRevision(), version, JobOrderMoneyHolder.class, holder.getId());
   }
 
-  private JobOrderEditor.MoneyEdit<JobOrderMoneyOutcome> replay(
+  private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> replay(
       JobOrder order,
       JobOrderMoneyOperation operation,
       UUID actor,
@@ -212,6 +242,6 @@ public class JobOrderMoneyCommands {
     }
     JobOrderMoneyHolder holder = holders.findById(operation.getHolderId()).orElseThrow();
     return new JobOrderEditor.MoneyEdit<>(
-        queries.projectOutcome(operation, holder), JobOrderEdit.unchanged(order));
+        Optional.of(queries.projectOutcome(operation, holder)), JobOrderEdit.unchanged(order));
   }
 }

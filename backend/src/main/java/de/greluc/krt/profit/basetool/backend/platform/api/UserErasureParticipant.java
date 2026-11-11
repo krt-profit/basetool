@@ -94,13 +94,6 @@ public interface UserErasureParticipant {
   int position();
 
   /**
-   * Acquires any module locks required before the deletion marks the account absent or erases rows.
-   *
-   * @param userId the departing member's {@code app_user.id}
-   */
-  default void prepareErasure(@NotNull UUID userId) {}
-
-  /**
    * Erases the member's rows of this module.
    *
    * @param userId the departing member's {@code app_user.id}

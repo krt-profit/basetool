@@ -61,8 +61,11 @@ evidence is claimed by accepting this ADR.
 The initial provision uses the existing order row guard, an independent holder revision and a
 separately versioned target. The accepted attempt is a typed fact scoped by order and caller's
 logical UUID. Current labels are projected from the holder and actor, while the submitted
-selection remains separately recoverable subject to name erasure. The [aUEC specification](../specs/orders-auec.md)
-records the implemented checkpoint and its verification.
+selection remains separately recoverable subject to name erasure. A stale, unrecorded attempt or
+one checked while the order is inactive reserves its UUID under the same guard as a definitive
+refusal. The reservation carries no financial effect, actor, or submitted terms and does not
+block hard deletion. The [aUEC specification](../specs/orders-auec.md) records the implemented
+checkpoint and its verification.
 
 ## Alternatives considered
 

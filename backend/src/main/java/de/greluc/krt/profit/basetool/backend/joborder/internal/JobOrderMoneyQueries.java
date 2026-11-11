@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -152,20 +153,24 @@ public class JobOrderMoneyQueries {
   }
 
   /**
-   * Recovers an accepted provision without performing a write.
+   * Recovers a decided provision without performing a write.
    *
    * @param orderId the aUEC order whose current read access governs lookup
    * @param operationId the caller's logical operation identity
-   * @return the accepted outcome
-   * @throws NotFoundException if no accepted outcome exists
+   * @return the accepted outcome, or empty for a durable refusal with no monetary effect
+   * @throws NotFoundException if no outcome is known
    */
-  public JobOrderMoneyOutcome getOutcome(UUID orderId, UUID operationId) {
+  public Optional<JobOrderMoneyOutcome> getOutcome(UUID orderId, UUID operationId) {
     requireReadableMoneyOrder(orderId);
-    return operations
-        .findByOrderIdAndOperationId(orderId, operationId)
-        .map(operation ->
-            projectOutcome(operation, holders.findById(operation.getHolderId()).orElseThrow()))
-        .orElseThrow(() -> new NotFoundException("orders.money.operation.unknown"));
+    var accepted =
+        operations
+            .findByOrderIdAndOperationId(orderId, operationId)
+            .map(operation ->
+                projectOutcome(operation, holders.findById(operation.getHolderId()).orElseThrow()));
+    if (accepted.isEmpty() && !operations.isRefused(orderId, operationId)) {
+      throw new NotFoundException("orders.money.operation.unknown");
+    }
+    return accepted;
   }
 
   /**

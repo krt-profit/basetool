@@ -369,6 +369,27 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "jobOrderMoneyHolders",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : <n>,
+      "holder_id" : "<uuid>",
+      "revision" : 1
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "jobOrderMoneyOperations",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : <n>,
+      "operation_id" : "<uuid>",
+      "holder_id" : "<uuid>",
+      "amount" : "17",
+      "bank_handling" : false,
+      "recorded_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "marketOffers",
     "legalBasis" : "ART_15_20",
     "rows" : [ {

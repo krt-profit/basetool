@@ -49,6 +49,9 @@ export const NUMBER_GERMAN = Object.freeze({ group: '.', decimal: ',' });
 /** The most integer digits a field keeps; more cannot be represented exactly as a number. */
 export const NUMBER_MAX_INT_DIGITS = 15;
 
+/** The number-input mode for fields that preserve all whole digits. */
+export const EXACT_WHOLE_INPUT_MODE = 'exact-whole';
+
 /**
  * Finds the thousands and decimal separators of a language.
  *

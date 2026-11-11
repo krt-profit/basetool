@@ -271,6 +271,8 @@ class JobOrderMoneyPrivacyIntegrationTest {
 
     mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
         .andExpect(status().isForbidden());
+    assertMergedSelectionRefused(order, "holderId", sourceHolder);
+    assertMergedSelectionRefused(order, "holderUserId", unitless.toString());
     mvc.perform(get("/api/v1/orders/{id}/money", order).with(signedInMember(survivor)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.provided").value("9007199254741000"))
@@ -288,6 +290,32 @@ class JobOrderMoneyPrivacyIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.holderId").value(sourceHolder))
         .andExpect(jsonPath("$.amount").value("9007199254740993"));
+  }
+
+  private void assertMergedSelectionRefused(UUID order, String reference, String value)
+      throws Exception {
+    UUID operation = UUID.randomUUID();
+    provision(
+            order,
+            writer(),
+            Map.of(
+                "operationId",
+                operation,
+                "amount",
+                "19",
+                "bankHandling",
+                false,
+                "holderVersion",
+                1,
+                reference,
+                value))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, operation)
+                .with(writer()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
   }
 
   private String provisionFor(UUID order, UUID operation, String amount, UUID holderUser)

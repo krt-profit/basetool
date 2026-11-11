@@ -341,15 +341,21 @@ idempotency is not proof of logical-operation idempotency.
 - [ ] Reload recovers the original submitted identity and outcome without another game payment.
 - [ ] An unauthorised caller cannot inspect an outcome by knowing its ID.
 
-**Enforced by:** `JobOrderMoneyIntegrationTest` covers durable provision replay, terms and current
-authority against PostgreSQL; `JobOrderMoneyE2eTest` covers an actual committed response loss.
+**Enforced by:** `JobOrderMoneyIntegrationTest` covers durable provision replay, refusal, terms
+and current authority against PostgreSQL. `JobOrderMoneyE2eTest` covers actual committed response
+loss and recovery from a missed request followed by a stale retry.
 Bank waiting and replacement attempts require their own checks.
 
 For an immediate provision, `POST /api/v1/orders/{id}/money/provisions` uses the caller's
 operation UUID and records one accepted attempt. A current authorized actor may replay matching
-terms with an older holder version. `GET /api/v1/orders/{id}/money/operations/{operation}` checks
-current order access before returning the recorded effect or an unknown outcome. The browser
-keeps submitted recovery state scoped to the account and order until a definite result is known.
+terms with an older holder version. If an unrecorded operation is checked while the order is
+inactive or its captured holder is stale or no longer selectable, the same guard permanently
+refuses its UUID. The refusal has no financial or audit effect and does not count as the first
+accepted submission for deletion. The authorized
+`GET /api/v1/orders/{id}/money/operations/{operation}` returns the recorded effect,
+`409 MONEY_PROVISION_REFUSED` for that permanent refusal, or `404` for an unknown result.
+The browser keeps uncertain terms scoped to account and order. After a proven refusal it loads
+the current holding for review and requires a deliberate new operation.
 
 ### REQ-ORDERS-066 — Narrow edit scopes protect shared financial invariants
 

@@ -45,6 +45,27 @@ class JobOrderMoneyHolders {
   private final JobOrderMoneyHolderRepository holders;
   private final UserRepository users;
 
+  private enum UnavailableReason {
+    MERGED_HOLDER,
+    INACTIVE_ACCOUNT
+  }
+
+  /** Identifies a holder selection whose observed identity is no longer available. */
+  static final class UnavailableHolderException extends RuntimeException {
+    private final UnavailableReason reason;
+
+    private UnavailableHolderException(UnavailableReason reason) {
+      this.reason = reason;
+    }
+
+    RuntimeException previewProblem() {
+      return switch (reason) {
+        case MERGED_HOLDER -> new BusinessConflictException("orders.money.holder.linkChanged");
+        case INACTIVE_ACCOUNT -> new BadRequestException("orders.money.holder.accountInactive");
+      };
+    }
+  }
+
   JobOrderMoneyHolder resolve(UUID orderId, UUID actor, JobOrderMoneySelection selection) {
     return switch (selection.kind()) {
       case SELF -> linked(orderId, actor);
@@ -54,14 +75,14 @@ class JobOrderMoneyHolders {
                 .findByOrderIdAndId(orderId, Objects.requireNonNull(selection.reference()))
                 .orElseThrow(() -> new BadRequestException("orders.money.holder.notFound"));
         if (holder.getMergedIntoId() != null) {
-          throw new BusinessConflictException("orders.money.holder.linkChanged");
+          throw new UnavailableHolderException(UnavailableReason.MERGED_HOLDER);
         }
         yield holder;
       }
       case LINKED -> {
         UUID id = Objects.requireNonNull(selection.reference());
         if (activeUser(id).isEmpty()) {
-          throw new BadRequestException("orders.money.holder.accountInactive");
+          throw new UnavailableHolderException(UnavailableReason.INACTIVE_ACCOUNT);
         }
         yield linked(orderId, id);
       }

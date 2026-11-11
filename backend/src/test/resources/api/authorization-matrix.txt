@@ -400,6 +400,7 @@ GET /api/v1/operations/{id}/payouts | OperationController#getOperationPayouts | 
 PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=@operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or @operationAccessPolicy.canClearPayout(#id)) | url=anyRequest -> authenticated
 GET /api/v1/orders | JobOrderController#getAllJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders | JobOrderController#createJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/auec | JobOrderMoneyController#createMoneyOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/by-number | JobOrderNumberLookupController#findByNumber | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/create-options | JobOrderCreateOptionsController#current | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/items | JobOrderController#createItemJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -427,6 +428,11 @@ PUT /api/v1/orders/{id}/items/requested | JobOrderController#updateItemJobOrderA
 POST /api/v1/orders/{id}/items/{itemId}/production | JobOrderHandoverController#bookProduction | pre=isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/materials/{matId}/attribution | JobOrderMaterialController#getStockAttributionForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/materials/{matId}/inventory | JobOrderMaterialController#getInventoryItemsForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money | JobOrderMoneyController#getMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/holder-candidates | JobOrderMoneyController#holderCandidates | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/operations/{operation} | JobOrderMoneyController#getMoneyOutcome | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/provisions | JobOrderMoneyController#provideMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/provisions/preview | JobOrderMoneyController#previewMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/participations | JobOrderSupportController#support | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id}/participations/{unitId} | JobOrderSupportController#withdraw | pre=isAuthenticated() | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/participations/{unitId} | JobOrderSupportController#enroll | pre=isAuthenticated() | url=anyRequest -> authenticated

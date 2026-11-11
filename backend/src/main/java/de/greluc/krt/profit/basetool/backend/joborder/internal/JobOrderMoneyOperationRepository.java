@@ -28,12 +28,33 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
-/** Loads accepted money facts and outcomes scoped to their order. */
+/** Stores accepted money facts and reserves refused attempts within their order. */
 interface JobOrderMoneyOperationRepository extends JpaRepository<JobOrderMoneyOperation, UUID> {
 
   Optional<JobOrderMoneyOperation> findByOrderIdAndOperationId(UUID orderId, UUID operationId);
 
   List<JobOrderMoneyOperation> findAllByOrderIdOrderByRecordedAtAscIdAsc(UUID orderId);
+
+  @Query(
+      value =
+          """
+          SELECT EXISTS (
+              SELECT 1 FROM job_order_money_refused_attempt
+              WHERE order_id = :orderId AND operation_id = :operationId
+          )
+          """,
+      nativeQuery = true)
+  boolean isRefused(UUID orderId, UUID operationId);
+
+  @Modifying
+  @Query(
+      value =
+          """
+          INSERT INTO job_order_money_refused_attempt (order_id, operation_id)
+          VALUES (:orderId, :operationId)
+          """,
+      nativeQuery = true)
+  void reserveRefusal(UUID orderId, UUID operationId);
 
   @Modifying
   @Query(

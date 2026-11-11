@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -87,9 +88,7 @@ class JobOrderMoneyE2eTest {
               route.abort();
             });
 
-        page.getByTestId("order-money-provide").click();
-        page.getByTestId("order-money-amount").fill(GROUPED_AMOUNT);
-        page.getByTestId("order-money-bank-free").check();
+        prepareSelfProvision(page, GROUPED_AMOUNT);
         page.getByTestId("order-money-save").click();
         assertThat(page.getByTestId("order-money-unknown")).isVisible();
 
@@ -215,9 +214,7 @@ class JobOrderMoneyE2eTest {
       E2eSupport.navigate(writer, baseUrl + "/orders/create?lang=de");
       String orderPath = createOrder(writer, baseUrl, IRIDIUM);
       String orderId = orderPath.substring("/orders/".length());
-      writer.getByTestId("order-money-provide").click();
-      writer.getByTestId("order-money-amount").fill("10");
-      writer.getByTestId("order-money-bank-free").check();
+      prepareSelfProvision(writer, "10");
       writer.getByTestId("order-money-save").click();
       assertThat(writer.locator("#order-status-badge.status-active")).isVisible();
 
@@ -259,8 +256,27 @@ class JobOrderMoneyE2eTest {
       assertThat(queue.getByTestId("order-money-provided")).containsText("35");
 
       writer.getByTestId("order-money-provide").click();
+      writer.getByTestId("order-money-holder-mode").selectOption("new");
+      writer.getByTestId("order-money-holder-choice").fill(memberName);
+      writer.locator("li[role='option'][data-value='accountless']").click();
+      writer.getByTestId("order-money-amount").fill("2");
+      writer.getByTestId("order-money-bank-free").check();
+      var named =
+          writer.waitForResponse(
+              response -> response.url().endsWith(orderPath + "/money/provisions"),
+              () -> writer.getByTestId("order-money-save").click());
+      assertEquals(200, named.status());
+      String accountlessId = json(named.text()).get("holderId").getAsString();
+      assertNotEquals(holderId, accountlessId);
+
+      writer.getByTestId("order-money-provide").click();
       writer.getByTestId("order-money-holder-mode").selectOption("existing");
-      writer.getByTestId("order-money-existing-holder").selectOption(holderId);
+      var existing = writer.getByTestId("order-money-existing-holder");
+      assertThat(existing.locator("option[value='" + holderId + "']"))
+          .hasText(memberName + " (mit Basetool-Konto)");
+      assertThat(existing.locator("option[value='" + accountlessId + "']"))
+          .hasText(memberName + " (ohne Basetool-Konto)");
+      existing.selectOption(holderId);
       writer.getByTestId("order-money-amount").fill("5");
       writer.getByTestId("order-money-bank-free").check();
       var appended =
@@ -272,8 +288,98 @@ class JobOrderMoneyE2eTest {
       assertEquals(holderId, appendedTerms.get("holderId").getAsString());
       assertEquals(1, appendedTerms.get("holderVersion").getAsInt());
       assertEquals(holderId, json(appended.text()).get("holderId").getAsString());
-      assertThat(queue.getByTestId("order-money-provided")).containsText("40");
+      assertThat(queue.getByTestId("order-money-provided")).containsText("42");
+      assertThat(queue.locator("[data-money-holder='" + accountlessId + "']"))
+          .containsText("2 aUEC");
     }
+  }
+
+  /** Restores a refused stale draft after resolving its originally uncertain operation. */
+  @Test
+  void resolvesAnUnknownStaleAttemptBeforeBookingWithFreshTerms() {
+    assumeTrue(STACK.managesStack(), "requires the isolated provision fixture");
+    new BackendSeeder().ensureIridiumMembership(USERNAME, PASSWORD);
+    String baseUrl = STACK.baseUrl();
+    var options = new Browser.NewContextOptions().setIgnoreHTTPSErrors(true);
+    try (Playwright playwright = Playwright.create();
+        Browser browser = E2eSupport.launchBrowser(playwright, true);
+        BrowserContext actorContext = browser.newContext(options);
+        BrowserContext peerContext = browser.newContext(options)) {
+      Page actor = actorContext.newPage();
+      Page peer = peerContext.newPage();
+      E2eSupport.login(actor, baseUrl, USERNAME, PASSWORD);
+      E2eSupport.navigate(actor, baseUrl + "/orders/create?lang=de");
+      String orderPath = createOrder(actor, baseUrl, IRIDIUM);
+      String provisions = orderPath + "/money/provisions";
+      E2eSupport.login(peer, baseUrl, USERNAME, PASSWORD);
+      E2eSupport.navigate(peer, baseUrl + orderPath + "?lang=de");
+      waitForRoom(actor, "order:" + orderPath.substring("/orders/".length()));
+
+      AtomicReference<JsonObject> original = new AtomicReference<>();
+      AtomicInteger attempts = new AtomicInteger();
+      actor.route(
+          "**" + provisions,
+          route -> {
+            if (attempts.incrementAndGet() == 1) {
+              original.set(json(route.request().postData()));
+              route.abort();
+            } else {
+              route.resume();
+            }
+          });
+      prepareSelfProvision(actor, "37");
+      actor.getByTestId("order-money-save").click();
+      assertThat(actor.getByTestId("order-money-unknown")).isVisible();
+      assertNotNull(original.get());
+      String operation = original.get().get("operationId").getAsString();
+
+      prepareSelfProvision(peer, "11");
+      var peerBooked =
+          peer.waitForResponse(
+              response -> response.url().endsWith(provisions),
+              () -> peer.getByTestId("order-money-save").click());
+      assertEquals(200, peerBooked.status());
+      assertThat(peer.getByTestId("order-money-provided")).containsText("11");
+      assertThat(peer.getByTestId("order-money-history-entry")).hasCount(1);
+      var unknown =
+          actor.waitForResponse(
+              response -> response.url().endsWith(orderPath + "/money/operations/" + operation),
+              () -> actor.locator("[data-money-check]").click());
+      assertEquals(404, unknown.status());
+
+      var refused =
+          actor.waitForResponse(
+              response -> response.url().endsWith(provisions),
+              () -> actor.locator("[data-money-retry]").click());
+      assertEquals(original.get(), json(refused.request().postData()));
+      assertEquals(409, refused.status());
+      assertThat(actor.getByTestId("order-money-amount")).isVisible();
+      assertThat(actor.getByTestId("order-money-amount")).hasValue("37");
+      assertThat(actor.getByTestId("order-money-bank-free")).not().isChecked();
+      assertThat(actor.getByTestId("order-money-save")).isDisabled();
+      assertEquals(2, attempts.get());
+      assertEquals("MONEY_PROVISION_REFUSED", json(refused.text()).get("code").getAsString());
+
+      actor.getByTestId("order-money-bank-free").check();
+      var booked =
+          actor.waitForResponse(
+              response -> response.url().endsWith(provisions),
+              () -> actor.getByTestId("order-money-save").click());
+      assertEquals(200, booked.status());
+      JsonObject newTerms = json(booked.request().postData());
+      assertNotEquals(operation, newTerms.get("operationId").getAsString());
+      assertEquals("37", newTerms.get("amount").getAsString());
+      assertEquals(1, newTerms.get("holderVersion").getAsInt());
+      assertThat(actor.getByTestId("order-money-provided")).containsText("48");
+      assertThat(actor.getByTestId("order-money-history-entry")).hasCount(2);
+      assertEquals(3, attempts.get());
+    }
+  }
+
+  private static void prepareSelfProvision(Page page, String amount) {
+    page.getByTestId("order-money-provide").click();
+    page.getByTestId("order-money-amount").fill(amount);
+    page.getByTestId("order-money-bank-free").check();
   }
 
   private static String assignReaderHome(BackendSeeder seeder, String suffix) {

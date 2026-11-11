@@ -54,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
@@ -560,6 +561,42 @@ class DataExportEndStateTest {
             .amount(5.0)
             .claimedByUser(subject)
             .build());
+    seedMoneyOrder(jobOrder);
+  }
+
+  private void seedMoneyOrder(JobOrder reference) {
+    UUID orderId =
+        jobOrderRepository
+            .saveAndFlush(
+                JobOrder.builder()
+                    .responsibleOrgUnit(reference.getResponsibleOrgUnit())
+                    .requestingOrgUnit(reference.getRequestingOrgUnit())
+                    .handle("export-money")
+                    .type(JobOrderType.AUEC)
+                    .status(JobOrderStatus.IN_PROGRESS)
+                    .build())
+            .getId();
+    UUID holderId = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order_money_target (order_id, amount, version) VALUES (?, 80, 0)",
+        orderId);
+    jdbc.update(
+        "INSERT INTO job_order_money_holder (id, order_id, user_id, revision) VALUES (?, ?, ?, 1)",
+        holderId,
+        orderId,
+        subject.getId());
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_operation
+            (id, order_id, operation_id, holder_id, actor_id, selection_kind,
+             bank_handling, amount, recorded_at)
+        VALUES (?, ?, ?, ?, ?, 'SELF', false, 17, now())
+        """,
+        UUID.randomUUID(),
+        orderId,
+        UUID.randomUUID(),
+        holderId,
+        subject.getId());
   }
 
   private JobOrder jobOrder(String handle) {

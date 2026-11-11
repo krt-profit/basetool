@@ -281,7 +281,7 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
 - **One enum per module, in the module's `api` package** — `bank.api.BankProblemCode` (the 20
   `BANK_*` codes, among them `BANK_APPROVER_NOTE_REQUIRED`, 400, REQ-BANK-041), `exchange.api.ExchangeProblemCode` (`ACTING_MEMBER_REFUSED`, which the exchange
   module's `ActingMemberFilter` answers), `inventory.api.InventoryProblemCode` (`OVER_ALLOCATION`),
-  `joborder.api.JobOrderProblemCode` (`PRODUCTION_ALLOCATION`),
+  `joborder.api.JobOrderProblemCode` (`PRODUCTION_ALLOCATION`, `MONEY_PROVISION_REFUSED`),
   `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`),
   `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`), `supply.api.SupplyProblemCode` (the
   `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes),

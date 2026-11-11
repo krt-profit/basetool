@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MoneyProvisionRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyHolderCandidate;
@@ -94,10 +95,15 @@ public class JobOrderMoneyController {
    */
   @PostMapping("/{id}/money/provisions")
   @PreAuthorize("isAuthenticated()")
-  @Operation(operationId = "provideJobOrderMoney", summary = "Record aUEC order provision")
+  @Operation(
+      operationId = "provideJobOrderMoney",
+      summary = "Record aUEC order provision",
+      description =
+          "An inactive order or stale holder basis refuses the identity without booking funds."
+              + " The stable conflict code is MONEY_PROVISION_REFUSED.")
   public JobOrderMoneyOutcome provideMoney(
       @PathVariable UUID id, @Valid @RequestBody ProvideJobOrderMoneyDto dto) {
-    return commands.provide(id, dto);
+    return commands.provide(id, dto).orElseThrow(MoneyProvisionRefusedException::new);
   }
 
   /**
@@ -141,8 +147,13 @@ public class JobOrderMoneyController {
    */
   @GetMapping("/{id}/money/operations/{operation}")
   @PreAuthorize("isAuthenticated()")
-  @Operation(operationId = "getJobOrderMoneyOutcome", summary = "Recover an aUEC operation outcome")
+  @Operation(
+      operationId = "getJobOrderMoneyOutcome",
+      summary = "Recover an aUEC operation outcome",
+      description =
+          "Returns the accepted outcome, a MONEY_PROVISION_REFUSED conflict for a permanent"
+              + " no-effect refusal, or not found when the outcome is unknown.")
   public JobOrderMoneyOutcome getMoneyOutcome(@PathVariable UUID id, @PathVariable UUID operation) {
-    return queries.getOutcome(id, operation);
+    return queries.getOutcome(id, operation).orElseThrow(MoneyProvisionRefusedException::new);
   }
 }

@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.PreparedUserErasureParticipant;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
 import java.util.Comparator;
@@ -313,7 +314,9 @@ public class UserDeletionService implements AccountErasure {
   @Transactional(propagation = Propagation.MANDATORY)
   public void prepareErasure(@NotNull UUID userId) {
     for (UserErasureParticipant participant : inRunOrder()) {
-      participant.prepareErasure(userId);
+      if (participant instanceof PreparedUserErasureParticipant prepared) {
+        prepared.prepareErasure(userId);
+      }
     }
   }
 

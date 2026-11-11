@@ -22,6 +22,7 @@ import {
     canonicalOf,
     caretAfter,
     dropDigitBesideSeparator,
+    EXACT_WHOLE_INPUT_MODE,
     formatParts,
     pastedDecimalIndex,
     readCanonical,
@@ -37,7 +38,7 @@ import {
  * @typedef {{ shown: string, canonical: string }} KrtNumberState
  */
 
-const SELECTOR = 'input[data-number-input]';
+const SELECTOR = `input[data-number-input]:not([data-number-input="${EXACT_WHOLE_INPUT_MODE}"])`;
 
 /** The thousands and decimal separators of the page language. */
 const SEPS = separatorsFor(document.documentElement.lang);

@@ -17,7 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { canonicalOf, formatParts, separatorsFor } from '/js/kernel/krt-number-format.js';
+import {
+    canonicalOf,
+    EXACT_WHOLE_INPUT_MODE,
+    formatParts,
+    separatorsFor,
+} from '/js/kernel/krt-number-format.js';
 
 /**
  * Reads a positive whole aUEC value in the page language without passing through a JS number.
@@ -55,6 +60,9 @@ export function formatWholeAuec(amount) {
  * @param {HTMLInputElement} input the monetary input
  */
 export function bindWholeAuec(input) {
+    if (input.dataset.numberInput !== EXACT_WHOLE_INPUT_MODE) {
+        throw new Error('An aUEC amount requires an exact whole number input');
+    }
     input.addEventListener('input', () => input.setCustomValidity(''));
     input.addEventListener('blur', () => {
         const amount = readWholeAuec(input.value);

@@ -31,9 +31,9 @@ public final class JobOrderScope {
   /** Current linked identity predicate for the holder alias {@code h} and the caller. */
   public static final String ACTIVE_HOLDER_LINK =
       """
-      h.userId = :callerId AND EXISTS (SELECT u.id FROM User u WHERE u.id = h.userId
-        AND u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
-        AND u.inKeycloak = true AND u.enabledInKeycloak = true)
+            h.userId = :callerId AND EXISTS (SELECT u.id FROM User u WHERE u.id = h.userId
+              AND u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
+              AND u.inKeycloak = true AND u.enabledInKeycloak = true)
       """;
 
   /** Complete web order readership, independent of the reduced allocation and Exchange scope. */
@@ -57,5 +57,5 @@ public final class JobOrderScope {
           WHERE h.orderId = o.id AND
       """
           + ACTIVE_HOLDER_LINK
-          + "))\n)";
+          + "  ))\n)\n";
 }
