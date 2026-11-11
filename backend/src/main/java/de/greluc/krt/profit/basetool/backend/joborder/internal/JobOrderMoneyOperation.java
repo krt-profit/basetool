@@ -183,12 +183,10 @@ class JobOrderMoneyOperation {
       UUID actorId,
       BigDecimal amount,
       JobOrderMoneyKind kind,
-      boolean createsNamedDestination) {
+      JobOrderMoneySelection.Kind selectionKind) {
     var fact = marker(orderId, operationId, holderId, actorId, amount, kind);
     fact.peerOrderId = peerOrderId;
-    if (createsNamedDestination) {
-      fact.selectionKind = JobOrderMoneySelection.Kind.ACCOUNTLESS;
-    }
+    fact.selectionKind = selectionKind;
     return fact;
   }
 

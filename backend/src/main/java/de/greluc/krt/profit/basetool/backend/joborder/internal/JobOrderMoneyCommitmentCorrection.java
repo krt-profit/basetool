@@ -89,7 +89,7 @@ class JobOrderMoneyCommitmentCorrection {
       }
       BigDecimal previous = Objects.requireNonNull(entry.getPreviousCredit());
       BigDecimal revised = Objects.requireNonNull(entry.getCredit());
-      if (previous.compareTo(revised) != 0) {
+      if (previous.compareTo(revised) != 0 || entry.isRemoveAttributionRequested()) {
         restored.merge(occurrence, previous.subtract(revised), BigDecimal::add);
       }
     }

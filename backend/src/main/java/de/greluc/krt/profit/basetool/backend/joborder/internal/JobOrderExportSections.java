@@ -34,8 +34,17 @@ public class JobOrderExportSections implements PersonalDataExportSection {
       """
       JOIN job_order_money_holder source ON source.id = p.holder_id
       JOIN job_order_money_holder holder ON holder.id = COALESCE(source.merged_into_id, source.id)
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(
+          (SELECT effective.amount FROM job_order_money_correction_entry effective
+           WHERE effective.order_id = p.order_id AND effective.original_operation_id = p.operation_id
+           ORDER BY effective.id DESC LIMIT 1),
+          p.amount
+        ) > 0 AS paid
+      ) participation ON TRUE
       LEFT JOIN job_order_money_recipient original_recipient ON original_recipient.id = p.recipient_id
       LEFT JOIN job_order_money_recipient r ON r.id = COALESCE(original_recipient.corrected_into_id, original_recipient.id)
+        AND participation.paid
       LEFT JOIN job_order_money_holder receiving ON receiving.id = p.destination_holder_id
       LEFT JOIN job_order_money_holder destination ON destination.id = COALESCE(receiving.merged_into_id, receiving.id)
       LEFT JOIN job_order_money_holder designated ON designated.id = r.holder_id
@@ -44,7 +53,7 @@ public class JobOrderExportSections implements PersonalDataExportSection {
 
   private static final String MONEY_PERSON =
       """
-      (p.actor_id = :userId OR p.selected_user_id = :userId AND p.kind = 'SETTLEMENT' OR holder.user_id = :userId
+      (p.actor_id = :userId OR p.selected_user_id = :userId AND p.kind = 'SETTLEMENT' AND participation.paid OR holder.user_id = :userId
        OR r.user_id = :userId OR destination.user_id = :userId OR payee.user_id = :userId)
       """;
 

@@ -253,12 +253,16 @@ public class JobOrderMoneyReassignment {
   private static boolean matchesDestination(
       ReassignJobOrderMoneyDto dto, Parties parties, JobOrderMoneyOperation inflow) {
     UUID selected = dto.destinationHolderId();
-    if (inflow.getSelectionKind() == JobOrderMoneySelection.Kind.ACCOUNTLESS) {
-      return selected == null && Boolean.TRUE.equals(dto.confirmSamePerson());
-    }
-    return selected == null
-        ? parties.accounts().sameAccount()
-        : selected.equals(inflow.getHolderId());
+    boolean confirmed = Boolean.TRUE.equals(dto.confirmSamePerson());
+    return switch (inflow.getSelectionKind()) {
+      case ACCOUNTLESS -> selected == null && confirmed;
+      case EXISTING -> inflow.getHolderId().equals(selected) && confirmed;
+      case LINKED ->
+          selected == null
+              ? parties.accounts().sameAccount()
+              : selected.equals(inflow.getHolderId());
+      case SELF -> false;
+    };
   }
 
   private MoneyPairEdit<Optional<JobOrderMoneyOutcome>> post(
@@ -281,7 +285,7 @@ public class JobOrderMoneyReassignment {
                 attempt.actor(),
                 attempt.amount(),
                 JobOrderMoneyKind.PURPOSE_OUTFLOW,
-                false));
+                JobOrderMoneySelection.Kind.EXISTING));
     operations.save(
         JobOrderMoneyOperation.reassignment(
             destinationId,
@@ -291,7 +295,7 @@ public class JobOrderMoneyReassignment {
             attempt.actor(),
             attempt.amount(),
             JobOrderMoneyKind.PURPOSE_INFLOW,
-            createsDestination && destinationAccount == null));
+            destinationSelection(createsDestination, destinationAccount)));
     boolean started = destination.getStatus() == JobOrderStatus.OPEN;
     if (started) {
       JobOrderService.changeLifecycle(destination, JobOrderStatus.IN_PROGRESS);
@@ -308,6 +312,16 @@ public class JobOrderMoneyReassignment {
         Optional.of(queries.projectOutcome(outflow, sourceHolder)),
         audit(source, attempt, JobOrderMoneyKind.PURPOSE_OUTFLOW),
         audit(destination, attempt, JobOrderMoneyKind.PURPOSE_INFLOW));
+  }
+
+  private static JobOrderMoneySelection.Kind destinationSelection(
+      boolean createsDestination, @Nullable UUID account) {
+    if (account != null) {
+      return JobOrderMoneySelection.Kind.LINKED;
+    }
+    return createsDestination
+        ? JobOrderMoneySelection.Kind.ACCOUNTLESS
+        : JobOrderMoneySelection.Kind.EXISTING;
   }
 
   private static JobOrderEdit audit(JobOrder order, Attempt attempt, JobOrderMoneyKind kind) {

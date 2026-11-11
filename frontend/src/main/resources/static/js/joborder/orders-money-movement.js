@@ -371,10 +371,7 @@ export function bindMoneyMovement(root, recovery) {
         krtModal.open(modalId);
     };
 
-    krtEvents.on('click', 'od-money-move', () => {
-        if (recovery.pending()) void recovery.recover();
-        else open();
-    });
+    krtEvents.on('click', 'od-money-move', () => void recovery.openWhenRecovered(open));
     form.closest('dialog')?.addEventListener('close', () => {
         if (!krtModal.isOpen(modalId)) reassignment.reset();
     });

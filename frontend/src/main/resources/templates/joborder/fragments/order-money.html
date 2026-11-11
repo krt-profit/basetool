@@ -127,6 +127,8 @@
                                               th:text="#{orders.money.correction.creditChange(
                                                   ${@moneyFormat.exactWhole(change.previousCredit, #locale)},
                                                   ${@moneyFormat.exactWhole(change.credit, #locale)})}"></span>
+                                        <span th:if="${change.attributionRemoved}"
+                                              th:text="#{orders.money.correction.attributionRemoved}"></span>
                                     </li>
                                 </ul>
                             </th:block>

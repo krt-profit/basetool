@@ -33,6 +33,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Route;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
@@ -492,8 +493,22 @@ class JobOrderMoneyE2eTest {
       assertThat(page.getByTestId("order-money-unknown")).isVisible();
       assertNotNull(accepted.get());
       String outcome = orderPath + "/money/operations/" + accepted.get();
+      AtomicReference<Route> pendingOutcome = new AtomicReference<>();
+      AtomicInteger outcomeLookups = new AtomicInteger();
+      page.route(
+          "**" + outcome,
+          route -> {
+            outcomeLookups.incrementAndGet();
+            pendingOutcome.set(route);
+          });
+      page.reload();
+      page.waitForCondition(() -> pendingOutcome.get() != null);
+      assertThat(page.locator("[data-money-check]")).isDisabled();
+      page.getByTestId("order-money-move").click();
+      assertThat(page.getByTestId("order-money-movement-kind")).isHidden();
       var recovered =
-          page.waitForResponse(response -> response.url().endsWith(outcome), page::reload);
+          page.waitForResponse(
+              response -> response.url().endsWith(outcome), pendingOutcome.get()::resume);
       assertEquals(200, recovered.status());
       assertEquals("HANDOVER", json(recovered.text()).get("kind").getAsString());
       assertThat(page.getByTestId("order-money-handed-over")).containsText("3 aUEC");
@@ -501,7 +516,10 @@ class JobOrderMoneyE2eTest {
       assertThat(page.locator("#order-status-badge.status-active")).isVisible();
       page.unroute("**" + movements);
 
-      prepareHandover(page, collector, recipientId, "7");
+      assertThat(page.getByTestId("order-money-movement-kind")).isVisible();
+      assertEquals(1, outcomeLookups.get());
+      page.unroute("**" + outcome);
+      fillHandover(page, collector, recipientId, "7");
       awaitPost(page, movements, "order-money-movement-save");
       assertThat(page.locator("#order-status-badge.status-completed")).isVisible();
       assertThat(page.getByTestId("order-money-provided")).containsText("10 aUEC");
@@ -556,13 +574,22 @@ class JobOrderMoneyE2eTest {
 
   private static void beginMovement(Page page, String kind, String source, String amount) {
     page.getByTestId("order-money-move").click();
+    fillMovement(page, kind, source, amount);
+  }
+
+  private static void fillMovement(Page page, String kind, String source, String amount) {
     page.getByTestId("order-money-movement-kind").selectOption(kind);
     page.getByTestId("order-money-source-holder").selectOption(source);
     page.getByTestId("order-money-movement-amount").fill(amount);
   }
 
   private static void prepareHandover(Page page, String source, String recipient, String amount) {
-    beginMovement(page, "HANDOVER", source, amount);
+    page.getByTestId("order-money-move").click();
+    fillHandover(page, source, recipient, amount);
+  }
+
+  private static void fillHandover(Page page, String source, String recipient, String amount) {
+    fillMovement(page, "HANDOVER", source, amount);
     page.getByTestId("order-money-handover-recipient").selectOption(recipient);
     page.getByTestId("order-money-movement-bank-free").check();
   }
@@ -633,9 +660,7 @@ class JobOrderMoneyE2eTest {
     }
   }
 
-  /**
-   * Moves one player's purpose money and updates the open destination without another provision.
-   */
+  /** Refreshes both order views and preserves a correction draft through a peer-only change. */
   @Test
   void reassignsHeldMoneyAndRefreshesTheOtherOrder() {
     assumeTrue(STACK.managesStack(), "requires the isolated managed order stack");
@@ -699,6 +724,29 @@ class JobOrderMoneyE2eTest {
       assertThat(destination.getByTestId("order-money-provided")).containsText("1 aUEC");
       assertThat(destination.getByTestId("order-money-history-entry")).hasCount(2);
       assertThat(destination.locator("#order-status-badge.status-active")).isVisible();
+
+      source.locator("[data-original-kind='PURPOSE_OUTFLOW']").click();
+      Locator correction = source.locator("#order-money-correction-modal");
+      Locator revised = correction.locator("input[name='amount']");
+      revised.fill("7000000");
+      Locator peerHoldings = correction.locator("[data-preview-value='linkedHoldings']");
+      assertThat(peerHoldings).hasText("7.000.001");
+      waitForRoom(source, "order:" + destinationPath.substring("/orders/".length()));
+
+      prepareSelfProvision(destination, "1");
+      awaitPost(destination, destinationPath + "/money/provisions", "order-money-save");
+      assertThat(peerHoldings).hasText("7.000.002");
+      assertThat(correction.locator("[data-money-correction-basis]")).isVisible();
+      assertEquals("7.000.000", shownAmount(revised));
+      assertThat(source.getByTestId("order-money-history-entry")).hasCount(2);
+      assertThat(source.getByTestId("order-money-holdings")).containsText("2.000.000");
+
+      awaitPost(source, sourcePath + "/money/corrections", "order-money-correction-save");
+      assertThat(source.getByTestId("order-money-holdings")).containsText("3.000.000");
+      assertThat(destination.getByTestId("order-money-holdings")).containsText("7.000.002");
+      assertThat(destination.getByTestId("order-money-provided")).containsText("2 aUEC");
+      assertThat(source.getByTestId("order-money-history-entry")).hasCount(3);
+      assertThat(destination.getByTestId("order-money-history-entry")).hasCount(4);
     }
   }
 

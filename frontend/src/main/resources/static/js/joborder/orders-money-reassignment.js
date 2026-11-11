@@ -18,7 +18,7 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
-import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
+import { bindMoneyPeer } from '/js/joborder/orders-money-preview.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { setMoneyOptions } from '/js/joborder/orders-money-holders.js';
 import { showMovementField } from '/js/joborder/orders-money-movement-parties.js';
@@ -54,32 +54,9 @@ export function bindReassignmentDestination(form, url, changed) {
     let timer = 0;
     let sequence = 0;
     let selectedOnRestore = '';
-    let subscribedOrder = '';
-    /** @type {{unsubscribe(): void} | null} */
-    let subscription = null;
     /** @type {Destination | null} */
     let target = null;
-
-    /**
-     * Keeps the open form's destination basis current through the existing order room.
-     *
-     * @param {string} order the authorised destination, or empty when no destination is open
-     * @param {() => void} refreshBasis rereads the destination's current versions
-     */
-    const subscribe = (order, refreshBasis) => {
-        if (order === subscribedOrder) return;
-        subscription?.unsubscribe();
-        subscribedOrder = order;
-        subscription = order
-            ? krtLiveSync.subscribe(`order:${order}`, {
-                  onSubscribed: refreshBasis,
-                  onChanged(sections) {
-                      if (sections.includes('money') || sections.includes('header')) refreshBasis();
-                  },
-                  onDenied: refreshBasis,
-              })
-            : null;
-    };
+    const subscribe = bindMoneyPeer();
 
     /** @param {boolean} accountless whether the sender requires a named counterpart */
     const showHolderChoices = (accountless) => {

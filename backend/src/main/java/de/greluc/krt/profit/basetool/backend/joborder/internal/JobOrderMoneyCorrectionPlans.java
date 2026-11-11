@@ -95,30 +95,31 @@ class JobOrderMoneyCorrectionPlans {
           OptimisticLock.check(
               holder.getRevision(), dto.holderVersions().get(id), JobOrderMoneyHolder.class, id));
     }
-    var entries =
-        originals.entrySet().stream()
-            .map(entry -> {
-              var fact = entry.getValue();
-              var change = Objects.requireNonNull(terms.get(entry.getKey()));
-              var correction =
-                  new JobOrderMoneyCorrectionEntry(
-                      order.getId(),
-                      dto.operationId(),
-                      fact.getOperationId(),
-                      current.effective(fact),
-                      revisedAmounts(fact, change));
-              var prior =
-                  current.corrections().reversed().stream()
-                      .filter(previous ->
-                          previous.getOriginalOperationId().equals(fact.getOperationId()))
-                      .findFirst()
-                      .orElse(null);
-              creditCorrection.attachCredit(
-                  order, fact, correction, prior, change.removeAttribution());
-              return correction;
-            })
-            .toList();
-    if (entries.stream().noneMatch(entry -> entry.changesAmounts() || entry.changesCredit())) {
+    var entries = new ArrayList<JobOrderMoneyCorrectionEntry>();
+    boolean changesFact = false;
+    for (var original : originals.entrySet()) {
+      var fact = original.getValue();
+      var change = Objects.requireNonNull(terms.get(original.getKey()));
+      var correction =
+          new JobOrderMoneyCorrectionEntry(
+              order.getId(),
+              dto.operationId(),
+              fact.getOperationId(),
+              current.effective(fact),
+              revisedAmounts(fact, change));
+      var prior =
+          current.corrections().reversed().stream()
+              .filter(previous -> previous.getOriginalOperationId().equals(fact.getOperationId()))
+              .findFirst()
+              .orElse(null);
+      creditCorrection.attachCredit(order, fact, correction, prior, change.removeAttribution());
+      boolean removesAttribution =
+          change.removeAttribution() && (prior == null || !prior.isAttributionRemoved());
+      changesFact |=
+          correction.changesAmounts() || correction.changesCredit() || removesAttribution;
+      entries.add(correction);
+    }
+    if (!changesFact) {
       throw new BadRequestException("orders.money.correction.noChange");
     }
     var revised = current.revised(entries);

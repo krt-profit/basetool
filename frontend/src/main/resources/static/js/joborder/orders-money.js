@@ -154,13 +154,7 @@ function bindProvisionForm(root, form, recovery) {
             preview.reset();
         }
     };
-    krtEvents.on('click', 'od-money-open', () => {
-        if (recovery.pending()) {
-            void recovery.recover();
-            return;
-        }
-        openPending();
-    });
+    krtEvents.on('click', 'od-money-open', () => void recovery.openWhenRecovered(openPending));
     form.addEventListener('input', updateDraft);
     form.addEventListener('change', updateDraft);
     input.addEventListener('blur', () => {

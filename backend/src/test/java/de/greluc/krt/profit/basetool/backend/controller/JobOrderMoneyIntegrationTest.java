@@ -1057,6 +1057,53 @@ class JobOrderMoneyIntegrationTest {
   }
 
   @Test
+  void zeroCorrectionRemovesThirdPartyBeneficiaryPaymentFromPersonalExport() throws Exception {
+    withFeeRate(
+        "0",
+        () -> {
+          UUID order = createOrder();
+          String holder = providedHolder(order, writer(), "10");
+          setMoneyStatus(order, "CANCELLED", 1);
+          Map<String, ?> payment =
+              movementTerms(
+                  "SETTLEMENT", holder, 1, "3", "0", Map.of("destinationUserId", unitless));
+          String original = payment.get("operationId").toString();
+          mvc.perform(settlementRequest(order, writer(), payment)).andExpect(status().isOk());
+
+          var personalExport =
+              get("/api/v1/users/me/export")
+                  .with(signedInMember(unitless))
+                  .accept(MediaType.APPLICATION_JSON);
+          assertThat(
+                  mvc.perform(personalExport)
+                      .andExpect(status().isOk())
+                      .andReturn()
+                      .getResponse()
+                      .getContentAsString())
+              .contains(original);
+
+          UUID correction = UUID.randomUUID();
+          mvc.perform(
+                  correctionRequest(
+                      order,
+                      Map.of(
+                          "operationId", correction,
+                          "entries",
+                              List.of(Map.of("originalOperationId", original, "amount", "0")),
+                          "holderVersions", Map.of(holder, 2))))
+              .andExpect(status().isOk());
+          assertThat(
+                  mvc.perform(personalExport)
+                      .andExpect(status().isOk())
+                      .andReturn()
+                      .getResponse()
+                      .getContentAsString())
+              .doesNotContain(original, correction.toString());
+          assertMoney(order, "10", "10", "0", "10000000", "CANCELLED");
+        });
+  }
+
+  @Test
   @Timeout(30)
   void invalidResponsibilityBlocksAllTerminalMoneyActionsUntilValidTransfer() throws Exception {
     UUID order = createOrder();
@@ -1130,16 +1177,31 @@ class JobOrderMoneyIntegrationTest {
               .andExpect(status().isNoContent());
           mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
               .andExpect(status().isOk());
+          var personalExport =
+              get("/api/v1/users/me/export")
+                  .with(signedInMember(unitless))
+                  .accept(MediaType.APPLICATION_JSON);
+          assertThat(
+                  mvc.perform(personalExport)
+                      .andExpect(status().isOk())
+                      .andReturn()
+                      .getResponse()
+                      .getContentAsString())
+              .contains(original);
 
+          UUID correctionId = UUID.randomUUID();
           mvc.perform(
                   correctionRequest(
                       order,
                       Map.of(
-                          "operationId", UUID.randomUUID(),
+                          "operationId",
+                          correctionId,
                           "entries",
-                              List.of(Map.of("originalOperationId", original, "amount", "0")),
-                          "holderVersions", Map.of(holder, 2),
-                          "targetVersion", 0)))
+                          List.of(Map.of("originalOperationId", original, "amount", "0")),
+                          "holderVersions",
+                          Map.of(holder, 2),
+                          "targetVersion",
+                          0)))
               .andExpect(status().isOk());
           mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
               .andExpect(status().isForbidden());
@@ -1148,6 +1210,14 @@ class JobOrderMoneyIntegrationTest {
                       .with(writer()))
               .andExpect(status().isOk())
               .andExpect(jsonPath("$.amount").value("3"));
+          assertThat(
+                  mvc.perform(personalExport)
+                      .andExpect(status().isOk())
+                      .andReturn()
+                      .getResponse()
+                      .getContentAsString())
+              .contains(designation)
+              .doesNotContain(original, correctionId.toString());
           assertMoney(order, "10", "10", "0", "10000000", "IN_PROGRESS");
         });
   }
@@ -1195,6 +1265,66 @@ class JobOrderMoneyIntegrationTest {
               .andExpect(status().isOk());
           assertMoney(order, "10", "8", "2", "9999998", "CANCELLED");
         });
+  }
+
+  @Test
+  void removingAlreadyZeroAttributionPreventsLaterCorrectedProvisionFromCreditingIt()
+      throws Exception {
+    UUID order = createOrder();
+    String commitment = openResponsibleCommitment(order, "6000000");
+    UUID original = UUID.randomUUID();
+    var provisionTerms = new HashMap<String, Object>(provisionTerms(original, "4000000", 0));
+    provisionTerms.put("commitmentId", commitment);
+    var booking = provision(order, writer(), provisionTerms).andExpect(status().isOk()).andReturn();
+    String holder =
+        json.readTree(booking.getResponse().getContentAsByteArray()).path("holderId").asString();
+
+    mvc.perform(
+            correctionRequest(
+                order,
+                Map.of(
+                    "operationId", UUID.randomUUID(),
+                    "entries", List.of(Map.of("originalOperationId", original, "amount", "0")),
+                    "holderVersions", Map.of(holder, 1))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.corrections[0].credit").value("0"));
+    var removal =
+        Map.<String, Object>of(
+            "operationId", UUID.randomUUID(),
+            "entries",
+                List.of(
+                    Map.of(
+                        "originalOperationId", original, "amount", "0", "removeAttribution", true)),
+            "holderVersions", Map.of(holder, 2));
+    mvc.perform(correctionRequest(order, removal))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.corrections[0].attributionRemoved").value(true));
+    mvc.perform(correctionRequest(order, removal)).andExpect(status().isOk());
+    var noChange = new HashMap<>(removal);
+    noChange.put("operationId", UUID.randomUUID());
+    noChange.put("holderVersions", Map.of(holder, 3));
+    mvc.perform(correctionRequest(order, noChange)).andExpect(status().isBadRequest());
+
+    mvc.perform(
+            correctionRequest(
+                order,
+                Map.of(
+                    "operationId", UUID.randomUUID(),
+                    "entries",
+                        List.of(Map.of("originalOperationId", original, "amount", "3000000")),
+                    "holderVersions", Map.of(holder, 3))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.corrections[0].credit").value("0"))
+        .andExpect(jsonPath("$.corrections[0].attributionRemoved").value(true));
+    assertMoney(order, "3000000", "3000000", "0", "10000000", "IN_PROGRESS");
+    mvc.perform(get("/api/v1/orders/{id}/participations", order).with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("6000000"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes.length()").value(4))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[3].reason").value("CORRECTED"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[3].before").value("6000000"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[3].after").value("6000000"));
+    assertAuditCount(order, "JOB_ORDER_MONEY_CORRECTED", 3);
   }
 
   private MockHttpServletRequestBuilder settlementRequest(
@@ -2655,6 +2785,28 @@ class JobOrderMoneyIntegrationTest {
         .andExpect(jsonPath("$.holders[0].displayName").value("Named player"))
         .andExpect(jsonPath("$.history.length()").value(1));
     assertAuditCount(empty, "JOB_ORDER_MONEY_REASSIGNED", 1);
+
+    linkNamedPurposeHolder(source, sourceHolder, 3);
+    linkNamedPurposeHolder(destination, destinationHolder, 2);
+    terms.put("confirmSamePerson", false);
+    mvc.perform(reassignmentRequest(source, writer(), terms, false))
+        .andExpect(status().isConflict());
+    terms.put("confirmSamePerson", true);
+    mvc.perform(reassignmentRequest(source, writer(), terms, false)).andExpect(status().isOk());
+    assertPurposeEffects(source, "0", "10000000");
+    assertPurposeEffects(destination, "8000000", "0");
+    assertAuditCount(destination, "JOB_ORDER_MONEY_REASSIGNED", 1);
+  }
+
+  private void linkNamedPurposeHolder(UUID order, String holder, long version) throws Exception {
+    mvc.perform(
+            patch("/api/v1/orders/{id}/money/holders/{holder}/identity", order, holder)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of("kind", "LINK", "version", version, "userId", unitless))))
+        .andExpect(status().isNoContent());
   }
 
   private String namedPurposeHolder(UUID order, String amount) throws Exception {

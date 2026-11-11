@@ -20,7 +20,11 @@
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
-import { bindMoneyPreview, showPreviewAmounts } from '/js/joborder/orders-money-preview.js';
+import {
+    bindMoneyPeer,
+    bindMoneyPreview,
+    showPreviewAmounts,
+} from '/js/joborder/orders-money-preview.js';
 
 /** @typedef {Omit<ApiDto<'CorrectJobOrderMoneyDto'>, 'operationId'>} CorrectionTerms */
 /** @typedef {NonNullable<CorrectionTerms['entries']>[number]} CorrectionEntry */
@@ -62,6 +66,7 @@ export function bindMoneyCorrection(root, recovery) {
     let previewId = '';
     let fingerprint = '';
     let saving = false;
+    const subscribePeer = bindMoneyPeer();
 
     const choices = () =>
         new Map(
@@ -142,7 +147,21 @@ export function bindMoneyCorrection(root, recovery) {
         const next = JSON.stringify(readTerms());
         if (live && next !== fingerprint) basisChanged.hidden = false;
         fingerprint = next;
-        add.disabled = lines.length >= Math.min(50, choices().size);
+        const current = choices();
+        add.disabled = lines.length >= Math.min(50, current.size);
+        const peers = new Set(
+            lines.flatMap(({ select }) => {
+                const peer = current.get(select.value)?.dataset.originalPeer;
+                return peer ? [peer] : [];
+            }),
+        );
+        const peer = peers.size === 1 ? peers.values().next().value || '' : '';
+        subscribePeer(peer, (changed) => {
+            if (!krtModal.isOpen(modalId)) return;
+            if (changed) basisChanged.hidden = false;
+            preview.reset();
+            if (!saving) preview.refresh();
+        });
         if (!saving) preview.refresh();
     };
 
@@ -231,8 +250,7 @@ export function bindMoneyCorrection(root, recovery) {
     krtEvents.on('click', 'od-money-correct', (button) => {
         const original = button.dataset.originalOperation;
         if (!original) return;
-        if (recovery.pending()) void recovery.recover();
-        else open(original);
+        void recovery.openWhenRecovered(() => open(original));
     });
     add.addEventListener('click', () => {
         const next = [...choices().keys()].find((id) =>
@@ -241,6 +259,9 @@ export function bindMoneyCorrection(root, recovery) {
         if (!next) return;
         addLine(next)?.select.focus();
         update();
+    });
+    form.closest('dialog')?.addEventListener('close', () => {
+        if (!krtModal.isOpen(modalId)) subscribePeer('', () => {});
     });
     form.addEventListener('input', () => update());
     form.addEventListener('change', () => update());

@@ -18,8 +18,40 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { krtLiveSync } from '/js/kernel/krt-live-sync.js';
 import { formatParts, separatorsFor } from '/js/kernel/krt-number-format.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
+
+/**
+ * Keeps a draft's related order basis current through its authorized order room.
+ *
+ * @returns {(order: string, refresh: (changed: boolean) => void) => void} the peer room binding
+ */
+export function bindMoneyPeer() {
+    let subscribedOrder = '';
+    /** @type {{unsubscribe(): void} | null} */
+    let subscription = null;
+    return (order, refresh) => {
+        if (order === subscribedOrder) return;
+        subscription?.unsubscribe();
+        subscribedOrder = order;
+        /** @param {boolean} changed whether the room reported an actual change */
+        const refreshCurrent = (changed) => {
+            if (order === subscribedOrder) refresh(changed);
+        };
+        subscription = order
+            ? krtLiveSync.subscribe(`order:${order}`, {
+                  onSubscribed: () => refreshCurrent(false),
+                  onChanged(sections) {
+                      if (sections.includes('money') || sections.includes('header')) {
+                          refreshCurrent(true);
+                      }
+                  },
+                  onDenied: () => refreshCurrent(true),
+              })
+            : null;
+    };
+}
 
 const seps = separatorsFor(document.documentElement.lang);
 

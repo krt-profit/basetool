@@ -5,6 +5,7 @@
     <button th:if="${entry.correctionBasis != null and currentUserId != null}" type="button"
             class="btn btn-ghost" data-trigger="od-money-correct" data-testid="order-money-correct"
             th:data-original-operation="${entry.operationId}" th:data-original-kind="${entry.kind}"
+            th:data-original-peer="${entry.peerOrderId}"
             th:data-original-amount="${entry.correctionBasis.amount}"
             th:data-original-provision="${entry.correctionBasis.provision}"
             th:data-original-holders="${#strings.listJoin(entry.correctionBasis.holderIds, ',')}"

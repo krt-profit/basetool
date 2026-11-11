@@ -68,7 +68,10 @@ export function bindMoneyRecovery(root, restoreRefused) {
     const banner = root.querySelector('[data-money-recovery]');
     const check = root.querySelector('[data-money-check]');
     const retry = root.querySelector('[data-money-retry]');
-    let busy = false;
+    /** @type {Promise<boolean> | null} */
+    let recovering = null;
+    let sending = false;
+    let opening = false;
 
     if (
         !(banner instanceof HTMLElement) ||
@@ -77,6 +80,12 @@ export function bindMoneyRecovery(root, restoreRefused) {
     ) {
         throw new Error('The order money recovery controls are missing');
     }
+
+    /** @param {boolean} waiting whether the result is being resolved */
+    const showWaiting = (waiting) => {
+        check.disabled = waiting;
+        banner.setAttribute('aria-busy', String(waiting));
+    };
 
     /** @returns {Submission | null} the submitted terms for this account and order */
     function pending() {
@@ -147,30 +156,53 @@ export function bindMoneyRecovery(root, restoreRefused) {
         try {
             /** @type {MoneyOutcome | null} */
             const outcome = await krtFetch.getJson(`${url}/operations/${terms.operationId}`);
-            if (outcome?.operationId === terms.operationId) await finish(terms);
-        } catch (error) {
-            if (!(error instanceof Error) || !('status' in error)) return;
-            if ('problem' in error && definitivelyRefused(error.status, error.problem)) {
-                await refuse(terms);
-                return;
+            if (outcome?.operationId === terms.operationId) {
+                await finish(terms);
+                return true;
             }
-            retry.hidden = error.status !== 404;
+        } catch (error) {
+            if (error instanceof Error && 'status' in error) {
+                if ('problem' in error && definitivelyRefused(error.status, error.problem)) {
+                    await refuse(terms);
+                } else {
+                    retry.hidden = error.status !== 404;
+                }
+            }
         }
+        return false;
     };
 
-    /** Reads the stored identity before allowing another command. */
-    const recover = async () => {
-        if (busy) return;
+    /** Shares the pending outcome lookup until its resulting state has refreshed. */
+    const recover = () => {
+        if (recovering) return recovering;
+        if (sending) return Promise.resolve(false);
         const terms = pending();
         banner.hidden = !terms;
-        if (!terms) return;
-        busy = true;
-        check.disabled = true;
+        if (!terms) return Promise.resolve(false);
+        showWaiting(true);
+        recovering = lookup(terms).finally(() => {
+            recovering = null;
+            showWaiting(false);
+        });
+        return recovering;
+    };
+
+    /**
+     * Preserves one editor-opening click while the submitted operation is being recovered.
+     *
+     * @param {() => void} open the requested editor action
+     */
+    const openWhenRecovered = async (open) => {
+        if (opening) return;
+        if (!recovering && !sending && !pending()) {
+            open();
+            return;
+        }
+        opening = true;
         try {
-            await lookup(terms);
+            if ((await recover()) && !pending()) open();
         } finally {
-            check.disabled = false;
-            busy = false;
+            opening = false;
         }
     };
 
@@ -183,9 +215,9 @@ export function bindMoneyRecovery(root, restoreRefused) {
      * @returns {Promise<boolean>} true when the submission was accepted or its outcome is unknown
      */
     const send = async (terms, submitter, retrying) => {
-        if (busy) return false;
-        busy = true;
-        check.disabled = true;
+        if (recovering || sending) return false;
+        sending = true;
+        showWaiting(true);
         try {
             const result = await krtFetch.write({
                 method: 'POST',
@@ -221,8 +253,8 @@ export function bindMoneyRecovery(root, restoreRefused) {
             }
             return true;
         } finally {
-            check.disabled = false;
-            busy = false;
+            sending = false;
+            showWaiting(false);
         }
     };
 
@@ -237,7 +269,7 @@ export function bindMoneyRecovery(root, restoreRefused) {
         let terms;
         try {
             terms = await navigator.locks.request(key, () => {
-                if (pending()) return null;
+                if (recovering || sending || pending()) return null;
                 const submitted = { ...draft, operationId: crypto.randomUUID() };
                 localStorage.setItem(key, JSON.stringify(submitted));
                 return submitted;
@@ -258,5 +290,5 @@ export function bindMoneyRecovery(root, restoreRefused) {
         const terms = pending();
         if (terms) void send(terms, retry, true);
     });
-    return { pending, recover, submit };
+    return { openWhenRecovered, recover, submit };
 }
