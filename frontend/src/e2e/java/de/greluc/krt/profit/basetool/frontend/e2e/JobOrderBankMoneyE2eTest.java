@@ -296,7 +296,9 @@ class JobOrderBankMoneyE2eTest {
 
   private static void confirm(Page staff, String request, String holder) {
     staff.locator(requestAction("confirm", request)).click();
-    E2eSupport.selectComboboxByValue(staff.getByTestId("bank-confirm-holder"), holder);
+    assertThat(staff.getByTestId("bank-confirm-holder")).isHidden();
+    E2eSupport.selectComboboxByValue(
+        staff.getByTestId("bank-confirm-account-deposit-holder"), holder);
     post(staff, "/api/proxy/bank/requests/" + request + "/confirm", "bank-confirm-submit");
   }
 

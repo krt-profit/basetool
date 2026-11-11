@@ -105,6 +105,8 @@ class JobOrderLinkedBankIntegrationTest {
   private UUID profit;
   private UUID responsible;
   private UUID committedOrder;
+  private UUID noticeApprover;
+  private UUID noticeCustodian;
   private boolean ownsProfit;
   private boolean committedWorld;
 
@@ -142,7 +144,20 @@ class JobOrderLinkedBankIntegrationTest {
         jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", committedOrder);
         jdbc.update("DELETE FROM job_order WHERE id = ?", committedOrder);
       }
+      if (noticeApprover != null) {
+        removeNoticeRows();
+      }
       removeBankRows();
+      if (noticeCustodian != null) {
+        jdbc.update("DELETE FROM bank_holder WHERE id = ?", noticeCustodian);
+        jdbc.update(
+            "DELETE FROM bank_audit_event WHERE event_type = 'HOLDER_REGISTERED' AND target_user_id"
+                + " = ?",
+            world.user(Actor.MEMBER));
+      }
+      if (noticeApprover != null) {
+        users.deleteById(noticeApprover);
+      }
       for (var supplemental : supplementalAccounts) {
         jdbc.update("DELETE FROM org_unit WHERE id = ?", supplemental.ownerId());
       }
@@ -156,6 +171,23 @@ class JobOrderLinkedBankIntegrationTest {
         jdbc.update("DELETE FROM org_unit WHERE id = ?", profit);
       }
     });
+  }
+
+  private void removeNoticeRows() {
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    jdbc.update(
+        """
+        DELETE FROM notification WHERE entity_id = ?
+          OR entity_id IN (SELECT id FROM bank_booking_request WHERE account_id = ?)
+        """,
+        committedOrder,
+        account);
+    jdbc.update(
+        """
+        DELETE FROM notification_cause_receipt
+        WHERE id IN (SELECT authorisation_id FROM bank_booking_request WHERE account_id = ?)
+        """,
+        account);
   }
 
   private void removeBankRows() {
@@ -208,6 +240,141 @@ class JobOrderLinkedBankIntegrationTest {
       jdbc.update("DELETE FROM bank_posting WHERE transaction_id = ?", transaction);
       jdbc.update("DELETE FROM bank_transaction WHERE id = ?", transaction);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void linkedAuthorisationGroupsOutcomeAndRetainsApprovalTasks(boolean muted) throws Exception {
+    var approver =
+        Objects.requireNonNull(
+            transactions.execute(_ ->
+                new BankAccessSeeder(context)
+                    .seedLinkedOrderApprover(world.pinned(Pin.OWN_STAFFEL))));
+    noticeApprover = approver.getId();
+    RequestPostProcessor approverIdentity =
+        jwt()
+            .jwt(token(approver.getId(), approver.getUsername()))
+            .authorities(authorities::convert);
+    UUID applicant = world.user(Actor.MEMBER);
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    noticeCustodian = registerNoticeCustodian(applicant);
+    perform(
+            post("/api/v1/bank/deposits").with(as(Actor.MANAGEMENT)),
+            Map.of(
+                "accountId",
+                account,
+                "holderId",
+                world.holder(Holder.MANAGEMENT_HOLDER),
+                "amount",
+                5000,
+                "counterpartyExternalName",
+                "Fixture depositor"))
+        .andExpect(status().isCreated());
+    long bookings = accountBookingCount(account, Actor.MANAGEMENT);
+    String confirmation = "BANK_BOOKING_REQUEST_CONFIRMED";
+    perform(
+            put("/api/v1/notifications/preferences/{type}", confirmation).with(writer()),
+            Map.of("muted", muted))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.muted").value(muted));
+
+    UUID order = createOrder("10000");
+    UUID operation = UUID.randomUUID();
+    Map<String, ?> terms =
+        Map.of(
+            "operationId",
+            operation,
+            "amount",
+            "4000",
+            "holderVersion",
+            0,
+            "holderUserId",
+            applicant,
+            "bankHandling",
+            true,
+            "bank",
+            Map.of("type", "AUTHORISATION", "accountId", account, "custodianId", noticeCustodian));
+    provide(order, terms)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    JsonNode request = ownRequestOfType("AUTHORISATION");
+    assertThat(request.path("requiredApprover").asString()).isEqualTo("RESPONSIBLE_HOLDER");
+    UUID requestId = UUID.fromString(request.path("id").asString());
+    String approvalNeeded = "BANK_BOOKING_REQUEST_APPROVAL_NEEDED";
+    String approvedForStaff = "BANK_BOOKING_REQUEST_APPROVED";
+    money(order).andExpect(status().isOk()).andExpect(jsonPath("$.provided").value("0"));
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() ->
+            assertThat(noticeTypes(approverIdentity, requestId)).containsExactly(approvalNeeded));
+
+    JsonNode approved =
+        response(
+            perform(
+                    post(OWN_REQUESTS + "/{request}/owner-approval", requestId)
+                        .with(approverIdentity),
+                    Map.of("version", request.path("version").asLong()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownerApprovalGranted").value(true)));
+    money(order).andExpect(status().isOk()).andExpect(jsonPath("$.provided").value("0"));
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          assertThat(noticeTypes(approverIdentity, requestId)).doesNotContain(approvalNeeded);
+          assertThat(noticeTypes(as(Actor.MANAGEMENT), requestId)).contains(approvedForStaff);
+        });
+
+    confirm(approved, Actor.MANAGEMENT, noticeCustodian)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          assertThat(noticeTypes(as(Actor.MANAGEMENT), requestId)).doesNotContain(approvedForStaff);
+          assertApplicantOutcomeNotices(order, requestId, confirmation, muted);
+        });
+    provide(order, terms)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.operationId").value(operation.toString()))
+        .andExpect(jsonPath("$.state").value("AUTHORISED"));
+    assertApplicantOutcomeNotices(order, requestId, confirmation, muted);
+    assertThat(ownLinkedRequests()).hasSize(1);
+    money(order).andExpect(status().isOk()).andExpect(jsonPath("$.provided").value("4000"));
+    assertThat(accountBookingCount(account, Actor.MANAGEMENT)).isEqualTo(bookings);
+    assertThat(accountBalance(account)).isEqualTo(5000);
+    assertConfirmedAudit(account, order, 1);
+  }
+
+  private UUID registerNoticeCustodian(UUID applicant) throws Exception {
+    JsonNode holder =
+        response(
+            perform(
+                    post("/api/v1/bank/holders").with(as(Actor.MANAGEMENT)),
+                    Map.of("userId", applicant))
+                .andExpect(status().isCreated()));
+    return UUID.fromString(holder.path("id").asString());
+  }
+
+  private List<String> noticeTypes(RequestPostProcessor identity, UUID entityId) throws Exception {
+    JsonNode inbox =
+        response(
+            mvc.perform(get("/api/v1/notifications").with(identity)).andExpect(status().isOk()));
+    List<String> types = new ArrayList<>();
+    for (JsonNode entry : inbox.path("content")) {
+      if (entityId.toString().equals(entry.path("entityId").asString())) {
+        types.add(entry.path("type").asString());
+      }
+    }
+    return types;
+  }
+
+  private void assertApplicantOutcomeNotices(
+      UUID order, UUID requestId, String confirmation, boolean muted) throws Exception {
+    assertThat(noticeTypes(writer(), requestId))
+        .filteredOn(confirmation::equals)
+        .hasSize(muted ? 0 : 1);
+    assertThat(noticeTypes(writer(), order)).doesNotContain("JOB_ORDER_MONEY_PROVISIONED");
   }
 
   @Test
@@ -1710,10 +1877,14 @@ class JobOrderLinkedBankIntegrationTest {
   }
 
   private Jwt token(Actor actor) {
+    return token(world.user(actor), world.username(actor));
+  }
+
+  private static Jwt token(UUID userId, String username) {
     return Jwt.withTokenValue("linked-order-bank-test")
         .header("alg", "none")
-        .subject(world.user(actor).toString())
-        .claim("preferred_username", world.username(actor))
+        .subject(userId.toString())
+        .claim("preferred_username", username)
         .build();
   }
 }

@@ -251,6 +251,16 @@ final class BankAccessSeeder {
         admin.getId());
   }
 
+  User seedLinkedOrderApprover(UUID requester) {
+    User approver = user("approver", ApprovalStatus.ACTIVE, Set.of(role("KRT Member")));
+    seat(
+        approver,
+        orgUnitRepository.findById(requester).orElseThrow(),
+        MembershipRole.STAFFELLEITER);
+    entityManager.flush();
+    return approver;
+  }
+
   LinkedOrderAccount seedLinkedOrderAccount(UUID applicant) {
     Squadron owner = orgUnit(new Squadron(), "Linked account owner", null, null);
     BankAccount account = account(BankAccountType.ORG_UNIT, "Linked account", owner);
