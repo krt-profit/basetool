@@ -28,7 +28,9 @@ import {
     bindResults,
     field,
     initPledgeModal,
+    itemChosen,
     numberOrNull,
+    resetForm,
     select,
     sendWrite,
     textOrNull,
@@ -68,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Opens the need form empty, for a new need.
      */
     function openCreate() {
-        /** @type {HTMLFormElement} */ (form).reset();
+        resetForm(/** @type {HTMLFormElement} */ (form));
         field('supply-need-id').value = '';
         field('supply-need-version').value = '';
         [
@@ -92,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param {HTMLElement} button the edit button carrying the need's data attributes
      */
     function openEdit(button) {
-        /** @type {HTMLFormElement} */ (form).reset();
+        resetForm(/** @type {HTMLFormElement} */ (form));
         field('supply-need-id').value = button.getAttribute('data-need-id') || '';
         field('supply-need-version').value = button.getAttribute('data-version') || '';
         field('supply-need-amount').value = button.getAttribute('data-amount') || '';
@@ -156,7 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
     krtEvents.on('click', 'supply-open-need', openCreate);
     krtEvents.on('click', 'supply-edit-need', openEdit);
 
-    const SHORTCUT_PARAMS = ['needUnit', 'needMaterial', 'needItem', 'needTier', 'needAmount'];
+    const SHORTCUT_PARAMS = [
+        'needUnit',
+        'needMaterial',
+        'needItem',
+        'needItemName',
+        'needTier',
+        'needAmount',
+    ];
 
     /**
      * Selects an option by value when the select offers it; any other value leaves it unchanged.
@@ -185,7 +194,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (itemId) {
             select('supply-need-kind').value = 'item';
             select('supply-need-kind').dispatchEvent(new Event('change'));
-            selectIfOffered(select('supply-need-item'), itemId);
+            const item = select('supply-need-item');
+            if (item.krtCombobox)
+                item.krtCombobox.setValue(itemId, params.get('needItemName') || '');
         } else {
             selectIfOffered(select('supply-need-material'), materialId);
             selectIfOffered(select('supply-need-tier'), params.get('needTier'));
@@ -201,6 +212,8 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const id = textOrNull(field('supply-need-id').value);
         const isItem = select('supply-need-kind').value === 'item';
+        const itemId = textOrNull(select('supply-need-item').value);
+        if (!id && !itemChosen(isItem, itemId)) return;
         const buy = purchasable.checked;
         const common = {
             amount: numberOrNull(field('supply-need-amount').value),
@@ -216,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   ...common,
                   orgUnitId: select('supply-need-unit').value,
                   materialId: isItem ? null : textOrNull(select('supply-need-material').value),
-                  gameItemId: isItem ? textOrNull(select('supply-need-item').value) : null,
+                  gameItemId: isItem ? itemId : null,
                   qualityTierId: isItem ? null : textOrNull(select('supply-need-tier').value),
               };
         sendWrite({

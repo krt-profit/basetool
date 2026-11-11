@@ -30,8 +30,8 @@
                         </div>
                         <div class="form-group" id="supply-pledge-item-row" hidden>
                             <label for="supply-pledge-item" th:text="#{supply.need.item}">Item</label>
-                            <select id="supply-pledge-item">
-                                <option th:each="i : ${items}" th:value="${i.id()}" th:text="${i.displayName(#locale)}">Item</option>
+                            <select id="supply-pledge-item" data-krt-combobox="remote-game-items">
+                                <option value=""></option>
                             </select>
                         </div>
                         <div class="form-group" id="supply-pledge-quality-row">

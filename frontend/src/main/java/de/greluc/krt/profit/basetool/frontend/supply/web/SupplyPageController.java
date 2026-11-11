@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -333,12 +332,10 @@ public class SupplyPageController {
 
   private void addCatalogues(@NotNull Model model) {
     List<MaterialReferenceDto> materials = orEmpty(supplyClient.materials());
-    PageResponse<InventoryGameItemReferenceDto> items = supplyClient.items();
     List<LocationReferenceDto> locations = orEmpty(supplyClient.locations());
     List<QualityTierDto> tiers =
         qualityTierCatalog.all().stream().filter(QualityTierDto::active).toList();
     model.addAttribute("materials", materials);
-    model.addAttribute("items", items == null ? List.of() : items.content());
     model.addAttribute("locations", locations);
     model.addAttribute("tiers", tiers);
   }
