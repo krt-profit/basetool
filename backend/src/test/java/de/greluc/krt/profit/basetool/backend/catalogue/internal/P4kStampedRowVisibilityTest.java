@@ -35,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepositor
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import java.time.Instant;
 import java.util.List;
@@ -66,6 +68,7 @@ class P4kStampedRowVisibilityTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private P4kImportChangeRepository changeRepository;
   @Autowired private InventoryItemMapper inventoryItemMapper;
+  @Autowired private StockItemCatalogue stockItemCatalogue;
   @Autowired private ShipTypeMapper shipTypeMapper;
   @Autowired private BlueprintProductService productService;
 
@@ -90,9 +93,9 @@ class P4kStampedRowVisibilityTest {
     gameItemRepository.flush();
 
     List<UUID> offered =
-        blueprintRepository
-            .findItemsWithActiveBlueprint("visibility", PageRequest.of(0, 50))
-            .map(GameItem::getId)
+        stockItemCatalogue
+            .findBookableItems("visibility", PageRequest.of(0, 50))
+            .map(InventoryGameItemReferenceDto::id)
             .getContent();
 
     assertThat(offered).contains(live.getId()).doesNotContain(stamped.getId());

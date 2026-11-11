@@ -59,11 +59,16 @@ caller manages (every raising unit for an admin), filtered to the selected unit
 edit sends the link back instead of clearing it (ADR-0320).
 
 The „Bedarf anlegen" shortcut of a low minimum stock level (REQ-INV-068) uses the same gate and
-opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` for a game item),
-`needTier` and `needAmount` query parameters of `/supply/needs`.
+opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` and its display name
+`needItemName` for a game item), `needTier` and `needAmount` query parameters of `/supply/needs`.
+
+**Item picker.** The need form, the pledge dialog (REQ-SUP-007) and the recorded-donation dialog
+(REQ-SUP-011) pick a game item from the items the Lager books (REQ-INV-029) through the
+server-searched picker `remote-game-items` (REQ-FE-016); no item list is preloaded, so none is cut
+off. A form set to an item asks for one before it sends, and opening a form clears its pickers.
 
 **Enforced by:** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`,
-`aNeedForAGameItemTheP4kRetiredIsRefused`), `SupplyNeedOrderRenderTest`
+`aNeedForAGameItemTheP4kRetiredIsRefused`), `SupplyNeedOrderRenderTest`, `SupplyItemPickerE2eTest`
 · **Code:** `supply/internal/SupplyNeedService`, `supply/needs.html`,
 `static/js/supply/supply-needs.js` · **Related:** REQ-INV-068, REQ-ROLE-002
 

@@ -474,7 +474,7 @@ shell/sc-links.html head-own <title>Star-Citizen-Links - Profit Basetool – All
 shell/sc-links.html body <body data-nav-mode="drawer">
 shell/sc-links.html parts chrome:59578e6a78647e86 x-content x-tail
 supply/admin/supply-settings.html html <html lang="de">
-supply/admin/supply-settings.html head-fixed 252a9863111715a4
+supply/admin/supply-settings.html head-fixed 858efc4412779f73
 supply/admin/supply-settings.html head-own <title>Bedarf &amp; Spenden - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/supply/supply.css">
 supply/admin/supply-settings.html body <body data-nav-mode="drawer">
 supply/admin/supply-settings.html parts chrome:59578e6a78647e86 x-content toast:a1359ecc4bd4b21d x-tail
@@ -484,17 +484,17 @@ supply/incoming-donations.html head-own <title>Eingehende Spenden - Profit Baset
 supply/incoming-donations.html body <body data-nav-mode="drawer">
 supply/incoming-donations.html parts chrome:59578e6a78647e86 x-content toast:a1359ecc4bd4b21d x-tail
 supply/my-donations.html html <html lang="de">
-supply/my-donations.html head-fixed 29885d1fd9b8ceb6
+supply/my-donations.html head-fixed a049e8502ef42100
 supply/my-donations.html head-own <title>Meine Spenden - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/supply/supply.css">
 supply/my-donations.html body <body data-nav-mode="drawer">
 supply/my-donations.html parts chrome:59578e6a78647e86 x-content toast:a1359ecc4bd4b21d x-tail
 supply/needs.html html <html lang="de">
-supply/needs.html head-fixed 29885d1fd9b8ceb6
+supply/needs.html head-fixed a049e8502ef42100
 supply/needs.html head-own <title>Bedarf - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/supply/supply.css">
 supply/needs.html body <body data-nav-mode="drawer">
 supply/needs.html parts chrome:59578e6a78647e86 x-content toast:a1359ecc4bd4b21d x-tail
 supply/stats.html html <html lang="de">
-supply/stats.html head-fixed 252a9863111715a4
+supply/stats.html head-fixed 858efc4412779f73
 supply/stats.html head-own <title>Statistik - Profit Basetool – Alle Staffeln</title><link rel="stylesheet" href="/css/pages/supply/supply.css">
 supply/stats.html body <body data-nav-mode="drawer">
 supply/stats.html parts chrome:59578e6a78647e86 x-content x-tail

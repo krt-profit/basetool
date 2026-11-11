@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.supply.client;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
-import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -85,9 +84,6 @@ public class SupplyBackendClient {
 
   private static final ParameterizedTypeReference<List<LocationReferenceDto>> LOCATION_LIST =
       new ParameterizedTypeReference<>() {};
-
-  private static final ParameterizedTypeReference<PageResponse<InventoryGameItemReferenceDto>>
-      ITEM_PAGE = new ParameterizedTypeReference<>() {};
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
@@ -474,16 +470,6 @@ public class SupplyBackendClient {
   @Nullable
   public List<LocationReferenceDto> locations() {
     return backendApiClient.getCached(CachedCatalog.LOCATIONS_LOOKUP, LOCATION_LIST);
-  }
-
-  /**
-   * Reads the first page of the item catalogue, sorted by name.
-   *
-   * @return the page, or {@code null} when the backend sent no body
-   */
-  @Nullable
-  public PageResponse<InventoryGameItemReferenceDto> items() {
-    return backendApiClient.get("/api/v1/game-items?size=500&sort=name,asc", ITEM_PAGE);
   }
 
   /** The state changes of a need that carry only the echoed version. */

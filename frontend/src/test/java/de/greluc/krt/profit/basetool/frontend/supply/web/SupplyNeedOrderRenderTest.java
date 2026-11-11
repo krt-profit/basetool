@@ -24,6 +24,8 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -55,8 +57,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the job-order picker of the need form and the linked order's coverage on a need row
- * (REQ-SUP-003, REQ-SUP-023).
+ * Renders the job-order and item pickers of the supply forms and the linked order's coverage on a
+ * need row (REQ-SUP-003, REQ-SUP-023).
  */
 @SpringBootTest
 class SupplyNeedOrderRenderTest {
@@ -179,5 +181,27 @@ class SupplyNeedOrderRenderTest {
         .containsPattern(
             "<option value=\"" + ORDER + "\" data-unit-id=\"" + UNIT + "\">#42</option>")
         .contains("Kein Auftrag");
+  }
+
+  /**
+   * The need, pledge and record forms search the items the Lager books on the server, so no item
+   * list is preloaded and none is cut off (REQ-SUP-003, REQ-FE-016).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theItemPickersSearchTheServerInsteadOfAPreloadedList() throws Exception {
+    needsAre(linkedNeed(null));
+
+    String needs = render("/supply/needs");
+    String incoming = render("/supply/donations/incoming");
+
+    assertThat(needs)
+        .contains("<select id=\"supply-need-item\" data-krt-combobox=\"remote-game-items\">")
+        .contains("<select id=\"supply-pledge-item\" data-krt-combobox=\"remote-game-items\">")
+        .contains("/js/kernel/krt-searchable-select")
+        .contains("/js/kernel/krt-catalog-search");
+    assertThat(incoming)
+        .contains("<select id=\"supply-record-item\" data-krt-combobox=\"remote-game-items\">");
+    verify(backendApiClient, never()).get(startsWith("/api/v1/game-items"), anyTypeRef());
   }
 }

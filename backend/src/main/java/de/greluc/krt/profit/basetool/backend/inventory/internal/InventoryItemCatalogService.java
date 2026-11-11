@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
+import java.util.Collection;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -33,10 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Read service behind the game-item catalogue {@code GET /api/v1/game-items} (REQ-INV-029): lists
- * the game items bookable as Lager item stock, i.e. the output of at least one active blueprint
- * ({@link BlueprintRepository#findItemsWithActiveBlueprint(String, Pageable)}), or the narrower set
- * orderable as job-order item lines ({@link BlueprintRepository#findOrderableItems(String,
- * Pageable)}).
+ * the game items bookable as Lager item stock, i.e. every blueprint output and every item of a
+ * {@link StockableItemGroup} ({@link GameItemRepository#findStockable(String, Collection,
+ * Collection, Pageable)}), or the narrower set orderable as job-order item lines ({@link
+ * BlueprintRepository#findOrderableItems(String, Pageable)}).
  */
 @Service
 @RequiredArgsConstructor
@@ -44,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryItemCatalogService implements StockItemCatalogue {
 
   private final BlueprintRepository blueprintRepository;
+  private final GameItemRepository gameItemRepository;
   private final InventoryItemMapper inventoryItemMapper;
 
   /**
@@ -58,8 +61,12 @@ public class InventoryItemCatalogService implements StockItemCatalogue {
   @NotNull
   public Page<InventoryGameItemReferenceDto> findBookableItems(
       @Nullable String search, @NotNull Pageable pageable) {
-    return blueprintRepository
-        .findItemsWithActiveBlueprint(likeTerm(search), pageable)
+    return gameItemRepository
+        .findStockable(
+            likeTerm(search),
+            StockableItemGroup.TYPES,
+            StockableItemGroup.EXCLUDED_TYPE_SUB_TYPES,
+            pageable)
         .map(inventoryItemMapper::gameItemToReferenceDto);
   }
 
