@@ -63,6 +63,14 @@ million provision, regardless of how many related Bank records explain it.
 - [ ] Each new operation preselects Bank handling; an earlier Bank-free choice does not silently carry forward.
 - [ ] A denied, incomplete or unavailable Bank path produces no automatic Bank-free effect and does not bypass existing-fund approvals.
 
+**Enforced by:** The independent-path checkpoint runs both worked examples in
+`JobOrderMoneyIntegrationTest`. It scopes Bank account, holder, grant, request, transaction,
+posting and audit checks to the example actors, units, named parties and order. A contextual
+Profit Logistician and an ordinary member exercise the direct-handover path in
+`JobOrderMoneyE2eTest.contextualWriterCompletesWithoutBankOrCentralCollection`.
+`DomainMapTest`, `ModuleBaselineTest`, `ModularityTest` and `TableOwnershipTest` enforce the
+JobOrder module's independent boundary.
+
 ### REQ-ORDERS-070 - Existing Bank funds require debit-equivalent authority before availability
 
 An order may use existing active accounts. Suggest the affected unit's account, such as the providing

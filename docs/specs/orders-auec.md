@@ -483,6 +483,8 @@ REQ-ORDERS-065; a new default does not reinterpret a submitted operation or repl
 
 Use the existing live-update/section framework for own and peer changes across every authorised
 audience. Preserve dirty input in the open form while refreshing server basis/other sections.
+The status badge follows the latest lifecycle revision delivered with the money or header fragment,
+including while the money dialog is open.
 Show relevant changes/conflicts; do not overwrite input or automatically rebook. There is no
 persistent unsent-draft manager. Submitted-operation recovery under REQ-ORDERS-065 is durable
 independently of this draft scope. No ordinary edit triggers a full-page success reload.
@@ -556,8 +558,14 @@ from the order.
 - [ ] Verify mutation audit, grouped notices and peer updates against the same operation cause.
 
 **Enforced by:** `JobOrderMoneyIntegrationTest` verifies each fee-free row and the full 100,000-aUEC
-fee reconciliation using PostgreSQL. The settlement and correction cases are listed under
-REQ-ORDERS-061 and REQ-ORDERS-062. Bank integration has a separate evidence gate.
+fee reconciliation using PostgreSQL. Both examples check the fixture's Bank footprint before
+creation and after completion, including replay in the configured-fee example.
+`JobOrderMoneyE2eTest.contextualWriterCompletesWithoutBankOrCentralCollection` exercises separate
+holders, a named accountless holder, live peer completion with its draft open, and recovery of
+a committed handover after a lost response. The recovered handover yields one audit entry and
+one affected-reader notice. REQ-ORDERS-061 and REQ-ORDERS-062 list
+the settlement and correction evidence. Public release readiness also requires the default Bank
+journey and its acceptance matrix in REQ-ORDERS-069–076.
 
 ## Out of scope
 

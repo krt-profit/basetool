@@ -22,6 +22,9 @@
              th:data-target="${money.target}" th:data-target-version="${money.targetVersion}"
              th:data-information-version="${money.informationVersion}" th:data-remaining="${money.remaining}"
              th:data-net-handed-over="${money.netHandedOver}" th:data-status="${order.status}"
+             th:data-lifecycle-version="${order.lifecycleVersion}"
+             th:data-status-label="#{__${orderStatusKey}__}"
+             th:data-status-class="${orderStatusClass}"
              th:data-handle="${money.canEditInformation ? order.handle : null}"
              th:data-comment="${money.canEditInformation ? order.comment : null}">
         <h2 id="order-money-heading" class="section-title" th:text="#{orders.money.title}"></h2>

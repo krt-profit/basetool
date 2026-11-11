@@ -202,26 +202,24 @@ function initOrdersDetailProduction() {
 
 initOrdersDetailProduction();
 
-document.addEventListener('krt:swapped', (ev) => {
-    const container = ev && ev.detail && ev.detail.container;
-    if (!container || container.id !== 'order-header-results') {
-        return;
-    }
-    const meta = document.getElementById('order-head-meta');
+document.addEventListener('krt:swapped', (event) => {
+    const container = event.detail.container;
+    if (container?.id !== 'order-header-results' && container?.id !== 'order-money-results') return;
+
+    const meta = container.querySelector('[data-status-class]');
     const badge = document.getElementById('order-status-badge');
-    if (!meta || !badge) {
-        return;
+    if (!(meta instanceof HTMLElement) || !badge) return;
+
+    const { statusClass, statusLabel, lifecycleVersion } = meta.dataset;
+    if (!statusClass || !statusLabel) return;
+    if (BigInt(lifecycleVersion ?? '0') < BigInt(badge.dataset.lifecycleVersion ?? '0')) return;
+
+    for (const cls of [...badge.classList]) {
+        if (cls.startsWith('status-') && cls !== 'status-badge') badge.classList.remove(cls);
     }
-    const statusClass = meta.getAttribute('data-status-class') || '';
-    /** @type {string[]} */ (Array.prototype.slice.call(badge.classList)).forEach((cls) => {
-        if (cls.indexOf('status-') === 0 && cls !== 'status-badge') {
-            badge.classList.remove(cls);
-        }
-    });
-    if (statusClass) {
-        badge.classList.add(statusClass);
-    }
-    badge.textContent = meta.getAttribute('data-status-label') || badge.textContent;
+    badge.classList.add(statusClass);
+    badge.textContent = statusLabel;
+    badge.dataset.lifecycleVersion = lifecycleVersion ?? '0';
 });
 
 /**

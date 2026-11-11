@@ -36,6 +36,8 @@ final class E2eUserRoles {
           Map.entry("test-admin", List.of("ADMIN", KRT_MEMBER)),
           Map.entry("test-officer", List.of(KRT_MEMBER)),
           Map.entry("test-member", List.of(KRT_MEMBER)),
+          Map.entry("test-order-writer", List.of(KRT_MEMBER)),
+          Map.entry("test-order-reader", List.of(KRT_MEMBER)),
           Map.entry("test-sk", List.of(KRT_MEMBER)),
           Map.entry("test-none", List.of(KRT_MEMBER)),
           Map.entry("test-both", List.of(KRT_MEMBER)),

@@ -702,6 +702,9 @@ class JobOrderMoneyIntegrationTest {
             rateKey);
     jdbc.update("UPDATE system_setting SET setting_value = '0' WHERE setting_key = ?", rateKey);
     try {
+      String collectorName = "Collector " + writer;
+      String recipientName = "Requester " + reader;
+      assertBankFreeFixture(collectorName, recipientName);
       UUID order = createOrder();
       assertMoney(order, "0", "0", "0", "10000000", "OPEN");
       String holderA = providedHolder(order, reader(), "4000000");
@@ -719,7 +722,7 @@ class JobOrderMoneyIntegrationTest {
                   holderA,
                   1,
                   "4000000",
-                  Map.of("destinationName", "Collection C", "destinationVersion", 0))
+                  Map.of("destinationName", collectorName, "destinationVersion", 0))
               .get("destinationHolderId")
               .asString();
       assertMoney(order, "10000000", "10000000", "0", "10000000", "IN_PROGRESS");
@@ -744,7 +747,7 @@ class JobOrderMoneyIntegrationTest {
                   post("/api/v1/orders/{id}/money/recipients", order)
                       .with(writer())
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(json.writeValueAsString(Map.of("name", "Requester R"))))
+                      .content(json.writeValueAsString(Map.of("name", recipientName))))
               .andExpect(status().isCreated())
               .andReturn();
       String recipient =
@@ -774,6 +777,9 @@ class JobOrderMoneyIntegrationTest {
           .andExpect(jsonPath("$.holders.length()").value(3))
           .andExpect(jsonPath("$.history.length()").value(6))
           .andExpect(jsonPath("$.fees").value("0"));
+      assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 4);
+      assertAuditCount(order, "JOB_ORDER_COMPLETED", 1);
+      assertNoBankRecords(collectorName, recipientName, order);
     } finally {
       jdbc.update(
           "UPDATE system_setting SET setting_value = ? WHERE setting_key = ?",
@@ -1347,6 +1353,9 @@ class JobOrderMoneyIntegrationTest {
     withFeeRate(
         "0.005",
         () -> {
+          String collectorName = "Collector " + writer;
+          String recipientName = "Requester " + reader;
+          assertBankFreeFixture(collectorName, recipientName);
           UUID order = createOrder();
           String a = providedHolder(order, reader(), "4000000");
           String b = providedHolder(order, writer(), "6000000");
@@ -1359,7 +1368,7 @@ class JobOrderMoneyIntegrationTest {
                   "0.005",
                   Map.of(
                       "destinationName",
-                      "Collecting account",
+                      collectorName,
                       "destinationVersion",
                       0,
                       "provision",
@@ -1376,7 +1385,7 @@ class JobOrderMoneyIntegrationTest {
                   "0.005",
                   Map.of("destinationHolderId", c, "destinationVersion", 1, "provision", "30000")));
           assertMoney(order, "10050000", "10000000", "0", "10000000", "IN_PROGRESS");
-          String recipient = designateRecipient(order, writer(), Map.of("name", "Net requester"));
+          String recipient = designateRecipient(order, writer(), Map.of("name", recipientName));
           Map<String, ?> third =
               movementTerms(
                   "HANDOVER",
@@ -1408,6 +1417,7 @@ class JobOrderMoneyIntegrationTest {
               () -> assertThat(submitMovement(order, writer(), third)).isEqualTo(paidThird));
           assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 4);
           assertAuditCount(order, "JOB_ORDER_COMPLETED", 1);
+          assertNoBankRecords(collectorName, recipientName, order);
         });
   }
 
@@ -2039,6 +2049,26 @@ class JobOrderMoneyIntegrationTest {
         .with(writer())
         .contentType(MediaType.APPLICATION_JSON)
         .content(json.writeValueAsString(Map.of("target", amount, "version", version)));
+  }
+
+  private void assertBankFreeFixture(String collector, String recipient) throws Exception {
+    for (var actor : List.of(writer(), reader())) {
+      mvc.perform(get("/api/v1/me/capabilities").with(actor))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.isAdmin").value(false))
+          .andExpect(jsonPath("$.canViewBankStaff").value(false))
+          .andExpect(jsonPath("$.canManageBank").value(false));
+    }
+    assertNoBankRecords(collector, recipient, null);
+  }
+
+  private void assertNoBankRecords(String collector, String recipient, @Nullable UUID order) {
+    JobOrderBankFootprint.assertAbsent(
+        jdbc,
+        List.of(writer, reader),
+        List.of(responsible, requester),
+        List.of(collector, recipient),
+        order);
   }
 
   private void assertAuditCount(UUID order, String event, int count) {

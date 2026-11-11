@@ -1695,6 +1695,34 @@
       "username": "test-appoint-tgt"
     },
     {
+      "credentials": [
+        {
+          "temporary": false,
+          "type": "password",
+          "value": "test-order-writer-pw"
+        }
+      ],
+      "email": "test-order-writer@example.test",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": [],
+      "username": "test-order-writer"
+    },
+    {
+      "credentials": [
+        {
+          "temporary": false,
+          "type": "password",
+          "value": "test-order-reader-pw"
+        }
+      ],
+      "email": "test-order-reader@example.test",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": [],
+      "username": "test-order-reader"
+    },
+    {
       "clientRoles": {},
       "credentials": [
         {

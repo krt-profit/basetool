@@ -10,8 +10,7 @@
 <th:block th:fragment="pageContent">
 <main class="orders-detail"
       th:with="isItemOrder=${order.type == 'ITEM'},
-               isMaterialOrder=${order.type == 'MATERIAL'},
-               statusClass=${order.status == 'OPEN' ? 'status-planned' : (order.status == 'IN_PROGRESS' ? 'status-active' : (order.status == 'COMPLETED' ? 'status-completed' : 'status-cancelled'))}">
+               isMaterialOrder=${order.type == 'MATERIAL'}">
     <div class="page-head" data-testid="page-head">
         <div class="page-head__main">
             <a class="page-eyebrow" th:href="@{/orders}" data-testid="page-eyebrow"
@@ -22,8 +21,9 @@
                 <span th:if="${isItemOrder}" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
                 <span th:if="${isMaterialOrder}" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
                 <span th:if="${order.type == 'AUEC'}" class="order-kind-badge" th:text="#{orders.kind.auec}"></span>
-                <span id="order-status-badge" class="status-badge" th:classappend="${statusClass}" data-testid="order-status-badge"
-                      th:text="#{__${'status.' + order.status}__}">In Bearbeitung</span>
+                <span id="order-status-badge" class="status-badge" th:classappend="${orderStatusClass}" data-testid="order-status-badge"
+                      th:data-lifecycle-version="${order.lifecycleVersion}"
+                      th:text="#{__${orderStatusKey}__}">In Bearbeitung</span>
             </div>
         </div>
         <div id="order-actions-results" class="page-actions"><th:block th:fragment="orderActions" th:with="isItemOrder=${order.type == 'ITEM'}">
@@ -55,8 +55,9 @@
               th:data-can-fulfill="${canFulfill}"
               th:data-requesting-unit-id="${order.requestingOrgUnit != null ? order.requestingOrgUnit.id() : null}"
               th:data-status="${order.status}"
-              th:data-status-label="#{__${'status.' + order.status}__}"
-              th:data-status-class="${order.status == 'OPEN' ? 'status-planned' : (order.status == 'IN_PROGRESS' ? 'status-active' : (order.status == 'COMPLETED' ? 'status-completed' : 'status-cancelled'))}"></span>
+              th:data-lifecycle-version="${order.lifecycleVersion}"
+              th:data-status-label="#{__${orderStatusKey}__}"
+              th:data-status-class="${orderStatusClass}"></span>
         <span id="order-display-id" hidden
               th:text="'#' + ${order.displayId}" th:data-order-number="'#' + ${order.displayId}">#1</span>
         <p th:if="${order.responsibilityInvalid}" class="alert alert-warning" data-testid="responsibility-invalid" th:text="#{orders.responsibility.invalid}"></p>

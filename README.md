@@ -26,6 +26,7 @@ runbook. Individual features, plans and decisions are **not** re-documented here
   unit commitments, exact fees and net handovers. The order detail also handles returns, settlement,
   same-holder reassignment and financial corrections. Holder and recipient maintenance preserves
   the original operation history, and submitted operations can be recovered after response loss.
+  The status updates live for other viewers with a money draft open.
   [Optional Bank handling](docs/specs/orders-auec-bank.md) remains planned.
 - **Hangar & inventory** — track ships and personal inventories per member, with a server-paginated org-unit fleet overview and personal hangar; admins keep a member's hangar from the member's page.
 - **Lager (warehouse)** — org-scoped, append-only stock tracking: book stock in/out, transfer it (Umbuchen) — individually or for a whole marked selection at once — earmark slices to job orders and missions, and track both materials (with quality) and craftable game items. Each unit's Logisticians set minimum and target levels per material and quality tier, or per game item, in the „Mindestbestände“ tab, which shows the free stock allocated to each level from the top tier down and the amount already requested. A low level marks its material or game item „niedrig“ in the global Lager, offers a prefilled job order and need, and tells the direct Logisticians and seat holders once, until the target is reached again.

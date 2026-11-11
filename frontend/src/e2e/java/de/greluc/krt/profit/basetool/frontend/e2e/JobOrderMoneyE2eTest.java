@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,6 +57,10 @@ class JobOrderMoneyE2eTest {
   private static final String IRIDIUM = "00000000-0000-0000-0000-000000000001";
   private static final String READER = "test-member";
   private static final String READER_PASSWORD = "test-member-pw";
+  private static final String ORDER_WRITER = "test-order-writer";
+  private static final String ORDER_WRITER_PASSWORD = ORDER_WRITER + "-pw";
+  private static final String ORDER_READER = "test-order-reader";
+  private static final String ORDER_READER_PASSWORD = ORDER_READER + "-pw";
   private static final String AMOUNT = "9007199254740993";
   private static final String GROUPED_AMOUNT = "9.007.199.254.740.993";
 
@@ -479,46 +484,10 @@ class JobOrderMoneyE2eTest {
       assertThat(recipient).containsText("Requester recipient");
       String recipientId = recipient.getAttribute("data-money-recipient");
 
-      AtomicReference<String> accepted = new AtomicReference<>();
-      page.route(
-          "**" + movements,
-          route -> {
-            var response = route.fetch();
-            assertEquals(200, response.status());
-            accepted.set(json(response.text()).get("operationId").getAsString());
-            route.abort();
-          });
-      prepareHandover(page, collector, recipientId, "3");
-      page.getByTestId("order-money-movement-save").click();
-      assertThat(page.getByTestId("order-money-unknown")).isVisible();
-      assertNotNull(accepted.get());
-      String outcome = orderPath + "/money/operations/" + accepted.get();
-      AtomicReference<Route> pendingOutcome = new AtomicReference<>();
-      AtomicInteger outcomeLookups = new AtomicInteger();
-      page.route(
-          "**" + outcome,
-          route -> {
-            outcomeLookups.incrementAndGet();
-            pendingOutcome.set(route);
-          });
-      page.reload();
-      page.waitForCondition(() -> pendingOutcome.get() != null);
-      assertThat(page.locator("[data-money-check]")).isDisabled();
-      page.getByTestId("order-money-move").click();
-      assertThat(page.getByTestId("order-money-movement-kind")).isHidden();
-      var recovered =
-          page.waitForResponse(
-              response -> response.url().endsWith(outcome), pendingOutcome.get()::resume);
-      assertEquals(200, recovered.status());
-      assertEquals("HANDOVER", json(recovered.text()).get("kind").getAsString());
+      recoverCommittedHandover(page, orderPath, collector, recipientId, "3");
       assertThat(page.getByTestId("order-money-handed-over")).containsText("3 aUEC");
       assertThat(page.getByTestId("order-money-holdings")).containsText("7 aUEC");
       assertThat(page.locator("#order-status-badge.status-active")).isVisible();
-      page.unroute("**" + movements);
-
-      assertThat(page.getByTestId("order-money-movement-kind")).isVisible();
-      assertEquals(1, outcomeLookups.get());
-      page.unroute("**" + outcome);
       fillHandover(page, collector, recipientId, "7");
       awaitPost(page, movements, "order-money-movement-save");
       assertThat(page.locator("#order-status-badge.status-completed")).isVisible();
@@ -553,6 +522,176 @@ class JobOrderMoneyE2eTest {
       assertThat(page.getByTestId("order-money-target-change")).containsText("10 auf 12 aUEC");
       assertThat(page.locator("#order-header-results")).containsText("trace-contact");
     }
+  }
+
+  /** Hands over from separate holders while an ordinary requester-side peer keeps a draft. */
+  @Test
+  void contextualWriterCompletesWithoutBankOrCentralCollection() {
+    assumeTrue(STACK.managesStack(), "requires the isolated monetary order stack");
+    var seeder = new BackendSeeder();
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    String unit = seeder.createSquadron(USERNAME, PASSWORD, "Bank-free orders " + tag, "BF" + tag);
+    seeder.moveOrgUnitToProfit(USERNAME, PASSWORD, unit);
+    String writerId = seeder.getUserId(ORDER_WRITER, ORDER_WRITER_PASSWORD);
+    JsonObject recipientAccount =
+        json(seeder.getBody(ORDER_READER, ORDER_READER_PASSWORD, "/api/v1/users/me"));
+    String readerId = recipientAccount.get("id").getAsString();
+    seeder.assignStaffelMembership(USERNAME, PASSWORD, writerId, unit, true, false);
+    seeder.assignStaffelMembership(USERNAME, PASSWORD, readerId, unit, false, false);
+    assertNoBankStaffAuthority(seeder, ORDER_WRITER, ORDER_WRITER_PASSWORD);
+    assertNoBankStaffAuthority(seeder, ORDER_READER, ORDER_READER_PASSWORD);
+
+    String baseUrl = STACK.baseUrl();
+    var options = new Browser.NewContextOptions().setIgnoreHTTPSErrors(true);
+    try (Playwright playwright = Playwright.create();
+        Browser browser = E2eSupport.launchBrowser(playwright, true);
+        BrowserContext writerContext = browser.newContext(options);
+        BrowserContext readerContext = browser.newContext(options)) {
+      Page writer = writerContext.newPage();
+      Page reader = readerContext.newPage();
+      E2eSupport.login(writer, baseUrl, ORDER_WRITER, ORDER_WRITER_PASSWORD);
+      E2eSupport.navigate(writer, baseUrl + "/orders/create?lang=de");
+      String orderPath = createOrder(writer, baseUrl, unit, unit, "10");
+      String orderId = orderPath.substring("/orders/".length());
+      String provisions = orderPath + "/money/provisions";
+      String movements = orderPath + "/money/movements";
+
+      E2eSupport.login(reader, baseUrl, ORDER_READER, ORDER_READER_PASSWORD);
+      E2eSupport.navigate(reader, baseUrl + orderPath + "?lang=de");
+      waitForRoom(reader, "order:" + orderId);
+      reader.getByTestId("order-money-provide").click();
+      Locator draft = reader.getByTestId("order-money-amount");
+      draft.fill("78");
+
+      prepareSelfProvision(writer, "4");
+      String firstHolder =
+          json(awaitPost(writer, provisions, "order-money-save")).get("holderId").getAsString();
+      writer.getByTestId("order-money-provide").click();
+      writer.getByTestId("order-money-holder-mode").selectOption("new");
+      chooseAccountless(writer, "order-money-holder-choice", "Accountless " + tag);
+      writer.getByTestId("order-money-amount").fill("6");
+      writer.getByTestId("order-money-bank-free").check();
+      String secondHolder =
+          json(awaitPost(writer, provisions, "order-money-save")).get("holderId").getAsString();
+      assertNotEquals(firstHolder, secondHolder);
+      assertThat(reader.getByTestId("order-money-designate-recipient")).hasCount(0);
+      assertMoneyFigure(reader, "order-money-provided", "10");
+      assertThat(draft).hasValue("78");
+
+      writer.getByTestId("order-money-designate-recipient").click();
+      writer.getByTestId("order-money-recipient-mode").selectOption("new");
+      writer
+          .getByTestId("order-money-recipient-choice")
+          .fill(recipientAccount.get("effectiveName").getAsString());
+      writer.locator("li[role='option'][data-value='" + readerId + "']:visible").click();
+      awaitPost(writer, orderPath + "/money/recipients", "order-money-recipient-save");
+      String recipient =
+          writer.locator("[data-money-recipient]").getAttribute("data-money-recipient");
+      assertNotNull(recipient);
+
+      String recoveredOperation =
+          recoverCommittedHandover(writer, orderPath, firstHolder, recipient, "4");
+      assertMoneyFigure(reader, "order-money-handed-over", "4");
+      assertMoneyFigure(reader, "order-money-remaining", "6");
+      assertThat(draft).hasValue("78");
+      reader.waitForCondition(
+          () -> movementNotices(seeder, ORDER_READER, ORDER_READER_PASSWORD, orderId) > 0);
+      assertEquals(1, movementNotices(seeder, ORDER_READER, ORDER_READER_PASSWORD, orderId));
+      assertEquals(0, movementNotices(seeder, ORDER_WRITER, ORDER_WRITER_PASSWORD, orderId));
+      assertOneMovementAudit(seeder, writerId, orderId, recoveredOperation);
+
+      fillHandover(writer, secondHolder, recipient, "6");
+      awaitPost(writer, movements, "order-money-movement-save");
+      assertThat(writer.locator("#order-status-badge.status-completed")).isVisible();
+      assertThat(reader.locator("#order-status-badge.status-completed")).hasText("Abgeschlossen");
+      assertThat(draft).isVisible();
+      assertThat(draft).hasValue("78");
+      assertMoneyFigure(reader, "order-money-provided", "10");
+      assertMoneyFigure(reader, "order-money-handed-over", "10");
+      assertMoneyFigure(reader, "order-money-holdings", "0");
+      assertMoneyFigure(reader, "order-money-remaining", "0");
+      assertThat(reader.getByTestId("order-money-history-entry")).hasCount(4);
+    }
+  }
+
+  private static void assertMoneyFigure(Page page, String testId, String amount) {
+    assertThat(page.getByTestId(testId).locator(".kpi-value")).hasText(amount + " aUEC");
+  }
+
+  private static long movementNotices(
+      BackendSeeder seeder, String user, String password, String orderId) {
+    return json(seeder.getBody(user, password, "/api/v1/notifications"))
+        .getAsJsonArray("content")
+        .asList()
+        .stream()
+        .map(entry -> entry.getAsJsonObject())
+        .filter(entry -> "JOB_ORDER_MONEY_MOVED".equals(entry.get("type").getAsString()))
+        .filter(entry -> orderId.equals(entry.get("entityId").getAsString()))
+        .count();
+  }
+
+  private static void assertNoBankStaffAuthority(
+      BackendSeeder seeder, String user, String password) {
+    JsonObject capabilities = json(seeder.getBody(user, password, "/api/v1/me/capabilities"));
+    assertFalse(capabilities.get("isAdmin").getAsBoolean());
+    assertFalse(capabilities.get("canViewBankStaff").getAsBoolean());
+    assertFalse(capabilities.get("canManageBank").getAsBoolean());
+  }
+
+  private static void assertOneMovementAudit(
+      BackendSeeder seeder, String actorId, String orderId, String operationId) {
+    String path = "/api/v1/audit/JOB_ORDER?eventType=JOB_ORDER_MONEY_MOVED&actorUserId=" + actorId;
+    JsonObject audit = json(seeder.getBody(USERNAME, PASSWORD, path));
+    assertEquals(1, audit.get("totalElements").getAsInt());
+    JsonObject movement = audit.getAsJsonArray("content").get(0).getAsJsonObject();
+    assertEquals(orderId, movement.get("subjectId").getAsString());
+    assertTrue(movement.get("details").getAsString().contains(operationId));
+  }
+
+  private static String recoverCommittedHandover(
+      Page page, String orderPath, String holder, String recipient, String amount) {
+    String movements = orderPath + "/money/movements";
+    AtomicReference<String> accepted = new AtomicReference<>();
+    page.route(
+        "**" + movements,
+        route -> {
+          assertFalse(json(route.request().postData()).get("bankHandling").getAsBoolean());
+          var response = route.fetch();
+          assertEquals(200, response.status());
+          accepted.set(json(response.text()).get("operationId").getAsString());
+          route.abort();
+        });
+    prepareHandover(page, holder, recipient, amount);
+    page.getByTestId("order-money-movement-save").click();
+    assertThat(page.getByTestId("order-money-unknown")).isVisible();
+    assertNotNull(accepted.get());
+    String outcome = orderPath + "/money/operations/" + accepted.get();
+    AtomicReference<Route> pendingOutcome = new AtomicReference<>();
+    AtomicInteger outcomeLookups = new AtomicInteger();
+    page.route(
+        "**" + outcome,
+        route -> {
+          outcomeLookups.incrementAndGet();
+          pendingOutcome.set(route);
+        });
+    page.reload();
+    page.waitForCondition(() -> pendingOutcome.get() != null);
+    assertThat(page.locator("[data-money-check]")).isDisabled();
+    page.getByTestId("order-money-move").click();
+    assertThat(page.getByTestId("order-money-movement-kind")).isHidden();
+    var recovered =
+        page.waitForResponse(
+            response -> response.url().endsWith(outcome), pendingOutcome.get()::resume);
+    assertEquals(200, recovered.status());
+    JsonObject recorded = json(recovered.text());
+    assertEquals("HANDOVER", recorded.get("kind").getAsString());
+    assertEquals(accepted.get(), recorded.get("operationId").getAsString());
+    assertEquals(amount, recorded.get("amount").getAsString());
+    assertThat(page.getByTestId("order-money-movement-kind")).isVisible();
+    assertEquals(1, outcomeLookups.get());
+    page.unroute("**" + movements);
+    page.unroute("**" + outcome);
+    return accepted.get();
   }
 
   private static void awaitPatch(Page page, String path, String saveTestId) {
@@ -834,8 +973,13 @@ class JobOrderMoneyE2eTest {
 
   private static String createOrder(
       Page page, String baseUrl, String requestingUnit, String target) {
+    return createOrder(page, baseUrl, IRIDIUM, requestingUnit, target);
+  }
+
+  private static String createOrder(
+      Page page, String baseUrl, String responsibleUnit, String requestingUnit, String target) {
     page.getByTestId("order-mode-auec").click();
-    page.locator("#auec-responsible-org-unit").selectOption(IRIDIUM);
+    page.locator("#auec-responsible-org-unit").selectOption(responsibleUnit);
     page.locator("#auec-requesting-org-unit").selectOption(requestingUnit);
     page.getByTestId("order-auec-handle").fill("E2E Money " + UUID.randomUUID());
     page.getByTestId("order-auec-target").fill(target);

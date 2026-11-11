@@ -208,7 +208,9 @@ no open promises.
 - [ ] Need edits do not silently reopen manual completion or cancellation.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest` covers MATERIAL and ITEM lifecycle
-rights, cancellation and the preservation of historical promises and booked work.
+rights, cancellation and the preservation of historical promises and booked work. The ITEM
+early-completion case reads back the unmet need and original handover after a responsible-unit
+writer closes the order. `JobOrderStatusE2eTest` covers early MATERIAL completion.
 `JobOrderStatusQueueRaceIntegrationTest` covers terminal queue changes. The Bank-free completion,
 return and settlement cases are part of the
 [money lifecycle contract](orders-auec.md#req-orders-063--auec-lifecycle-follows-effective-net-handover).

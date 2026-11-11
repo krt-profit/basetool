@@ -956,7 +956,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
 
   @Test
   void requesterEditsCancelledItemNeedWithoutChangingBookedWork() throws Exception {
-    JobOrderItem line = cancelledItemWithBookedWork();
+    JobOrderItem line = itemWithBookedWork(JobOrderStatus.CANCELLED);
     JobOrder order = line.getJobOrder();
     String endpoint = "/api/v1/orders/" + order.getId();
     String body =
@@ -986,7 +986,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
 
   @Test
   void cancelledItemOrderRequiresReopeningBeforeAnotherHandover() throws Exception {
-    JobOrderItem line = cancelledItemWithBookedWork();
+    JobOrderItem line = itemWithBookedWork(JobOrderStatus.CANCELLED);
     String endpoint = "/api/v1/orders/" + line.getJobOrder().getId();
     String body =
         "{\"handoverTime\":\"2026-11-10T20:00:00Z\",\"recipientHandle\":\"Recipient\","
@@ -1020,13 +1020,37 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         .andExpect(status().isCreated());
   }
 
-  private JobOrderItem cancelledItemWithBookedWork() {
+  @Test
+  void responsibleWriterCanCompleteAnItemOrderWithUnmetNeed() throws Exception {
+    JobOrderItem line = itemWithBookedWork(JobOrderStatus.IN_PROGRESS);
+    String endpoint = "/api/v1/orders/" + line.getJobOrder().getId();
+
+    mvc.perform(
+            put(endpoint + "/status")
+                .with(contextualWriter(responsible.getId()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"COMPLETED\",\"version\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("COMPLETED"))
+        .andExpect(jsonPath("$.lifecycleVersion").value(1));
+
+    as(get(endpoint), null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("COMPLETED"))
+        .andExpect(jsonPath("$.items[0].id").value(line.getId().toString()))
+        .andExpect(jsonPath("$.items[0].amount").value(4))
+        .andExpect(jsonPath("$.items[0].manufacturedAmount").value(2))
+        .andExpect(jsonPath("$.items[0].deliveredAmount").value(1))
+        .andExpect(jsonPath("$.itemHandovers[0].entries[0].amount").value(1));
+  }
+
+  private JobOrderItem itemWithBookedWork(JobOrderStatus status) {
     JobOrder order =
         JobOrder.builder()
             .responsibleOrgUnit(responsible)
             .requestingOrgUnit(requester)
             .type(JobOrderType.ITEM)
-            .status(JobOrderStatus.CANCELLED)
+            .status(status)
             .handle("Partial item order")
             .build();
     JobOrderItem line =
