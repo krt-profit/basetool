@@ -251,6 +251,20 @@ final class BankAccessSeeder {
         admin.getId());
   }
 
+  LinkedOrderAccount seedLinkedOrderAccount(UUID applicant) {
+    Squadron owner = orgUnit(new Squadron(), "Linked account owner", null, null);
+    BankAccount account = account(BankAccountType.ORG_UNIT, "Linked account", owner);
+    BankAccountViewGrant grant = new BankAccountViewGrant();
+    grant.setAccount(account);
+    grant.setGranteeKind(BankAccountViewGranteeKind.USER);
+    grant.setGranteeUserId(applicant);
+    viewGrantRepository.save(grant);
+    entityManager.flush();
+    return new LinkedOrderAccount(account.getId(), owner.getId());
+  }
+
+  record LinkedOrderAccount(UUID accountId, UUID ownerId) {}
+
   /**
    * Seeds one user per actor with the roles the actor holds.
    *

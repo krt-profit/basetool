@@ -242,10 +242,7 @@ class JobOrderLinkedMoneyEffects implements JobOrderBankEffects {
 
   private static void requireBookableOrder(JobOrder order, JobOrderLinkedMoneyAttempt attempt) {
     if (order.getStatus() == JobOrderStatus.REJECTED
-        || (!order.getStatus().isActive()
-            && !attempt.isActualPayment()
-            && attempt.getKind() != JobOrderMoneyKind.REQUESTER_RETURN
-            && attempt.getKind() != JobOrderMoneyKind.SETTLEMENT)) {
+        || (!order.getStatus().isActive() && !attempt.permitsTerminalPosting())) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
   }

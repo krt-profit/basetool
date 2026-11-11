@@ -33,9 +33,11 @@ import org.jetbrains.annotations.Nullable;
  * @param operationId caller-generated identity, required to book
  * @param kind requester return, shortage, release or settlement
  * @param sourceHolderId the existing holder who pays the fee or funds the movement
- * @param sourceVersion observed source holder revision
+ * @param sourceAccountHoldingId the source order account position for a release or shortage
+ * @param sourceVersion observed source position revision
  * @param recipientId original requester designation returning its payment
  * @param destinationHolderId existing receiving order holder
+ * @param destinationAccountHoldingId the receiving order account position for a requester return
  * @param destinationVersion observed receiver revision or zero for a new holder
  * @param destinationUserId selected receiving account
  * @param destinationName reported accountless beneficiary or receiving holder
@@ -50,9 +52,11 @@ public record SettleJobOrderMoneyDto(
     @Nullable UUID operationId,
     @NotNull JobOrderMoneyKind kind,
     @Nullable UUID sourceHolderId,
+    @Nullable UUID sourceAccountHoldingId,
     @Nullable Long sourceVersion,
     @Nullable UUID recipientId,
     @Nullable UUID destinationHolderId,
+    @Nullable UUID destinationAccountHoldingId,
     @Nullable Long destinationVersion,
     @Nullable UUID destinationUserId,
     @Nullable @Size(max = 200) String destinationName,

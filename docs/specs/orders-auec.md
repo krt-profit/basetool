@@ -207,6 +207,8 @@ shortage, pay a named beneficiary or reassign the same player's money to another
 shortage and reassignment carry no game transfer fee. A beneficiary payment debits the holder's
 principal and charges its game transfer fee separately. Its principal leaves the order's holdings
 without changing the requester's net handover. Explicit additional funds can cover its fee.
+A release or actual later shortage on an order Bank account position reduces the funds assigned to
+the order on that position. It preserves historical provision and credit and creates no Bank posting.
 
 Cross-order reassignment requires current rights and valid responsibility on both orders. An
 eligible active destination receives the purpose inflow as the source records the purpose outflow.

@@ -126,7 +126,7 @@ public class JobOrderLinkedMoneyRepair {
     if (prior.getRevision() != dto.revision()
         || !prior.replaceable()
         || order.getStatus() == JobOrderStatus.REJECTED
-        || (!order.getStatus().isActive() && !prior.isActualPayment())) {
+        || (!order.getStatus().isActive() && !prior.permitsTerminalPosting())) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
     var next = createReplacement(order, prior, bank, amount, provision, actor);
@@ -140,7 +140,8 @@ public class JobOrderLinkedMoneyRepair {
     if (!actor.equals(attempt.getActorId())) {
       return false;
     }
-    if (attempt.getKind().delivers() && access.requester(order)) {
+    if ((attempt.getKind().delivers() || attempt.getKind() == JobOrderMoneyKind.REQUESTER_RETURN)
+        && access.requester(order)) {
       return true;
     }
     UUID holder = attempt.getHolderId();
@@ -210,7 +211,10 @@ public class JobOrderLinkedMoneyRepair {
                 amount,
                 rate,
                 prior.isActualPayment(),
-                prior.counterparty()),
+                bank.type() == JobOrderBankSelection.Type.DEPOSIT
+                        && prior.getKind() == JobOrderMoneyKind.PROVISION
+                    ? prior.depositCounterpartyForReplacement()
+                    : prior.counterparty()),
             new PreviousAttempt(prior.getId(), Objects.requireNonNull(prior.getRequestId())));
     if (next.getState() == JobOrderLinkedMoneyState.SUBMITTING) {
       throw JobOrderLinkedMoneyAttempt.conflict();
@@ -233,7 +237,7 @@ public class JobOrderLinkedMoneyRepair {
     }
     if (bank.type() == JobOrderBankSelection.Type.DEPOSIT
         && prior.getKind() == JobOrderMoneyKind.PROVISION
-        && !Objects.equals(prior.counterparty(), JobOrderLinkedPaymentTerms.depositor(bank))) {
+        && !prior.matchesDepositor(bank)) {
       throw JobOrderLinkedPaymentTerms.invalid();
     }
     UUID recipientId = prior.getRecipientId();
@@ -262,7 +266,9 @@ public class JobOrderLinkedMoneyRepair {
                       new JobOrderMoneyAccountHolding(order.getId(), accountId)));
       return Objects.requireNonNull(position.getId());
     }
-    if (!accountId.equals(prior.getBankAccountId())) {
+    if (!accountId.equals(prior.getBankAccountId())
+        || (prior.getKind() == JobOrderMoneyKind.REQUESTER_RETURN
+            && !Objects.equals(prior.getBankTargetAccountId(), bank.targetAccountId()))) {
       throw JobOrderLinkedPaymentTerms.invalid();
     }
     return previousPosition;
@@ -286,6 +292,15 @@ public class JobOrderLinkedMoneyRepair {
     boolean returning = prior.getKind() == JobOrderMoneyKind.REQUESTER_RETURN;
     BigDecimal principal = returning ? BigDecimal.ZERO : amount;
     BigDecimal shortage = principal.subtract(available).max(BigDecimal.ZERO);
+    if (returning
+        && account != null
+        && current
+                .availableForAccountReturn(
+                    account, Objects.requireNonNull(prior.getRecipientId()), prior.getId())
+                .compareTo(amount)
+            < 0) {
+      throw JobOrderLinkedMoneyAttempt.conflict();
+    }
     if (provision.compareTo(shortage.add(fee)) > 0
         || (prior.getKind() == JobOrderMoneyKind.SETTLEMENT && shortage.signum() > 0)
         || (returning

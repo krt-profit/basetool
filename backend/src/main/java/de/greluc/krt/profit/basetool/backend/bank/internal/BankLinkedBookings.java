@@ -129,18 +129,31 @@ class BankLinkedBookings {
    */
   @Nullable
   private CounterpartySnapshot linkedCounterparty(@NotNull BankBookingRequest request) {
-    String handle = request.getCounterpartyHandle();
-    if (handle == null) {
-      return null;
+    CounterpartySnapshot snapshot = storedCounterparty(request);
+    if (snapshot == null || request.getType() == BankBookingRequestType.DEPOSIT) {
+      return snapshot;
     }
-    UUID member = request.getCounterpartyUserId();
-    UUID unit = request.getCounterpartyOrgUnitId();
+    String handle = snapshot.handle();
+    UUID member = snapshot.userId();
+    UUID unit = snapshot.orgUnitId();
     if (HandleAnonymisation.isAnonymised(handle)
-        || (unit == null && request.getCounterpartyOrgUnitName() != null)) {
+        || (unit == null && snapshot.orgUnitName() != null)) {
       throw new BadRequestException("The submitted Bank counterparty is no longer available");
     }
     ledger.resolveCounterparty(member, member == null ? handle : null, unit);
-    return new CounterpartySnapshot(member, handle, unit, request.getCounterpartyOrgUnitName());
+    return snapshot;
+  }
+
+  /** Reads the trusted counterparty snapshot of a locked linked request. */
+  static @Nullable CounterpartySnapshot storedCounterparty(@NotNull BankBookingRequest request) {
+    String handle = request.getCounterpartyHandle();
+    return handle == null
+        ? null
+        : new CounterpartySnapshot(
+            request.getCounterpartyUserId(),
+            handle,
+            request.getCounterpartyOrgUnitId(),
+            request.getCounterpartyOrgUnitName());
   }
 
   /**

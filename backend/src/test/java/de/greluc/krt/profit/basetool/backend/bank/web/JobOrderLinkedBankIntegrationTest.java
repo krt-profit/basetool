@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Account;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Holder;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Pin;
+import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessSeeder.LinkedOrderAccount;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
@@ -98,6 +99,7 @@ class JobOrderLinkedBankIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private TransactionTemplate transactions;
 
+  private final List<LinkedOrderAccount> supplementalAccounts = new ArrayList<>();
   private BankAccessWorld world;
   private MockMvc mvc;
   private UUID profit;
@@ -141,6 +143,9 @@ class JobOrderLinkedBankIntegrationTest {
         jdbc.update("DELETE FROM job_order WHERE id = ?", committedOrder);
       }
       removeBankRows();
+      for (var supplemental : supplementalAccounts) {
+        jdbc.update("DELETE FROM org_unit WHERE id = ?", supplemental.ownerId());
+      }
       users.deleteAllById(
           List.of(world.user(Actor.MEMBER), world.user(Actor.MANAGEMENT), world.user(Actor.ADMIN)));
       users.flush();
@@ -154,7 +159,23 @@ class JobOrderLinkedBankIntegrationTest {
   }
 
   private void removeBankRows() {
-    UUID account = world.account(Account.OWN_ORG_UNIT);
+    List<UUID> accounts = new ArrayList<>();
+    accounts.add(world.account(Account.OWN_ORG_UNIT));
+    supplementalAccounts.stream().map(LinkedOrderAccount::accountId).forEach(accounts::add);
+    for (UUID account : accounts) {
+      removeBankRequests(account);
+    }
+    for (UUID account : accounts) {
+      removeBankTransactions(account);
+      jdbc.update("DELETE FROM bank_audit_event WHERE account_id = ?", account);
+    }
+    jdbc.update("DELETE FROM bank_holder WHERE id = ?", world.holder(Holder.MANAGEMENT_HOLDER));
+    for (UUID account : accounts) {
+      jdbc.update("DELETE FROM bank_account WHERE id = ?", account);
+    }
+  }
+
+  private void removeBankRequests(UUID account) {
     List<UUID> attempts =
         jdbc.queryForList(
             """
@@ -168,19 +189,25 @@ class JobOrderLinkedBankIntegrationTest {
       jdbc.update("DELETE FROM bank_authorisation WHERE id = ?", attempt);
       jdbc.update("DELETE FROM bank_linked_attempt WHERE id = ?", attempt);
     }
-    List<UUID> postings =
+  }
+
+  private void removeBankTransactions(UUID account) {
+    List<UUID> transactions =
         jdbc.queryForList(
-            "SELECT DISTINCT transaction_id FROM bank_posting WHERE account_id = ?",
+            """
+            SELECT t.id FROM bank_transaction t
+            WHERE EXISTS (
+                SELECT 1 FROM bank_posting p WHERE p.transaction_id = t.id AND p.account_id = ?
+            )
+            ORDER BY t.reversed_transaction_id NULLS LAST
+            """,
             UUID.class,
             account);
-    for (UUID posting : postings) {
-      jdbc.update("DELETE FROM bank_holder_posting WHERE transaction_id = ?", posting);
-      jdbc.update("DELETE FROM bank_posting WHERE transaction_id = ?", posting);
-      jdbc.update("DELETE FROM bank_transaction WHERE id = ?", posting);
+    for (UUID transaction : transactions) {
+      jdbc.update("DELETE FROM bank_holder_posting WHERE transaction_id = ?", transaction);
+      jdbc.update("DELETE FROM bank_posting WHERE transaction_id = ?", transaction);
+      jdbc.update("DELETE FROM bank_transaction WHERE id = ?", transaction);
     }
-    jdbc.update("DELETE FROM bank_audit_event WHERE account_id = ?", account);
-    jdbc.update("DELETE FROM bank_holder WHERE id = ?", world.holder(Holder.MANAGEMENT_HOLDER));
-    jdbc.update("DELETE FROM bank_account WHERE id = ?", account);
   }
 
   @Test
@@ -229,6 +256,239 @@ class JobOrderLinkedBankIntegrationTest {
         .andExpect(jsonPath("$.holdings").value("600000"));
     assertThat(onlyOwnRequest().path("id").asString()).isEqualTo(request.path("id").asString());
     assertThat(accountBookingCount(account)).isEqualTo(bookings);
+  }
+
+  @Test
+  void requesterAccountReturnsFundsToTheirOriginalCollectionPosition() throws Exception {
+    UUID order = createOrder("600000");
+    UUID collection = world.account(Account.OWN_ORG_UNIT);
+    UUID requester = world.account(Account.CARTEL);
+    provide(order, accountAuthorisationTerms(UUID.randomUUID(), collection, "600000"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    confirm(ownRequestOfType("AUTHORISATION"), Actor.MANAGEMENT, null, null)
+        .andExpect(status().isOk());
+    String designation = designateBankRequester(order, requester);
+    handOverAccountFunds(order, collection, requester, designation, "600000");
+    assertFigures(order, "0", "600000", "0", "COMPLETED");
+
+    UUID returned = UUID.randomUUID();
+    requestAccountReturn(order, collection, requester, designation, returned, "200000");
+    assertFigures(order, "0", "600000", "0", "COMPLETED");
+    UUID transaction = confirmAccountTransfer();
+    assertAccountOnlyPosting(transaction);
+    assertFigures(order, "200000", "400000", "0", "IN_PROGRESS");
+    money(order)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("600000"))
+        .andExpect(jsonPath("$.holders").isEmpty())
+        .andExpect(jsonPath("$.accountHoldings[0].availableAmount").value("200000"));
+    outcome(order, returned).andExpect(jsonPath("$.state").value("POSTED"));
+
+    JsonNode reversal =
+        response(
+            perform(
+                    post("/api/v1/bank/transactions/{id}/reversal", transaction)
+                        .with(as(Actor.MANAGEMENT)),
+                    Map.of())
+                .andExpect(status().isCreated()));
+    assertAccountOnlyPosting(UUID.fromString(reversal.path("id").asString()));
+    assertFigures(order, "0", "600000", "0", "COMPLETED");
+  }
+
+  @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void aPostedReturnPreventsReversingItsOriginalCollectionHandover() throws Exception {
+    UUID order = createOrder("1400000");
+    UUID firstCollection = world.account(Account.OWN_ORG_UNIT);
+    UUID secondCollection = addLinkedOrderAccount();
+    UUID requester = addLinkedOrderAccount();
+    UUID custodian = world.holder(Holder.MANAGEMENT_HOLDER);
+    reportDepositToAccount(order, firstCollection, "600000", "First contributor");
+    confirmDepositToAccount("First contributor", custodian);
+    reportDepositToAccount(order, secondCollection, "800000", "Second contributor");
+    confirmDepositToAccount("Second contributor", custodian);
+    String designation = designateBankRequester(order, requester);
+
+    UUID firstTransfer =
+        handOverAccountFunds(order, firstCollection, requester, designation, "600000");
+    handOverAccountFunds(order, secondCollection, requester, designation, "800000");
+    assertFigures(order, "0", "1400000", "0", "COMPLETED");
+    requestAccountReturn(
+        order, firstCollection, requester, designation, UUID.randomUUID(), "200000");
+    confirmAccountTransfer();
+    assertFigures(order, "200000", "1200000", "0", "IN_PROGRESS");
+
+    long collectionBookings = accountBookingCount(firstCollection, Actor.MANAGEMENT);
+    long requesterBookings = accountBookingCount(requester, Actor.MANAGEMENT);
+    perform(
+            post("/api/v1/bank/transactions/{id}/reversal", firstTransfer)
+                .with(as(Actor.MANAGEMENT)),
+            Map.of())
+        .andExpect(status().isConflict());
+    assertThat(accountBalance(firstCollection)).isEqualTo(200000);
+    assertThat(accountBalance(requester)).isEqualTo(1200000);
+    assertThat(accountBookingCount(firstCollection, Actor.MANAGEMENT))
+        .isEqualTo(collectionBookings);
+    assertThat(accountBookingCount(requester, Actor.MANAGEMENT)).isEqualTo(requesterBookings);
+    assertFigures(order, "200000", "1200000", "0", "IN_PROGRESS");
+  }
+
+  private UUID addLinkedOrderAccount() {
+    var account =
+        Objects.requireNonNull(
+            transactions.execute(_ ->
+                new BankAccessSeeder(context).seedLinkedOrderAccount(world.user(Actor.MEMBER))));
+    supplementalAccounts.add(account);
+    return account.accountId();
+  }
+
+  private String designateBankRequester(UUID order, UUID requester) throws Exception {
+    return response(
+            perform(
+                    post(MONEY + "/recipients", order).with(writer()),
+                    Map.of("bankAccountId", requester))
+                .andExpect(status().isCreated()))
+        .path("id")
+        .asString();
+  }
+
+  private UUID handOverAccountFunds(
+      UUID order, UUID collection, UUID requester, String designation, String amount)
+      throws Exception {
+    JsonNode money = response(money(order).andExpect(status().isOk()));
+    JsonNode position = accountPosition(money, collection);
+    perform(
+            post(MONEY + "/movements", order).with(writer()),
+            Map.of(
+                "operationId", UUID.randomUUID(),
+                "kind", "PURPOSE_HANDOVER",
+                "sourceAccountHoldingId", position.path("id").asString(),
+                "sourceVersion", position.path("version").asLong(),
+                "targetVersion", money.path("targetVersion").asLong(),
+                "recipientId", designation,
+                "amount", amount,
+                "bankHandling", true,
+                "bank", accountTransferTerms(collection, requester)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    return confirmAccountTransfer();
+  }
+
+  private void requestAccountReturn(
+      UUID order,
+      UUID collection,
+      UUID requester,
+      String designation,
+      UUID operation,
+      String amount)
+      throws Exception {
+    JsonNode money = response(money(order).andExpect(status().isOk()));
+    JsonNode position = accountPosition(money, collection);
+    perform(
+            post(MONEY + "/movements/settlement", order).with(writer()),
+            Map.of(
+                "operationId",
+                operation,
+                "kind",
+                "REQUESTER_RETURN",
+                "destinationAccountHoldingId",
+                position.path("id").asString(),
+                "destinationVersion",
+                position.path("version").asLong(),
+                "targetVersion",
+                money.path("targetVersion").asLong(),
+                "recipientId",
+                designation,
+                "amount",
+                amount,
+                "bankHandling",
+                true,
+                "bank",
+                accountTransferTerms(requester, collection)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+  }
+
+  private UUID confirmAccountTransfer() throws Exception {
+    return UUID.fromString(
+        response(
+                confirm(ownRequestOfType("TRANSFER"), Actor.MANAGEMENT, null, null)
+                    .andExpect(status().isOk()))
+            .path("resultingTransactionId")
+            .asString());
+  }
+
+  private static JsonNode accountPosition(JsonNode money, UUID account) {
+    for (JsonNode position : money.path("accountHoldings")) {
+      if (account.toString().equals(position.path("bankAccountId").asString())) {
+        return position;
+      }
+    }
+    throw new AssertionError("Missing order account position " + account);
+  }
+
+  private static Map<String, ?> accountAuthorisationTerms(
+      UUID operation, UUID account, String amount) {
+    return Map.of(
+        "operationId",
+        operation,
+        "amount",
+        amount,
+        "bankHandling",
+        true,
+        "bank",
+        Map.of(
+            "type",
+            "AUTHORISATION",
+            "accountOnly",
+            true,
+            "accountId",
+            account,
+            "justification",
+            "Attribute existing funds to this order"));
+  }
+
+  private static Map<String, ?> accountTransferTerms(UUID source, UUID target) {
+    return Map.of(
+        "type",
+        "TRANSFER",
+        "accountOnly",
+        true,
+        "accountId",
+        source,
+        "targetAccountId",
+        target,
+        "justification",
+        "Transfer the attributed funds");
+  }
+
+  @Test
+  void aCorrectionCannotMakeMoreThanTheAuthorisedBankPrincipalAvailable() throws Exception {
+    UUID order = createOrder("800000");
+    UUID collection = world.account(Account.OWN_ORG_UNIT);
+    UUID original = UUID.randomUUID();
+    long initialBookings = accountBookingCount(collection, Actor.MANAGEMENT);
+    provide(order, accountAuthorisationTerms(original, collection, "600000"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    confirm(ownRequestOfType("AUTHORISATION"), Actor.MANAGEMENT, null, null)
+        .andExpect(status().isOk());
+    JsonNode holding =
+        response(money(order).andExpect(status().isOk())).path("accountHoldings").path(0);
+    perform(
+            post(MONEY + "/corrections", order).with(writer()),
+            Map.of(
+                "operationId", UUID.randomUUID(),
+                "entries", List.of(Map.of("originalOperationId", original, "amount", "700000")),
+                "holderVersions",
+                    Map.of(holding.path("id").asString(), holding.path("version").asLong())))
+        .andExpect(status().isBadRequest());
+    money(order)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("600000"))
+        .andExpect(jsonPath("$.accountHoldings[0].availableAmount").value("600000"));
+    assertThat(accountBookingCount(collection, Actor.MANAGEMENT)).isEqualTo(initialBookings);
   }
 
   @Test
@@ -376,6 +636,153 @@ class JobOrderLinkedBankIntegrationTest {
       assertThat(exportedMoneyRow(export, section, transfer).toString())
           .doesNotContain(collection.toString(), destination.toString());
     }
+  }
+
+  @Test
+  void independentBankDebitPreventsAnUncoveredOrderHandover() throws Exception {
+    UUID order = createOrder("1000000");
+    UUID collection = authoriseOrderAccountFunds(order);
+    UUID destination = world.account(Account.SPECIAL_SHARED);
+    JsonNode money = response(money(order).andExpect(status().isOk()));
+    JsonNode holding = money.path("accountHoldings").path(0);
+    assertThat(holding.path("availableAmount").asString()).isEqualTo("600000");
+    JsonNode recipient =
+        response(
+            perform(
+                    post(MONEY + "/recipients", order).with(writer()),
+                    Map.of("bankAccountId", destination))
+                .andExpect(status().isCreated()));
+
+    UUID transfer = UUID.randomUUID();
+    perform(
+            post(MONEY + "/movements", order).with(writer()),
+            Map.of(
+                "operationId",
+                transfer,
+                "kind",
+                "PURPOSE_HANDOVER",
+                "sourceAccountHoldingId",
+                holding.path("id").asString(),
+                "sourceVersion",
+                holding.path("version").asLong(),
+                "targetVersion",
+                money.path("targetVersion").asLong(),
+                "recipientId",
+                recipient.path("id").asString(),
+                "amount",
+                "600000",
+                "rate",
+                "0",
+                "bankHandling",
+                true,
+                "bank",
+                accountTransferTerms(collection, destination)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+
+    withdrawIndependently(collection);
+    long bookings = accountBookingCount(collection, Actor.MANAGEMENT);
+    confirm(ownRequestOfType("TRANSFER"), Actor.MANAGEMENT, null, null)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("BANK_OVERDRAFT"));
+    assertThat(accountBalance(collection)).isEqualTo(300000);
+    assertThat(accountBookingCount(collection, Actor.MANAGEMENT)).isEqualTo(bookings);
+    assertFigures(order, "600000", "0", "0", "IN_PROGRESS");
+  }
+
+  @Test
+  void accountShortageAndCancelledRestReleasePreserveProvisionWithoutBankPostings()
+      throws Exception {
+    UUID order = createOrder("1000000");
+    UUID collection = authoriseOrderAccountFunds(order);
+    withdrawIndependently(collection);
+    long bookings = accountBookingCount(collection, Actor.MANAGEMENT);
+    JsonNode holding =
+        response(money(order).andExpect(status().isOk())).path("accountHoldings").path(0);
+    Map<String, ?> shortage = accountAdjustment(holding, "SHORTAGE", "300000");
+
+    perform(post(MONEY + "/movements/settlement/preview", order).with(writer()), shortage)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.sourceAfter").value("300000"))
+        .andExpect(jsonPath("$.fee").value("0"));
+    perform(post(MONEY + "/movements/settlement", order).with(writer()), shortage)
+        .andExpect(status().isOk());
+    perform(post(MONEY + "/movements/settlement", order).with(writer()), shortage)
+        .andExpect(status().isOk());
+    money(order)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("600000"))
+        .andExpect(jsonPath("$.shortages").value("300000"))
+        .andExpect(jsonPath("$.holders").isEmpty())
+        .andExpect(jsonPath("$.accountHoldings[0].availableAmount").value("300000"));
+
+    JsonNode lifecycle =
+        response(
+            mvc.perform(get("/api/v1/orders/{id}", order).with(writer()))
+                .andExpect(status().isOk()));
+    perform(
+            put("/api/v1/orders/{id}/status", order).with(writer()),
+            Map.of("status", "CANCELLED", "version", lifecycle.path("lifecycleVersion").asLong()))
+        .andExpect(status().isOk());
+
+    JsonNode remaining =
+        response(money(order).andExpect(status().isOk())).path("accountHoldings").path(0);
+    perform(
+            post(MONEY + "/movements/settlement", order).with(writer()),
+            accountAdjustment(remaining, "RELEASE", "100000"))
+        .andExpect(status().isOk());
+    money(order)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("600000"))
+        .andExpect(jsonPath("$.shortages").value("300000"))
+        .andExpect(jsonPath("$.released").value("100000"))
+        .andExpect(jsonPath("$.accountHoldings[0].availableAmount").value("200000"));
+    assertFigures(order, "200000", "0", "0", "CANCELLED");
+    assertThat(accountBalance(collection)).isEqualTo(300000);
+    assertThat(accountBookingCount(collection, Actor.MANAGEMENT)).isEqualTo(bookings);
+  }
+
+  private UUID authoriseOrderAccountFunds(UUID order) throws Exception {
+    setFeeRate("0");
+    UUID collection = world.account(Account.OWN_ORG_UNIT);
+    provide(order, accountAuthorisationTerms(UUID.randomUUID(), collection, "600000"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    confirm(ownRequestOfType("AUTHORISATION"), Actor.MANAGEMENT, null, null)
+        .andExpect(status().isOk());
+    return collection;
+  }
+
+  private void withdrawIndependently(UUID collection) throws Exception {
+    perform(
+            post("/api/v1/bank/withdrawals").with(as(Actor.MANAGEMENT)),
+            Map.of(
+                "accountId",
+                collection,
+                "holderId",
+                world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
+                "amount",
+                "700000",
+                "justification",
+                "Independent expenditure"))
+        .andExpect(status().isCreated());
+    assertThat(accountBalance(collection)).isEqualTo(300000);
+  }
+
+  private static Map<String, ?> accountAdjustment(JsonNode holding, String kind, String amount) {
+    return Map.of(
+        "operationId",
+        UUID.randomUUID(),
+        "kind",
+        kind,
+        "sourceAccountHoldingId",
+        holding.path("id").asString(),
+        "sourceVersion",
+        holding.path("version").asLong(),
+        "amount",
+        amount,
+        "bankHandling",
+        false);
   }
 
   private static JsonNode exportedMoneyRow(JsonNode export, String sectionKey, UUID operation) {

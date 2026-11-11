@@ -159,6 +159,9 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockMe
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemMaterialDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankEffects;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemPlan;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
@@ -174,6 +177,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimServ
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialHandoverCalculation;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialHandoverRequirement;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialQuantityArithmetic;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.ReplaceJobOrderBankAttemptDto;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.GameMedia;
 import de.greluc.krt.profit.basetool.backend.kernel.GameText;
@@ -611,6 +615,15 @@ class ArchitectureTest {
    * since the handle anonymisation's bank part became a participant inside the bank package.
    */
   static final Set<Class<?>> BANK_CLASSES = Set.of();
+
+  /** Exact application and Order boundary types of the linked Bank integration (ADR-0357). */
+  static final Set<Class<?>> BANK_ORDER_BOUNDARY =
+      Set.of(
+          AuecBankComposition.class,
+          JobOrderBankEffects.class,
+          JobOrderBankPort.class,
+          JobOrderBankSelection.class,
+          ReplaceJobOrderBankAttemptDto.class);
 
   /**
    * The org-unit side of the bank: classes that carry "Bank" in their name but belong to org-unit
@@ -1961,9 +1974,7 @@ class ArchitectureTest {
 
   /**
    * Every production class named after the bank is classified: a bank class, the org-unit side, the
-   * exchange side (the bank route family of the exchange module, which reaches the bank through its
-   * {@code api} only, REQ-BXCH-006), or in the bank module package, so a new bank class cannot slip
-   * past the bank rules.
+   * exchange side, the explicit Order integration boundary, or the bank module package.
    */
   @Test
   void everyBankNamedClassIsClassified() {
@@ -1980,12 +1991,13 @@ class ArchitectureTest {
         .that(selection)
         .should(
             new ArchCondition<JavaClass>(
-                "be a registered bank class, on the org-unit side, on the exchange side, or in the"
-                    + " bank module") {
+                "be a registered bank class or a classified org-unit, exchange or Order boundary"
+                    + " class") {
               @Override
               public void check(JavaClass javaClass, ConditionEvents events) {
                 if (BANK_DOMAIN.test(javaClass)
                     || EXCHANGE_DOMAIN.test(javaClass)
+                    || BANK_ORDER_BOUNDARY.stream().anyMatch(javaClass::isEquivalentTo)
                     || ORG_UNIT_BANK_SIDE.stream().anyMatch(javaClass::isEquivalentTo)) {
                   return;
                 }
@@ -1993,10 +2005,8 @@ class ArchitectureTest {
                     SimpleConditionEvent.violated(
                         javaClass,
                         javaClass.getName()
-                            + " is named after the bank but is neither in BANK_CLASSES, in"
-                            + " ORG_UNIT_BANK_SIDE nor in the exchange module; add it to the list"
-                            + " it belongs to so the bank rules see it (REQ-BANK-008,"
-                            + " REQ-BANK-019)."));
+                            + " is named after the bank and needs explicit domain classification"
+                            + " (REQ-BANK-008, REQ-BANK-019, ADR-0357)."));
               }
             });
   }

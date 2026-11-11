@@ -56,6 +56,7 @@ import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Holder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
+import de.greluc.krt.profit.basetool.backend.privacy.api.HandleAnonymisationService;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -108,6 +109,7 @@ class BankLinkedPaymentsIntegrationTest {
   @Autowired private SystemSettings settings;
   @Autowired private TransferFeePolicy feePolicy;
   @Autowired private DataExportService exports;
+  @Autowired private HandleAnonymisationService anonymisation;
 
   private final JsonMapper json = JsonMapper.builder().build();
   private final List<String> registeredHandlers = new ArrayList<>();
@@ -534,6 +536,90 @@ class BankLinkedPaymentsIntegrationTest {
   }
 
   @Test
+  void accountDepositRemainsConfirmableAfterDepositorHandleErasure() throws Exception {
+    addHandler();
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    UUID depositor = world.user(Actor.MEMBER);
+    UUID custodian = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
+    UUID request =
+        ((BankLinkedOutcome.Pending)
+                as(
+                    Actor.MANAGEMENT,
+                    () ->
+                        payments.submit(
+                            attempt(),
+                            new AccountDeposit(
+                                account, new Counterparty.Member(depositor, null), terms("400")))))
+            .requestId();
+    entityManager.flush();
+    as(Actor.ADMIN, () -> anonymisation.anonymise(depositor, List.of()));
+    entityManager.clear();
+
+    confirm(request, Actor.ADMIN, custodian, null, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.holderId").value(custodian.toString()))
+        .andExpect(jsonPath("$.counterpartyHandle").value("#ANONYMISED#"))
+        .andExpect(jsonPath("$.resultingTransactionId").isNotEmpty());
+  }
+
+  @Test
+  void replacementRetainsTheExactRejectedDepositsErasedCounterparty() throws Exception {
+    addHandler();
+    UUID depositor = world.user(Actor.MEMBER);
+    UUID custodian = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
+    UUID correctedAccount = world.account(Account.FOREIGN_ORG_UNIT);
+    BankLinkedAttempt first = attempt();
+    Terms originalTerms = terms("400");
+    UUID failed =
+        ((BankLinkedOutcome.Pending)
+                as(
+                    Actor.MANAGEMENT,
+                    () ->
+                        payments.submit(
+                            first,
+                            new AccountDeposit(
+                                world.account(Account.OWN_ORG_UNIT),
+                                new Counterparty.Member(depositor, null),
+                                originalTerms))))
+            .requestId();
+    mvc.perform(
+            post(REQUESTS + "/" + failed + "/reject")
+                .with(jwt().jwt(token(Actor.ADMIN)).authorities(authorities::convert))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "version",
+                            requestVersion(failed),
+                            "reason",
+                            "Wrong collection account"))))
+        .andExpect(status().isOk());
+    entityManager.flush();
+    as(Actor.ADMIN, () -> anonymisation.anonymise(depositor, List.of()));
+    entityManager.clear();
+
+    BankLinkedAttempt next = new BankLinkedAttempt(UUID.randomUUID(), first.purpose());
+    UUID replacement =
+        ((BankLinkedOutcome.Pending)
+                as(
+                    Actor.MANAGEMENT,
+                    () ->
+                        payments.replace(
+                            failed,
+                            first,
+                            next,
+                            new AccountDeposit(
+                                correctedAccount, new Counterparty.Retained(), originalTerms))))
+            .requestId();
+    confirm(replacement, Actor.ADMIN, custodian, null, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.accountId").value(correctedAccount.toString()))
+        .andExpect(jsonPath("$.holderId").value(custodian.toString()))
+        .andExpect(jsonPath("$.counterpartyHandle").value("#ANONYMISED#"))
+        .andExpect(jsonPath("$.resultingTransactionId").isNotEmpty());
+  }
+
+  @Test
   void confirmationUsesTheGrantAfterTheOwningEffectPreparation() throws Exception {
     FixtureHandler handler = addHandler();
     UUID account = world.account(Account.OWN_ORG_UNIT);
@@ -823,12 +909,7 @@ class BankLinkedPaymentsIntegrationTest {
       @Nullable UUID destination,
       boolean attestation)
       throws Exception {
-    entityManager.flush();
-    Long version =
-        jdbc.sql("SELECT version FROM bank_booking_request WHERE id = :id")
-            .param("id", request)
-            .query(Long.class)
-            .single();
+    Long version = requestVersion(request);
     var body =
         json.createObjectNode().put("version", version).put("ownerApprovalConfirmed", attestation);
     if (holder != null) {
@@ -845,6 +926,14 @@ class BankLinkedPaymentsIntegrationTest {
             .with(jwt().jwt(token(staff)).authorities(authorities::convert))
             .contentType(MediaType.APPLICATION_JSON)
             .content(json.writeValueAsString(body)));
+  }
+
+  private Long requestVersion(UUID request) {
+    entityManager.flush();
+    return jdbc.sql("SELECT version FROM bank_booking_request WHERE id = :id")
+        .param("id", request)
+        .query(Long.class)
+        .single();
   }
 
   private <T> T as(Actor actor, Supplier<T> operation) {

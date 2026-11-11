@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
-import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
@@ -471,11 +470,12 @@ public class BankBookingRequestService {
    *
    * @param requestId the failed request
    * @param attempt its exact linked identity
-   * @return the rate retained for the original actual payment
+   * @return the failed request retaining the original payment evidence
    */
   @NotNull
   @Transactional(propagation = Propagation.MANDATORY)
-  RateSnapshot replacementRate(@NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
+  BankBookingRequest replacementSource(
+      @NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
     BankBookingRequest request = lockRequest(requestId);
     BankLinkedAttemptRecord previous = request.getLinkedAttempt();
     if (previous == null
@@ -489,7 +489,7 @@ public class BankBookingRequestService {
       throw new BusinessConflictException(
           "Only a rejected or cancelled Bank request can be replaced");
     }
-    return new RateSnapshot(previous.getFeeRate());
+    return request;
   }
 
   /**

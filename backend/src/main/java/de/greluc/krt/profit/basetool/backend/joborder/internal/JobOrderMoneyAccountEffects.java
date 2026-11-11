@@ -52,13 +52,17 @@ class JobOrderMoneyAccountEffects {
     var position = position(attempt);
     UUID positionId = Objects.requireNonNull(position.getId());
     boolean delivers = attempt.getKind() == JobOrderMoneyKind.PURPOSE_HANDOVER;
-    if (delivers
-        && ledger
-                .read(orderId)
-                .availableAccountBalance(positionId, attempt.getId())
-                .compareTo(attempt.getAmount())
-            < 0) {
-      throw JobOrderLinkedMoneyAttempt.conflict();
+    boolean returning = attempt.getKind() == JobOrderMoneyKind.REQUESTER_RETURN;
+    if (delivers || returning) {
+      var current = ledger.read(orderId);
+      BigDecimal available =
+          returning
+              ? current.availableForAccountReturn(
+                  positionId, Objects.requireNonNull(attempt.getRecipientId()), attempt.getId())
+              : current.availableAccountBalance(positionId, attempt.getId());
+      if (available.compareTo(attempt.getAmount()) < 0) {
+        throw JobOrderLinkedMoneyAttempt.conflict();
+      }
     }
     operations.saveAndFlush(
         JobOrderMoneyOperation.accountOperation(
@@ -75,20 +79,26 @@ class JobOrderMoneyAccountEffects {
           order, attempt.getOperationId(), attempt.getCommitmentId(), attempt.getAmount());
     }
     position.recordChange();
-    boolean started = order.getStatus() == JobOrderStatus.OPEN;
+    boolean started = !returning && order.getStatus() == JobOrderStatus.OPEN;
+    boolean reopens =
+        returning
+            && order.getStatus() == JobOrderStatus.COMPLETED
+            && !targetMet(orderId, ledger.delivered(orderId));
     boolean completes =
-        delivers
-            && order.getStatus().isActive()
-            && ledger.delivered(orderId).compareTo(targets.amountFor(orderId).orElseThrow()) >= 0;
+        delivers && order.getStatus().isActive() && targetMet(orderId, ledger.delivered(orderId));
     if (completes) {
       lifecycle.completeJobOrderWithinTransaction(order);
+    } else if (reopens) {
+      lifecycle.reopenUnderfulfilledMoneyOrder(order);
     } else if (started) {
       JobOrderService.changeLifecycle(order, JobOrderStatus.IN_PROGRESS);
     }
-    effects.accountMoneyChanged(order, started || completes);
+    effects.accountMoneyChanged(order, started || completes || reopens);
     return JobOrderEdit.audited(
         order,
-        delivers ? AuditEventType.JOB_ORDER_MONEY_MOVED : AuditEventType.JOB_ORDER_MONEY_PROVIDED,
+        delivers || returning
+            ? AuditEventType.JOB_ORDER_MONEY_MOVED
+            : AuditEventType.JOB_ORDER_MONEY_PROVIDED,
         AuditDetails.of("operationId", attempt.getOperationId())
             .with("attemptId", attempt.getId())
             .with("kind", attempt.getKind())
@@ -127,13 +137,22 @@ class JobOrderMoneyAccountEffects {
             BigDecimal.ZERO));
     corrections.save(entry);
     position.recordChange();
-    boolean reopens =
-        order.getStatus() == JobOrderStatus.COMPLETED
-            && revised.handedOver().compareTo(targets.amountFor(orderId).orElseThrow()) < 0;
+    boolean met = targetMet(orderId, revised.handedOver());
+    boolean reopens = order.getStatus() == JobOrderStatus.COMPLETED && !met;
+    boolean completes =
+        original.getKind() == JobOrderMoneyKind.REQUESTER_RETURN
+            && order.getStatus().isActive()
+            && met;
     if (reopens) {
       lifecycle.reopenUnderfulfilledMoneyOrder(order);
+    } else if (completes) {
+      lifecycle.completeJobOrderWithinTransaction(order);
     }
-    effects.accountMoneyChanged(order, reopens);
+    effects.accountMoneyChanged(order, reopens || completes);
+  }
+
+  private boolean targetMet(UUID orderId, BigDecimal delivered) {
+    return delivered.compareTo(targets.amountFor(orderId).orElseThrow()) >= 0;
   }
 
   private JobOrderMoneyAccountHolding position(JobOrderLinkedMoneyAttempt attempt) {

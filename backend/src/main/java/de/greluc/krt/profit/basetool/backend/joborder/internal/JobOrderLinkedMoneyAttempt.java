@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankEffects.Ou
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.Counterparty;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -248,9 +249,7 @@ class JobOrderLinkedMoneyAttempt {
                 == Boolean.TRUE.equals(bank.orderFundedDepositFee()))
         && (kind != JobOrderMoneyKind.PROVISION
             || bankType != JobOrderBankSelection.Type.DEPOSIT
-            || (Objects.equals(counterpartyUserId, bank.counterpartyUserId())
-                && Objects.equals(
-                    counterpartyName, JobOrderLinkedPaymentTerms.normalizedCounterparty(bank))));
+            || matchesDepositor(bank));
   }
 
   UUID personalHolderId() {
@@ -262,6 +261,25 @@ class JobOrderLinkedMoneyAttempt {
     return counterpartyUserId == null && counterpartyName == null
         ? null
         : new Counterparty(counterpartyUserId, counterpartyName);
+  }
+
+  boolean matchesDepositor(JobOrderBankSelection bank) {
+    var depositor = depositCounterpartyForReplacement();
+    return Objects.equals(depositor == null ? null : depositor.userId(), bank.counterpartyUserId())
+        && Objects.equals(
+            depositor == null ? null : depositor.name(),
+            JobOrderLinkedPaymentTerms.normalizedCounterparty(bank));
+  }
+
+  @Nullable
+  Counterparty depositCounterpartyForReplacement() {
+    return HandleAnonymisation.isAnonymised(counterpartyName) ? null : counterparty();
+  }
+
+  boolean permitsTerminalPosting() {
+    return actualPayment
+        || kind == JobOrderMoneyKind.REQUESTER_RETURN
+        || kind == JobOrderMoneyKind.SETTLEMENT;
   }
 
   boolean replaceable() {

@@ -194,8 +194,9 @@ class JobOrderMoneyOperation {
       JobOrderMoneyKind kind,
       @Nullable UUID recipientId,
       BigDecimal amount) {
-    boolean delivers = kind == JobOrderMoneyKind.PURPOSE_HANDOVER;
-    BigDecimal noGameCost = delivers ? BigDecimal.ZERO : null;
+    boolean transfers =
+        kind == JobOrderMoneyKind.PURPOSE_HANDOVER || kind == JobOrderMoneyKind.REQUESTER_RETURN;
+    BigDecimal noGameCost = transfers ? BigDecimal.ZERO : null;
     var fact =
         new JobOrderMoneyOperation(
             orderId,
@@ -204,7 +205,7 @@ class JobOrderMoneyOperation {
             actorId,
             null,
             commitmentId,
-            kind != JobOrderMoneyKind.CORRECTION,
+            transfers || kind == JobOrderMoneyKind.PROVISION,
             amount,
             kind,
             null,

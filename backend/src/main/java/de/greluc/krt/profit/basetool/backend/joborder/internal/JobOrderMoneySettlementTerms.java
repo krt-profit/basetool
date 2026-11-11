@@ -31,7 +31,7 @@ import org.jetbrains.annotations.Nullable;
  * Immutable purpose, participants and amounts of one settlement.
  *
  * @param kind recorded purpose
- * @param sourceId existing source or fee payer
+ * @param sourceId existing source holding or fee payer
  * @param requesterRecipientId original requester designation making an actual return
  * @param destination explicitly selected destination
  * @param amount exact net principal
@@ -47,6 +47,15 @@ record JobOrderMoneySettlementTerms(
 
   static JobOrderMoneySettlementTerms from(SettleJobOrderMoneyDto dto) {
     validateBank(dto);
+    UUID account = dto.sourceAccountHoldingId();
+    if (account != null
+        && (dto.sourceHolderId() != null
+            || !Boolean.FALSE.equals(dto.bankHandling())
+            || (dto.kind() != JobOrderMoneyKind.RELEASE
+                && dto.kind() != JobOrderMoneyKind.SHORTAGE))) {
+      throw invalidSelection();
+    }
+    UUID source = account == null ? dto.sourceHolderId() : account;
     var destination =
         JobOrderMoneySelection.parse(
             dto.destinationHolderId(), dto.destinationUserId(), dto.destinationName());
@@ -56,7 +65,7 @@ record JobOrderMoneySettlementTerms(
     if ((dto.kind() == JobOrderMoneyKind.REQUESTER_RETURN) != (dto.recipientId() != null)
         || (dto.kind() != JobOrderMoneyKind.REQUESTER_RETURN
             && (dto.targetVersion() != null || dto.destinationVersion() != null))
-        || (dto.sourceHolderId() == null && dto.sourceVersion() != null)) {
+        || (source == null && dto.sourceVersion() != null)) {
       throw invalidSelection();
     }
     return switch (dto.kind()) {
@@ -64,7 +73,7 @@ record JobOrderMoneySettlementTerms(
         if (!hasDestination) {
           throw invalidSelection();
         }
-        yield terms(dto, destination, provision);
+        yield terms(dto, source, destination, provision);
       }
       case SETTLEMENT -> {
         if (dto.sourceHolderId() == null
@@ -72,13 +81,13 @@ record JobOrderMoneySettlementTerms(
             || destination.kind() == JobOrderMoneySelection.Kind.EXISTING) {
           throw invalidSelection();
         }
-        yield terms(dto, destination, provision);
+        yield terms(dto, source, destination, provision);
       }
       case RELEASE, SHORTAGE -> {
-        if (dto.sourceHolderId() == null || hasDestination || provision.signum() != 0) {
+        if (source == null || hasDestination || provision.signum() != 0) {
           throw invalidSelection();
         }
-        yield terms(dto, destination, provision);
+        yield terms(dto, source, destination, provision);
       }
       case PROVISION,
           COLLECTION,
@@ -127,10 +136,13 @@ record JobOrderMoneySettlementTerms(
   }
 
   private static JobOrderMoneySettlementTerms terms(
-      SettleJobOrderMoneyDto dto, JobOrderMoneySelection destination, BigDecimal provision) {
+      SettleJobOrderMoneyDto dto,
+      @Nullable UUID source,
+      JobOrderMoneySelection destination,
+      BigDecimal provision) {
     return new JobOrderMoneySettlementTerms(
         dto.kind(),
-        dto.sourceHolderId(),
+        source,
         dto.recipientId(),
         destination,
         WholeAuec.positive(dto.amount()),
@@ -145,6 +157,17 @@ record JobOrderMoneySettlementTerms(
     return requesterReturn() || kind == JobOrderMoneyKind.SETTLEMENT;
   }
 
+  RateSnapshot submittedRate(@Nullable String rawRate) {
+    RateSnapshot rate =
+        hasFee() || rawRate != null
+            ? JobOrderMoneyMovementTerms.submittedRate(rawRate)
+            : new RateSnapshot(BigDecimal.ZERO);
+    if (!hasFee() && rate.rate().signum() != 0) {
+      throw invalidSelection();
+    }
+    return rate;
+  }
+
   JobOrderMoneySelection recordedSelection() {
     return hasFee()
         ? destination
@@ -152,7 +175,8 @@ record JobOrderMoneySettlementTerms(
   }
 
   boolean matches(JobOrderMoneyOperation fact, RateSnapshot rate) {
-    if (kind != fact.getKind()
+    if (fact.getAccountHoldingId() != null
+        || kind != fact.getKind()
         || !Objects.equals(requesterRecipientId, fact.getRecipientId())
         || !fact.matchesSelection(recordedSelection())
         || amount.compareTo(fact.getAmount()) != 0

@@ -143,7 +143,7 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
     if (Boolean.TRUE.equals(selected.accountOnly())) {
       UUID account = Objects.requireNonNull(selected.accountId());
       return switch (selected.type()) {
-        case DEPOSIT -> new BankLinkedPayment.AccountDeposit(account, party(payment), terms);
+        case DEPOSIT -> new BankLinkedPayment.AccountDeposit(account, depositor(payment), terms);
         case TRANSFER ->
             new BankLinkedPayment.AccountTransfer(
                 account, Objects.requireNonNull(selected.targetAccountId()), terms);
@@ -163,7 +163,7 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
               Objects.requireNonNull(selected.accountId()), custodian, terms);
       case DEPOSIT ->
           new BankLinkedPayment.Deposit(
-              Objects.requireNonNull(selected.accountId()), custodian, party(payment), terms);
+              Objects.requireNonNull(selected.accountId()), custodian, depositor(payment), terms);
       case WITHDRAWAL ->
           new BankLinkedPayment.Withdrawal(
               Objects.requireNonNull(selected.accountId()), custodian, party(payment), game, terms);
@@ -179,6 +179,12 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
           new BankLinkedPayment.HolderTransfer(
               custodian, Objects.requireNonNull(selected.targetCustodianId()), terms);
     };
+  }
+
+  private static BankLinkedPayment.Counterparty depositor(Payment payment) {
+    return payment.counterparty() == null
+        ? new BankLinkedPayment.Counterparty.Retained()
+        : party(payment);
   }
 
   private static BankLinkedPayment.Counterparty party(Payment payment) {

@@ -36,6 +36,7 @@ final class JobOrderMoneyAvailability {
   private final Map<UUID, BigDecimal> holders;
   private final Map<UUID, BigDecimal> accounts;
   private final Map<UUID, BigDecimal> recipients;
+  private final Map<AccountReceipt, BigDecimal> accountReceipts;
   private final Map<UUID, Binding> byAttempt;
 
   static JobOrderMoneyAvailability collect(
@@ -45,6 +46,7 @@ final class JobOrderMoneyAvailability {
     Map<UUID, BigDecimal> held = new HashMap<>();
     Map<UUID, BigDecimal> onAccounts = new HashMap<>();
     Map<UUID, BigDecimal> delivered = new HashMap<>();
+    Map<AccountReceipt, BigDecimal> accountDelivered = new HashMap<>();
     Map<UUID, Binding> byAttempt = new HashMap<>();
     for (JobOrderLinkedMoneyAttempt attempt : attempts) {
       if (!attempt.bindingActive()) {
@@ -64,10 +66,14 @@ final class JobOrderMoneyAvailability {
         recipient = canonicalRecipient.apply(Objects.requireNonNull(attempt.getRecipientId()));
         principal = attempt.getAmount();
         delivered.merge(recipient, principal, BigDecimal::add);
+        if (account != null) {
+          accountDelivered.merge(
+              new AccountReceipt(account, recipient), principal, BigDecimal::add);
+        }
       }
       byAttempt.put(attempt.getId(), new Binding(holder, account, source, recipient, principal));
     }
-    return new JobOrderMoneyAvailability(held, onAccounts, delivered, byAttempt);
+    return new JobOrderMoneyAvailability(held, onAccounts, delivered, accountDelivered, byAttempt);
   }
 
   BigDecimal forHolder(UUID holderId, @Nullable UUID excludedAttemptId) {
@@ -94,21 +100,36 @@ final class JobOrderMoneyAvailability {
         : bound;
   }
 
+  BigDecimal forAccountReceipt(AccountReceipt receipt, @Nullable UUID excludedAttemptId) {
+    BigDecimal bound = accountReceipts.getOrDefault(receipt, BigDecimal.ZERO);
+    Binding excluded = byAttempt.get(excludedAttemptId);
+    return excluded != null
+            && receipt.holdingId().equals(excluded.accountHoldingId())
+            && receipt.recipientId().equals(excluded.recipientId())
+        ? bound.subtract(excluded.principal())
+        : bound;
+  }
+
   boolean coveredBy(
       Map<UUID, BigDecimal> balances,
       Map<UUID, BigDecimal> accountBalances,
-      Map<UUID, BigDecimal> requesterBalances) {
+      Map<UUID, BigDecimal> requesterBalances,
+      Map<AccountReceipt, BigDecimal> accountRequesterBalances) {
     return covered(holders, balances)
         && covered(accounts, accountBalances)
-        && covered(recipients, requesterBalances);
+        && covered(recipients, requesterBalances)
+        && covered(accountReceipts, accountRequesterBalances);
   }
 
-  private static boolean covered(Map<UUID, BigDecimal> bindings, Map<UUID, BigDecimal> balances) {
+  private static <K> boolean covered(Map<K, BigDecimal> bindings, Map<K, BigDecimal> balances) {
     return bindings.entrySet().stream()
         .allMatch(entry ->
             balances.getOrDefault(entry.getKey(), BigDecimal.ZERO).compareTo(entry.getValue())
                 >= 0);
   }
+
+  /** Identifies the order collection position that funded a particular requester receipt. */
+  record AccountReceipt(UUID holdingId, UUID recipientId) {}
 
   /**
    * The two separately spendable sources that this attempt can release while applying its effect.

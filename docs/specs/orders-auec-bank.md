@@ -46,7 +46,7 @@ The actual economic boundary selects the representation:
 | --- | --- | --- |
 | Money first enters the collection account | DEPOSIT to the selected account, with the registered receiving custodian confirmed in Bank | Provision in the order's collection-account position on first attribution |
 | Money leaves Bank custody | WITHDRAWAL from the selected account and paying custodian to the actual counterparty | The provision, movement, handover or return the operation represents |
-| Account ownership changes without a game payment | Account-only TRANSFER between the collection account and the designated requester account | Debit the order's collection-account position and record net handover |
+| Account ownership changes without a game payment | Account-only TRANSFER between the collection account and the designated requester account | Debit the collection position and record net handover, or credit the original position and reduce net handover on a requester return |
 | Account ownership changes with a game payment | TRANSFER between the selected accounts with actual custodians | Reallocation or designated requester handover/return, with the actual payment terms |
 | Custody changes between Bank custodians, principal account ownership unchanged | HOLDER_TRANSFER under REQ-BANK-031 | Collection/holder change; no repeat provision or fulfilment |
 | Existing Bank funds are authorised for this order without an account/custody movement | Successful authorisation under REQ-BANK-022/-023/-024, without a ledger transaction | First authorised order provision once, to the selected account position or explicitly selected player holding |
@@ -58,6 +58,10 @@ designated requester account. The order records both effects without a personal 
 Bank staff select or confirm the actual registered receiving custodian for the deposit.
 The account transfer changes account balances and leaves custody and game fees unchanged.
 The same collection-account position can receive successfully authorised existing Bank funds.
+A requester-account return reverses the direction and requires debit-equivalent authority on the
+requester account. Its principal is bounded by the still-unreturned receipt from that particular
+collection position, with pending returns deducted. Final confirmation restores that position and
+reduces the net handover without new provision or unit credit.
 
 Entering or leaving the Bank does not repeat an already recorded provision or unit contribution.
 Four million newly contributed and six million first provided from existing Bank funds is ten
@@ -98,8 +102,11 @@ account must cover the amount made available. Ten million cannot be provided fro
 
 This check creates no Bank reservation, aggregate allocation pool or guarantee against later
 independent Bank dispositions. It does not sum other orders' earmarks. A known subsequent shortage
-uses the ordinary holding correction/real-shortage rules. The first successful provision counts
-once even though the Bank ledger remains unchanged.
+uses the ordinary holding correction or real-shortage rules. A loss or release against an order's
+collection position changes its purpose balance without a Bank posting or a change to its original
+provision or contribution. The first successful provision counts once even though the Bank ledger
+remains unchanged. A factual correction cannot make more Bank-funded principal available than the
+effective authorisation or the first-provision Bank withdrawal approved.
 
 **Acceptance**
 
@@ -211,7 +218,9 @@ Retries of an unknown outcome inspect/continue the existing operation. An eligib
 a rejected/cancelled attempt retains history and prevents the superseded attempt from posting.
 Correcting an erroneous account or reported amount preserves old/new facts and required approvals;
 it does not repeat the actual game payment. Submitted linked terms cannot be silently changed in
-the generic Bank edit surface.
+the generic Bank edit surface. A replacement of a failed linked deposit retains the exact earlier
+Bank depositor snapshot, including after handle erasure or account deletion. The current Bank
+receiving-custodian and admission checks still apply.
 
 A real payment may be recorded without Bank participation only when factually appropriate and
 authorised. Removing the Bank option cannot bypass approval of existing Bank funds or substitute
@@ -245,9 +254,11 @@ cleanup, and cleanup never automatically reactivates the cancelled order.
 
 For a pure Bank account/purpose posting actually reversed in the ledger, reverse its linked order effect
 atomically and coherently with the Bank reversal. Preserve history and nonnegative holdings;
-connected corrections may be necessary. Reversing a same-custodian requester handover restores the
-order funds at that holder and removes the handover. Recalculate completion under the current
-target; a cancelled order stays cancelled.
+connected corrections may be necessary. Reversing a requester handover restores order funds to
+the original holder or collection position and removes the handover. An effective or pending
+account return must remain covered by its original collection-position receipt. Reversing the
+account return removes the returned amount from that position and restores delivery. Recalculate
+completion under the current target; a cancelled order stays cancelled.
 
 A no-ledger authorisation has no ledger reversal. Its correction or release uses the ordinary
 authorised actions; no separate revocation queue or workflow is introduced.

@@ -101565,6 +101565,10 @@
           "bankHandling" : {
             "type" : "boolean"
           },
+          "destinationAccountHoldingId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "destinationHolderId" : {
             "type" : "string",
             "format" : "uuid"
@@ -101597,6 +101601,10 @@
             "type" : "string"
           },
           "recipientId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "sourceAccountHoldingId" : {
             "type" : "string",
             "format" : "uuid"
           },

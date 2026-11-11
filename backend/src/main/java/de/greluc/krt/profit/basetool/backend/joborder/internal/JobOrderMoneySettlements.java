@@ -57,6 +57,8 @@ public class JobOrderMoneySettlements {
   private final JobOrderMoneySettlementBasis basis;
   private final JobOrderMoneySettlementWriter writer;
   private final JobOrderLinkedMoneySettlements linked;
+  private final JobOrderMoneyAccountAdjustments accountAdjustments;
+  private final JobOrderMoneyAccountReturns accountReturns;
 
   /**
    * Calculates a settlement at its observed basis without creating a fact.
@@ -68,7 +70,14 @@ public class JobOrderMoneySettlements {
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public JobOrderMoneyMovementPreview preview(UUID orderId, SettleJobOrderMoneyDto dto) {
     JobOrder order = readableSettlement(orderId);
+    if (hasAccountReturn(dto)) {
+      return accountReturns.preview(orderId, dto);
+    }
     var terms = JobOrderMoneySettlementTerms.from(dto);
+    if (dto.sourceAccountHoldingId() != null) {
+      terms.submittedRate(dto.rate());
+      return accountAdjustments.preview(order, terms, dto.sourceVersion());
+    }
     try {
       var resolved = basis.resolve(order, dto, terms, access.requireActiveActor(), null);
       if (dto.bank() != null) {
@@ -158,13 +167,13 @@ public class JobOrderMoneySettlements {
     if (id == null) {
       throw new BadRequestException("orders.money.movement.operationRequired");
     }
+    if (hasAccountReturn(dto)) {
+      return accountReturns.record(orderId, dto);
+    }
     var terms = JobOrderMoneySettlementTerms.from(dto);
-    RateSnapshot rate =
-        terms.hasFee() || dto.rate() != null
-            ? JobOrderMoneyMovementTerms.submittedRate(dto.rate())
-            : new RateSnapshot(BigDecimal.ZERO);
-    if (!terms.hasFee() && rate.rate().signum() != 0) {
-      throw JobOrderMoneySettlementTerms.invalidSelection();
+    RateSnapshot rate = terms.submittedRate(dto.rate());
+    if (dto.sourceAccountHoldingId() != null) {
+      return accountAdjustments.record(orderId, id, terms, dto.sourceVersion());
     }
     UUID actor = access.actorId();
     Accounts accounts = accounts(orderId, terms);
@@ -174,6 +183,13 @@ public class JobOrderMoneySettlements {
         orderId,
         order -> mayReopen(order, attempt),
         (order, queueLocked) -> recordLocked(order, attempt, queueLocked));
+  }
+
+  private static boolean hasAccountReturn(SettleJobOrderMoneyDto dto) {
+    if (dto.destinationAccountHoldingId() != null && dto.sourceAccountHoldingId() != null) {
+      throw JobOrderMoneySettlementTerms.invalidSelection();
+    }
+    return dto.destinationAccountHoldingId() != null;
   }
 
   private JobOrder readableSettlement(UUID orderId) {

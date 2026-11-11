@@ -68,6 +68,9 @@ public sealed interface BankLinkedPayment {
      * @param orgUnitId an optional active unit
      */
     record Accountless(@NotNull String name, @Nullable UUID orgUnitId) implements Counterparty {}
+
+    /** Retains the verified counterparty of a failed linked deposit. */
+    record Retained() implements Counterparty {}
   }
 
   /** The actual movement between players. */

@@ -85,16 +85,18 @@ class JobOrderLinkedPartyIntegrity {
             || bankType == JobOrderBankSelection.Type.AUTHORISATION)) {
       return;
     }
-    if (attempt.getKind() != JobOrderMoneyKind.PURPOSE_HANDOVER
+    boolean returning = attempt.getKind() == JobOrderMoneyKind.REQUESTER_RETURN;
+    if ((!returning && attempt.getKind() != JobOrderMoneyKind.PURPOSE_HANDOVER)
         || bankType != JobOrderBankSelection.Type.TRANSFER
         || attempt.isActualPayment()) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
     var designation = recipients.require(orderId, required(attempt.getRecipientId()));
-    if (!designation.isActive() || designation.isSuperseded()) {
+    if ((!returning && !designation.isActive()) || designation.isSuperseded()) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
-    requireBankDesignation(designation, attempt.getBankTargetAccountId());
+    requireBankDesignation(
+        designation, returning ? attempt.getBankAccountId() : attempt.getBankTargetAccountId());
   }
 
   private void deposit(JobOrderBankPort port, JobOrderLinkedMoneyAttempt attempt, Parties parties) {

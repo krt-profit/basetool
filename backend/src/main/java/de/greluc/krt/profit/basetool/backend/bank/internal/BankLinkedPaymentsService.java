@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -78,7 +79,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   public BankLinkedOutcome submit(
       @NotNull BankLinkedAttempt attempt, @NotNull BankLinkedPayment payment) {
     BankLinkedDecisions.Prepared prepared = prepareSubmission(attempt, payment);
-    return admit(prepared, payment, feePolicy.snapshot());
+    return admit(prepared, payment, feePolicy.snapshot(), null);
   }
 
   @Override
@@ -93,8 +94,10 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
       throw new BadRequestException("Replacement requires a fresh attempt for the same purpose");
     }
     BankLinkedDecisions.Prepared prepared = prepareSubmission(nextAttempt, payment);
-    RateSnapshot previousRate = requests.replacementRate(previousRequestId, previousAttempt);
-    return admit(prepared, payment, previousRate);
+    BankBookingRequest previous = requests.replacementSource(previousRequestId, previousAttempt);
+    RateSnapshot rate =
+        new RateSnapshot(Objects.requireNonNull(previous.getLinkedAttempt()).getFeeRate());
+    return admit(prepared, payment, rate, previous);
   }
 
   /**
@@ -120,19 +123,21 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
    * @param prepared the prepared owner and attempt
    * @param payment the immutable submitted terms
    * @param rate the authoritative rate for this payment
+   * @param previous the verified failed Bank request for a replacement
    * @return the Bank outcome
    */
   @NotNull
   private BankLinkedOutcome admit(
       @NotNull BankLinkedDecisions.Prepared prepared,
       @NotNull BankLinkedPayment payment,
-      @NotNull RateSnapshot rate) {
+      @NotNull RateSnapshot rate,
+      @Nullable BankBookingRequest previous) {
     if (!rate.equals(payment.terms().rate())) {
       throw new BadRequestException("The submitted fee rate does not match the payment fee basis");
     }
     BankActor actor = actors.of(prepared.actor());
     requirePreliminaryAdmission(actor, payment);
-    BankLinkedBooking booking = normalize(payment);
+    BankLinkedBooking booking = normalize(payment, previous);
     actor = actors.of(prepared.actor());
     BankStaffRights staff = policy.staffRights(actor);
     boolean samePlayer =
@@ -340,10 +345,12 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
    * Resolves the accounts, fixed custodians and actual counterparties under Bank rules.
    *
    * @param payment the typed submitted payment
+   * @param previous the verified failed Bank request for a replacement
    * @return the normalized Bank terms
    */
   @NotNull
-  private BankLinkedBooking normalize(@NotNull BankLinkedPayment payment) {
+  private BankLinkedBooking normalize(
+      @NotNull BankLinkedPayment payment, @Nullable BankBookingRequest previous) {
     BankLinkedPayment.Terms terms = payment.terms();
     return switch (payment) {
       case BankLinkedPayment.Deposit deposit ->
@@ -353,7 +360,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
               null,
               deposit.holderId(),
               null,
-              resolve(deposit.depositor()),
+              depositor(previous, deposit.holderId(), deposit.depositor()),
               terms);
       case BankLinkedPayment.Withdrawal withdrawal ->
           booking(
@@ -385,7 +392,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
               null,
               null,
               null,
-              resolve(deposit.depositor()),
+              depositor(previous, null, deposit.depositor()),
               terms);
       case BankLinkedPayment.AccountAuthorisation authorisation ->
           booking(
@@ -500,13 +507,41 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
     return account;
   }
 
-  /**
-   * Resolves the selected actual counterparty using the ordinary Bank directory and membership
-   * rules.
-   *
-   * @param party the actual depositor or payee
-   * @return the snapshot
-   */
+  /** Resolves a new depositor or retains the exact failed deposit's validated snapshot. */
+  @NotNull
+  private CounterpartySnapshot depositor(
+      @Nullable BankBookingRequest previous, @Nullable UUID holderId, @NotNull Counterparty party) {
+    if (previous == null) {
+      return resolve(party);
+    }
+    BankHolder holder = previous.getRequestedHolder();
+    CounterpartySnapshot snapshot = BankLinkedBookings.storedCounterparty(previous);
+    if (previous.getType() != BankBookingRequestType.DEPOSIT
+        || !Objects.equals(holderId, holder == null ? null : holder.getId())
+        || snapshot == null
+        || !matchesDepositor(party, snapshot)) {
+      throw new BadRequestException(
+          "Replacement requires the submitted Bank depositor and custodian");
+    }
+    return snapshot;
+  }
+
+  private static boolean matchesDepositor(Counterparty party, CounterpartySnapshot snapshot) {
+    return switch (party) {
+      case Counterparty.Member member ->
+          member.userId().equals(snapshot.userId())
+              && Objects.equals(member.orgUnitId(), snapshot.orgUnitId());
+      case Counterparty.Accountless external ->
+          snapshot.userId() == null
+              && !HandleAnonymisation.isReserved(external.name())
+              && Objects.equals(StringNormalization.trimToNull(external.name()), snapshot.handle())
+              && Objects.equals(external.orgUnitId(), snapshot.orgUnitId());
+      case Counterparty.Retained _ ->
+          snapshot.userId() == null || HandleAnonymisation.isAnonymised(snapshot.handle());
+    };
+  }
+
+  /** Resolves a newly selected counterparty under ordinary Bank identity rules. */
   @NotNull
   private CounterpartySnapshot resolve(@NotNull Counterparty party) {
     CounterpartySnapshot snapshot =
@@ -515,6 +550,9 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
               ledger.resolveCounterparty(member.userId(), null, member.orgUnitId());
           case Counterparty.Accountless external ->
               ledger.resolveCounterparty(null, external.name(), external.orgUnitId());
+          case Counterparty.Retained _ ->
+              throw new BadRequestException(
+                  "A retained depositor requires a failed linked deposit");
         };
     if (snapshot == null
         || snapshot.handle().length() > MAX_COUNTERPARTY_LENGTH

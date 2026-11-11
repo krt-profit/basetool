@@ -173,7 +173,7 @@ class DatabaseIndexMigrationTest {
         jdbc,
         "job_order_linked_money_attempt",
         "idx_order_attempt_account_holding",
-        "(order_id, account_holding_id, bank_account_id)");
+        "(order_id, account_holding_id, holding_bank_account_id)");
     assertIndexDefContains(
         jdbc,
         "job_order_money_operation",

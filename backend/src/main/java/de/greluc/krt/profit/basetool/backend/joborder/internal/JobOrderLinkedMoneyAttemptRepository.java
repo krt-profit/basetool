@@ -58,6 +58,9 @@ interface JobOrderLinkedMoneyAttemptRepository
       SELECT a FROM JobOrderLinkedMoneyAttempt a
       WHERE a.orderId = :orderId AND a.active = true AND a.actualPayment = false
         AND a.state = de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderLinkedMoneyState.WAITING
+        AND a.kind NOT IN (
+          de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyKind.REQUESTER_RETURN,
+          de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyKind.SETTLEMENT)
       ORDER BY a.requestId
       """)
   List<JobOrderLinkedMoneyAttempt> unexecutedWaiting(UUID orderId);

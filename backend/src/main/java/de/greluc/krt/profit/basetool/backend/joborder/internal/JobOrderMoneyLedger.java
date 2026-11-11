@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyAvailability.AccountReceipt;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import java.math.BigDecimal;
 import java.util.EnumMap;
@@ -134,6 +135,7 @@ class JobOrderMoneyLedger {
    * @param balances effective balances by canonical holder
    * @param accountBalances effective balances by order-local Bank account position
    * @param requesterBalances effective net handover by requester designation
+   * @param accountRequesterBalances effective net handover by collection position and designation
    * @param provided actual new funds recorded for this order
    * @param handedOver effective net handover to requester recipients
    * @param fees fees paid by this order
@@ -155,6 +157,7 @@ class JobOrderMoneyLedger {
       Map<UUID, BigDecimal> balances,
       Map<UUID, BigDecimal> accountBalances,
       Map<UUID, BigDecimal> requesterBalances,
+      Map<AccountReceipt, BigDecimal> accountRequesterBalances,
       BigDecimal provided,
       BigDecimal handedOver,
       BigDecimal fees,
@@ -178,6 +181,7 @@ class JobOrderMoneyLedger {
       Map<UUID, BigDecimal> balances = new HashMap<>();
       Map<UUID, BigDecimal> accountBalances = new HashMap<>();
       Map<UUID, BigDecimal> requesterBalances = new HashMap<>();
+      Map<AccountReceipt, BigDecimal> accountRequesterBalances = new HashMap<>();
       BigDecimal provision = BigDecimal.ZERO;
       BigDecimal fees = BigDecimal.ZERO;
       var movements = new EnumMap<JobOrderMoneyKind, BigDecimal>(JobOrderMoneyKind.class);
@@ -189,7 +193,11 @@ class JobOrderMoneyLedger {
         if (accountHoldingId == null) {
           add(balances, identities, fact.personalHolderId(), fact.holderEffect(effective));
         } else {
-          accountBalances.merge(accountHoldingId, fact.holderEffect(effective), BigDecimal::add);
+          BigDecimal accountEffect =
+              fact.getKind() == JobOrderMoneyKind.REQUESTER_RETURN
+                  ? effective.amount()
+                  : fact.holderEffect(effective);
+          accountBalances.merge(accountHoldingId, accountEffect, BigDecimal::add);
         }
         if (fact.getDestinationHolderId() != null) {
           add(balances, identities, fact.getDestinationHolderId(), effective.amount());
@@ -197,8 +205,12 @@ class JobOrderMoneyLedger {
         UUID recipientId = fact.getRecipientId();
         if (recipientId != null) {
           UUID currentRecipient = recipientAliases.getOrDefault(recipientId, recipientId);
-          requesterBalances.merge(
-              currentRecipient, fact.handoverEffect(effective), BigDecimal::add);
+          BigDecimal delivered = fact.handoverEffect(effective);
+          requesterBalances.merge(currentRecipient, delivered, BigDecimal::add);
+          if (accountHoldingId != null) {
+            accountRequesterBalances.merge(
+                new AccountReceipt(accountHoldingId, currentRecipient), delivered, BigDecimal::add);
+          }
         }
         movements.merge(fact.getKind(), effective.amount(), BigDecimal::add);
       }
@@ -212,6 +224,7 @@ class JobOrderMoneyLedger {
           balances,
           accountBalances,
           requesterBalances,
+          accountRequesterBalances,
           provision,
           requesterBalances.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add),
           fees,
@@ -244,7 +257,9 @@ class JobOrderMoneyLedger {
       return balances.values().stream().allMatch(amount -> amount.signum() >= 0)
           && accountBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
           && requesterBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
-          && availability.coveredBy(balances, accountBalances, requesterBalances);
+          && accountRequesterBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
+          && availability.coveredBy(
+              balances, accountBalances, requesterBalances, accountRequesterBalances);
     }
 
     boolean canCorrect(JobOrderMoneyOperation fact) {
@@ -281,6 +296,16 @@ class JobOrderMoneyLedger {
       return requesterBalances
           .getOrDefault(canonical, BigDecimal.ZERO)
           .subtract(availability.forRecipient(canonical, excludedAttemptId));
+    }
+
+    BigDecimal availableForAccountReturn(
+        UUID holdingId, UUID recipientId, @Nullable UUID excludedAttemptId) {
+      UUID recipient = recipientAliases.getOrDefault(recipientId, recipientId);
+      var receipt = new AccountReceipt(holdingId, recipient);
+      return accountRequesterBalances
+          .getOrDefault(receipt, BigDecimal.ZERO)
+          .subtract(availability.forAccountReceipt(receipt, excludedAttemptId))
+          .min(availableForRecipient(recipient, excludedAttemptId));
     }
 
     BigDecimal balance(@Nullable UUID holderId) {

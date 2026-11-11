@@ -244,6 +244,13 @@ class JobOrderMoneyCorrectionPlans {
     BigDecimal rate = current.historicalOrderFeeRate(fact);
     BigDecimal fee = rate == null ? BigDecimal.ZERO : fees.feeOn(amount, new RateSnapshot(rate));
     if (fact.getKind() == JobOrderMoneyKind.PROVISION) {
+      var linked = current.linkedAttempts().get(fact.getOperationId());
+      if (linked != null
+          && (linked.getState() == JobOrderLinkedMoneyState.AUTHORISED
+              || linked.getFeeFunding() == JobOrderMoneyFeeFunding.BANK_SOURCE)
+          && amount.compareTo(linked.getAmount()) > 0) {
+        throw new BadRequestException("orders.money.bank.authorisedAmountExceeded");
+      }
       if (provision != null) {
         throw new BadRequestException("orders.money.correction.provision");
       }
@@ -251,7 +258,9 @@ class JobOrderMoneyCorrectionPlans {
     }
     BigDecimal newFunds = Objects.requireNonNullElse(provision, BigDecimal.ZERO);
     JobOrderMoneyKind kind = fact.getKind();
-    if ((fact.getFeeRate() == null || kind == JobOrderMoneyKind.PURPOSE_HANDOVER)
+    if ((fact.getFeeRate() == null
+            || kind == JobOrderMoneyKind.PURPOSE_HANDOVER
+            || fact.getAccountHoldingId() != null)
         && newFunds.signum() != 0) {
       throw new BadRequestException("orders.money.correction.provision");
     }
@@ -260,6 +269,7 @@ class JobOrderMoneyCorrectionPlans {
       throw new BadRequestException("orders.money.settlement.feeProvision.excess");
     }
     if (kind == JobOrderMoneyKind.REQUESTER_RETURN
+        && fact.getAccountHoldingId() == null
         && fact.personalHolderId().equals(fact.getDestinationHolderId())
         && newFunds.compareTo(fee) != 0) {
       throw new BadRequestException("orders.money.correction.provision");
