@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div id="mode-auec" th:fragment="form" hidden>
+    <form class="orders-create__form" th:action="@{/orders/auec}" method="post"
+          th:data-error="#{orders.money.create.error}">
+        <fieldset class="form-section">
+            <legend class="form-section__head" th:text="#{orders.create.section.order}"></legend>
+            <div class="form-grid">
+                <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('auec-responsible-org-unit', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
+                <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('auec-requesting-org-unit', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
+                <div class="form-group">
+                    <label for="auec-handle" th:text="#{orders.create.handle}"></label>
+                    <input type="text" id="auec-handle" name="handle" data-testid="order-auec-handle"
+                           autocomplete="off" maxlength="200" required>
+                </div>
+                <div class="form-group">
+                    <label for="auec-target" th:text="#{orders.money.target.withUnit}"></label>
+                    <input type="text" id="auec-target" name="target" inputmode="numeric"
+                           data-testid="order-auec-target" th:data-invalid="#{orders.money.amount.invalid}" required>
+                </div>
+            </div>
+        </fieldset>
+        <div class="form-section form-group">
+            <label for="auec-comment">
+                <span th:text="#{orders.create.comment}"></span>
+                <span class="opt" th:text="#{form.optional}"></span>
+            </label>
+            <textarea id="auec-comment" name="comment" rows="4" maxlength="1000"></textarea>
+        </div>
+        <div class="form-actions--sticky">
+            <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.create.cancel}"></a>
+            <button type="submit" class="btn btn--cta" data-testid="order-auec-submit">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>
+                <span th:text="#{orders.create.submit.create}"></span>
+            </button>
+        </div>
+    </form>
+</div>
+</body>
+</html>

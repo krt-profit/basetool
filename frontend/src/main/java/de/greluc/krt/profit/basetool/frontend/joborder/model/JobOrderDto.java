@@ -27,8 +27,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code JobOrderDto} for both order kinds: {@code MATERIAL} orders
- * fill {@code materials} and {@code handovers}; {@code ITEM} orders fill {@code items}, {@code
+ * Frontend mirror of the backend {@code JobOrderDto}: {@code MATERIAL} orders fill {@code
+ * materials} and {@code handovers}; {@code ITEM} orders fill {@code items}, {@code
  * aggregatedMaterials} and {@code itemHandovers}. The other kind's lists are empty.
  */
 @DtoMirror

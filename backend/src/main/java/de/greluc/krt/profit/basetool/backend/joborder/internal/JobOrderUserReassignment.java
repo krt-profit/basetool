@@ -21,33 +21,82 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRows;
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRowsMover;
-import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRowsReassignment;
+import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * The job-order module's part of the account merge: the assignee seats follow the member, the
- * executing user of a handover and the claiming user of a claim stay with the act.
- */
+/** Moves the member's order assignments and linked holder identities during account merge. */
 @Component
-public class JobOrderUserReassignment extends OwnedRowsReassignment {
+@RequiredArgsConstructor
+@Transactional(propagation = Propagation.MANDATORY)
+public class JobOrderUserReassignment implements UserReassignmentParticipant {
 
   static final int POSITION = 100;
 
+  private static final OwnedRows ASSIGNEES =
+      OwnedRows.deduped("job_order_assignees", "user_id", "job_order_id");
+  private static final OwnedRows HOLDERS =
+      new OwnedRows("job_order_money_holder", "user_id", List.of("order_id"));
+
+  private final OwnedRowsMover mover;
+  private final JobOrderMoneyHolderRepository holders;
+  private final JobOrderMoneyPrivacy moneyPrivacy;
+  private final JobOrderMoneyIdentityLock identityLock;
+
+  @Override
+  public int position() {
+    return POSITION;
+  }
+
+  @Override
+  public @NotNull List<OwnedRows> followsTheMember() {
+    return List.of(ASSIGNEES, HOLDERS);
+  }
+
+  @Override
+  public @NotNull List<String> staysWithTheAct() {
+    return List.of(
+        "job_order_handover.executing_user_id",
+        "job_order_item_handover.executing_user_id",
+        "material_claim.claimed_by_user_id",
+        "job_order_money_operation.actor_id",
+        "job_order_money_operation.selected_user_id");
+  }
+
+  @Override
+  public void assertMergeable(@NotNull UUID source, @NotNull UUID target) {
+    identityLock.lockAccounts(source, target);
+  }
+
   /**
-   * Declares the module's columns.
+   * Moves order membership and keeps every credited holder identity in a monetary collision.
    *
-   * @param mover the engine that runs the statements
+   * @param source the account being emptied
+   * @param target the surviving account
+   * @return the counts of assignments and holder links moved or merged
    */
-  public JobOrderUserReassignment(@NotNull OwnedRowsMover mover) {
-    super(
-        mover,
-        POSITION,
-        List.of(OwnedRows.deduped("job_order_assignees", "user_id", "job_order_id")),
-        List.of(
-            "job_order_handover.executing_user_id",
-            "job_order_item_handover.executing_user_id",
-            "material_claim.claimed_by_user_id"));
+  @Override
+  public @NotNull List<Moved> reassign(@NotNull UUID source, @NotNull UUID target) {
+    List<UUID> orderIds = moneyPrivacy.lockAffectedOrders(source, List.of());
+    List<Moved> assignments = mover.move(List.of(ASSIGNEES), source, target);
+    if (orderIds.isEmpty()) {
+      return assignments;
+    }
+    int collisions = holders.reviseCollidingHolders(source, target, orderIds);
+    holders.mergeCollidingHolders(source, target, orderIds);
+    int movedLinks = holders.moveLinkedHolders(source, target, orderIds);
+    if (collisions + movedLinks == 0) {
+      return assignments;
+    }
+    List<Moved> moved = new ArrayList<>(assignments);
+    moved.add(new Moved(HOLDERS.qualified(), collisions + movedLinks));
+    moneyPrivacy.publishChanges(orderIds);
+    return List.copyOf(moved);
   }
 }

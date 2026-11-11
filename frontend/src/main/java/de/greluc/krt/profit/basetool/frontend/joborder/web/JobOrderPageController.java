@@ -150,7 +150,11 @@ public class JobOrderPageController {
     }
     List<OrderListScope> offeredScopes =
         OrderListScope.offered(
-            canViewJobOrders, canViewOwnJobOrders, canViewAssignedJobOrders, canViewOrderUnitWork);
+            canViewOrderWorkspace,
+            canViewJobOrders,
+            canViewOwnJobOrders,
+            canViewAssignedJobOrders,
+            canViewOrderUnitWork);
     OrderListScope effectiveScope =
         OrderListScope.resolve(
             OrderListScope.parseOrNull(scope),
@@ -298,6 +302,7 @@ public class JobOrderPageController {
         case "actions" -> "joborder/orders-detail :: orderActions";
         case "dialogs" -> "joborder/orders-detail :: orderDialogs";
         case "kpi" -> "joborder/orders-detail :: kpiSection";
+        case "money" -> "joborder/fragments/order-money :: money";
         case "handovers" -> "joborder/orders-detail :: materialHandoverSection";
         case "items" -> "joborder/orders-detail :: itemsSection";
         case "item-handovers" -> "joborder/orders-detail :: itemHandoverSection";
@@ -328,11 +333,14 @@ public class JobOrderPageController {
     JobOrderDto order = detail.order();
     model.addAttribute("order", order);
     model.addAttribute("currentUserId", detail.currentUserId().orElse(null));
+    addPart(model, "money", detail.money());
     model.addAttribute("itemsWithoutMaterials", itemsWithoutDerivedMaterials(order));
 
+    boolean moneyOrder = "AUEC".equals(order.type());
     boolean canAssign = !order.responsibilityInvalid() && detail.canAssign();
     model.addAttribute("isLogistician", canAssign);
-    model.addAttribute("canFulfill", canAssign && !"CANCELLED".equals(order.status()));
+    model.addAttribute(
+        "canFulfill", !moneyOrder && canAssign && !"CANCELLED".equals(order.status()));
     boolean canEditAsRequester = order.callerMayEditAsRequester();
     model.addAttribute("canEditAsRequester", canEditAsRequester);
     model.addAttribute("requesterEditMode", canEditAsRequester && !canAssign);
@@ -347,7 +355,7 @@ public class JobOrderPageController {
             .map(OrgUnitMembershipOptionDto::orgUnitId)
             .collect(Collectors.toUnmodifiableSet()));
     model.addAttribute("canManageAssignees", order.callerMayManageAssignees());
-    if (canEditAsRequester || canAssign) {
+    if (!moneyOrder && (canEditAsRequester || canAssign)) {
       model.addAttribute("qualityTiers", qualityTierCatalog.all());
     }
     detail.materials().ifPresent(materials -> model.addAttribute("materials", materials));
@@ -356,7 +364,9 @@ public class JobOrderPageController {
         .requestingOptions()
         .ifPresent(options -> applyOwnerPickerOptions(model, options, detail.responsibleOptions()));
 
-    if ((canEditAsRequester || canAssign) && !model.containsAttribute("jobOrderForm")) {
+    if (!moneyOrder
+        && (canEditAsRequester || canAssign)
+        && !model.containsAttribute("jobOrderForm")) {
       JobOrderForm form = JobOrderForm.forEdit(order);
       if (canAssign) {
         form.setRequestingOrgUnitId(
@@ -381,7 +391,9 @@ public class JobOrderPageController {
     }
     model.addAttribute("hasOutstandingItemLines", hasOutstandingItemLines(order));
     model.addAttribute("isFullyDelivered", isFullyDelivered(order));
-    model.addAttribute("kpi", computeKpi(order));
+    if (!moneyOrder) {
+      model.addAttribute("kpi", computeKpi(order));
+    }
     addPart(model, "itemBlueprintOwners", detail.blueprintOwners());
     addPart(model, "itemStockByGameItem", detail.itemStockByGameItem());
     addPart(model, "orphanedInventory", detail.orphanedInventory());

@@ -591,10 +591,12 @@ function krtSearchableSelect(select, config) {
         const typed = input.value.trim().toLowerCase();
         /** @type {any} */
         let exact = null;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].label.toLowerCase() === typed) {
-                exact = items[i];
-                break;
+        if (!opts.explicitChoice) {
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].label.toLowerCase() === typed) {
+                    exact = items[i];
+                    break;
+                }
             }
         }
         if (exact) {
@@ -616,7 +618,7 @@ function krtSearchableSelect(select, config) {
             mirrorItemData(null);
             hidden.dispatchEvent(new Event('change', { bubbles: true }));
         }
-        if (optional && !input.value.trim()) {
+        if (opts.explicitChoice || (optional && !input.value.trim())) {
             committedLabel = '';
             committedValue = '';
             committedItem = null;

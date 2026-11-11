@@ -247,6 +247,9 @@ public enum NotificationType {
   /** A Staffel began or ended active support for the order. */
   JOB_ORDER_PARTICIPATION_CHANGED,
 
+  /** A new aUEC provision was reported for the affected linked holder. */
+  JOB_ORDER_MONEY_PROVISIONED,
+
   /**
    * A refinery order is ready to collect (REQ-REFINERY-023), rendered with {@code order}, {@code
    * location} and the {@code outputs}.
@@ -562,6 +565,7 @@ public enum NotificationType {
           JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED,
           JOB_ORDER_CLARIFICATION_REQUIRED,
           JOB_ORDER_PARTICIPATION_CHANGED,
+          JOB_ORDER_MONEY_PROVISIONED,
           REFINERY_ORDER_READY,
           REFINERY_ORDER_CHANGED_BY_OTHER,
           MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,

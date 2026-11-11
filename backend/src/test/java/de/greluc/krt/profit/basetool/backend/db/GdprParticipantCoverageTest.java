@@ -54,7 +54,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,7 +90,7 @@ class GdprParticipantCoverageTest {
 
   private static final Pattern EXPORT_KEY =
       Pattern.compile(
-          "\\bwhere\\s+(?:([a-z_][a-z0-9_]*)\\.)?([a-z_][a-z0-9_]*)\\s*=\\s*:userid\\b");
+          "\\b(?:where|or)\\s+(?:([a-z_][a-z0-9_]*)\\.)?([a-z_][a-z0-9_]*)\\s*=\\s*:userid\\b");
 
   private static final JavaClasses PRODUCTION =
       new ClassFileImporter()
@@ -532,26 +531,26 @@ class GdprParticipantCoverageTest {
                 String.class));
     Set<String> keys = new TreeSet<>();
     for (Section section : declared) {
-      String key = exportKey(section.sql(), tables);
-      if (key != null) {
-        keys.add(key);
-      }
+      keys.addAll(exportKeys(section.sql(), tables));
     }
     return keys;
   }
 
-  static @Nullable String exportKey(String sql, Set<String> tables) {
+  static Set<String> exportKeys(String sql, Set<String> tables) {
     String text = SqlReferences.scannable(sql);
     Matcher where = EXPORT_KEY.matcher(text);
     Matcher from = FIRST_FROM.matcher(text);
-    if (!where.find() || !from.find()) {
-      return null;
+    if (!from.find()) {
+      return Set.of();
     }
-    String table =
-        where.group(1) == null
-            ? from.group(1)
-            : SqlReferences.aliases(sql, tables).getOrDefault(where.group(1), where.group(1));
-    return table + "." + where.group(2);
+    Map<String, String> aliases = SqlReferences.aliases(sql, tables);
+    Set<String> keys = new TreeSet<>();
+    while (where.find()) {
+      String alias = where.group(1);
+      String table = alias == null ? from.group(1) : aliases.getOrDefault(alias, alias);
+      keys.add(table + "." + where.group(2));
+    }
+    return keys;
   }
 
   private static Set<String> exportGaps(Set<String> references, Set<String> exported) {

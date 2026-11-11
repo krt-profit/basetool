@@ -258,6 +258,7 @@ function saveStatus({ orderId, status, version, previousStatus, select }) {
                   'participations',
                   'dialogs',
                   'kpi',
+                  'money',
                   'materials',
                   'aggregated',
                   'items',

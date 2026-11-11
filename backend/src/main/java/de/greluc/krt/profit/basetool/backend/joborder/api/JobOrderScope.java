@@ -25,6 +25,17 @@ public final class JobOrderScope {
   /** Non-instantiable constant holder. */
   private JobOrderScope() {}
 
+  /** Predicate for physical stock-demand, allocation and linked-need representations. */
+  public static final String STOCK_KINDS = "o.type IN ('MATERIAL', 'ITEM')";
+
+  /** Current linked identity predicate for the holder alias {@code h} and the caller. */
+  public static final String ACTIVE_HOLDER_LINK =
+      """
+      h.userId = :callerId AND EXISTS (SELECT u.id FROM User u WHERE u.id = h.userId
+        AND u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
+        AND u.inKeycloak = true AND u.enabledInKeycloak = true)
+      """;
+
   /** Complete web order readership, independent of the reduced allocation and Exchange scope. */
   public static final String READ_PREDICATE =
       """
@@ -42,6 +53,9 @@ public final class JobOrderScope {
             OR (:activeOrgUnitId IS NULL AND p.claimingOrgUnit.id IN :memberOrgUnitIds)))
         OR EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o
           AND a.user.id = :callerId)
-      )
-      """;
+        OR (o.type = 'AUEC' AND EXISTS (SELECT h.id FROM JobOrderMoneyHolder h
+          WHERE h.orderId = o.id AND
+      """
+          + ACTIVE_HOLDER_LINK
+          + "))\n)";
 }

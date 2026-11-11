@@ -59,6 +59,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -118,14 +119,45 @@ public class JobOrderService {
    */
   @Transactional
   public JobOrderDto createJobOrder(CreateJobOrderDto createDto) {
+    return createOrder(
+        createDto.responsibleOrgUnitId(),
+        createDto.requestingOrgUnitId(),
+        createDto.handle(),
+        createDto.comment(),
+        JobOrderType.MATERIAL,
+        createDto.materials());
+  }
+
+  /**
+   * Persists an aUEC order's shared information and queue entry.
+   *
+   * @param dto the creation input for the current unit writer
+   * @return the common order projection
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  JobOrderDto createAuecJobOrder(CreateAuecJobOrderDto dto) {
+    return createOrder(
+        dto.responsibleOrgUnitId(),
+        dto.requestingOrgUnitId(),
+        dto.handle(),
+        dto.comment(),
+        JobOrderType.AUEC,
+        List.of());
+  }
+
+  private JobOrderDto createOrder(
+      @Nullable UUID responsibleOrgUnitId,
+      @Nullable UUID requestingOrgUnitId,
+      String handle,
+      @Nullable String comment,
+      JobOrderType type,
+      List<CreateJobOrderMaterialDto> materialRequests) {
     profitHierarchy.lockForOrderWrite();
     jobOrderRepository.lockAllJobOrders();
     Integer newPriority = jobOrderRepository.findMaxPriority().orElse(0) + 1;
 
-    OrgUnit responsible =
-        jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(createDto.responsibleOrgUnitId());
-    OrgUnit requesting =
-        jobOrderOrgUnitResolver.resolveRequestingOrgUnit(createDto.requestingOrgUnitId());
+    OrgUnit responsible = jobOrderOrgUnitResolver.resolveResponsibleOrgUnit(responsibleOrgUnitId);
+    OrgUnit requesting = jobOrderOrgUnitResolver.resolveRequestingOrgUnit(requestingOrgUnitId);
 
     if (!jobOrderAccessPolicy.canCreate(responsible, requesting)) {
       throw new AccessDeniedException(
@@ -133,15 +165,16 @@ public class JobOrderService {
     }
     JobOrder jobOrder =
         JobOrder.builder()
-            .handle(createDto.handle())
-            .comment(StringNormalization.trimToNull(createDto.comment()))
+            .handle(handle)
+            .comment(StringNormalization.trimToNull(comment))
             .priority(newPriority)
+            .type(type)
             .originalProfitOrgUnitId(profitHierarchy.requireEligible(responsible.getId()))
             .responsibleOrgUnit(responsible)
             .requestingOrgUnit(requesting)
             .build();
 
-    for (JobOrderMaterial line : materialLines.build(createDto.materials(), Set.of())) {
+    for (JobOrderMaterial line : materialLines.build(materialRequests, Set.of())) {
       jobOrder.addMaterial(line);
     }
 
@@ -312,6 +345,9 @@ public class JobOrderService {
   }
 
   private JobOrderEditPlan statusPlan(@NotNull JobOrder order, @NotNull JobOrderStatus status) {
+    if (order.getType() == JobOrderType.AUEC && status == JobOrderStatus.COMPLETED) {
+      throw new BadRequestException("orders.money.completion.requiresHandover");
+    }
     if (order.getType() == JobOrderType.ITEM) {
       itemFulfillment.lock(order.getId());
     }
@@ -335,7 +371,7 @@ public class JobOrderService {
     return !status.isActive();
   }
 
-  private static void changeLifecycle(JobOrder order, JobOrderStatus status) {
+  static void changeLifecycle(JobOrder order, JobOrderStatus status) {
     order.setStatus(status);
     order.setLifecycleVersion(Math.incrementExact(order.getLifecycleVersion()));
   }
@@ -501,6 +537,9 @@ public class JobOrderService {
       JobOrder order,
       List<CreateJobOrderMaterialDto> materials,
       java.util.function.Function<JobOrder, JobOrderEdit> mutation) {
+    if (order.getType() != JobOrderType.MATERIAL) {
+      throw new BadRequestException("orders.kind.material.required");
+    }
     Set<UUID> targets =
         materials.stream()
             .map(CreateJobOrderMaterialDto::materialId)
@@ -694,12 +733,6 @@ public class JobOrderService {
                 plannedOrder,
                 materials,
                 jobOrder -> {
-                  if (jobOrder.getType() != JobOrderType.MATERIAL) {
-                    throw new BadRequestException(
-                        "Order "
-                            + id
-                            + " is not a material order; use the requester item-update endpoint.");
-                  }
                   jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
                   MaterialReplaceOutcome outcome =
                       replaceMaterialsWithinTransaction(id, jobOrder, materials);
@@ -1048,6 +1081,7 @@ public class JobOrderService {
             "items",
             "assignees",
             "participations",
+            "money",
             "blueprint-owners",
             "handovers",
             "item-handovers",

@@ -120,7 +120,8 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
             "aggregated",
             "items",
             "assignees",
-            "participations"));
+            "participations",
+            "money"));
   }
 
   private void publishQueueChanged() {

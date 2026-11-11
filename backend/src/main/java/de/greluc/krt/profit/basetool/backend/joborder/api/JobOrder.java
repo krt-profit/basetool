@@ -131,10 +131,8 @@ public class JobOrder extends AbstractEntity<UUID> {
   private Long lifecycleVersion = 0L;
 
   /**
-   * Order kind. {@link JobOrderType#MATERIAL} (the default, and the value backfilled onto every
-   * pre-existing row by migration V123) requests raw materials directly via {@link #materials};
-   * {@link JobOrderType#ITEM} requests finished items via {@link #items}, from which the material
-   * requirements are derived. Never {@code null}.
+   * Exclusive order kind: raw materials, finished items, or an independently tracked net aUEC
+   * amount.
    */
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)

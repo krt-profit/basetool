@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthorityFlags;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -91,7 +92,12 @@ public class JobOrderAccessPolicy
             && accessGateService.canSeeSquadronAsGrantee(
                 order.getResponsibleOrgUnit().getId(), Roles.LOGISTICIAN))
         || isOrderRequesterRow(order)
-        || hasHistoricalUnitRead(order);
+        || hasHistoricalUnitRead(order)
+        || (order.getType() == JobOrderType.AUEC
+            && authHelper
+                .currentUserId()
+                .map(caller -> jobOrderRepository.hasMoneyHolderReadGrant(order.getId(), caller))
+                .orElse(false));
   }
 
   /**

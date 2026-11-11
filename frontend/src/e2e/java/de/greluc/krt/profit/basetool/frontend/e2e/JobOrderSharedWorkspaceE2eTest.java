@@ -130,7 +130,7 @@ class JobOrderSharedWorkspaceE2eTest {
         E2eSupport.navigate(queue, base + "/orders");
         assertThat(queue.locator("input[name='scope'][value='ALL']")).isChecked();
         assertThat(queue.getByTestId("orders-create-link")).hasCount(0);
-        assertThat(queue.locator("#orders-type-filter option[value='AUEC']")).hasCount(0);
+        assertThat(queue.locator("#orders-type-filter option[value='AUEC']")).hasCount(1);
         assertThat(queue.locator(row(orderId))).isVisible();
         assertThat(queue.locator(row(unrelatedOrderId))).hasCount(0);
         queue.evaluate("window.__workspaceNoReload = true");

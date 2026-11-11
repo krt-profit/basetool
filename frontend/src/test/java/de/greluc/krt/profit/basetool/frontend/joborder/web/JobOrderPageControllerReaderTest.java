@@ -141,7 +141,7 @@ class JobOrderPageControllerReaderTest {
         .containsEntry("scope", "ALL")
         .containsEntry("squadronFilterAvailable", false)
         .containsEntry("orders", List.of(recoverable));
-    assertThat(OrderListScope.offered(false, true, false, false))
+    assertThat(OrderListScope.offered(true, false, true, false, false))
         .containsExactly(OrderListScope.MINE, OrderListScope.ALL);
     verify(reader)
         .readOrderList(
@@ -169,7 +169,7 @@ class JobOrderPageControllerReaderTest {
     assertThat(model.asMap())
         .containsEntry("scope", "ALL")
         .containsEntry("squadronFilterAvailable", false);
-    assertThat(OrderListScope.offered(false, false, true, false))
+    assertThat(OrderListScope.offered(true, false, false, true, false))
         .containsExactly(OrderListScope.ASSIGNED, OrderListScope.ALL);
   }
 
@@ -212,6 +212,7 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.of(null),
                 List.of(options.getFirst()),
                 List.of(),
+                JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent()));
     Model model = new ExtendedModelMap();
 
@@ -261,6 +262,7 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.absent(),
                 List.of(),
                 List.of(),
+                JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent()));
 
     assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, "items"))

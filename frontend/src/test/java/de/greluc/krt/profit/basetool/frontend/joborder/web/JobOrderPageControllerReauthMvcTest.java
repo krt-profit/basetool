@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
@@ -54,6 +55,7 @@ class JobOrderPageControllerReauthMvcTest {
                 client,
                 new JobOrderPageReader(
                     client,
+                    mock(JobOrderMoneyBackendClient.class),
                     mock(
                         de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient
                             .class),

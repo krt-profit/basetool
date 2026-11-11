@@ -100,10 +100,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "requestingOrgUnit"
       })
   @Query(
-      """
-      SELECT o FROM JobOrder o WHERE o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.priority ASC
-      NULLS LAST, o.displayId DESC
-      """)
+      "SELECT o FROM JobOrder o WHERE "
+          + JobOrderScope.STOCK_KINDS
+          + " AND o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.priority ASC NULLS LAST,"
+          + " o.displayId DESC")
   List<JobOrder> findAllActiveWithMaterials();
 
   /**
@@ -129,6 +129,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Query(
       "SELECT o FROM JobOrder o WHERE "
           + JobOrderScope.READ_PREDICATE
+          + " AND "
+          + JobOrderScope.STOCK_KINDS
           + " AND o.status IN ('OPEN', 'IN_PROGRESS') ORDER BY o.priority ASC NULLS LAST,"
           + " o.displayId DESC")
   List<JobOrder> findReadableActiveWithMaterials(
@@ -159,10 +161,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "requestingOrgUnit"
       })
   @Query(
-      """
-      SELECT o FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :orgUnitIds
-      AND o.status IN :statuses ORDER BY o.displayId ASC
-      """)
+      "SELECT o FROM JobOrder o WHERE "
+          + JobOrderScope.STOCK_KINDS
+          + " AND o.responsibleOrgUnit.id IN :orgUnitIds AND o.status IN :statuses ORDER BY"
+          + " o.displayId ASC")
   List<JobOrder> findOpenForExchangeDemand(
       @Param("statuses") Collection<JobOrderStatus> statuses,
       @Param("orgUnitIds") Collection<UUID> orgUnitIds);
@@ -176,10 +178,10 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * @return the orders, ordered by descending {@code displayId}
    */
   @Query(
-      """
-      SELECT o FROM JobOrder o WHERE o.responsibleOrgUnit.id IN :orgUnitIds
-      AND o.status IN :statuses ORDER BY o.displayId DESC
-      """)
+      "SELECT o FROM JobOrder o WHERE "
+          + JobOrderScope.STOCK_KINDS
+          + " AND o.responsibleOrgUnit.id IN :orgUnitIds AND o.status IN :statuses ORDER BY"
+          + " o.displayId DESC")
   List<JobOrder> findByResponsibleOrgUnitsAndStatuses(
       @Param("statuses") Collection<JobOrderStatus> statuses,
       @Param("orgUnitIds") Collection<UUID> orgUnitIds);
@@ -231,6 +233,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Query(
       "SELECT o FROM JobOrder o WHERE "
           + JobOrderScope.READ_PREDICATE
+          + " AND "
+          + JobOrderScope.STOCK_KINDS
           + " AND o.status IN :statuses ORDER BY o.displayId ASC")
   List<JobOrder> findScopedOrdersWithMaterialRequirements(
       @Param("statuses") Collection<JobOrderStatus> statuses,
@@ -485,6 +489,36 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    */
   @Query(value = "SELECT id FROM job_order WHERE id = :id FOR NO KEY UPDATE", nativeQuery = true)
   Optional<UUID> lockForScopedEdit(@Param("id") UUID id);
+
+  /**
+   * Checks the permanent hard-delete boundary while the caller holds the order write guard.
+   *
+   * @param orderId the aUEC order
+   * @return whether a monetary submission was durably accepted
+   */
+  @Query("SELECT COUNT(m) > 0 FROM JobOrderMoneyOperation m WHERE m.orderId = :orderId")
+  boolean hasDurableMoneySubmission(@Param("orderId") UUID orderId);
+
+  /**
+   * Checks whether the caller is a currently linked holder in any order.
+   *
+   * @param callerId the account whose workspace admission is checked
+   * @return whether one valid personal order relationship exists
+   */
+  @Query("SELECT COUNT(h) > 0 FROM JobOrderMoneyHolder h WHERE " + JobOrderScope.ACTIVE_HOLDER_LINK)
+  boolean hasMoneyWorkspaceReadGrant(@Param("callerId") UUID callerId);
+
+  /**
+   * Checks the current personal holder link for one order, independently of status and balance.
+   *
+   * @param orderId the order the caller would read
+   * @param callerId the account requesting it
+   * @return whether a current authorised link grants full order reading
+   */
+  @Query(
+      "SELECT COUNT(h) > 0 FROM JobOrderMoneyHolder h WHERE h.orderId = :orderId AND "
+          + JobOrderScope.ACTIVE_HOLDER_LINK)
+  boolean hasMoneyHolderReadGrant(@Param("orderId") UUID orderId, @Param("callerId") UUID callerId);
 
   /**
    * Locks all planned earmark targets in priority-queue row order after physical stock locks.

@@ -26,10 +26,7 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
-/**
- * The joborder's part of the Art. 15 / Art. 20 data export: the member's job-order assignments and
- * material claims (REQ-SEC-058).
- */
+/** Exports the member's job-order assignments, material claims and directly related money facts. */
 @Component
 public class JobOrderExportSections implements PersonalDataExportSection {
 
@@ -78,6 +75,31 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                 "job_order",
                 "job_order.display_id, a number rather than a name. The order's handle column is"
                     + " deliberately not selected by any section, being an external contact's name"
-                    + " the scrubber cannot see."));
+                    + " the scrubber cannot see."),
+        new Section(
+            305,
+            "jobOrderMoneyHolders",
+            ART_15_20,
+            "The member's current monetary holder links within individual orders.",
+            """
+            SELECT o.display_id AS job_order, h.id AS holder_id, h.revision
+            FROM job_order_money_holder h JOIN job_order o ON o.id = h.order_id
+            WHERE h.user_id = :userId ORDER BY o.display_id, h.id
+            """),
+        new Section(
+            306,
+            "jobOrderMoneyOperations",
+            ART_15_20,
+            "Provisions the member recorded, received, or was explicitly selected for.",
+            """
+            SELECT o.display_id AS job_order, p.operation_id, p.holder_id,
+                   CAST(p.amount AS text) AS amount, p.bank_handling, p.recorded_at
+            FROM job_order_money_operation p
+            JOIN job_order o ON o.id = p.order_id
+            JOIN job_order_money_holder h ON h.id = p.holder_id
+            JOIN job_order_money_holder linked ON linked.id = COALESCE(h.merged_into_id, h.id)
+            WHERE linked.user_id = :userId OR p.actor_id = :userId OR p.selected_user_id = :userId
+            ORDER BY p.recorded_at, p.id
+            """));
   }
 }

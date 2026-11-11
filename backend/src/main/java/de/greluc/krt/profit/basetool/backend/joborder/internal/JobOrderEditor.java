@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -73,6 +74,34 @@ public class JobOrderEditor {
 
   /** The checked order and first captured mutation after exact resource revalidation. */
   private record PreparedEdit(@NotNull JobOrder order, @NotNull JobOrderEditPlan plan) {}
+
+  /** Scoped money mutation and the audit and notices that commit with it. */
+  record MoneyEdit<T>(T result, JobOrderEdit edit) {}
+
+  /**
+   * Applies one monetary edit while responsibility, lifecycle and deletion are serialized.
+   *
+   * @param id the order to edit
+   * @param mutation the financial action, including its applicable version checks
+   * @param <T> the action result type
+   * @return the action's durable result
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  <T> T editMoney(UUID id, Function<JobOrder, MoneyEdit<T>> mutation) {
+    profitHierarchy.lockForOrderWrite();
+    Entities.require(jobOrderRepository.lockForScopedEdit(id), () -> "JobOrder not found: " + id);
+    JobOrder order =
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    entityManager.refresh(order);
+    if (!jobOrderAccessPolicy.canSeeJobOrder(order)) {
+      throw new AccessDeniedException("Caller may not read this order.");
+    }
+    JobOrderMoneyQueries.requireMoneyKind(order);
+    responsibilityGuard.assertWritable(order);
+    MoneyEdit<T> result = mutation.apply(order);
+    recordOutcome(result.edit());
+    return result.result();
+  }
 
   /**
    * Runs a versioned edit and projects the result.
@@ -175,6 +204,10 @@ public class JobOrderEditor {
   public void deletePlanned(
       @NotNull UUID id, @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
     PreparedEdit prepared = prepare(id, JobOrderGate.ADMIN_DELETE, false, null, planner);
+    if (prepared.order().getType() == JobOrderType.AUEC
+        && jobOrderRepository.hasDurableMoneySubmission(id)) {
+      throw new BusinessConflictException("orders.money.delete.submitted");
+    }
     JobOrderEdit edit = prepared.plan().mutation().apply(prepared.order());
     recordOutcome(edit);
   }

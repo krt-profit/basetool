@@ -61,7 +61,13 @@ public interface HandleAnonymisationParticipant {
     MATERIAL_HANDOVERS,
 
     /** Rows rewritten in {@code job_order_item_handover}. */
-    ITEM_HANDOVERS
+    ITEM_HANDOVERS,
+
+    /** Rows rewritten in {@code job_order_money_holder}. */
+    ORDER_MONEY_HOLDERS,
+
+    /** Rows rewritten in {@code job_order_money_operation}. */
+    ORDER_MONEY_OPERATIONS
   }
 
   /**
@@ -80,8 +86,7 @@ public interface HandleAnonymisationParticipant {
   List<String> columns();
 
   /**
-   * Rewrites the member's handle snapshots of this module to {@code
-   * de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation#SENTINEL}.
+   * Redacts the member's handle snapshots with the erasure sentinel or clears an optional term.
    *
    * <p>Columns matched by id are rewritten once; columns matched by text once per spelling, whole
    * value and case-insensitively, never by substring.

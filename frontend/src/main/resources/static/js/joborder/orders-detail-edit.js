@@ -174,7 +174,7 @@ function localizeOrderDates(root) {
             targetEl.classList.add('text-warning');
         }
     });
-    scope.querySelectorAll('.handover-time-span').forEach((el) => {
+    scope.querySelectorAll('.handover-time-span, .od-money-date').forEach((el) => {
         const utcDateStr = el.getAttribute('data-utc');
         if (utcDateStr) {
             const dateObj = new Date(utcDateStr);

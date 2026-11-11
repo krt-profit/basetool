@@ -490,6 +490,12 @@ follows effective net handover. If responsibility is ineligible, only read and t
 even on completed/cancelled orders: all other user changes and coupled financial results wait for
 valid responsibility. Mandatory automatic support ending remains required.
 
+The internal Bank-free checkpoint supports aUEC creation, own provision by a full order reader,
+and provision on behalf by a current responsible writer. A consciously linked holder can read
+their order and recover its accepted outcomes through the ordinary workspace, without unit
+membership or Bank access. A typed name grants neither account access nor an Inbox recipient.
+Once a monetary submission is accepted, even an administrator cannot hard-delete its order.
+
 The canonical detailed grants, historical relationships and acceptance criteria live in the three
 linked specifications. The following table and footnotes are the **current implementation baseline**.
 
@@ -500,7 +506,7 @@ linked specifications. The following table and footnotes are the **current imple
 | Mark Lager stock as „gestohlen“ or remove the marker, a whole row or a part (REQ-INV-053) — follows the row's **edit right**, no permission of its own: `canEditInventoryItem`, then owner or Logistician and above, like every per-row write; a selection only of your own rows. Refused while the server switch is off |   ✅¹   |  ✅   | ✅¹  |    ✅    |   ✅   |
 | Change the org unit of your **own personal** Lager rows — to one of your direct memberships or to „Keine Einheit", singly or for a selection (REQ-INV-052) (`isAuthenticated()` + `canEditInventoryItem`; the service refuses a shared or a foreign row) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Move a **shared** Lager row, whole or a part of its free stock, into the pool of another org unit its holder directly belongs to — „Pool wechseln" in the Globales Lager (REQ-INV-059) (`isAuthenticated()` + `canEditInventoryItem`; the service requires the contextual Logistician authority of **both** units, `hasRoleInOrgUnit`, so the flat role alone is not enough; the holder is notified) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Create** MATERIAL/ITEM through a current contextual writer of either proposed unit | ❌ | ✅ | ❌ | ✅ | ✅ |
+| **Create** MATERIAL/ITEM/aUEC through a current contextual writer of either proposed unit | ❌ | ✅ | ❌ | ✅ | ✅ |
 | Read permitted job-order list / count / lookup / detail (`isAuthenticated()` + common `canSeeJobOrder`; REQ-ORDERS-052)                                                                                                                                                                                                                                                                               |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | Read the **cross-order material demand** (`/orders/material-demand`, REQ-ORDERS-034) (`isAuthenticated()` + the common order read predicate)                                                                                                                                                                                                                                          |   ✅³   |  ✅³  | ✅³  |   ✅³    |   ✅   |
 | Maintain your **existing own** editor note or remove yourself (`canSeeJobOrder` + own entry); enrolling any account requires `canManageAssignees`                                                                                                                                                                                                                                                             |  ✅³⁵   |  ✅³  | ✅³⁵ |   ✅³    |   ✅   |

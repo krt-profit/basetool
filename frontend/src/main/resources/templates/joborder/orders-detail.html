@@ -10,6 +10,7 @@
 <th:block th:fragment="pageContent">
 <main class="orders-detail"
       th:with="isItemOrder=${order.type == 'ITEM'},
+               isMaterialOrder=${order.type == 'MATERIAL'},
                statusClass=${order.status == 'OPEN' ? 'status-planned' : (order.status == 'IN_PROGRESS' ? 'status-active' : (order.status == 'COMPLETED' ? 'status-completed' : 'status-cancelled'))}">
     <div class="page-head" data-testid="page-head">
         <div class="page-head__main">
@@ -19,16 +20,17 @@
             <div class="page-title">
                 <h1 th:text="#{orders.detail.group.order} + ' #' + ${order.displayId}">Auftrag #1</h1>
                 <span th:if="${isItemOrder}" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
-                <span th:unless="${isItemOrder}" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
+                <span th:if="${isMaterialOrder}" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
+                <span th:if="${order.type == 'AUEC'}" class="order-kind-badge" th:text="#{orders.kind.auec}"></span>
                 <span id="order-status-badge" class="status-badge" th:classappend="${statusClass}" data-testid="order-status-badge"
                       th:text="#{__${'status.' + order.status}__}">In Bearbeitung</span>
             </div>
         </div>
         <div id="order-actions-results" class="page-actions"><th:block th:fragment="orderActions" th:with="isItemOrder=${order.type == 'ITEM'}">
-            <button th:if="${!order.responsibilityInvalid and (isLogistician or canEditAsRequester) and !isItemOrder}" type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
+            <button th:if="${!order.responsibilityInvalid and (isLogistician or canEditAsRequester) and order.type == 'MATERIAL'}" type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
             <a th:if="${isItemOrder and (order.callerMayUseItemProcessingEditor() or canEditAsRequester)}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
-            <th:block th:if="${!order.responsibilityInvalid}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
+            <th:block th:if="${!order.responsibilityInvalid and (order.type != 'AUEC' or (money != null and money.canDelete))}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                 <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='order-menu', items=~{::order-menu-items})}">
                     <th:block th:ref="order-menu-items">
                         <form id="delete-order-form" th:data-order-id="${order.id}" th:action="@{/orders/{id}/delete(id=${order.id})}" method="post" class="m-0">
@@ -41,7 +43,7 @@
     </div>
 
     <section class="card card--flush od-summary">
-    <div id="order-header-results"><th:block th:fragment="orderHeader" th:with="canProcessStatus=${isLogistician and order.status != 'CANCELLED'}">
+    <div id="order-header-results"><th:block th:fragment="orderHeader" th:with="canProcessStatus=${isLogistician and order.status != 'CANCELLED' and (order.type != 'AUEC' or order.status == 'OPEN')}">
         <span id="order-head-meta" hidden
               th:data-responsibility-invalid="${order.responsibilityInvalid}"
               th:data-order-version="${order.version}"
@@ -116,7 +118,7 @@
                         <option value="OPEN" th:selected="${order.status == 'OPEN'}" th:text="#{status.OPEN}">Offen</option>
                         <option value="IN_PROGRESS" th:selected="${order.status == 'IN_PROGRESS'}" th:text="#{status.IN_PROGRESS}">In Bearbeitung</option>
                         <option value="REJECTED" th:selected="${order.status == 'REJECTED'}" th:text="#{status.REJECTED}">Abgelehnt</option>
-                        <option value="COMPLETED" th:selected="${order.status == 'COMPLETED'}" th:text="#{status.COMPLETED}">Abgeschlossen</option>
+                        <option th:if="${order.type != 'AUEC'}" value="COMPLETED" th:selected="${order.status == 'COMPLETED'}" th:text="#{status.COMPLETED}">Abgeschlossen</option>
                     </select>
                 </th:block>
                 <button th:if="${order.canCancel}" type="button" class="btn btn-quiet-danger"
@@ -159,7 +161,7 @@
     </th:block></div>
     </section>
 
-    <div id="order-kpi-results" class="od-kpi"><th:block th:fragment="kpiSection">
+    <div th:unless="${order.type == 'AUEC'}" id="order-kpi-results" class="od-kpi"><th:block th:fragment="kpiSection">
         <div class="kpi-grid" th:if="${kpi != null}">
             <div th:if="${kpi.showProgress}" class="kpi-total od-progress" data-testid="order-progress">
                 <div class="kpi-label" th:text="#{orders.detail.kpi.progress}">Geliefert / benötigt</div>
@@ -212,19 +214,26 @@
         </div>
     </th:block></div>
 
+    <th:block th:if="${order.type == 'AUEC'}">
+        <div id="order-money-results" th:insert="~{joborder/fragments/order-money :: money}"></div>
+        <th:block th:if="${currentUserId != null}">
+            <th:block th:replace="~{joborder/fragments/order-money :: provision}"></th:block>
+        </th:block>
+    </th:block>
+
     <div class="tab-nav od-tabs" role="tablist" th:aria-label="#{orders.detail.title}">
-        <button th:unless="${isItemOrder}" class="tab" id="tab-materials" type="button" role="tab" aria-selected="false" aria-controls="pane-materials" data-tab="materials"><span th:text="#{orders.detail.tab.demand}">Bedarf</span> <span class="tab-count" th:text="${order.materials != null ? order.materials.size() : 0}">0</span></button>
+        <button th:if="${isMaterialOrder}" class="tab" id="tab-materials" type="button" role="tab" aria-selected="false" aria-controls="pane-materials" data-tab="materials"><span th:text="#{orders.detail.tab.demand}">Bedarf</span> <span class="tab-count" th:text="${order.materials != null ? order.materials.size() : 0}">0</span></button>
         <button th:if="${isItemOrder}" class="tab" id="tab-items" type="button" role="tab" aria-selected="false" aria-controls="pane-items" data-tab="items"><span th:text="#{orders.detail.tab.items}">Items</span> <span class="tab-count" th:text="${order.items != null ? order.items.size() : 0}">0</span></button>
         <button th:if="${isItemOrder}" th:hidden="${order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty()}" data-od-hide-empty class="tab" id="tab-aggregated" type="button" role="tab" aria-selected="false" aria-controls="pane-aggregated" data-tab="aggregated"><span th:text="#{orders.detail.tab.materials}">Materialien</span> <span class="tab-count" th:text="${order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0}">0</span></button>
         <button th:if="${itemBlueprintOwners != null}" class="tab" id="tab-blueprints" type="button" role="tab" aria-selected="false" aria-controls="pane-blueprints" data-tab="blueprints"><span th:text="#{orders.detail.tab.makers}">Herstellung</span> <span class="tab-count" th:text="${itemBlueprintOwners.owners != null ? itemBlueprintOwners.owners.size() : 0}">0</span></button>
-        <button th:if="${!isItemOrder}" th:hidden="${!canFulfill and (order.handovers == null or order.handovers.isEmpty())}" th:attr="data-od-hide-empty=${canFulfill ? null : 'true'}" class="tab" id="tab-handovers" type="button" role="tab" aria-selected="false" aria-controls="pane-handovers" data-tab="handovers"><span th:text="#{orders.detail.handovers.title}">Übergaben</span> <span class="tab-count" th:text="${order.handovers != null ? order.handovers.size() : 0}">0</span></button>
+        <button th:if="${isMaterialOrder}" th:hidden="${!canFulfill and (order.handovers == null or order.handovers.isEmpty())}" th:attr="data-od-hide-empty=${canFulfill ? null : 'true'}" class="tab" id="tab-handovers" type="button" role="tab" aria-selected="false" aria-controls="pane-handovers" data-tab="handovers"><span th:text="#{orders.detail.handovers.title}">Übergaben</span> <span class="tab-count" th:text="${order.handovers != null ? order.handovers.size() : 0}">0</span></button>
         <button th:if="${isItemOrder}" th:hidden="${!canFulfill and (order.itemHandovers == null or order.itemHandovers.isEmpty())}" th:attr="data-od-hide-empty=${canFulfill ? null : 'true'}" class="tab" id="tab-item-handovers" type="button" role="tab" aria-selected="false" aria-controls="pane-item-handovers" data-tab="item-handovers"><span th:text="#{orders.detail.handovers.title}">Übergaben</span> <span class="tab-count" th:text="${order.itemHandovers != null ? order.itemHandovers.size() : 0}">0</span></button>
         <button class="tab" id="tab-assignees" type="button" role="tab" aria-selected="false" aria-controls="pane-assignees" data-tab="assignees"><span th:text="#{orders.detail.assignees.title}">Bearbeiter</span> <span class="tab-count" th:text="${order.assignees != null ? order.assignees.size() : 0}">0</span></button>
         <button th:if="${orphanedInventory != null and !orphanedInventory.isEmpty()}" class="tab" id="tab-verkn" type="button" role="tab" aria-selected="false" aria-controls="pane-verkn" data-tab="verkn"><span th:text="#{orders.detail.tab.linked}">Verknüpft</span> <span class="tab-count" th:text="${orphanedInventory != null ? orphanedInventory.size() : 0}">0</span></button>
     </div>
 
     <div class="tab-panes">
-        <section th:if="${order.type != 'ITEM'}" id="pane-materials" class="tab-pane" role="tabpanel" aria-labelledby="tab-materials">
+        <section th:if="${order.type == 'MATERIAL'}" id="pane-materials" class="tab-pane" role="tabpanel" aria-labelledby="tab-materials">
         <div id="order-materials-results"><th:block th:fragment="materialsSection">
         <div data-contribution-history-slot th:data-order-id="${order.id}" th:data-error="#{orders.claim.history.error}"></div>
         <span hidden data-od-tab-count="materials" th:text="${order.materials != null ? order.materials.size() : 0}">0</span>
@@ -719,7 +728,7 @@
         </th:block></section>
         </section>
 
-        <section th:if="${order.type != 'ITEM'}" id="pane-handovers" class="tab-pane" role="tabpanel" aria-labelledby="tab-handovers">
+        <section th:if="${order.type == 'MATERIAL'}" id="pane-handovers" class="tab-pane" role="tabpanel" aria-labelledby="tab-handovers">
         <div id="order-handovers-results"><th:block th:fragment="materialHandoverSection">
         <span hidden data-od-tab-count="handovers" th:data-od-tab-action="${canFulfill}" th:text="${order.handovers != null ? order.handovers.size() : 0}">0</span>
         <div class="od-pane-actions">
@@ -932,7 +941,7 @@
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='status-warning-modal', titleKey='orders.status.warning.title', body=~{::status-warning-modal-body})}">
     <th:block th:ref="status-warning-modal-body">
         <div class="krt-modal-body">
-        <p class="od-modal-text" th:text="#{orders.status.warning.body}"></p>
+        <p class="od-modal-text" th:text="${order.type == 'AUEC'} ? #{orders.money.status.warning} : #{orders.status.warning.body}"></p>
         </div>
         <div class="krt-modal-foot">
             <button type="button" class="btn btn-ghost" data-trigger="od-cancel-status" th:text="#{orders.status.warning.cancel}">Abbrechen</button>
@@ -942,6 +951,7 @@
 </th:block>
 </th:block>
 
+<th:block th:if="${order.type == 'MATERIAL'}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='material-delete-confirm-modal', titleKey='orders.detail.material.removeConfirmTitle', variant='krt-modal--danger', body=~{::material-delete-confirm-modal-body})}">
     <th:block th:ref="material-delete-confirm-modal-body">
         <div class="krt-modal-body">
@@ -954,6 +964,7 @@
     </th:block>
 </th:block>
 
+</th:block>
 <th:block th:if="${!claimingOptions.isEmpty()}">
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='claim-modal', titleKey='orders.claim.modal.title.add', titleId='claim-modal-title', body=~{::claim-modal-body})}">
     <th:block th:ref="claim-modal-body">
@@ -1297,6 +1308,7 @@
 <script type="module" th:src="@{/js/joborder/orders-detail-reports.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/joborder/orders-detail-production.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/joborder/orders-detail-events.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/joborder/orders-money.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

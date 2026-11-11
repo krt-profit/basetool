@@ -31,6 +31,10 @@
                        data-trigger="order-mode-toggle" />
                 <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
             </label>
+            <label class="krt-segmented__item" data-testid="order-mode-auec">
+                <input type="radio" name="orderModeToggle" value="auec" data-trigger="order-mode-toggle" />
+                <span th:text="#{orders.create.kind.auec}"></span>
+            </label>
         </div>
 
         <div id="mode-material" th:hidden="${itemMode}">
@@ -169,6 +173,9 @@
                 </div>
             </form>
         </div>
+        <th:block th:if="${editOrderId == null}">
+            <div th:replace="~{joborder/fragments/order-money-create :: form}"></div>
+        </th:block>
     </div>
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='orders-scmdb-modal', titleKey='orders.create.scmdb.open', variant='krt-modal--wide', body=~{::orders-scmdb-modal-body})}">
@@ -241,6 +248,7 @@
     const MSG_UPDATE_FAILED = /*[[#{error.joborder.update.failed}]]*/ 'Update failed.';
 </script>
 <script type="module" th:src="@{/js/joborder/orders-create.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/joborder/orders-money-create.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

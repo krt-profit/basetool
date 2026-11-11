@@ -53,7 +53,11 @@ public class JobOrderWorkspaceAccessService implements JobOrderWorkspaceAccess {
   public boolean canViewWorkspace() {
     return scopeResolver.canViewJobOrders()
         || scopeResolver.canViewOwnJobOrders()
-        || authHelper.currentUserId().map(orders::existsByAssigneesUserId).orElse(false);
+        || authHelper
+            .currentUserId()
+            .map(caller ->
+                orders.existsByAssigneesUserId(caller) || orders.hasMoneyWorkspaceReadGrant(caller))
+            .orElse(false);
   }
 
   /**

@@ -77,12 +77,11 @@ public interface UserReassignmentParticipant {
   void assertMergeable(@NotNull UUID source, @NotNull UUID target);
 
   /**
-   * Re-points this module's {@link #followsTheMember} columns from the source to the target, after
-   * dropping the source rows the target already holds under a unique key.
+   * Moves this module's {@link #followsTheMember} links and resolves collisions with the target.
    *
    * @param source the account being emptied
    * @param target the account being kept
-   * @return one entry per column that had a row to move or to drop, in declaration order
+   * @return one entry per column with moved links, including collisions, in declaration order
    */
   @NotNull
   List<Moved> reassign(@NotNull UUID source, @NotNull UUID target);

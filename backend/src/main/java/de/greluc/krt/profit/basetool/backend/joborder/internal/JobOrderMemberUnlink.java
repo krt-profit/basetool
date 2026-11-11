@@ -42,6 +42,8 @@ public class JobOrderMemberUnlink implements UserErasureParticipant {
 
   private final JobOrderRepository jobOrderRepository;
   private final MaterialClaimRepository materialClaimRepository;
+  private final JobOrderMoneyPrivacy moneyPrivacy;
+  private final JobOrderMoneyIdentityLock identityLock;
 
   @Override
   public @NotNull Phase phase() {
@@ -53,9 +55,13 @@ public class JobOrderMemberUnlink implements UserErasureParticipant {
     return POSITION;
   }
 
+  @Override
+  public void prepareErasure(@NotNull UUID userId) {
+    identityLock.lockAccounts(userId, null);
+  }
+
   /**
-   * Removes the member from every job order's assignees, then clears the member as the claiming
-   * user of every material claim.
+   * Removes the member's order access links and their identity as a material claimant.
    *
    * @param userId the departing member's {@code app_user.id}
    * @param fallbackAdminId unused
@@ -63,6 +69,7 @@ public class JobOrderMemberUnlink implements UserErasureParticipant {
    */
   @Override
   public @NotNull Map<Erased, Integer> erase(@NotNull UUID userId, @NotNull UUID fallbackAdminId) {
+    moneyPrivacy.unlink(userId);
     jobOrderRepository.removeAssignee(userId);
     materialClaimRepository.unlinkClaimedByUser(userId);
     return Map.of();

@@ -29,7 +29,9 @@ public enum OrderKind {
   /** Raw-material procurement. */
   MATERIAL("orders.kind.material"),
   /** Finished-item production. */
-  ITEM("orders.kind.item");
+  ITEM("orders.kind.item"),
+  /** Whole-aUEC procurement. */
+  AUEC("orders.kind.auec");
 
   private final String labelKey;
 

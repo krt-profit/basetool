@@ -1813,7 +1813,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   exists for — a realm-side role rename — happens at 03:00 when the request rate is near zero.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse; the two
-  `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events of REQ-ORDERS-047 count under `JOB_ORDER`). Silence
+  `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events of REQ-ORDERS-047 and `JOB_ORDER_MONEY_PROVIDED` count under
+  `JOB_ORDER`). Order IDs, holders and submitted terms are not metric labels. Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
   **30 d** while others stay active — the domain-lost-its-wiring failure mode the global sum masks).

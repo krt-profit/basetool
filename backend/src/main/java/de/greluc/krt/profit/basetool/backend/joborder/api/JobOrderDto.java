@@ -26,8 +26,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Job order of either kind: a {@code MATERIAL} order fills {@code materials}, an {@code ITEM} order
- * fills {@code items} and {@code aggregatedMaterials}; the unused lists are empty.
+ * Common job order projection, with stock lines and fulfillment records for the applicable kind.
  *
  * @param id job order primary key
  * @param displayId human-readable sequential id
@@ -37,7 +36,7 @@ import org.jetbrains.annotations.NotNull;
  * @param comment optional free-text note
  * @param priority queue priority ({@code null} when terminal)
  * @param status lifecycle status
- * @param type order kind ({@code MATERIAL} or {@code ITEM})
+ * @param type exclusive order kind
  * @param countBlueprintsWithVariants whether the blueprint-coverage view counts cosmetic variants
  *     ({@code ITEM} orders only)
  * @param materials material lines ({@code MATERIAL} orders)

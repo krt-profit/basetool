@@ -72,9 +72,7 @@ public enum OrderListScope {
   /**
    * The segments a caller may choose from, in display order.
    *
-   * <p>The concrete ALL view is available with any existing order-list capability. It grants no
-   * queue-only processing scope and changes no backend or external capability.
-   *
+   * @param canViewWorkspace whether the caller has shared workspace admission
    * @param canViewQueue whether the caller may enter the Job-Order area
    * @param canViewOwn whether the caller may view the orders their own units requested
    * @param canViewAssigned whether the caller holds an assignee entry
@@ -83,7 +81,14 @@ public enum OrderListScope {
    */
   @NotNull
   public static List<OrderListScope> offered(
-      boolean canViewQueue, boolean canViewOwn, boolean canViewAssigned, boolean canViewUnitWork) {
+      boolean canViewWorkspace,
+      boolean canViewQueue,
+      boolean canViewOwn,
+      boolean canViewAssigned,
+      boolean canViewUnitWork) {
+    if (!canViewWorkspace) {
+      return List.of();
+    }
     return Arrays.stream(values())
         .filter(
             scope -> scope.isOffered(canViewQueue, canViewOwn, canViewAssigned, canViewUnitWork))
@@ -122,7 +127,7 @@ public enum OrderListScope {
       case MINE -> canViewOwn;
       case ASSIGNED -> canViewQueue || canViewAssigned;
       case TO_PROCESS -> canViewUnitWork;
-      case ALL -> canViewQueue || canViewOwn || canViewAssigned || canViewUnitWork;
+      case ALL -> true;
     };
   }
 }

@@ -63,6 +63,9 @@ can, from text alone. So the read-through remains part of the procedure: before 
 verbatim, read it, and if an entry names another person redact that name rather than withholding the
 whole entry. The right is to a copy of *their* data, not to everything that mentions them.
 
+The aUEC export sections contain the member's holder links and provisions they recorded, received
+or were explicitly selected for. They include exact amounts, timestamps and order references.
+
 > [!warning] "Nothing was removed" does not mean "nothing to look for" — corrected 2026-09-16
 > This section used to say that when the document reports no removals, there is nothing to read
 > through. **That is wrong, and it is the read-through that would have suffered.** The flag reports
@@ -99,7 +102,8 @@ In short:
 - **Reassigned to an admin**: missions and refinery orders — operational history that must stay
   readable.
 - **Unlinked**: mission participation survives as *"Gelöschter Nutzer"* with no name; the
-  material-claim stamp is nulled.
+  material-claim stamp is nulled. aUEC order holder links and operation account references are
+  cleared. The order retains its operation identities and amounts for financial traceability.
 - **Kept**: the audit trail and bank booking history, including the **handle used at the time**,
   under Art. 6(1)(f). The two are not kept for the same length of time: the **bank booking history
   is permanent**, while the **audit trail is bounded at 24 months** after the recorded activity
@@ -114,11 +118,12 @@ is easier to grant than one asking to rewrite the ledger. Decide it explicitly, 
 and tell the requester the outcome either way — Art. 12(4) requires telling them **why** if the
 answer is no, together with their right to complain and to a judicial remedy.
 
-**What granting it does** (REQ-SEC-062): the member's name is replaced by a placeholder in all
-**eleven** places a handle snapshot survives a deletion — both audit trails (the actor handle, the
+**What granting it does** (REQ-SEC-062): the member's name is redacted wherever a handle snapshot
+survives a deletion - both audit trails (the actor handle, the
 subject label and the details payload), the bank booking history, the four handle columns on the
 booking requests, the bank custodian registry, the job-order contact, the two job-order handover
-recipients and the render parameters of the notifications other administrators received. **No row is
+recipients, aUEC holder labels, submitted accountless names and the render parameters of the
+notifications other administrators received. **No row is
 removed** and no fact about what happened changes; only the name goes. That is why it can be granted
 at all: deleting the rows would take a counterparty's own evidence with it. It leaves a marker event
 in both trails, and it runs **before** the account is deleted — the id-matched updates only reach
@@ -129,14 +134,14 @@ nickname and the optional RSI handle (REQ-SEC-072) — because a handover or a j
 whichever name they use for the person.
 
 > [!warning] The text-matched columns can over-match, so review the hits first
-> A handover recipient, a job-order contact and an audit subject label have no user id beside them:
-> somebody typed them. They are matched on the text, case-insensitively, which means the
+> Handover recipients, job-order contacts, accountless aUEC names and audit subject labels are
+> matched on the text, case-insensitively, which means the
 > anonymisation can **over-match** if two people ever used the same spelling. Run the
 > [name search](#finding-every-mention-of-a-person) and look at the hits before granting. That is
 > also why granting is never automatic.
 
-**Rather more than half of it is still your job, and the tool now says which half.** The eleven
-columns above are the ones a rule can rewrite safely: a column that holds a name and nothing else.
+**Free-text passages still need manual review.** The columns above are the ones a rule can
+rewrite safely because they hold a name as a separate value.
 The larger part of the schema holds the name **inside a sentence somebody wrote** — a booking
 justification, a mission description, an announcement, a market remark. No
 rule can rewrite those without either corrupting the sentence or missing the mention, so an admin

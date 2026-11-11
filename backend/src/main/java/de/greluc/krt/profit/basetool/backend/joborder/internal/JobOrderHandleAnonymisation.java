@@ -46,6 +46,7 @@ public class JobOrderHandleAnonymisation implements HandleAnonymisationParticipa
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
+  private final JobOrderMoneyPrivacy moneyPrivacy;
 
   @Override
   public int position() {
@@ -57,20 +58,23 @@ public class JobOrderHandleAnonymisation implements HandleAnonymisationParticipa
     return List.of(
         "job_order.handle",
         "job_order_handover.recipient_handle",
-        "job_order_item_handover.recipient_handle");
+        "job_order_item_handover.recipient_handle",
+        "job_order_money_holder.accountless_name",
+        "job_order_money_operation.selected_accountless_name");
   }
 
   /**
-   * For each spelling, rewrites the order contact, the material-handover recipient and the
-   * item-handover recipient whose whole value matches it, case-insensitively.
+   * Redacts order contacts, handover recipients and monetary names by identity or whole spelling.
    *
-   * @param userId the member whose snapshots are erased, unused: no column here carries a user id
+   * @param userId the member whose snapshots are erased
    * @param spellings every name the member is stored under
    * @return the rows rewritten per table
    */
   @Override
   public @NotNull Map<Rewritten, Integer> anonymise(
       @NotNull UUID userId, @NotNull List<String> spellings) {
+    Map<Rewritten, Integer> rewritten = new EnumMap<>(Rewritten.class);
+    moneyPrivacy.anonymise(userId, spellings, rewritten::put);
     String sentinel = HandleAnonymisation.SENTINEL;
     int jobOrders = 0;
     int materialHandovers = 0;
@@ -80,7 +84,6 @@ public class JobOrderHandleAnonymisation implements HandleAnonymisationParticipa
       materialHandovers += jobOrderHandoverRepository.anonymiseRecipientHandle(name, sentinel);
       itemHandovers += jobOrderItemHandoverRepository.anonymiseRecipientHandle(name, sentinel);
     }
-    Map<Rewritten, Integer> rewritten = new EnumMap<>(Rewritten.class);
     rewritten.put(Rewritten.JOB_ORDERS, jobOrders);
     rewritten.put(Rewritten.MATERIAL_HANDOVERS, materialHandovers);
     rewritten.put(Rewritten.ITEM_HANDOVERS, itemHandovers);

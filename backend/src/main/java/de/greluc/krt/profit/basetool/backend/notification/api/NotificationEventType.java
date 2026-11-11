@@ -294,6 +294,9 @@ public enum NotificationEventType {
   /** A Staffel began or ended active support for the order. */
   JOB_ORDER_PARTICIPATION_CHANGED,
 
+  /** A responsible writer reported a provision for a linked aUEC holder. */
+  JOB_ORDER_MONEY_PROVISIONED,
+
   /** The order's responsibility qualifies again and its clarification prompt is obsolete. */
   JOB_ORDER_CLARIFICATION_RESOLVED,
 

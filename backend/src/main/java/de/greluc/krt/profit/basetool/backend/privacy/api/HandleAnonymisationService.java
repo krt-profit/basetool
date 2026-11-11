@@ -67,6 +67,8 @@ public class HandleAnonymisationService {
    * @param jobOrders rows rewritten in {@code job_order}
    * @param materialHandovers rows rewritten in {@code job_order_handover}
    * @param itemHandovers rows rewritten in {@code job_order_item_handover}
+   * @param orderMoneyHolders rows rewritten in {@code job_order_money_holder}
+   * @param orderMoneyOperations rows rewritten in {@code job_order_money_operation}
    */
   public record AnonymisationResult(
       int activityAudit,
@@ -76,7 +78,9 @@ public class HandleAnonymisationService {
       int bankHolders,
       int jobOrders,
       int materialHandovers,
-      int itemHandovers) {
+      int itemHandovers,
+      int orderMoneyHolders,
+      int orderMoneyOperations) {
 
     /**
      * The total number of rows rewritten across every column.
@@ -91,7 +95,9 @@ public class HandleAnonymisationService {
           + bankHolders
           + jobOrders
           + materialHandovers
-          + itemHandovers;
+          + itemHandovers
+          + orderMoneyHolders
+          + orderMoneyOperations;
     }
   }
 
@@ -129,7 +135,9 @@ public class HandleAnonymisationService {
             rewritten.getOrDefault(Rewritten.BANK_HOLDERS, 0),
             rewritten.getOrDefault(Rewritten.JOB_ORDERS, 0),
             rewritten.getOrDefault(Rewritten.MATERIAL_HANDOVERS, 0),
-            rewritten.getOrDefault(Rewritten.ITEM_HANDOVERS, 0));
+            rewritten.getOrDefault(Rewritten.ITEM_HANDOVERS, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_HOLDERS, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_OPERATIONS, 0));
 
     auditRecorder.record(
         AuditEventType.HANDLE_SNAPSHOTS_ANONYMISED,
@@ -144,6 +152,8 @@ public class HandleAnonymisationService {
             .with("jobOrders", result.jobOrders())
             .with("materialHandovers", result.materialHandovers())
             .with("itemHandovers", result.itemHandovers())
+            .with("orderMoneyHolders", result.orderMoneyHolders())
+            .with("orderMoneyOperations", result.orderMoneyOperations())
             .with("spellings", names.size()));
 
     for (HandleAnonymisationParticipant participant : ordered) {

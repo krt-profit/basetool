@@ -120,6 +120,7 @@ public class JobOrderEarmarkTargets implements EarmarkTargets.JobOrders {
       @NotNull Function<JobOrder, Set<UUID>> requirements) {
     return jobOrderRepository
         .findById(jobOrderId)
+        .filter(order -> order.getType().usesStock())
         .filter(visibility)
         .map(requirements)
         .orElse(null);

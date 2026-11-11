@@ -208,7 +208,8 @@ class HandleAnonymisationEndStateTest {
     assertThat(markers("audit_event"))
         .containsExactly(
             "activityAudit=3 bankAudit=1 bankTransactions=1 bookingRequests=2 bankHolders=1"
-                + " jobOrders=2 materialHandovers=1 itemHandovers=1 spellings=2");
+                + " jobOrders=2 materialHandovers=1 itemHandovers=1"
+                + " orderMoneyHolders=0 orderMoneyOperations=0 spellings=2");
     assertThat(markers("bank_audit_event"))
         .containsExactly("bankAudit=1 bankTransactions=1 bookingRequests=2 bankHolders=1");
     assertThat(
@@ -246,7 +247,8 @@ class HandleAnonymisationEndStateTest {
     assertThat(markers("audit_event"))
         .containsExactly(
             "activityAudit=1 bankAudit=0 bankTransactions=0 bookingRequests=0 bankHolders=1"
-                + " jobOrders=0 materialHandovers=0 itemHandovers=0 spellings=0");
+                + " jobOrders=0 materialHandovers=0 itemHandovers=0"
+                + " orderMoneyHolders=0 orderMoneyOperations=0 spellings=0");
     assertThat(markers("bank_audit_event"))
         .containsExactly("bankAudit=0 bankTransactions=0 bookingRequests=0 bankHolders=1");
   }

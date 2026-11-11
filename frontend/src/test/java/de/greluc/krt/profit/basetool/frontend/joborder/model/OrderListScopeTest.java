@@ -32,31 +32,33 @@ class OrderListScopeTest {
 
   @Test
   void aQueueMemberChoosesAmongFourSegmentsInDisplayOrder() {
-    assertThat(OrderListScope.offered(true, true, false, true))
+    assertThat(OrderListScope.offered(true, true, true, false, true))
         .containsExactly(MINE, ASSIGNED, TO_PROCESS, ALL);
   }
 
   @Test
   void aQueueMemberWithoutOwnViewHasNoMineSegment() {
-    assertThat(OrderListScope.offered(true, false, false, true))
+    assertThat(OrderListScope.offered(true, true, false, false, true))
         .containsExactly(ASSIGNED, TO_PROCESS, ALL);
   }
 
   @Test
   void anAssigneeWithoutQueueAccessCanChooseAssignedAndConcreteAll() {
-    assertThat(OrderListScope.offered(false, false, true, false)).containsExactly(ASSIGNED, ALL);
+    assertThat(OrderListScope.offered(true, false, false, true, false))
+        .containsExactly(ASSIGNED, ALL);
   }
 
   @Test
   void aRequesterWhoIsAlsoAnAssigneeCanChooseConcreteAll() {
-    assertThat(OrderListScope.offered(false, true, true, false))
+    assertThat(OrderListScope.offered(true, false, true, true, false))
         .containsExactly(MINE, ASSIGNED, ALL);
   }
 
   @Test
   void aRequesterCanChooseMineAndConcreteAllWithoutProcessingScope() {
-    assertThat(OrderListScope.offered(false, true, false, false)).containsExactly(MINE, ALL);
-    assertThat(OrderListScope.offered(false, false, false, false)).isEmpty();
+    assertThat(OrderListScope.offered(true, false, true, false, false)).containsExactly(MINE, ALL);
+    assertThat(OrderListScope.offered(true, false, false, false, false)).containsExactly(ALL);
+    assertThat(OrderListScope.offered(false, false, false, false, false)).isEmpty();
   }
 
   @Test
@@ -84,10 +86,10 @@ class OrderListScopeTest {
 
   @Test
   void currentUnitWorkIsAReadViewIndependentOfGlobalProfitAndWriteRoles() {
-    assertThat(OrderListScope.offered(false, true, false, true))
+    assertThat(OrderListScope.offered(true, false, true, false, true))
         .containsExactly(MINE, TO_PROCESS, ALL);
     assertThat(OrderListScope.resolve(TO_PROCESS, false, true, false, true)).isEqualTo(TO_PROCESS);
-    assertThat(OrderListScope.offered(true, true, false, false))
+    assertThat(OrderListScope.offered(true, true, true, false, false))
         .containsExactly(MINE, ASSIGNED, ALL);
   }
 

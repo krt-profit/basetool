@@ -135,7 +135,7 @@ public class JobOrderHandoverService {
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
     accessPolicy.assertCanFulfill(jobOrder);
 
-    if (jobOrder.getType() == JobOrderType.ITEM) {
+    if (jobOrder.getType() != JobOrderType.MATERIAL) {
       throw new BadRequestException(JobOrderStockErrors.MATERIAL_ORDER_REQUIRED);
     }
     final MaterialHandoverCalculation.Booked booked =

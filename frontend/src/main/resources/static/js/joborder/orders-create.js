@@ -525,11 +525,12 @@ function toggleOrderMode() {
         document.querySelector('input[name="orderModeToggle"]:checked')
     );
     const mode = checked ? checked.value : 'material';
-    /** @type {HTMLElement} */ (document.getElementById('mode-material')).hidden =
-        mode !== 'material';
-    /** @type {HTMLElement} */ (document.getElementById('mode-item')).hidden = mode !== 'item';
-    setFormDisabled('mode-material', mode !== 'material');
-    setFormDisabled('mode-item', mode !== 'item');
+    for (const kind of ['material', 'item', 'auec']) {
+        const container = document.getElementById(`mode-${kind}`);
+        if (!container) continue;
+        container.hidden = mode !== kind;
+        setFormDisabled(container.id, container.hidden);
+    }
     if (mode === 'material') {
         syncMaterialRemoveButtons();
     }

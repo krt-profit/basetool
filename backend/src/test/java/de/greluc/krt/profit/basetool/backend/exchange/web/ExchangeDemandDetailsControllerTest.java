@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
@@ -204,6 +205,42 @@ class ExchangeDemandDetailsControllerTest {
                 "materials",
                 "items"));
     assertThat(body).doesNotContain(assignee.toString()).doesNotContain("secret note");
+  }
+
+  @Test
+  void anAuecOrderAndItsContextNeverEnterTheStockDemandFeed() throws Exception {
+    UUID unit = orgUnit(true);
+    joins(unit, "MEMBER", true);
+    UUID materialOrder = openOrder(unit, unit, material("Demand fixture"), 10.0, null);
+    UUID money =
+        Objects.requireNonNull(
+            transactionTemplate.execute(_ -> {
+              JobOrder order =
+                  jobOrderRepository.saveAndFlush(
+                      JobOrder.builder()
+                          .responsibleOrgUnit(orgUnitRepository.getReferenceById(unit))
+                          .requestingOrgUnit(orgUnitRepository.getReferenceById(unit))
+                          .type(JobOrderType.AUEC)
+                          .handle("private order-money contact")
+                          .comment("private order-money comment")
+                          .build());
+              jdbc.update(
+                  "INSERT INTO job_order_money_target(order_id, amount, version) VALUES (?, ?, 0)",
+                  order.getId(),
+                  100);
+              return order.getId();
+            }));
+    orders.add(money);
+    String response =
+        mockMvc
+            .perform(relayed(get(PATH), DETAILS))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.orders.length()").value(1))
+            .andExpect(jsonPath("$.orders[0].id").value(materialOrder.toString()))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(response).doesNotContain(money.toString()).doesNotContain("private order-money");
   }
 
   @Test

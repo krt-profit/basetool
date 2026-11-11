@@ -23,11 +23,13 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyView;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSupportDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
@@ -80,6 +82,7 @@ public class JobOrderPageReader {
   private static final String TYPE_ITEM = "ITEM";
 
   private final JobOrderBackendClient jobOrderClient;
+  private final JobOrderMoneyBackendClient moneyClient;
   private final OrgUnitBackendClient orgUnitClient;
   private final ParallelPageLoader parallelPageLoader;
 
@@ -201,6 +204,7 @@ public class JobOrderPageReader {
    * @param responsibleOptions the currently eligible responsible units
    * @param claimingOptions the squadrons whose claims the caller may manage on this order
    * @param support the Staffel participation and authorized enrollment choices
+   * @param money the aUEC projection and current action grants
    */
   public record OrderDetailPage(
       @NotNull JobOrderDto order,
@@ -217,7 +221,8 @@ public class JobOrderPageReader {
       @NotNull Part<List<InventoryItemDto>> orphanedInventory,
       @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions,
       @NotNull List<OrgUnitMembershipOptionDto> claimingOptions,
-      @NotNull Part<JobOrderSupportDto> support) {}
+      @NotNull Part<JobOrderSupportDto> support,
+      @NotNull Part<JobOrderMoneyView> money) {}
 
   /**
    * Everything the authorized creation form renders.
@@ -316,8 +321,10 @@ public class JobOrderPageReader {
     JobOrderDto order = jobOrderClient.order(id);
     boolean canAssign = order.callerMayEdit();
     boolean itemOrder = TYPE_ITEM.equals(order.type());
+    boolean moneyOrder = "AUEC".equals(order.type());
     Optional<UUID> currentUserId = currentUserId(caller);
-    DetailCatalogs catalogs = detailCatalogs(order.callerMayEditAsRequester(), canAssign);
+    DetailCatalogs catalogs =
+        detailCatalogs(!moneyOrder && order.callerMayEditAsRequester(), !moneyOrder && canAssign);
     Part<UserDto> actingUser =
         canAssign && itemOrder && (fragment == null || "dialogs".equalsIgnoreCase(fragment))
             ? actingUser()
@@ -339,11 +346,12 @@ public class JobOrderPageReader {
         itemOrder && (fragment == null || "items".equalsIgnoreCase(fragment))
             ? itemStock(id)
             : Part.absent(),
-        fragment == null ? orphanedInventory(id) : Part.absent(),
+        !moneyOrder && fragment == null ? orphanedInventory(id) : Part.absent(),
         canAssign || Boolean.TRUE.equals(order.canTransferResponsibility())
             ? responsibleOptions()
             : List.of(),
-        !order.responsibilityInvalid()
+        !moneyOrder
+                && !order.responsibilityInvalid()
                 && (fragment == null
                     || "materials".equalsIgnoreCase(fragment)
                     || "aggregated".equalsIgnoreCase(fragment)
@@ -352,6 +360,13 @@ public class JobOrderPageReader {
             : List.of(),
         fragment == null || "participations".equalsIgnoreCase(fragment)
             ? support(id)
+            : Part.absent(),
+        moneyOrder
+                && (fragment == null
+                    || "money".equalsIgnoreCase(fragment)
+                    || "actions".equalsIgnoreCase(fragment))
+            ? SectionFallback.load(
+                log, "job-order-money", () -> Part.of(moneyClient.view(id)), Part.absent())
             : Part.absent());
   }
 

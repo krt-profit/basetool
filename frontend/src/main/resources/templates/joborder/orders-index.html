@@ -124,6 +124,7 @@
                             <span class="cell-sub orders-meta">
                                 <th:block th:switch="${order.type}">
                                     <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
+                                    <span th:case="'AUEC'" class="order-kind-badge" th:text="#{orders.kind.auec}"></span>
                                     <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
                                 </th:block>
                                 <span class="order-responsible-label" th:text="#{orders.index.responsible}">Bearbeitende Einheit</span>
@@ -156,6 +157,7 @@
                         <span class="cell-sub" th:text="${@handles.display(order.handle)}">Handle</span>
                     </td>
                     <td class="orders-materials-cell" th:with="matCount=${order.type == 'ITEM' ? (order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0) : (order.materials != null ? order.materials.size() : 0)}">
+                        <th:block th:unless="${order.type == 'AUEC'}">
                         <button type="button" class="btn btn-ghost btn-xs ord-materials-toggle" data-trigger="ord-toggle-materials" th:data-order-id="${order.id}" aria-expanded="false">
                             <span class="toggle-icon" aria-hidden="true">&#9654;</span>
                             <span th:text="#{orders.index.materials}">Materialien</span>
@@ -204,6 +206,7 @@
                         <p th:if="${order.type == 'ITEM' and (order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty())}"
                            class="orders-materials-empty" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</p>
                         </div>
+                        </th:block>
                     </td>
                     <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
                 </tr>

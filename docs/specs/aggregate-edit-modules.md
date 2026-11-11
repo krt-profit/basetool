@@ -37,6 +37,12 @@ OFFICER, ADMIN for the unlinks) for the job-order edit gate, `isAuthenticated()`
 gate. Audit event types and payloads are unchanged (REQ-AUDIT-001); a mutation that changes
 nothing records nothing.
 
+The Bank-free aUEC provision passes through the scoped `JobOrderEditor` money edit. The
+current order and responsibility are checked under the same row guard used by lifecycle and
+deletion. The holder revision is independent of the target and common information. A matching
+accepted replay returns its durable result before the fresh holder version check and records no
+new audit. See [REQ-ORDERS-065 and REQ-ORDERS-066](orders-auec.md).
+
 **Acceptance**
 
 - [ ] A denied caller gets 403 before the version is checked, and nothing is mutated or audited.

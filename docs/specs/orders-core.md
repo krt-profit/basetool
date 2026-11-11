@@ -29,7 +29,12 @@ navigation and invalid-hierarchy handling apply to all three kinds.
 
 - [ ] Each kind exposes only its applicable demand and processing actions.
 
-**Enforced by:** Pending implementation · **Issues:** #3200, #3203
+**Enforced by:** `JobOrderMoneyIntegrationTest` and `ExchangeDemandDetailsControllerTest` cover
+the aUEC kind, stock-kind gates and external demand exclusion. **Issues:** #3200, #3203
+
+The initial aUEC kind can be created through the same unit writer gate and appears in the common
+workspace. Its stock-facing writes and the Inventory, Supply and external Exchange stock pickers
+exclude it. Use [the money contract](orders-auec.md) for its separate provision and target scope.
 
 ### REQ-ORDERS-050 — Responsibility follows the actual Profit hierarchy
 
@@ -130,7 +135,9 @@ reduced, capability-based surface.
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
 `JobOrderSupportReadIntegrationTest`, `V378JobOrderUnitReadingMigrationTest`, `JobOrderAssigneeGrantIntegrationTest`,
 `JobOrderScopeQueryIntegrationTest`, `JobOrderLinkedStockReadNoNPlusOneTest` and the frontend
-order render tests cover the implemented workspace; linked money readers remain pending.
+order render tests cover the implemented workspace. `JobOrderMoneyIntegrationTest` covers the
+currently linked holder through workspace capability, detail, list count and number lookup;
+recipient designation belongs to the handover workflow.
 **Issues:** #3197, #3200, #3201
 
 ### REQ-ORDERS-053 — Writing uses current contextual and personal authority
@@ -139,7 +146,7 @@ A unit writer is authorized unit leadership or a contextual Logistician under th
 unit-specific grants and leadership reach rules, or an administrator. Mere membership is read authority. Either a writer of the requesting unit
 or a writer of the proposed responsible unit may create an order on behalf of those units.
 
-The MATERIAL/ITEM creation affordance and form use the current backend `canCreateJobOrders` and
+The creation affordance and form for all three kinds use the current backend `canCreateJobOrders` and
 `GET /api/v1/orders/create-options` projection. Options carry per-unit writer flags and one
 currently permitted proposed pair; the frontend does not reconstruct authority or enumerate all
 pairs. The backend revalidates the selected pair when creating. All create transports consume the
@@ -251,7 +258,8 @@ and active-support unit work are independent of command authority, and creation 
 created-order identity. A managed Chromium journey uses distinct requester and processor accounts:
 it rejects an unrelated live room, observes peer queue updates without reload, preserves an open
 personal-note draft and its independent version, then saves and applies the deferred detail update.
-Money kinds and their submitted-operation retry remain pending.
+The internal Bank-free checkpoint adds aUEC creation, reported amounts and submitted-operation
+recovery to the same workspace.
 
 All kinds share the overview and a type filter. Its scopes are Meine (requesting units),
 Ich bearbeite (personal Bearbeiter), Zu bearbeiten (responsible or supporting own units under
@@ -273,8 +281,8 @@ Notification preferences, recipient deduplication and privacy gates remain; see
 
 **Enforced by:** `JobOrderSupportReadIntegrationTest`, `JobOrderHierarchyAuthorityIntegrationTest`,
 `OrdersListPatternRenderTest`, `JobOrderCreationWorkspaceMvcTest`, `JobOrderCreateE2eTest` and
-`JobOrderSharedWorkspaceE2eTest` cover the implemented MATERIAL/ITEM workspace. Money-operation
-retry remains pending. **Issues:** #3201, #3202
+`JobOrderSharedWorkspaceE2eTest` cover the MATERIAL/ITEM workspace. The initial aUEC create and
+recovery journey is covered by `JobOrderMoneyE2eTest`. **Issues:** #3201, #3202
 
 ## Out of scope
 

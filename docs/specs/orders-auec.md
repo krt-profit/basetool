@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS · **Related ADRs:** [ADR-0359](../adr/0359-orders-record-money-operations-and-replay-their-outcomes.md), [ADR-0358](../adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)
-> **Status:** Owner-approved target; implementation pending. Every acceptance item below is a required future check, not evidence of shipped behavior.
+> **Status:** The internal Bank-free create and provision checkpoint covers the first reported holding and operation recovery. Collection, handover, settlement and Bank handling remain part of the owner-approved target. The checklists describe that complete workflow.
 
 # aUEC procurement orders
 
@@ -49,7 +49,12 @@ bank-independent model. Bank waiting is the separate integration condition.
 - [ ] All monetary input, storage, display and returned amounts preserve whole-aUEC values; fees follow REQ-ORDERS-060.
 - [ ] The main progress displays target, net handed over and remaining; current availability and Bank waiting remain distinguishable.
 
-**Enforced by:** Required future arithmetic, API validation and render checks; not implemented.
+**Enforced by:** `JobOrderMoneyIntegrationTest` and `JobOrderMoneyE2eTest` cover initial exact
+provision. The complete handover, fee and availability figures require their owning increments.
+
+The provision checkpoint transports whole amounts as decimal strings and stores exact numbers.
+The public PostgreSQL and Chromium provision journeys keep the target and remaining amount
+unchanged while separately showing the new reported holding and zero net handover.
 
 ### REQ-ORDERS-058 — Reported holdings support players with or without accounts
 
@@ -85,7 +90,13 @@ of manual reporting, not a guarantee supplied by this model.
 - [ ] A personal incoming entry cannot invent additional funds for a foreign source.
 - [ ] The same player can hold independently reported amounts for two orders; the UI does not claim global coverage.
 
-**Enforced by:** Required future action-authorisation, identity/link/merge, privacy and multi-order checks.
+**Enforced by:** `JobOrderMoneyIntegrationTest`, `JobOrderMoneyPrivacyIntegrationTest` and the
+initial browser paths. Explicit later identity corrections and movement grants require their
+own verification.
+
+Initial provision accepts the reader's own linked holder, or a responsible writer's explicitly
+selected account, existing holder or newly named accountless person. The accepted name and
+financial references are not inferred from other people with the same spelling.
 
 ### REQ-ORDERS-059 — Unit commitments are planning with one-time provision attribution
 
@@ -251,7 +262,13 @@ operation history under the existing privacy/anonymisation contracts in REQ-ORDE
 - [ ] A Bank-free booking or Bank-coupled submission prevents hard-delete, including after rejection, withdrawal, replacement, correction or settlement to zero.
 - [ ] Concurrent first submission and hard-delete yield one coherent permitted outcome without losing a submitted operation or committing a booking against a deleted order.
 
-**Enforced by:** Required future target/lifecycle and selected-Bank timing checks.
+**Enforced by:** `JobOrderMoneyIntegrationTest` covers the initial lifecycle and real PostgreSQL
+deletion races. Effective handover, target changes and selected Bank timing require later checks.
+
+The provision checkpoint makes an OPEN order IN_PROGRESS after its first accepted booking and
+refuses manual completion. Hard-delete and provision share the order write guard. The existence
+of a submitted operation closes hard-delete; a refusal before durable submission leaves it open.
+Target mutation, automatic handover completion and Bank outcomes use their own later increments.
 
 ### REQ-ORDERS-064 — Effective operation history is the monetary authority
 
@@ -280,7 +297,21 @@ retention exemption. No private Bank approval note enters the order view.
 - [ ] Purging admin audit does not erase the order's necessary financial basis.
 - [ ] Account changes and privacy actions preserve financial references without exposing unrelated personal data.
 
-**Enforced by:** Required future replay/reconciliation, projection, privacy and history checks.
+**Enforced by:** `JobOrderMoneyIntegrationTest` and `JobOrderMoneyPrivacyIntegrationTest` cover
+provision projection, persisted history, consolidation and erasure. Movement reconciliation
+requires the completed money model.
+
+For Bank-free provision, `job_order_money_operation` records the accepted terms and effect.
+One committed read snapshot supplies the current target, holder identities and reconstructed
+amounts. Account consolidation preserves original financial references; names and actor labels
+are resolved with the current privacy state.
+
+When both accounts have a holder on the same order, the source holder becomes an alias of the
+survivor and both provisions count toward the survivor's holdings. Provision and account-privacy
+writes take their account locks before affected order locks. Account deletion clears live links
+and historical account references. A granted erasure also redacts retained names and removes
+matching submitted spellings. The original operation ID still supports authorised outcome recovery.
+The personal export contains the member's links and directly related provisions.
 
 ### REQ-ORDERS-065 — One persistent operation survives retries and lost responses
 
@@ -310,7 +341,15 @@ idempotency is not proof of logical-operation idempotency.
 - [ ] Reload recovers the original submitted identity and outcome without another game payment.
 - [ ] An unauthorised caller cannot inspect an outcome by knowing its ID.
 
-**Enforced by:** Required future real-database uniqueness/replay, outcome API, reload and access checks.
+**Enforced by:** `JobOrderMoneyIntegrationTest` covers durable provision replay, terms and current
+authority against PostgreSQL; `JobOrderMoneyE2eTest` covers an actual committed response loss.
+Bank waiting and replacement attempts require their own checks.
+
+For an immediate provision, `POST /api/v1/orders/{id}/money/provisions` uses the caller's
+operation UUID and records one accepted attempt. A current authorized actor may replay matching
+terms with an older holder version. `GET /api/v1/orders/{id}/money/operations/{operation}` checks
+current order access before returning the recorded effect or an unknown outcome. The browser
+keeps submitted recovery state scoped to the account and order until a definite result is known.
 
 ### REQ-ORDERS-066 — Narrow edit scopes protect shared financial invariants
 
@@ -344,7 +383,14 @@ exposing version information. Exact schema, SQL and classes follow these contrac
 - [ ] Either side's failure, including audit, rolls back a combined operation or cross-order change.
 - [ ] PostgreSQL races cover first creation, replacement/confirm/cancel and inverse-direction transfers without deadlock-prone lock inversion.
 
-**Enforced by:** Required future scoped-version, real PostgreSQL concurrency and atomicity checks.
+**Enforced by:** `JobOrderMoneyIntegrationTest` exercises concurrent provision, deletion,
+responsibility transfer and audit rollback with real PostgreSQL. Multi-holder movement and
+combined Bank effects require their own checks.
+
+Provision reads the observed holder's own revision, using zero before a holder is created. It
+does not advance the target revision. The order row guard stabilizes the lifecycle, current
+responsibility and absence of a durable submission before deleting an eligible order. Submitted
+terms, holder revision, status consequences and activity audit commit in the same transaction.
 
 ### REQ-ORDERS-067 — Few contextual actions provide truthful live feedback
 
@@ -396,6 +442,11 @@ every participant.
 - [ ] A completed order with residual money or Bank clarification still shows those facts.
 
 **Enforced by:** Required future render, shared-section parity and multi-user browser checks.
+
+The initial workspace exposes the minimal aUEC form, a manual-holdings section and the explicit
+Bank-free action. `JobOrderMoneyE2eTest.recoversExactCommittedProvisionAfterReload` forwards the real
+provision request and drops only the successful browser response, then retrieves the same
+operation on reload. The Bank-free checkpoint alone is not the release of the money workflow.
 
 ### REQ-ORDERS-068 — Both operating modes have verifiable end-to-end evidence
 

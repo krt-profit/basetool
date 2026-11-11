@@ -36,6 +36,11 @@ Routine individual money movements are live/history updates, not broadcasts to e
 Do not notify all Profit members or all administrators. The global-Admin creation default is removed;
 an administrator who independently qualifies through an affected functional relationship may receive it.
 
+An accepted provision for a linked holder is registered as `JOB_ORDER_MONEY_PROVISIONED`.
+The notice is limited to that account even when a configured rule selects additional users, and
+the delivery guard rechecks the specific holder link. Matching replays and accountless entries create no additional
+personal notice. The live order room carries only section invalidations.
+
 Each logical cause/revision gives at most one grouped notice per recipient across relevant roles
 and the same Bank/order decision. Preserve distinct necessary Bank approval tasks. Existing type
 muting and priority still apply: an order wrapper cannot recreate a muted Bank success. Resolve

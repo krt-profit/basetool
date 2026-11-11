@@ -1,6 +1,6 @@
 # ADR-0359 — Orders record money operations and replay their outcomes
 
-- **Status:** Accepted — implementation pending
+- **Status:** Accepted - Bank-free provision checkpoint implemented; movement and Bank outcomes pending
 - **Date:** 2026-11-09
 - **Deciders:** @greluc
 - **Related:** [aUEC orders](../specs/orders-auec.md), REQ-ORDERS-057…068; [edit modules](../specs/aggregate-edit-modules.md), REQ-SEC-085 / REQ-ORDERS-046; [ADR-0287](0287-mission-and-job-order-each-edit-through-one-edit-module.md) (amended for scoped order edits); [ADR-0232](0232-modules-interact-through-commands-observers-and-after-commit-events.md); [technical decision](https://github.com/krt-profit/basetool/issues/3202#issuecomment-6741369845)
@@ -57,6 +57,12 @@ exclusion, deterministic locking and atomic rollback. It must test real PostgreS
 all permission paths; button disabling, HTTP correlation or an idempotent callback alone are
 insufficient. Privacy registries must cover new identities/history. No successful runtime
 evidence is claimed by accepting this ADR.
+
+The initial provision uses the existing order row guard, an independent holder revision and a
+separately versioned target. The accepted attempt is a typed fact scoped by order and caller's
+logical UUID. Current labels are projected from the holder and actor, while the submitted
+selection remains separately recoverable subject to name erasure. The [aUEC specification](../specs/orders-auec.md)
+records the implemented checkpoint and its verification.
 
 ## Alternatives considered
 

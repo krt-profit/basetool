@@ -38,6 +38,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
@@ -75,6 +76,7 @@ class JobOrderPageReaderTest {
   private final JobOrderPageReader reader =
       new JobOrderPageReader(
           client,
+          mock(JobOrderMoneyBackendClient.class),
           mock(de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient.class),
           new ParallelPageLoader());
 

@@ -74,6 +74,11 @@ exemption: `MaterialMapper.toEntity`, whose DTO is the admin-edit subset of a ~4
 row, uses `@BeanMapping(ignoreByDefault = true)` and names each of the fields it carries. The switch found
 one real gap — the job type a mission embeds never carried `isMissionLead`.
 
+The initial aUEC order routes keep exact whole amounts as JSON decimal strings. An independent
+holder revision is required for a fresh provision; an authorized replay uses the recorded
+logical operation and submitted terms. The same account/order-scoped recovery uses the explicit
+outcome route. None of these internal DTOs widens the frozen Exchange relay.
+
 **As enforced today** (2026-10-10). Every DTO of the backend is a record (321 `*Dto` types, none a
 class). A controller method returns no entity, also not inside `ResponseEntity`, `PageResponse`,
 `List` or another generic (`ArchitectureTest#controllerMethodsShouldNotReturnJpaEntities`,

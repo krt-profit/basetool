@@ -79,6 +79,11 @@ function initOrdersDetail() {
             actions: { container: '#order-actions-results', fragmentValue: 'actions' },
             dialogs: { container: '#order-dialogs-results', fragmentValue: 'dialogs' },
             kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },
+            money: {
+                container: '#order-money-results',
+                fragmentValue: 'money',
+                refreshWhileModalOpen: true,
+            },
             materials: { container: '#order-materials-results', fragmentValue: 'materials' },
             aggregated: { container: '#order-aggregated-results', fragmentValue: 'aggregated' },
             items: { container: '#order-items-results', fragmentValue: 'items' },

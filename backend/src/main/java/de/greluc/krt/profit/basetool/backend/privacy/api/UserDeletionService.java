@@ -51,6 +51,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 
@@ -196,6 +197,7 @@ public class UserDeletionService implements AccountErasure {
         && !isConfiguredGatewayServiceAccount(userId)) {
       throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
     }
+    prepareErasure(userId);
     if (user.getApprovalStatus() == ApprovalStatus.PENDING) {
       eventPublisher.publishEvent(new DiscordRegistrationDecidedEvent(userId, null));
     }
@@ -301,6 +303,18 @@ public class UserDeletionService implements AccountErasure {
         notificationsDeleted,
         ruleSelectorsDeleted,
         admin.getId());
+  }
+
+  /**
+   * Coordinates participant locks before a caller marks the account absent in this transaction.
+   *
+   * @param userId the account being deleted
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void prepareErasure(@NotNull UUID userId) {
+    for (UserErasureParticipant participant : inRunOrder()) {
+      participant.prepareErasure(userId);
+    }
   }
 
   /**

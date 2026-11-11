@@ -180,6 +180,7 @@ public class AdminAuditLogPageController {
               "JOB_ORDER",
               List.of(
                   "JOB_ORDER_CREATED",
+                  "JOB_ORDER_MONEY_PROVIDED",
                   "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED",
                   "JOB_ORDER_ITEM_CREATED",
                   "JOB_ORDER_UPDATED",

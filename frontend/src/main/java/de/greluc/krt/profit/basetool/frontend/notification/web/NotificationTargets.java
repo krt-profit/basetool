@@ -95,6 +95,7 @@ final class NotificationTargets {
           Map.entry("JOB_ORDER_REOPENED", detail(JOB_ORDER, ORDERS)),
           Map.entry("JOB_ORDER_CLARIFICATION_REQUIRED", detail(JOB_ORDER, ORDERS)),
           Map.entry("JOB_ORDER_PARTICIPATION_CHANGED", detail(JOB_ORDER, ORDERS)),
+          Map.entry("JOB_ORDER_MONEY_PROVISIONED", detail(JOB_ORDER, ORDERS)),
           Map.entry("JOB_ORDER_ASSIGNED", detailTab(JOB_ORDER, ORDERS, "assignees")),
           Map.entry("JOB_ORDER_CLAIM_WITHDRAWN", detailTab(JOB_ORDER, ORDERS, "materials")),
           Map.entry(

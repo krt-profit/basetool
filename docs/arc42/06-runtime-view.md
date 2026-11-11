@@ -293,4 +293,22 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
 
 The quantity/evidence contract and its acceptance status live in
 [REQ-ORDERS-024](../specs/orders-material-claims.md); this runtime map is not a second acceptance
-record. The separate aUEC and optional Bank scenarios remain planned.
+record.
+
+## 6.13 Bank-free order provision and response recovery
+
+1. The common creation command records the aUEC order and its independently versioned target in
+   one transaction. Reporting an own holding, selecting a linked account, or naming an accountless
+   holder begins in the order's money section.
+2. The order edit acquires the involved account identity guards, then the hierarchy and order
+   write guards. It checks current authority and compares an existing accepted attempt before
+   considering the holder version of a new submission.
+3. A fresh booking commits the operation, holder revision, initial lifecycle change and audit
+   together. After commit, participants receive section invalidations, and the affected linked
+   account can receive its own notice.
+4. A browser with an unknown outcome queries the same operation after reload. The order rechecks
+   access and reconstructs exact amounts from the accepted monetary facts; current holder and actor
+   labels follow the privacy rules.
+
+See [the aUEC order contract](../specs/orders-auec.md) for the initial checkpoint and remaining
+movement, settlement and Bank acceptance.

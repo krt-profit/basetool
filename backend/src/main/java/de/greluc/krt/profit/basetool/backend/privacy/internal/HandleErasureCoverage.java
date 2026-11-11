@@ -133,6 +133,14 @@ public final class HandleErasureCoverage {
               "job_order_handover.recipient_handle",
               "A recipient with no user id beside them; matched by text, case-insensitively."),
           anonymised("job_order_item_handover.recipient_handle", "See job_order_handover."),
+          anonymised(
+              "job_order_money_holder.accountless_name",
+              "Replaces the linked holder's fallback label by account ID and accountless labels"
+                  + " by whole spelling."),
+          anonymised(
+              "job_order_money_operation.selected_accountless_name",
+              "Clears the submitted accountless spelling without changing the booked operation"
+                  + " or treating erased terms as a valid retry."),
           removed("app_user.username", "The account row itself is deleted."),
           removed("app_user.display_name", "The account row itself is deleted."),
           removed("app_user.email", "The account row itself is deleted."),

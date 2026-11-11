@@ -334,6 +334,7 @@ krtEvents.on('submit', 'od-transfer-responsibility', async (el, event) => {
             'participations',
             'dialogs',
             'kpi',
+            'money',
             'materials',
             'aggregated',
             'items',
@@ -372,7 +373,7 @@ krtEvents.on('submit', 'od-enroll-support', (element, event) => {
         method: 'PUT',
         url,
         sectionKey: 'participations',
-        refresh: ['participations'],
+        refresh: ['participations', 'money'],
         errorMessage: error,
         onSuccess: _publishOrdersQueue,
     });
@@ -388,7 +389,7 @@ krtEvents.on('click', 'od-withdraw-support', async (element) => {
         method: 'DELETE',
         url,
         sectionKey: 'participations',
-        refresh: ['participations', 'materials', 'aggregated', 'kpi'],
+        refresh: ['participations', 'materials', 'aggregated', 'kpi', 'money'],
         errorMessage: error,
         onSuccess: _publishOrdersQueue,
     });

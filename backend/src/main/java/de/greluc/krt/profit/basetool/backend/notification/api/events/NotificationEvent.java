@@ -122,6 +122,16 @@ public interface NotificationEvent {
   }
 
   /**
+   * Restricts rules to the event's permitted audience when it carries private context.
+   *
+   * @param recipientUserId an account selected by a configured rule
+   * @return whether the account may receive this event's notice
+   */
+  default boolean admitsRecipient(@NotNull UUID recipientUserId) {
+    return true;
+  }
+
+  /**
    * The set of affected users this event carries, for {@code EVENT_RECIPIENTS} selector resolution
    * — bulk actions that touch many members, such as the owners of reset ships or the interested
    * members of a withdrawn offer. Distinct from {@link #contextRecipientUserId()}, which names one.

@@ -104,6 +104,7 @@ public final class ApiDomains {
           Map.entry("JobOrderController", "joborder"),
           Map.entry("JobOrderSupportController", "joborder"),
           Map.entry("JobOrderCreateOptionsController", "joborder"),
+          Map.entry("JobOrderMoneyController", "joborder"),
           Map.entry("JobOrderHandoverController", "joborder"),
           Map.entry("JobOrderItemStockController", "joborder"),
           Map.entry("JobOrderMaterialController", "joborder"),
