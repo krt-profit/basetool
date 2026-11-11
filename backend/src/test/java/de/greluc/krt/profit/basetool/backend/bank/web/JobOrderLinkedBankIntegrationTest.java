@@ -62,6 +62,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -309,14 +310,11 @@ class JobOrderLinkedBankIntegrationTest {
         .untilAsserted(() ->
             assertThat(noticeTypes(approverIdentity, requestId)).containsExactly(approvalNeeded));
 
-    JsonNode approved =
-        response(
-            perform(
-                    post(OWN_REQUESTS + "/{request}/owner-approval", requestId)
-                        .with(approverIdentity),
-                    Map.of("version", request.path("version").asLong()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownerApprovalGranted").value(true)));
+    perform(
+            post(OWN_REQUESTS + "/{request}/owner-approval", requestId).with(approverIdentity),
+            Map.of("version", request.path("version").asLong()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.ownerApprovalGranted").value(true));
     money(order).andExpect(status().isOk()).andExpect(jsonPath("$.provided").value("0"));
     await()
         .atMost(Duration.ofSeconds(10))
@@ -325,8 +323,16 @@ class JobOrderLinkedBankIntegrationTest {
           assertThat(noticeTypes(as(Actor.MANAGEMENT), requestId)).contains(approvedForStaff);
         });
 
-    confirm(approved, Actor.MANAGEMENT, noticeCustodian)
-        .andExpect(status().isOk())
+    JsonNode ready = pendingStaffRequest(requestId);
+    assertThat(ready.path("ownerApprovalGranted").asBoolean()).isTrue();
+    assertThat(ready.path("version").asLong()).isGreaterThan(request.path("version").asLong());
+    confirm(ready, Actor.MANAGEMENT, noticeCustodian)
+        .andExpect(result -> {
+          var response = result.getResponse();
+          assertThat(response.getStatus())
+              .as("Bank confirmation response: %s", response.getContentAsString())
+              .isEqualTo(HttpStatus.OK.value());
+        })
         .andExpect(jsonPath("$.status").value("CONFIRMED"));
     await()
         .atMost(Duration.ofSeconds(10))
@@ -344,6 +350,18 @@ class JobOrderLinkedBankIntegrationTest {
     assertThat(accountBookingCount(account, Actor.MANAGEMENT)).isEqualTo(bookings);
     assertThat(accountBalance(account)).isEqualTo(5000);
     assertConfirmedAudit(account, order, 1);
+  }
+
+  private JsonNode pendingStaffRequest(UUID requestId) throws Exception {
+    JsonNode queue =
+        response(
+            mvc.perform(get(STAFF_REQUESTS).with(as(Actor.MANAGEMENT))).andExpect(status().isOk()));
+    for (JsonNode request : queue.path("content")) {
+      if (requestId.toString().equals(request.path("id").asString())) {
+        return request;
+      }
+    }
+    throw new AssertionError("The Bank staff queue lacks pending request " + requestId);
   }
 
   private UUID registerNoticeCustodian(UUID applicant) throws Exception {
