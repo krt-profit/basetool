@@ -1,4 +1,4 @@
-> **Doc type:** Living spec - accepted contract; S04 implementation under review. Last reviewed: 2026-11-10.
+> **Doc type:** Living spec. Last reviewed: 2026-11-11.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0360 (amends ADR-0092)
 
 # Material promises within Staffel participation
@@ -10,8 +10,7 @@ MATERIAL or ITEM order's material/quality requirement. It belongs to the single 
 of [REQ-ORDERS-051](orders-core.md); there is no second support registration. Support can exist
 without a quantity, and one participation may carry promises for several requirements.
 This accepted target replaces the signal-only, SK-only claim model and the original-total ITEM
-claim denominator. The material foundation below has focused local verification; complete S04
-acceptance and the shared writer conversion remain pending.
+claim denominator. Support and responsibility changes use the shared order workflow.
 The owner-approved decisions are [material quantities](https://github.com/krt-profit/basetool/issues/3207)
 and [technical contracts](https://github.com/krt-profit/basetool/issues/3202).
 
@@ -242,20 +241,20 @@ case rather than accumulating every alternative.
 - [ ] Ineligible/terminal/reopened cases obey shared write and participation boundaries.
 - [ ] Legacy stock covers demand without fabricated contribution attribution.
 
-**Enforced by:** Pending implementation. Existing MaterialClaimConcurrencyTest and
-MaterialClaimServiceTest cover the legacy model only; they do not prove this target.
+**Enforced by:** `MaterialClaimConcurrencyTest`, `MaterialProvisionAuthorityIntegrationTest`
+and `MaterialOrderResourcePlanningIntegrationTest` cover the database, current authority and
+resource-planning cases described in the implementation notes below.
 **Issues:** #3207, #3202, #3203 · **ADR:** ADR-0360, amending ADR-0092
 
 ## Out of scope
 
 Money, new material bank accounts/ledgers, a second enrollment or approval process, automatic
-attribution from a recorder/owner, production reversal, a general settlement workflow and runtime
-implementation. Actual inventory ownership and ordinary stock permissions stay with Inventory.
+attribution from a recorder/owner, production reversal and a general settlement workflow.
+Actual inventory ownership and ordinary stock permissions stay with Inventory.
 
 ## Open questions
 
-None for the approved quantity and original-quality contracts. Complete runtime acceptance remains
-pending; support and responsibility writes use the shared workflow.
+None for the approved quantity and original-quality contracts.
 
 The existing explicit administrator hard-delete of a MATERIAL/ITEM order (REQ-ORDERS-042) removes
 its dependent active and ended claim rows in the same transaction after the responsibility guard.
@@ -308,6 +307,4 @@ historical original-quality correction and corrected-quality attribution choices
 cover current Inventory write authority, terminal preparation, simultaneous ITEM completion,
 administrative stock release/relink without repeat credit and transaction-owned exclusive startup
 maintenance. Immutable migration validation, privacy export, history rendering and grouped notice
-proofs accompany those paths. Complete Undo composition, physical quality correction, remaining
-cross-path/browser acceptance and the shared writer conversion are still under review; these local
-checks do not claim the complete shared workflow has shipped.
+proofs accompany those paths. Integrated runtime acceptance is recorded against REQ-ORDERS-024.

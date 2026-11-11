@@ -27,11 +27,11 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
-> **JobOrder audit scope:** The internal Bank-free checkpoint records settlement, corrections,
-> holder maintenance and reciprocal order movements with the financial write. The activity filter
-> and both locales include the event types. Participant history has its own authorised contract in
-> [aUEC orders](orders-auec.md). Optional Bank linkage, outcomes and clarification retain their
-> [separate audit requirements](orders-auec-bank.md).
+> **JobOrder audit scope:** The order records settlement, corrections, holder maintenance and
+> reciprocal order movements with the financial write. The activity filter and both locales
+> include the event types. Participant history is scoped to permitted order readers. Linked
+> Bank outcomes and clarification follow their owning audit rules. See the [aUEC order
+> contract](orders-auec.md) and [optional Bank contract](orders-auec-bank.md).
 >
 > **Bank audit scope:** Final debit-equivalent authority records `FUNDS_AUTHORISED` in the Bank
 > trail, with the funding account, authorisation reference and amount. A requested authorisation
@@ -901,9 +901,11 @@ amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
 
 ### REQ-AUDIT-007 — Audit is never an event; listeners never read the request; observers join the transaction
 
-> **Approved planned JobOrder amendment (not implemented):** The JobOrder composition adapter and synchronous Bank/stock coordination join the owning business transaction and keep audit atomic. Data-only notification/live causes are published or registered within that transaction, with delivery after commit; financial effects and audit never move into those listeners. See [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+> **JobOrder transactions:** The JobOrder composition adapter coordinates synchronous Bank and
+> stock effects in the owning business transaction. Financial mutations and their audit records
+> commit together. The transaction publishes or registers the data needed for live updates and
+> notifications. Delivery follows a successful commit. See the [aUEC order contract](orders-auec.md)
+> and [optional Bank contract](orders-auec-bank.md).
 
 REQ-AUDIT-001 holds only while the audit row is written **inside the transaction of the mutation it
 records**: an audit-insert failure must roll the mutation back. Three rules keep a well-meant

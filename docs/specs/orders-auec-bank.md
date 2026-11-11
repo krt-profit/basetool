@@ -1,4 +1,4 @@
-> **Doc type:** Living spec - approved target. Last reviewed: 2026-11-10.
+> **Doc type:** Living spec. Last reviewed: 2026-11-11.
 > **Owner area:** ORDERS / BANK
 > **Status:** The ordinary order actions use the synchronous Bank integration and its
 > [Bank-owned capabilities](bank.md#req-bank-061--purpose-reference). Acceptance evidence is
@@ -313,7 +313,7 @@ Existing connected-client idempotency is not automatic protection of an order op
 request/queue projections need compatibility evidence for new internal meanings without changing
 frozen wire shapes or exposing additional data.
 
-Later implementation evidence includes real PostgreSQL financial/Bank/hierarchy races, coupled
+Required verification includes real PostgreSQL financial/Bank/hierarchy races, coupled
 rollback after domain/audit failures, repeated/mismatched submissions, correct pending availability,
 rate snapshots and fee funding, both reversal modes, no-Bank journeys and selected-Bank journeys.
 Bounded metrics cover waiting age/count, clarification, technical failure and integrity contradictions
@@ -322,7 +322,50 @@ approval waiting is not itself a new deadline or technical failure.
 
 **Acceptance**
 
-- [ ] Order views, history, links and outcomes expose no additional Bank data or private approval note.
-- [ ] Audit/live/notice causes explain each effective mutation once and preserve the correct actor and current access.
-- [ ] Frozen exchange schema/golden/capability tests retain their public contract for the new internal cases.
-- [ ] Appropriate database, security, contract, UI and observability checks cover both operating modes; no unimplemented test is marked as passing.
+- [x] Order views, history, links and outcomes expose no additional Bank data or private approval note.
+- [x] Audit/live/notice causes explain each effective mutation once and preserve the correct actor and current access.
+- [x] Frozen exchange schema/golden/capability tests retain their public contract for the new internal cases.
+- [x] Appropriate database, security, contract, UI and observability checks cover both operating modes; no unimplemented test is marked as passing.
+
+**Evidence**
+
+- `JobOrderBankMoneyE2eTest.creditsAndReturnsThroughAccountPositions` covers the default Bank
+  selection, recovery and wrong-account repair, linked approval and delivery, return to the
+  collection position and private note exclusion. It passed in all six browser profiles at
+  `d7ec1198b`. [Hosted E2E](https://github.com/krt-profit/basetool/actions/runs/43087989837)
+- Full App CI passed at `be43dcd29`. The focused PostgreSQL run at that revision passed all 19
+  cases in `JobOrderLinkedBankIntegrationTest` and all five in
+  `JobOrderLinkedBankSettlementIntegrationTest`. These cases exercise coupled audit rollback,
+  cancellation and hierarchy races, rejected-payment binding, fee attribution and both reversal
+  modes. [Hosted App CI](https://github.com/krt-profit/basetool/actions/runs/43098702371)
+- `BankLinkedPaymentsIntegrationTest` verifies the ten-million authorisation against six
+  million of coverage, applicant and accountless depositor attribution, balanced account-only
+  transfers, and the retained KRT-funded holder transfer fee. `JobOrderLinkedBankIntegrationTest`
+  verifies pending funds, failed-payment repair, confirmation races against cancellation
+  and hierarchy changes, and the treatment of a real payment when its ledger entry is reversed.
+- Both `JobOrderLinkedBankIntegrationTest.linkedAuthorisationGroupsOutcomeAndRetainsApprovalTasks`
+  variants passed in that PostgreSQL run. They verify the staff audit actor, approval task
+  lifecycle, one Order credit without a Bank posting, one preferred confirmation when unmuted
+  and suppression of the fallback when muted. The expanded
+  `JobOrderBankMoneyE2eTest.creditsAndReturnsThroughAccountPositions` passed in a separate
+  isolated Chromium run. It verifies that a staff confirmation refreshes the Order while
+  preserving the next deposit's amount, account and Bank choices in the writer's open draft.
+- `BankLinkedPaymentsIntegrationTest.ordinaryMembershipCannotAuthoriseFundsFromAHiddenAccount`
+  verifies hidden-account admission. In `JobOrderMoneyPrivacyIntegrationTest`,
+  `correctingAFalseHolderLinkRevokesReadershipAndRetainsTheHandover` and
+  `correctingDirectRequesterDesignationRevokesFalseHistoricalReadGrant` verify revocation
+  after correction. The browser journey verifies private-note exclusion from Order history.
+- Against main at `34bc84efb`, the published Exchange OpenAPI and schemas are byte-identical. The
+  generated internal relay document differs only by the shared `ProblemDetail.x-problem-codes`
+  extension entry `MONEY_PROVISION_REFUSED`. This preserves the Exchange runtime vocabulary,
+  endpoints and wire shapes. See [REQ-XCH-039](external-exchange.md#req-xch-039--the-relay-surface-has-its-own-internal-openapi-document)
+  and [REQ-API-019](api-conventions.md#req-api-019--every-problem-code-is-registered-once-and-documented).
+  Hosted App CI at `be43dcd29` passed `ExchangeWireContractTest`, `ExchangeGoldenAnswerTest`,
+  `ExchangeRoutesContractTest` and the Bank Exchange request scope tests.
+  [Hosted App CI](https://github.com/krt-profit/basetool/actions/runs/43098702371)
+- The linked-money dashboard signals and passing contradiction alert test are recorded in
+  [REQ-OBS-011](observability.md#req-obs-011--business-metrics-basetool_).
+- The integrated S15 tree passed the Gradle wrapper's `spotlessApply build --continue` with
+  `CONTRACT_BASELINE_REQUIRED=true` and the published `v1.23.4` contracts as the compatibility
+  baseline. The isolated Chromium runs cover both operating modes and the expanded Bank
+  draft assertion.

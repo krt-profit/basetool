@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — MATERIAL/ITEM shared workflow implemented. Last reviewed: 2026-11-09.
+> **Doc type:** Living spec. Last reviewed: 2026-11-11.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0356, ADR-0359, ADR-0360
 
 # Shared JobOrder model
@@ -10,11 +10,11 @@ organisation, participation, access and lifecycle contract. Accepted Wayfinder d
 [responsibility](https://github.com/krt-profit/basetool/issues/3193),
 [access](https://github.com/krt-profit/basetool/issues/3197) and
 [shared scope](https://github.com/krt-profit/basetool/issues/3200) replace conflicting legacy
-rules. The material and item workflow is described below. Money operations follow the aUEC specs.
+rules. Money operations follow the aUEC specs.
 
 Kind-specific homes remain [production](orders-item-production.md),
 [material promises](orders-material-claims.md), [money](orders-auec.md) and
-[optional Bank integration](orders-auec-bank.md). Acceptance below remains unchecked.
+[optional Bank integration](orders-auec-bank.md).
 
 ## Requirements
 
@@ -260,15 +260,15 @@ use the same hierarchy and order edit guards.
 
 ### REQ-ORDERS-056 — One shared overview leads to a central detail
 
-**Implemented MATERIAL/ITEM workspace:** a server-side kind filter narrows every scope and its
+**Shared workspace:** a server-side kind filter narrows every scope and its
 database page count. The browser remembers kind, scope, status and unit selections; an unset scope
-defaults to ALL for every permitted reader. Only implemented kinds are offered. Current responsible
+defaults to ALL for every permitted reader. Current responsible
 and active-support unit work are independent of command authority, and creation opens the central
 created-order identity. A managed Chromium journey uses distinct requester and processor accounts:
 it rejects an unrelated live room, observes peer queue updates without reload, preserves an open
 personal-note draft and its independent version, then saves and applies the deferred detail update.
-The internal Bank-free checkpoint adds aUEC creation, reported amounts, immediate money movements,
-target and information edits, and submitted-operation recovery to the same workspace.
+The same workspace supports aUEC creation, reported amounts, money movements, target and
+information edits, and submitted-operation recovery.
 
 All kinds share the overview and a type filter. Its scopes are Meine (requesting units),
 Ich bearbeite (personal Bearbeiter), Zu bearbeiten (responsible or supporting own units under
@@ -301,5 +301,4 @@ accepted decisions. Bank internals remain in the Bank specs.
 
 ## Open questions
 
-None for this shared contract. The hierarchy foundation is implemented; acceptance of the complete
-shared workflows remains pending.
+None for this shared contract. See the requirements above for shared workflow verification.

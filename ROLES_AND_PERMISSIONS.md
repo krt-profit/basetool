@@ -1,6 +1,6 @@
 # Role and Permission Matrix (Profit Basetool)
 
-> **Approved JobOrder contract and implementation scope:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Section 3.3 describes the internal Bank-free checkpoint. Bank authority for linked payments is covered in section 3.11. The coupled order actions use the same current Order and Bank authority. Each applicable money action starts with Bank selected. The Order form suggests eligible account references under current Order and Bank authority. The Bank queue owns deposit custodian confirmation.
+> **JobOrder authority:** Section 3.3 describes shared order rights and aUEC order actions. Section 3.11 covers Bank authority for linked payments. Each applicable money action starts with Bank selected and offers an explicit Bank-free choice. Account suggestions follow current Order and Bank authority. Bank staff confirm a linked deposit's custodian in the Bank queue. See the [shared order](docs/specs/orders-core.md), [aUEC procurement](docs/specs/orders-auec.md) and [optional Bank integration](docs/specs/orders-auec-bank.md) contracts.
 
 > **Last reviewed: 2026-09-22** — re-verified against every `@PreAuthorize` of the 88 backend
 > `@RestController`s and the frontend page/proxy controllers, after the members-only cut
@@ -463,14 +463,13 @@ somebody's Art. 15 request than to the member themselves.
 
 ### 3.3 Inventory (Lager) & Job Orders
 
-#### Approved JobOrder rights and Bank-free checkpoint
+#### Shared JobOrder rights
 
-This target replaces the JobOrder-specific legacy flags, read reductions and write limits in the
-current matrix below. It does not widen unrelated Lager, blueprint, mission or Bank rights.
 A unit writer means its existing contextual Logistician/leadership authority; a grant in an
 unrelated unit is insufficient. Rights combine only through legitimate current relationships.
+Lager, blueprint, mission and Bank rights use their own gates.
 
-| Actor or relationship | Planned permitted scope |
+| Actor or relationship | Permitted scope |
 | --- | --- |
 | Actual active Profit audience; requesting/responsible/supporting-unit members and relevant leadership | Read the complete relevant order across all kinds; no private Bank data, unreadable mission data or separate blueprint-owner-panel bypass. |
 | Writer of requesting or proposed responsible unit | Create any of the three exclusive order kinds. Responsibility must be the unique Profit Bereich or an eligible subordinate Staffel/SK. |
@@ -494,7 +493,7 @@ follows effective net handover. If responsibility is ineligible, only read and t
 even on completed/cancelled orders: all other user changes and coupled financial results wait for
 valid responsibility. Mandatory automatic support ending remains required.
 
-The internal Bank-free checkpoint supports creation, provision, collection, handover, settlement and
+The Bank-free workflow supports creation, provision, collection, handover, settlement and
 financial correction. The current responsible writer can maintain holder names and links, merge
 same-person records, and coordinate permitted movements and corrections. Either current unit writer
 can correct a mistaken direct requester designation. Its original operation references remain in the
@@ -520,7 +519,7 @@ The first commitment of an eligible Staffel starts its shared participation. An 
 Bearbeiter or holder grant carries only the existing personal actions.
 
 The canonical detailed grants, historical relationships and acceptance criteria live in the three
-linked specifications. The following table and footnotes are the **current implementation baseline**.
+linked specifications.
 
 | Function (gate)                                                                                                                                                                                                                                                                                                                                                          | Member | Log. | MM  | Officer | Admin |
 |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:---:|:-------:|:-----:|
@@ -561,7 +560,7 @@ strict OrgUnit scope.
 ² Current responsible-unit writers transfer immediately to any eligible Profit target, including
 recovery when the current unit is no longer eligible.
 ³ General Profit access follows actual membership in the unique active `Department.PROFIT`
-area or its active Staffel/SK children, independent of retired flags. Creating MATERIAL/ITEM
+area or its active Staffel/SK children, independent of retired flags. Creating MATERIAL, ITEM or aUEC
 requires a current contextual writer of the requesting **or** responsible unit. Responsible writers
 process and immediately transfer responsibility to any eligible target in the verified original
 boundary, without target acceptance or movement of stock. Concrete current-unit recovery authority
@@ -949,8 +948,7 @@ staff attestation. Final authorisation of existing funds uses withdrawal authori
 full principal on one account. Bank staff can decide a linked custody transfer under the existing
 holder-transfer right. Both custodians must be registered Bank holders. Bank Management and Admin
 retain their existing reach, and only Admin has the ordinary four-eyes exception. Order access
-grants no access to the Bank queue, private notes, custody balances or reversals. Public Order
-actions await composition.
+grants no access to the Bank queue, private notes, custody balances or reversals.
 
 #### 3.11.1 Org-unit access for officers/leads (epic #666)
 

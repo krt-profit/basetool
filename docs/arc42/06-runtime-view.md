@@ -295,23 +295,28 @@ The quantity/evidence contract and its acceptance status live in
 [REQ-ORDERS-024](../specs/orders-material-claims.md); this runtime map is not a second acceptance
 record.
 
-## 6.13 Bank-free money movements, correction and response recovery
+## 6.13 Order money movements, correction and response recovery
 
 1. The common creation command records the aUEC order and its independently versioned target in
    one transaction. Reporting an own holding, selecting a linked account, or naming an accountless
-   holder begins in the order's money section.
+   holder begins in the order's money section. Each new applicable operation selects Bank
+   handling by default. The actor can choose Bank-free handling for that operation.
 2. The order edit acquires the involved account identity guards, then the hierarchy and order
    write guards. It checks current authority and compares an existing accepted attempt before
    considering the holder version of a new submission.
-3. A fresh movement applies the source debit, recipient credit, explicit new funds and fixed
+3. A Bank-free movement applies the source debit, recipient credit, explicit new funds and fixed
    fee in one booking. If a handover can reach the current target, the edit locks the priority
    queue before its order row. The movement, lifecycle change and audit commit together.
    Participants receive section invalidations after commit. An affected linked account can
    receive a targeted notice.
-4. A purpose reassignment or its correction locks both orders in PostgreSQL ID order. A linked
+4. A selected-Bank operation uses the Bank's normal admission and decision. The composition
+   adapter applies the linked Order effect and both domains' audit in the decision transaction.
+   Pending requests can bind available order funds. Participants receive live updates and
+   grouped notices after commit.
+5. A purpose reassignment or its correction locks both orders in PostgreSQL ID order. A linked
    correction appends revised effects without removing its original amounts. An actual requester
    return uses the same net handover projection as the lifecycle decision.
-5. A browser with an unknown outcome queries the same operation after reload. The order rechecks
+6. A browser with an unknown outcome queries the same operation after reload. The order rechecks
    access and reconstructs exact amounts from the accepted monetary facts; current holder and actor
    labels follow the privacy rules.
 

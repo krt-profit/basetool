@@ -1,3 +1,3 @@
 ### Changed
 
-- **JobOrder specification.** Recorded the approved contract for aUEC procurement and shared order behavior. Implementation and runtime acceptance remain pending.
+- **Job orders.** Material, item and aUEC orders share the same overview, filters and detail workspace. Current unit responsibilities and relationships determine which orders you can see and work on.

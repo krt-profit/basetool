@@ -727,9 +727,10 @@ it is invisible until something waits on the container's health.
 
 ### REQ-OBS-006 — No PII and no unbounded labels in metrics
 
-> **Approved planned JobOrder amendment (not implemented):** JobOrder operation, pending-bank, clarification and invariant observations use only counts/age and bounded kind/status/reason labels. Do not expose holder/order/operation/account identities, names or amounts as labels, or bank balances/transaction amounts as metrics. The approved contracts do not widen telemetry access. See [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+> **JobOrder metrics:** Order and linked Bank observations use counts, waiting age and bounded
+> labels. The linked-money gauges and counter have no participant, order, account or payment
+> dimensions. See the [aUEC order contract](orders-auec.md) and [optional Bank
+> contract](orders-auec-bank.md).
 
 Metric names, label keys, label values and measured values must never contain
 user-identifying data (usernames, e-mails, `sub` UUIDs, IPs, tokens) or free text. Labels
@@ -1259,9 +1260,10 @@ aggregated counts and bounded `app`/`host` labels.
 
 ### REQ-OBS-011 — Business metrics (`basetool_*`)
 
-> **Approved planned JobOrder amendment (not implemented):** Extend existing gauges, audit/notification observations and relevant alert/dashboard tests for the planned JobOrder kinds, terminal behavior, coupled waiting/clarification and technical integrity outcomes. Normal approval waiting is not a technical failure or a new deadline. Integrity detection reports contradictions without silently repairing money or creating a user exception queue. No new metric is claimed shipped here; see [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+> **Linked order money:** The operations dashboard shows waiting count and age, clarification,
+> contradictions and technical failures. The contradiction alert fires after 15 minutes of a
+> positive contradiction count. Routine approval waiting contributes to the waiting gauges.
+> See the [optional Bank contract](orders-auec-bank.md).
 
 > **Status: shipped** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, map #2800) for the signals
 > of the amendment at the end of this requirement.
@@ -2147,6 +2149,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   These metrics carry no participant, order, account or payment dimensions. Routine approval
   waiting and clarification are visible on the operations dashboard. An alert fires for
   persistent contradictory order effects.
+  `JobOrderLinkedMoneyMetricsTest` passed both sampling and technical-failure checks. It
+  verifies waiting age, gauge reset, the failure counter and untagged meter registration.
+  Prometheus 3.16.0 validated the business rule file and passed the linked-money alert test,
+  including ordinary waiting, the 15-minute threshold and recovery.
+  [Alert test](../../monitoring/prometheus/tests/job_order_linked_money_test.yml)
 - `basetool_job_order_integrity_violations{category}` gauge fed by the hourly `JobOrderIntegrityTask`
   (REQ-ORDERS-033; one `category` today, `item_line_blueprint_drift`). `> 0` means an ordered-item
   line's blueprint no longer produces the ordered item after an SC-Wiki re-point, so that order

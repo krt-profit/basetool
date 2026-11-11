@@ -1,6 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-11.
 > **Owner area:** ORDERS · **Related ADRs:** [ADR-0359](../adr/0359-orders-record-money-operations-and-replay-their-outcomes.md), [ADR-0358](../adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)
-> **Status:** The internal Bank-free checkpoint covers creation, provision, unit commitments, handover, settlement, financial corrections and holder and recipient maintenance. Optional Bank handling remains part of the owner-approved target. The checklists cover the complete workflow.
+> **Status:** The shared workspace supports aUEC creation, provision, unit commitments, handover, settlement, corrections and holder and recipient maintenance. [Kartellbank handling](orders-auec-bank.md) is selected by default for each new applicable money operation. Each operation offers an explicit Bank-free choice.
 
 # aUEC procurement orders
 
@@ -554,21 +554,41 @@ from the order.
 
 **Acceptance**
 
-- [ ] Run every fee-free row and the nonzero-fee reconciliation with exact totals and no double credit.
-- [ ] Run the complete no-Bank journey with explicit Bank-free selection at every new monetary operation, without Bank accounts, holders, roles, requests or service prerequisites.
-- [ ] Run the selected-Bank matrix in REQ-ORDERS-069…076, including actual payment with a rejected wrong-account request and a corrected retry without another game transfer.
-- [ ] Cover underfunding, multiple orders/holders, returns, overpayment, cancellation, corrections, accountless identity and unauthorised access.
-- [ ] Verify mutation audit, grouped notices and peer updates against the same operation cause.
+- [x] Run every fee-free row and the nonzero-fee reconciliation with exact totals and no double credit.
+- [x] Run the complete no-Bank journey with explicit Bank-free selection at every new monetary operation, without Bank accounts, holders, roles, requests or service prerequisites.
+- [x] Run the selected-Bank matrix in REQ-ORDERS-069…076, including actual payment with a rejected wrong-account request and a corrected retry without another game transfer.
+- [x] Cover underfunding, multiple orders/holders, returns, overpayment, cancellation, corrections, accountless identity and unauthorised access.
+- [x] Verify mutation audit, grouped notices and peer updates against the same operation cause.
 
-**Enforced by:** `JobOrderMoneyIntegrationTest` verifies each fee-free row and the full 100,000-aUEC
-fee reconciliation using PostgreSQL. Both examples check the fixture's Bank footprint before
-creation and after completion, including replay in the configured-fee example.
+**Enforced by:** `JobOrderMoneyIntegrationTest.collectsTenMillionAndCompletesOnlyOnTheLastRequesterHandover`
+and `fourFeeFundedTransfersReconcileExactly` passed on PostgreSQL at `be43dcd29`. They verify
+each fee-free row and the full 100,000-aUEC fee reconciliation. Both examples check the fixture's
+Bank footprint before creation and after completion, including replay in the configured-fee example.
 `JobOrderMoneyE2eTest.contextualWriterCompletesWithoutBankOrCentralCollection` exercises separate
 holders, a named accountless holder, live peer completion with its draft open, and recovery of
 a committed handover after a lost response. The recovered handover yields one audit entry and
-one affected-reader notice. REQ-ORDERS-061 and REQ-ORDERS-062 list
-the settlement and correction evidence. Public release readiness also requires the default Bank
-journey and its acceptance matrix in REQ-ORDERS-069–076.
+one affected-reader notice. The actor needs no Bank staff grant or Bank prerequisite for this
+order. REQ-ORDERS-061 and REQ-ORDERS-062 list the settlement and correction evidence.
+REQ-ORDERS-069…076 define the selected-Bank acceptance matrix.
+
+Full App CI at `be43dcd29` passed the `JobOrderMoneyIntegrationTest` cases for underfunding
+(`onlyExplicitAuthorisedProvisionCanFillTheDeficitInTheSameOperation`), cross-order movements
+(`inversePurposeMovesAcquireBothOrderRowsInPostgresOrder`), requester returns and cancellation
+(`requesterReturnReopensCompletedOrderAndFundsItsFeeSeparately`,
+`actualReturnOnACancelledOrderPreservesCancellation`), overpayment and corrections
+(`sameHolderPurposeHandoverRequiresExplicitPurposeAndKeepsOverpaymentSeparate`,
+`connectedCorrectionPreservesOriginalFactsAndAppliesOnce`), and authority
+(`onlyResponsibleWriterCanRecordNamedAccountlessProvision`,
+`explicitlyLinkedUnitlessHolderCanReadOnlyTheirOrderAcrossWorkspace`).
+[Hosted App CI](https://github.com/krt-profit/basetool/actions/runs/43098702371)
+
+The browser run at `d7ec1198b` passed the selected-Kartellbank and explicitly Bank-free journeys
+in all six Chromium, Firefox and WebKit desktop/mobile profiles. The isolated Chromium run at
+`be43dcd29` passed all 29 selected cases, including both aUEC modes and existing Bank, MATERIAL
+and ITEM journeys. The selected-Bank journey repairs the rejected wrong-account request under
+the same operation identity. REQ-ORDERS-076 records the database, audit, grouped notice and
+draft preservation evidence.
+[Hosted E2E](https://github.com/krt-profit/basetool/actions/runs/43087989837)
 
 ## Out of scope
 

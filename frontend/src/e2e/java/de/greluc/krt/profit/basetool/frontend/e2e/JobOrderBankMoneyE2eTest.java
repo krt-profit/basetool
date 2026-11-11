@@ -93,13 +93,19 @@ class JobOrderBankMoneyE2eTest {
         assertEquals(operation, replacement.get("operationId").getAsString());
         assertEquals(2, replacement.get("linkedRevision").getAsInt());
         assertEquals("WAITING", replacement.get("state").getAsString());
+        assertThat(order.getByTestId("order-money-repair-save")).isHidden();
+        prepareDeposit(order, fixture, fixture.collectionAccount(), SIX_MILLION);
         confirm(
             staff,
             pendingRequest(seeder, fixture.collectionAccount(), 4_000_000),
             fixture.holderA());
         figure(order, "order-money-provided", "4.000.000");
 
-        prepareDeposit(order, fixture, fixture.collectionAccount(), SIX_MILLION);
+        assertThat(order.getByTestId("order-money-amount")).hasValue("6.000.000");
+        assertThat(order.getByTestId("order-money-bank-account"))
+            .hasValue(fixture.collectionAccount());
+        assertThat(order.getByTestId("order-money-bank")).isChecked();
+        assertThat(order.getByTestId("order-money-bank-payment")).isChecked();
         var second = post(order, money + "/provisions", "order-money-save");
         assertEquals("WAITING", second.get("state").getAsString());
         confirm(

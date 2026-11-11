@@ -1,9 +1,9 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** BANK · **Related ADRs:** [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
 
-> **Status:** Bank-owned linked request and direct outcome notices are implemented. Cross-domain
-> grouping and the composed aUEC journey remain part of the approved target.
-> **Approved target:** [orders-auec-bank.md](orders-auec-bank.md) (REQ-ORDERS-076), ADR-0357.
+> **Status:** Linked aUEC outcomes use grouped Bank and Order notices with the existing approval
+> tasks and mute preferences. The composition evidence is tracked in
+> [REQ-ORDERS-076](orders-auec-bank.md#req-orders-076---integration-preserves-access-evidence-and-external-boundaries).
 
 # Bank notifications
 
@@ -43,11 +43,10 @@ REQ-NOTIF-025) and leaves every other grantee's alone.
 
 ### REQ-BANK-059 — A direct booking by bank staff tells the members it affects
 
-> **Approved composition target:** Group the same logical outcome/recipient across Bank/order
-> roles, retaining necessary approval
-> tasks, mute and priority. Later staff decisions use that actor, not the applicant. Rollback,
-> replay and duplicate callbacks announce no extra mutation. Private notes and unrelated Bank data
-> do not enter order notices. REQ-ORDERS-073/-075/-076 owns the order meaning.
+> **Linked aUEC outcomes:** Bank and Order notices use one logical outcome per recipient.
+> Approval tasks retain their own lifecycle. Success notices follow the existing mute and
+> priority rules. A later staff decision uses the staff actor. Order notices carry the permitted
+> order facts under REQ-ORDERS-073/-075/-076.
 
 `BankBookingController` (withdrawal, transfer, reversal) and `BankHolderController` (holder transfer)
 call `BankDirectBookingNotifier` after the ledger booked; the ledger itself publishes nothing, because

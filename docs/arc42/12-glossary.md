@@ -170,14 +170,14 @@ These terms come with ADR-0335…0347 (map #2884); the rules are in
 
 ## 12.9 Approved JobOrder terminology
 
-These definitions cover the shared order model, the Bank-free checkpoint and planned Bank coupling.
+These definitions cover the shared order model and both aUEC operating modes.
 Runtime scope, rules and acceptance status live once in [orders-core.md](../specs/orders-core.md),
 [orders-auec.md](../specs/orders-auec.md), [orders-auec-bank.md](../specs/orders-auec-bank.md)
 and [material contributions](../specs/orders-material-claims.md).
 
 | Term | Meaning |
 | --- | --- |
-| **aUEC-Beschaffungsauftrag** | The third exclusive JobOrder kind, procuring a net requester amount; fully usable without Kartellbank. MATERIAL and ITEM receive no money workflow. |
+| **aUEC-Beschaffungsauftrag** | The third exclusive JobOrder kind, procuring a net requester amount. Each applicable operation defaults to Kartellbank and offers an explicit Bank-free choice. |
 | **Profit-Einheit / responsible Profit unit** | The uniquely designated active Department.PROFIT Bereich or an eligible active subordinate Staffel/SK; eligibility follows actual hierarchy, not an independent flag or display name. |
 | **Auftraggeber / requesting unit** | The commissioning OrgUnit, distinct from current responsible unit, contact person and designated payment recipient. |
 | **Verantwortliche Einheit / responsible unit** | Exactly one current processing unit, with traceable commissioning/transfer history. Responsibility transfer moves no physical money or stock by itself. |

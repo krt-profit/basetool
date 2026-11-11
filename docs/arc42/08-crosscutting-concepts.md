@@ -1,6 +1,6 @@
 # 8. Cross-cutting concepts
 
-> **JobOrder implementation scope:** [Shared access/hierarchy](../specs/orders-core.md) and [material contributions](../specs/orders-material-claims.md) define the MATERIAL/ITEM foundation below. The [Bank-free monetary contract](../specs/orders-auec.md) owns submitted-operation recovery, financial corrections and holder and recipient identity. [Synchronous Bank coordination](../specs/orders-auec-bank.md) applies the frozen attempt under current order authority in the Bank transaction.
+> **JobOrder implementation scope:** [Shared access and hierarchy](../specs/orders-core.md) apply to every kind. The [material contribution contract](../specs/orders-material-claims.md) owns MATERIAL/ITEM provision. The [aUEC contract](../specs/orders-auec.md) owns operation recovery, financial corrections and holder and recipient identity. [Synchronous Bank coordination](../specs/orders-auec-bank.md) applies the submitted attempt and both domains' audit in the Bank transaction. Live updates and grouped notices follow commit.
 
 These rules hold across modules. Each names its authority; this section exists to make them
 findable from one place, not to restate them.

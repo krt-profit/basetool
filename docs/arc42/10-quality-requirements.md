@@ -1,6 +1,6 @@
 # 10. Quality requirements
 
-> **JobOrder acceptance boundary:** [Shared JobOrder](../specs/orders-core.md), [material contributions](../specs/orders-material-claims.md), [aUEC consistency](../specs/orders-auec.md) and [bank lifecycle](../specs/orders-auec-bank.md) own their acceptance and evidence status. Each path has its own database, security, contract and browser evidence. The Bank-free reassignment and correction cases exercise the order edit guards. Coupled Bank outcomes have their own acceptance criteria.
+> **JobOrder acceptance:** The shared requirements track [access and lifecycle](../specs/orders-core.md) and [material contributions](../specs/orders-material-claims.md). The [aUEC acceptance matrix](../specs/orders-auec.md#req-orders-068--both-operating-modes-have-verifiable-end-to-end-evidence) links the worked examples and both browser journeys. [Bank integration acceptance](../specs/orders-auec-bank.md#req-orders-076---integration-preserves-access-evidence-and-external-boundaries) tracks rollback, authority, notices and the Exchange boundary.
 
 ## 10.1 The quality tree
 
