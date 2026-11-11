@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Proves that the escaped fragments {@link LikePatterns#escape(String)} produces match literally in
- * the three blueprint-backed catalogue searches: {@code %} and {@code _} must not act as wildcards.
+ * the blueprint-backed catalogue searches: {@code %} and {@code _} must not act as wildcards.
  */
 @SpringBootTest
 @Transactional
@@ -75,22 +75,6 @@ class BlueprintRepositoryLikeEscapeTest {
     assertThat(names(blueprintRepository.findActiveProductRows(LikePatterns.escape("100% D"))))
         .containsExactly(percentName);
     assertThat(names(blueprintRepository.findActiveProductRows(LikePatterns.escape(TAG + "_"))))
-        .containsExactly(underscoreName);
-  }
-
-  @Test
-  void findItemsWithActiveBlueprint_treatsPercentAndUnderscoreLiterally() {
-    assertThat(
-            blueprintRepository
-                .findItemsWithActiveBlueprint(LikePatterns.escape("100% D"), PageRequest.of(0, 50))
-                .map(GameItem::getName)
-                .getContent())
-        .containsExactly(percentName);
-    assertThat(
-            blueprintRepository
-                .findItemsWithActiveBlueprint(LikePatterns.escape(TAG + "_"), PageRequest.of(0, 50))
-                .map(GameItem::getName)
-                .getContent())
         .containsExactly(underscoreName);
   }
 

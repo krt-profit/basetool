@@ -27,7 +27,9 @@ import {
     bindKindToggle,
     bindResults,
     field,
+    itemChosen,
     numberOrNull,
+    resetForm,
     retargetResults,
     select,
     sendWrite,
@@ -150,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const recordModal = document.getElementById('supply-record-modal');
     const recordForm = document.getElementById('supply-record-form');
     if (recordModal && recordForm) {
-        bindKindToggle(
+        const syncKind = bindKindToggle(
             'supply-record-kind',
             'supply-record-material-row',
             'supply-record-item-row',
@@ -164,7 +166,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         needSelect.addEventListener('change', syncNeed);
         krtEvents.on('click', 'supply-open-record', () => {
-            /** @type {HTMLFormElement} */ (recordForm).reset();
+            resetForm(/** @type {HTMLFormElement} */ (recordForm));
+            syncKind();
             syncNeed();
             krtModal.open(recordModal);
         });
@@ -172,6 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
             event.preventDefault();
             const needId = textOrNull(needSelect.value);
             const isItem = select('supply-record-kind').value === 'item';
+            const itemId = textOrNull(select('supply-record-item').value);
+            if (!needId && !itemChosen(isItem, itemId)) return;
             sendWrite({
                 method: 'POST',
                 url: '/api/proxy/supply/donations/recorded',
@@ -182,8 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         needId || isItem
                             ? null
                             : textOrNull(select('supply-record-material').value),
-                    gameItemId:
-                        needId || !isItem ? null : textOrNull(select('supply-record-item').value),
+                    gameItemId: needId || !isItem ? null : itemId,
                     quality:
                         needId || isItem
                             ? null

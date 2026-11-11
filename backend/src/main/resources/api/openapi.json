@@ -18899,7 +18899,7 @@
     },
     "/api/v1/game-items" : {
       "get" : {
-        "description" : "Returns a paginated list of game items that are the output of at least one active blueprint; orderable=true keeps those with a resolvable material (item-order lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the orderable subset any login.",
+        "description" : "Returns a paginated list of the game items the Lager books: every output of an active blueprint and every item of a stocked type (weapons, armour, ship components, mining and salvage modules, storage containers, loot); orderable=true keeps the blueprint outputs with a resolvable material (item-order lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the orderable subset any login.",
         "operationId" : "getGameItems",
         "parameters" : [ {
           "in" : "query",

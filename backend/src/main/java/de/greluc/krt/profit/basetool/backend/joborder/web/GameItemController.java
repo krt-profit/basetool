@@ -71,11 +71,12 @@ public class GameItemController {
   private final JobOrderItemService jobOrderItemService;
 
   /**
-   * Pages the game items that are the output of at least one active blueprint, or only those
-   * orderable as item-order lines.
+   * Pages the game items bookable as Lager item stock (every blueprint output and every item of a
+   * stocked type, REQ-INV-029), or only those orderable as item-order lines.
    *
    * @param q optional case-insensitive item-name filter
-   * @param orderable {@code true} narrows to items with at least one resolvable material
+   * @param orderable {@code true} narrows to blueprint outputs with at least one resolvable
+   *     material
    * @param page zero-based page index
    * @param size page size
    * @param sort sort spec (whitelist: {@code name}, {@code id}; the default appends {@code id} as a
@@ -87,9 +88,11 @@ public class GameItemController {
   @Operation(
       summary = "List game items",
       description =
-          "Returns a paginated list of game items that are the output of at least one active"
-              + " blueprint; orderable=true keeps those with a resolvable material (item-order"
-              + " lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the"
+          "Returns a paginated list of the game items the Lager books: every output of an"
+              + " active blueprint and every item of a stocked type (weapons, armour, ship"
+              + " components, mining and salvage modules, storage containers, loot);"
+              + " orderable=true keeps the blueprint outputs with a resolvable material"
+              + " (item-order lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the"
               + " orderable subset any login.")
   @Transactional(readOnly = true)
   public PageResponse<InventoryGameItemReferenceDto> getGameItems(

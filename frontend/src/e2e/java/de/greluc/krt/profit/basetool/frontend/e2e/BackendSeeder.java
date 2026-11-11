@@ -2165,6 +2165,33 @@ public final class BackendSeeder {
   }
 
   /**
+   * Seeds a game item no blueprint produces over JDBC, of the given P4K type and sub-type, so the
+   * Lager books it through its stocked type alone (REQ-INV-029). Local-stack only.
+   *
+   * @param gameItemName the display name of the item (shown in the picker)
+   * @param wikiType the item type, e.g. {@code WeaponPersonal}
+   * @param wikiSubType the item sub-type, e.g. {@code Large}
+   * @return the created game item's id
+   */
+  public String seedStockableItem(String gameItemName, String wikiType, String wikiSubType) {
+    UUID gameItemId = UUID.randomUUID();
+    try (Connection connection = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
+        PreparedStatement ps =
+            connection.prepareStatement(
+                "INSERT INTO game_item (id, name, kind, wiki_type, wiki_sub_type)"
+                    + " VALUES (?, ?, 'GENERIC', ?, ?) ON CONFLICT DO NOTHING")) {
+      ps.setObject(1, gameItemId);
+      ps.setString(2, gameItemName);
+      ps.setString(3, wikiType);
+      ps.setString(4, wikiSubType);
+      ps.executeUpdate();
+      return gameItemId.toString();
+    } catch (Exception e) {
+      throw new IllegalStateException("BackendSeeder.seedStockableItem failed", e);
+    }
+  }
+
+  /**
    * Turns a seeded game item into a ship component over JDBC: category {@code VEHICLE_ITEM}, the
    * given SC Wiki type, size and grade (REQ-INV-061). Local-stack only.
    *

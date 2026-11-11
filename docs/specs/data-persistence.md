@@ -1131,7 +1131,7 @@ load-bearing: Hibernate renders a `LIKE` without an `ESCAPE` clause on PostgreSQ
 `like … escape ''`, which switches the escape character off, so an escaped `\%` then matches a
 literal backslash and the search finds nothing. `ILIKE` behaves the same way and takes the same
 clause. Every JPQL `LIKE`/`ILIKE` whose caller escapes follows both halves: the blueprint-backed
-catalogue searches, the location, material, user, mission, operation and ship searches, the
+catalogue searches, the Lager item picker, the location, material, user, mission, operation and ship searches, the
 squadron ship overview, the Materialbörse offer and request boards, and the releasable-stock picker.
 `BankAccountRepository` is the one deliberate exception (REQ-BANK, `bank.md`): its caller does not
 escape, so `%` and `_` act as wildcards on that bank-employee-gated read, and it carries no
@@ -1141,7 +1141,8 @@ are unaffected, because they do not go through the HQL `like` rendering.
 **Acceptance**
 
 - [x] `%` and `_` in a blueprint product, orderable-item or bookable-item search match literally
-  (`BlueprintRepositoryLikeEscapeTest`); the three service callers escape their input.
+  (`BlueprintRepositoryLikeEscapeTest`, `InventoryBookableItemsTest`); the three service callers
+  escape their input.
 - [x] The same holds for every other escaping JPQL query, and an ordinary fragment still matches:
   `LikeEscapeCatalogRepositoriesDataTest` (location, material picker and price overview, mission,
   operation), `UserScopedQueriesDataTest`, `ShipRepositoryPersonalHangarTest` (own hangar and
