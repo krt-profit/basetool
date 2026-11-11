@@ -18,8 +18,15 @@
  */
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { formatParts, separatorsFor } from '/js/kernel/krt-number-format.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
-import { formatWholeAuec } from '/js/joborder/orders-money-amount.js';
+
+const seps = separatorsFor(document.documentElement.lang);
+
+/** @param {string} amount the exact server amount */
+function formatWholeAuec(amount) {
+    return formatParts({ neg: false, int: amount, frac: null }, seps);
+}
 
 /** @typedef {ApiDto<'PreviewJobOrderMoneyProvisionDto'>} PreviewTerms */
 /** @typedef {ApiDto<'JobOrderMoneyProvisionPreview'>} ProvisionPreview */

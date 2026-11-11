@@ -19,13 +19,13 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
-import { bindWholeAuec, requireWholeAuec } from '/js/joborder/orders-money-amount.js';
+import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 
 const form = document.querySelector('#mode-auec form');
 const input = document.getElementById('auec-target');
 
 if (form instanceof HTMLFormElement && input instanceof HTMLInputElement) {
-    bindWholeAuec(input);
+    krtNumberInput.enhance(input);
     form.addEventListener('submit', (event) => {
         event.preventDefault();
         void createOrder(form, input, event.submitter);
@@ -40,8 +40,7 @@ if (form instanceof HTMLFormElement && input instanceof HTMLInputElement) {
  * @param {HTMLElement | null} submitter the activated control
  */
 async function createOrder(form, input, submitter) {
-    const target = requireWholeAuec(input);
-    if (!target) return;
+    if (!input.reportValidity()) return;
     const fields = new FormData(form);
     /** @type {ApiDto<'CreateAuecJobOrderDto'>} */
     const payload = {
@@ -49,7 +48,7 @@ async function createOrder(form, input, submitter) {
         requestingOrgUnitId: String(fields.get('requestingOrgUnitId')),
         handle: String(fields.get('handle')),
         comment: String(fields.get('comment')).trim() || undefined,
-        target,
+        target: String(fields.get('target')),
     };
     const result = await krtFetch.write({
         url: form.action,

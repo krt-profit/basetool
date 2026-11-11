@@ -19,7 +19,7 @@
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
-import { bindWholeAuec, formatWholeAuec, readWholeAuec } from '/js/joborder/orders-money-amount.js';
+import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { bindHolderChoices } from '/js/joborder/orders-money-holders.js';
 import { bindProvisionPreview } from '/js/joborder/orders-money-preview.js';
 import { bindProvisionRecovery } from '/js/joborder/orders-money-recovery.js';
@@ -57,10 +57,10 @@ function bindProvisionForm(root, form) {
     let refusedDraft = null;
     let basis = '';
     let saving = false;
-    bindWholeAuec(input);
+    krtNumberInput.enhance(input);
 
     const preview = bindProvisionPreview(form, `/orders/${root.dataset.orderId}/money`, () => {
-        const amount = readWholeAuec(input.value);
+        const amount = input.value;
         const selection = holders.selection();
         return amount && bankFree.checked && selection
             ? { ...selection, amount, bankHandling: false }
@@ -86,7 +86,7 @@ function bindProvisionForm(root, form) {
         input.removeAttribute('aria-invalid');
         if (refused?.amount) {
             holders.restore(refused);
-            input.value = formatWholeAuec(refused.amount);
+            input.value = refused.amount;
         }
         updateDraft();
         krtModal.open(modalId);
@@ -118,13 +118,13 @@ function bindProvisionForm(root, form) {
     form.addEventListener('input', updateDraft);
     form.addEventListener('change', updateDraft);
     input.addEventListener('blur', () => {
-        const invalid = input.value.trim() !== '' && readWholeAuec(input.value) === null;
+        const invalid = input.validity.customError;
         amountError.hidden = !invalid;
         if (invalid) input.setAttribute('aria-invalid', 'true');
         else input.removeAttribute('aria-invalid');
     });
     input.addEventListener('input', () => {
-        if (readWholeAuec(input.value) !== null) {
+        if (!input.validity.customError) {
             amountError.hidden = true;
             input.removeAttribute('aria-invalid');
         }

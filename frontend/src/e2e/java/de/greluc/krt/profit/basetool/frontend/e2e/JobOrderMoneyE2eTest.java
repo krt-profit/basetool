@@ -29,6 +29,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import java.net.URI;
@@ -88,7 +89,20 @@ class JobOrderMoneyE2eTest {
               route.abort();
             });
 
-        prepareSelfProvision(page, GROUPED_AMOUNT);
+        page.getByTestId("order-money-provide").click();
+        Locator amount = page.getByTestId("order-money-amount");
+        amount.pressSequentially(AMOUNT);
+        assertEquals(GROUPED_AMOUNT, shownAmount(amount));
+        amount.press("Home");
+        amount.press("ArrowRight");
+        amount.pressSequentially("8");
+        assertEquals("98.007.199.254.740.993", shownAmount(amount));
+        assertEquals(2, ((Number) amount.evaluate("field => field.selectionStart")).intValue());
+        amount.press("Backspace");
+        assertEquals(GROUPED_AMOUNT, shownAmount(amount));
+        assertEquals(AMOUNT, amount.evaluate("field => field.value"));
+        assertEquals(AMOUNT, amount.evaluate("field => new FormData(field.form).get(field.name)"));
+        page.getByTestId("order-money-bank-free").check();
         page.getByTestId("order-money-save").click();
         assertThat(page.getByTestId("order-money-unknown")).isVisible();
 
@@ -164,6 +178,15 @@ class JobOrderMoneyE2eTest {
       writer.getByTestId("order-money-amount").fill("1.234,5");
       writer.getByTestId("order-money-bank-free").check();
       assertThat(writer.getByTestId("order-money-save")).isDisabled();
+
+      Locator invalidAmount = writer.getByTestId("order-money-amount");
+      invalidAmount.fill("-1");
+      assertEquals("-1", shownAmount(invalidAmount));
+      assertThat(writer.getByTestId("order-money-save")).isDisabled();
+      JsonObject unbooked =
+          json(seeder.getBody(USERNAME, PASSWORD, "/api/v1" + orderPath + "/money"));
+      assertEquals("0", unbooked.get("provided").getAsString());
+      assertThat(writer.getByTestId("order-money-history-entry")).hasCount(0);
 
       var preview =
           writer.waitForResponse(
@@ -380,6 +403,12 @@ class JobOrderMoneyE2eTest {
     page.getByTestId("order-money-provide").click();
     page.getByTestId("order-money-amount").fill(amount);
     page.getByTestId("order-money-bank-free").check();
+  }
+
+  private static Object shownAmount(Locator input) {
+    return input.evaluate(
+        "field => Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"
+            + " 'value').get.call(field)");
   }
 
   private static String assignReaderHome(BackendSeeder seeder, String suffix) {

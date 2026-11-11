@@ -247,11 +247,27 @@ export function readCanonical(raw, rules, seps) {
  */
 export function formatParts(parts, seps) {
     const sign = parts.neg ? '-' : '';
-    const grouped = parts.int.replace(/\B(?=(\d{3})+(?!\d))/g, seps.group);
+    const grouped = groupDigits(parts.int, seps.group);
     if (parts.frac === null) {
         return sign + grouped;
     }
     return `${sign}${grouped || '0'}${seps.decimal}${parts.frac}`;
+}
+
+/**
+ * Groups a string of digits in a single pass.
+ *
+ * @param {string} digits the integer digits
+ * @param {string} separator the display separator
+ * @returns {string} the grouped digits
+ */
+function groupDigits(digits, separator) {
+    const first = digits.length % 3 || 3;
+    const groups = [digits.slice(0, first)];
+    for (let offset = first; offset < digits.length; offset += 3) {
+        groups.push(digits.slice(offset, offset + 3));
+    }
+    return groups.join(separator);
 }
 
 /**

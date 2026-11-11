@@ -113,7 +113,8 @@
             <div class="form-group">
                 <label for="order-money-amount" th:text="#{orders.money.amount.withUnit}"></label>
                 <input type="text" id="order-money-amount" name="amount" inputmode="numeric" data-number-input="exact-whole"
-                       data-testid="order-money-amount" aria-describedby="order-money-amount-error" required>
+                       data-testid="order-money-amount" th:data-invalid="#{orders.money.amount.invalid}"
+                       aria-describedby="order-money-amount-error" required>
                 <p id="order-money-amount-error" class="field-error" data-money-amount-error hidden
                    th:text="#{orders.money.amount.invalid}"></p>
             </div>

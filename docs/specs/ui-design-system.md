@@ -2903,6 +2903,11 @@ types**, without breaking the input.
   appear; a script that builds one and sets its value calls `krtNumberInput.enhance` first; a form
   reset re-formats them.
 
+Order money fields use the `data-number-input="exact-whole"` mode. They group as the user types
+and keep the caret and canonical FormData contract. They preserve a valid positive whole amount
+as digits, with no 15-digit cap or floating-point value. An invalid sign or fractional value,
+including malformed pasted numbers, stays visible and invalid. No input is rounded.
+
 **Acceptance**
 
 - [x] Typing `1999999,0` on a German page shows `1.999.999,0`, `1999999.0` on an English page shows

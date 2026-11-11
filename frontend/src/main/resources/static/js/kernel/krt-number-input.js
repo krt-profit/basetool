@@ -18,6 +18,7 @@
  */
 
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
+import { enhanceExactWhole } from '/js/kernel/krt-exact-whole-input.js';
 import {
     canonicalOf,
     caretAfter,
@@ -38,7 +39,8 @@ import {
  * @typedef {{ shown: string, canonical: string }} KrtNumberState
  */
 
-const SELECTOR = `input[data-number-input]:not([data-number-input="${EXACT_WHOLE_INPUT_MODE}"])`;
+const SELECTOR = 'input[data-number-input]';
+const STANDARD_SELECTOR = `${SELECTOR}:not([data-number-input="${EXACT_WHOLE_INPUT_MODE}"])`;
 
 /** The thousands and decimal separators of the page language. */
 const SEPS = separatorsFor(document.documentElement.lang);
@@ -208,6 +210,10 @@ function readForeign(el, text) {
  * @returns {string} the canonical value
  */
 function canonicalValue(el) {
+    if (el.dataset.numberInput === EXACT_WHOLE_INPUT_MODE) {
+        enhanceExactWhole(el, SEPS, shownText, writeShown);
+        return el.value;
+    }
     const text = shownText(el);
     const state = states.get(el);
     if (state && state.shown === text) {
@@ -224,6 +230,10 @@ function canonicalValue(el) {
  * @param {HTMLInputElement} el the field
  */
 function enhance(el) {
+    if (el.dataset.numberInput === EXACT_WHOLE_INPUT_MODE) {
+        enhanceExactWhole(el, SEPS, shownText, writeShown);
+        return;
+    }
     if (states.has(el)) {
         return;
     }
@@ -273,6 +283,10 @@ function enhanceWithin(root) {
  * @param {HTMLInputElement} el the field
  */
 function resync(el) {
+    if (el.dataset.numberInput === EXACT_WHOLE_INPUT_MODE) {
+        enhanceExactWhole(el, SEPS, shownText, writeShown)();
+        return;
+    }
     if (!states.has(el)) {
         return;
     }
@@ -286,7 +300,7 @@ function resync(el) {
  */
 function onInput(e) {
     const el = /** @type {HTMLInputElement} */ (e.target);
-    if (!(el instanceof HTMLInputElement) || !el.matches(SELECTOR)) {
+    if (!(el instanceof HTMLInputElement) || !el.matches(STANDARD_SELECTOR)) {
         return;
     }
     enhance(el);
@@ -327,7 +341,7 @@ function onInput(e) {
  */
 function onCompositionEnd(e) {
     const el = /** @type {HTMLInputElement} */ (e.target);
-    if (!(el instanceof HTMLInputElement) || !el.matches(SELECTOR)) {
+    if (!(el instanceof HTMLInputElement) || !el.matches(STANDARD_SELECTOR)) {
         return;
     }
     enhance(el);
@@ -345,7 +359,7 @@ function onCompositionEnd(e) {
  */
 function onChange(e) {
     const el = /** @type {HTMLInputElement} */ (e.target);
-    if (!(el instanceof HTMLInputElement) || !el.matches(SELECTOR)) {
+    if (!(el instanceof HTMLInputElement) || !el.matches(STANDARD_SELECTOR)) {
         return;
     }
     resync(el);
@@ -417,7 +431,7 @@ function onMutations(records) {
         if (record.type === 'attributes') {
             const target = /** @type {Element} */ (record.target);
             if (target instanceof HTMLInputElement && target.matches(SELECTOR)) {
-                if (states.has(target)) {
+                if (states.has(target) || target.dataset.numberInput === EXACT_WHOLE_INPUT_MODE) {
                     resync(target);
                 } else {
                     enhance(target);
