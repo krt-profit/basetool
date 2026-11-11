@@ -73,7 +73,7 @@ class JobOrderBankMoneyE2eTest {
             JobOrderMoneyE2eTest.createOrder(
                 order, base, fixture.collectionUnit(), fixture.requesterUnit(), TEN_MILLION);
         String money = orderPath + "/money";
-        String operation = recoverPendingDeposit(order, money, fixture.wrongAccount());
+        String operation = recoverPendingDeposit(order, money, fixture);
         figure(order, "order-money-provided", "0");
         order.waitForFunction(
             "topic => window.krtLiveSync?.subscribedTopics().includes(topic)",
@@ -99,7 +99,7 @@ class JobOrderBankMoneyE2eTest {
             fixture.holderA());
         figure(order, "order-money-provided", "4.000.000");
 
-        prepareDeposit(order, fixture.collectionAccount(), SIX_MILLION);
+        prepareDeposit(order, fixture, fixture.collectionAccount(), SIX_MILLION);
         var second = post(order, money + "/provisions", "order-money-save");
         assertEquals("WAITING", second.get("state").getAsString());
         confirm(
@@ -180,6 +180,8 @@ class JobOrderBankMoneyE2eTest {
     seeder.ensureBankGrant(STAFF, password(STAFF), writer, collection, true, true, true);
     seeder.ensureBankGrant(STAFF, password(STAFF), writer, requester, false, false, false);
     seeder.ensureBankGrant(STAFF, password(STAFF), writer, wrong, true, false, false);
+    grantAccountVisibility(seeder, requester, writer);
+    grantAccountVisibility(seeder, wrong, writer);
     String holderA =
         seeder.registerBankHolder(
             STAFF, password(STAFF), seeder.getUserId(EMPLOYEE, password(EMPLOYEE)));
@@ -188,7 +190,15 @@ class JobOrderBankMoneyE2eTest {
         collectionUnit, requesterUnit, collection, requester, wrong, holderA, holderB);
   }
 
-  private static String recoverPendingDeposit(Page order, String money, String wrongAccount) {
+  private static void grantAccountVisibility(BackendSeeder seeder, String account, String user) {
+    seeder.postBody(
+        ADMIN,
+        password(ADMIN),
+        "/api/v1/bank/org-units/accounts/" + account + "/visibility/user/" + user,
+        "{}");
+  }
+
+  private static String recoverPendingDeposit(Page order, String money, Fixture fixture) {
     var accepted = new AtomicReference<JsonObject>();
     var submissions = new AtomicInteger();
     String path = money + "/provisions";
@@ -207,7 +217,7 @@ class JobOrderBankMoneyE2eTest {
           accepted.set(json(response.text()));
           route.abort();
         });
-    prepareDeposit(order, wrongAccount, "5000000");
+    prepareDeposit(order, fixture, fixture.wrongAccount(), "5000000");
     order.getByTestId("order-money-save").click();
     assertThat(order.getByTestId("order-money-unknown")).isVisible();
     var original = accepted.get();
@@ -224,13 +234,17 @@ class JobOrderBankMoneyE2eTest {
     return operation;
   }
 
-  private static void prepareDeposit(Page order, String account, String amount) {
+  private static void prepareDeposit(Page order, Fixture fixture, String account, String amount) {
     order.getByTestId("order-money-provide").click();
     assertThat(order.getByTestId("order-money-bank")).isChecked();
     assertThat(order.getByTestId("order-money-bank-purpose")).hasValue("DEPOSIT");
     assertThat(order.getByTestId("order-money-bank-custodian")).isHidden();
     assertThat(order.getByTestId("order-money-holder-mode")).isHidden();
-    order.getByTestId("order-money-bank-account").selectOption(account);
+    var accounts = order.getByTestId("order-money-bank-account");
+    assertThat(accounts).hasValue(fixture.collectionAccount());
+    if (!fixture.collectionAccount().equals(account)) {
+      accounts.selectOption(account);
+    }
     order.getByTestId("order-money-amount").fill(amount);
     order.getByTestId("order-money-bank-payment").check();
   }
@@ -239,7 +253,10 @@ class JobOrderBankMoneyE2eTest {
     order.getByTestId("order-money-designate-recipient").click();
     order.getByTestId("order-money-recipient-mode").selectOption("bank");
     order.getByTestId("order-money-recipient-bank-account").selectOption(account);
-    return post(order, money + "/recipients", "order-money-recipient-save").get("id").getAsString();
+    String designation =
+        post(order, money + "/recipients", "order-money-recipient-save").get("id").getAsString();
+    assertThat(order.locator("[data-money-bank-recipient='" + designation + "']")).isAttached();
+    return designation;
   }
 
   private static void prepareTransfer(
