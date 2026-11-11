@@ -57,7 +57,25 @@ final class ContextualOrderCreator {
       String material,
       int quality,
       double amount) {
-    String userId = seeder.getUserId(creator, creatorPassword);
+    try (var _ = grantWriter(admin, adminPassword, creator, creatorPassword, unit)) {
+      return seeder.createJobOrder(
+          creator, creatorPassword, unit, handle, material, quality, amount);
+    }
+  }
+
+  /**
+   * Grants contextual order authority until the returned membership restorer closes.
+   *
+   * @param admin the fixture administrator
+   * @param adminPassword the administrator's test password
+   * @param writer the user receiving the Staffel write authority
+   * @param writerPassword the writer's test password
+   * @param unit the Staffel receiving the membership
+   * @return the original membership snapshot
+   */
+  RestoreStaffeln grantWriter(
+      String admin, String adminPassword, String writer, String writerPassword, String unit) {
+    String userId = seeder.getUserId(writer, writerPassword);
     String membershipPath = "/api/v1/org-units/members/" + userId + "/memberships";
     JsonArray memberships =
         JsonParser.parseString(seeder.getBody(admin, adminPassword, membershipPath + "/detail"))
@@ -90,10 +108,7 @@ final class ContextualOrderCreator {
     }
     target.addProperty("isLogistician", true);
     replaceStaffeln(seeder, admin, adminPassword, membershipPath, granted);
-    try (var _ = new RestoreStaffeln(seeder, admin, adminPassword, membershipPath, original)) {
-      return seeder.createJobOrder(
-          creator, creatorPassword, unit, handle, material, quality, amount);
-    }
+    return new RestoreStaffeln(seeder, admin, adminPassword, membershipPath, original);
   }
 
   private static boolean enabled(@Nullable JsonElement value) {
@@ -115,7 +130,7 @@ final class ContextualOrderCreator {
   }
 
   /**
-   * The original Staffel membership set restored when the fixture's create action ends.
+   * Restores the fixture user's original Staffel memberships when closed.
    *
    * @param seeder the backend fixture transport
    * @param admin the fixture administrator
@@ -123,7 +138,7 @@ final class ContextualOrderCreator {
    * @param path the membership endpoint
    * @param staffeln the original Staffel memberships
    */
-  private record RestoreStaffeln(
+  record RestoreStaffeln(
       BackendSeeder seeder, String admin, String password, String path, JsonArray staffeln)
       implements AutoCloseable {
     /** Restores the original Staffel memberships through the backend API. */

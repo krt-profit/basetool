@@ -137,7 +137,15 @@ class JobOrderItemHandoverE2eTest {
             "the partial item handover must consume one earmarked unit (REQ-ORDERS-030)");
 
         E2eSupport.navigate(page, detailUrl + "/items/edit");
-        assertThat(page.getByTestId("order-item-submit")).hasCount(0);
+        Locator orderedQuantity = page.locator("input[name='items[0].amount']");
+        assertThat(orderedQuantity).hasValue("2");
+        assertThat(orderedQuantity).hasAttribute("min", "2");
+        String revisedComment = "E2E comment after partial handover";
+        page.locator("#item-comment").fill(revisedComment);
+        E2eSupport.clickSubmitClearingFooter(page.getByTestId("order-item-submit"));
+        page.waitForURL(detailUrl);
+        assertThat(page.getByText(revisedComment, new Page.GetByTextOptions().setExact(true)))
+            .isVisible();
 
         E2eSupport.navigate(page, itemHandoverUrl);
         recordItemHandover(page, "1", "E2E Item Recipient B");

@@ -1362,6 +1362,18 @@ public final class BackendSeeder {
   }
 
   /**
+   * Grants the notification fixture recipient the actual IRIDIUM writer role.
+   *
+   * @param username the fixture administrator receiving the grant
+   * @param password the administrator's test password
+   * @return the original membership snapshot
+   */
+  ContextualOrderCreator.RestoreStaffeln grantIridiumWriter(String username, String password) {
+    return new ContextualOrderCreator(this)
+        .grantWriter(username, password, username, password, IRIDIUM_SQUADRON_ID);
+  }
+
+  /**
    * Creates a job order with distinct responsible and requesting org units (REQ-ORDERS-023).
    *
    * @param username the Keycloak username of the (admin) test user
