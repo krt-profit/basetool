@@ -18,10 +18,17 @@
  */
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { bindAccountMovement } from '/js/joborder/orders-money-account-movement.js';
+import { bindBankMode } from '/js/joborder/orders-money-bank.js';
+import { bindPlayerBankMovement } from '/js/joborder/orders-money-player-bank.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { orderHolders, orderMoneyProjection } from '/js/joborder/orders-money-holders.js';
-import { bindMoneyPreview, showPreviewAmounts } from '/js/joborder/orders-money-preview.js';
+import {
+    bindMoneyPreview,
+    showBankPreview,
+    showPreviewAmounts,
+} from '/js/joborder/orders-money-preview.js';
 import {
     bindMovementParties,
     showMovementField,
@@ -53,6 +60,7 @@ const activePurposes = new Set(['COLLECTION', ...handovers]);
  */
 function renderMovement(output, result, handover, returning, hasDestination, nameUnavailable) {
     const { amount, fee, provision, sourceAfter } = result;
+    const bank = 'bank' in result ? result.bank : undefined;
     const shortfall = 'shortfall' in result ? result.shortfall : undefined;
     const overpayment = 'overpayment' in result ? result.overpayment : undefined;
     const destinationAfter =
@@ -61,8 +69,10 @@ function renderMovement(output, result, handover, returning, hasDestination, nam
             : undefined;
     showPreviewAmounts(output, {
         amount,
-        fee,
-        charge: returning ? fee : (BigInt(amount || '0') + BigInt(fee || '0')).toString(),
+        fee: bank?.actualFee ?? fee,
+        charge:
+            bank?.orderSourceCharge ??
+            (returning ? fee : (BigInt(amount || '0') + BigInt(fee || '0')).toString()),
         provision,
         sourceAfter,
         destinationAfter,
@@ -86,14 +96,9 @@ function renderMovement(output, result, handover, returning, hasDestination, nam
     output
         .querySelector('[data-preview-destination-balance]')
         ?.toggleAttribute('hidden', destinationAfter === undefined);
-    const projection = orderMoneyProjection()?.dataset;
-    const remaining = BigInt(projection?.remaining || '0');
-    const completes = handover && remaining > 0n && BigInt(amount || '0') >= remaining;
-    const reopens =
-        returning &&
-        projection?.status === 'COMPLETED' &&
-        BigInt(projection.netHandedOver || '0') - BigInt(amount || '0') <
-            BigInt(projection.target || '0');
+    const completes = handover && 'completes' in result && result.completes;
+    const reopens = returning && 'reopens' in result && result.reopens;
+    showBankPreview(output, bank);
     output.querySelector('[data-preview-completes]')?.toggleAttribute('hidden', !completes);
     output.querySelector('[data-preview-reopens]')?.toggleAttribute('hidden', !reopens);
 }
@@ -109,7 +114,6 @@ export function bindMoneyMovement(root, recovery) {
     if (!(form instanceof HTMLFormElement)) throw new Error('The order movement form is missing');
     const kind = form.elements.namedItem('kind');
     const amount = form.elements.namedItem('amount');
-    const bankFree = form.elements.namedItem('bankFree');
     const topUp = form.elements.namedItem('topUp');
     const commitment = form.elements.namedItem('commitmentId');
     const fields = form.querySelector('fieldset');
@@ -117,7 +121,6 @@ export function bindMoneyMovement(root, recovery) {
     if (
         !(kind instanceof HTMLSelectElement) ||
         !(amount instanceof HTMLInputElement) ||
-        !(bankFree instanceof HTMLInputElement) ||
         !(topUp instanceof HTMLInputElement) ||
         !(commitment instanceof HTMLSelectElement) ||
         !(fields instanceof HTMLFieldSetElement) ||
@@ -133,7 +136,10 @@ export function bindMoneyMovement(root, recovery) {
     let saving = false;
     krtNumberInput.enhance(amount);
 
-    const parties = bindMovementParties(form, kind, url, self);
+    const bank = bindBankMode(form);
+    const parties = bindMovementParties(form, kind, url, self, bank.enabled);
+    const account = bindAccountMovement(form, kind, bank.enabled, parties.canReturn);
+    const playerBank = bindPlayerBankMovement(form, kind, url, () => sync(true));
     const reassignment = bindReassignmentDestination(form, url, (live) => sync(live));
     const isReassignment = () => kind.value === 'REASSIGNMENT';
     const isReturning = () => kind.value === 'REQUESTER_RETURN';
@@ -146,26 +152,30 @@ export function bindMoneyMovement(root, recovery) {
         const hasOwnScope = parties.moveForOthers() || parties.ownsHolding();
         for (const option of kind.options) {
             const permitted = activePurposes.has(option.value)
-                ? active && state?.canRecordMovement === 'true'
+                ? active &&
+                  state?.canRecordMovement === 'true' &&
+                  (option.value === 'PURPOSE_HANDOVER' && bank.enabled()
+                      ? account.canHandOver() || orderHolders().length > 0
+                      : orderHolders().length > 0)
                 : option.value === 'REQUESTER_RETURN'
-                  ? parties.canReturn()
-                  : hasOwnScope;
+                  ? parties.canReturn() || (bank.enabled() && account.canReturn())
+                  : option.value === 'SHORTAGE' || option.value === 'RELEASE'
+                    ? hasOwnScope || account.canAdjust()
+                    : hasOwnScope && orderHolders().length > 0;
             option.disabled = !valid || !permitted;
             option.hidden = option.disabled && option.value !== kind.value;
         }
     };
 
-    /** @returns {MovementDraft | null} the complete terms before selecting additional funds */
-    const readBase = () => {
+    const playerBankEnabled = () =>
+        bank.enabled() && !account.active() && !isReassignment() && !account.adjusting();
+
+    /** @returns {MovementDraft | null} the complete Order-side terms before selecting additional funds */
+    const readOrderTerms = () => {
         const state = orderMoneyProjection()?.dataset;
-        if (
-            !state ||
-            kind.selectedOptions.item(0)?.disabled ||
-            !amount.value ||
-            !bankFree.checked
-        ) {
-            return null;
-        }
+        if (!state || kind.selectedOptions.item(0)?.disabled || !amount.value) return null;
+        if (account.active()) return account.selection(amount.value);
+
         const common = { amount: amount.value, bankHandling: false };
         const holder = parties.source();
         const targetVersion = Number(state.targetVersion || 0);
@@ -236,10 +246,23 @@ export function bindMoneyMovement(root, recovery) {
         }
     };
 
+    /** @returns {MovementDraft | null} the complete terms before selecting additional funds */
+    const readBase = () => {
+        const draft = readOrderTerms();
+        if (!draft || !playerBankEnabled() || draft.command === 'movements/reassignment')
+            return draft;
+        const selection = playerBank.selection();
+        if (!selection) return null;
+        draft.terms.bankHandling = true;
+        draft.terms.bank = selection;
+        return draft;
+    };
+
     const showAttribution = () =>
         showMovementField(
             commitment,
             !!(
+                !account.active() &&
                 activePurposes.has(kind.value) &&
                 topUp.checked &&
                 offered &&
@@ -250,7 +273,13 @@ export function bindMoneyMovement(root, recovery) {
     /** @returns {MovementDraft | null} the draft including any consciously selected fee funding */
     const readTerms = () => {
         const draft = readBase();
-        if (!draft || !topUp.checked || !offered || draft.command === 'movements/reassignment') {
+        if (
+            !draft ||
+            account.active() ||
+            !topUp.checked ||
+            !offered ||
+            draft.command === 'movements/reassignment'
+        ) {
             return draft;
         }
         if (draft.command === 'movements/settlement') {
@@ -268,7 +297,13 @@ export function bindMoneyMovement(root, recovery) {
         readTerms,
         (output, body, draft) => {
             const result = /** @type {MovementPreview | ReassignmentPreview | null} */ (body);
-            if (!result || typeof result.amount !== 'string' || typeof result.fee !== 'string') {
+            const bankRequested = 'bankHandling' in draft.terms && draft.terms.bankHandling;
+            if (
+                !result ||
+                typeof result.amount !== 'string' ||
+                typeof result.fee !== 'string' ||
+                (bankRequested && (!('bank' in result) || !result.bank))
+            ) {
                 return undefined;
             }
             const handover = draft.command === 'movements' && handovers.has(draft.terms.kind);
@@ -279,7 +314,7 @@ export function bindMoneyMovement(root, recovery) {
                 (draft.terms.kind !== 'RELEASE' && draft.terms.kind !== 'SHORTAGE');
             renderMovement(
                 output,
-                result,
+                account.active() ? { ...result, ...account.labels() } : result,
                 handover,
                 returning,
                 hasDestination,
@@ -292,7 +327,9 @@ export function bindMoneyMovement(root, recovery) {
             const unfunded = typeof shortfall === 'string' && shortfall !== '0';
             const offer = unfunded ? shortfall : fee;
             if (!topUp.checked) {
-                const mayFund = returning ? parties.returnFeeAuthority() : parties.canSpend();
+                const mayFund =
+                    !account.active() &&
+                    (returning ? parties.returnFeeAuthority() : parties.canSpend());
                 const feeOnly = draft.command === 'movements/settlement';
                 offered =
                     mayFund && offer && offer !== '0' && (!feeOnly || BigInt(offer) <= BigInt(fee))
@@ -317,14 +354,22 @@ export function bindMoneyMovement(root, recovery) {
      */
     const sync = (live = false, refreshPeer = false) => {
         updatePurposes();
-        parties.sync();
+        account.refreshPurpose();
+        bank.show(!isReassignment() && !account.adjusting());
+        const accountAction = account.active();
+        if (accountAction) parties.hide();
+        else parties.sync();
+        playerBank.sync(accountAction ? null : readOrderTerms(), playerBankEnabled());
+        account.sync();
         reassignment.refresh(isReassignment(), parties.source(), refreshPeer);
         const next = JSON.stringify(readBase());
         if (next !== basis) {
             if (live && amount.value) changed.hidden = false;
-            offered = '';
-            topUp.checked = false;
-            topUp.closest('label')?.setAttribute('hidden', '');
+            if (!live) {
+                offered = '';
+                topUp.checked = false;
+                topUp.closest('label')?.setAttribute('hidden', '');
+            }
         }
         basis = next;
         showAttribution();
@@ -345,14 +390,26 @@ export function bindMoneyMovement(root, recovery) {
         offered = '';
         topUp.closest('label')?.setAttribute('hidden', '');
         if (refused) {
+            bank.restore(
+                refused.command === 'movements/reassignment' || refused.terms.bankHandling,
+            );
             kind.value =
                 refused.command === 'movements/reassignment' ? 'REASSIGNMENT' : refused.terms.kind;
         }
         updatePurposes();
+        if (!refused && account.canHandOver()) kind.value = 'PURPOSE_HANDOVER';
+        if (!refused && !account.canHandOver() && account.canReturn())
+            kind.value = 'REQUESTER_RETURN';
         if (!refused && kind.selectedOptions.item(0)?.disabled) {
             kind.value = Array.from(kind.options).find((option) => !option.disabled)?.value || '';
         }
-        parties.sync();
+        account.refreshPurpose(true);
+        if (account.active()) {
+            parties.hide();
+            account.sync(true);
+        } else {
+            parties.sync();
+        }
         const own = orderHolders().find(({ userId }) => userId === self);
         parties.setSource(refused?.terms.sourceHolderId || (isReturning() ? '' : own?.id) || '');
         if (refused) {
@@ -363,12 +420,13 @@ export function bindMoneyMovement(root, recovery) {
                     refused.terms.destinationHolderId || '',
                     !refused.terms.destinationHolderId && refused.terms.confirmSamePerson === true,
                 );
-            } else {
+            } else if (!account.restore(refused)) {
                 parties.restore(refused.terms);
             }
         }
         sync();
         krtModal.open(modalId);
+        if (playerBankEnabled()) void playerBank.refresh('');
     };
 
     krtEvents.on('click', 'od-money-move', () => {
@@ -386,7 +444,16 @@ export function bindMoneyMovement(root, recovery) {
         if (!krtModal.isOpen(modalId)) reassignment.reset();
     });
     form.addEventListener('input', () => sync());
-    form.addEventListener('change', () => sync());
+    form.addEventListener('change', (event) => {
+        sync();
+        if (
+            playerBankEnabled() &&
+            (event.target === kind ||
+                (event.target instanceof HTMLInputElement && event.target.name === 'bankHandling'))
+        ) {
+            void playerBank.refresh();
+        }
+    });
     document.addEventListener('krt:swapped', (event) => {
         if (!krtModal.isOpen(modalId)) return;
         const section = event.detail.container?.id;
@@ -404,6 +471,7 @@ export function bindMoneyMovement(root, recovery) {
             sync(true);
         } else if (section === 'order-money-results') {
             sync(true, true);
+            if (playerBankEnabled()) void playerBank.refresh();
         }
     });
     form.addEventListener('submit', async (event) => {

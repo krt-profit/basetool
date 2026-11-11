@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.CorrectJobOrderMone
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.DesignateJobOrderMoneyRecipientDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyBankAccounts;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyCorrectionPreview;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyHolderCandidate;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyMovementPreview;
@@ -31,11 +32,14 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyProvis
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyReassignmentDestination;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyReassignmentPreview;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyRecipientView;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyRepairQuote;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyRepairView;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyView;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MoveJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.PreviewJobOrderMoneyProvisionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ProvideJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReplaceJobOrderBankAttemptDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.SettleJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyInformationDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyTargetDto;
@@ -75,6 +79,16 @@ public class JobOrderMoneyBackendClient {
    */
   public JobOrderMoneyView view(@NotNull UUID id) {
     return backend.get(MONEY, JobOrderMoneyView.class, id);
+  }
+
+  /**
+   * Reads the Bank accounts available to the caller for the current Order actions.
+   *
+   * @param id the order
+   * @return the scoped references for collection, designation and withdrawal
+   */
+  public JobOrderMoneyBankAccounts bankAccounts(@NotNull UUID id) {
+    return backend.get(MONEY + "/bank-accounts", JobOrderMoneyBankAccounts.class, id);
   }
 
   /**
@@ -338,6 +352,57 @@ public class JobOrderMoneyBackendClient {
    */
   public JobOrderMoneyOutcome correct(@NotNull UUID id, @NotNull CorrectJobOrderMoneyDto request) {
     return backend.post(MONEY + "/corrections", request, JobOrderMoneyOutcome.class, id);
+  }
+
+  /**
+   * Reads the current action and choices for a failed attempt.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @return the authorized repair terms
+   */
+  public JobOrderMoneyRepairView bankRepair(@NotNull UUID id, @NotNull UUID operation) {
+    return backend.get(
+        MONEY + "/operations/{operation}/bank-replacement",
+        JobOrderMoneyRepairView.class,
+        id,
+        operation);
+  }
+
+  /**
+   * Quotes corrected terms using the failed attempt's retained basis.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @param request the failed revision and proposed corrections
+   * @return the exact fee and bound amount
+   */
+  public JobOrderMoneyRepairQuote previewBankRepair(
+      @NotNull UUID id, @NotNull UUID operation, @NotNull ReplaceJobOrderBankAttemptDto request) {
+    return backend.post(
+        MONEY + "/operations/{operation}/bank-replacement/preview",
+        request,
+        JobOrderMoneyRepairQuote.class,
+        id,
+        operation);
+  }
+
+  /**
+   * Repairs a failed request under the same logical identity.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @param request the failed revision and confirmed terms
+   * @return the new authoritative outcome
+   */
+  public JobOrderMoneyOutcome replaceBankAttempt(
+      @NotNull UUID id, @NotNull UUID operation, @NotNull ReplaceJobOrderBankAttemptDto request) {
+    return backend.post(
+        MONEY + "/operations/{operation}/bank-replacement",
+        request,
+        JobOrderMoneyOutcome.class,
+        id,
+        operation);
   }
 
   /**

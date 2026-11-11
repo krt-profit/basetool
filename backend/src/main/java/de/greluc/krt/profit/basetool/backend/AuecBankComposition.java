@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAccountRight;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActors;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedAccountOptions;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedAttempt;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedEffectHandler;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedOutcome;
@@ -34,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankEffects.De
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankEffects.Outcome;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.MANDATORY)
 class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
   private final BankLinkedPayments bank;
+  private final BankLinkedAccountOptions accountOptions;
   private final JobOrderBankEffects order;
   private final BankAccessPolicy access;
   private final BankActors actors;
@@ -55,7 +58,7 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
 
   @Override
   public void submit(@NotNull Payment payment) {
-    bank.submit(attempt(payment.attemptId(), payment.purposeRef()), toBank(payment));
+    bank.submit(attempt(payment.attemptId(), payment.purposeRef()), toBank(terms(payment)));
   }
 
   @Override
@@ -64,7 +67,7 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
         predecessor.requestId(),
         attempt(predecessor.attemptId(), payment.purposeRef()),
         attempt(payment.attemptId(), payment.purposeRef()),
-        toBank(payment));
+        toBank(terms(payment)));
   }
 
   @Override
@@ -83,6 +86,33 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
     return access
         .accessTo(actors.of(auth.currentUserId().orElse(null)), accountId, null)
         .has(BankAccountRight.VIEW);
+  }
+
+  @Override
+  public @NotNull AccountOptions accountOptions(
+      @NotNull UUID responsibleUnit,
+      @NotNull UUID requestingUnit,
+      boolean canDeposit,
+      boolean canDesignate,
+      boolean canDebit) {
+    var options =
+        accountOptions.candidates(
+            new BankLinkedAccountOptions.Scope(
+                responsibleUnit, requestingUnit, canDeposit, canDesignate, canDebit));
+    return new AccountOptions(
+        accounts(options.collection()),
+        accounts(options.designation()),
+        accounts(options.withdrawal()),
+        accounts(options.transfer()),
+        options.custodians().stream()
+            .map(holder -> new CustodianRef(holder.id(), holder.userId(), holder.name()))
+            .toList());
+  }
+
+  private static List<AccountRef> accounts(List<BankLinkedAccountOptions.Account> references) {
+    return references.stream()
+        .map(account -> new AccountRef(account.id(), account.name()))
+        .toList();
   }
 
   @Override
@@ -135,7 +165,31 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
     return new BankLinkedAttempt(id, new BankPurpose(BankPurposeKind.AUEC_ORDER, purposeRef));
   }
 
-  private static BankLinkedPayment toBank(Payment payment) {
+  @Override
+  public @NotNull Quote quote(@NotNull Terms terms) {
+    var quote = bank.quote(toBank(terms));
+    return new Quote(quote.pending(), quote.sourceDebit());
+  }
+
+  @Override
+  public @NotNull Quote quoteReplacement(
+      @NotNull Terms terms, @NotNull UUID purposeRef, @NotNull PreviousAttempt predecessor) {
+    var quote =
+        bank.quoteReplacement(
+            toBank(terms), predecessor.requestId(), attempt(predecessor.attemptId(), purposeRef));
+    return new Quote(quote.pending(), quote.sourceDebit());
+  }
+
+  private static Terms terms(Payment payment) {
+    return new Terms(
+        payment.selection(),
+        payment.amount(),
+        payment.rate(),
+        payment.actualPayment(),
+        payment.counterparty());
+  }
+
+  private static BankLinkedPayment toBank(Terms payment) {
     var selected = payment.selection();
     var terms =
         new BankLinkedPayment.Terms(
@@ -181,13 +235,13 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
     };
   }
 
-  private static BankLinkedPayment.Counterparty depositor(Payment payment) {
+  private static BankLinkedPayment.Counterparty depositor(Terms payment) {
     return payment.counterparty() == null
         ? new BankLinkedPayment.Counterparty.Retained()
         : party(payment);
   }
 
-  private static BankLinkedPayment.Counterparty party(Payment payment) {
+  private static BankLinkedPayment.Counterparty party(Terms payment) {
     Counterparty party = Objects.requireNonNull(payment.counterparty());
     return party.userId() == null
         ? new BankLinkedPayment.Counterparty.Accountless(Objects.requireNonNull(party.name()), null)

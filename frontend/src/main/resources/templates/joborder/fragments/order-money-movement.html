@@ -7,6 +7,7 @@
            th:text="#{orders.money.basis.changed}"></p>
         <fieldset class="form-section">
             <legend class="visually-hidden" th:text="#{orders.money.move}"></legend>
+            <fieldset th:replace="~{joborder/fragments/order-money-bank :: mode('order-money-movement-bank')}"></fieldset>
             <div class="form-group">
                 <label for="order-money-movement-kind" th:text="#{orders.money.movement.purpose}"></label>
                 <select id="order-money-movement-kind" name="kind" data-testid="order-money-movement-kind">
@@ -18,6 +19,19 @@
                     <option value="SHORTAGE" th:text="#{orders.money.movement.shortage}"></option>
                     <option value="SETTLEMENT" th:text="#{orders.money.movement.settlement}"></option>
                     <option value="REASSIGNMENT" th:text="#{orders.money.movement.reassignment}"></option>
+                </select>
+            </div>
+            <div class="form-group" hidden>
+                <label for="order-money-movement-source-type" th:text="#{orders.money.movement.source}"></label>
+                <select id="order-money-movement-source-type" name="sourceType" disabled>
+                    <option value="player" th:text="#{orders.money.holder}"></option>
+                    <option value="account" th:text="#{orders.money.bank.account}"></option>
+                </select>
+            </div>
+            <div class="form-group" hidden>
+                <label for="order-money-movement-account" th:text="#{orders.money.bank.account}"></label>
+                <select id="order-money-movement-account" name="accountHoldingId" data-testid="order-money-movement-account" required disabled>
+                    <option value="" th:text="#{orders.create.select}"></option>
                 </select>
             </div>
             <div class="form-group">
@@ -70,16 +84,15 @@
                     <span th:text="#{orders.money.movement.confirmSamePerson}"></span>
                 </label>
             </div>
+
             <div class="form-group">
                 <label for="order-money-movement-amount" th:text="#{orders.money.movement.net}"></label>
                 <input type="text" id="order-money-movement-amount" name="amount" inputmode="numeric"
                        data-number-input="exact-whole" data-testid="order-money-movement-amount"
                        th:data-invalid="#{orders.money.amount.invalid}" required>
             </div>
-            <label class="cluster gap-2">
-                <input type="checkbox" name="bankFree" data-testid="order-money-movement-bank-free" required>
-                <span th:text="#{orders.money.bankFree}"></span>
-            </label>
+
+            <th:block th:replace="~{joborder/fragments/order-money-bank :: movement}"></th:block>
             <label class="cluster gap-2" hidden>
                 <input type="checkbox" name="topUp" data-testid="order-money-movement-top-up">
                 <span><span th:text="#{orders.money.movement.topUp}"></span>
@@ -134,11 +147,13 @@
                     <dt class="fact-k" th:text="#{orders.money.overpaid.withUnit}"></dt>
                     <dd class="fact-v" data-preview-value="overpayment"></dd>
                 </div>
+                <th:block th:replace="~{joborder/fragments/order-money-bank :: preview}"></th:block>
             </dl>
+            <p th:replace="~{joborder/fragments/order-money-bank :: disposition}"></p>
             <p data-preview-completes hidden th:text="#{orders.money.movement.completes}"></p>
             <p data-preview-reopens hidden th:text="#{orders.money.movement.reopens}"></p>
         </div>
-        <p class="alert alert-warning" role="status" data-money-preview-error hidden></p>
+        <p th:replace="~{joborder/fragments/order-money-bank :: problem}"></p>
         <button type="button" class="btn btn-ghost" data-money-preview-retry hidden
                 th:text="#{orders.money.preview.retry}"></button>
     </div>
@@ -151,7 +166,7 @@
 </form>
 
 <div th:fragment="partyChoice(id, name)" class="form-group" data-name-limit="200" hidden>
-    <label th:for="${id}" th:text="#{orders.money.holder.name}"></label>
+    <label th:for="${id}" th:text="#{__${name == 'bankDepositor' ? 'orders.money.bank.payer' : 'orders.money.holder.name'}__}"></label>
     <select th:id="${id}" th:name="${name}" th:data-testid="${id}"
             th:data-free-text-label="#{orders.money.holder.freeText('{0}')}"
             th:data-combobox-placeholder="#{orders.money.holder.search}"

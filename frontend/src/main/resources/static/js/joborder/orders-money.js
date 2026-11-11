@@ -21,8 +21,10 @@ import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { bindHolderChoices } from '/js/joborder/orders-money-holders.js';
+import { bindBankProvision } from '/js/joborder/orders-money-bank.js';
 import { bindProvisionPreview } from '/js/joborder/orders-money-preview.js';
 import { bindMoneyRecovery } from '/js/joborder/orders-money-recovery.js';
+import { bindLinkedMoneyRepair } from '/js/joborder/orders-money-repair.js';
 import { bindMoneyMovement } from '/js/joborder/orders-money-movement.js';
 import { bindMoneySettings } from '/js/joborder/orders-money-settings.js';
 import { bindMoneyCorrection } from '/js/joborder/orders-money-correction.js';
@@ -44,12 +46,13 @@ if (root && form instanceof HTMLFormElement) {
         const { command, terms } = submission;
         if (command === 'provisions') provision.restore(terms);
         else if (command === 'corrections') correction.restore(terms);
-        else movement.restore(submission);
+        else if (command !== 'bank-replacement') movement.restore(submission);
     });
     const provision = bindProvisionForm(root, form, recovery);
     const movement = bindMoneyMovement(root, recovery);
     const correction = bindMoneyCorrection(root, recovery);
     bindMoneySettings(root);
+    bindLinkedMoneyRepair(root, recovery);
     bindHolderIdentity(root);
     bindRecipientIdentity(root);
     void recovery.recover();
@@ -65,7 +68,6 @@ if (root && form instanceof HTMLFormElement) {
 function bindProvisionForm(root, form, recovery) {
     const fields = form.querySelector('fieldset');
     const input = form.elements.namedItem('amount');
-    const bankFree = form.elements.namedItem('bankFree');
     const commitment = form.elements.namedItem('commitmentId');
     const commitmentField = form.querySelector('[data-money-commitment-field]');
     const changed = form.querySelector('[data-money-basis-changed]');
@@ -73,7 +75,6 @@ function bindProvisionForm(root, form, recovery) {
     if (
         !(fields instanceof HTMLFieldSetElement) ||
         !(input instanceof HTMLInputElement) ||
-        !(bankFree instanceof HTMLInputElement) ||
         !(commitment instanceof HTMLSelectElement) ||
         !(commitmentField instanceof HTMLElement) ||
         !(changed instanceof HTMLElement) ||
@@ -83,6 +84,7 @@ function bindProvisionForm(root, form, recovery) {
     }
 
     const holders = bindHolderChoices(form, root);
+    const bank = bindBankProvision(form, root, () => updateDraft());
     /** @type {Omit<ApiDto<'ProvideJobOrderMoneyDto'>, 'operationId'> | null} */
     let refusedDraft = null;
     let basis = '';
@@ -97,21 +99,25 @@ function bindProvisionForm(root, form, recovery) {
 
     const currentBasis = () =>
         JSON.stringify([
-            holders.selection(),
+            bank.enabled() ? bank.selection() : null,
+            bank.needsHolder() ? holders.selection() : null,
             commitment.value,
             commitment.selectedOptions.item(0)?.dataset.version,
         ]);
 
     const preview = bindProvisionPreview(form, `/orders/${root.dataset.orderId}/money`, () => {
         const amount = input.value;
-        const selection = holders.selection();
+        const selection = bank.needsHolder() ? holders.selection() : {};
+        const handling = bank.enabled() ? bank.selection() : { bankHandling: false };
         const attribution = readAttributionChoice(commitment);
-        return amount && bankFree.checked && selection && attribution
-            ? { ...selection, ...attribution, amount, bankHandling: false }
+        return amount && selection && handling && attribution
+            ? { ...selection, ...attribution, ...handling, amount }
             : null;
     });
 
     const updateDraft = () => {
+        bank.sync();
+        holders.show(bank.needsHolder());
         basis = currentBasis();
         if (!saving) preview.refresh();
     };
@@ -131,10 +137,14 @@ function bindProvisionForm(root, form, recovery) {
         input.removeAttribute('aria-invalid');
         if (refused?.amount) {
             holders.restore(refused);
+            bank.restore(refused.bank || (refused.bankHandling ? { type: 'DEPOSIT' } : null));
             input.value = refused.amount;
+        } else {
+            bank.restore({ type: 'DEPOSIT' });
         }
         updateDraft();
         krtModal.open(modalId);
+        void bank.refresh(refused?.bank?.accountId || '', refused === null);
     };
 
     const openPending = () => {
@@ -191,11 +201,18 @@ function bindProvisionForm(root, form, recovery) {
             return;
         }
         const next = currentBasis();
-        if (next !== basis && (input.value || bankFree.checked)) {
+        if (next !== basis && input.value) {
             changed.hidden = false;
             preview.reset();
         }
         updateDraft();
+        if (section === 'order-money-results') {
+            const observed = currentBasis();
+            void bank.refresh().then(() => {
+                if (input.value && bank.enabled() && currentBasis() !== observed)
+                    changed.hidden = false;
+            });
+        }
     });
     form.addEventListener('submit', async (event) => {
         event.preventDefault();

@@ -19,6 +19,7 @@
 
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import {
+    bankRecipients,
     bindMoneyPartyChoice,
     orderHolders,
     orderMoneyProjection,
@@ -45,7 +46,7 @@ function recipients() {
 /**
  * Enables only the fields relevant to the selected purpose.
  *
- * @param {HTMLSelectElement | HTMLInputElement} input the contextual field
+ * @param {HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement} input the contextual field
  * @param {boolean} enabled whether it applies to the draft
  */
 export function showMovementField(input, enabled) {
@@ -73,8 +74,9 @@ function samePlayer(holder, recipient) {
  * @param {HTMLSelectElement} purpose the movement purpose
  * @param {string} url the scoped order money route
  * @param {string} self the signed-in account
+ * @param {() => boolean} usesBank whether the action uses Bank handling
  */
-export function bindMovementParties(form, purpose, url, self) {
+export function bindMovementParties(form, purpose, url, self, usesBank) {
     const source = form.elements.namedItem('sourceHolderId');
     const mode = form.elements.namedItem('destinationMode');
     const destination = form.elements.namedItem('destinationHolderId');
@@ -161,17 +163,20 @@ export function bindMovementParties(form, purpose, url, self) {
 
         if (handover()) {
             const sender = selectedSource();
-            setMoneyOptions(
-                recipient,
-                designations.filter(
-                    (row) =>
-                        row.active &&
-                        (canSpend() || requesterHandover() || row.userId === self) &&
-                        (purpose.value === 'PURPOSE_HANDOVER'
-                            ? !!sender && samePlayer(sender, row)
-                            : !sender || !samePlayer(sender, row)),
-                ),
+            const permitted = designations.filter(
+                (row) =>
+                    row.active &&
+                    (canSpend() || requesterHandover() || row.userId === self) &&
+                    (purpose.value === 'PURPOSE_HANDOVER'
+                        ? !!sender && samePlayer(sender, row)
+                        : !sender || !samePlayer(sender, row)),
             );
+            const canCreditAccount =
+                purpose.value === 'HANDOVER' && usesBank() && (canSpend() || requesterHandover());
+            const bankTargets = canCreditAccount
+                ? bankRecipients().filter(({ active }) => active)
+                : [];
+            setMoneyOptions(recipient, [...permitted, ...bankTargets]);
         }
         showMovementField(recipient, returning() || handover());
         if (recipientLabel) {
@@ -244,6 +249,12 @@ export function bindMovementParties(form, purpose, url, self) {
 
     return {
         sync,
+        hide() {
+            for (const control of [source, mode, destination, recipient]) {
+                showMovementField(control, false);
+            }
+            chosenParty.setEnabled(false);
+        },
         source: selectedSource,
         canSpend,
         canReturn,

@@ -22,14 +22,12 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Operations & payouts** — group missions under an *Operation*, track per-participant finances and confirm payouts behind an asymmetric mark/clear gate.
 - **Members only** — the landing page and the legal pages are the whole public surface (ADR-0159). Everything else needs a login, and every account holds at least member rights. A person without an account can still take part in an Einsatz: the mission leadership records them as an external participant.
 - **Job orders & cross-order material demand** — a prioritised queue of material and item orders with one complete permitted workspace and remembered filters. Current unit writers can transfer Profit responsibility, coordinate Staffel participation, and cancel or reopen work on the central order page. Requesters can safely adjust remaining need after partial delivery. The *Materialbedarf* overview shows remaining material need, earmarked stock and outstanding Staffel promises separately. Explicitly attributed provision credits a promise once; its contribution history remains distinct from current stock coverage. An authorised editor (Bearbeiter) can read their concrete order and maintain their own note outside their unit, without general Profit access (ADR-0301).
-  The [internal Bank-free aUEC checkpoint](docs/specs/orders-auec.md) tracks reported holdings,
-  unit commitments, exact fees and net handovers. The order detail also handles returns, settlement,
-  same-holder reassignment and financial corrections. Holder and recipient maintenance preserves
-  the original operation history, and submitted operations can be recovered after response loss.
-  The status updates live for other viewers with a money draft open.
-  [Selected Bank actions](docs/specs/orders-auec-bank.md) use the existing Bank request and staff
-  workflow. Waiting payments appear in the order's submitted history. Approval makes eligible
-  order funds effective, and retries recover the recorded outcome.
+  [aUEC orders](docs/specs/orders-auec.md) track reported holdings, unit commitments, exact fees
+  and net handovers. Each new money action starts with [Kartellbank selected](docs/specs/orders-auec-bank.md)
+  and offers an explicit Bank-free choice. With a collection and designated requester account,
+  the same forms record deposit and account-to-account delivery without a personal order holder.
+  Bank staff confirm deposits in their existing queue. Waiting and failed attempts are visible
+  in order history, with recovery and authorised repair under the same payment identity.
 - **Hangar & inventory** — track ships and personal inventories per member, with a server-paginated org-unit fleet overview and personal hangar; admins keep a member's hangar from the member's page.
 - **Lager (warehouse)** — org-scoped, append-only stock tracking: book stock in/out, transfer it (Umbuchen) — individually or for a whole marked selection at once — earmark slices to job orders and missions, and track both materials (with quality) and craftable game items. Each unit's Logisticians set minimum and target levels per material and quality tier, or per game item, in the „Mindestbestände“ tab, which shows the free stock allocated to each level from the top tier down and the amount already requested. A low level marks its material or game item „niedrig“ in the global Lager, offers a prefilled job order and need, and tells the direct Logisticians and seat holders once, until the target is reached again.
 - **Refinery & materials** — refinery job orders, material handovers and a planet-aware materials matrix; new orders can be pre-filled from a desktop-extractor screenshot JSON.
@@ -119,7 +117,7 @@ inventing full original quantities or quality.
 The claim entry remains the existing SK workflow; the broader all-kind writer and lifecycle
 conversion is part of the remaining shared workflow below.
 
-> **Implementation and acceptance scope:** The hierarchy and shared MATERIAL/ITEM reader foundations are implemented. Material-contribution implementation and verification are under review against its owning requirement. The remaining shared writer/lifecycle conversion, [aUEC procurement](docs/specs/orders-auec.md) and [Bank handling selected by default with an explicit choice per operation to work without Bank](docs/specs/orders-auec-bank.md) remain accepted/planned. These records are not a release announcement, and acceptance stays unchecked until its evidence is produced.
+> **Implementation and acceptance scope:** The hierarchy and shared MATERIAL/ITEM reader foundations are implemented. Material-contribution implementation and verification are under review against its owning requirement. The remaining shared writer/lifecycle conversion, [aUEC procurement](docs/specs/orders-auec.md) and [Bank handling](docs/specs/orders-auec-bank.md) are tracked against their owning acceptance criteria. These records are not a release announcement, and acceptance stays unchecked until its evidence is produced.
 
 The README is the overview; everything else lives in dedicated, versioned docs:
 

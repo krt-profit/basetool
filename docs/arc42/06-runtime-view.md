@@ -1,6 +1,6 @@
 # 6. Runtime view
 
-> [aUEC procurement](../specs/orders-auec.md) owns the Bank-free order runtime. The [planned Bank coupling](../specs/orders-auec-bank.md) owns delayed Bank effects and reversals.
+> [aUEC procurement](../specs/orders-auec.md) owns the order runtime. The [optional Bank coupling](../specs/orders-auec-bank.md) owns selected-account actions, delayed effects, repair and reversal.
 
 These scenarios exercise rules that are not visible in the static view. Their canonical
 requirements own behavior and verification status.

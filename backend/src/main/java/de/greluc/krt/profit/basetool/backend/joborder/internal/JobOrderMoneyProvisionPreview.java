@@ -29,10 +29,14 @@ import org.jetbrains.annotations.Nullable;
  * @param fee zero for a provision without a game transfer
  * @param bankHandling the chosen Bank handling
  * @param resultingHolding expected whole-aUEC amount for the selected holder
+ * @param holderVersion observed holder or account-position revision
+ * @param bank expected linked Bank effect
  */
 public record JobOrderMoneyProvisionPreview(
     String amount,
     @Nullable String holderName,
     String fee,
     boolean bankHandling,
-    String resultingHolding) {}
+    String resultingHolding,
+    long holderVersion,
+    @Nullable JobOrderMoneyBankPreview bank) {}

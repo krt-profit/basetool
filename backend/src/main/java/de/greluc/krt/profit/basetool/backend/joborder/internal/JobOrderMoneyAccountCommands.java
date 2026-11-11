@@ -56,18 +56,85 @@ class JobOrderMoneyAccountCommands {
 
   Optional<JobOrderMoneyOutcome> provide(
       UUID orderId, ProvideJobOrderMoneyDto dto, JobOrderBankSelection bank) {
-    JobOrderLinkedPaymentTerms.validate(bank);
-    if (!dto.bankHandling()
-        || dto.selection().kind() != JobOrderMoneySelection.Kind.SELF
-        || (bank.type() != JobOrderBankSelection.Type.DEPOSIT
-            && bank.type() != JobOrderBankSelection.Type.AUTHORISATION)) {
-      throw JobOrderLinkedPaymentTerms.invalid();
-    }
+    validateProvision(dto.bankHandling(), dto.selection(), bank);
     UUID actor = access.actorId();
     identities.lockAccounts(actor, bank.counterpartyUserId());
     BigDecimal amount = WholeAuec.positive(dto.amount());
     return editor.editMoney(orderId, order -> provideGuarded(order, dto, bank, actor, amount));
   }
+
+  JobOrderMoneyProvisionPreview previewProvision(
+      JobOrder order, PreviewJobOrderMoneyProvisionDto dto, JobOrderBankSelection bank) {
+    validateProvision(dto.bankHandling(), dto.selection(), bank);
+    authorizeProvision(order, bank, access.requireActiveActor(), dto.commitmentId());
+    if (dto.commitmentId() != null) {
+      commitmentCredit.assertCurrentTarget(order, dto.commitmentId());
+    }
+    BigDecimal amount = WholeAuec.positive(dto.amount());
+    var basis = provisionBasis(order.getId(), bank, dto.holderVersion());
+    BigDecimal current =
+        basis
+            .position()
+            .map(position ->
+                ledger.read(order.getId()).accountBalance(Objects.requireNonNull(position.getId())))
+            .orElse(BigDecimal.ZERO);
+    var quote = linked.provisionQuote(bank, amount, provisionParty(bank));
+    return new JobOrderMoneyProvisionPreview(
+        amount.toPlainString(),
+        null,
+        "0",
+        true,
+        current.add(amount).toPlainString(),
+        basis.revision(),
+        quote);
+  }
+
+  private static void validateProvision(
+      boolean bankHandling, JobOrderMoneySelection selection, JobOrderBankSelection bank) {
+    JobOrderLinkedPaymentTerms.validate(bank);
+    if (!bankHandling
+        || selection.kind() != JobOrderMoneySelection.Kind.SELF
+        || (bank.type() != JobOrderBankSelection.Type.DEPOSIT
+            && bank.type() != JobOrderBankSelection.Type.AUTHORISATION)) {
+      throw JobOrderLinkedPaymentTerms.invalid();
+    }
+  }
+
+  private void authorizeProvision(
+      JobOrder order, JobOrderBankSelection bank, UUID actor, @Nullable UUID commitmentId) {
+    if (!access.responsible(order)
+        && !(bank.type() == JobOrderBankSelection.Type.DEPOSIT
+            && actor.equals(bank.counterpartyUserId())
+            && commitmentId == null)) {
+      throw new AccessDeniedException(
+          "Caller may not provide funds on this account for the order.");
+    }
+    if (commitmentId != null) {
+      commitmentCredit.assertAttributionAuthority(order, commitmentId);
+    }
+  }
+
+  private static @Nullable Counterparty provisionParty(JobOrderBankSelection bank) {
+    return bank.type() == JobOrderBankSelection.Type.DEPOSIT
+        ? JobOrderLinkedPaymentTerms.depositor(bank)
+        : null;
+  }
+
+  private ProvisionBasis provisionBasis(
+      UUID orderId, JobOrderBankSelection bank, @Nullable Long version) {
+    var position =
+        holdings.findByOrderIdAndBankAccountId(orderId, Objects.requireNonNull(bank.accountId()));
+    long revision = position.map(JobOrderMoneyAccountHolding::getRevision).orElse(0L);
+    OptimisticLock.checkOptionalClient(
+        revision,
+        version,
+        JobOrderMoneyAccountHolding.class,
+        position.map(JobOrderMoneyAccountHolding::getId).orElse(null));
+    return new ProvisionBasis(position, revision);
+  }
+
+  /** The existing collection position and observed Order-local revision. */
+  private record ProvisionBasis(Optional<JobOrderMoneyAccountHolding> position, long revision) {}
 
   private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> provideGuarded(
       JobOrder order,
@@ -76,23 +143,18 @@ class JobOrderMoneyAccountCommands {
       UUID actor,
       BigDecimal amount) {
     access.requireActiveActor();
-    if (!access.responsible(order)
-        && !(bank.type() == JobOrderBankSelection.Type.DEPOSIT
-            && actor.equals(bank.counterpartyUserId())
-            && dto.commitmentId() == null)) {
-      throw new AccessDeniedException(
-          "Caller may not provide funds on this account for the order.");
-    }
     UUID commitmentId = dto.commitmentId();
-    if (commitmentId != null) {
-      commitmentCredit.assertAttributionAuthority(order, commitmentId);
-    }
+    authorizeProvision(order, bank, actor, commitmentId);
     var previous =
         attempts.findByOrderIdAndOperationIdAndActiveTrue(order.getId(), dto.operationId());
     if (previous.isPresent()) {
+      var attempt = previous.orElseThrow();
+      if (!JobOrderLinkedMoneyCommands.matchesProvisionRate(dto.rate(), attempt.rateSnapshot())) {
+        throw new BusinessConflictException("orders.money.operation.termsMismatch");
+      }
       return replay(
           order,
-          previous.orElseThrow(),
+          attempt,
           bank,
           new Expected(JobOrderMoneyKind.PROVISION, actor, amount, null, null, commitmentId));
     }
@@ -100,22 +162,15 @@ class JobOrderMoneyAccountCommands {
     if (commitmentId != null) {
       commitmentCredit.assertCurrentTarget(order, commitmentId);
     }
-    Counterparty depositor =
-        bank.type() == JobOrderBankSelection.Type.DEPOSIT
-            ? JobOrderLinkedPaymentTerms.depositor(bank)
-            : null;
+    Counterparty depositor = provisionParty(bank);
     UUID accountId = Objects.requireNonNull(bank.accountId());
-    var existing = holdings.findByOrderIdAndBankAccountId(order.getId(), accountId);
-    long revision = existing.map(JobOrderMoneyAccountHolding::getRevision).orElse(0L);
-    OptimisticLock.checkOptionalClient(
-        revision,
-        dto.holderVersion(),
-        JobOrderMoneyAccountHolding.class,
-        existing.map(JobOrderMoneyAccountHolding::getId).orElse(null));
+    var rate = linked.provisionRate(dto.rate());
+    var basis = provisionBasis(order.getId(), bank, dto.holderVersion());
     var position =
-        existing.orElseGet(
-            () -> holdings.saveAndFlush(new JobOrderMoneyAccountHolding(order.getId(), accountId)));
-    var rate = fees.snapshot();
+        basis
+            .position()
+            .orElseGet(() ->
+                holdings.saveAndFlush(new JobOrderMoneyAccountHolding(order.getId(), accountId)));
     var fee = paymentTerms.feeFor(JobOrderMoneyKind.PROVISION, bank, amount, rate);
     var terms =
         new JobOrderLinkedMoneyAttempt.Terms(
@@ -156,7 +211,9 @@ class JobOrderMoneyAccountCommands {
       UUID orderId, MoveJobOrderMoneyDto dto, JobOrderBankSelection bank) {
     JobOrder order = queries.requireReadableMoneyOrder(orderId);
     var request = movement(dto, bank);
-    var current = basis(order, request);
+    access.requireActiveActor();
+    access.requireUnitWriter(order);
+    var current = basis(order, request, coordinates(orderId, request));
     BigDecimal remaining = current.available().subtract(request.amount());
     BigDecimal overpayment =
         current
@@ -174,19 +231,23 @@ class JobOrderMoneyAccountCommands {
         null,
         overpayment.toPlainString(),
         remaining.negate().max(BigDecimal.ZERO).toPlainString(),
-        null);
+        null,
+        current.delivered().add(request.amount()).compareTo(current.target().getAmount()) >= 0,
+        false,
+        linked.previewAccountTransfer(current.bank(), request.amount()));
   }
 
   private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> moveGuarded(
       JobOrder order, UUID operationId, Movement request, UUID actor, boolean queueLocked) {
     access.requireActiveActor();
     access.requireUnitWriter(order);
+    var coordinates = coordinates(order.getId(), request);
     var previous = attempts.findByOrderIdAndOperationIdAndActiveTrue(order.getId(), operationId);
     if (previous.isPresent()) {
       return replay(
           order,
           previous.orElseThrow(),
-          request.bank(),
+          coordinates.bank(),
           new Expected(
               JobOrderMoneyKind.PURPOSE_HANDOVER,
               actor,
@@ -196,7 +257,7 @@ class JobOrderMoneyAccountCommands {
               null));
     }
     assertFresh(order, operationId);
-    var current = basis(order, request);
+    var current = basis(order, request, coordinates);
     if (current.available().compareTo(request.amount()) < 0
         || (!queueLocked
             && queueImpact.posting(order, JobOrderMoneyKind.PURPOSE_HANDOVER, request.amount()))) {
@@ -219,26 +280,30 @@ class JobOrderMoneyAccountCommands {
             false,
             request.sourceId());
     return accepted(
-        order, linked.submitPrepared(order, operationId, actor, terms, request.bank(), null));
+        order, linked.submitPrepared(order, operationId, actor, terms, coordinates.bank(), null));
   }
 
-  private Basis basis(JobOrder order, Movement request) {
-    access.requireActiveActor();
-    access.requireUnitWriter(order);
-    if (!order.getStatus().isActive() || queries.responsibilityInvalid(order)) {
-      throw new BusinessConflictException("orders.money.movement.inactive");
-    }
-    UUID orderId = order.getId();
+  private Coordinates coordinates(UUID orderId, Movement request) {
     var position =
         holdings
             .findByOrderIdAndId(orderId, request.sourceId())
             .orElseThrow(JobOrderLinkedMoneyAttempt::conflict);
     var designation = recipients.require(orderId, request.recipientId());
-    if (!position.getBankAccountId().equals(request.bank().accountId())
-        || designation.getBankAccountId() == null
-        || !designation.isActive()
-        || designation.isSuperseded()
-        || !designation.getBankAccountId().equals(request.bank().targetAccountId())) {
+    return new Coordinates(
+        position,
+        designation,
+        JobOrderLinkedPaymentTerms.resolveAccountTransfer(
+            request.bank(), position.getBankAccountId(), designation.getBankAccountId()));
+  }
+
+  private Basis basis(JobOrder order, Movement request, Coordinates coordinates) {
+    if (!order.getStatus().isActive() || queries.responsibilityInvalid(order)) {
+      throw new BusinessConflictException("orders.money.movement.inactive");
+    }
+    UUID orderId = order.getId();
+    var position = coordinates.position();
+    var designation = coordinates.designation();
+    if (!designation.isActive() || designation.isSuperseded()) {
       throw JobOrderLinkedPaymentTerms.invalid();
     }
     OptimisticLock.check(
@@ -251,7 +316,10 @@ class JobOrderMoneyAccountCommands {
         target.getVersion(), request.targetVersion(), JobOrderMoneyTarget.class, orderId);
     var current = ledger.read(orderId);
     return new Basis(
-        current.availableAccountBalance(request.sourceId()), current.handedOver(), target);
+        current.availableAccountBalance(request.sourceId()),
+        current.handedOver(),
+        target,
+        coordinates.bank());
   }
 
   private void assertFresh(JobOrder order, UUID operationId) {
@@ -288,7 +356,6 @@ class JobOrderMoneyAccountCommands {
   }
 
   private static Movement movement(MoveJobOrderMoneyDto dto, JobOrderBankSelection bank) {
-    JobOrderLinkedPaymentTerms.validate(bank);
     UUID source = dto.sourceAccountHoldingId();
     UUID recipient = dto.recipientId();
     if (!dto.bankHandling()
@@ -325,8 +392,18 @@ class JobOrderMoneyAccountCommands {
       BigDecimal amount,
       JobOrderBankSelection bank) {}
 
+  /** The scoped positions and their corresponding Bank coordinates. */
+  private record Coordinates(
+      JobOrderMoneyAccountHolding position,
+      JobOrderMoneyRecipient designation,
+      JobOrderBankSelection bank) {}
+
   /** Current account availability and the fulfilment basis for the target. */
-  private record Basis(BigDecimal available, BigDecimal delivered, JobOrderMoneyTarget target) {}
+  private record Basis(
+      BigDecimal available,
+      BigDecimal delivered,
+      JobOrderMoneyTarget target,
+      JobOrderBankSelection bank) {}
 
   /** Frozen order-side terms expected in a recovered result. */
   private record Expected(

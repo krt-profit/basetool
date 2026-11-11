@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -35,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
  * @param holderUserId explicitly selected member account
  * @param holderName newly named accountless holder
  * @param commitmentId explicitly selected unit commitment occurrence
+ * @param bank selected Bank effect and actual parties
  */
 public record PreviewJobOrderMoneyProvisionDto(
     @NotBlank String amount,
@@ -43,7 +46,8 @@ public record PreviewJobOrderMoneyProvisionDto(
     @Nullable UUID holderId,
     @Nullable UUID holderUserId,
     @Nullable @Size(max = 200) String holderName,
-    @Nullable UUID commitmentId) {
+    @Nullable UUID commitmentId,
+    @Valid @Nullable JobOrderBankSelection bank) {
 
   JobOrderMoneySelection selection() {
     return JobOrderMoneySelection.parse(holderId, holderUserId, holderName);

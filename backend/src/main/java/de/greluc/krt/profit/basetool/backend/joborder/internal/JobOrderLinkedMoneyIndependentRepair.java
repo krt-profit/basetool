@@ -60,7 +60,9 @@ class JobOrderLinkedMoneyIndependentRepair {
         || order.getStatus() == JobOrderStatus.REJECTED) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
-    requireIndependentFacts(order, prior);
+    if (!permitsIndependentFacts(order, prior)) {
+      throw JobOrderLinkedPaymentTerms.invalid();
+    }
     var booked = ledger.read(order.getId());
     var source = booked.holder(prior.personalHolderId());
     if (!prior.isActive()) {
@@ -93,34 +95,30 @@ class JobOrderLinkedMoneyIndependentRepair {
     return effect;
   }
 
-  private void requireIndependentFacts(JobOrder order, JobOrderLinkedMoneyAttempt attempt) {
-    if (attempt.getAccountHoldingId() != null) {
-      throw JobOrderLinkedPaymentTerms.invalid();
+  boolean permitsIndependentFacts(JobOrder order, JobOrderLinkedMoneyAttempt attempt) {
+    if (!attempt.isActualPayment() || attempt.getAccountHoldingId() != null) {
+      return false;
     }
     var type = attempt.getBankType();
     var kind = attempt.getKind();
     if (kind == JobOrderMoneyKind.PROVISION) {
-      if (type != JobOrderBankSelection.Type.DEPOSIT
-          || attempt.getFeeFunding() != JobOrderMoneyFeeFunding.DEPOSITOR) {
-        throw JobOrderLinkedPaymentTerms.invalid();
-      }
-      return;
+      return type == JobOrderBankSelection.Type.DEPOSIT
+          && attempt.getFeeFunding() == JobOrderMoneyFeeFunding.DEPOSITOR;
     }
     if ((kind != JobOrderMoneyKind.COLLECTION && kind != JobOrderMoneyKind.HANDOVER)
         || (type != JobOrderBankSelection.Type.DEPOSIT
             && type != JobOrderBankSelection.Type.WITHDRAWAL)
         || attempt.getProvision().signum() != 0) {
-      throw JobOrderLinkedPaymentTerms.invalid();
+      return false;
     }
     UUID recipientId = attempt.getRecipientId();
-    if (recipientId != null) {
-      var recipient = recipients.require(order.getId(), recipientId);
-      if (recipient.getBankAccountId() != null
-          || recipient.isSuperseded()
-          || !recipients.party(recipient).usable()) {
-        throw JobOrderLinkedPaymentTerms.invalid();
-      }
+    if (recipientId == null) {
+      return true;
     }
+    var recipient = recipients.require(order.getId(), recipientId);
+    return recipient.getBankAccountId() == null
+        && !recipient.isSuperseded()
+        && recipients.party(recipient).usable();
   }
 
   private JobOrderEditor.MoneyEdit<JobOrderMoneyOutcome> provision(

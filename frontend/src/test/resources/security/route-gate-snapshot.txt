@@ -539,6 +539,7 @@
 /orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
+/orders/{id}/money/bank-accounts GET -> JobOrderMoneyProxyController#bankAccounts gate=class:isAuthenticated() layout=no
 /orders/{id}/money/corrections POST -> JobOrderMoneyProxyController#correct gate=class:isAuthenticated() layout=no
 /orders/{id}/money/corrections/preview POST -> JobOrderMoneyProxyController#previewCorrection gate=class:isAuthenticated() layout=no
 /orders/{id}/money/holder-candidates GET -> JobOrderMoneyProxyController#holderCandidates gate=class:isAuthenticated() layout=no
@@ -555,6 +556,9 @@
 /orders/{id}/money/movements/settlement/candidates GET -> JobOrderMoneyProxyController#settlementCandidates gate=class:isAuthenticated() layout=no
 /orders/{id}/money/movements/settlement/preview POST -> JobOrderMoneyProxyController#previewSettlement gate=class:isAuthenticated() layout=no
 /orders/{id}/money/operations/{operation} GET -> JobOrderMoneyProxyController#outcome gate=class:isAuthenticated() layout=no
+/orders/{id}/money/operations/{operation}/bank-replacement GET -> JobOrderMoneyProxyController#bankRepair gate=class:isAuthenticated() layout=no
+/orders/{id}/money/operations/{operation}/bank-replacement POST -> JobOrderMoneyProxyController#replaceBankAttempt gate=class:isAuthenticated() layout=no
+/orders/{id}/money/operations/{operation}/bank-replacement/preview POST -> JobOrderMoneyProxyController#previewBankRepair gate=class:isAuthenticated() layout=no
 /orders/{id}/money/provisions POST -> JobOrderMoneyProxyController#provide gate=class:isAuthenticated() layout=no
 /orders/{id}/money/provisions/preview POST -> JobOrderMoneyProxyController#preview gate=class:isAuthenticated() layout=no
 /orders/{id}/money/recipient-candidates GET -> JobOrderMoneyProxyController#recipientCandidates gate=class:isAuthenticated() layout=no

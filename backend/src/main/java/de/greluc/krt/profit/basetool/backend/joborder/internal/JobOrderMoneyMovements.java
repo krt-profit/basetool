@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import java.math.BigDecimal;
@@ -77,13 +78,15 @@ public class JobOrderMoneyMovements {
     }
     UUID actor = access.requireActiveActor();
     var terms = JobOrderMoneyMovementTerms.from(dto);
+    bank = resolveBank(orderId, bank, terms);
     try {
-      var resolved = basis.resolve(order, dto, terms, actor, null);
+      var resolved = basis.resolve(order, dto, terms, actor, null, bank);
       authorizeAttribution(order, terms);
       if (terms.commitmentId() != null) {
         commitmentCredit.assertCurrentTarget(order, terms.commitmentId());
       }
-      return resolved.preview(terms, holderChoices.nameOf(resolved.source()));
+      var quote = bank == null ? null : linked.previewMovement(terms, resolved, bank);
+      return resolved.preview(terms, holderChoices.nameOf(resolved.source()), quote);
     } catch (JobOrderMoneyMovementBasis.UnavailableBasis unavailable) {
       throw unavailable.previewProblem();
     } catch (JobOrderMoneyHolders.UnavailableHolderException unavailable) {
@@ -124,14 +127,10 @@ public class JobOrderMoneyMovements {
     access.requireActiveActor();
     authorizeAttribution(order, attempt.terms());
     UUID id = order.getId();
+    var bank = resolveBank(id, attempt.dto().bank(), attempt.terms());
     var linkedReplay =
         linked.replayMovement(
-            order,
-            attempt.id(),
-            attempt.dto().bank(),
-            attempt.actor(),
-            attempt.terms(),
-            attempt.rate());
+            order, attempt.id(), bank, attempt.actor(), attempt.terms(), attempt.rate());
     if (linkedReplay.isPresent()) {
       basis.authorize(
           order,
@@ -143,7 +142,7 @@ public class JobOrderMoneyMovements {
     }
     var previous = operations.findByOrderIdAndOperationId(id, attempt.id());
     if (previous.isPresent()) {
-      if (attempt.dto().bank() != null) {
+      if (bank != null) {
         throw new BusinessConflictException("orders.money.operation.termsMismatch");
       }
       return replay(order, attempt, previous.orElseThrow());
@@ -160,7 +159,8 @@ public class JobOrderMoneyMovements {
     JobOrderMoneyMovementBasis.Resolved resolved;
     try {
       resolved =
-          basis.resolve(order, attempt.dto(), attempt.terms(), attempt.actor(), attempt.rate());
+          basis.resolve(
+              order, attempt.dto(), attempt.terms(), attempt.actor(), attempt.rate(), bank);
     } catch (ObjectOptimisticLockingFailureException
         | JobOrderMoneyHolders.UnavailableHolderException
         | JobOrderMoneyMovementBasis.UnavailableBasis staleBasis) {
@@ -181,18 +181,29 @@ public class JobOrderMoneyMovements {
         return refuse(order, attempt.id());
       }
     }
-    if (attempt.dto().bank() != null) {
+    if (bank != null) {
       var outcome =
           linked.submitMovement(
-              order,
-              attempt.id(),
-              attempt.actor(),
-              attempt.terms(),
-              resolved,
-              attempt.dto().bank());
+              order, attempt.id(), attempt.actor(), attempt.terms(), resolved, bank);
       return new JobOrderEditor.MoneyEdit<>(Optional.of(outcome), JobOrderEdit.unchanged(order));
     }
     return post(order, attempt, resolved);
+  }
+
+  private @Nullable JobOrderBankSelection resolveBank(
+      UUID orderId, @Nullable JobOrderBankSelection bank, JobOrderMoneyMovementTerms terms) {
+    if (bank == null) {
+      return null;
+    }
+    if (bank.type() == JobOrderBankSelection.Type.TRANSFER
+        && terms.kind().delivers()
+        && bank.targetAccountId() == null) {
+      var designation = recipients.require(orderId, Objects.requireNonNull(terms.recipientId()));
+      return JobOrderLinkedPaymentTerms.resolveAccountTransfer(
+          bank, bank.accountId(), designation.getBankAccountId());
+    }
+    JobOrderLinkedPaymentTerms.validate(bank);
+    return bank;
   }
 
   private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> post(

@@ -20,12 +20,16 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.Counterparty;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.Payment;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.PreviousAttempt;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.Terms;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import java.math.BigDecimal;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -64,7 +68,9 @@ public class JobOrderLinkedMoneyRepair {
   public JobOrderMoneyOutcome replace(
       UUID orderId, UUID operationId, ReplaceJobOrderBankAttemptDto dto) {
     boolean outsideBank = Boolean.TRUE.equals(dto.outsideBank());
-    if (outsideBank == (dto.bank() != null)) {
+    if ((outsideBank && dto.bank() != null)
+        || ((outsideBank || dto.bank() != null)
+            && (dto.accountId() != null || dto.justification() != null))) {
       throw JobOrderLinkedPaymentTerms.invalid();
     }
     if (dto.bank() != null) {
@@ -106,48 +112,245 @@ public class JobOrderLinkedMoneyRepair {
     if (!accounts.equals(new HashSet<>(attempts.identityAccounts(prior.getId())))) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
-    if (!mayRepair(order, prior, actor)) {
+    if (!access.mayRepair(order, prior, actor, ledger.read(order.getId()))) {
       throw new AccessDeniedException("Caller may not replace this operation.");
     }
-    BigDecimal provision = provisionOf(prior, dto, amount);
     if (Boolean.TRUE.equals(dto.outsideBank())) {
-      return independent.repair(order, prior, dto.revision(), amount, provision, actor);
+      return independent.repair(
+          order, prior, dto.revision(), amount, provisionOf(prior, dto, amount), actor);
     }
-    JobOrderBankSelection bank = Objects.requireNonNull(dto.bank());
-    if (prior.getRevision() > dto.revision()
-        && prior.getRevision() - dto.revision() == 1
-        && prior.isActive()
-        && actor.equals(prior.getActorId())
-        && prior.matchesBank(bank)
-        && prior.getAmount().compareTo(amount) == 0
-        && prior.getProvision().compareTo(provision) == 0) {
-      return result(order, prior);
+    if (prior.getRevision() != dto.revision()) {
+      return replayReplacement(order, prior, dto, amount, actor);
     }
-    if (prior.getRevision() != dto.revision()
-        || !prior.replaceable()
-        || order.getStatus() == JobOrderStatus.REJECTED
-        || (!order.getStatus().isActive() && !prior.permitsTerminalPosting())) {
+    if (!JobOrderMoneyAccess.repairable(order, prior)) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
-    var next = createReplacement(order, prior, bank, amount, provision, actor);
+    var bank = selection(order, prior, dto);
+    var next =
+        createReplacement(order, prior, bank, amount, provisionOf(prior, dto, amount), actor);
     return result(order, next);
   }
 
-  private boolean mayRepair(JobOrder order, JobOrderLinkedMoneyAttempt attempt, UUID actor) {
-    if (access.responsible(order)) {
+  private JobOrderEditor.MoneyEdit<JobOrderMoneyOutcome> replayReplacement(
+      JobOrder order,
+      JobOrderLinkedMoneyAttempt successor,
+      ReplaceJobOrderBankAttemptDto dto,
+      BigDecimal amount,
+      UUID actor) {
+    if (successor.getRevision() <= dto.revision()
+        || successor.getRevision() - dto.revision() != 1
+        || !successor.isActive()
+        || !actor.equals(successor.getActorId())
+        || successor.getAmount().compareTo(amount) != 0) {
+      throw JobOrderLinkedMoneyAttempt.conflict();
+    }
+    var predecessor =
+        attempts
+            .findByOrderIdAndOperationIdAndRevision(
+                order.getId(), successor.getOperationId(), dto.revision())
+            .orElseThrow(JobOrderLinkedMoneyAttempt::conflict);
+    if (!successor.matchesBank(selection(order, predecessor, dto))
+        || successor.getProvision().compareTo(provisionOf(predecessor, dto, amount)) != 0) {
+      throw JobOrderLinkedMoneyAttempt.conflict();
+    }
+    return result(order, successor);
+  }
+
+  /**
+   * Reads an authorized repair without exposing the previous Bank request or custody.
+   *
+   * @param orderId the order
+   * @param operationId the existing logical operation
+   * @return the failed attempt and its currently permitted account options
+   */
+  @Transactional(readOnly = true)
+  public JobOrderMoneyRepairView getRepair(UUID orderId, UUID operationId) {
+    JobOrder order = queries.requireReadableMoneyOrder(orderId);
+    var prior = requireRepairable(order, operationId);
+    UUID accountId = prior.getBankAccountId();
+    var bank = commands.port();
+    return new JobOrderMoneyRepairView(
+        prior.getRevision(),
+        prior.getAmount().toPlainString(),
+        prior.getProvision().toPlainString(),
+        prior.getKind(),
+        prior.getBankType(),
+        prior.isActualPayment(),
+        prior.getActualFee().toPlainString(),
+        prior.getRate().toPlainString(),
+        prior.getFeeFunding(),
+        independent.permitsIndependentFacts(order, prior),
+        accountChangeAllowed(prior),
+        accountId != null && bank.canSeeAccount(accountId) ? accountId : null,
+        repairAccounts(order, prior));
+  }
+
+  /**
+   * Quotes corrected principal and binding against the failed attempt's retained fee basis.
+   *
+   * @param orderId the order
+   * @param operationId the existing logical operation
+   * @param dto the intended corrected terms
+   * @return the exact principal, fee and order-source charge
+   */
+  @Transactional(readOnly = true)
+  public JobOrderMoneyRepairQuote preview(
+      UUID orderId, UUID operationId, ReplaceJobOrderBankAttemptDto dto) {
+    JobOrder order = queries.requireReadableMoneyOrder(orderId);
+    var prior = requireRepairable(order, operationId);
+    OptimisticLock.checkRequired(
+        prior.getRevision(), dto.revision(), JobOrderLinkedMoneyAttempt.class, prior.getId());
+    BigDecimal amount = WholeAuec.positive(dto.amount());
+    BigDecimal provision = provisionOf(prior, dto, amount);
+    if (Boolean.TRUE.equals(dto.outsideBank())) {
+      if (dto.bank() != null
+          || dto.accountId() != null
+          || dto.justification() != null
+          || !independent.permitsIndependentFacts(order, prior)
+          || prior.getAmount().compareTo(amount) != 0
+          || prior.getProvision().compareTo(provision) != 0) {
+        throw JobOrderLinkedPaymentTerms.invalid();
+      }
+      return quote(
+          prior,
+          amount,
+          new JobOrderLinkedPaymentTerms.Fee(prior.getActualFee(), prior.getFeeFunding()),
+          prior.getSourceBinding(),
+          null);
+    }
+    JobOrderBankSelection bank = selection(order, prior, dto);
+    var fee = fees.feeFor(prior.getKind(), bank, amount, prior.rateSnapshot());
+    validateLineage(order, prior, bank, fee.funding());
+    BigDecimal binding = replacementBinding(order, prior, amount, provision, fee.orderFee());
+    var basis =
+        commands
+            .port()
+            .quoteReplacement(
+                new Terms(
+                    bank,
+                    amount,
+                    prior.rateSnapshot(),
+                    prior.isActualPayment(),
+                    counterparty(prior)),
+                prior.getPurposeRef(),
+                previous(prior));
+    var bankQuote =
+        new JobOrderMoneyBankPreview(
+            basis.pending()
+                ? JobOrderMoneyBankPreview.Disposition.PENDING
+                : JobOrderMoneyBankPreview.Disposition.DIRECT,
+            fee.amount().toPlainString(),
+            fee.funding(),
+            basis.sourceDebit().toPlainString(),
+            binding.toPlainString(),
+            prior.getRate().toPlainString());
+    return quote(prior, amount, fee, binding, bankQuote);
+  }
+
+  private JobOrderLinkedMoneyAttempt requireRepairable(JobOrder order, UUID operationId) {
+    var prior =
+        attempts
+            .findByOrderIdAndOperationIdAndActiveTrue(order.getId(), operationId)
+            .orElseThrow(() -> new NotFoundException("orders.money.operation.unknown"));
+    if (!access.mayRepair(order, prior, access.requireActiveActor(), ledger.read(order.getId()))) {
+      throw new AccessDeniedException("Caller may not replace this operation.");
+    }
+    if (!JobOrderMoneyAccess.repairable(order, prior)) {
+      throw JobOrderLinkedMoneyAttempt.conflict();
+    }
+    return prior;
+  }
+
+  private List<JobOrderMoneyRepairView.RepairAccount> repairAccounts(
+      JobOrder order, JobOrderLinkedMoneyAttempt prior) {
+    if (!accountChangeAllowed(prior)) {
+      return List.of();
+    }
+    boolean deposit = prior.getBankType() == JobOrderBankSelection.Type.DEPOSIT;
+    var options =
+        commands
+            .port()
+            .accountOptions(
+                order.getResponsibleOrgUnit().getId(),
+                order.getRequestingOrgUnit().getId(),
+                deposit,
+                false,
+                !deposit);
+    return (deposit ? options.collection() : options.withdrawal())
+        .stream()
+            .map(account -> new JobOrderMoneyRepairView.RepairAccount(account.id(), account.name()))
+            .toList();
+  }
+
+  private JobOrderBankSelection selection(
+      JobOrder order, JobOrderLinkedMoneyAttempt prior, ReplaceJobOrderBankAttemptDto dto) {
+    JobOrderBankSelection submitted = dto.bank();
+    if (submitted != null) {
+      if (dto.accountId() != null || dto.justification() != null) {
+        throw JobOrderLinkedPaymentTerms.invalid();
+      }
+      JobOrderLinkedPaymentTerms.validate(submitted);
+      return submitted;
+    }
+    UUID account = dto.accountId();
+    if (account != null
+        && (!accountChangeAllowed(prior) || !repairAccountPermitted(order, prior, account))) {
+      throw JobOrderLinkedPaymentTerms.invalid();
+    }
+    boolean deposit = prior.getBankType() == JobOrderBankSelection.Type.DEPOSIT;
+    var depositor =
+        deposit && prior.getKind() == JobOrderMoneyKind.PROVISION
+            ? prior.depositCounterpartyForReplacement()
+            : null;
+    var retained =
+        new JobOrderBankSelection(
+            prior.getBankType(),
+            prior.getAccountHoldingId() != null,
+            account == null ? prior.getBankAccountId() : account,
+            prior.getBankCustodianId(),
+            prior.getBankTargetAccountId(),
+            prior.getBankTargetCustodianId(),
+            prior.isActualPayment(),
+            (deposit && prior.getAccountHoldingId() == null)
+                ? prior.getFeeFunding() == JobOrderMoneyFeeFunding.ORDER
+                : null,
+            depositor == null ? null : depositor.userId(),
+            depositor == null ? null : depositor.name(),
+            dto.justification());
+    JobOrderLinkedPaymentTerms.validate(retained);
+    return retained;
+  }
+
+  private boolean repairAccountPermitted(
+      JobOrder order, JobOrderLinkedMoneyAttempt prior, UUID accountId) {
+    if (commands.port().canSeeAccount(accountId)) {
       return true;
     }
-    if (!actor.equals(attempt.getActorId())) {
-      return false;
-    }
-    if ((attempt.getKind().delivers() || attempt.getKind() == JobOrderMoneyKind.REQUESTER_RETURN)
-        && access.requester(order)) {
-      return true;
-    }
-    UUID holder = attempt.getHolderId();
-    return holder == null
-        ? actor.equals(attempt.getCounterpartyUserId())
-        : actor.equals(ledger.read(order.getId()).holder(holder).getUserId());
+    return prior.getBankType() == JobOrderBankSelection.Type.DEPOSIT
+        && repairAccounts(order, prior).stream()
+            .anyMatch(account -> accountId.equals(account.id()));
+  }
+
+  private static boolean accountChangeAllowed(JobOrderLinkedMoneyAttempt prior) {
+    return prior.getBankAccountId() != null
+        && prior.getKind() != JobOrderMoneyKind.REQUESTER_RETURN
+        && (prior.getAccountHoldingId() == null || prior.getKind() == JobOrderMoneyKind.PROVISION);
+  }
+
+  private static JobOrderMoneyRepairQuote quote(
+      JobOrderLinkedMoneyAttempt prior,
+      BigDecimal amount,
+      JobOrderLinkedPaymentTerms.Fee fee,
+      BigDecimal binding,
+      @Nullable JobOrderMoneyBankPreview bank) {
+    return new JobOrderMoneyRepairQuote(
+        prior.getRevision(),
+        amount.toPlainString(),
+        fee.amount().toPlainString(),
+        fee.funding(),
+        binding.toPlainString(),
+        prior.getRate().toPlainString(),
+        bank);
   }
 
   private static BigDecimal provisionOf(
@@ -211,15 +414,23 @@ public class JobOrderLinkedMoneyRepair {
                 amount,
                 rate,
                 prior.isActualPayment(),
-                bank.type() == JobOrderBankSelection.Type.DEPOSIT
-                        && prior.getKind() == JobOrderMoneyKind.PROVISION
-                    ? prior.depositCounterpartyForReplacement()
-                    : prior.counterparty()),
-            new PreviousAttempt(prior.getId(), Objects.requireNonNull(prior.getRequestId())));
+                counterparty(prior)),
+            previous(prior));
     if (next.getState() == JobOrderLinkedMoneyState.SUBMITTING) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
     return next;
+  }
+
+  private static PreviousAttempt previous(JobOrderLinkedMoneyAttempt prior) {
+    return new PreviousAttempt(prior.getId(), Objects.requireNonNull(prior.getRequestId()));
+  }
+
+  private static @Nullable Counterparty counterparty(JobOrderLinkedMoneyAttempt prior) {
+    return prior.getBankType() == JobOrderBankSelection.Type.DEPOSIT
+            && prior.getKind() == JobOrderMoneyKind.PROVISION
+        ? prior.depositCounterpartyForReplacement()
+        : prior.counterparty();
   }
 
   private void validateLineage(

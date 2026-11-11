@@ -52,7 +52,8 @@ class JobOrderMoneyMovementBasis {
       MoveJobOrderMoneyDto dto,
       JobOrderMoneyMovementTerms terms,
       UUID actor,
-      @Nullable RateSnapshot expectedRate) {
+      @Nullable RateSnapshot expectedRate,
+      @Nullable JobOrderBankSelection bank) {
     UUID orderId = order.getId();
     var sourceSelection =
         new JobOrderMoneySelection(JobOrderMoneySelection.Kind.EXISTING, terms.sourceId(), null);
@@ -85,7 +86,6 @@ class JobOrderMoneyMovementBasis {
             || (destinationAccount == null && !receivingParty.usable()))) {
       throw new UnavailableBasis(new BusinessConflictException("orders.money.recipient.inactive"));
     }
-    JobOrderBankSelection bank = dto.bank();
     if (destinationAccount != null) {
       if (bank == null
           || bank.type() != JobOrderBankSelection.Type.TRANSFER
@@ -218,7 +218,9 @@ class JobOrderMoneyMovementBasis {
     }
 
     JobOrderMoneyMovementPreview preview(
-        JobOrderMoneyMovementTerms terms, @Nullable String sourceName) {
+        JobOrderMoneyMovementTerms terms,
+        @Nullable String sourceName,
+        @Nullable JobOrderMoneyBankPreview bank) {
       return new JobOrderMoneyMovementPreview(
           terms.amount().toPlainString(),
           fee.toPlainString(),
@@ -229,7 +231,10 @@ class JobOrderMoneyMovementBasis {
           recipient.name(),
           target == null ? "0" : delivered.subtract(target).max(BigDecimal.ZERO).toPlainString(),
           sourceAfter.negate().max(BigDecimal.ZERO).toPlainString(),
-          null);
+          null,
+          completes(),
+          false,
+          bank);
     }
   }
 }

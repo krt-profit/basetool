@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.math.BigDecimal;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -93,6 +94,31 @@ class JobOrderLinkedPaymentTerms {
             && Boolean.FALSE.equals(bank.paymentReported()))) {
       throw invalid();
     }
+  }
+
+  static JobOrderBankSelection resolveAccountTransfer(
+      JobOrderBankSelection bank, @Nullable UUID source, @Nullable UUID destination) {
+    if (source == null
+        || destination == null
+        || (bank.accountId() != null && !source.equals(bank.accountId()))
+        || (bank.targetAccountId() != null && !destination.equals(bank.targetAccountId()))) {
+      throw invalid();
+    }
+    var resolved =
+        new JobOrderBankSelection(
+            bank.type(),
+            bank.accountOnly(),
+            source,
+            bank.custodianId(),
+            destination,
+            bank.targetCustodianId(),
+            bank.paymentReported(),
+            bank.orderFundedDepositFee(),
+            bank.counterpartyUserId(),
+            bank.counterpartyName(),
+            bank.justification());
+    validate(resolved);
+    return resolved;
   }
 
   static Counterparty depositor(JobOrderBankSelection bank) {

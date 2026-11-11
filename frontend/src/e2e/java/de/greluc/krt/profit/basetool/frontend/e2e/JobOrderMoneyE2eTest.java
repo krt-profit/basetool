@@ -179,11 +179,12 @@ class JobOrderMoneyE2eTest {
 
       String holder = "E2E Accountless " + suffix;
       writer.getByTestId("order-money-provide").click();
+      assertThat(writer.getByTestId("order-money-bank")).isChecked();
+      writer.getByTestId("order-money-bank-free").check();
       writer.getByTestId("order-money-holder-mode").selectOption("new");
       writer.getByTestId("order-money-holder-choice").fill(holder);
       writer.locator("li[role='option'][data-value='accountless']").click();
       writer.getByTestId("order-money-amount").fill("1.234,5");
-      writer.getByTestId("order-money-bank-free").check();
       assertThat(writer.getByTestId("order-money-save")).isDisabled();
 
       Locator invalidAmount = writer.getByTestId("order-money-amount");
@@ -273,9 +274,10 @@ class JobOrderMoneyE2eTest {
       queue.evaluate("window.__moneyQueueKept = true");
 
       writer.getByTestId("order-money-provide").click();
+      assertThat(writer.getByTestId("order-money-bank")).isChecked();
+      writer.getByTestId("order-money-bank-free").check();
       writer.getByTestId("order-money-holder-mode").selectOption("new");
       writer.getByTestId("order-money-amount").fill("25");
-      writer.getByTestId("order-money-bank-free").check();
       var account = writer.getByTestId("order-money-holder-choice");
       var candidate = writer.locator("li[role='option'][data-value='" + memberId + "']");
       String partialName = memberName.substring(0, memberName.length() - 1);
@@ -302,11 +304,12 @@ class JobOrderMoneyE2eTest {
       assertThat(queue.getByTestId("order-money-provided")).containsText("35");
 
       writer.getByTestId("order-money-provide").click();
+      assertThat(writer.getByTestId("order-money-bank")).isChecked();
+      writer.getByTestId("order-money-bank-free").check();
       writer.getByTestId("order-money-holder-mode").selectOption("new");
       writer.getByTestId("order-money-holder-choice").fill(memberName);
       writer.locator("li[role='option'][data-value='accountless']").click();
       writer.getByTestId("order-money-amount").fill("2");
-      writer.getByTestId("order-money-bank-free").check();
       var named =
           writer.waitForResponse(
               response -> response.url().endsWith(orderPath + "/money/provisions"),
@@ -316,6 +319,8 @@ class JobOrderMoneyE2eTest {
       assertNotEquals(holderId, accountlessId);
 
       writer.getByTestId("order-money-provide").click();
+      assertThat(writer.getByTestId("order-money-bank")).isChecked();
+      writer.getByTestId("order-money-bank-free").check();
       writer.getByTestId("order-money-holder-mode").selectOption("existing");
       var existing = writer.getByTestId("order-money-existing-holder");
       assertThat(existing.locator("option[value='" + holderId + "']"))
@@ -324,7 +329,6 @@ class JobOrderMoneyE2eTest {
           .hasText(memberName + " (ohne Basetool-Konto)");
       existing.selectOption(holderId);
       writer.getByTestId("order-money-amount").fill("5");
-      writer.getByTestId("order-money-bank-free").check();
       var appended =
           writer.waitForResponse(
               response -> response.url().endsWith(orderPath + "/money/provisions"),
@@ -401,12 +405,10 @@ class JobOrderMoneyE2eTest {
       assertEquals(409, refused.status());
       assertThat(actor.getByTestId("order-money-amount")).isVisible();
       assertThat(actor.getByTestId("order-money-amount")).hasValue("37");
-      assertThat(actor.getByTestId("order-money-bank-free")).not().isChecked();
-      assertThat(actor.getByTestId("order-money-save")).isDisabled();
+      assertThat(actor.getByTestId("order-money-bank-free")).isChecked();
       assertEquals(2, attempts.get());
       assertEquals("MONEY_PROVISION_REFUSED", json(refused.text()).get("code").getAsString());
 
-      actor.getByTestId("order-money-bank-free").check();
       var booked =
           actor.waitForResponse(
               response -> response.url().endsWith(provisions),
@@ -448,10 +450,11 @@ class JobOrderMoneyE2eTest {
       assertThat(page.getByTestId("order-money-provided")).containsText("4 aUEC");
 
       page.getByTestId("order-money-provide").click();
+      assertThat(page.getByTestId("order-money-bank")).isChecked();
+      page.getByTestId("order-money-bank-free").check();
       page.getByTestId("order-money-holder-mode").selectOption("new");
       chooseAccountless(page, "order-money-holder-choice", "Second holder");
       page.getByTestId("order-money-amount").fill("6");
-      page.getByTestId("order-money-bank-free").check();
       String secondHolder =
           json(awaitPost(page, provisions, "order-money-save")).get("holderId").getAsString();
       assertThat(page.getByTestId("order-money-provided")).containsText("10 aUEC");
@@ -459,7 +462,6 @@ class JobOrderMoneyE2eTest {
       beginMovement(page, "COLLECTION", firstHolder, "4");
       page.getByTestId("order-money-destination-mode").selectOption("new");
       chooseAccountless(page, "order-money-destination-choice", "Collector");
-      page.getByTestId("order-money-movement-bank-free").check();
       assertThat(page.getByTestId("order-money-movement-preview")).containsText("Collector");
       String collector =
           json(awaitPost(page, movements, "order-money-movement-save"))
@@ -470,7 +472,6 @@ class JobOrderMoneyE2eTest {
       beginMovement(page, "COLLECTION", secondHolder, "6");
       page.getByTestId("order-money-destination-mode").selectOption("existing");
       page.getByTestId("order-money-destination-holder").selectOption(collector);
-      page.getByTestId("order-money-movement-bank-free").check();
       awaitPost(page, movements, "order-money-movement-save");
       assertThat(page.locator("[data-money-holder='" + collector + "']")).containsText("10 aUEC");
       assertThat(page.getByTestId("order-money-provided")).containsText("10 aUEC");
@@ -563,14 +564,19 @@ class JobOrderMoneyE2eTest {
       Locator draft = reader.getByTestId("order-money-amount");
       draft.fill("78");
 
-      prepareSelfProvision(writer, "4");
+      writer.getByTestId("order-money-provide").click();
+      assertThat(writer.getByTestId("order-money-bank")).isChecked();
+      writer.getByTestId("order-money-amount").fill("4");
+      assertThat(writer.getByTestId("order-money-save")).isDisabled();
+      writer.getByTestId("order-money-bank-free").check();
       String firstHolder =
           json(awaitPost(writer, provisions, "order-money-save")).get("holderId").getAsString();
       writer.getByTestId("order-money-provide").click();
+      assertThat(writer.getByTestId("order-money-bank")).isChecked();
+      writer.getByTestId("order-money-bank-free").check();
       writer.getByTestId("order-money-holder-mode").selectOption("new");
       chooseAccountless(writer, "order-money-holder-choice", "Accountless " + tag);
       writer.getByTestId("order-money-amount").fill("6");
-      writer.getByTestId("order-money-bank-free").check();
       String secondHolder =
           json(awaitPost(writer, provisions, "order-money-save")).get("holderId").getAsString();
       assertNotEquals(firstHolder, secondHolder);
@@ -713,6 +719,10 @@ class JobOrderMoneyE2eTest {
 
   private static void beginMovement(Page page, String kind, String source, String amount) {
     page.getByTestId("order-money-move").click();
+    if (!"REASSIGNMENT".equals(kind)) {
+      assertThat(page.getByTestId("order-money-movement-bank")).isChecked();
+      page.getByTestId("order-money-movement-bank-free").check();
+    }
     fillMovement(page, kind, source, amount);
   }
 
@@ -728,9 +738,10 @@ class JobOrderMoneyE2eTest {
   }
 
   private static void fillHandover(Page page, String source, String recipient, String amount) {
+    assertThat(page.getByTestId("order-money-movement-bank")).isChecked();
+    page.getByTestId("order-money-movement-bank-free").check();
     fillMovement(page, "HANDOVER", source, amount);
     page.getByTestId("order-money-handover-recipient").selectOption(recipient);
-    page.getByTestId("order-money-movement-bank-free").check();
   }
 
   private static void chooseAccountless(Page page, String field, String name) {
@@ -831,12 +842,11 @@ class JobOrderMoneyE2eTest {
       assertThat(source.getByTestId("order-money-holdings")).containsText("10.000.000");
 
       beginMovement(source, "REASSIGNMENT", holder, "8000000");
-      source.getByTestId("order-money-destination-number").fill(destinationNumber);
       String reassignment = sourcePath + "/money/movements/reassignment";
       var preview =
           source.waitForResponse(
               response -> response.url().endsWith(reassignment + "/preview"),
-              () -> source.getByTestId("order-money-movement-bank-free").check());
+              () -> source.getByTestId("order-money-destination-number").fill(destinationNumber));
       assertTrue(preview.ok(), () -> preview.status() + " " + preview.text());
       JsonObject terms = json(preview.text());
       assertEquals("2000000", terms.get("sourceAfter").getAsString());
@@ -912,7 +922,6 @@ class JobOrderMoneyE2eTest {
       beginMovement(page, "COLLECTION", holder, "9");
       page.getByTestId("order-money-destination-mode").selectOption("new");
       chooseAccountless(page, "order-money-destination-choice", "Correction collector");
-      page.getByTestId("order-money-movement-bank-free").check();
       String collector =
           json(awaitPost(page, path + "/money/movements", "order-money-movement-save"))
               .get("destinationHolderId")
@@ -976,7 +985,7 @@ class JobOrderMoneyE2eTest {
     return createOrder(page, baseUrl, IRIDIUM, requestingUnit, target);
   }
 
-  private static String createOrder(
+  static String createOrder(
       Page page, String baseUrl, String responsibleUnit, String requestingUnit, String target) {
     page.getByTestId("order-mode-auec").click();
     page.locator("#auec-responsible-org-unit").selectOption(responsibleUnit);

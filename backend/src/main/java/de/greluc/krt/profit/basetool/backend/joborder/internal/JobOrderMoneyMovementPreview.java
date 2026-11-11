@@ -34,6 +34,9 @@ import org.jetbrains.annotations.Nullable;
  * @param overpayment overpayment that would result from this handover
  * @param shortfall additional funds still required before booking
  * @param destinationAfter receiving order holding after a return
+ * @param completes whether execution would reach the requested target
+ * @param reopens whether execution would reopen the completed order
+ * @param bank expected linked Bank effect
  */
 public record JobOrderMoneyMovementPreview(
     String amount,
@@ -45,4 +48,7 @@ public record JobOrderMoneyMovementPreview(
     @Nullable String destinationName,
     String overpayment,
     String shortfall,
-    @Nullable String destinationAfter) {}
+    @Nullable String destinationAfter,
+    boolean completes,
+    boolean reopens,
+    @Nullable JobOrderMoneyBankPreview bank) {}

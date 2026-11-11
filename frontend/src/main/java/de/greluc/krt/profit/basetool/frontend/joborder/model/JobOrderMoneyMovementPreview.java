@@ -35,6 +35,9 @@ import org.jetbrains.annotations.Nullable;
  * @param overpayment the projected amount over the target
  * @param shortfall the additional amount needed to fund the draft
  * @param destinationAfter the receiving order holding after the movement, if applicable
+ * @param completes whether the applied effect fulfils the order
+ * @param reopens whether the applied effect reopens the order
+ * @param bank the authorised linked Bank effects
  */
 @DtoMirror
 public record JobOrderMoneyMovementPreview(
@@ -47,4 +50,7 @@ public record JobOrderMoneyMovementPreview(
     @Nullable String destinationName,
     String overpayment,
     String shortfall,
-    @Nullable String destinationAfter) {}
+    @Nullable String destinationAfter,
+    boolean completes,
+    boolean reopens,
+    @Nullable JobOrderMoneyBankPreview bank) {}

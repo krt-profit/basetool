@@ -37,7 +37,79 @@ import { joborderHooks } from '/js/joborder/joborder-hooks.js';
  * @typedef {{ command: 'provisions', terms: Omit<ProvisionTerms, 'operationId'> }
  *     | MovementDraft | { command: 'corrections', terms: CorrectionTerms }} Draft
  */
-/** @typedef {Draft & { operationId: string }} Submission */
+/** @typedef {ApiDto<'ReplaceJobOrderBankAttemptDto'>} RepairTerms */
+/** @typedef {{ command: 'bank-replacement', existingOperationId: string, terms: RepairTerms }} RepairDraft */
+/** @typedef {(Draft | RepairDraft) & { operationId: string }} Submission */
+
+/**
+ * Matches the exact accepted logical attempt, including a replacement's expected revision.
+ *
+ * @param {Submission} terms the staged immutable submission
+ * @param {MoneyOutcome | null} outcome the returned outcome
+ * @returns {boolean} whether the outcome matches the immutable submission
+ */
+function matchesOutcome(terms, outcome) {
+    if (outcome?.operationId !== terms.operationId || outcome.state === 'SUBMITTING') return false;
+    if (terms.command !== 'bank-replacement') return true;
+    return (
+        outcome.amount === terms.terms.amount &&
+        (terms.terms.outsideBank
+            ? outcome.bankHandling === false && outcome.state === 'POSTED'
+            : outcome.linkedRevision === Number(terms.terms.revision) + 1)
+    );
+}
+
+/**
+ * Builds the original command URL and wire terms for a staged submission.
+ *
+ * @param {string} url the Order money resource
+ * @param {Submission} terms the staged immutable submission
+ */
+function commandRequest(url, terms) {
+    if (terms.command === 'bank-replacement') {
+        return {
+            url: `${url}/operations/${terms.operationId}/bank-replacement`,
+            payload: terms.terms,
+        };
+    }
+    return {
+        url: `${url}/${terms.command}`,
+        payload: { ...terms.terms, operationId: terms.operationId },
+    };
+}
+
+/**
+ * Announces the authoritative result of the accepted attempt.
+ *
+ * @param {HTMLElement} root the localized money workspace
+ * @param {MoneyOutcome} outcome the accepted result
+ */
+function announceOutcome(root, outcome) {
+    switch (outcome.state) {
+        case 'WAITING':
+            showFrontendSuccessToast(root.dataset.bankWaiting || '');
+            break;
+        case 'AUTHORISED':
+            showFrontendSuccessToast(root.dataset.bankAuthorised || '');
+            break;
+        case 'POSTED':
+            showFrontendSuccessToast(root.dataset.recorded || '');
+            break;
+        case 'REJECTED':
+        case 'CANCELLED':
+        case 'REVERSED':
+        case 'CLARIFICATION': {
+            const status = {
+                REJECTED: root.dataset.bankRejected,
+                CANCELLED: root.dataset.bankCancelled,
+                REVERSED: root.dataset.bankReversed,
+                CLARIFICATION: root.dataset.bankClarification,
+            };
+            showFrontendErrorToast(status[outcome.state] || '');
+            break;
+        }
+    }
+}
 
 /**
  * Identifies a permanently refused command from its authoritative outcome.
@@ -105,7 +177,13 @@ export function bindMoneyRecovery(root, restoreRefused) {
      */
     const forget = (terms) =>
         navigator.locks.request(key, () => {
-            const matches = pending()?.operationId === terms.operationId;
+            const current = pending();
+            const matches =
+                current?.operationId === terms.operationId &&
+                current.command === terms.command &&
+                (terms.command !== 'bank-replacement' ||
+                    (current.command === 'bank-replacement' &&
+                        current.terms.revision === terms.terms.revision));
             if (matches) localStorage.removeItem(key);
             banner.hidden = pending() === null;
             return matches;
@@ -121,11 +199,11 @@ export function bindMoneyRecovery(root, restoreRefused) {
      * Removes a resolved operation and refreshes its visible effects.
      *
      * @param {Submission} terms the submitted terms
+     * @param {MoneyOutcome} outcome the accepted result
      * @returns {Promise<boolean>} whether the money section was refreshed
      */
-    const finish = async (terms) => {
-        await forget(terms);
-        showFrontendSuccessToast(root.dataset.recorded || '');
+    const finish = async (terms, outcome) => {
+        if (await forget(terms)) announceOutcome(root, outcome);
         const [moneyRefreshed] = (await refresh()) || [];
         return moneyRefreshed === true;
     };
@@ -149,6 +227,33 @@ export function bindMoneyRecovery(root, restoreRefused) {
     };
 
     /**
+     * Checks an observed successor against the exact staged repair and its submitting actor.
+     *
+     * @param {Submission} terms the staged repair
+     * @returns {Promise<boolean>} whether recovery was resolved
+     */
+    const verifyReplacement = async (terms) => {
+        const result = await krtFetch.write({
+            method: 'POST',
+            ...commandRequest(url, terms),
+            toast: false,
+            onError: () => true,
+            onNetworkError: () => true,
+        });
+        /** @type {MoneyOutcome | null} */
+        const outcome = result.body;
+        if (result.ok && !result.redirected && outcome && matchesOutcome(terms, outcome)) {
+            return finish(terms, outcome);
+        }
+        if ([403, 409].includes(result.status)) {
+            if (await forget(terms)) showFrontendErrorToast(root.dataset.refused || '');
+            const [moneyRefreshed] = (await refresh()) || [];
+            return moneyRefreshed === true;
+        }
+        return false;
+    };
+
+    /**
      * Looks up the original identity after an uncertain transport result.
      *
      * @param {Submission} terms the submitted terms
@@ -158,8 +263,23 @@ export function bindMoneyRecovery(root, restoreRefused) {
         try {
             /** @type {MoneyOutcome | null} */
             const outcome = await krtFetch.getJson(`${url}/operations/${terms.operationId}`);
-            if (outcome?.operationId === terms.operationId) {
-                return await finish(terms);
+            if (outcome?.operationId !== terms.operationId) return false;
+            if (terms.command !== 'bank-replacement') {
+                return matchesOutcome(terms, outcome) && (await finish(terms, outcome));
+            }
+            const revision = Number(outcome.linkedRevision);
+            const submittedRevision = Number(terms.terms.revision);
+            if (
+                revision > submittedRevision ||
+                (outcome.bankHandling === false && outcome.state === 'POSTED')
+            ) {
+                return await verifyReplacement(terms);
+            }
+            if (
+                revision === submittedRevision &&
+                (outcome.state === 'REJECTED' || outcome.state === 'CANCELLED')
+            ) {
+                retry.hidden = false;
             }
         } catch (error) {
             if (error instanceof Error && 'status' in error) {
@@ -222,8 +342,7 @@ export function bindMoneyRecovery(root, restoreRefused) {
         try {
             const result = await krtFetch.write({
                 method: 'POST',
-                url: `${url}/${terms.command}`,
-                payload: { ...terms.terms, operationId: terms.operationId },
+                ...commandRequest(url, terms),
                 submitter,
                 toast: false,
                 onError: () => true,
@@ -231,8 +350,8 @@ export function bindMoneyRecovery(root, restoreRefused) {
             });
             /** @type {MoneyOutcome | null} */
             const outcome = result.body;
-            if (result.ok && !result.redirected && outcome?.operationId === terms.operationId) {
-                await finish(terms);
+            if (result.ok && !result.redirected && outcome && matchesOutcome(terms, outcome)) {
+                await finish(terms, outcome);
                 return true;
             }
             if (definitivelyRefused(result.status, result.body)) {
@@ -262,7 +381,7 @@ export function bindMoneyRecovery(root, restoreRefused) {
     /**
      * Stages a new identity before contacting the server.
      *
-     * @param {Draft} draft the explicitly submitted terms
+     * @param {Draft | RepairDraft} draft the explicitly submitted terms
      * @param {HTMLElement | null} submitter the activated control
      * @returns {Promise<boolean>} whether the submitted form can close
      */
@@ -271,7 +390,11 @@ export function bindMoneyRecovery(root, restoreRefused) {
         try {
             terms = await navigator.locks.request(key, () => {
                 if (recovering || sending || pending()) return null;
-                const submitted = { ...draft, operationId: crypto.randomUUID() };
+                const operationId =
+                    draft.command === 'bank-replacement'
+                        ? draft.existingOperationId
+                        : crypto.randomUUID();
+                const submitted = { ...draft, operationId };
                 localStorage.setItem(key, JSON.stringify(submitted));
                 return submitted;
             });

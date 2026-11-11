@@ -1,6 +1,6 @@
 # Role and Permission Matrix (Profit Basetool)
 
-> **Approved JobOrder contract and implementation scope:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Section 3.3 describes the internal Bank-free checkpoint. Bank authority for linked payments is covered in section 3.11. The coupled order actions use the same current Order and Bank authority. The default Bank journey in the order forms remains pending.
+> **Approved JobOrder contract and implementation scope:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Section 3.3 describes the internal Bank-free checkpoint. Bank authority for linked payments is covered in section 3.11. The coupled order actions use the same current Order and Bank authority. Each applicable money action starts with Bank selected. The Order form suggests eligible account references under current Order and Bank authority. The Bank queue owns deposit custodian confirmation.
 
 > **Last reviewed: 2026-09-22** — re-verified against every `@PreAuthorize` of the 88 backend
 > `@RestController`s and the frontend page/proxy controllers, after the members-only cut

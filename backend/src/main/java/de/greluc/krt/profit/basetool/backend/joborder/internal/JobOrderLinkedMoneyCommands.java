@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
+import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.Counterparty;
@@ -68,7 +69,8 @@ class JobOrderLinkedMoneyCommands {
               || attempt.getKind() != JobOrderMoneyKind.PROVISION
               || attempt.getAmount().compareTo(amount) != 0
               || !selection.equals(attempt.selection())
-              || !Objects.equals(dto.commitmentId(), attempt.getCommitmentId())) {
+              || !Objects.equals(dto.commitmentId(), attempt.getCommitmentId())
+              || !matchesProvisionRate(dto.rate(), attempt.rateSnapshot())) {
             throw new BusinessConflictException("orders.money.operation.termsMismatch");
           }
           return queries.projectLinkedOutcome(attempt);
@@ -83,34 +85,12 @@ class JobOrderLinkedMoneyCommands {
       JobOrderMoneySelection selection,
       JobOrderMoneyHolder holder,
       JobOrderBankSelection bank) {
-    JobOrderLinkedPaymentTerms.validate(bank);
-    var port = port();
-    Counterparty counterparty =
-        switch (bank.type()) {
-          case AUTHORISATION -> {
-            requireCustodian(port, bank, holder);
-            yield null;
-          }
-          case DEPOSIT -> {
-            if (Boolean.TRUE.equals(bank.orderFundedDepositFee())) {
-              throw JobOrderLinkedPaymentTerms.invalid();
-            }
-            requireCustodian(port, bank, holder);
-            yield JobOrderLinkedPaymentTerms.depositor(bank);
-          }
-          case WITHDRAWAL -> {
-            if (!JobOrderLinkedPaymentTerms.reported(bank)) {
-              requireCustodian(port, bank, holder);
-            }
-            yield party(holder);
-          }
-          case TRANSFER, HOLDER_TRANSFER -> throw JobOrderLinkedPaymentTerms.invalid();
-        };
+    Counterparty counterparty = provisionParty(holder, bank);
+    var rate = provisionRate(dto.rate());
     if (holder.getId() == null) {
       holder.recordChange();
       holders.saveAndFlush(holder);
     }
-    var rate = fees.snapshot();
     var fee = paymentTerms.feeFor(JobOrderMoneyKind.PROVISION, bank, amount, rate);
     var terms =
         new JobOrderLinkedMoneyAttempt.Terms(
@@ -128,6 +108,79 @@ class JobOrderLinkedMoneyCommands {
             BigDecimal.ZERO,
             JobOrderLinkedPaymentTerms.reported(bank));
     return submitPrepared(order, dto.operationId(), actor, terms, bank, counterparty);
+  }
+
+  JobOrderMoneyBankPreview previewProvision(
+      JobOrderMoneyHolder holder, BigDecimal amount, JobOrderBankSelection bank) {
+    return provisionQuote(bank, amount, provisionParty(holder, bank));
+  }
+
+  JobOrderMoneyBankPreview provisionQuote(
+      JobOrderBankSelection bank, BigDecimal amount, @Nullable Counterparty counterparty) {
+    var rate = fees.snapshot();
+    var fee = paymentTerms.feeFor(JobOrderMoneyKind.PROVISION, bank, amount, rate);
+    return quote(bank, amount, rate, fee, counterparty, BigDecimal.ZERO);
+  }
+
+  RateSnapshot provisionRate(@Nullable String observed) {
+    var rate = fees.snapshot();
+    if (!matchesProvisionRate(observed, rate)) {
+      throw new BusinessConflictException("orders.money.movement.rateRequired");
+    }
+    return rate;
+  }
+
+  static boolean matchesProvisionRate(@Nullable String observed, RateSnapshot rate) {
+    return observed == null || rate.equals(JobOrderMoneyMovementTerms.submittedRate(observed));
+  }
+
+  private @Nullable Counterparty provisionParty(
+      JobOrderMoneyHolder holder, JobOrderBankSelection bank) {
+    JobOrderLinkedPaymentTerms.validate(bank);
+    var port = port();
+    return switch (bank.type()) {
+      case AUTHORISATION -> {
+        requireCustodian(port, bank, holder);
+        yield null;
+      }
+      case DEPOSIT -> {
+        if (Boolean.TRUE.equals(bank.orderFundedDepositFee())) {
+          throw JobOrderLinkedPaymentTerms.invalid();
+        }
+        requireCustodian(port, bank, holder);
+        yield JobOrderLinkedPaymentTerms.depositor(bank);
+      }
+      case WITHDRAWAL -> {
+        if (!JobOrderLinkedPaymentTerms.reported(bank)) {
+          requireCustodian(port, bank, holder);
+        }
+        yield party(holder);
+      }
+      case TRANSFER, HOLDER_TRANSFER -> throw JobOrderLinkedPaymentTerms.invalid();
+    };
+  }
+
+  JobOrderMoneyBankPreview quote(
+      JobOrderBankSelection bank,
+      BigDecimal amount,
+      RateSnapshot rate,
+      JobOrderLinkedPaymentTerms.Fee fee,
+      @Nullable Counterparty counterparty,
+      BigDecimal orderSourceCharge) {
+    var quote =
+        port()
+            .quote(
+                new JobOrderBankPort.Terms(
+                    bank, amount, rate, JobOrderLinkedPaymentTerms.reported(bank), counterparty));
+    return new JobOrderMoneyBankPreview(
+        quote.pending()
+            ? JobOrderMoneyBankPreview.Disposition.PENDING
+            : JobOrderMoneyBankPreview.Disposition.DIRECT,
+        fee.amount().toPlainString(),
+        fee.funding(),
+        quote.sourceDebit().toPlainString(),
+        orderSourceCharge.toPlainString(),
+        rate.rate().toPlainString());
   }
 
   Optional<JobOrderMoneyOutcome> replayMovement(
@@ -159,6 +212,38 @@ class JobOrderLinkedMoneyCommands {
           }
           return queries.projectLinkedOutcome(attempt);
         });
+  }
+
+  JobOrderMoneyBankPreview previewMovement(
+      JobOrderMoneyMovementTerms movement,
+      JobOrderMoneyMovementBasis.Resolved resolved,
+      JobOrderBankSelection bank) {
+    var counterparty =
+        movementParty(
+            port(),
+            movement.kind(),
+            bank,
+            resolved.source(),
+            resolved.destination(),
+            resolved.recipient());
+    var fee = Objects.requireNonNull(resolved.linkedFee());
+    return quote(
+        bank,
+        movement.amount(),
+        resolved.configuredRate(),
+        fee,
+        counterparty,
+        movement.amount().add(fee.orderFee()));
+  }
+
+  JobOrderMoneyBankPreview previewAccountTransfer(JobOrderBankSelection bank, BigDecimal amount) {
+    return quote(
+        bank,
+        amount,
+        fees.snapshot(),
+        new JobOrderLinkedPaymentTerms.Fee(BigDecimal.ZERO, JobOrderMoneyFeeFunding.NONE),
+        null,
+        amount);
   }
 
   JobOrderMoneyOutcome submitMovement(

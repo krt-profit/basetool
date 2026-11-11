@@ -33,6 +33,9 @@ interface JobOrderLinkedMoneyAttemptRepository
   Optional<JobOrderLinkedMoneyAttempt> findByOrderIdAndOperationIdAndActiveTrue(
       UUID orderId, UUID operationId);
 
+  Optional<JobOrderLinkedMoneyAttempt> findByOrderIdAndOperationIdAndRevision(
+      UUID orderId, UUID operationId, long revision);
+
   boolean existsByOrderIdAndOperationIdAndActiveTrue(UUID orderId, UUID operationId);
 
   List<JobOrderLinkedMoneyAttempt> findAllByOrderIdAndActiveTrue(UUID orderId);

@@ -280,7 +280,19 @@ class JobOrderLinkedBankSettlementIntegrationTest {
                 true,
                 "justification",
                 "Provide game funds to the order holder"));
-    send(post(MONEY + "/provisions", order).with(writer()), terms)
+    JsonNode preview =
+        body(
+            send(post(MONEY + "/provisions/preview", order).with(writer()), terms)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultingHolding").value("4000000"))
+                .andExpect(jsonPath("$.bank.disposition").value("PENDING"))
+                .andExpect(jsonPath("$.bank.actualFee").value("20000"))
+                .andExpect(jsonPath("$.bank.feeFunding").value("BANK_SOURCE"))
+                .andExpect(jsonPath("$.bank.bankSourceDebit").value("4020000"))
+                .andExpect(jsonPath("$.bank.orderSourceCharge").value("0")));
+    var quotedTerms = new HashMap<>(terms);
+    quotedTerms.put("rate", preview.path("bank").path("rate").asString());
+    send(post(MONEY + "/provisions", order).with(writer()), quotedTerms)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("WAITING"));
     JsonNode request = linkedRequest("WITHDRAWAL");

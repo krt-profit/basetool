@@ -431,6 +431,7 @@ POST /api/v1/orders/{id}/items/{itemId}/production | JobOrderHandoverController#
 GET /api/v1/orders/{id}/materials/{matId}/attribution | JobOrderMaterialController#getStockAttributionForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/materials/{matId}/inventory | JobOrderMaterialController#getInventoryItemsForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/money | JobOrderMoneyController#getMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/bank-accounts | JobOrderMoneyController#bankAccounts | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/money/corrections | JobOrderMoneyCorrectionController#record | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/money/corrections/preview | JobOrderMoneyCorrectionController#preview | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/money/holder-candidates | JobOrderMoneyController#holderCandidates | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -447,7 +448,9 @@ POST /api/v1/orders/{id}/money/movements/settlement | JobOrderMoneySettlementCon
 GET /api/v1/orders/{id}/money/movements/settlement/candidates | JobOrderMoneySettlementController#candidates | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/money/movements/settlement/preview | JobOrderMoneySettlementController#preview | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/money/operations/{operation} | JobOrderMoneyController#getMoneyOutcome | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/operations/{operation}/bank-replacement | JobOrderMoneyController#getBankRepair | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/money/operations/{operation}/bank-replacement | JobOrderMoneyController#replaceBankAttempt | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/operations/{operation}/bank-replacement/preview | JobOrderMoneyController#previewBankRepair | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/money/provisions | JobOrderMoneyController#provideMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/{id}/money/provisions/preview | JobOrderMoneyController#previewMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/money/recipient-candidates | JobOrderMoneyController#recipientCandidates | pre=isAuthenticated() | url=anyRequest -> authenticated

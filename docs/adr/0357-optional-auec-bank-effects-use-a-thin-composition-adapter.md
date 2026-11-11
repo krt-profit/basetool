@@ -82,6 +82,12 @@ the order preparation under the authenticated decision actor. The synchronous ef
 that preparation in the same transaction. Bank account UUID order follows PostgreSQL order.
 The terminal cleanup cancels unexecuted sibling requests under the held order guard.
 
+The ordinary order forms read purpose-scoped account references and query the same Bank admission
+before confirming new terms. Scoped position and designation identities let the server resolve a
+handover or return without expanding the reader's Bank visibility. Repair reads and retained-basis
+quotes use the Order's current authority. The replacement reuses the immutable Bank facts and runs
+through the existing Bank decision path.
+
 ## Consequences
 
 - Bank and JobOrder remain replaceable behind their own public contracts, without a rank change,

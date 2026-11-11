@@ -476,7 +476,26 @@ public class BankBookingRequestService {
   @Transactional(propagation = Propagation.MANDATORY)
   BankBookingRequest replacementSource(
       @NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
-    BankBookingRequest request = lockRequest(requestId);
+    return requireFailedAttempt(lockRequest(requestId), attempt);
+  }
+
+  /**
+   * Reads the exact failed attempt and its retained terms for a replacement quote.
+   *
+   * @param requestId the failed request
+   * @param attempt its exact linked identity
+   * @return the failed request's retained evidence
+   */
+  @NotNull
+  BankBookingRequest previewReplacementSource(
+      @NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
+    return requireFailedAttempt(
+        Entities.require(requestRepository.findById(requestId), "Booking request not found"),
+        attempt);
+  }
+
+  private static BankBookingRequest requireFailedAttempt(
+      BankBookingRequest request, BankLinkedAttempt attempt) {
     BankLinkedAttemptRecord previous = request.getLinkedAttempt();
     if (previous == null
         || !previous.getId().equals(attempt.id())

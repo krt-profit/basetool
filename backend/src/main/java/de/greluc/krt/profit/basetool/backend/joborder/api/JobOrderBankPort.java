@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,6 +36,51 @@ public interface JobOrderBankPort {
    * @param payment the prepared order attempt and selected Bank terms
    */
   void submit(@NotNull Payment payment);
+
+  /**
+   * Checks the current Bank route for proposed Order terms.
+   *
+   * @param terms the proposed Bank effect
+   * @return the expected routing and source debit
+   */
+  @NotNull
+  Quote quote(@NotNull Terms terms);
+
+  /**
+   * Checks replacement routing and funding at the previously submitted basis.
+   *
+   * @param terms the proposed corrected payment terms
+   * @param purposeRef the stable opaque lineage
+   * @param predecessor the exact failed Bank request
+   * @return the expected Bank disposition and source debit
+   */
+  @NotNull
+  Quote quoteReplacement(
+      @NotNull Terms terms, @NotNull UUID purposeRef, @NotNull PreviousAttempt predecessor);
+
+  /**
+   * Terms of a proposed Bank effect.
+   *
+   * @param selection the selected Bank coordinates
+   * @param amount exact net principal
+   * @param rate configured fee basis
+   * @param actualPayment whether the operation reports a game payment
+   * @param counterparty the actual depositor or payee
+   */
+  record Terms(
+      @NotNull JobOrderBankSelection selection,
+      @NotNull BigDecimal amount,
+      @NotNull RateSnapshot rate,
+      boolean actualPayment,
+      @Nullable Counterparty counterparty) {}
+
+  /**
+   * Expected Bank result if the terms and admission remain current.
+   *
+   * @param pending whether the request would await a decision
+   * @param sourceDebit exact Bank source-account debit
+   */
+  record Quote(boolean pending, @NotNull BigDecimal sourceDebit) {}
 
   /**
    * Replaces a failed attempt through Bank admission at its retained rate.
@@ -75,6 +122,58 @@ public interface JobOrderBankPort {
    * @return whether the actor may view this active account
    */
   boolean canSeeAccount(@NotNull UUID accountId);
+
+  /**
+   * Returns only selectable Bank references for already authorized Order actions.
+   *
+   * @param responsibleUnit the collection unit
+   * @param requestingUnit the requester unit
+   * @param canDeposit the caller may deposit
+   * @param canDesignate the caller may designate a recipient
+   * @param canDebit the caller may provide from existing funds
+   * @return minimal active references
+   */
+  @NotNull
+  AccountOptions accountOptions(
+      @NotNull UUID responsibleUnit,
+      @NotNull UUID requestingUnit,
+      boolean canDeposit,
+      boolean canDesignate,
+      boolean canDebit);
+
+  /**
+   * Authorized reference groups.
+   *
+   * @param collection accounts for deposits
+   * @param designation accounts for requester designation
+   * @param withdrawal accounts for withdrawing Bank funds
+   * @param transfer accounts for transferring Bank funds
+   * @param custodians registered custody actors
+   */
+  record AccountOptions(
+      List<AccountRef> collection,
+      List<AccountRef> designation,
+      List<AccountRef> withdrawal,
+      List<AccountRef> transfer,
+      List<CustodianRef> custodians) {}
+
+  /**
+   * Reference to an eligible Bank account.
+   *
+   * @param id the account
+   * @param name its label
+   */
+  record AccountRef(UUID id, String name) {}
+
+  /**
+   * Registered custodian reference available for a linked action.
+   *
+   * @param id the custody identity
+   * @param userId the exact linked member
+   * @param name their display name
+   */
+  @Schema(name = "JobOrderMoneyBankCustodian")
+  record CustodianRef(UUID id, UUID userId, String name) {}
 
   /**
    * Payment data required by the Bank.

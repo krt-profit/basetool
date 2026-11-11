@@ -30,7 +30,14 @@
                      th:text="${#messages.msg('orders.money.bank.fee.' + attempt.feeFunding, @moneyFormat.exactWhole(attempt.actualFee, #locale))}"></div>
                 <div th:if="${attempt.activeLinkedRevision == false}" th:text="#{orders.money.bank.superseded}"></div>
             </div>
-            <time class="od-money-date" th:datetime="${attempt.recordedAt}" th:data-utc="${attempt.recordedAt}"></time>
+            <div>
+                <button th:if="${attempt.activeLinkedRevision == true and money.replaceableOperationIds != null and
+                            #lists.contains(money.replaceableOperationIds, attempt.operationId)}"
+                        type="button" class="btn btn-ghost" data-trigger="od-money-bank-repair"
+                        data-testid="order-money-bank-repair" th:data-repair-operation="${attempt.operationId}"
+                        th:text="#{orders.money.bank.repair}"></button>
+                <time class="od-money-date" th:datetime="${attempt.recordedAt}" th:data-utc="${attempt.recordedAt}"></time>
+            </div>
         </li>
     </ul>
 </section>

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +59,36 @@ class JobOrderMoneyAccess {
 
   boolean unitWriter(JobOrder order) {
     return responsible(order) || requester(order);
+  }
+
+  boolean mayRepair(
+      JobOrder order,
+      JobOrderLinkedMoneyAttempt attempt,
+      UUID actor,
+      JobOrderMoneyLedger.Ledger booked) {
+    if (access.responsibilityInvalid(order)) {
+      return false;
+    }
+    if (responsible(order)) {
+      return true;
+    }
+    if (!actor.equals(attempt.getActorId())) {
+      return false;
+    }
+    if ((attempt.getKind().delivers() || attempt.getKind() == JobOrderMoneyKind.REQUESTER_RETURN)
+        && requester(order)) {
+      return true;
+    }
+    UUID holder = attempt.getHolderId();
+    return holder == null
+        ? actor.equals(attempt.getCounterpartyUserId())
+        : actor.equals(booked.holder(holder).getUserId());
+  }
+
+  static boolean repairable(JobOrder order, JobOrderLinkedMoneyAttempt attempt) {
+    return attempt.replaceable()
+        && order.getStatus() != JobOrderStatus.REJECTED
+        && (order.getStatus().isActive() || attempt.permitsTerminalPosting());
   }
 
   void requireUnitWriter(JobOrder order) {

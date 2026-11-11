@@ -193,7 +193,34 @@ public class JobOrderMoneyQueries {
         linked.stream()
             .map(attempt -> projectLinkedOutcome(attempt, booked, names, recipientsById))
             .toList(),
-        accountHoldingViews(booked));
+        accountHoldingViews(booked),
+        unitWriter ? accountReturns(booked) : List.of(),
+        actor == null
+            ? List.of()
+            : linked.stream()
+                .filter(attempt ->
+                    JobOrderMoneyAccess.repairable(order, attempt)
+                        && moneyAccess.mayRepair(order, attempt, actor, booked))
+                .map(JobOrderLinkedMoneyAttempt::getOperationId)
+                .toList());
+  }
+
+  private static List<JobOrderMoneyAccountReturnView> accountReturns(
+      JobOrderMoneyLedger.Ledger booked) {
+    return booked.accountRequesterBalances().keySet().stream()
+        .sorted(
+            Comparator.comparing(JobOrderMoneyAvailability.AccountReceipt::holdingId)
+                .thenComparing(JobOrderMoneyAvailability.AccountReceipt::recipientId))
+        .<JobOrderMoneyAccountReturnView>mapMulti((receipt, choices) -> {
+          var amount =
+              booked.availableForAccountReturn(receipt.holdingId(), receipt.recipientId(), null);
+          if (amount.signum() > 0) {
+            choices.accept(
+                new JobOrderMoneyAccountReturnView(
+                    receipt.holdingId(), receipt.recipientId(), amount.toPlainString()));
+          }
+        })
+        .toList();
   }
 
   private List<JobOrderMoneyAccountHoldingView> accountHoldingViews(

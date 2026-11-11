@@ -217,7 +217,8 @@ class JobOrderMoneySettlementBasis {
       @Nullable BigDecimal destinationAfter,
       boolean reopens) {
 
-    JobOrderMoneyMovementPreview preview(JobOrderMoneySettlementTerms terms) {
+    JobOrderMoneyMovementPreview preview(
+        JobOrderMoneySettlementTerms terms, @Nullable JobOrderMoneyBankPreview bank) {
       return new JobOrderMoneyMovementPreview(
           terms.amount().toPlainString(),
           fee.toPlainString(),
@@ -228,7 +229,10 @@ class JobOrderMoneySettlementBasis {
           beneficiary.name(),
           overpayment.toPlainString(),
           sourceAfter.negate().max(BigDecimal.ZERO).toPlainString(),
-          destinationAfter == null ? null : destinationAfter.toPlainString());
+          destinationAfter == null ? null : destinationAfter.toPlainString(),
+          false,
+          reopens,
+          bank);
     }
   }
 

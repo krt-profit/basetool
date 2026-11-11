@@ -80,10 +80,8 @@ public class JobOrderMoneySettlements {
     }
     try {
       var resolved = basis.resolve(order, dto, terms, access.requireActiveActor(), null);
-      if (dto.bank() != null) {
-        linked.validateParties(resolved, dto.bank());
-      }
-      return resolved.preview(terms);
+      var quote = dto.bank() == null ? null : linked.preview(terms, resolved, dto.bank());
+      return resolved.preview(terms, quote);
     } catch (JobOrderMoneySettlementBasis.UnavailableSettlement unavailable) {
       throw unavailable.previewProblem();
     } catch (JobOrderMoneyHolders.UnavailableHolderException unavailable) {

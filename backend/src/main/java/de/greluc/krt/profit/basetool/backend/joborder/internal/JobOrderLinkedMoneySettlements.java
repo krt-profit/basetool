@@ -77,8 +77,15 @@ class JobOrderLinkedMoneySettlements {
         });
   }
 
-  void validateParties(JobOrderMoneySettlementBasis.Resolved settled, JobOrderBankSelection bank) {
-    bankCounterparty(settled, bank);
+  JobOrderMoneyBankPreview preview(
+      JobOrderMoneySettlementTerms terms,
+      JobOrderMoneySettlementBasis.Resolved settled,
+      JobOrderBankSelection bank) {
+    var counterparty = bankCounterparty(settled, bank);
+    var fee = Objects.requireNonNull(settled.linkedFee());
+    BigDecimal principal = terms.requesterReturn() ? BigDecimal.ZERO : terms.amount();
+    return linked.quote(
+        bank, terms.amount(), settled.rate(), fee, counterparty, principal.add(fee.orderFee()));
   }
 
   JobOrderMoneyOutcome submit(

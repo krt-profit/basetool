@@ -29,7 +29,9 @@ import org.jetbrains.annotations.Nullable;
  * @param holderName the current visible recipient
  * @param fee the fee in whole aUEC
  * @param bankHandling whether the provision uses Bank handling
- * @param resultingHolding the holder's resulting amount in whole aUEC
+ * @param resultingHolding the resulting Order position in whole aUEC
+ * @param holderVersion the observed Order position revision
+ * @param bank the authorised linked Bank effects
  */
 @DtoMirror
 public record JobOrderMoneyProvisionPreview(
@@ -37,4 +39,6 @@ public record JobOrderMoneyProvisionPreview(
     @Nullable String holderName,
     String fee,
     boolean bankHandling,
-    String resultingHolding) {}
+    String resultingHolding,
+    long holderVersion,
+    @Nullable JobOrderMoneyBankPreview bank) {}

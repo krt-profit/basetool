@@ -62,6 +62,7 @@ function formatWholeAuec(amount) {
 
 /** @typedef {ApiDto<'PreviewJobOrderMoneyProvisionDto'>} PreviewTerms */
 /** @typedef {ApiDto<'JobOrderMoneyProvisionPreview'>} ProvisionPreview */
+/** @typedef {ApiDto<'JobOrderMoneyBankPreview'>} BankPreview */
 
 /**
  * Enables saving while the server preview matches the draft.
@@ -91,6 +92,7 @@ export function bindMoneyPreview(form, url, readTerms, render) {
     /** @type {Ready | null} */
     let ready = null;
     let timer = 0;
+    let refreshedBasis = '';
 
     /** Invalidates the old preview before waiting for a new response. */
     const reset = () => {
@@ -121,23 +123,34 @@ export function bindMoneyPreview(form, url, readTerms, render) {
         const rendered =
             result.ok && !result.redirected ? render(output, result.body, terms) : undefined;
         if (rendered === undefined) {
-            retry.hidden = false;
+            retry.hidden = result.status === 403;
             const details = result.body;
-            if (
-                problem &&
-                details &&
-                typeof details === 'object' &&
-                'detail' in details &&
-                typeof details.detail === 'string'
-            ) {
-                problem.textContent = details.detail;
-                problem.removeAttribute('hidden');
+            if (problem instanceof HTMLElement) {
+                const detail =
+                    details &&
+                    typeof details === 'object' &&
+                    'detail' in details &&
+                    typeof details.detail === 'string'
+                        ? details.detail
+                        : undefined;
+                problem.textContent =
+                    detail ||
+                    (result.status === 409
+                        ? problem.dataset.stale
+                        : result.status === 403
+                          ? problem.dataset.denied
+                          : problem.dataset.unavailable) ||
+                    '';
+                problem.hidden = !problem.textContent;
             }
-            if (result.status === 409) {
+            const basis = JSON.stringify(terms);
+            if (result.status === 409 && basis !== refreshedBasis) {
+                refreshedBasis = basis;
                 await joborderHooks.refreshOrderSection?.('money', { broadcast: false });
             }
             return;
         }
+        refreshedBasis = '';
         ready = rendered;
         output.hidden = false;
         save.disabled = ready === null;
@@ -153,6 +166,7 @@ export function bindMoneyPreview(form, url, readTerms, render) {
     };
 
     retry.addEventListener('click', () => {
+        refreshedBasis = '';
         reset();
         refresh();
     });
@@ -181,6 +195,33 @@ export function showPreviewAmounts(output, values) {
 }
 
 /**
+ * Displays the Bank fee payer, source debit and expected disposition.
+ *
+ * @param {HTMLElement} output the preview
+ * @param {BankPreview | null | undefined} bank the authorised Bank effects
+ */
+export function showBankPreview(output, bank) {
+    const debit = output.querySelector('[data-preview-bank-debit]');
+    const payer = output.querySelector('[data-preview-bank-payer]');
+    const payerLabel = payer?.querySelector('[data-preview-bank-payer-label]');
+    const disposition = output.querySelector('[data-preview-bank-disposition]');
+    const charge = bank?.bankSourceDebit;
+    debit?.toggleAttribute('hidden', !charge || charge === '0');
+    showPreviewAmounts(output, { bankDebit: charge });
+    if (payerLabel instanceof HTMLElement) {
+        const key =
+            bank?.feeFunding === 'BANK_SOURCE' ? 'bankSource' : bank?.feeFunding?.toLowerCase();
+        payerLabel.textContent = key ? payerLabel.dataset[key] || '' : '';
+        payer?.toggleAttribute('hidden', !payerLabel.textContent || bank?.actualFee === '0');
+    }
+    if (disposition instanceof HTMLElement) {
+        const key = bank?.disposition?.toLowerCase();
+        disposition.textContent = key ? disposition.dataset[key] || '' : '';
+        disposition.hidden = !disposition.textContent;
+    }
+}
+
+/**
  * Projects the exact provision and the resulting holding.
  *
  * @param {HTMLFormElement} form the provision form
@@ -190,12 +231,23 @@ export function showPreviewAmounts(output, values) {
 export function bindProvisionPreview(form, url, readTerms) {
     return bindMoneyPreview(form, `${url}/provisions/preview`, readTerms, (output, body, terms) => {
         const preview = /** @type {ProvisionPreview | null} */ (body);
-        if (!preview || typeof preview.amount !== 'string') return undefined;
+        if (
+            !preview ||
+            typeof preview.amount !== 'string' ||
+            (terms.bankHandling && !preview.bank)
+        ) {
+            return undefined;
+        }
         showPreviewAmounts(output, {
             amount: preview.amount,
-            fee: preview.fee,
+            fee: preview.bank?.actualFee ?? preview.fee,
             holding: preview.resultingHolding,
         });
-        return terms;
+        showBankPreview(output, preview.bank);
+        return {
+            ...terms,
+            ...(preview.bank ? { holderVersion: preview.holderVersion } : {}),
+            ...(preview.bank?.rate ? { rate: preview.bank.rate } : {}),
+        };
     });
 }

@@ -51,7 +51,6 @@ record JobOrderMoneyMovementTerms(
       if (dto.bank() == null) {
         throw new BadRequestException("orders.money.bankHandling.unavailable");
       }
-      JobOrderLinkedPaymentTerms.validate(dto.bank());
     } else if (dto.bank() != null) {
       throw JobOrderLinkedPaymentTerms.invalid();
     }

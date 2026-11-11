@@ -112,15 +112,21 @@ public class JobOrderMoneyCommands {
   public JobOrderMoneyProvisionPreview preview(UUID orderId, PreviewJobOrderMoneyProvisionDto dto) {
     JobOrder order = queries.requireReadableMoneyOrder(orderId);
     responsibility.assertWritable(order);
+    var bank = dto.bank();
+    if (Boolean.TRUE.equals(dto.bankHandling()) != (bank != null)) {
+      throw JobOrderLinkedPaymentTerms.invalid();
+    }
+    if (!order.getStatus().isActive()) {
+      throw new BusinessConflictException("orders.money.provision.inactive");
+    }
+    if (bank != null && Boolean.TRUE.equals(bank.accountOnly())) {
+      return accountCommands.previewProvision(order, dto, bank);
+    }
     final UUID actor = requireActor();
     JobOrderMoneySelection selection = dto.selection();
     authorizeSelection(order, selection);
     if (dto.commitmentId() != null) {
       commitmentCredit.assertAttributionAuthority(order, dto.commitmentId());
-    }
-    requireBankFree(dto.bankHandling());
-    if (!order.getStatus().isActive()) {
-      throw new BusinessConflictException("orders.money.provision.inactive");
     }
     final BigDecimal amount = WholeAuec.positive(dto.amount());
     JobOrderMoneyHolder holder;
@@ -134,12 +140,17 @@ public class JobOrderMoneyCommands {
       commitmentCredit.assertCurrentTarget(order, dto.commitmentId());
     }
     BigDecimal current = ledger.read(orderId).balance(holder.getId());
+    var quote = bank == null ? null : linked.previewProvision(holder, amount, bank);
     return new JobOrderMoneyProvisionPreview(
         amount.toPlainString(),
         holderChoices.nameOf(holder),
-        BigDecimal.ZERO.toPlainString(),
+        quote != null && quote.feeFunding() == JobOrderMoneyFeeFunding.ORDER
+            ? quote.actualFee()
+            : "0",
         dto.bankHandling(),
-        current.add(amount).toPlainString());
+        current.add(amount).toPlainString(),
+        holder.getRevision(),
+        quote);
   }
 
   private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> provideChecked(
@@ -175,6 +186,9 @@ public class JobOrderMoneyCommands {
     }
     if (dto.bank() == null) {
       requireBankFree(dto.bankHandling());
+      if (dto.rate() != null) {
+        throw JobOrderLinkedPaymentTerms.invalid();
+      }
     } else if (!dto.bankHandling()) {
       throw JobOrderLinkedPaymentTerms.invalid();
     }

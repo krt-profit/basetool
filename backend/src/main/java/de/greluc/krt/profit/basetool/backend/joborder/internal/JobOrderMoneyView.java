@@ -61,6 +61,8 @@ import java.util.UUID;
  * @param returnableRecipientIds designations with a positive retained net receipt
  * @param linkedAttempts retained Bank-linked submissions and their order-side outcomes
  * @param accountHoldings the order-local balances attributed to Bank accounts
+ * @param accountReturns the available order-local requester receipts by collection position
+ * @param replaceableOperationIds the failed attempts that the caller may repair
  */
 public record JobOrderMoneyView(
     String target,
@@ -98,4 +100,6 @@ public record JobOrderMoneyView(
     boolean canCorrectRecipient,
     List<UUID> returnableRecipientIds,
     List<JobOrderMoneyOutcome> linkedAttempts,
-    List<JobOrderMoneyAccountHoldingView> accountHoldings) {}
+    List<JobOrderMoneyAccountHoldingView> accountHoldings,
+    List<JobOrderMoneyAccountReturnView> accountReturns,
+    List<UUID> replaceableOperationIds) {}

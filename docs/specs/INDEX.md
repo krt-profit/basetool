@@ -104,7 +104,7 @@ versioned transport, safe identity/presence handling, archived convergence, enri
 | Archived plans & one-time runbooks (index) | [`docs/archive/README.md`](../archive/README.md) | Historical — archived | Frozen records, not current truth — every implemented plan and executed one-time runbook, including the ones not listed individually above (multi-squadron, Spezialkommando, R8, Materialbörse, item inventory, Android API exposure, members-only, management VPN, the Podman migration and cutover, the edge, monitoring, live-sync, API-vhost and SK rollouts) | — |
 | Shared JobOrder model | [`orders-core.md`](orders-core.md) | Living | Owner-approved target; implementation pending; REQ-ORDERS-049…056 | ORDERS/ORG/SEC |
 | aUEC procurement orders | [`orders-auec.md`](orders-auec.md) | Living | Internal Bank-free checkpoint including settlement and corrections. Full acceptance is tracked under REQ-ORDERS-057…068 | ORDERS |
-| Optional aUEC order–Bank integration | [`orders-auec-bank.md`](orders-auec-bank.md) | Living | Owner-approved target; implementation pending; REQ-ORDERS-069…076 | ORDERS/BANK |
+| Optional aUEC order–Bank integration | [`orders-auec-bank.md`](orders-auec-bank.md) | Living | Order actions and Bank admission; REQ-ORDERS-069…076 | ORDERS/BANK |
 
 Architecture *decisions* (the "why we chose X over Y") live next door in
 [`docs/adr/`](../adr/README.md), not here. A spec says what must hold; an ADR records the

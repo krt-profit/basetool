@@ -40,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * @param holderName the entered accountless holder name
  * @param commitmentId the explicitly selected unit commitment occurrence
  * @param bank the selected Bank effect and its parties
+ * @param rate the fee rate observed in the Bank preview
  */
 @DtoMirror
 public record ProvideJobOrderMoneyDto(
@@ -51,4 +52,5 @@ public record ProvideJobOrderMoneyDto(
     @Nullable UUID holderUserId,
     @Nullable @Size(max = 200) String holderName,
     @Nullable UUID commitmentId,
-    @Nullable @Valid @JsonInclude(JsonInclude.Include.NON_NULL) JobOrderBankSelection bank) {}
+    @Nullable @Valid @JsonInclude(JsonInclude.Include.NON_NULL) JobOrderBankSelection bank,
+    @Nullable @Size(max = 24) @JsonInclude(JsonInclude.Include.NON_NULL) String rate) {}

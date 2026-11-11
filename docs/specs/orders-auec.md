@@ -511,10 +511,11 @@ every participant.
 recipient correction and reassignment journeys. The Bank-default and coupled result cases belong
 to the Bank integration acceptance.
 
-The workspace exposes the minimal aUEC form, a manual holdings section and the explicit Bank-free
-action. Settlement uses the existing movement dialog. A correction starts from the history and
-can include further affected original entries. It previews the resulting balances before saving.
-Identity maintenance uses the relevant holder or recipient row.
+The workspace exposes the minimal aUEC creation form, booked and available holdings, and the
+per-operation Bank choice. Account-only deposits, authorisation and delivery use the ordinary
+provision and movement forms. Settlement uses the same movement dialog. A factual correction or
+an eligible repair starts from history and previews the affected money before saving. Identity
+maintenance uses the relevant holder or recipient row.
 
 ### REQ-ORDERS-068 — Both operating modes have verifiable end-to-end evidence
 

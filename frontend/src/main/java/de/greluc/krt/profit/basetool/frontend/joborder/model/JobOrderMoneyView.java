@@ -100,4 +100,6 @@ public record JobOrderMoneyView(
     boolean canCorrectRecipient,
     List<UUID> returnableRecipientIds,
     List<JobOrderMoneyOutcome> linkedAttempts,
-    List<JobOrderMoneyAccountHoldingView> accountHoldings) {}
+    List<JobOrderMoneyAccountHoldingView> accountHoldings,
+    List<JobOrderMoneyAccountReturnView> accountReturns,
+    List<UUID> replaceableOperationIds) {}

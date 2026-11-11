@@ -101,6 +101,16 @@ export function orderMoneyProjection() {
     return document.querySelector('#order-money-results [data-can-provide-self]');
 }
 
+/** @returns {{id: string, label: string, active: boolean}[]} visible order-local Bank designations */
+export function bankRecipients() {
+    const rows = orderMoneyProjection()?.querySelectorAll('[data-money-bank-recipient]') || [];
+    return Array.from(rows, (row) => ({
+        id: row.getAttribute('data-money-bank-recipient') || '',
+        label: row.getAttribute('data-label') || '',
+        active: row.getAttribute('data-active') === 'true',
+    }));
+}
+
 /** @returns {{id: string, userId: string, label: string, version: number}[]} order-local holders */
 export function orderHolders() {
     const rows = orderMoneyProjection()?.querySelectorAll('[data-money-holder]') || [];
@@ -154,21 +164,22 @@ export function bindHolderChoices(form, root) {
     let holders = [];
     let canSelf = false;
     let canOnBehalf = false;
+    let visible = true;
 
     const sync = () => {
         const onlySelf = !canOnBehalf && mode.value === 'self';
-        mode.disabled = onlySelf;
-        mode.closest('[data-money-mode-field]')?.toggleAttribute('hidden', onlySelf);
+        mode.disabled = !visible || onlySelf;
+        mode.closest('[data-money-mode-field]')?.toggleAttribute('hidden', mode.disabled);
         for (const option of mode.options) {
             if (option.value === 'existing') option.disabled = !canOnBehalf || holders.length === 0;
             else if (option.value === 'new') option.disabled = !canOnBehalf;
         }
-        existing.disabled = !canOnBehalf || mode.value !== 'existing';
+        const choosingExisting = visible && mode.value === 'existing';
+        existing.disabled = !canOnBehalf || !choosingExisting;
         existing
             .closest('[data-money-existing-field]')
-            ?.toggleAttribute('hidden', mode.value !== 'existing');
-        const searching = mode.value === 'new';
-        party.setEnabled(canOnBehalf && searching);
+            ?.toggleAttribute('hidden', !choosingExisting);
+        party.setEnabled(visible && canOnBehalf && mode.value === 'new');
     };
 
     /** Refreshes the available parties without dropping an applicable selected holder. */
@@ -203,6 +214,11 @@ export function bindHolderChoices(form, root) {
     return {
         refresh,
         selection,
+        /** @param {boolean} enabled whether the provision involves a personal holder */
+        show(enabled) {
+            visible = enabled;
+            sync();
+        },
         canProvide() {
             return canSelf || canOnBehalf;
         },

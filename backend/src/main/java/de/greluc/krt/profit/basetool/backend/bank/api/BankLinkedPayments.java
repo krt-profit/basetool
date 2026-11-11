@@ -19,11 +19,43 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.api;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /** Submits and cancels linked payments under the current actor in the caller's transaction. */
 public interface BankLinkedPayments {
+
+  /**
+   * Checks how Bank would admit these terms without recording an attempt.
+   *
+   * @param payment the proposed linked effect
+   * @return the expected routing and source debit
+   */
+  @NotNull
+  Quote quote(@NotNull BankLinkedPayment payment);
+
+  /**
+   * Checks replacement admission using the failed request's retained Bank evidence.
+   *
+   * @param payment the corrected proposed effect
+   * @param requestId the failed request
+   * @param attempt the failed request's linked identity
+   * @return the expected routing and source debit
+   */
+  @NotNull
+  Quote quoteReplacement(
+      @NotNull BankLinkedPayment payment,
+      @NotNull UUID requestId,
+      @NotNull BankLinkedAttempt attempt);
+
+  /**
+   * Expected Bank result from the current admission policy.
+   *
+   * @param pending whether a request would wait for a decision
+   * @param sourceDebit exact reduction in the funding account on execution
+   */
+  record Quote(boolean pending, @NotNull BigDecimal sourceDebit) {}
 
   /**
    * Admits a new linked attempt under the current Bank policy.

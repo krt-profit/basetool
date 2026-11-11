@@ -498,6 +498,36 @@ class JobOrderLinkedBankIntegrationTest {
     UUID destination = world.account(Account.SPECIAL_SHARED);
     assertThat(accountBalance(collection)).isEqualTo(1000000);
     assertThat(accountBalance(destination)).isEqualTo(1000000);
+    mvc.perform(get(MONEY + "/bank-accounts", order).with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.collection[*].id").isNotEmpty())
+        .andExpect(jsonPath("$.collection[*].balance").doesNotExist())
+        .andExpect(jsonPath("$.custodians").isEmpty());
+    perform(
+            post(MONEY + "/provisions/preview", order).with(writer()),
+            Map.of(
+                "amount",
+                "400000",
+                "bankHandling",
+                true,
+                "bank",
+                Map.of(
+                    "type",
+                    "DEPOSIT",
+                    "accountOnly",
+                    true,
+                    "accountId",
+                    collection,
+                    "counterpartyName",
+                    "First contributor")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.amount").value("400000"))
+        .andExpect(jsonPath("$.resultingHolding").value("400000"))
+        .andExpect(jsonPath("$.bank.disposition").value("PENDING"))
+        .andExpect(jsonPath("$.bank.feeFunding").value("DEPOSITOR"))
+        .andExpect(jsonPath("$.bank.bankSourceDebit").value("0"))
+        .andExpect(jsonPath("$.bank.orderSourceCharge").value("0"));
+    assertThat(ownLinkedRequests()).isEmpty();
     reportDepositToAccount(order, collection, "400000", "First contributor");
     money(order)
         .andExpect(status().isOk())
@@ -555,39 +585,43 @@ class JobOrderLinkedBankIntegrationTest {
                     Map.of("bankAccountId", destination))
                 .andExpect(status().isCreated()));
     UUID transfer = UUID.randomUUID();
-    perform(
-            post(MONEY + "/movements", order).with(writer()),
+    var transferTerms =
+        Map.of(
+            "operationId",
+            transfer,
+            "kind",
+            "PURPOSE_HANDOVER",
+            "sourceAccountHoldingId",
+            holding.path("id").asString(),
+            "sourceVersion",
+            holding.path("version").asLong(),
+            "targetVersion",
+            money.path("targetVersion").asLong(),
+            "recipientId",
+            recipient.path("id").asString(),
+            "amount",
+            "800000",
+            "rate",
+            "0",
+            "bankHandling",
+            true,
+            "bank",
             Map.of(
-                "operationId",
-                transfer,
-                "kind",
-                "PURPOSE_HANDOVER",
-                "sourceAccountHoldingId",
-                holding.path("id").asString(),
-                "sourceVersion",
-                holding.path("version").asLong(),
-                "targetVersion",
-                money.path("targetVersion").asLong(),
-                "recipientId",
-                recipient.path("id").asString(),
-                "amount",
-                "800000",
-                "rate",
-                "0",
-                "bankHandling",
-                true,
-                "bank",
-                Map.of(
-                    "type",
-                    "TRANSFER",
-                    "accountOnly",
-                    true,
-                    "accountId",
-                    collection,
-                    "targetAccountId",
-                    destination,
-                    "justification",
-                    "Handover of collected funds")))
+                "type", "TRANSFER",
+                "accountOnly", true,
+                "justification", "Handover of collected funds"));
+    perform(post(MONEY + "/movements/preview", order).with(writer()), transferTerms)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.completes").value(true))
+        .andExpect(jsonPath("$.bank.disposition").value("PENDING"))
+        .andExpect(jsonPath("$.bank.actualFee").value("0"))
+        .andExpect(jsonPath("$.bank.feeFunding").value("NONE"))
+        .andExpect(jsonPath("$.bank.bankSourceDebit").value("800000"))
+        .andExpect(jsonPath("$.bank.orderSourceCharge").value("800000"));
+    money(order)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.accountHoldings[0].availableAmount").value("800000"));
+    perform(post(MONEY + "/movements", order).with(writer()), transferTerms)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("WAITING"));
     money(order)
@@ -1202,41 +1236,60 @@ class JobOrderLinkedBankIntegrationTest {
                     Map.of("bankAccountId", targetAccount))
                 .andExpect(status().isCreated()));
     UUID operation = UUID.randomUUID();
-    perform(
-            post(MONEY + "/movements", order).with(writer()),
+    Map<String, Object> bank =
+        new HashMap<>(
             Map.of(
-                "operationId",
-                operation,
-                "kind",
-                gamePayment ? "HANDOVER" : "PURPOSE_HANDOVER",
-                "sourceHolderId",
-                holder.path("id").asString(),
-                "sourceVersion",
-                holder.path("version").asLong(),
-                "targetVersion",
-                basis.path("targetVersion").asLong(),
-                "recipientId",
-                recipient.path("id").asString(),
-                "amount",
-                "400000",
-                "rate",
-                gamePayment ? "0.005" : "0",
-                "bankHandling",
-                true,
-                "bank",
-                Map.of(
-                    "type", "TRANSFER",
-                    "accountId", sourceAccount,
-                    "custodianId", sourceCustodian,
-                    "targetAccountId", targetAccount,
-                    "targetCustodianId", targetCustodian,
-                    "paymentReported", gamePayment,
-                    "justification", "Handover to requester account")))
+                "type", "TRANSFER",
+                "accountId", sourceAccount,
+                "custodianId", sourceCustodian,
+                "targetCustodianId", targetCustodian,
+                "paymentReported", gamePayment,
+                "justification", "Handover to requester account"));
+    if (!gamePayment) {
+      bank.put("targetAccountId", targetAccount);
+    }
+    Map<String, Object> movement =
+        Map.of(
+            "operationId",
+            operation,
+            "kind",
+            gamePayment ? "HANDOVER" : "PURPOSE_HANDOVER",
+            "sourceHolderId",
+            holder.path("id").asString(),
+            "sourceVersion",
+            holder.path("version").asLong(),
+            "targetVersion",
+            basis.path("targetVersion").asLong(),
+            "recipientId",
+            recipient.path("id").asString(),
+            "amount",
+            "400000",
+            "rate",
+            gamePayment ? "0.005" : "0",
+            "bankHandling",
+            true,
+            "bank",
+            bank);
+    perform(post(MONEY + "/movements/preview", order).with(writer()), movement)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.bank.actualFee").value(gamePayment ? "2000" : "0"))
+        .andExpect(jsonPath("$.bank.disposition").value("PENDING"));
+    perform(post(MONEY + "/movements", order).with(writer()), movement)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("WAITING"));
     assertFigures(order, "600000", "0", "0", "IN_PROGRESS");
 
     setFeeRate("0.01");
+    if (gamePayment) {
+      perform(post(MONEY + "/movements", order).with(writer()), movement)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.operationId").value(operation.toString()))
+          .andExpect(jsonPath("$.state").value("WAITING"));
+      bank.put("targetAccountId", world.account(Account.CARTEL));
+      perform(post(MONEY + "/movements", order).with(writer()), movement)
+          .andExpect(status().isConflict());
+      bank.remove("targetAccountId");
+    }
     JsonNode booked =
         response(
             confirm(
@@ -1324,18 +1377,61 @@ class JobOrderLinkedBankIntegrationTest {
         .andExpect(jsonPath("$.state").value("REJECTED"))
         .andExpect(jsonPath("$.amount").value("500000"))
         .andExpect(jsonPath("$.rejectReason").doesNotExist());
+    mvc.perform(
+            get(MONEY + "/operations/{operation}/bank-replacement", order, operation)
+                .with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.revision").value(1))
+        .andExpect(jsonPath("$.amount").value("500000"))
+        .andExpect(jsonPath("$.rate").value("0.005"))
+        .andExpect(jsonPath("$.actualFee").value("2500"))
+        .andExpect(jsonPath("$.accountChangeAllowed").value(true))
+        .andExpect(jsonPath("$.custodianId").doesNotExist())
+        .andExpect(jsonPath("$.rejectReason").doesNotExist());
     assertReleaseRefused(order);
     assertFigures(order, "600000", "0", "0", "IN_PROGRESS");
 
     setFeeRate("0.01");
+    Map<String, ?> repair =
+        Map.of(
+            "revision",
+            1,
+            "amount",
+            "300000",
+            "accountId",
+            correctAccount,
+            "justification",
+            "Handover to named requester");
+    perform(
+            post(MONEY + "/operations/{operation}/bank-replacement/preview", order, operation)
+                .with(writer()),
+            repair)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.rate").value("0.005"))
+        .andExpect(jsonPath("$.actualFee").value("1500"))
+        .andExpect(jsonPath("$.bank.disposition").value("PENDING"))
+        .andExpect(jsonPath("$.bank.bankSourceDebit").value("301500"));
+    perform(
+            post(MONEY + "/operations/{operation}/bank-replacement", order, operation)
+                .with(writer()),
+            repair)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"))
+        .andExpect(jsonPath("$.linkedRevision").value(2));
+    perform(
+            post(MONEY + "/operations/{operation}/bank-replacement", order, operation)
+                .with(writer()),
+            repair)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.linkedRevision").value(2));
     perform(
             post(MONEY + "/operations/{operation}/bank-replacement", order, operation)
                 .with(writer()),
             Map.of(
-                "revision", 1, "amount", "300000", "bank", withdrawal(correctAccount, custodian)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.state").value("WAITING"))
-        .andExpect(jsonPath("$.linkedRevision").value(2));
+                "revision", 1,
+                "amount", "300000",
+                "justification", "Handover to named requester"))
+        .andExpect(status().isConflict());
     JsonNode old = ownRequestOfType("WITHDRAWAL", "REJECTED");
     JsonNode replacement = ownRequestOfType("WITHDRAWAL", "PENDING");
     assertThat(old.path("id").asString()).isEqualTo(original.path("id").asString());

@@ -24,6 +24,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.MoneyProvisionRefusedE
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.DesignateJobOrderMoneyRecipientDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderLinkedMoneyRepair;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankAccountQueries;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankAccounts;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyHolderCandidate;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyMovementPreview;
@@ -34,6 +36,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyProv
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyQueries;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyRecipientView;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyRecipients;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyRepairQuote;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyRepairView;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyView;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MoveJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.PreviewJobOrderMoneyProvisionDto;
@@ -70,6 +74,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderMoneyController {
 
   private final JobOrderMoneyCommands commands;
+  private final JobOrderMoneyBankAccountQueries bankAccounts;
   private final JobOrderLinkedMoneyRepair repair;
   private final JobOrderMoneyQueries queries;
   private final JobOrderMoneyMovements movements;
@@ -101,6 +106,21 @@ public class JobOrderMoneyController {
   @Operation(operationId = "getJobOrderMoney", summary = "Get reported aUEC order money")
   public JobOrderMoneyView getMoney(@PathVariable UUID id) {
     return queries.getMoney(id);
+  }
+
+  /**
+   * Finds Bank account references for the caller's authorized money actions.
+   *
+   * @param id the order
+   * @return selectable Bank references and the Order-local revisions
+   */
+  @GetMapping("/{id}/money/bank-accounts")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      operationId = "findJobOrderBankAccounts",
+      summary = "Find Bank accounts for order money")
+  public JobOrderMoneyBankAccounts bankAccounts(@PathVariable UUID id) {
+    return bankAccounts.candidates(id);
   }
 
   /**
@@ -286,6 +306,39 @@ public class JobOrderMoneyController {
       @PathVariable UUID id, @Valid @RequestBody UpdateJobOrderMoneyInformationDto dto) {
     changes.information(id, dto);
     return queries.getMoney(id);
+  }
+
+  /**
+   * Reads the permitted repair for a failed linked request.
+   *
+   * @param id the order
+   * @param operation the original logical operation identity
+   * @return editable payment facts and permitted account choices
+   */
+  @GetMapping("/{id}/money/operations/{operation}/bank-replacement")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(operationId = "getJobOrderBankRepair", summary = "Read a failed linked Bank attempt")
+  public JobOrderMoneyRepairView getBankRepair(
+      @PathVariable UUID id, @PathVariable UUID operation) {
+    return repair.getRepair(id, operation);
+  }
+
+  /**
+   * Quotes corrected terms at the retained Bank attempt rate.
+   *
+   * @param id the order
+   * @param operation the original logical operation identity
+   * @param dto the prior attempt revision and corrected terms
+   * @return the current order binding and exact fee
+   */
+  @PostMapping("/{id}/money/operations/{operation}/bank-replacement/preview")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(operationId = "previewJobOrderBankRepair", summary = "Preview a linked Bank repair")
+  public JobOrderMoneyRepairQuote previewBankRepair(
+      @PathVariable UUID id,
+      @PathVariable UUID operation,
+      @Valid @RequestBody ReplaceJobOrderBankAttemptDto dto) {
+    return repair.preview(id, operation, dto);
   }
 
   /**

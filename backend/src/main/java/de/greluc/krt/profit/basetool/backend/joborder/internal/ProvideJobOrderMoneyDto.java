@@ -39,6 +39,7 @@ import org.jetbrains.annotations.Nullable;
  * @param holderName new accountless person, with no account inferred from their name
  * @param commitmentId explicitly selected unit commitment occurrence
  * @param bank the explicit Bank selection when handling is selected
+ * @param rate the fee basis observed in the linked provision preview
  */
 public record ProvideJobOrderMoneyDto(
     @NotNull UUID operationId,
@@ -49,7 +50,8 @@ public record ProvideJobOrderMoneyDto(
     @Nullable UUID holderUserId,
     @Nullable @Size(max = 200) String holderName,
     @Nullable UUID commitmentId,
-    @Valid @Nullable JobOrderBankSelection bank) {
+    @Valid @Nullable JobOrderBankSelection bank,
+    @Nullable @Size(max = 24) String rate) {
 
   JobOrderMoneySelection selection() {
     return JobOrderMoneySelection.parse(holderId, holderUserId, holderName);

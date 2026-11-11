@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -36,6 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * @param holderUserId the explicitly selected account
  * @param holderName the entered accountless holder name
  * @param commitmentId the explicitly selected unit commitment occurrence
+ * @param bank the selected Bank effect and its parties
  */
 @DtoMirror
 public record PreviewJobOrderMoneyProvisionDto(
@@ -45,4 +48,5 @@ public record PreviewJobOrderMoneyProvisionDto(
     @Nullable UUID holderId,
     @Nullable UUID holderUserId,
     @Nullable @Size(max = 200) String holderName,
-    @Nullable UUID commitmentId) {}
+    @Nullable UUID commitmentId,
+    @Nullable @Valid @JsonInclude(JsonInclude.Include.NON_NULL) JobOrderBankSelection bank) {}

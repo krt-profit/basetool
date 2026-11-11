@@ -23,6 +23,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -33,10 +35,14 @@ import org.jetbrains.annotations.Nullable;
  * @param provision the corrected explicit additional funds, when changed
  * @param bank the corrected Bank coordinates with the same actual parties
  * @param outsideBank whether the reported payment factually occurred outside Bank custody
+ * @param accountId a replacement account for retained Bank terms
+ * @param justification the debit reason for retained Bank terms
  */
 public record ReplaceJobOrderBankAttemptDto(
     @Positive long revision,
     @NotBlank String amount,
     @Nullable String provision,
     @Valid @Nullable JobOrderBankSelection bank,
-    @Nullable Boolean outsideBank) {}
+    @Nullable Boolean outsideBank,
+    @Nullable UUID accountId,
+    @Nullable @Size(max = 1000) String justification) {}

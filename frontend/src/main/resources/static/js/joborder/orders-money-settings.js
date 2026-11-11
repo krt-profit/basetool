@@ -18,6 +18,8 @@
  */
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
+import { bindBankAccounts } from '/js/joborder/orders-money-bank.js';
+import { showMovementField } from '/js/joborder/orders-money-movement-parties.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
@@ -55,11 +57,13 @@ function bindRecipients(url) {
     const mode = form.elements.namedItem('mode');
     const holder = form.elements.namedItem('holderId');
     const select = form.elements.namedItem('party');
+    const account = form.elements.namedItem('bankAccountId');
     const save = form.querySelector('button[type="submit"]');
     if (
         !(mode instanceof HTMLSelectElement) ||
         !(holder instanceof HTMLSelectElement) ||
         !(select instanceof HTMLSelectElement) ||
+        !(account instanceof HTMLSelectElement) ||
         !(save instanceof HTMLButtonElement)
     ) {
         throw new Error('The recipient form controls are missing');
@@ -68,10 +72,21 @@ function bindRecipients(url) {
         krtFetch.getJson(`${url}/recipient-candidates?q=${encodeURIComponent(query)}`),
     );
 
+    const bankAccounts = bindBankAccounts(
+        url,
+        account,
+        () => 'designation',
+        () => sync(),
+    );
+
     /** @returns {Designation | null} the explicit designation permitted by current authority */
     const selection = () => {
         if (orderMoneyProjection()?.dataset.canDesignateRecipient !== 'true') return null;
         if (mode.value === 'existing') return holder.value ? { holderId: holder.value } : null;
+        if (mode.value === 'bank') {
+            const bankAccountId = bankAccounts.selection()?.id;
+            return bankAccountId ? { bankAccountId } : null;
+        }
         return party.selection();
     };
 
@@ -79,7 +94,8 @@ function bindRecipients(url) {
         const existing = mode.value === 'existing';
         holder.disabled = !existing;
         holder.closest('.form-group')?.toggleAttribute('hidden', !existing);
-        party.setEnabled(!existing);
+        party.setEnabled(mode.value === 'new');
+        showMovementField(account, mode.value === 'bank');
         save.disabled = !selection();
     };
 
@@ -107,6 +123,7 @@ function bindRecipients(url) {
         if (holder.options.length < 2) mode.value = 'new';
         sync();
         krtModal.open(recipientModal);
+        void bankAccounts.load('');
     });
     form.addEventListener('change', sync);
     form.addEventListener('input', sync);
@@ -116,6 +133,7 @@ function bindRecipients(url) {
             krtModal.isOpen(recipientModal)
         ) {
             update();
+            if (mode.value === 'bank') void bankAccounts.load();
         }
     });
     form.addEventListener('submit', async (event) => {

@@ -17,7 +17,7 @@
             th:with="name=${@handles.display(recipient.name) ?: #messages.msg('orders.money.nameUnavailable')},
                      returnable=${money.returnableRecipientIds.contains(recipient.id)},
                      label=${#messages.msg(recipient.userId != null ? 'orders.money.holder.linkedLabel' : 'orders.money.holder.accountlessLabel', name)}"
-            th:data-money-recipient="${returnable ? recipient.id : null}"
+            th:data-money-recipient="${returnable and !recipient.bankDestination ? recipient.id : null}"
             th:data-holder-id="${recipient.holderId}" th:data-user-id="${recipient.userId}"
             th:data-recipient-label="${label}" data-money-recipient-active="false"
             th:data-money-recipient-returnable="${returnable}"

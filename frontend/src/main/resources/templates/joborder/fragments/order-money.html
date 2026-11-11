@@ -11,6 +11,7 @@
                          (active and (money.canMoveForOthers or money.canProvideSelf or money.canRecordRequesterHandover)))}"
              th:data-order-active="${active}" th:data-responsibility-valid="${money.responsibilityValid}"
              th:data-can-record-movement="${canMove}"
+             th:data-can-record-settlement="${money.canRecordSettlement}"
              th:data-can-maintain-holders="${money.canMaintainHolders}"
              th:data-can-correct-recipient="${money.canCorrectRecipient}"
              th:data-can-record-requester-return="${money.canRecordRequesterReturn}"
@@ -49,7 +50,7 @@
              class="od-pane-actions" th:with="canProvide=${money.canProvideSelf or money.canProvideOnBehalf}">
             <button th:if="${canProvide}" type="button" class="btn btn--cta" data-trigger="od-money-open"
                     data-testid="order-money-provide" th:text="#{orders.money.provide}"></button>
-            <button th:if="${canMove and (!#lists.isEmpty(money.holders) or money.recipients != null and money.recipients.?[!bankDestination].size() > 0)}" type="button" class="btn" th:classappend="${canProvide ? 'btn-ghost' : 'btn--cta'}"
+            <button th:if="${canMove and (!#lists.isEmpty(money.holders) or !#lists.isEmpty(money.recipients) or !#lists.isEmpty(money.accountHoldings))}" type="button" class="btn" th:classappend="${canProvide ? 'btn-ghost' : 'btn--cta'}"
                     data-trigger="od-money-move" data-testid="order-money-move" th:text="#{orders.money.move}"></button>
         </div>
         <section class="card" th:unless="${#lists.isEmpty(money.holders)}" aria-labelledby="order-money-holders">
@@ -70,9 +71,12 @@
                  aria-labelledby="order-money-account-holdings">
             <h3 id="order-money-account-holdings" class="section-title" th:text="#{orders.money.bank.holdings}"></h3>
             <ul class="od-assignee-list">
-                <li class="od-assignee split" th:each="holding : ${money.accountHoldings}"
-                    data-testid="order-money-account-holding">
-                    <span th:text="#{orders.money.recipient.bankDestination}"></span>
+                <li class="od-assignee split" th:each="holding, item : ${money.accountHoldings}"
+                    th:with="label=${#messages.msg('orders.money.bank.holdingLabel', item.count)}"
+                    data-testid="order-money-account-holding" th:data-money-account-holding="${holding.id}"
+                    th:data-holding-label="${label}" th:data-version="${holding.version}"
+                    th:data-available="${holding.availableAmount}">
+                    <span th:text="${label}"></span>
                     <th:block th:replace="~{joborder/fragments/order-money :: balances(${holding.amount}, ${holding.availableAmount})}"></th:block>
                 </li>
             </ul>
@@ -104,6 +108,13 @@
             </ul>
             <th:block th:replace="~{joborder/fragments/order-money-recipient-identity :: retired}"></th:block>
         </section>
+        <span hidden th:each="recipient, item : ${money.recipients.?[bankDestination]}"
+              th:data-money-bank-recipient="${recipient.id}"
+              th:data-active="${recipient.active}"
+              th:data-label="#{orders.money.bank.designationLabel(${item.count})}"></span>
+        <span hidden th:if="${money.canRecordRequesterReturn}" th:each="entry : ${money.accountReturns}"
+              th:data-money-account-return="${entry.accountHoldingId}"
+              th:data-recipient-id="${entry.recipientId}" th:data-available="${entry.availableAmount}"></span>
         <th:block th:replace="~{joborder/fragments/order-money-linked-attempts :: linkedAttempts}"></th:block>
         <section class="card" th:if="${!#lists.isEmpty(money.history) or !#lists.isEmpty(money.targetChanges)
                      or !#lists.isEmpty(money.holderIdentityHistory)
@@ -206,7 +217,13 @@
     <div id="order-money-operation" th:data-account-id="${currentUserId}" th:data-order-id="${order.id}"
          th:data-recorded="#{orders.money.recorded}" th:data-storage-error="#{orders.money.storage.error}"
          th:data-refused="#{orders.money.recovery.refused}" th:data-name-unavailable="#{orders.money.nameUnavailable}"
-         th:data-provide-error="#{orders.money.provide.error}">
+         th:data-provide-error="#{orders.money.provide.error}"
+         th:data-bank-waiting="#{orders.money.bank.state.WAITING}"
+         th:data-bank-authorised="#{orders.money.bank.state.AUTHORISED}"
+         th:data-bank-rejected="#{orders.money.bank.state.REJECTED}"
+         th:data-bank-cancelled="#{orders.money.bank.state.CANCELLED}"
+         th:data-bank-reversed="#{orders.money.bank.state.REVERSED}"
+         th:data-bank-clarification="#{orders.money.bank.state.CLARIFICATION}">
         <div class="alert alert-warning" data-money-recovery hidden>
             <p data-testid="order-money-unknown" role="status" th:text="#{orders.money.recovery.unknown}"></p>
             <div class="cluster gap-2">
@@ -227,16 +244,19 @@
         <th:block th:replace="~{joborder/fragments/order-money-holder-identity :: dialog}"></th:block>
         <th:block th:replace="~{joborder/fragments/order-money-recipient-identity :: dialog}"></th:block>
         <th:block th:replace="~{joborder/fragments/order-money-correction :: dialog}"></th:block>
+        <th:block th:replace="~{joborder/fragments/order-money-repair :: dialog}"></th:block>
     </div>
 </th:block>
 
 <form th:fragment="provisionForm" id="order-money-provision-form">
     <div class="krt-modal-body">
-        <p class="text-muted" th:text="#{orders.money.manual}"></p>
+        <p class="text-muted" data-money-bank-free-note hidden th:text="#{orders.money.manual}"></p>
         <p class="alert alert-info" role="status" data-money-basis-changed hidden
            th:text="#{orders.money.basis.changed}"></p>
         <fieldset class="form-section">
             <legend class="visually-hidden" th:text="#{orders.money.provide}"></legend>
+            <fieldset th:replace="~{joborder/fragments/order-money-bank :: mode('order-money-bank')}"></fieldset>
+            <th:block th:replace="~{joborder/fragments/order-money-bank :: provision}"></th:block>
             <div class="form-group" data-money-mode-field hidden>
                 <label for="order-money-holder-mode" th:text="#{orders.money.holder}"></label>
                 <select id="order-money-holder-mode" name="holderMode" data-testid="order-money-holder-mode">
@@ -267,10 +287,7 @@
                         th:data-unavailable="#{orders.money.commitment.unavailable}"
                         th:data-unattributed="#{orders.money.commitment.unattributed}"></select>
             </div>
-            <label class="cluster gap-2">
-                <input type="checkbox" name="bankFree" data-testid="order-money-bank-free" required>
-                <span th:text="#{orders.money.bankFree}"></span>
-            </label>
+
         </fieldset>
         <div data-money-preview data-testid="order-money-preview" role="status" hidden>
             <dl class="facts-bar">
@@ -286,8 +303,11 @@
                     <dt class="fact-k" th:text="#{orders.money.preview.holding}"></dt>
                     <dd class="fact-v" data-preview-value="holding"></dd>
                 </div>
+                <th:block th:replace="~{joborder/fragments/order-money-bank :: preview}"></th:block>
             </dl>
+            <p th:replace="~{joborder/fragments/order-money-bank :: disposition}"></p>
         </div>
+        <p th:replace="~{joborder/fragments/order-money-bank :: problem}"></p>
         <button type="button" class="btn btn-ghost" data-money-preview-retry hidden
                 th:text="#{orders.money.preview.retry}"></button>
     </div>

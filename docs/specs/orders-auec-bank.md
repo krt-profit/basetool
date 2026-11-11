@@ -1,8 +1,8 @@
 > **Doc type:** Living spec - approved target. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS / BANK
-> **Status:** The [Bank-owned capabilities](bank.md#req-bank-061--purpose-reference) and the
-> synchronous order integration are implemented through the order action API. The default Bank
-> journey in the order forms and its browser acceptance remain separate.
+> **Status:** The ordinary order actions use the synchronous Bank integration and its
+> [Bank-owned capabilities](bank.md#req-bank-061--purpose-reference). Acceptance evidence is
+> recorded against each requirement below.
 > **Related ADRs:** [ADR-0357](../adr/0357-optional-auec-bank-effects-use-a-thin-composition-adapter.md),
 > [ADR-0358](../adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md),
 > ADR-0232, ADR-0251, ADR-0254, ADR-0352, ADR-0353.
@@ -62,6 +62,12 @@ A requester-account return reverses the direction and requires debit-equivalent 
 requester account. Its principal is bounded by the still-unreturned receipt from that particular
 collection position, with pending returns deducted. Final confirmation restores that position and
 reduces the net handover without new provision or unit credit.
+
+The order suggests the responsible unit's eligible collection account. An authorised designation
+can use the requesting unit's account or another eligible Bank account. The form uses the order's
+own position and designation to select the accounts for handover and return, including when the
+underlying account identifier is masked. Suggestions contain only permitted references and the
+order's position revision. Account releases and shortages use the existing settlement action.
 
 Entering or leaving the Bank does not repeat an already recorded provision or unit contribution.
 Four million newly contributed and six million first provided from existing Bank funds is ten
@@ -280,7 +286,12 @@ or settlement workflow.
 
 The order retains each submitted attempt and its decision. The same operation identity can
 recover the active result. A replacement uses the previous request's retained fee basis and
-keeps the old revision visible in the order's linked attempt history. Booked holdings and usable
+keeps the old revision visible in the order's linked attempt history. The repair editor previews
+the corrected amount and its fee at the retained rate before submission. It sends the failed
+revision and the deliberate account correction, if any. The server retains the parties and
+custody coordinates and applies current Bank admission to the replacement. Recovery recognises
+the acknowledged replacement revision before clearing its pending submission.
+Booked holdings and usable
 holdings are separate figures. A Bank account designation carries its account identifier only
 for an actor who can currently view that account in the Bank.
 

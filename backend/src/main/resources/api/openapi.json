@@ -50948,6 +50948,127 @@
         "x-domain" : "joborder"
       }
     },
+    "/api/v1/orders/{id}/money/bank-accounts" : {
+      "get" : {
+        "operationId" : "findJobOrderBankAccounts",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderMoneyBankAccounts"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Find Bank accounts for order money",
+        "tags" : [ "joborder" ],
+        "x-domain" : "joborder"
+      }
+    },
     "/api/v1/orders/{id}/money/corrections" : {
       "post" : {
         "operationId" : "correctJobOrderMoney",
@@ -53012,6 +53133,133 @@
       }
     },
     "/api/v1/orders/{id}/money/operations/{operation}/bank-replacement" : {
+      "get" : {
+        "operationId" : "getJobOrderBankRepair",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "operation",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderMoneyRepairView"
+                }
+              }
+            },
+            "description" : "OK",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Read a failed linked Bank attempt",
+        "tags" : [ "joborder" ],
+        "x-domain" : "joborder"
+      },
       "post" : {
         "operationId" : "replaceJobOrderBankAttempt",
         "parameters" : [ {
@@ -53138,6 +53386,137 @@
           }
         },
         "summary" : "Replace a failed linked Bank request",
+        "tags" : [ "joborder" ],
+        "x-domain" : "joborder"
+      }
+    },
+    "/api/v1/orders/{id}/money/operations/{operation}/bank-replacement/preview" : {
+      "post" : {
+        "operationId" : "previewJobOrderBankRepair",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "operation",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReplaceJobOrderBankAttemptDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/JobOrderMoneyRepairQuote"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Preview a linked Bank repair",
         "tags" : [ "joborder" ],
         "x-domain" : "joborder"
       }
@@ -92026,6 +92405,120 @@
           }
         }
       },
+      "JobOrderMoneyAccountReturnView" : {
+        "type" : "object",
+        "properties" : {
+          "accountHoldingId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "availableAmount" : {
+            "type" : "string"
+          },
+          "recipientId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "JobOrderMoneyBankAccountCandidate" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "JobOrderMoneyBankAccounts" : {
+        "type" : "object",
+        "properties" : {
+          "collection" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderMoneyBankAccountCandidate"
+            }
+          },
+          "custodians" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderMoneyBankCustodian"
+            }
+          },
+          "designation" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderMoneyBankAccountCandidate"
+            }
+          },
+          "settlementDeposit" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderMoneyBankAccountCandidate"
+            }
+          },
+          "transfer" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderMoneyBankAccountCandidate"
+            }
+          },
+          "withdrawal" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderMoneyBankAccountCandidate"
+            }
+          }
+        }
+      },
+      "JobOrderMoneyBankCustodian" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }
+      },
+      "JobOrderMoneyBankPreview" : {
+        "type" : "object",
+        "properties" : {
+          "actualFee" : {
+            "type" : "string"
+          },
+          "bankSourceDebit" : {
+            "type" : "string"
+          },
+          "disposition" : {
+            "type" : "string",
+            "enum" : [ "DIRECT", "PENDING" ]
+          },
+          "feeFunding" : {
+            "type" : "string",
+            "enum" : [ "NONE", "ORDER", "KRT", "DEPOSITOR", "BANK_SOURCE" ]
+          },
+          "orderSourceCharge" : {
+            "type" : "string"
+          },
+          "rate" : {
+            "type" : "string"
+          }
+        }
+      },
       "JobOrderMoneyCorrectionBasisView" : {
         "type" : "object",
         "properties" : {
@@ -92258,6 +92751,12 @@
           "amount" : {
             "type" : "string"
           },
+          "bank" : {
+            "$ref" : "#/components/schemas/JobOrderMoneyBankPreview"
+          },
+          "completes" : {
+            "type" : "boolean"
+          },
           "destinationAfter" : {
             "type" : "string"
           },
@@ -92275,6 +92774,9 @@
           },
           "rate" : {
             "type" : "string"
+          },
+          "reopens" : {
+            "type" : "boolean"
           },
           "shortfall" : {
             "type" : "string"
@@ -92390,6 +92892,9 @@
           "amount" : {
             "type" : "string"
           },
+          "bank" : {
+            "$ref" : "#/components/schemas/JobOrderMoneyBankPreview"
+          },
           "bankHandling" : {
             "type" : "boolean"
           },
@@ -92398,6 +92903,10 @@
           },
           "holderName" : {
             "type" : "string"
+          },
+          "holderVersion" : {
+            "type" : "integer",
+            "format" : "int64"
           },
           "resultingHolding" : {
             "type" : "string"
@@ -92511,6 +93020,86 @@
           }
         }
       },
+      "JobOrderMoneyRepairQuote" : {
+        "type" : "object",
+        "properties" : {
+          "actualFee" : {
+            "type" : "string"
+          },
+          "amount" : {
+            "type" : "string"
+          },
+          "bank" : {
+            "$ref" : "#/components/schemas/JobOrderMoneyBankPreview"
+          },
+          "feeFunding" : {
+            "type" : "string",
+            "enum" : [ "NONE", "ORDER", "KRT", "DEPOSITOR", "BANK_SOURCE" ]
+          },
+          "orderSourceCharge" : {
+            "type" : "string"
+          },
+          "rate" : {
+            "type" : "string"
+          },
+          "revision" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "JobOrderMoneyRepairView" : {
+        "type" : "object",
+        "properties" : {
+          "accountChangeAllowed" : {
+            "type" : "boolean"
+          },
+          "accountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "accounts" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/RepairAccount"
+            }
+          },
+          "actualFee" : {
+            "type" : "string"
+          },
+          "actualPayment" : {
+            "type" : "boolean"
+          },
+          "amount" : {
+            "type" : "string"
+          },
+          "feeFunding" : {
+            "type" : "string",
+            "enum" : [ "NONE", "ORDER", "KRT", "DEPOSITOR", "BANK_SOURCE" ]
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "PROVISION", "COLLECTION", "HANDOVER", "PURPOSE_HANDOVER", "REQUESTER_RETURN", "RELEASE", "SHORTAGE", "SETTLEMENT", "PURPOSE_OUTFLOW", "PURPOSE_INFLOW", "CORRECTION" ]
+          },
+          "outsideBankAllowed" : {
+            "type" : "boolean"
+          },
+          "provision" : {
+            "type" : "string"
+          },
+          "rate" : {
+            "type" : "string"
+          },
+          "revision" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "type" : {
+            "type" : "string",
+            "enum" : [ "DEPOSIT", "WITHDRAWAL", "TRANSFER", "HOLDER_TRANSFER", "AUTHORISATION" ]
+          }
+        }
+      },
       "JobOrderMoneyTargetChangeView" : {
         "type" : "object",
         "properties" : {
@@ -92540,6 +93129,12 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/JobOrderMoneyAccountHoldingView"
+            }
+          },
+          "accountReturns" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/JobOrderMoneyAccountReturnView"
             }
           },
           "canCorrectRecipient" : {
@@ -92638,6 +93233,13 @@
           },
           "remaining" : {
             "type" : "string"
+          },
+          "replaceableOperationIds" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
           },
           "responsibilityValid" : {
             "type" : "boolean"
@@ -99734,6 +100336,9 @@
             "type" : "string",
             "minLength" : 1
           },
+          "bank" : {
+            "$ref" : "#/components/schemas/JobOrderBankSelection"
+          },
           "bankHandling" : {
             "type" : "boolean"
           },
@@ -99900,6 +100505,11 @@
           "operationId" : {
             "type" : "string",
             "format" : "uuid"
+          },
+          "rate" : {
+            "type" : "string",
+            "maxLength" : 24,
+            "minLength" : 0
           }
         },
         "required" : [ "amount", "bankHandling", "operationId" ]
@@ -101129,15 +101739,36 @@
         },
         "required" : [ "stepIds", "stepsVersion" ]
       },
+      "RepairAccount" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
       "ReplaceJobOrderBankAttemptDto" : {
         "type" : "object",
         "properties" : {
+          "accountId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "amount" : {
             "type" : "string",
             "minLength" : 1
           },
           "bank" : {
             "$ref" : "#/components/schemas/JobOrderBankSelection"
+          },
+          "justification" : {
+            "type" : "string",
+            "maxLength" : 1000,
+            "minLength" : 0
           },
           "outsideBank" : {
             "type" : "boolean"

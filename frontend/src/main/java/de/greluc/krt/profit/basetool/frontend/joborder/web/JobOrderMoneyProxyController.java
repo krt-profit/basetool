@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.MoveJobOrderMoneyDt
 import de.greluc.krt.profit.basetool.frontend.joborder.model.PreviewJobOrderMoneyProvisionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ProvideJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReplaceJobOrderBankAttemptDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.SettleJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyInformationDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyTargetDto;
@@ -83,6 +84,17 @@ public class JobOrderMoneyProxyController {
           liveSyncLocalBus.publish("orders", List.of("queue"));
           return ResponseEntity.ok(order);
         });
+  }
+
+  /**
+   * Offers eligible Bank references for the caller's current Order actions.
+   *
+   * @param id the order
+   * @return the scoped Bank references or the backend refusal
+   */
+  @GetMapping("/{id}/money/bank-accounts")
+  public ResponseEntity<Object> bankAccounts(@PathVariable UUID id) {
+    return relay(log, "read order Bank accounts", () -> ResponseEntity.ok(money.bankAccounts(id)));
   }
 
   /**
@@ -397,6 +409,57 @@ public class JobOrderMoneyProxyController {
         log,
         "update money order information",
         () -> ResponseEntity.ok(money.updateInformation(id, request)));
+  }
+
+  /**
+   * Reads the repair terms under current authorization.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @return the authorized repair terms
+   */
+  @GetMapping("/{id}/money/operations/{operation}/bank-replacement")
+  public ResponseEntity<Object> bankRepair(@PathVariable UUID id, @PathVariable UUID operation) {
+    return relay(
+        log, "read order Bank repair", () -> ResponseEntity.ok(money.bankRepair(id, operation)));
+  }
+
+  /**
+   * Quotes the corrected terms for the selected failed attempt.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @param request the failed revision and proposed corrections
+   * @return the exact fee and bound amount
+   */
+  @PostMapping("/{id}/money/operations/{operation}/bank-replacement/preview")
+  public ResponseEntity<Object> previewBankRepair(
+      @PathVariable UUID id,
+      @PathVariable UUID operation,
+      @RequestBody @Valid ReplaceJobOrderBankAttemptDto request) {
+    return relay(
+        log,
+        "preview order Bank repair",
+        () -> ResponseEntity.ok(money.previewBankRepair(id, operation, request)));
+  }
+
+  /**
+   * Repairs a failed Bank request without submitting a second payment.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @param request the failed revision and confirmed terms
+   * @return the authoritative outcome
+   */
+  @PostMapping("/{id}/money/operations/{operation}/bank-replacement")
+  public ResponseEntity<Object> replaceBankAttempt(
+      @PathVariable UUID id,
+      @PathVariable UUID operation,
+      @RequestBody @Valid ReplaceJobOrderBankAttemptDto request) {
+    return relay(
+        log,
+        "replace order Bank attempt",
+        () -> ResponseEntity.ok(money.replaceBankAttempt(id, operation, request)));
   }
 
   /**
