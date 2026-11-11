@@ -1,6 +1,6 @@
 # ADR-0101 — Track game items as catalog-discriminated inventory rows
 
-- **Status:** Accepted
+- **Status:** Accepted — the catalog predicate amended by ADR-0370
 - **Date:** 2026-07-16
 - **Deciders:** @greluc
 - **Related:** ADR-0098 (Variante-C allocations), ADR-0099 (production booking), ADR-0053

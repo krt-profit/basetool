@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
+import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_BLUEPRINT;
+import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_ITEM;
+
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -27,6 +30,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -40,6 +45,62 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface GameItemRepository
     extends JpaRepository<GameItem, UUID>, GameItemIdentityReferences {
+
+  /** Joins an item's type and sub-type into the keys {@link #findStockable} leaves out. */
+  String TYPE_KEY_SEPARATOR = ":";
+
+  /**
+   * The {@code WHERE} clause of the Lager item picker over a game item aliased {@code gi}: a listed
+   * item whose name contains {@code :q} and that a listed active blueprint produces, or whose type
+   * is one of {@code :types} and whose type and sub-type key is not one of {@code
+   * :excludedTypeSubTypes}.
+   */
+  String STOCKABLE_ITEM_FILTER =
+      LISTED_ITEM
+          + "AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'"
+          + " AND (EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi"
+          + " AND b.scwikiDeletedAt IS NULL AND"
+          + LISTED_BLUEPRINT
+          + ") OR (gi.wikiType IN :types AND CONCAT(gi.wikiType, '"
+          + TYPE_KEY_SEPARATOR
+          + "', COALESCE(gi.wikiSubType, '')) NOT IN :excludedTypeSubTypes))";
+
+  /**
+   * Builds the key {@link #findStockable} compares an item's type and sub-type with.
+   *
+   * @param type the item type, e.g. {@code WeaponAttachment}
+   * @param subType the sub-type, e.g. {@code Magazine}
+   * @return {@code type}, {@value #TYPE_KEY_SEPARATOR} and {@code subType}
+   */
+  @NotNull
+  static String typeSubTypeKey(@NotNull String type, @NotNull String subType) {
+    return type + TYPE_KEY_SEPARATOR + subType;
+  }
+
+  /**
+   * Pages the listed game items the Lager books as item stock (REQ-INV-029): every output of a
+   * listed active blueprint, and every item of a stocked type outside its excluded sub-types.
+   *
+   * <p>Both collections must be non-empty.
+   *
+   * @param q case-insensitive, LIKE-escaped name substring; must be non-null ({@code ""} = no
+   *     filter)
+   * @param types the item types the Lager books without a blueprint
+   * @param excludedTypeSubTypes {@link #typeSubTypeKey(String, String)} keys left out of {@code
+   *     types}
+   * @param pageable page request (whitelisted {@code name} / {@code id} sort)
+   * @return a page of bookable game items
+   */
+  @Query(
+      value =
+          "SELECT gi FROM GameItem gi LEFT JOIN FETCH gi.manufacturer WHERE"
+              + STOCKABLE_ITEM_FILTER,
+      countQuery = "SELECT COUNT(gi) FROM GameItem gi WHERE" + STOCKABLE_ITEM_FILTER)
+  Page<GameItem> findStockable(
+      @Param("q") String q,
+      @Param("types") Collection<String> types,
+      @Param("excludedTypeSubTypes") Collection<String> excludedTypeSubTypes,
+      Pageable pageable);
 
   /**
    * Loads the surviving item for a live or retained local id.

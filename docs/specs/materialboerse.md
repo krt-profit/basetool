@@ -506,7 +506,8 @@ game-item row releases a **stock-backed item offer**: a `MaterialExchangeOffer` 
 - **Identity derived from the row's game item.** A stock row keys on a `GameItem`, an offer on the
   blueprint `product_key` (ADR-0087). The release derives `itemProductKey`/`itemName` from the row's
   game item via its blueprint product (`BlueprintProductService.resolveByGameItem`) — the same identity
-  a free-stated offer of that item carries; the catalog predicate (REQ-INV-029) guarantees it resolves.
+  a free-stated offer of that item carries. The Lager also books items no active blueprint produces
+  (REQ-INV-029, ADR-0370); such a row has no product, and its release is refused with `400`.
   The `inventory_item_id` is the physical truth, so the product-key↔item fuzziness stays a display
   concern only.
 - **One active offer per row.** The V210 partial-unique index applies as-is (the row's non-null FK), so
