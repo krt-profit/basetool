@@ -20,11 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
-import java.math.BigInteger;
-import java.text.NumberFormat;
 import java.util.List;
-import java.util.Locale;
-import org.jetbrains.annotations.NotNull;
 
 /**
  * Monetary totals, history and the caller's current aUEC order actions.
@@ -53,16 +49,4 @@ public record JobOrderMoneyView(
     List<JobOrderMoneyOutcome> history,
     boolean canProvideSelf,
     boolean canProvideOnBehalf,
-    boolean canDelete) {
-
-  /**
-   * Groups a canonical whole amount exactly for the page language.
-   *
-   * @param amount the canonical decimal digits supplied by the backend
-   * @param locale the page language
-   * @return the localized integer
-   */
-  public String formatAmount(@NotNull String amount, @NotNull Locale locale) {
-    return NumberFormat.getIntegerInstance(locale).format(new BigInteger(amount));
-  }
-}
+    boolean canDelete) {}

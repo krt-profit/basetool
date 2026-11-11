@@ -134,9 +134,10 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @return distinct order identities in identity order
    */
   @Query(
-      "SELECT o.id FROM JobOrder o WHERE (:afterOrderId IS NULL OR o.id > :afterOrderId)"
-          + " AND (EXISTS (SELECT c.id FROM MaterialClaim c WHERE c.jobOrder = o) OR EXISTS"
-          + " (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o AND p.active = true))"
+      "SELECT o.id FROM JobOrder o WHERE (:afterOrderId IS NULL OR o.id > :afterOrderId) AND"
+          + " (EXISTS (SELECT c.id FROM MaterialClaim c WHERE c.jobOrder = o) OR EXISTS (SELECT"
+          + " p.id FROM JobOrderParticipation p WHERE p.jobOrder = o AND p.active = true) OR EXISTS"
+          + " (SELECT m.id FROM JobOrderMoneyCommitment m WHERE m.order = o AND m.endedAt IS NULL))"
           + " ORDER BY o.id")
   List<UUID> findContributionMaintenanceOrderIdsAfter(
       @Param("afterOrderId") @Nullable UUID afterOrderId, Pageable pageable);

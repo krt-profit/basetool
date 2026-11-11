@@ -25,11 +25,13 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitEligibilityObserver;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchySnapshot;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +50,8 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
 
   private final MaterialClaimService materialClaims;
   private final JobOrderParticipationEligibility participationEligibility;
+  private final JobOrderMoneyCommitments moneyCommitments;
+  private final ProfitHierarchyService hierarchy;
   private final JobOrderRepository orders;
   private final LiveSyncPublisher liveSyncPublisher;
   private final JobOrderChangeEffects effects;
@@ -75,7 +79,13 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
     } while (batch.size() == ORDER_BATCH_SIZE);
     int ended = materialClaims.endIneligibleClaimsWithinTransaction(affectedUnitIds);
     int endedParticipations = participationEligibility.endForUnits(affectedUnitIds);
-    if (affected || ended > 0 || endedParticipations > 0) {
+    Set<UUID> eligible = current.eligibleUnitIds();
+    int endedCommitments =
+        moneyCommitments.endForUnits(
+            affectedUnitIds.stream()
+                .filter(id -> !eligible.contains(id))
+                .collect(Collectors.toSet()));
+    if (affected || ended > 0 || endedParticipations > 0 || endedCommitments > 0) {
       publishQueueChanged();
     }
   }
@@ -89,7 +99,9 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
   public void reconcileExistingPromises(@NotNull UUID orderId) {
     int ended = materialClaims.endIneligibleClaimsForOrderWithinTransaction(orderId);
     int endedParticipations = participationEligibility.endForOrder(orderId);
-    if (ended > 0 || endedParticipations > 0) {
+    int endedCommitments =
+        moneyCommitments.endUnavailableForOrder(orderId, hierarchy.eligibleUnitIds());
+    if (ended > 0 || endedParticipations > 0 || endedCommitments > 0) {
       publishOrderChanged(orderId);
       publishQueueChanged();
     }

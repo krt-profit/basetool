@@ -135,6 +135,9 @@ web, naming its client (REQ-AUDIT-005):
   `JOB_ORDER_PARTICIPATION_ENDED`, with safe participation and unit ids and a bounded reason.
   An accepted money provision records `JOB_ORDER_MONEY_PROVIDED` in the same transaction as the
   durable operation, with its logical operation ID and exact amount. Replay does not record it again.
+  `JOB_ORDER_MONEY_COMMITMENT_CHANGED` records the unit, commitment occurrence, before and
+  outstanding amounts, and reason. Credited provision adds the logical operation ID. The same
+  transaction records the affected occurrence and its order-visible history.
   Adding or removing an assignee who is not a direct member of the processing unit (REQ-ORDERS-047)
   records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in place of
   `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is SK-public; the assignee is the

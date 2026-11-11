@@ -23,6 +23,9 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderSupportDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MoneyCommitmentChangeDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.MoneyCommitmentDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.StaffelParticipationDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -33,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -40,6 +44,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Exposes current and retained Staffel support on the central order. */
@@ -56,6 +61,8 @@ public class JobOrderSupportService {
   private final JobOrderParticipationCommands commands;
   private final JobOrderEditor editor;
   private final JobOrderAccessPolicy accessPolicy;
+  private final JobOrderMoneyCommitmentRepository moneyCommitments;
+  private final JobOrderMoneyCommitmentChangeRepository moneyCommitmentChanges;
 
   /**
    * Projects support history and eligible current actions for a readable order.
@@ -63,6 +70,7 @@ public class JobOrderSupportService {
    * @param orderId the readable order
    * @return retained participations and the current caller's enrollment choices
    */
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public JobOrderSupportDto support(UUID orderId) {
     JobOrder order =
         Entities.require(orders.findById(orderId), () -> "Order not found: " + orderId);
@@ -73,11 +81,15 @@ public class JobOrderSupportService {
     var rows = participations.findByJobOrderIdOrderById(orderId);
     boolean valid = responsibility.isValid(order);
     var views = rows.stream().map(row -> participationView(order, row, eligible, valid)).toList();
+    boolean writable = valid && order.getStatus().isActive();
+    boolean moneyOrder = order.getType() == JobOrderType.AUEC;
+    List<MoneyCommitmentDto> commitments =
+        moneyOrder ? commitmentViews(order, eligible, writable, rows) : List.of();
     return new JobOrderSupportDto(
         views,
-        valid && order.getStatus().isActive()
-            ? enrollmentOptions(order, rows, eligible)
-            : List.of());
+        writable ? enrollmentOptions(order, rows, eligible) : List.of(),
+        commitments,
+        moneyOrder && writable ? commitmentOptions(order, commitments, eligible) : List.of());
   }
 
   /**
@@ -157,7 +169,75 @@ public class JobOrderSupportService {
         .toList();
   }
 
-  private static boolean eligible(JobOrder order, OrgUnit unit, Set<UUID> eligibleUnits) {
+  private List<OrgUnitMembershipOptionDto> commitmentOptions(
+      JobOrder order, List<MoneyCommitmentDto> commitments, Set<UUID> eligibleUnits) {
+    Set<UUID> current =
+        commitments.stream()
+            .filter(commitment -> commitment.endedAt() == null)
+            .map(commitment -> commitment.unit().orgUnitId())
+            .collect(Collectors.toSet());
+    return units.findAllById(eligibleUnits).stream()
+        .filter(unit ->
+            unit.getId().equals(OrgUnit.idOf(order.getResponsibleOrgUnit()))
+                || eligible(order, unit, eligibleUnits))
+        .filter(unit -> !current.contains(unit.getId()))
+        .filter(unit -> authority.canManage(order, unit.getId()))
+        .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+        .map(JobOrderSupportService::option)
+        .toList();
+  }
+
+  private List<MoneyCommitmentDto> commitmentViews(
+      JobOrder order, Set<UUID> eligibleUnits, boolean writable, List<JobOrderParticipation> rows) {
+    Set<UUID> supporting =
+        rows.stream()
+            .filter(JobOrderParticipation::isActive)
+            .map(row -> row.getClaimingOrgUnit().getId())
+            .collect(Collectors.toSet());
+    Map<UUID, List<MoneyCommitmentChangeDto>> changes =
+        moneyCommitmentChanges.findByOrderIdOrderByIdAsc(order.getId()).stream()
+            .collect(
+                Collectors.groupingBy(
+                    JobOrderMoneyCommitmentChange::getCommitmentId,
+                    Collectors.mapping(JobOrderMoneyCommitmentChange::toDto, Collectors.toList())));
+    return moneyCommitments.findByOrderIdOrderByOpenedAtAscIdAsc(order.getId()).stream()
+        .map(commitment ->
+            commitmentView(
+                order,
+                commitment,
+                eligibleUnits,
+                supporting,
+                writable,
+                changes.getOrDefault(commitment.getId(), List.of())))
+        .toList();
+  }
+
+  private MoneyCommitmentDto commitmentView(
+      JobOrder order,
+      JobOrderMoneyCommitment commitment,
+      Set<UUID> eligibleUnits,
+      Set<UUID> supporting,
+      boolean writable,
+      List<MoneyCommitmentChangeDto> changes) {
+    OrgUnit unit = commitment.getUnit();
+    boolean currentUnit =
+        unit.getId().equals(OrgUnit.idOf(order.getResponsibleOrgUnit()))
+            || (supporting.contains(unit.getId()) && eligible(order, unit, eligibleUnits));
+    return new MoneyCommitmentDto(
+        commitment.getId(),
+        option(unit),
+        commitment.getOutstanding().toPlainString(),
+        commitment.getOpenedAt(),
+        commitment.getEndedAt(),
+        Objects.requireNonNull(commitment.getVersion()),
+        writable
+            && currentUnit
+            && commitment.getEndedAt() == null
+            && authority.canManage(order, unit.getId()),
+        changes);
+  }
+
+  static boolean eligible(JobOrder order, OrgUnit unit, Set<UUID> eligibleUnits) {
     return unit.getKind() == OrgUnitKind.SQUADRON
         && eligibleUnits.contains(unit.getId())
         && !Objects.equals(unit.getId(), OrgUnit.idOf(order.getResponsibleOrgUnit()));

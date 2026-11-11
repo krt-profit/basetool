@@ -206,6 +206,7 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_CLAIM_WITHDRAWN",
                   "JOB_ORDER_PARTICIPATION_ENROLLED",
                   "JOB_ORDER_PARTICIPATION_ENDED",
+                  "JOB_ORDER_MONEY_COMMITMENT_CHANGED",
                   "QUALITY_TIER_CREATED",
                   "QUALITY_TIER_UPDATED",
                   "QUALITY_TIER_DEACTIVATED",

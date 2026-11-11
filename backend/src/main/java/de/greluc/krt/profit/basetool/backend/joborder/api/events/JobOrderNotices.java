@@ -379,6 +379,30 @@ public final class JobOrderNotices {
   }
 
   /**
+   * Tells the affected current writers about changes to a unit's aUEC commitment.
+   *
+   * @param orderId the affected order
+   * @param displayId its display number
+   * @param recipients the affected unit and responsible writers
+   * @param actor the actor of the change
+   * @return the grouped commitment notice
+   */
+  public static @NotNull NoticeEvent moneyCommitmentChanged(
+      @NotNull UUID orderId,
+      @Nullable Integer displayId,
+      @NotNull Set<UUID> recipients,
+      @NotNull ActorRef actor) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_MONEY_COMMITMENT_CHANGED)
+        .actorSub(actor.id())
+        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(orderId)
+        .contextRecipientUserIds(recipients)
+        .renderParams(params(displayId, null))
+        .build();
+  }
+
+  /**
    * Groups changed material promises and provision facts for the affected current unit writers.
    *
    * @param jobOrderId the order

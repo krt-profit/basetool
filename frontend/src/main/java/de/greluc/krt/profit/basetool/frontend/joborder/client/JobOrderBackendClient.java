@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.WriteMoneyCommitmentDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
@@ -190,6 +191,23 @@ public class JobOrderBackendClient {
   public void enrollSupport(@NotNull UUID id, @NotNull UUID unitId) {
     backendApiClient.put(
         "/api/v1/orders/{id}/participations/{unitId}", null, Void.class, id, unitId);
+  }
+
+  /**
+   * Records or revises a unit's outstanding aUEC commitment.
+   *
+   * @param id the order receiving the contribution
+   * @param unitId the contributing unit
+   * @param input the amount and observed commitment occurrence
+   */
+  public void putMoneyCommitment(
+      @NotNull UUID id, @NotNull UUID unitId, @NotNull WriteMoneyCommitmentDto input) {
+    backendApiClient.put(
+        "/api/v1/orders/{id}/participations/{unitId}/money-commitment",
+        input,
+        Void.class,
+        id,
+        unitId);
   }
 
   /**

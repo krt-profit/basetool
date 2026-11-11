@@ -158,6 +158,9 @@
                 <button type="submit" class="btn btn-ghost" th:text="#{orders.support.enroll}">Staffel hinzufügen</button>
             </form>
         </div>
+        <th:block th:if="${order.type == 'AUEC' and support != null}">
+            <th:block th:replace="~{joborder/fragments/order-money-commitments :: commitments}"></th:block>
+        </th:block>
     </th:block></div>
     </section>
 
@@ -218,6 +221,7 @@
         <div id="order-money-results" th:insert="~{joborder/fragments/order-money :: money}"></div>
         <th:block th:if="${currentUserId != null}">
             <th:block th:replace="~{joborder/fragments/order-money :: provision}"></th:block>
+            <th:block th:replace="~{joborder/fragments/order-money-commitments :: dialog}"></th:block>
         </th:block>
     </th:block>
 

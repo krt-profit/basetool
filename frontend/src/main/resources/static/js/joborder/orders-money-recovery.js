@@ -85,7 +85,9 @@ export function bindProvisionRecovery(root, restoreRefused) {
 
     /** Reads the current holder and order state after a resolved submission. */
     const refresh = () =>
-        joborderHooks.refreshOrderSection?.(['money', 'header', 'actions'], { broadcast: false });
+        joborderHooks.refreshOrderSection?.(['money', 'header', 'actions', 'participations'], {
+            broadcast: false,
+        });
 
     /**
      * Removes a resolved operation and refreshes its visible effects.

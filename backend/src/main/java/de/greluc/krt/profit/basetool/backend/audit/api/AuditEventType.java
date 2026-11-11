@@ -167,6 +167,8 @@ public enum AuditEventType {
   JOB_ORDER_CREATED(AuditDomain.JOB_ORDER),
   /** Actual aUEC reported as purpose-bound to one order. */
   JOB_ORDER_MONEY_PROVIDED(AuditDomain.JOB_ORDER),
+  /** A unit's outstanding aUEC commitment changed. */
+  JOB_ORDER_MONEY_COMMITMENT_CHANGED(AuditDomain.JOB_ORDER),
   /** An item job order was created. */
   JOB_ORDER_ITEM_CREATED(AuditDomain.JOB_ORDER),
   /** A material job order was edited (materials/handle/requesting unit). */

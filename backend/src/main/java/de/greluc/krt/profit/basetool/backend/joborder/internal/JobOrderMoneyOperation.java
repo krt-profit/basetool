@@ -72,6 +72,10 @@ class JobOrderMoneyOperation {
   @Column(length = 200, updatable = false)
   private String selectedAccountlessName;
 
+  @Nullable
+  @Column(updatable = false)
+  private UUID commitmentId;
+
   @Column(nullable = false, updatable = false)
   private boolean bankHandling;
 
@@ -87,6 +91,7 @@ class JobOrderMoneyOperation {
       UUID holderId,
       UUID actorId,
       JobOrderMoneySelection selection,
+      @Nullable UUID commitmentId,
       boolean bankHandling,
       BigDecimal amount) {
     this.orderId = orderId;
@@ -98,6 +103,7 @@ class JobOrderMoneyOperation {
         selectionKind == JobOrderMoneySelection.Kind.LINKED ? selection.reference() : null;
     this.selectedAccountlessName =
         selectionKind == JobOrderMoneySelection.Kind.ACCOUNTLESS ? selection.name() : null;
+    this.commitmentId = commitmentId;
     this.bankHandling = bankHandling;
     this.amount = amount;
     this.recordedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);

@@ -59,6 +59,7 @@ public class JobOrderMoneyCommands {
   private final JobOrderMoneyQueries queries;
   private final JobOrderMoneyIdentityLock identityLock;
   private final JobOrderMoneyEffects effects;
+  private final JobOrderMoneyCommitmentCredit commitmentCredit;
 
   /**
    * Creates an aUEC order and its requested amount in one transaction.
@@ -104,6 +105,9 @@ public class JobOrderMoneyCommands {
     final UUID actor = requireActor();
     JobOrderMoneySelection selection = dto.selection();
     authorizeSelection(order, selection);
+    if (dto.commitmentId() != null) {
+      commitmentCredit.assertAttributionAuthority(order, dto.commitmentId());
+    }
     requireBankFree(dto.bankHandling());
     if (!order.getStatus().isActive()) {
       throw new BusinessConflictException("orders.money.provision.inactive");
@@ -116,6 +120,9 @@ public class JobOrderMoneyCommands {
       throw unavailable.previewProblem();
     }
     requireHolderVersion(holder, dto.holderVersion());
+    if (dto.commitmentId() != null) {
+      commitmentCredit.assertCurrentTarget(order, dto.commitmentId());
+    }
     BigDecimal current = holdingAmount(holder.getId());
     return new JobOrderMoneyProvisionPreview(
         amount.toPlainString(),
@@ -144,9 +151,19 @@ public class JobOrderMoneyCommands {
       throw new AccessDeniedException("An active member account is required.");
     }
     authorizeSelection(order, selection);
+    if (dto.commitmentId() != null) {
+      commitmentCredit.assertAttributionAuthority(order, dto.commitmentId());
+    }
     var existing = operations.findByOrderIdAndOperationId(order.getId(), dto.operationId());
     if (existing.isPresent()) {
-      return replay(order, existing.orElseThrow(), actor, amount, dto.bankHandling(), selection);
+      return replay(
+          order,
+          existing.orElseThrow(),
+          actor,
+          amount,
+          dto.bankHandling(),
+          selection,
+          dto.commitmentId());
     }
     if (operations.isRefused(order.getId(), dto.operationId())) {
       return refused(order);
@@ -159,8 +176,12 @@ public class JobOrderMoneyCommands {
     try {
       holder = holderChoices.resolve(order.getId(), actor, selection);
       requireHolderVersion(holder, dto.holderVersion());
+      if (dto.commitmentId() != null) {
+        commitmentCredit.assertCurrentTarget(order, dto.commitmentId());
+      }
     } catch (ObjectOptimisticLockingFailureException
-        | JobOrderMoneyHolders.UnavailableHolderException unavailableBasis) {
+        | JobOrderMoneyHolders.UnavailableHolderException
+        | BusinessConflictException unavailableBasis) {
       return reserveRefusal(order, dto.operationId());
     }
     boolean newLinkedHolder = holder.getId() == null && holder.getUserId() != null;
@@ -174,8 +195,12 @@ public class JobOrderMoneyCommands {
                 holderId,
                 actor,
                 selection,
+                dto.commitmentId(),
                 dto.bankHandling(),
                 amount));
+    if (dto.commitmentId() != null) {
+      commitmentCredit.recordFreshProvision(order, dto.operationId(), dto.commitmentId(), amount);
+    }
     boolean started = order.getStatus() == JobOrderStatus.OPEN;
     if (started) {
       JobOrderService.changeLifecycle(order, JobOrderStatus.IN_PROGRESS);
@@ -231,12 +256,14 @@ public class JobOrderMoneyCommands {
       UUID actor,
       BigDecimal amount,
       boolean bankHandling,
-      JobOrderMoneySelection selection) {
+      JobOrderMoneySelection selection,
+      @Nullable UUID commitmentId) {
     if (!Objects.equals(actor, operation.getActorId())) {
       throw new AccessDeniedException("Caller may not replay this operation.");
     }
     if (amount.compareTo(operation.getAmount()) != 0
         || bankHandling != operation.isBankHandling()
+        || !Objects.equals(commitmentId, operation.getCommitmentId())
         || !operation.matchesSelection(selection)) {
       throw new BusinessConflictException("orders.money.operation.termsMismatch");
     }

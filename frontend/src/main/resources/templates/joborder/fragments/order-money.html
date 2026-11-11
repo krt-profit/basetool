@@ -27,16 +27,17 @@
                     th:data-money-holder="${holder.id}" th:data-user-id="${holder.userId}"
                     th:data-version="${holder.version}" th:data-holder-label="${label}">
                     <span th:text="${label}"></span>
-                    <span th:text="#{orders.money.amount.display(${money.formatAmount(holder.amount, #locale)})}"></span>
+                    <span th:text="#{orders.money.amount.display(${@moneyFormat.exactWhole(holder.amount, #locale)})}"></span>
                 </li>
             </ul>
         </section>
         <section class="card" th:unless="${#lists.isEmpty(money.history)}" aria-labelledby="order-money-history">
             <h3 id="order-money-history" class="section-title" th:text="#{orders.money.history}"></h3>
             <ul class="od-assignee-list">
-                <li class="od-assignee split" th:each="entry : ${money.history}" data-testid="order-money-history-entry">
+                <li class="od-assignee split" th:each="entry : ${money.history}" data-testid="order-money-history-entry"
+                    th:id="|order-money-operation-${entry.operationId}|">
                     <div>
-                        <strong th:text="#{orders.money.history.provision(${money.formatAmount(entry.amount, #locale)})}"></strong>
+                        <strong th:text="#{orders.money.history.provision(${@moneyFormat.exactWhole(entry.amount, #locale)})}"></strong>
                         <div th:text="#{orders.money.history.names(
                             ${@handles.display(entry.holderName) ?: #messages.msg('orders.money.nameUnavailable')},
                             ${@handles.display(entry.actorName) ?: #messages.msg('orders.money.nameUnavailable')})}"></div>
@@ -51,7 +52,7 @@
 <div th:fragment="figure(labelKey, amount, testId)" class="kpi-total" th:data-testid="${testId}">
     <div class="kpi-label" th:text="#{__${labelKey}__}"></div>
     <div class="kpi-value">
-        <span th:text="${money.formatAmount(amount, #locale)}"></span>
+        <span th:text="${@moneyFormat.exactWhole(amount, #locale)}"></span>
         <span class="kpi-unit" th:text="#{orders.kind.auec}"></span>
     </div>
 </div>
@@ -117,6 +118,12 @@
                        aria-describedby="order-money-amount-error" required>
                 <p id="order-money-amount-error" class="field-error" data-money-amount-error hidden
                    th:text="#{orders.money.amount.invalid}"></p>
+            </div>
+            <div class="form-group" data-money-commitment-field hidden>
+                <label for="order-money-provision-commitment" th:text="#{orders.money.commitment.attribution}"></label>
+                <select id="order-money-provision-commitment" name="commitmentId" data-testid="order-money-provision-commitment"
+                        th:data-unavailable="#{orders.money.commitment.unavailable}"
+                        th:data-unattributed="#{orders.money.commitment.unattributed}"></select>
             </div>
             <label class="cluster gap-2">
                 <input type="checkbox" name="bankFree" data-testid="order-money-bank-free" required>

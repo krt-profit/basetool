@@ -250,6 +250,9 @@ public enum NotificationType {
   /** A new aUEC provision was reported for the affected linked holder. */
   JOB_ORDER_MONEY_PROVISIONED,
 
+  /** A unit's outstanding aUEC commitment changed. */
+  JOB_ORDER_MONEY_COMMITMENT_CHANGED,
+
   /**
    * A refinery order is ready to collect (REQ-REFINERY-023), rendered with {@code order}, {@code
    * location} and the {@code outputs}.
@@ -566,6 +569,7 @@ public enum NotificationType {
           JOB_ORDER_CLARIFICATION_REQUIRED,
           JOB_ORDER_PARTICIPATION_CHANGED,
           JOB_ORDER_MONEY_PROVISIONED,
+          JOB_ORDER_MONEY_COMMITMENT_CHANGED,
           REFINERY_ORDER_READY,
           REFINERY_ORDER_CHANGED_BY_OTHER,
           MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,

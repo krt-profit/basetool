@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="commitments">
+    <template id="order-money-commitment-units">
+        <option value="" th:text="#{orders.create.select}"></option>
+        <option th:each="unit : ${support.moneyCommitmentOptions}" th:value="${unit.orgUnitId}"
+                th:text="${unit.orgUnitName}"></option>
+        <option th:each="commitment : ${support.moneyCommitments}" th:if="${commitment.canEdit}"
+                th:value="${commitment.unit.orgUnitId}" th:text="${commitment.unit.orgUnitName}"
+                th:data-commitment-id="${commitment.id}" th:data-version="${commitment.version}"
+                th:data-outstanding="${commitment.outstanding}"
+                th:data-current="#{orders.money.commitment.current(${@moneyFormat.exactWhole(commitment.outstanding, #locale)})}"></option>
+    </template>
+    <template id="order-money-provision-commitments">
+        <option value="" th:text="#{orders.money.commitment.unattributed}"></option>
+        <option th:each="commitment : ${support.moneyCommitments}" th:if="${commitment.canEdit}"
+                th:value="${commitment.id}" th:data-version="${commitment.version}"
+                th:text="${commitment.unit.orgUnitName}"></option>
+    </template>
+    <div class="od-summary__body"
+         th:if="${!support.moneyCommitments.isEmpty() or !support.moneyCommitmentOptions.isEmpty()}">
+        <h3 class="section-title" th:text="#{orders.money.commitment.title}"></h3>
+        <ul class="od-assignee-list" th:unless="${support.moneyCommitments.isEmpty()}">
+            <li class="od-assignee split" th:each="commitment : ${support.moneyCommitments}"
+                th:data-commitment="${commitment.id}" data-testid="order-money-commitment">
+                <div>
+                    <strong th:text="${commitment.unit.orgUnitName}"></strong>
+                    <span th:if="${commitment.endedAt == null}" data-testid="order-money-commitment-outstanding"
+                          th:text="#{orders.money.amount.display(${@moneyFormat.exactWhole(commitment.outstanding, #locale)})}"></span>
+                    <span th:unless="${commitment.endedAt == null}" class="status-pill status-cancelled"
+                          th:text="#{orders.support.ended}"></span>
+                    <details>
+                        <summary th:text="#{orders.money.commitment.history}"></summary>
+                        <ul class="od-assignee-list">
+                            <li class="od-assignee split" th:each="change : ${commitment.changes}">
+                                <span th:text="${#messages.msg('orders.money.commitment.change.' + change.reason.name(),
+                                    @moneyFormat.exactWhole(change.before, #locale),
+                                    @moneyFormat.exactWhole(change.after, #locale))}"></span>
+                                <a th:if="${change.operationId != null}"
+                                   th:href="|#order-money-operation-${change.operationId}|"
+                                   data-testid="order-money-commitment-operation"
+                                   th:text="#{orders.money.commitment.operation}"></a>
+                                <time class="od-money-date" th:datetime="${change.recordedAt}"
+                                      th:data-utc="${change.recordedAt}"></time>
+                            </li>
+                        </ul>
+                    </details>
+                </div>
+                <button type="button" class="btn btn-ghost" th:if="${commitment.canEdit}"
+                        data-trigger="od-money-commitment-open" data-testid="order-money-commitment-edit"
+                        th:data-unit-id="${commitment.unit.orgUnitId}"
+                        th:text="#{orders.money.commitment.edit}"></button>
+            </li>
+        </ul>
+        <button type="button" class="btn btn-ghost" th:unless="${support.moneyCommitmentOptions.isEmpty()}"
+                data-trigger="od-money-commitment-open" data-testid="order-money-commitment-add"
+                th:text="#{orders.money.commitment.add}"></button>
+    </div>
+</th:block>
+
+<th:block th:fragment="dialog">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='order-money-commitment-modal',
+        titleKey='orders.money.commitment.title', body=~{joborder/fragments/order-money-commitments :: form})}"></th:block>
+</th:block>
+
+<form th:fragment="form" id="order-money-commitment-form"
+      th:data-order-id="${order.id}" th:data-error="#{orders.money.commitment.error}">
+    <div class="krt-modal-body">
+        <div class="alert alert-info" role="status" data-commitment-changed hidden>
+            <p th:text="#{orders.money.commitment.changed}"></p>
+            <p data-commitment-current></p>
+            <button type="button" class="btn btn-ghost" data-commitment-review
+                    th:text="#{orders.money.commitment.review}"></button>
+        </div>
+        <div class="form-group">
+            <label for="order-money-commitment-unit" th:text="#{orders.money.commitment.unit}"></label>
+            <select id="order-money-commitment-unit" name="unitId"
+                    data-testid="order-money-commitment-unit" required></select>
+        </div>
+        <div class="form-group">
+            <label for="order-money-commitment-amount" th:text="#{orders.money.commitment.outstanding}"></label>
+            <input type="text" id="order-money-commitment-amount" name="amount" inputmode="numeric"
+                   data-number-input="exact-whole" data-testid="order-money-commitment-amount"
+                   th:data-invalid="#{orders.money.amount.invalid}" required>
+        </div>
+    </div>
+    <div class="krt-modal-foot">
+        <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                data-modal-id="order-money-commitment-modal" th:text="#{general.cancel}"></button>
+        <button type="submit" value="end" class="btn btn-quiet-danger" formnovalidate
+                data-commitment-end hidden th:text="#{orders.money.commitment.end}"></button>
+        <button type="submit" class="btn btn--cta" data-testid="order-money-commitment-save"
+                th:text="#{orders.detail.save}"></button>
+    </div>
+</form>
+</body>
+</html>

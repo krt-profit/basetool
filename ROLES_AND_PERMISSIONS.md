@@ -495,6 +495,10 @@ and provision on behalf by a current responsible writer. A consciously linked ho
 their order and recover its accepted outcomes through the ordinary workspace, without unit
 membership or Bank access. A typed name grants neither account access nor an Inbox recipient.
 Once a monetary submission is accepted, even an administrator cannot hard-delete its order.
+Current responsible-unit writers coordinate aUEC commitments. Supporting Staffel writers
+manage their own commitment and may explicitly credit a provision they are authorised to record.
+The first commitment of an eligible Staffel starts its shared participation. An individual
+Bearbeiter or holder grant carries only the existing personal actions.
 
 The canonical detailed grants, historical relationships and acceptance criteria live in the three
 linked specifications. The following table and footnotes are the **current implementation baseline**.

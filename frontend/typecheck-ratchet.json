@@ -116,6 +116,7 @@
       "joborder/orders-money-preview.js",
       "joborder/orders-money-recovery.js",
       "joborder/orders-money.js",
+      "joborder/orders-money-commitments.js",
       "joborder/orders-detail-claims.js",
       "joborder/orders-contribution-history.js",
       "joborder/orders-detail-edit.js",

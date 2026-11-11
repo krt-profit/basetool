@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.WriteMoneyCommitmentDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.time.Instant;
@@ -281,6 +282,18 @@ class JobOrderBackendClientTest {
     backend.expect("GET", supportPath);
     backend.expect("PUT", supportPath + "/" + SQUADRON, null);
     backend.expect("DELETE", supportPath + "/" + SQUADRON + "?version=9", null);
+  }
+
+  @Test
+  void moneyCommitmentWritesKeepTheUnitAndObservedOccurrence() {
+    backend.answerEmpty();
+
+    client.putMoneyCommitment(ORDER, SQUADRON, new WriteMoneyCommitmentDto("6000000", OTHER, 9L));
+
+    backend.expect(
+        "PUT",
+        "/api/v1/orders/" + ORDER + "/participations/" + SQUADRON + "/money-commitment",
+        "{\"amount\":\"6000000\",\"commitmentId\":\"%s\",\"version\":9}".formatted(OTHER));
   }
 
   @Test

@@ -544,6 +544,7 @@
 /orders/{id}/money/provisions/preview POST -> JobOrderMoneyProxyController#preview gate=class:isAuthenticated() layout=no
 /orders/{id}/participations/{unitId} DELETE -> JobOrderResponsibilityProxyController#withdrawSupport gate=class:isAuthenticated() layout=no
 /orders/{id}/participations/{unitId} PUT -> JobOrderResponsibilityProxyController#enrollSupport gate=class:isAuthenticated() layout=no
+/orders/{id}/participations/{unitId}/money-commitment PUT -> JobOrderResponsibilityProxyController#putMoneyCommitment gate=class:isAuthenticated() layout=no
 /orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes
 /orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=class:isAuthenticated() layout=yes
 /orders/{id}/requested-update POST -> JobOrderWriteController#updateOrderAsRequester gate=class:isAuthenticated() layout=yes

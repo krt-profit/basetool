@@ -399,6 +399,67 @@ class JobOrderMoneyE2eTest {
     }
   }
 
+  /** Credits an explicit contribution and updates a peer without replacing its open draft. */
+  @Test
+  void creditsAUnitCommitmentWhilePreservingAnotherEditorsDraft() {
+    assumeTrue(STACK.managesStack(), "requires the isolated managed order stack");
+    var seeder = new BackendSeeder();
+    seeder.ensureIridiumMembership(USERNAME, PASSWORD);
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    String otherUnit =
+        seeder.createSquadron(USERNAME, PASSWORD, "Commitment witness " + tag, "C" + tag);
+    seeder.moveOrgUnitToProfit(USERNAME, PASSWORD, otherUnit);
+    String baseUrl = STACK.baseUrl();
+    var options = new Browser.NewContextOptions().setIgnoreHTTPSErrors(true);
+    try (Playwright playwright = Playwright.create();
+        Browser browser = E2eSupport.launchBrowser(playwright, true);
+        BrowserContext actorContext = browser.newContext(options);
+        BrowserContext peerContext = browser.newContext(options)) {
+      Page actor = actorContext.newPage();
+      Page peer = peerContext.newPage();
+      E2eSupport.login(actor, baseUrl, USERNAME, PASSWORD);
+      E2eSupport.navigate(actor, baseUrl + "/orders/create?lang=de");
+      String orderPath = createOrder(actor, baseUrl, IRIDIUM);
+
+      actor.getByTestId("order-money-commitment-add").click();
+      actor.getByTestId("order-money-commitment-unit").selectOption(IRIDIUM);
+      actor.getByTestId("order-money-commitment-amount").fill("6000000");
+      actor.getByTestId("order-money-commitment-save").click();
+      assertThat(actor.getByTestId("order-money-commitment-outstanding")).containsText("6.000.000");
+
+      E2eSupport.login(peer, baseUrl, USERNAME, PASSWORD);
+      E2eSupport.navigate(peer, baseUrl + orderPath + "?lang=de");
+      waitForRoom(peer, "order:" + orderPath.substring("/orders/".length()));
+      peer.getByTestId("order-money-commitment-edit").click();
+      Locator draft = peer.getByTestId("order-money-commitment-amount");
+      draft.fill("5000000");
+
+      prepareSelfProvision(actor, "4000000");
+      String commitmentId =
+          actor.getByTestId("order-money-commitment").getAttribute("data-commitment");
+      assertNotNull(commitmentId);
+      actor.getByTestId("order-money-provision-commitment").selectOption(commitmentId);
+      actor.getByTestId("order-money-save").click();
+
+      assertThat(actor.getByTestId("order-money-provided")).containsText("4.000.000");
+      assertThat(actor.getByTestId("order-money-commitment-outstanding")).containsText("2.000.000");
+      actor.getByTestId("order-money-commitment").locator("summary").click();
+      var source = actor.getByTestId("order-money-commitment-operation");
+      assertThat(source).isVisible();
+      String operationAnchor = source.getAttribute("href");
+      assertNotNull(operationAnchor);
+      assertThat(actor.locator(operationAnchor)).containsText("4.000.000");
+      assertThat(peer.locator("[data-commitment-changed]")).isVisible();
+      assertThat(peer.getByTestId("order-money-commitment-outstanding")).containsText("2.000.000");
+      assertThat(peer.getByTestId("order-money-commitment-save")).isDisabled();
+      assertEquals("5.000.000", shownAmount(draft));
+
+      peer.getByTestId("order-money-commitment-unit").selectOption(otherUnit);
+      assertThat(draft).hasValue("");
+      assertThat(peer.locator("[data-commitment-changed]")).isHidden();
+    }
+  }
+
   private static void prepareSelfProvision(Page page, String amount) {
     page.getByTestId("order-money-provide").click();
     page.getByTestId("order-money-amount").fill(amount);

@@ -27,7 +27,11 @@ import java.util.List;
  *
  * @param participations current and retained Staffel relationships
  * @param enrollmentOptions eligible Staffeln the caller can enroll
+ * @param moneyCommitments current and retained unit commitments on an aUEC order
+ * @param moneyCommitmentOptions the units for which the caller may start a commitment
  */
 public record JobOrderSupportDto(
     List<StaffelParticipationDto> participations,
-    List<OrgUnitMembershipOptionDto> enrollmentOptions) {}
+    List<OrgUnitMembershipOptionDto> enrollmentOptions,
+    List<MoneyCommitmentDto> moneyCommitments,
+    List<OrgUnitMembershipOptionDto> moneyCommitmentOptions) {}

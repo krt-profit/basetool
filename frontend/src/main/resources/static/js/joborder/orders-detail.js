@@ -75,6 +75,7 @@ function initOrdersDetail() {
             participations: {
                 container: '#order-participations-results',
                 fragmentValue: 'participations',
+                refreshWhileModalOpen: true,
             },
             actions: { container: '#order-actions-results', fragmentValue: 'actions' },
             dialogs: { container: '#order-dialogs-results', fragmentValue: 'dialogs' },

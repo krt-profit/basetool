@@ -23,11 +23,17 @@ import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { bindHolderChoices } from '/js/joborder/orders-money-holders.js';
 import { bindProvisionPreview } from '/js/joborder/orders-money-preview.js';
 import { bindProvisionRecovery } from '/js/joborder/orders-money-recovery.js';
+import {
+    initMoneyCommitments,
+    readAttributionChoice,
+    refreshAttributionChoices,
+} from '/js/joborder/orders-money-commitments.js';
 
 const modalId = 'order-money-provision-modal';
 const root = document.getElementById('order-money-operation');
 const form = document.getElementById('order-money-provision-form');
 
+initMoneyCommitments();
 if (root && form instanceof HTMLFormElement) bindProvisionForm(root, form);
 
 /**
@@ -40,12 +46,16 @@ function bindProvisionForm(root, form) {
     const fields = form.querySelector('fieldset');
     const input = form.elements.namedItem('amount');
     const bankFree = form.elements.namedItem('bankFree');
+    const commitment = form.elements.namedItem('commitmentId');
+    const commitmentField = form.querySelector('[data-money-commitment-field]');
     const changed = form.querySelector('[data-money-basis-changed]');
     const amountError = form.querySelector('[data-money-amount-error]');
     if (
         !(fields instanceof HTMLFieldSetElement) ||
         !(input instanceof HTMLInputElement) ||
         !(bankFree instanceof HTMLInputElement) ||
+        !(commitment instanceof HTMLSelectElement) ||
+        !(commitmentField instanceof HTMLElement) ||
         !(changed instanceof HTMLElement) ||
         !(amountError instanceof HTMLElement)
     ) {
@@ -59,16 +69,30 @@ function bindProvisionForm(root, form) {
     let saving = false;
     krtNumberInput.enhance(input);
 
+    /** @param {string} desired the selected occurrence, including a refused draft */
+    const refreshCommitments = (desired) => {
+        refreshAttributionChoices(commitment, desired);
+        commitmentField.hidden = commitment.options.length <= 1;
+    };
+
+    const currentBasis = () =>
+        JSON.stringify([
+            holders.selection(),
+            commitment.value,
+            commitment.selectedOptions.item(0)?.dataset.version,
+        ]);
+
     const preview = bindProvisionPreview(form, `/orders/${root.dataset.orderId}/money`, () => {
         const amount = input.value;
         const selection = holders.selection();
-        return amount && bankFree.checked && selection
-            ? { ...selection, amount, bankHandling: false }
+        const attribution = readAttributionChoice(commitment);
+        return amount && bankFree.checked && selection && attribution
+            ? { ...selection, ...attribution, amount, bankHandling: false }
             : null;
     });
 
     const updateDraft = () => {
-        basis = JSON.stringify(holders.selection());
+        basis = currentBasis();
         if (!saving) preview.refresh();
     };
 
@@ -80,6 +104,7 @@ function bindProvisionForm(root, form) {
     const open = (refused = null) => {
         form.reset();
         holders.reset();
+        refreshCommitments(refused?.commitmentId || '');
         preview.reset();
         changed.hidden = refused === null;
         amountError.hidden = true;
@@ -131,11 +156,20 @@ function bindProvisionForm(root, form) {
     });
 
     document.addEventListener('krt:swapped', (event) => {
-        if (event.detail.container?.id !== 'order-money-results' || !krtModal.isOpen(modalId))
+        const section = event.detail.container?.id;
+        if (!krtModal.isOpen(modalId)) return;
+        if (section === 'order-money-results') {
+            holders.refresh();
+        } else if (section === 'order-participations-results') {
+            refreshCommitments(commitment.value);
+        } else {
             return;
-        holders.refresh();
-        const next = JSON.stringify(holders.selection());
-        if (next !== basis && (input.value || bankFree.checked)) changed.hidden = false;
+        }
+        const next = currentBasis();
+        if (next !== basis && (input.value || bankFree.checked)) {
+            changed.hidden = false;
+            preview.reset();
+        }
         updateDraft();
     });
     form.addEventListener('submit', async (event) => {

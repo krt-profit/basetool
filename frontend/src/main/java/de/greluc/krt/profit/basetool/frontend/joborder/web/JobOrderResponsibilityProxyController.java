@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.WriteMoneyCommitmentDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -89,6 +90,28 @@ public class JobOrderResponsibilityProxyController {
         "enroll order support",
         () -> {
           jobOrderClient.enrollSupport(id, unitId);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Relays an outstanding unit aUEC commitment at its observed version.
+   *
+   * @param id the supported order
+   * @param unitId the contributing unit
+   * @param input the amount and observed commitment occurrence
+   * @return 204 on success or the backend refusal
+   */
+  @PutMapping("/{id}/participations/{unitId}/money-commitment")
+  public ResponseEntity<Object> putMoneyCommitment(
+      @PathVariable UUID id,
+      @PathVariable UUID unitId,
+      @RequestBody @Valid WriteMoneyCommitmentDto input) {
+    return relay(
+        log,
+        "record order money commitment",
+        () -> {
+          jobOrderClient.putMoneyCommitment(id, unitId, input);
           return ResponseEntity.noContent().build();
         });
   }

@@ -28,8 +28,12 @@ import java.util.List;
  *
  * @param participations the active and ended support entries
  * @param enrollmentOptions the Staffeln the caller may enroll
+ * @param moneyCommitments the current and retained unit commitments
+ * @param moneyCommitmentOptions units the caller can start a commitment for
  */
 @DtoMirror
 public record JobOrderSupportDto(
     List<StaffelParticipationDto> participations,
-    List<OrgUnitMembershipOptionDto> enrollmentOptions) {}
+    List<OrgUnitMembershipOptionDto> enrollmentOptions,
+    List<MoneyCommitmentDto> moneyCommitments,
+    List<OrgUnitMembershipOptionDto> moneyCommitmentOptions) {}

@@ -45,6 +45,7 @@ class JobOrderParticipationCommands {
   private final JobOrderParticipationRepository participations;
   private final MaterialClaimRepository claims;
   private final MaterialPromiseCoordinator materialPromises;
+  private final JobOrderMoneyCommitments moneyCommitments;
   private final AuditRecorder audit;
   private final JobOrderChangeEffects effects;
 
@@ -143,6 +144,7 @@ class JobOrderParticipationCommands {
             .toList());
     open.forEach(
         claim -> materialPromises.end(claim, MaterialContributionChange.Reason.PROMISE_WITHDRAWN));
+    moneyCommitments.endForParticipation(order, unitId);
     end(row, JobOrderChangeEffects.ParticipationChange.WITHDRAWN);
   }
 

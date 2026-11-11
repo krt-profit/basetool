@@ -34,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * @param holderId explicitly selected existing holder
  * @param holderUserId explicitly selected member account
  * @param holderName newly named accountless holder
+ * @param commitmentId explicitly selected unit commitment occurrence
  */
 public record PreviewJobOrderMoneyProvisionDto(
     @NotBlank String amount,
@@ -41,7 +42,8 @@ public record PreviewJobOrderMoneyProvisionDto(
     @Nullable Long holderVersion,
     @Nullable UUID holderId,
     @Nullable UUID holderUserId,
-    @Nullable @Size(max = 200) String holderName) {
+    @Nullable @Size(max = 200) String holderName,
+    @Nullable UUID commitmentId) {
 
   JobOrderMoneySelection selection() {
     return JobOrderMoneySelection.parse(holderId, holderUserId, holderName);

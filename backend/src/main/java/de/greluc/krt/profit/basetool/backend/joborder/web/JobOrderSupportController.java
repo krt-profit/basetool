@@ -20,9 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderSupportDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommitmentCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderSupportService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.WriteMoneyCommitmentDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -31,6 +34,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -43,6 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Order Support", description = "Staffel participation on job orders")
 public class JobOrderSupportController {
   private final JobOrderSupportService service;
+  private final JobOrderMoneyCommitmentCommands moneyCommitments;
 
   /**
    * Lists the order's Staffel participation and the current enrollment choices.
@@ -69,6 +74,24 @@ public class JobOrderSupportController {
   @Operation(operationId = "enrollJobOrderSupport", summary = "Enroll a Staffel in an order")
   public void enroll(@PathVariable UUID id, @PathVariable UUID unitId) {
     service.enroll(id, unitId);
+  }
+
+  /**
+   * Records or revises the unit's outstanding aUEC commitment.
+   *
+   * @param id the order receiving the contribution
+   * @param unitId the responsible or supporting unit making the commitment
+   * @param input the amount and observed commitment occurrence
+   */
+  @PutMapping("/{unitId}/money-commitment")
+  @PreAuthorize("isAuthenticated()")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(operationId = "putJobOrderMoneyCommitment", summary = "Record a unit aUEC commitment")
+  public void putMoneyCommitment(
+      @PathVariable UUID id,
+      @PathVariable UUID unitId,
+      @Valid @RequestBody WriteMoneyCommitmentDto input) {
+    moneyCommitments.put(id, unitId, input);
   }
 
   /**
