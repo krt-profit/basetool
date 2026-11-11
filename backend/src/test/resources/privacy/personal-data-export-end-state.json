@@ -374,7 +374,7 @@
     "rows" : [ {
       "job_order" : <n>,
       "holder_id" : "<uuid>",
-      "revision" : 1
+      "revision" : 4
     } ],
     "truncated" : false
   }, {
@@ -400,6 +400,16 @@
       "recorded_at" : "<instant>",
       "fee" : "0",
       "new_provision" : "0"
+    }, {
+      "job_order" : <n>,
+      "operation_id" : "<uuid>",
+      "holder_id" : "<uuid>",
+      "kind" : "CORRECTION",
+      "amount" : "0",
+      "bank_handling" : false,
+      "recorded_at" : "<instant>",
+      "fee" : null,
+      "new_provision" : null
     } ],
     "truncated" : false
   }, {
@@ -408,7 +418,10 @@
     "rows" : [ {
       "job_order" : <n>,
       "recipient_id" : "<uuid>",
-      "active" : true
+      "active" : true,
+      "corrects_id" : null,
+      "corrected_at" : null,
+      "superseded" : false
     } ],
     "truncated" : false
   }, {
@@ -422,6 +435,19 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "jobOrderMoneyHolderChanges",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : <n>,
+      "holder_id" : "<uuid>",
+      "target_holder_id" : null,
+      "kind" : "LINK",
+      "recorded_at" : "<instant>",
+      "previous_name" : "ZzzExportSubjectZzz",
+      "name" : null
+    } ],
+    "truncated" : false
+  }, {
     "key" : "marketOffers",
     "legalBasis" : "ART_15_20",
     "rows" : [ {
@@ -432,6 +458,24 @@
       "status" : "ACTIVE",
       "released_at" : "<instant>",
       "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "jobOrderMoneyCorrections",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : <n>,
+      "correction_operation_id" : "<uuid>",
+      "original_operation_id" : "<uuid>",
+      "previous_amount" : "17",
+      "amount" : "16",
+      "previous_provision" : "17",
+      "provision" : "16",
+      "previous_fee" : "0",
+      "fee" : "0",
+      "previous_credit" : null,
+      "credit" : null,
+      "recorded_at" : "<instant>"
     } ],
     "truncated" : false
   }, {

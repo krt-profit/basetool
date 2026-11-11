@@ -106,6 +106,7 @@ class PersonSearchEndStateTest {
     VALID.put("job_order.type", "MATERIAL");
     VALID.put("job_order.status", "OPEN");
     VALID.put("job_order_money_operation.selection_kind", "ACCOUNTLESS");
+    VALID.put("job_order_money_holder_change.kind", "NAME");
     VALID.put("purchasing_partner.kind", "ORG");
     VALID.put("purchasing_partner.channel", "OTHER");
     VALID.put("purchasing_partner.contact_via", "OTHER");

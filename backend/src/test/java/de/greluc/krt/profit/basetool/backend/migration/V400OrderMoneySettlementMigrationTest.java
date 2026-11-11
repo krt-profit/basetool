@@ -30,10 +30,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/** Verifies the additive recipient and paired-correction migration from the installed ledger. */
+/** Verifies the additive upgrades from the installed settlement ledger. */
 @Testcontainers
 @Timeout(90)
-class V399OrderMoneySettlementMigrationTest {
+class V400OrderMoneySettlementMigrationTest {
   @Container
   private static final PostgreSQLContainer POSTGRES =
       new PostgreSQLContainer(
@@ -48,15 +48,15 @@ class V399OrderMoneySettlementMigrationTest {
     Integer checksum = original.getChecksum();
     assertThat(checksum).isNotNull();
 
-    Flyway upgrade = flyway("399");
-    assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
+    Flyway upgrade = flyway("400");
+    assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(3);
     assertThat(upgrade.validateWithResult().validationSuccessful).isTrue();
     assertThat(upgrade.info().applied())
         .anySatisfy(applied -> {
           assertThat(applied.getVersion().getVersion()).isEqualTo("397");
           assertThat(applied.getChecksum()).isEqualTo(checksum);
         });
-    assertThat(upgrade.info().current().getVersion().getVersion()).isEqualTo("399");
+    assertThat(upgrade.info().current().getVersion().getVersion()).isEqualTo("400");
   }
 
   private static Flyway flyway(String target) {

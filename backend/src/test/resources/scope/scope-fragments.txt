@@ -40,8 +40,16 @@
 (o.type = 'AUEC' AND (
   EXISTS (SELECT h.id FROM JobOrderMoneyHolder h WHERE h.orderId = o.id AND h.userId = :callerId)
   OR EXISTS (SELECT r.id FROM JobOrderMoneyRecipient r WHERE r.orderId = o.id
+    AND r.correctedIntoId IS NULL
     AND (r.active = true OR EXISTS (SELECT m.id FROM JobOrderMoneyOperation m
-      WHERE m.orderId = o.id AND m.recipientId = r.id))
+      WHERE m.orderId = o.id AND (m.recipientId = r.id OR EXISTS (
+        SELECT prior.id FROM JobOrderMoneyRecipient prior
+        WHERE prior.orderId = o.id AND prior.id = m.recipientId AND prior.correctedIntoId = r.id))
+      AND NOT EXISTS (SELECT c.id FROM JobOrderMoneyCorrectionEntry c
+        WHERE c.orderId = o.id AND c.originalOperationId = m.operationId AND c.amount = 0
+          AND NOT EXISTS (SELECT later.id FROM JobOrderMoneyCorrectionEntry later
+            WHERE later.orderId = c.orderId AND later.originalOperationId = c.originalOperationId
+              AND later.id > c.id))))
     AND (r.userId = :callerId OR EXISTS (SELECT h.id FROM JobOrderMoneyHolder h
       WHERE h.orderId = o.id AND h.userId = :callerId AND
         (h.id = r.holderId OR EXISTS (SELECT alias.id FROM JobOrderMoneyHolder alias

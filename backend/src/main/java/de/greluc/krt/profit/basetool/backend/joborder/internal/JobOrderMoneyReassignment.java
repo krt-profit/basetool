@@ -26,8 +26,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEditor.MoneyPairEdit;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
-import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import java.math.BigDecimal;
 import java.util.List;
@@ -122,11 +122,12 @@ public class JobOrderMoneyReassignment {
       throw new BadRequestException("orders.money.reassignment.samePerson");
     }
     UUID destinationId =
-        orders.findByNumberPrefix(Integer.toString(number), 1).stream()
-            .filter(hit -> hit.displayId() == number)
-            .map(JobOrderNumberHitDto::id)
-            .findFirst()
-            .orElseThrow(() -> new NotFoundException("orders.money.reassignment.notFound"));
+        Entities.require(
+            orders.findByNumberPrefix(Integer.toString(number), 1).stream()
+                .filter(hit -> hit.displayId() == number)
+                .map(JobOrderNumberHitDto::id)
+                .findFirst(),
+            "orders.money.reassignment.notFound");
     if (orderId.equals(destinationId)) {
       throw new BadRequestException("orders.money.reassignment.order");
     }

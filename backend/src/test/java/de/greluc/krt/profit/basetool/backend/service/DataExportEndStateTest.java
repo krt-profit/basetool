@@ -577,11 +577,12 @@ class DataExportEndStateTest {
                     .build())
             .getId();
     UUID holderId = UUID.randomUUID();
+    UUID provisionId = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO job_order_money_target (order_id, amount, version) VALUES (?, 80, 0)",
         orderId);
     jdbc.update(
-        "INSERT INTO job_order_money_holder (id, order_id, user_id, revision) VALUES (?, ?, ?, 1)",
+        "INSERT INTO job_order_money_holder (id, order_id, user_id, revision) VALUES (?, ?, ?, 4)",
         holderId,
         orderId,
         subject.getId());
@@ -589,14 +590,16 @@ class DataExportEndStateTest {
         """
         INSERT INTO job_order_money_operation
             (id, order_id, operation_id, holder_id, actor_id, selection_kind,
-             bank_handling, amount, recorded_at)
-        VALUES (?, ?, ?, ?, ?, 'SELF', false, 17, now())
+             selected_accountless_name, bank_handling, amount, recorded_at)
+        VALUES (?, ?, ?, ?, ?, 'ACCOUNTLESS', ?, false, 17, now())
         """,
         UUID.randomUUID(),
         orderId,
-        UUID.randomUUID(),
+        provisionId,
         holderId,
-        subject.getId());
+        other.getId(),
+        SUBJECT);
+    seedMoneyHolderLink(orderId, holderId);
     UUID recipientId = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO job_order_money_recipient (id, order_id, user_id, active) VALUES (?, ?, ?,"
@@ -609,7 +612,7 @@ class DataExportEndStateTest {
         INSERT INTO job_order_money_operation
             (id, order_id, operation_id, holder_id, actor_id, selection_kind,
              bank_handling, amount, recorded_at, kind, recipient_id, new_provision, fee_rate, fee)
-        VALUES (?, ?, ?, ?, ?, 'EXISTING', false, 3, now() + interval '1 second',
+        VALUES (?, ?, ?, ?, ?, 'EXISTING', false, 3, now() + interval '2 seconds',
              'PURPOSE_HANDOVER', ?, 0, 0, 0)
         """,
         UUID.randomUUID(),
@@ -618,6 +621,7 @@ class DataExportEndStateTest {
         holderId,
         subject.getId(),
         recipientId);
+    seedMoneyCorrection(orderId, holderId, provisionId);
     jdbc.update(
         """
         INSERT INTO job_order_money_target_change
@@ -647,6 +651,47 @@ class DataExportEndStateTest {
     order.addMaterial(
         JobOrderMaterial.builder().material(material).qualityTier(good).amount(10.0).build());
     return jobOrderRepository.save(order);
+  }
+
+  private void seedMoneyHolderLink(UUID orderId, UUID holderId) {
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_holder_change
+            (id, order_id, holder_id, kind, actor_id, user_id, previous_name, recorded_at)
+        VALUES (?, ?, ?, 'LINK', ?, ?, ?, now() + interval '1 second')
+        """,
+        UUID.randomUUID(),
+        orderId,
+        holderId,
+        other.getId(),
+        subject.getId(),
+        SUBJECT);
+  }
+
+  private void seedMoneyCorrection(UUID orderId, UUID holderId, UUID provisionId) {
+    UUID correctionId = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_operation
+            (id, order_id, operation_id, holder_id, actor_id, selection_kind,
+             bank_handling, amount, recorded_at, kind)
+        VALUES (?, ?, ?, ?, ?, 'EXISTING', false, 0, now() + interval '3 seconds', 'CORRECTION')
+        """,
+        UUID.randomUUID(),
+        orderId,
+        correctionId,
+        holderId,
+        other.getId());
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_correction_entry
+            (order_id, correction_operation_id, original_operation_id,
+             previous_amount, previous_provision, previous_fee, amount, provision, fee)
+        VALUES (?, ?, ?, 17, 17, 0, 16, 16, 0)
+        """,
+        orderId,
+        correctionId,
+        provisionId);
   }
 
   private void seedMarket() {

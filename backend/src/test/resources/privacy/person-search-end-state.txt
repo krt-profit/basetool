@@ -28,6 +28,8 @@ JOB_ORDER|job_order_assignees|note|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_handover|recipient_handle|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_handover|recipient_squadron|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_item_handover|recipient_handle|JOB_ORDER|Vor ZzzMentionZzz nach
+JOB_ORDER|job_order_money_holder_change|name|JOB_ORDER|Vor ZzzMentionZzz nach
+JOB_ORDER|job_order_money_holder_change|previous_name|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_money_holder|accountless_name|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_money_operation|selected_accountless_name|JOB_ORDER|Vor ZzzMentionZzz nach
 JOB_ORDER|job_order_money_recipient|accountless_name|JOB_ORDER|Vor ZzzMentionZzz nach
