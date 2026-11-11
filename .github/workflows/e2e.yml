@@ -170,18 +170,6 @@ jobs:
       - name: Map host.docker.internal to the loopback (needed by WebKit)
         run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
 
-      - name: Check the Ubuntu mirror for browser dependencies
-        run: |
-          mirror_list=/etc/apt/apt-mirrors.txt
-          if [[ -f "$mirror_list" ]] &&
-              grep -qF azure.archive.ubuntu.com "$mirror_list" &&
-              ! timeout 10 getent ahosts azure.archive.ubuntu.com >/dev/null; then
-            archive=https://archive.ubuntu.com/ubuntu/
-            curl --fail --silent --show-error --head --max-time 15 "$archive" >/dev/null
-            printf '%s\n' "$archive" | sudo tee "$mirror_list" >/dev/null
-            echo "Using the Ubuntu archive for browser dependencies."
-          fi
-
       - name: Run e2e flows
         env:
           BROWSER: ${{ matrix.browser }}
