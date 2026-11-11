@@ -1678,7 +1678,8 @@ expects to scroll that list rather than guess a search term. The open-ended cata
 game items, bank accounts) keep the 50-row default and rely on the hint. The marker
 values are registered in `krt-catalog-search.js`: `remote-materials`,
 `remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
-`remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
+`remote-locations`, and `remote-game-items` (the bookable-item picker of the inventory item mode,
+the minimum stock levels and the supply need, pledge and recorded-donation forms — the
 one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated (full set) backend
 `/api/v1/game-items`, REQ-INV-029; its options and the orders item picker's are labelled with a
 component's size, grade and class, REQ-INV-064). Each marker carries its kind-specific default
@@ -1692,8 +1693,11 @@ programmatic fills use `krtCombobox.setValue(value, label, data?)` — in remote
 material + location pickers and its item-mode game-item picker, the job-order create/edit material
 lines (server-rendered **and** JS-built rows), the refinery create/details input-material pickers,
 the Umbuchen target-location pickers, the production modal's book-in location picker
-(REQ-INV-032), the `/inventory/material` navigate select and the admin material-alias pickers; the
-orders item picker already used the component's `remoteSource` API.
+(REQ-INV-032), the `/inventory/material` navigate select, the admin material-alias pickers and the
+supply need, pledge and recorded-donation item pickers (REQ-SUP-003); the orders item picker
+already used the component's `remoteSource` API. A native `form.reset()` keeps a combobox's hidden
+value while it empties the visible text, so a form that resets before it opens clears its
+comboboxes through `setValue('')` as well (the supply forms' `resetForm`).
 
 **Free-text terms cross the frontend→backend hop as URI-template variables, encoded exactly once
 (binding).** A page-controller relay that forwards a free-text search term (`q` / `query` /

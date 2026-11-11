@@ -65,12 +65,6 @@ class BlueprintRepositoryTest {
   }
 
   @Test
-  void findItemsWithActiveBlueprint_executesAgainstPostgresForBothSearchShapes() {
-    assertNotNull(blueprintRepository.findItemsWithActiveBlueprint("", PageRequest.of(0, 25)));
-    assertNotNull(blueprintRepository.findItemsWithActiveBlueprint("drive", PageRequest.of(0, 25)));
-  }
-
-  @Test
   @Transactional
   void findActiveIdNameRows_listsALiveRecipeBeforeARetiredOneOfTheSameName() {
     Blueprint retired = blueprint("Aaa Repository Order Pistol");

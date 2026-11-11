@@ -44,18 +44,6 @@ import org.springframework.stereotype.Repository;
 public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
 
   /**
-   * The {@code WHERE} clause of the Lager item picker over a game item aliased {@code gi}: an
-   * output of a live active blueprint, itself listed, whose name contains {@code :q}.
-   */
-  String BOOKABLE_ITEM_FILTER =
-      " EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL"
-          + " AND"
-          + LISTED_BLUEPRINT
-          + ") AND"
-          + LISTED_ITEM
-          + "AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'";
-
-  /**
    * The {@code WHERE} clause of the item-order picker over a game item aliased {@code gi}: an
    * output of a live active blueprint with a resolved RESOURCE ingredient, itself listed, whose
    * name contains {@code :q}.
@@ -222,26 +210,6 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
               + " WHERE"
               + ORDERABLE_ITEM_FILTER)
   Page<GameItem> findOrderableItems(@Param("q") String q, Pageable pageable);
-
-  /**
-   * Pages the distinct game items bookable as Lager item stock: outputs of at least one active
-   * blueprint (REQ-INV-029), the items and blueprints the P4K retired left out (REQ-P4K-013); a
-   * superset of {@link #findOrderableItems(String, Pageable)}.
-   *
-   * @param q case-insensitive item-name substring; must be non-null ({@code ""} = no filter)
-   * @param pageable page request (whitelisted {@code name} / {@code id} sort)
-   * @return a page of game items with at least one active blueprint
-   */
-  @Query(
-      value =
-          "SELECT gi FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi"
-              + " LEFT JOIN FETCH gi.manufacturer WHERE"
-              + BOOKABLE_ITEM_FILTER,
-      countQuery =
-          "SELECT COUNT(gi) FROM de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem gi"
-              + " WHERE"
-              + BOOKABLE_ITEM_FILTER)
-  Page<GameItem> findItemsWithActiveBlueprint(@Param("q") String q, Pageable pageable);
 
   /**
    * Projects active blueprint recipes to output name, Wiki key, manufacturer name, output-item id
