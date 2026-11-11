@@ -597,6 +597,36 @@ class DataExportEndStateTest {
         UUID.randomUUID(),
         holderId,
         subject.getId());
+    UUID recipientId = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order_money_recipient (id, order_id, user_id, active) VALUES (?, ?, ?,"
+            + " true)",
+        recipientId,
+        orderId,
+        subject.getId());
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_operation
+            (id, order_id, operation_id, holder_id, actor_id, selection_kind,
+             bank_handling, amount, recorded_at, kind, recipient_id, new_provision, fee_rate, fee)
+        VALUES (?, ?, ?, ?, ?, 'EXISTING', false, 3, now() + interval '1 second',
+             'PURPOSE_HANDOVER', ?, 0, 0, 0)
+        """,
+        UUID.randomUUID(),
+        orderId,
+        UUID.randomUUID(),
+        holderId,
+        subject.getId(),
+        recipientId);
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_target_change
+            (id, order_id, actor_id, previous_target, target, recorded_at)
+        VALUES (?, ?, ?, 85, 80, now())
+        """,
+        UUID.randomUUID(),
+        orderId,
+        subject.getId());
   }
 
   private JobOrder jobOrder(String handle) {

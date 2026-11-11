@@ -260,8 +260,8 @@ and active-support unit work are independent of command authority, and creation 
 created-order identity. A managed Chromium journey uses distinct requester and processor accounts:
 it rejects an unrelated live room, observes peer queue updates without reload, preserves an open
 personal-note draft and its independent version, then saves and applies the deferred detail update.
-The internal Bank-free checkpoint adds aUEC creation, reported amounts and submitted-operation
-recovery to the same workspace.
+The internal Bank-free checkpoint adds aUEC creation, reported amounts, immediate money movements,
+target and information edits, and submitted-operation recovery to the same workspace.
 
 All kinds share the overview and a type filter. Its scopes are Meine (requesting units),
 Ich bearbeite (personal Bearbeiter), Zu bearbeiten (responsible or supporting own units under

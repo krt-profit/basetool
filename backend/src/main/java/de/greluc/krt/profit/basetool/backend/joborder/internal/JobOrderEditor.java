@@ -37,7 +37,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -88,19 +90,36 @@ public class JobOrderEditor {
    */
   @Transactional(propagation = Propagation.MANDATORY)
   <T> T editMoney(UUID id, Function<JobOrder, MoneyEdit<T>> mutation) {
+    return editMoney(id, _ -> false, (order, _) -> mutation.apply(order));
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  <T> T editMoney(
+      UUID id,
+      Predicate<JobOrder> needsQueue,
+      BiFunction<JobOrder, Boolean, MoneyEdit<T>> mutation) {
     profitHierarchy.lockForOrderWrite();
-    Entities.require(jobOrderRepository.lockForScopedEdit(id), () -> "JobOrder not found: " + id);
     JobOrder order =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    authorizeMoney(order);
+    boolean queueLocked = needsQueue.test(order);
+    if (queueLocked) {
+      jobOrderRepository.lockPriorityQueueRows();
+    }
+    Entities.require(jobOrderRepository.lockForScopedEdit(id), () -> "JobOrder not found: " + id);
     entityManager.refresh(order);
+    authorizeMoney(order);
+    MoneyEdit<T> result = mutation.apply(order, queueLocked);
+    recordOutcome(result.edit());
+    return result.result();
+  }
+
+  private void authorizeMoney(JobOrder order) {
     if (!jobOrderAccessPolicy.canSeeJobOrder(order)) {
       throw new AccessDeniedException("Caller may not read this order.");
     }
     JobOrderMoneyQueries.requireMoneyKind(order);
     responsibilityGuard.assertWritable(order);
-    MoneyEdit<T> result = mutation.apply(order);
-    recordOutcome(result.edit());
-    return result.result();
   }
 
   /**

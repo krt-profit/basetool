@@ -96,7 +96,7 @@ public class JobOrderAccessPolicy
         || (order.getType() == JobOrderType.AUEC
             && authHelper
                 .currentUserId()
-                .map(caller -> jobOrderRepository.hasMoneyHolderReadGrant(order.getId(), caller))
+                .map(caller -> jobOrderRepository.hasMoneyPersonalReadGrant(order.getId(), caller))
                 .orElse(false));
   }
 

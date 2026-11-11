@@ -24,15 +24,22 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Recorded result of one accepted provision attempt.
+ * Recorded result of one accepted money operation.
  *
  * @param operationId submitted logical identity
- * @param holderId credited order-local holder
- * @param amount exact credited whole aUEC
+ * @param holderId credited provision holder or debited movement holder
+ * @param amount exact net whole aUEC
  * @param bankHandling the submitted choice
  * @param recordedAt the booking time
  * @param holderName the permitted current holder label
  * @param actorName the permitted current original actor label
+ * @param kind the recorded purpose
+ * @param destinationHolderId original receiving collection holder, if any
+ * @param recipientId original requester designation, if any
+ * @param recipientName the permitted destination label
+ * @param fee exact fee paid by the order
+ * @param rate the retained fee rate for a movement
+ * @param provision new money supplied in this operation
  */
 public record JobOrderMoneyOutcome(
     UUID operationId,
@@ -41,10 +48,20 @@ public record JobOrderMoneyOutcome(
     boolean bankHandling,
     Instant recordedAt,
     @Nullable String holderName,
-    @Nullable String actorName) {
+    @Nullable String actorName,
+    JobOrderMoneyKind kind,
+    @Nullable UUID destinationHolderId,
+    @Nullable UUID recipientId,
+    @Nullable String recipientName,
+    String fee,
+    @Nullable String rate,
+    String provision) {
 
   static JobOrderMoneyOutcome of(
-      JobOrderMoneyOperation operation, @Nullable String holderName, @Nullable String actorName) {
+      JobOrderMoneyOperation operation,
+      @Nullable String holderName,
+      @Nullable String actorName,
+      @Nullable String recipientName) {
     return new JobOrderMoneyOutcome(
         operation.getOperationId(),
         operation.getHolderId(),
@@ -52,6 +69,13 @@ public record JobOrderMoneyOutcome(
         operation.isBankHandling(),
         operation.getRecordedAt(),
         holderName,
-        actorName);
+        actorName,
+        operation.getKind(),
+        operation.getDestinationHolderId(),
+        operation.getRecipientId(),
+        recipientName,
+        operation.feeAmount().toPlainString(),
+        operation.getFeeRate() == null ? null : operation.getFeeRate().toPlainString(),
+        operation.providedAmount().toPlainString());
   }
 }

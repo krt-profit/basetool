@@ -130,6 +130,12 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private Long lifecycleVersion = 0L;
 
+  /** The independently observed contact and comment revision of an aUEC order. */
+  @Column(name = "money_information_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  @Builder.Default
+  private long moneyInformationVersion = 0L;
+
   /**
    * Exclusive order kind: raw materials, finished items, or an independently tracked net aUEC
    * amount.

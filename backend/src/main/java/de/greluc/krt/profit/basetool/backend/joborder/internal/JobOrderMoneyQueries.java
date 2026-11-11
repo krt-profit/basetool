@@ -26,14 +26,13 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -55,9 +54,13 @@ public class JobOrderMoneyQueries {
   private final JobOrderMoneyOperationRepository operations;
   private final JobOrderMoneyHolders holderChoices;
   private final AuthHelperService auth;
+  private final JobOrderMoneyAccess moneyAccess;
+  private final JobOrderMoneyLedger ledger;
+  private final JobOrderMoneyRecipients recipients;
+  private final JobOrderMoneyTargetChangeRepository targetChanges;
 
   /**
-   * Reconstructs current reported amounts from effective provisions.
+   * Reconstructs current reported amounts from effective monetary facts.
    *
    * @param orderId the aUEC order
    * @return the current money view
@@ -65,21 +68,15 @@ public class JobOrderMoneyQueries {
   public JobOrderMoneyView getMoney(UUID orderId) {
     JobOrder order = requireReadableMoneyOrder(orderId);
     JobOrderMoneyTarget target = targets.findById(orderId).orElseThrow();
-    List<JobOrderMoneyOperation> facts =
-        operations.findAllByOrderIdOrderByRecordedAtAscIdAsc(orderId);
-    List<JobOrderMoneyHolder> identities = holders.findAllByOrderIdOrderById(orderId);
-    Map<UUID, JobOrderMoneyHolder> byId =
-        identities.stream()
-            .collect(
-                Collectors.toMap(
-                    holder -> Objects.requireNonNull(holder.getId()), Function.identity()));
-    Map<UUID, BigDecimal> booked = new HashMap<>();
-    for (JobOrderMoneyOperation operation : facts) {
-      booked.merge(
-          canonicalId(byId, operation.getHolderId()), operation.getAmount(), BigDecimal::add);
-    }
-    BigDecimal total = booked.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-    Map<UUID, String> names = peopleNames(identities, facts);
+    var booked = ledger.read(orderId);
+    List<JobOrderMoneyHolder> identities =
+        booked.identities().values().stream()
+            .sorted(Comparator.comparing(JobOrderMoneyHolder::getId))
+            .toList();
+    Map<UUID, String> names = peopleNames(identities, booked.facts());
+    List<JobOrderMoneyRecipientView> designations = recipients.views(orderId);
+    Map<UUID, JobOrderMoneyRecipientView> recipientsById =
+        designations.stream().collect(Collectors.toMap(JobOrderMoneyRecipientView::id, r -> r));
     List<JobOrderMoneyHolderView> rows =
         identities.stream()
             .filter(holder -> holder.getMergedIntoId() == null)
@@ -88,28 +85,81 @@ public class JobOrderMoneyQueries {
                     Objects.requireNonNull(holder.getId()),
                     holder.getUserId(),
                     label(holder, names),
-                    booked.getOrDefault(holder.getId(), BigDecimal.ZERO).toPlainString(),
+                    booked.balance(holder.getId()).toPlainString(),
                     holder.getRevision()))
             .toList();
-    List<JobOrderMoneyOutcome> history = history(byId, facts, names);
-    boolean validResponsibility = !access.responsibilityInvalid(order);
-    boolean self =
-        validResponsibility
-            && order.getStatus().isActive()
-            && auth.currentUserId().flatMap(holderChoices::activeUser).isPresent();
-    String requested = target.getAmount().toPlainString();
+    List<JobOrderMoneyOutcome> history =
+        booked.facts().stream()
+            .map(fact ->
+                JobOrderMoneyOutcome.of(
+                    fact,
+                    label(booked.holder(fact.getHolderId()), names),
+                    fact.getActorId() == null ? null : names.get(fact.getActorId()),
+                    destinationName(fact, booked, names, recipientsById)))
+            .toList();
+    boolean validResponsibility = !responsibilityInvalid(order);
+    boolean activeAccount = auth.currentUserId().flatMap(holderChoices::activeUser).isPresent();
+    boolean self = validResponsibility && activeAccount && order.getStatus().isActive();
+    boolean unitWriter = validResponsibility && activeAccount && moneyAccess.unitWriter(order);
+    BigDecimal outstanding = target.getAmount().subtract(booked.handedOver());
     return new JobOrderMoneyView(
-        requested,
+        target.getAmount().toPlainString(),
         Objects.requireNonNull(target.getVersion()),
-        total.toPlainString(),
-        total.toPlainString(),
-        BigDecimal.ZERO.toPlainString(),
-        requested,
+        booked.provided().toPlainString(),
+        booked.holdings().toPlainString(),
+        booked.handedOver().toPlainString(),
+        outstanding.max(BigDecimal.ZERO).toPlainString(),
         rows,
         history,
         self,
-        self && access.canTransferResponsibility(order),
-        validResponsibility && auth.isAdmin() && facts.isEmpty());
+        self && moneyAccess.responsible(order),
+        validResponsibility && auth.isAdmin() && booked.facts().isEmpty(),
+        booked.fees().toPlainString(),
+        outstanding.negate().max(BigDecimal.ZERO).toPlainString(),
+        designations,
+        self && unitWriter,
+        unitWriter,
+        unitWriter,
+        order.getMoneyInformationVersion(),
+        self && moneyAccess.responsible(order),
+        self && moneyAccess.requester(order),
+        targetHistory(orderId));
+  }
+
+  private List<JobOrderMoneyTargetChangeView> targetHistory(UUID orderId) {
+    List<JobOrderMoneyTargetChange> changes =
+        targetChanges.findAllByOrderIdOrderByRecordedAtAscIdAsc(orderId);
+    Map<UUID, String> names =
+        holderChoices.namesOf(
+            changes.stream()
+                .map(JobOrderMoneyTargetChange::getActorId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
+    return changes.stream()
+        .map(change ->
+            new JobOrderMoneyTargetChangeView(
+                Objects.requireNonNull(change.getId()),
+                change.getPreviousTarget().toPlainString(),
+                change.getTarget().toPlainString(),
+                change.getRecordedAt(),
+                change.getActorId() == null ? null : names.get(change.getActorId())))
+        .toList();
+  }
+
+  private static @Nullable String destinationName(
+      JobOrderMoneyOperation operation,
+      JobOrderMoneyLedger.Ledger booked,
+      Map<UUID, String> names,
+      Map<UUID, JobOrderMoneyRecipientView> designations) {
+    UUID destinationId = operation.getDestinationHolderId();
+    if (destinationId != null) {
+      return label(booked.holder(destinationId), names);
+    }
+    UUID recipientId = operation.getRecipientId();
+    return recipientId == null
+        ? null
+        : Objects.requireNonNull(designations.get(recipientId)).name();
   }
 
   private Map<UUID, String> peopleNames(
@@ -128,32 +178,12 @@ public class JobOrderMoneyQueries {
     return holderChoices.namesOf(ids);
   }
 
-  private static List<JobOrderMoneyOutcome> history(
-      Map<UUID, JobOrderMoneyHolder> byId,
-      List<JobOrderMoneyOperation> facts,
-      Map<UUID, String> names) {
-    return facts.stream()
-        .map(operation ->
-            JobOrderMoneyOutcome.of(
-                operation,
-                label(
-                    Objects.requireNonNull(byId.get(canonicalId(byId, operation.getHolderId()))),
-                    names),
-                operation.getActorId() == null ? null : names.get(operation.getActorId())))
-        .toList();
-  }
-
-  private static UUID canonicalId(Map<UUID, JobOrderMoneyHolder> byId, UUID id) {
-    UUID canonical = Objects.requireNonNull(byId.get(id)).getMergedIntoId();
-    return canonical == null ? id : canonical;
-  }
-
   private static @Nullable String label(JobOrderMoneyHolder holder, Map<UUID, String> names) {
     return holder.getUserId() == null ? holder.getAccountlessName() : names.get(holder.getUserId());
   }
 
   /**
-   * Recovers a decided provision without performing a write.
+   * Recovers a decided money operation without performing a write.
    *
    * @param orderId the aUEC order whose current read access governs lookup
    * @param operationId the caller's logical operation identity
@@ -197,7 +227,46 @@ public class JobOrderMoneyQueries {
     JobOrderMoneyHolder current =
         aliasTarget == null ? holder : holders.findById(aliasTarget).orElseThrow();
     return JobOrderMoneyOutcome.of(
-        operation, holderChoices.nameOf(current), holderChoices.nameOf(operation.getActorId()));
+        operation,
+        holderChoices.nameOf(current),
+        holderChoices.nameOf(operation.getActorId()),
+        movementDestinationName(operation));
+  }
+
+  private @Nullable String movementDestinationName(JobOrderMoneyOperation operation) {
+    UUID destinationId = operation.getDestinationHolderId();
+    if (destinationId != null) {
+      JobOrderMoneyHolder destination = holders.findById(destinationId).orElseThrow();
+      UUID canonicalId = destination.getMergedIntoId();
+      return holderChoices.nameOf(
+          canonicalId == null ? destination : holders.findById(canonicalId).orElseThrow());
+    }
+    UUID recipientId = operation.getRecipientId();
+    return recipientId == null
+        ? null
+        : recipients.party(recipients.require(operation.getOrderId(), recipientId)).name();
+  }
+
+  /**
+   * Searches eligible accounts for a caller authorized to designate a requester recipient.
+   *
+   * @param orderId the owning order
+   * @param query optional name fragment
+   * @return eligible recipient accounts
+   */
+  public List<JobOrderMoneyHolderCandidate> recipientCandidates(
+      UUID orderId, @Nullable String query) {
+    JobOrder order = requireReadableMoneyOrder(orderId);
+    moneyAccess.requireActiveActor();
+    moneyAccess.requireUnitWriter(order);
+    if (responsibilityInvalid(order) || !order.getStatus().isActive()) {
+      throw new AccessDeniedException("Caller may not designate a recipient for this order.");
+    }
+    return holderChoices.candidates(query);
+  }
+
+  boolean responsibilityInvalid(JobOrder order) {
+    return access.responsibilityInvalid(order);
   }
 
   JobOrder requireReadableMoneyOrder(UUID orderId) {

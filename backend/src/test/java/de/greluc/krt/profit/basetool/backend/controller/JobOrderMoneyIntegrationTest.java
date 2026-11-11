@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAutho
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -75,6 +76,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Exercises durable order money through authenticated HTTP against real PostgreSQL. */
@@ -434,6 +436,916 @@ class JobOrderMoneyIntegrationTest {
         .andExpect(jsonPath("$.bankHandling").value(false));
   }
 
+  @Test
+  void collectsTenMillionAndCompletesOnlyOnTheLastRequesterHandover() throws Exception {
+    String rateKey = "operation.transfer_fee_rate";
+    String originalRate =
+        jdbc.queryForObject(
+            "SELECT setting_value FROM system_setting WHERE setting_key = ?",
+            String.class,
+            rateKey);
+    jdbc.update("UPDATE system_setting SET setting_value = '0' WHERE setting_key = ?", rateKey);
+    try {
+      UUID order = createOrder();
+      assertMoney(order, "0", "0", "0", "10000000", "OPEN");
+      String holderA = providedHolder(order, reader(), "4000000");
+      assertMoney(order, "4000000", "4000000", "0", "10000000", "IN_PROGRESS");
+      assertHeld(order, holderA, "4000000");
+      String holderB = providedHolder(order, writer(), "6000000");
+      assertMoney(order, "10000000", "10000000", "0", "10000000", "IN_PROGRESS");
+      assertHeld(order, holderA, "4000000");
+      assertHeld(order, holderB, "6000000");
+
+      String holderC =
+          move(
+                  order,
+                  "COLLECTION",
+                  holderA,
+                  1,
+                  "4000000",
+                  Map.of("destinationName", "Collection C", "destinationVersion", 0))
+              .get("destinationHolderId")
+              .asString();
+      assertMoney(order, "10000000", "10000000", "0", "10000000", "IN_PROGRESS");
+      assertHeld(order, holderA, "0");
+      assertHeld(order, holderB, "6000000");
+      assertHeld(order, holderC, "4000000");
+
+      move(
+          order,
+          "COLLECTION",
+          holderB,
+          1,
+          "6000000",
+          Map.of("destinationHolderId", holderC, "destinationVersion", 1));
+      assertMoney(order, "10000000", "10000000", "0", "10000000", "IN_PROGRESS");
+      assertHeld(order, holderA, "0");
+      assertHeld(order, holderB, "0");
+      assertHeld(order, holderC, "10000000");
+
+      var designated =
+          mvc.perform(
+                  post("/api/v1/orders/{id}/money/recipients", order)
+                      .with(writer())
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(json.writeValueAsString(Map.of("name", "Requester R"))))
+              .andExpect(status().isCreated())
+              .andReturn();
+      String recipient =
+          json.readTree(designated.getResponse().getContentAsString()).get("id").asString();
+      move(
+          order,
+          "HANDOVER",
+          holderC,
+          2,
+          "3000000",
+          Map.of("recipientId", recipient, "targetVersion", 0));
+      assertMoney(order, "10000000", "7000000", "3000000", "7000000", "IN_PROGRESS");
+      assertHeld(order, holderC, "7000000");
+
+      move(
+          order,
+          "HANDOVER",
+          holderC,
+          3,
+          "7000000",
+          Map.of("recipientId", recipient, "targetVersion", 0));
+      assertMoney(order, "10000000", "0", "10000000", "0", "COMPLETED");
+      assertHeld(order, holderA, "0");
+      assertHeld(order, holderB, "0");
+      assertHeld(order, holderC, "0");
+      mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+          .andExpect(jsonPath("$.holders.length()").value(3))
+          .andExpect(jsonPath("$.history.length()").value(6))
+          .andExpect(jsonPath("$.fees").value("0"));
+    } finally {
+      jdbc.update(
+          "UPDATE system_setting SET setting_value = ? WHERE setting_key = ?",
+          originalRate,
+          rateKey);
+    }
+  }
+
+  @Test
+  void fourFeeFundedTransfersReconcileExactly() throws Exception {
+    withFeeRate(
+        "0.005",
+        () -> {
+          UUID order = createOrder();
+          String a = providedHolder(order, reader(), "4000000");
+          String b = providedHolder(order, writer(), "6000000");
+          Map<String, ?> first =
+              movementTerms(
+                  "COLLECTION",
+                  a,
+                  1,
+                  "4000000",
+                  "0.005",
+                  Map.of(
+                      "destinationName",
+                      "Collecting account",
+                      "destinationVersion",
+                      0,
+                      "provision",
+                      "20000"));
+          String c = submitMovement(order, reader(), first).get("destinationHolderId").asString();
+          submitMovement(
+              order,
+              writer(),
+              movementTerms(
+                  "COLLECTION",
+                  b,
+                  1,
+                  "6000000",
+                  "0.005",
+                  Map.of("destinationHolderId", c, "destinationVersion", 1, "provision", "30000")));
+          assertMoney(order, "10050000", "10000000", "0", "10000000", "IN_PROGRESS");
+          String recipient = designateRecipient(order, writer(), Map.of("name", "Net requester"));
+          Map<String, ?> third =
+              movementTerms(
+                  "HANDOVER",
+                  c,
+                  2,
+                  "3000000",
+                  "0.005",
+                  Map.of("recipientId", recipient, "targetVersion", 0, "provision", "15000"));
+          JsonNode paidThird = submitMovement(order, writer(), third);
+          assertThat(paidThird.path("fee").asString()).isEqualTo("15000");
+          assertMoney(order, "10065000", "7000000", "3000000", "7000000", "IN_PROGRESS");
+          submitMovement(
+              order,
+              writer(),
+              movementTerms(
+                  "HANDOVER",
+                  c,
+                  3,
+                  "7000000",
+                  "0.005",
+                  Map.of("recipientId", recipient, "targetVersion", 0, "provision", "35000")));
+          assertMoney(order, "10100000", "0", "10000000", "0", "COMPLETED");
+          mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.fees").value("100000"))
+              .andExpect(jsonPath("$.history.length()").value(6));
+          withFeeRate(
+              "0.01",
+              () -> assertThat(submitMovement(order, writer(), third)).isEqualTo(paidThird));
+          assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 4);
+          assertAuditCount(order, "JOB_ORDER_COMPLETED", 1);
+        });
+  }
+
+  @Test
+  void onlyExplicitAuthorisedProvisionCanFillTheDeficitInTheSameOperation() throws Exception {
+    withFeeRate(
+        "0",
+        () -> {
+          UUID order = createOrder();
+          String source = providedHolder(order, reader(), "2000000");
+          Map<String, ?> unbacked =
+              movementTerms(
+                  "COLLECTION",
+                  source,
+                  1,
+                  "5000000",
+                  "0",
+                  Map.of("destinationUserId", writer, "destinationVersion", 0));
+          mvc.perform(movementRequest(order, reader(), unbacked, true))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.shortfall").value("3000000"));
+          mvc.perform(movementRequest(order, reader(), unbacked, false))
+              .andExpect(status().isConflict())
+              .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+          assertHeld(order, source, "2000000");
+          mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+              .andExpect(jsonPath("$.holders.length()").value(1))
+              .andExpect(jsonPath("$.history.length()").value(1));
+
+          Map<String, ?> covered =
+              movementTerms(
+                  "COLLECTION",
+                  source,
+                  1,
+                  "5000000",
+                  "0",
+                  Map.of(
+                      "destinationName",
+                      "New holder",
+                      "destinationVersion",
+                      0,
+                      "provision",
+                      "3000000"));
+          JsonNode booked = submitMovement(order, reader(), covered);
+          assertThat(booked.path("provision").asString()).isEqualTo("3000000");
+          assertHeld(order, source, "0");
+          assertHeld(order, booked.path("destinationHolderId").asString(), "5000000");
+          assertMoney(order, "5000000", "5000000", "0", "10000000", "IN_PROGRESS");
+        });
+  }
+
+  @Test
+  void linkedRequesterRecipientCanRecordAnIncomingPaymentButNotInventForeignFunds()
+      throws Exception {
+    UUID order = createOrder();
+    UUID unrelated = createOrder();
+    var payee = signedInMember(unitless);
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(payee))
+        .andExpect(status().isForbidden());
+    String recipient = designateRecipient(order, writer(), Map.of("userId", unitless));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(payee))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canProvideSelf").value(true))
+        .andExpect(jsonPath("$.canDesignateRecipient").value(false));
+    mvc.perform(get("/api/v1/orders/{id}/money", unrelated).with(payee))
+        .andExpect(status().isForbidden());
+    String source = providedHolder(order, reader(), "5");
+    Map<String, ?> overdraw =
+        movementTerms(
+            "HANDOVER",
+            source,
+            1,
+            "6",
+            "0.005",
+            Map.of("recipientId", recipient, "targetVersion", 0, "provision", "1"));
+    mvc.perform(movementRequest(order, payee, overdraw, false)).andExpect(status().isForbidden());
+    JsonNode paid =
+        submitMovement(
+            order,
+            payee,
+            movementTerms(
+                "HANDOVER",
+                source,
+                1,
+                "5",
+                "0.005",
+                Map.of("recipientId", recipient, "targetVersion", 0)));
+    assertThat(paid.path("recipientId").asString()).isEqualTo(recipient);
+
+    mvc.perform(
+            delete("/api/v1/orders/{id}/money/recipients/{recipient}", order, recipient)
+                .with(writer()))
+        .andExpect(status().isNoContent());
+    String replacement =
+        designateRecipient(order, requesterWriter(), Map.of("name", "Replacement"));
+    assertThat(replacement).isNotEqualTo(recipient);
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(payee))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.netHandedOver").value("5"))
+        .andExpect(jsonPath("$.history[1].kind").value("HANDOVER"))
+        .andExpect(jsonPath("$.history[1].recipientId").value(recipient));
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertThat(moneyMoveNotices(reader(), order)).isEqualTo(1));
+    assertThat(moneyMoveNotices(payee, order)).isZero();
+  }
+
+  @Test
+  void sameHolderPurposeHandoverRequiresExplicitPurposeAndKeepsOverpaymentSeparate()
+      throws Exception {
+    UUID order = createOrder();
+    String source = providedHolder(order, reader(), "12000000");
+    String recipient = designateRecipient(order, writer(), Map.of("holderId", source));
+    Map<String, ?> invalid =
+        movementTerms(
+            "HANDOVER",
+            source,
+            1,
+            "11000000",
+            "0.005",
+            Map.of("recipientId", recipient, "targetVersion", 0));
+    mvc.perform(movementRequest(order, reader(), invalid, true)).andExpect(status().isBadRequest());
+    JsonNode delivered =
+        submitMovement(
+            order,
+            reader(),
+            movementTerms(
+                "PURPOSE_HANDOVER",
+                source,
+                1,
+                "11000000",
+                "0",
+                Map.of("recipientId", recipient, "targetVersion", 0)));
+    assertThat(delivered.path("fee").asString()).isEqualTo("0");
+    assertThat(delivered.path("provision").asString()).isEqualTo("0");
+    assertMoney(order, "12000000", "1000000", "11000000", "0", "COMPLETED");
+
+    mvc.perform(targetRequest(order, "12000000", 0))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.remaining").value("1000000"))
+        .andExpect(jsonPath("$.informationVersion").value(0));
+    assertMoney(order, "12000000", "1000000", "11000000", "1000000", "IN_PROGRESS");
+    mvc.perform(
+            patch("/api/v1/orders/{id}/money/information", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of("handle", "New contact", "comment", "Terms", "version", 0))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.targetVersion").value(1))
+        .andExpect(jsonPath("$.informationVersion").value(1));
+    mvc.perform(targetRequest(order, "8000000", 1))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.overpaid").value("3000000"))
+        .andExpect(jsonPath("$.informationVersion").value(1))
+        .andExpect(jsonPath("$.targetChanges.length()").value(2))
+        .andExpect(jsonPath("$.targetChanges[0].previousTarget").value("10000000"))
+        .andExpect(jsonPath("$.targetChanges[1].target").value("8000000"));
+    assertMoney(order, "12000000", "1000000", "11000000", "0", "COMPLETED");
+    mvc.perform(get("/api/v1/orders/{id}", order).with(reader()))
+        .andExpect(jsonPath("$.handle").value("New contact"));
+    mvc.perform(
+            put("/api/v1/orders/{id}/status", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"OPEN\",\"version\":4}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @Timeout(60)
+  void postgresSerializesCompetingDebitsAndKeepsAcceptedReplayExact() throws Exception {
+    UUID order = createOrder();
+    String source = providedHolder(order, reader(), "7");
+    Map<String, ?> winning =
+        movementTerms(
+            "COLLECTION",
+            source,
+            1,
+            "6",
+            "0.005",
+            Map.of("destinationName", "First collection", "destinationVersion", 0));
+    Map<String, ?> losing =
+        movementTerms(
+            "COLLECTION",
+            source,
+            1,
+            "6",
+            "0.005",
+            Map.of("destinationName", "Second collection", "destinationVersion", 0));
+    RaceResults race =
+        serializeBehind(
+            movementRequest(order, reader(), winning, false),
+            200,
+            movementRequest(order, writer(), losing, false));
+    assertThat(race.waiter().getResponse().getStatus()).isEqualTo(409);
+    mvc.perform(
+            get(
+                    "/api/v1/orders/{id}/money/operations/{operation}",
+                    order,
+                    losing.get("operationId"))
+                .with(writer()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+    JsonNode original = json.readTree(race.first().getResponse().getContentAsByteArray());
+    assertThat(submitMovement(order, reader(), winning)).isEqualTo(original);
+    assertHeld(order, source, "1");
+    assertHeld(order, original.path("destinationHolderId").asString(), "6");
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+        .andExpect(jsonPath("$.history.length()").value(2))
+        .andExpect(jsonPath("$.holders.length()").value(2));
+    assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 1);
+  }
+
+  @Test
+  @Timeout(60)
+  void postgresTargetChangeAndCancellationDefeatStaleHandoverWithoutAnyDebit() throws Exception {
+    withFeeRate(
+        "0",
+        () -> {
+          UUID order = createOrder();
+          String source = providedHolder(order, reader(), "10000000");
+          String recipient = designateRecipient(order, writer(), Map.of("name", "Requester"));
+          Map<String, ?> stale =
+              movementTerms(
+                  "HANDOVER",
+                  source,
+                  1,
+                  "10000000",
+                  "0",
+                  Map.of("recipientId", recipient, "targetVersion", 0));
+          RaceResults targetRace =
+              serializeBehind(
+                  targetRequest(order, "12000000", 0),
+                  200,
+                  movementRequest(order, reader(), stale, false));
+          assertThat(targetRace.waiter().getResponse().getStatus()).isEqualTo(409);
+          assertMoney(order, "10000000", "10000000", "0", "12000000", "IN_PROGRESS");
+          Map<String, ?> correct =
+              movementTerms(
+                  "HANDOVER",
+                  source,
+                  1,
+                  "10000000",
+                  "0",
+                  Map.of("recipientId", recipient, "targetVersion", 1));
+          var cancel =
+              put("/api/v1/orders/{id}/status", order)
+                  .with(writer())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"status\":\"CANCELLED\",\"version\":1}");
+          RaceResults cancelRace =
+              serializeBehind(cancel, 200, movementRequest(order, reader(), correct, false));
+          assertThat(cancelRace.waiter().getResponse().getStatus()).isEqualTo(409);
+          assertMoney(order, "10000000", "10000000", "0", "12000000", "CANCELLED");
+          assertHeld(order, source, "10000000");
+          assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 0);
+          assertAuditCount(order, "JOB_ORDER_MONEY_TARGET_CHANGED", 1);
+        });
+  }
+
+  @Test
+  void failedMovementAuditRollsBackDebitDeliveryAndAutoCompletionTogether() throws Exception {
+    withFeeRate(
+        "0",
+        () -> {
+          UUID order = createOrder();
+          String source = providedHolder(order, reader(), "10000000");
+          String recipient = designateRecipient(order, writer(), Map.of("name", "Requester"));
+          Map<String, ?> terms =
+              movementTerms(
+                  "HANDOVER",
+                  source,
+                  1,
+                  "10000000",
+                  "0",
+                  Map.of("recipientId", recipient, "targetVersion", 0));
+          String constraint = "audit_move_" + order.toString().replace("-", "");
+          jdbc.execute(
+              "ALTER TABLE audit_event ADD CONSTRAINT "
+                  + constraint
+                  + " CHECK (subject_id IS DISTINCT FROM '"
+                  + order
+                  + "'::uuid OR event_type <> 'JOB_ORDER_MONEY_MOVED') NOT VALID");
+          try {
+            mvc.perform(movementRequest(order, reader(), terms, false))
+                .andExpect(status().isConflict());
+          } finally {
+            jdbc.execute("ALTER TABLE audit_event DROP CONSTRAINT " + constraint);
+          }
+          assertMoney(order, "10000000", "10000000", "0", "10000000", "IN_PROGRESS");
+          assertAuditCount(order, "JOB_ORDER_COMPLETED", 0);
+          mvc.perform(
+                  get(
+                          "/api/v1/orders/{id}/money/operations/{operation}",
+                          order,
+                          terms.get("operationId"))
+                      .with(reader()))
+              .andExpect(status().isNotFound());
+          submitMovement(order, reader(), terms);
+          assertMoney(order, "10000000", "0", "10000000", "0", "COMPLETED");
+          assertAuditCount(order, "JOB_ORDER_COMPLETED", 1);
+          assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 1);
+        });
+  }
+
+  @Test
+  @Timeout(60)
+  void postgresIdenticalMovementReplayAndChangedFeeBasisPreserveOneEffect() throws Exception {
+    UUID order = createOrder();
+    String source = providedHolder(order, reader(), "3000000");
+    Map<String, ?> same =
+        movementTerms(
+            "COLLECTION",
+            source,
+            1,
+            "1000000",
+            "0.005",
+            Map.of("destinationName", "Collecting account", "destinationVersion", 0));
+    RaceResults race =
+        serializeBehind(
+            movementRequest(order, reader(), same, false),
+            200,
+            movementRequest(order, reader(), same, false));
+    assertThat(race.waiter().getResponse().getStatus()).isEqualTo(200);
+    JsonNode original = json.readTree(race.first().getResponse().getContentAsByteArray());
+    assertThat(json.readTree(race.waiter().getResponse().getContentAsByteArray()))
+        .isEqualTo(original);
+    assertThat(original.path("fee").asString()).isEqualTo("5000");
+    String collected = original.path("destinationHolderId").asString();
+    Map<String, ?> newAttempt =
+        movementTerms(
+            "COLLECTION",
+            source,
+            2,
+            "1000000",
+            "0.005",
+            Map.of("destinationHolderId", collected, "destinationVersion", 1));
+    mvc.perform(movementRequest(order, reader(), newAttempt, true))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.fee").value("5000"));
+    withFeeRate(
+        "0.01",
+        () -> {
+          mvc.perform(movementRequest(order, reader(), newAttempt, false))
+              .andExpect(status().isConflict())
+              .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+          assertThat(submitMovement(order, reader(), same)).isEqualTo(original);
+        });
+    assertHeld(order, source, "1995000");
+    assertHeld(order, collected, "1000000");
+    assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 1);
+  }
+
+  @Test
+  void movementReplayRequiresCurrentAuthorityButReadersMayRecoverAnOutcome() throws Exception {
+    UUID order = createOrder();
+    String source = providedHolder(order, reader(), "10");
+    Map<String, ?> original =
+        movementTerms(
+            "COLLECTION",
+            source,
+            1,
+            "5",
+            "0.005",
+            Map.of("destinationName", "Receiving account", "destinationVersion", 0));
+    JsonNode accepted = submitMovement(order, writer(), original);
+    mvc.perform(
+            patch("/api/v1/orders/{id}/responsible-org-unit", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of("responsibleOrgUnitId", profitRoot, "version", 0))))
+        .andExpect(status().isOk());
+    mvc.perform(movementRequest(order, writer(), original, false))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            get(
+                    "/api/v1/orders/{id}/money/operations/{operation}",
+                    order,
+                    accepted.path("operationId").asString())
+                .with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.amount").value("5"));
+    assertHeld(order, source, "5");
+    assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 1);
+  }
+
+  @Test
+  @Timeout(60)
+  void unauthorizedCompletionCandidateDoesNotWaitForAnUnrelatedQueueRow() throws Exception {
+    UUID order = createOrder();
+    UUID unrelated = createOrder();
+    String source = providedHolder(order, writer(), "11000000");
+    String recipient = designateRecipient(order, writer(), Map.of("name", "Requester"));
+    Map<String, ?> terms =
+        movementTerms(
+            "HANDOVER",
+            source,
+            1,
+            "10000000",
+            "0.005",
+            Map.of("recipientId", recipient, "targetVersion", 0));
+    try (var worker = Executors.newSingleThreadExecutor()) {
+      transactions.executeWithoutResult(_ -> {
+        jdbc.queryForObject(
+            "SELECT id FROM job_order WHERE id = ? FOR NO KEY UPDATE", UUID.class, unrelated);
+        try {
+          MvcResult forbidden =
+              worker
+                  .submit(() -> perform(movementRequest(order, reader(), terms, false)))
+                  .get(8, TimeUnit.SECONDS);
+          assertThat(forbidden.getResponse().getStatus()).isEqualTo(403);
+        } catch (Exception failure) {
+          throw new IllegalStateException(
+              "An unauthorized movement must not wait on the queue.", failure);
+        }
+      });
+    }
+    assertMoney(order, "11000000", "11000000", "0", "10000000", "IN_PROGRESS");
+  }
+
+  @Test
+  @Timeout(60)
+  void oppositeCollectionsAcquireTheSameAccountOrderAndRecheckBothHolders() throws Exception {
+    UUID order = createOrder();
+    String a = providedHolder(order, reader(), "10");
+    String b = providedHolder(order, writer(), "10");
+    Map<String, ?> forward =
+        movementTerms(
+            "COLLECTION",
+            a,
+            1,
+            "3",
+            "0.005",
+            Map.of("destinationHolderId", b, "destinationVersion", 1));
+    Map<String, ?> reverse =
+        movementTerms(
+            "COLLECTION",
+            b,
+            1,
+            "3",
+            "0.005",
+            Map.of("destinationHolderId", a, "destinationVersion", 1));
+    RaceResults race =
+        serializeBehind(
+            movementRequest(order, reader(), forward, false),
+            200,
+            movementRequest(order, writer(), reverse, false));
+    assertThat(race.waiter().getResponse().getStatus()).isEqualTo(409);
+    assertHeld(order, a, "7");
+    assertHeld(order, b, "13");
+    assertMoney(order, "20", "20", "0", "10000000", "IN_PROGRESS");
+    assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 1);
+  }
+
+  @Test
+  void aLowerFeeCannotLeaveAnExplicitlyFundedAttemptUnknownOrLaterBookIt() throws Exception {
+    UUID order = createOrder();
+    String source = providedHolder(order, reader(), "2000000");
+    Map<String, ?> terms =
+        movementTerms(
+            "COLLECTION",
+            source,
+            1,
+            "2000000",
+            "0.005",
+            Map.of(
+                "destinationName",
+                "Receiving account",
+                "destinationVersion",
+                0,
+                "provision",
+                "10000"));
+    mvc.perform(movementRequest(order, reader(), terms, true))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.fee").value("10000"))
+        .andExpect(jsonPath("$.shortfall").value("0"));
+    withFeeRate(
+        "0",
+        () ->
+            mvc.perform(movementRequest(order, reader(), terms, false))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED")));
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, terms.get("operationId"))
+                .with(reader()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+    mvc.perform(movementRequest(order, reader(), terms, false)).andExpect(status().isConflict());
+    assertHeld(order, source, "2000000");
+    assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 0);
+  }
+
+  @Test
+  @Timeout(60)
+  void terminalHandoverWaitsForButIsNotStaledByIndependentContactEdit() throws Exception {
+    withFeeRate(
+        "0",
+        () -> {
+          UUID order = createOrder();
+          String source = providedHolder(order, reader(), "10000000");
+          String recipient = designateRecipient(order, writer(), Map.of("name", "Requester"));
+          Map<String, ?> payment =
+              movementTerms(
+                  "HANDOVER",
+                  source,
+                  1,
+                  "10000000",
+                  "0",
+                  Map.of("recipientId", recipient, "targetVersion", 0));
+          var information =
+              patch("/api/v1/orders/{id}/money/information", order)
+                  .with(writer())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      json.writeValueAsString(
+                          Map.of(
+                              "handle",
+                              "Updated contact",
+                              "comment",
+                              "Independent",
+                              "version",
+                              0)));
+          RaceResults race =
+              serializeBehind(information, 200, movementRequest(order, reader(), payment, false));
+          assertThat(race.waiter().getResponse().getStatus()).isEqualTo(200);
+          assertMoney(order, "10000000", "0", "10000000", "0", "COMPLETED");
+          mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+              .andExpect(jsonPath("$.targetVersion").value(0))
+              .andExpect(jsonPath("$.informationVersion").value(1));
+          mvc.perform(get("/api/v1/orders/{id}", order).with(reader()))
+              .andExpect(jsonPath("$.handle").value("Updated contact"));
+        });
+  }
+
+  @Test
+  void retiringAQuotedPayeeLeavesARecoverableNoEffectDecision() throws Exception {
+    UUID order = createOrder();
+    String source = providedHolder(order, reader(), "10");
+    String recipient = designateRecipient(order, writer(), Map.of("name", "Requester"));
+    Map<String, ?> terms =
+        movementTerms(
+            "HANDOVER",
+            source,
+            1,
+            "5",
+            "0.005",
+            Map.of("recipientId", recipient, "targetVersion", 0));
+    mvc.perform(movementRequest(order, reader(), terms, true)).andExpect(status().isOk());
+    mvc.perform(
+            delete("/api/v1/orders/{id}/money/recipients/{recipient}", order, recipient)
+                .with(writer()))
+        .andExpect(status().isNoContent());
+    mvc.perform(movementRequest(order, reader(), terms, false))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, terms.get("operationId"))
+                .with(reader()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MONEY_PROVISION_REFUSED"));
+    assertHeld(order, source, "10");
+    assertAuditCount(order, "JOB_ORDER_MONEY_MOVED", 0);
+  }
+
+  private String designateRecipient(UUID order, RequestPostProcessor caller, Map<String, ?> terms)
+      throws Exception {
+    MvcResult result =
+        mvc.perform(
+                post("/api/v1/orders/{id}/money/recipients", order)
+                    .with(caller)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(terms)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsByteArray()).path("id").asString();
+  }
+
+  private JsonNode submitMovement(UUID order, RequestPostProcessor caller, Map<String, ?> terms)
+      throws Exception {
+    MvcResult result =
+        mvc.perform(movementRequest(order, caller, terms, false))
+            .andExpect(status().isOk())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsByteArray());
+  }
+
+  private static Map<String, ?> movementTerms(
+      String kind,
+      String source,
+      int sourceVersion,
+      String amount,
+      String rate,
+      Map<String, ?> destination) {
+    var body = new HashMap<String, Object>(destination);
+    body.putAll(
+        Map.of(
+            "operationId",
+            UUID.randomUUID(),
+            "kind",
+            kind,
+            "sourceHolderId",
+            source,
+            "sourceVersion",
+            sourceVersion,
+            "amount",
+            amount,
+            "rate",
+            rate,
+            "bankHandling",
+            false));
+    return body;
+  }
+
+  private MockHttpServletRequestBuilder movementRequest(
+      UUID order, RequestPostProcessor caller, Map<String, ?> terms, boolean preview) {
+    String path = "/api/v1/orders/{id}/money/movements" + (preview ? "/preview" : "");
+    return post(path, order)
+        .with(caller)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(json.writeValueAsString(terms));
+  }
+
+  private MockHttpServletRequestBuilder targetRequest(UUID order, String amount, long version) {
+    return patch("/api/v1/orders/{id}/money/target", order)
+        .with(writer())
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(json.writeValueAsString(Map.of("target", amount, "version", version)));
+  }
+
+  private void assertAuditCount(UUID order, String event, int count) {
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM audit_event WHERE subject_id = ? AND event_type = ?",
+                Integer.class,
+                order,
+                event))
+        .isEqualTo(count);
+  }
+
+  private int moneyMoveNotices(RequestPostProcessor user, UUID order) {
+    MvcResult result = perform(get("/api/v1/notifications").with(user));
+    assertThat(result.getResponse().getStatus()).isEqualTo(200);
+    int count = 0;
+    for (var notice : json.readTree(result.getResponse().getContentAsByteArray()).path("content")) {
+      if ("JOB_ORDER_MONEY_MOVED".equals(notice.path("type").asString())
+          && order.toString().equals(notice.path("entityId").asString())) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  private void withFeeRate(String rate, CheckedScenario scenario) throws Exception {
+    String key = "operation.transfer_fee_rate";
+    String original =
+        jdbc.queryForObject(
+            "SELECT setting_value FROM system_setting WHERE setting_key = ?", String.class, key);
+    jdbc.update("UPDATE system_setting SET setting_value = ? WHERE setting_key = ?", rate, key);
+    try {
+      scenario.run();
+    } finally {
+      jdbc.update(
+          "UPDATE system_setting SET setting_value = ? WHERE setting_key = ?", original, key);
+    }
+  }
+
+  @FunctionalInterface
+  private interface CheckedScenario {
+    void run() throws Exception;
+  }
+
+  private String providedHolder(UUID order, RequestPostProcessor caller, String amount)
+      throws Exception {
+    var result =
+        provision(order, caller, provisionTerms(UUID.randomUUID(), amount, 0))
+            .andExpect(status().isOk())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsString()).get("holderId").asString();
+  }
+
+  private JsonNode move(
+      UUID order,
+      String kind,
+      String sourceHolder,
+      int sourceVersion,
+      String amount,
+      Map<String, ?> destination)
+      throws Exception {
+    var body = new HashMap<String, Object>(destination);
+    body.putAll(
+        Map.of(
+            "operationId",
+            UUID.randomUUID(),
+            "kind",
+            kind,
+            "sourceHolderId",
+            sourceHolder,
+            "sourceVersion",
+            sourceVersion,
+            "amount",
+            amount,
+            "rate",
+            "0",
+            "bankHandling",
+            false));
+    var result =
+        mvc.perform(
+                post("/api/v1/orders/{id}/money/movements", order)
+                    .with(writer())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(body)))
+            .andExpect(status().isOk())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsString());
+  }
+
+  private void assertMoney(
+      UUID order,
+      String provided,
+      String held,
+      String handedOver,
+      String remaining,
+      String statusValue)
+      throws Exception {
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value(provided))
+        .andExpect(jsonPath("$.holdings").value(held))
+        .andExpect(jsonPath("$.netHandedOver").value(handedOver))
+        .andExpect(jsonPath("$.remaining").value(remaining));
+    mvc.perform(get("/api/v1/orders/{id}", order).with(reader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(statusValue));
+  }
+
+  private void assertHeld(UUID order, String holderId, String amount) throws Exception {
+    var result =
+        mvc.perform(get("/api/v1/orders/{id}/money", order).with(reader()))
+            .andExpect(status().isOk())
+            .andReturn();
+    var amounts = new ArrayList<String>();
+    for (JsonNode holder :
+        json.readTree(result.getResponse().getContentAsByteArray()).path("holders")) {
+      if (holderId.equals(holder.path("id").asString())) {
+        amounts.add(holder.path("amount").asString());
+      }
+    }
+    assertThat(amounts).containsExactly(amount);
+  }
+
   private UUID createOrder() throws Exception {
     String created =
         mvc.perform(
@@ -730,7 +1642,8 @@ class JobOrderMoneyIntegrationTest {
                         transactions.execute(transaction -> {
                           waiterPid.set(currentPid());
                           MvcResult response = perform(waiting);
-                          if (response.getResponse().getStatus() >= 400) {
+                          if (response.getResponse().getStatus() >= 400
+                              && !durableMoneyRefusal(response)) {
                             transaction.setRollbackOnly();
                           }
                           return response;
@@ -749,6 +1662,15 @@ class JobOrderMoneyIntegrationTest {
               }));
       return new RaceResults(pending.first(), pending.waiter().get(15, TimeUnit.SECONDS));
     }
+  }
+
+  private boolean durableMoneyRefusal(MvcResult response) {
+    return response.getResponse().getStatus() == 409
+        && "MONEY_PROVISION_REFUSED"
+            .equals(
+                json.readTree(response.getResponse().getContentAsByteArray())
+                    .path("code")
+                    .asString());
   }
 
   private MvcResult perform(MockHttpServletRequestBuilder request) {
@@ -814,6 +1736,15 @@ class JobOrderMoneyIntegrationTest {
             new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
             new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
             new OrgUnitContextualAuthority(Roles.LOGISTICIAN, responsible));
+  }
+
+  private RequestPostProcessor requesterWriter() {
+    return jwt()
+        .jwt(token -> token.subject(writer.toString()))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+            new OrgUnitContextualAuthority(Roles.LOGISTICIAN, requester));
   }
 
   private RequestPostProcessor reader() {

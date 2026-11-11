@@ -19,11 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Stream;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -32,6 +30,8 @@ import org.springframework.data.jpa.repository.Query;
 interface JobOrderMoneyOperationRepository extends JpaRepository<JobOrderMoneyOperation, UUID> {
 
   Optional<JobOrderMoneyOperation> findByOrderIdAndOperationId(UUID orderId, UUID operationId);
+
+  boolean existsByOrderIdAndOperationId(UUID orderId, UUID operationId);
 
   List<JobOrderMoneyOperation> findAllByOrderIdOrderByRecordedAtAscIdAsc(UUID orderId);
 
@@ -67,12 +67,4 @@ interface JobOrderMoneyOperationRepository extends JpaRepository<JobOrderMoneyOp
           """,
       nativeQuery = true)
   int anonymiseSubmittedNames(String[] spellings, List<UUID> orderIds);
-
-  @Query(
-      """
-      SELECT o.amount FROM JobOrderMoneyOperation o
-        JOIN JobOrderMoneyHolder h ON h.id = o.holderId
-      WHERE h.id = :holderId OR h.mergedIntoId = :holderId
-      """)
-  Stream<BigDecimal> amountsForHolder(UUID holderId);
 }

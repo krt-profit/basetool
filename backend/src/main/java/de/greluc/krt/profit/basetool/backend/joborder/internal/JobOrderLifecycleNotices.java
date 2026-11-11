@@ -23,8 +23,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -86,6 +88,25 @@ final class JobOrderLifecycleNotices {
         units(order),
         revision(order),
         actor);
+  }
+
+  static NotificationEvent needChanged(JobOrder order, UUID actor, boolean responsible) {
+    return responsible ? needChanged(order, actor) : requesterChanged(order, actor);
+  }
+
+  static JobOrderUpdatedByRequesterEvent requesterChanged(JobOrder order, @Nullable UUID actor) {
+    OrgUnit responsible = order.getResponsibleOrgUnit();
+    OrgUnit requesting = order.getRequestingOrgUnit();
+    return new JobOrderUpdatedByRequesterEvent(
+        order.getId(),
+        order.getDisplayId(),
+        order.getHandle(),
+        new OrgUnitRef(responsible.getId(), responsible.getKind()),
+        responsible.getShorthand(),
+        requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
+        requesting == null ? null : requesting.getShorthand(),
+        actor,
+        revision(order));
   }
 
   static @NotNull NoticeEvent reopened(@NotNull JobOrder order, @Nullable UUID actor) {

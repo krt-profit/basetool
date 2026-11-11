@@ -37,7 +37,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 
-/** The durable submitted terms and booked effect of a Bank-free provision. */
+/** Durable submitted terms and booked effects for order money. */
 @Entity
 @Table(name = "job_order_money_operation")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -78,6 +78,30 @@ class JobOrderMoneyOperation {
   @Column(nullable = false, updatable = false, columnDefinition = "numeric")
   private BigDecimal amount;
 
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, updatable = false, length = 24)
+  private JobOrderMoneyKind kind;
+
+  @Nullable
+  @Column(updatable = false)
+  private UUID destinationHolderId;
+
+  @Nullable
+  @Column(updatable = false)
+  private UUID recipientId;
+
+  @Nullable
+  @Column(updatable = false, columnDefinition = "numeric")
+  private BigDecimal newProvision;
+
+  @Nullable
+  @Column(updatable = false, columnDefinition = "numeric")
+  private BigDecimal feeRate;
+
+  @Nullable
+  @Column(updatable = false, columnDefinition = "numeric")
+  private BigDecimal fee;
+
   @Column(nullable = false, updatable = false)
   private Instant recordedAt;
 
@@ -89,7 +113,43 @@ class JobOrderMoneyOperation {
       JobOrderMoneySelection selection,
       boolean bankHandling,
       BigDecimal amount) {
+    this(
+        orderId,
+        operationId,
+        holderId,
+        actorId,
+        selection,
+        bankHandling,
+        amount,
+        JobOrderMoneyKind.PROVISION,
+        null,
+        null,
+        null,
+        null,
+        null);
+  }
+
+  JobOrderMoneyOperation(
+      UUID orderId,
+      UUID operationId,
+      UUID holderId,
+      UUID actorId,
+      JobOrderMoneySelection selection,
+      boolean bankHandling,
+      BigDecimal amount,
+      JobOrderMoneyKind kind,
+      @Nullable UUID destinationHolderId,
+      @Nullable UUID recipientId,
+      @Nullable BigDecimal newProvision,
+      @Nullable BigDecimal feeRate,
+      @Nullable BigDecimal fee) {
     this.orderId = orderId;
+    this.kind = kind;
+    this.destinationHolderId = destinationHolderId;
+    this.recipientId = recipientId;
+    this.newProvision = newProvision;
+    this.feeRate = feeRate;
+    this.fee = fee;
     this.operationId = operationId;
     this.holderId = holderId;
     this.actorId = actorId;
@@ -109,9 +169,26 @@ class JobOrderMoneyOperation {
     }
     return switch (selectionKind) {
       case SELF -> true;
-      case EXISTING -> holderId.equals(selection.reference());
+      case EXISTING ->
+          Objects.equals(
+              kind == JobOrderMoneyKind.COLLECTION ? destinationHolderId : holderId,
+              selection.reference());
       case LINKED -> Objects.equals(selectedUserId, selection.reference());
       case ACCOUNTLESS -> Objects.equals(selectedAccountlessName, selection.name());
     };
+  }
+
+  BigDecimal providedAmount() {
+    return kind == JobOrderMoneyKind.PROVISION ? amount : Objects.requireNonNull(newProvision);
+  }
+
+  BigDecimal feeAmount() {
+    return fee == null ? BigDecimal.ZERO : fee;
+  }
+
+  BigDecimal sourceEffect() {
+    return kind == JobOrderMoneyKind.PROVISION
+        ? amount
+        : providedAmount().subtract(amount).subtract(feeAmount());
   }
 }

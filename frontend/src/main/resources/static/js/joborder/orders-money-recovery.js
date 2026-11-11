@@ -22,10 +22,13 @@ import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toa
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 /** @typedef {ApiDto<'ProvideJobOrderMoneyDto'>} ProvisionTerms */
-/** @typedef {ApiDto<'JobOrderMoneyOutcome'>} ProvisionOutcome */
+/** @typedef {ApiDto<'MoveJobOrderMoneyDto'>} MovementTerms */
+/** @typedef {ApiDto<'JobOrderMoneyOutcome'>} MoneyOutcome */
+/** @typedef {{ command: 'provisions', terms: Omit<ProvisionTerms, 'operationId'> } | { command: 'movements', terms: Omit<MovementTerms, 'operationId'> }} Draft */
+/** @typedef {Draft & { operationId: string }} Submission */
 
 /**
- * Identifies a permanently refused provision from its authoritative outcome.
+ * Identifies a permanently refused command from its authoritative outcome.
  *
  * @param {unknown} status the HTTP status
  * @param {unknown} problem the relayed problem document
@@ -37,7 +40,7 @@ function definitivelyRefused(status, problem) {
         problem !== null &&
         typeof problem === 'object' &&
         'code' in problem &&
-        problem.code === 'MONEY_PROVISION_REFUSED'
+        ['MONEY_PROVISION_REFUSED', 'MONEY_MOVEMENT_REFUSED'].some((code) => problem.code === code)
     );
 }
 
@@ -45,9 +48,9 @@ function definitivelyRefused(status, problem) {
  * Binds outcome recovery to the authenticated account and the current order.
  *
  * @param {HTMLElement} root the recovery controls and account scope
- * @param {(terms: ProvisionTerms) => void} restoreRefused the editor for the refused terms
+ * @param {(draft: Submission) => void} restoreRefused the editor for the refused terms
  */
-export function bindProvisionRecovery(root, restoreRefused) {
+export function bindMoneyRecovery(root, restoreRefused) {
     const url = `/orders/${root.dataset.orderId}/money`;
     const key = `krt:order-provision:${root.dataset.accountId}:${root.dataset.orderId}`;
     const banner = root.querySelector('[data-money-recovery]');
@@ -60,19 +63,23 @@ export function bindProvisionRecovery(root, restoreRefused) {
         !(check instanceof HTMLButtonElement) ||
         !(retry instanceof HTMLButtonElement)
     ) {
-        throw new Error('The order provision recovery controls are missing');
+        throw new Error('The order money recovery controls are missing');
     }
 
-    /** @returns {ProvisionTerms | null} the submitted terms for this account and order */
+    /** @returns {Submission | null} the submitted terms for this account and order */
     function pending() {
         const value = localStorage.getItem(key);
-        return value ? JSON.parse(value) : null;
+        if (!value) return null;
+        const saved = JSON.parse(value);
+        if (saved.command) return saved;
+        const { operationId, ...terms } = saved;
+        return { command: 'provisions', operationId, terms };
     }
 
     /**
      * Clears only this resolved operation from the account's current order slot.
      *
-     * @param {ProvisionTerms} terms the resolved submission
+     * @param {Submission} terms the resolved submission
      * @returns {Promise<boolean>} whether this operation still held the recovery slot
      */
     const forget = (terms) =>
@@ -90,7 +97,7 @@ export function bindProvisionRecovery(root, restoreRefused) {
     /**
      * Removes a resolved operation and refreshes its visible effects.
      *
-     * @param {ProvisionTerms} terms the submitted terms
+     * @param {Submission} terms the submitted terms
      */
     const finish = async (terms) => {
         await forget(terms);
@@ -101,7 +108,7 @@ export function bindProvisionRecovery(root, restoreRefused) {
     /**
      * Restores the terms of a permanent refusal against the latest holder basis.
      *
-     * @param {ProvisionTerms} terms the refused submission
+     * @param {Submission} terms the refused submission
      */
     const refuse = async (terms) => {
         if (!(await forget(terms))) return;
@@ -119,12 +126,12 @@ export function bindProvisionRecovery(root, restoreRefused) {
     /**
      * Looks up the original identity after an uncertain transport result.
      *
-     * @param {ProvisionTerms} terms the submitted terms
+     * @param {Submission} terms the submitted terms
      */
     const lookup = async (terms) => {
         retry.hidden = true;
         try {
-            /** @type {ProvisionOutcome | null} */
+            /** @type {MoneyOutcome | null} */
             const outcome = await krtFetch.getJson(`${url}/operations/${terms.operationId}`);
             if (outcome?.operationId === terms.operationId) await finish(terms);
         } catch (error) {
@@ -156,7 +163,7 @@ export function bindProvisionRecovery(root, restoreRefused) {
     /**
      * Sends the exact terms staged in browser storage for this identity.
      *
-     * @param {ProvisionTerms} terms the submitted terms
+     * @param {Submission} terms the submitted terms
      * @param {HTMLElement | null} submitter the activated control
      * @param {boolean} retrying whether an earlier response was inconclusive
      * @returns {Promise<boolean>} true when the submission was accepted or its outcome is unknown
@@ -168,14 +175,14 @@ export function bindProvisionRecovery(root, restoreRefused) {
         try {
             const result = await krtFetch.write({
                 method: 'POST',
-                url: `${url}/provisions`,
-                payload: terms,
+                url: `${url}/${terms.command}`,
+                payload: { ...terms.terms, operationId: terms.operationId },
                 submitter,
                 toast: false,
                 onError: () => true,
                 onNetworkError: () => true,
             });
-            /** @type {ProvisionOutcome | null} */
+            /** @type {MoneyOutcome | null} */
             const outcome = result.body;
             if (result.ok && !result.redirected && outcome?.operationId === terms.operationId) {
                 await finish(terms);
@@ -208,16 +215,16 @@ export function bindProvisionRecovery(root, restoreRefused) {
     /**
      * Stages a new identity before contacting the server.
      *
-     * @param {Omit<ProvisionTerms, 'operationId'>} fields the explicitly submitted terms
+     * @param {Draft} draft the explicitly submitted terms
      * @param {HTMLElement | null} submitter the activated control
      * @returns {Promise<boolean>} whether the submitted form can close
      */
-    const submit = async (fields, submitter) => {
+    const submit = async (draft, submitter) => {
         let terms;
         try {
             terms = await navigator.locks.request(key, () => {
                 if (pending()) return null;
-                const submitted = { ...fields, operationId: crypto.randomUUID() };
+                const submitted = { ...draft, operationId: crypto.randomUUID() };
                 localStorage.setItem(key, JSON.stringify(submitted));
                 return submitted;
             });
@@ -237,6 +244,5 @@ export function bindProvisionRecovery(root, restoreRefused) {
         const terms = pending();
         if (terms) void send(terms, retry, true);
     });
-    void recover();
     return { pending, recover, submit };
 }

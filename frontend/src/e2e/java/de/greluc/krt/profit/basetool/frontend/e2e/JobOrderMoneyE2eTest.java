@@ -23,6 +23,7 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.google.gson.JsonObject;
@@ -399,6 +400,151 @@ class JobOrderMoneyE2eTest {
     }
   }
 
+  /**
+   * Collects separate provisions, recovers a committed partial handover and completes on target.
+   */
+  @Test
+  void collectsAndHandsOverTheTargetOnceAfterResponseLoss() {
+    assumeTrue(STACK.managesStack(), "requires the isolated monetary order stack");
+    BackendSeeder seeder = new BackendSeeder();
+    seeder.ensureIridiumMembership(USERNAME, PASSWORD);
+    String baseUrl = STACK.baseUrl();
+    try (Playwright playwright = Playwright.create();
+        Browser browser = E2eSupport.launchBrowser(playwright, true);
+        BrowserContext context =
+            browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      E2eSupport.login(page, baseUrl, USERNAME, PASSWORD);
+      E2eSupport.navigate(page, baseUrl + "/orders/create?lang=de");
+      String orderPath = createOrder(page, baseUrl, IRIDIUM, "10");
+      String provisions = orderPath + "/money/provisions";
+      String movements = orderPath + "/money/movements";
+
+      prepareSelfProvision(page, "4");
+      String firstHolder =
+          json(awaitPost(page, provisions, "order-money-save")).get("holderId").getAsString();
+      assertThat(page.getByTestId("order-money-provided")).containsText("4 aUEC");
+
+      page.getByTestId("order-money-provide").click();
+      page.getByTestId("order-money-holder-mode").selectOption("new");
+      chooseAccountless(page, "order-money-holder-choice", "Second holder");
+      page.getByTestId("order-money-amount").fill("6");
+      page.getByTestId("order-money-bank-free").check();
+      String secondHolder =
+          json(awaitPost(page, provisions, "order-money-save")).get("holderId").getAsString();
+      assertThat(page.getByTestId("order-money-provided")).containsText("10 aUEC");
+
+      beginMovement(page, "COLLECTION", firstHolder, "4");
+      page.getByTestId("order-money-destination-mode").selectOption("new");
+      chooseAccountless(page, "order-money-destination-choice", "Collector");
+      page.getByTestId("order-money-movement-bank-free").check();
+      assertThat(page.getByTestId("order-money-movement-preview")).containsText("Collector");
+      String collector =
+          json(awaitPost(page, movements, "order-money-movement-save"))
+              .get("destinationHolderId")
+              .getAsString();
+      assertThat(page.locator("[data-money-holder='" + collector + "']")).containsText("4 aUEC");
+
+      beginMovement(page, "COLLECTION", secondHolder, "6");
+      page.getByTestId("order-money-destination-mode").selectOption("existing");
+      page.getByTestId("order-money-destination-holder").selectOption(collector);
+      page.getByTestId("order-money-movement-bank-free").check();
+      awaitPost(page, movements, "order-money-movement-save");
+      assertThat(page.locator("[data-money-holder='" + collector + "']")).containsText("10 aUEC");
+      assertThat(page.getByTestId("order-money-provided")).containsText("10 aUEC");
+      assertThat(page.getByTestId("order-money-handed-over")).containsText("0 aUEC");
+
+      page.getByTestId("order-money-designate-recipient").click();
+      page.getByTestId("order-money-recipient-mode").selectOption("new");
+      chooseAccountless(page, "order-money-recipient-choice", "Requester recipient");
+      awaitPost(page, orderPath + "/money/recipients", "order-money-recipient-save");
+      Locator recipient = page.locator("[data-money-recipient]");
+      assertThat(recipient).containsText("Requester recipient");
+      String recipientId = recipient.getAttribute("data-money-recipient");
+
+      AtomicReference<String> accepted = new AtomicReference<>();
+      page.route(
+          "**" + movements,
+          route -> {
+            var response = route.fetch();
+            assertEquals(200, response.status());
+            accepted.set(json(response.text()).get("operationId").getAsString());
+            route.abort();
+          });
+      prepareHandover(page, collector, recipientId, "3");
+      page.getByTestId("order-money-movement-save").click();
+      assertThat(page.getByTestId("order-money-unknown")).isVisible();
+      assertNotNull(accepted.get());
+      String outcome = orderPath + "/money/operations/" + accepted.get();
+      var recovered =
+          page.waitForResponse(response -> response.url().endsWith(outcome), page::reload);
+      assertEquals(200, recovered.status());
+      assertEquals("HANDOVER", json(recovered.text()).get("kind").getAsString());
+      assertThat(page.getByTestId("order-money-handed-over")).containsText("3 aUEC");
+      assertThat(page.getByTestId("order-money-holdings")).containsText("7 aUEC");
+      assertThat(page.locator("#order-status-badge.status-active")).isVisible();
+      page.unroute("**" + movements);
+
+      prepareHandover(page, collector, recipientId, "7");
+      awaitPost(page, movements, "order-money-movement-save");
+      assertThat(page.locator("#order-status-badge.status-completed")).isVisible();
+      assertThat(page.getByTestId("order-money-provided")).containsText("10 aUEC");
+      assertThat(page.getByTestId("order-money-holdings")).containsText("0 aUEC");
+      assertThat(page.getByTestId("order-money-handed-over")).containsText("10 aUEC");
+      assertThat(page.getByTestId("order-money-remaining")).containsText("0 aUEC");
+      assertThat(page.getByTestId("order-money-history-entry")).hasCount(6);
+
+      page.getByTestId("order-edit").click();
+      Locator target = page.getByTestId("order-money-edit-target");
+      target.fill("12");
+      page.getByTestId("order-money-edit-handle").fill("trace-contact");
+      awaitPatch(page, orderPath + "/money/information", "order-money-save-information");
+      assertThat(page.locator("#order-header-results")).containsText("trace-contact");
+      assertEquals("12", shownAmount(target));
+      awaitPatch(page, orderPath + "/money/target", "order-money-save-target");
+      assertThat(page.locator("#order-status-badge.status-active")).isVisible();
+      assertThat(page.getByTestId("order-money-handed-over")).containsText("10 aUEC");
+      assertThat(page.getByTestId("order-money-remaining")).containsText("2 aUEC");
+      assertThat(page.getByTestId("order-money-target-change")).containsText("10 auf 12 aUEC");
+      assertThat(page.locator("#order-header-results")).containsText("trace-contact");
+    }
+  }
+
+  private static void awaitPatch(Page page, String path, String saveTestId) {
+    awaitWrite(page, path, saveTestId, "PATCH");
+  }
+
+  private static String awaitPost(Page page, String path, String saveTestId) {
+    return awaitWrite(page, path, saveTestId, "POST");
+  }
+
+  private static String awaitWrite(Page page, String path, String saveTestId, String method) {
+    var saved =
+        page.waitForResponse(
+            response -> response.url().endsWith(path) && method.equals(response.request().method()),
+            () -> page.getByTestId(saveTestId).click());
+    assertTrue(saved.ok(), () -> saved.status() + " " + saved.text());
+    return saved.text();
+  }
+
+  private static void beginMovement(Page page, String kind, String source, String amount) {
+    page.getByTestId("order-money-move").click();
+    page.getByTestId("order-money-movement-kind").selectOption(kind);
+    page.getByTestId("order-money-source-holder").selectOption(source);
+    page.getByTestId("order-money-movement-amount").fill(amount);
+  }
+
+  private static void prepareHandover(Page page, String source, String recipient, String amount) {
+    beginMovement(page, "HANDOVER", source, amount);
+    page.getByTestId("order-money-handover-recipient").selectOption(recipient);
+    page.getByTestId("order-money-movement-bank-free").check();
+  }
+
+  private static void chooseAccountless(Page page, String field, String name) {
+    page.getByTestId(field).fill(name);
+    page.locator("li[role='option'][data-value='accountless']:visible").click();
+  }
+
   private static void prepareSelfProvision(Page page, String amount) {
     page.getByTestId("order-money-provide").click();
     page.getByTestId("order-money-amount").fill(amount);
@@ -425,11 +571,16 @@ class JobOrderMoneyE2eTest {
   }
 
   private static String createOrder(Page page, String baseUrl, String requestingUnit) {
+    return createOrder(page, baseUrl, requestingUnit, GROUPED_AMOUNT);
+  }
+
+  private static String createOrder(
+      Page page, String baseUrl, String requestingUnit, String target) {
     page.getByTestId("order-mode-auec").click();
     page.locator("#auec-responsible-org-unit").selectOption(IRIDIUM);
     page.locator("#auec-requesting-org-unit").selectOption(requestingUnit);
     page.getByTestId("order-auec-handle").fill("E2E Money " + UUID.randomUUID());
-    page.getByTestId("order-auec-target").fill(GROUPED_AMOUNT);
+    page.getByTestId("order-auec-target").fill(target);
     page.getByTestId("order-auec-submit").click();
     page.waitForURL(url ->
         url.startsWith(baseUrl + "/orders/")

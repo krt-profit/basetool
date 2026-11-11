@@ -181,6 +181,9 @@ public class AdminAuditLogPageController {
               List.of(
                   "JOB_ORDER_CREATED",
                   "JOB_ORDER_MONEY_PROVIDED",
+                  "JOB_ORDER_MONEY_MOVED",
+                  "JOB_ORDER_MONEY_RECIPIENT_CHANGED",
+                  "JOB_ORDER_MONEY_TARGET_CHANGED",
                   "JOB_ORDER_ITEM_CATALOGUE_REASSIGNED",
                   "JOB_ORDER_ITEM_CREATED",
                   "JOB_ORDER_UPDATED",

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<form th:fragment="movementForm" id="order-money-movement-form">
+    <div class="krt-modal-body">
+        <p class="alert alert-info" role="status" data-money-basis-changed hidden
+           th:text="#{orders.money.basis.changed}"></p>
+        <fieldset class="form-section">
+            <legend class="visually-hidden" th:text="#{orders.money.move}"></legend>
+            <div class="form-group">
+                <label for="order-money-movement-kind" th:text="#{orders.money.movement.purpose}"></label>
+                <select id="order-money-movement-kind" name="kind" data-testid="order-money-movement-kind">
+                    <option value="COLLECTION" th:text="#{orders.money.movement.collection}"></option>
+                    <option value="HANDOVER" th:text="#{orders.money.movement.handover}"></option>
+                    <option value="PURPOSE_HANDOVER" th:text="#{orders.money.movement.purposeHandover}"></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="order-money-source-holder" th:text="#{orders.money.movement.source}"></label>
+                <select id="order-money-source-holder" name="sourceHolderId" data-testid="order-money-source-holder" required>
+                    <option value="" th:text="#{orders.create.select}"></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="order-money-destination-mode" th:text="#{orders.money.movement.destination}"></label>
+                <select id="order-money-destination-mode" name="destinationMode" data-testid="order-money-destination-mode">
+                    <option value="existing" th:text="#{orders.money.holder.existing}"></option>
+                    <option value="new" th:text="#{orders.money.holder.new}"></option>
+                    <option value="self" th:text="#{orders.money.holder.self}"></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="order-money-destination-holder" th:text="#{orders.money.holder.existing}"></label>
+                <select id="order-money-destination-holder" name="destinationHolderId"
+                        data-testid="order-money-destination-holder" required>
+                    <option value="" th:text="#{orders.create.select}"></option>
+                </select>
+            </div>
+            <div th:replace="~{joborder/fragments/order-money-movement :: partyChoice('order-money-destination-choice', 'destinationChoice')}"></div>
+            <div class="form-group" hidden>
+                <label for="order-money-handover-recipient" th:text="#{orders.money.recipient}"></label>
+                <select id="order-money-handover-recipient" name="recipientId" data-testid="order-money-handover-recipient" required disabled>
+                    <option value="" th:text="#{orders.create.select}"></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="order-money-movement-amount" th:text="#{orders.money.movement.net}"></label>
+                <input type="text" id="order-money-movement-amount" name="amount" inputmode="numeric"
+                       data-number-input="exact-whole" data-testid="order-money-movement-amount"
+                       th:data-invalid="#{orders.money.amount.invalid}" required>
+            </div>
+            <label class="cluster gap-2">
+                <input type="checkbox" name="bankFree" data-testid="order-money-movement-bank-free" required>
+                <span th:text="#{orders.money.bankFree}"></span>
+            </label>
+            <label class="cluster gap-2" hidden>
+                <input type="checkbox" name="topUp" data-testid="order-money-movement-top-up">
+                <span><span th:text="#{orders.money.movement.topUp}"></span>
+                    <strong data-preview-value="offer"></strong></span>
+            </label>
+        </fieldset>
+        <div data-money-preview data-testid="order-money-movement-preview" role="status" hidden>
+            <dl class="facts-bar">
+                <div>
+                    <dt class="fact-k" th:text="#{orders.money.movement.source}"></dt>
+                    <dd class="fact-v" data-preview-label="source"></dd>
+                </div>
+                <div>
+                    <dt class="fact-k" th:text="#{orders.money.movement.destination}"></dt>
+                    <dd class="fact-v" data-preview-label="destination"></dd>
+                </div>
+                <div>
+                    <dt class="fact-k" th:text="#{orders.money.movement.net}"></dt>
+                    <dd class="fact-v" data-preview-value="amount"></dd>
+                </div>
+                <div>
+                    <dt class="fact-k" th:text="#{orders.money.preview.fee}"></dt>
+                    <dd class="fact-v" data-preview-value="fee"></dd>
+                </div>
+                <div>
+                    <dt class="fact-k" th:text="#{orders.money.movement.charge}"></dt>
+                    <dd class="fact-v" data-preview-value="charge"></dd>
+                </div>
+                <div>
+                    <dt class="fact-k" th:text="#{orders.money.movement.additional}"></dt>
+                    <dd class="fact-v" data-preview-value="provision"></dd>
+                </div>
+                <div>
+                    <dt class="fact-k" th:text="#{orders.money.preview.holding}"></dt>
+                    <dd class="fact-v" data-preview-value="sourceAfter"></dd>
+                </div>
+                <div data-preview-shortfall hidden>
+                    <dt class="fact-k" th:text="#{orders.money.movement.shortfall}"></dt>
+                    <dd class="fact-v" data-preview-value="shortfall"></dd>
+                </div>
+                <div data-preview-overpayment hidden>
+                    <dt class="fact-k" th:text="#{orders.money.overpaid.withUnit}"></dt>
+                    <dd class="fact-v" data-preview-value="overpayment"></dd>
+                </div>
+            </dl>
+            <p data-preview-completes hidden th:text="#{orders.money.movement.completes}"></p>
+        </div>
+        <button type="button" class="btn btn-ghost" data-money-preview-retry hidden
+                th:text="#{orders.money.preview.retry}"></button>
+    </div>
+    <div class="krt-modal-foot">
+        <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                data-modal-id="order-money-movement-modal" th:text="#{general.cancel}"></button>
+        <button type="submit" class="btn btn--cta" data-testid="order-money-movement-save"
+                th:text="#{orders.detail.save}" disabled></button>
+    </div>
+</form>
+
+<div th:fragment="partyChoice(id, name)" class="form-group" data-name-limit="200" hidden>
+    <label th:for="${id}" th:text="#{orders.money.holder.name}"></label>
+    <select th:id="${id}" th:name="${name}" th:data-testid="${id}"
+            th:data-free-text-label="#{orders.money.holder.freeText('{0}')}"
+            th:data-combobox-placeholder="#{orders.money.holder.search}"
+            th:data-combobox-no-results="#{userSelect.search.noResults}"
+            th:data-combobox-hint="#{userSelect.search.hint}"
+            th:data-combobox-invalid="#{userSelect.search.invalid}"
+            th:data-combobox-loading="#{userSelect.search.loading}" required disabled>
+        <option value=""></option>
+    </select>
+</div>
+</body>
+</html>

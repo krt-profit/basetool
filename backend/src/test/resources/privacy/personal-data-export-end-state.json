@@ -384,8 +384,40 @@
       "job_order" : <n>,
       "operation_id" : "<uuid>",
       "holder_id" : "<uuid>",
+      "kind" : "PROVISION",
       "amount" : "17",
       "bank_handling" : false,
+      "recorded_at" : "<instant>",
+      "fee" : null,
+      "new_provision" : null
+    }, {
+      "job_order" : <n>,
+      "operation_id" : "<uuid>",
+      "holder_id" : "<uuid>",
+      "kind" : "PURPOSE_HANDOVER",
+      "amount" : "3",
+      "bank_handling" : false,
+      "recorded_at" : "<instant>",
+      "fee" : "0",
+      "new_provision" : "0"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "jobOrderMoneyRecipients",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : <n>,
+      "recipient_id" : "<uuid>",
+      "active" : true
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "jobOrderMoneyTargetChanges",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : <n>,
+      "previous_target" : "85",
+      "target" : "80",
       "recorded_at" : "<instant>"
     } ],
     "truncated" : false

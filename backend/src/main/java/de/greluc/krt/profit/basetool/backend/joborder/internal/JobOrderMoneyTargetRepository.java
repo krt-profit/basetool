@@ -19,8 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 /** Persists the versioned target for a single aUEC order. */
-interface JobOrderMoneyTargetRepository extends JpaRepository<JobOrderMoneyTarget, UUID> {}
+interface JobOrderMoneyTargetRepository extends JpaRepository<JobOrderMoneyTarget, UUID> {
+
+  @Query("SELECT t.amount FROM JobOrderMoneyTarget t WHERE t.orderId = :orderId")
+  Optional<BigDecimal> amountFor(UUID orderId);
+}

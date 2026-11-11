@@ -22,21 +22,33 @@ import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { bindHolderChoices } from '/js/joborder/orders-money-holders.js';
 import { bindProvisionPreview } from '/js/joborder/orders-money-preview.js';
-import { bindProvisionRecovery } from '/js/joborder/orders-money-recovery.js';
+import { bindMoneyRecovery } from '/js/joborder/orders-money-recovery.js';
+import { bindMoneyMovement } from '/js/joborder/orders-money-movement.js';
+import { bindMoneySettings } from '/js/joborder/orders-money-settings.js';
 
 const modalId = 'order-money-provision-modal';
 const root = document.getElementById('order-money-operation');
 const form = document.getElementById('order-money-provision-form');
 
-if (root && form instanceof HTMLFormElement) bindProvisionForm(root, form);
+if (root && form instanceof HTMLFormElement) {
+    const recovery = bindMoneyRecovery(root, ({ command, terms }) => {
+        if (command === 'provisions') provision.restore(terms);
+        else movement.restore(terms);
+    });
+    const provision = bindProvisionForm(root, form, recovery);
+    const movement = bindMoneyMovement(root, recovery);
+    bindMoneySettings(root);
+    void recovery.recover();
+}
 
 /**
  * Preserves the draft outside the money section while updating its holder revision.
  *
  * @param {HTMLElement} root the account scope and recovery controls
  * @param {HTMLFormElement} form the provision form
+ * @param {ReturnType<typeof bindMoneyRecovery>} recovery the shared account and order recovery
  */
-function bindProvisionForm(root, form) {
+function bindProvisionForm(root, form, recovery) {
     const fields = form.querySelector('fieldset');
     const input = form.elements.namedItem('amount');
     const bankFree = form.elements.namedItem('bankFree');
@@ -53,7 +65,7 @@ function bindProvisionForm(root, form) {
     }
 
     const holders = bindHolderChoices(form, root);
-    /** @type {ApiDto<'ProvideJobOrderMoneyDto'> | null} */
+    /** @type {Omit<ApiDto<'ProvideJobOrderMoneyDto'>, 'operationId'> | null} */
     let refusedDraft = null;
     let basis = '';
     let saving = false;
@@ -75,7 +87,7 @@ function bindProvisionForm(root, form) {
     /**
      * Opens a new draft or restores the refused terms for another explicit choice.
      *
-     * @param {ApiDto<'ProvideJobOrderMoneyDto'> | null} [refused] the resolved stale submission
+     * @param {Omit<ApiDto<'ProvideJobOrderMoneyDto'>, 'operationId'> | null} [refused] the resolved stale submission
      */
     const open = (refused = null) => {
         form.reset();
@@ -97,7 +109,8 @@ function bindProvisionForm(root, form) {
         refusedDraft = null;
     };
 
-    const recovery = bindProvisionRecovery(root, (refused) => {
+    /** @param {Omit<ApiDto<'ProvideJobOrderMoneyDto'>, 'operationId'>} refused the closed operation */
+    const restore = (refused) => {
         refusedDraft = refused;
         holders.refresh();
         if (holders.canProvide()) {
@@ -107,7 +120,7 @@ function bindProvisionForm(root, form) {
             form.reset();
             preview.reset();
         }
-    });
+    };
     krtEvents.on('click', 'od-money-open', () => {
         if (recovery.pending()) {
             void recovery.recover();
@@ -145,7 +158,10 @@ function bindProvisionForm(root, form) {
         saving = true;
         fields.disabled = true;
         try {
-            const submitted = await recovery.submit(terms, event.submitter);
+            const submitted = await recovery.submit(
+                { command: 'provisions', terms },
+                event.submitter,
+            );
             if (submitted) {
                 krtModal.close(modalId);
                 form.reset();
@@ -157,4 +173,5 @@ function bindProvisionForm(root, form) {
             updateDraft();
         }
     });
+    return { restore };
 }

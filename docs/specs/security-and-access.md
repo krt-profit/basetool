@@ -4739,9 +4739,10 @@ one event type.
 
 ### REQ-SEC-058 — Art. 15 / Art. 20 data export
 
-> **Approved planned JobOrder amendment (not implemented):** Include planned personal JobOrder holder/link/history data in the owning export projection while excluding unrelated parties and private bank data. The new participant-readable business history is not the admin audit export; see [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+The aUEC export includes the subject's holder links, directly related money operations,
+requester designations and recorded target amendments. It excludes unrelated people and
+private Bank data. The [aUEC contract](orders-auec.md) owns participant-visible history.
+The [planned Bank coupling](orders-auec-bank.md) owns later Bank access rules.
 
 Every member MUST be able to export their own data from the application, and an admin MUST be able
 to export another account's for a request from somebody who cannot sign in.

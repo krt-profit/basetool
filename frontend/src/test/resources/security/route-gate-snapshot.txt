@@ -539,9 +539,17 @@
 /orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/money/holder-candidates GET -> JobOrderMoneyProxyController#holderCandidates gate=class:isAuthenticated() layout=no
+/orders/{id}/money/information PATCH -> JobOrderMoneyProxyController#updateInformation gate=class:isAuthenticated() layout=no
+/orders/{id}/money/movement-candidates GET -> JobOrderMoneyProxyController#movementCandidates gate=class:isAuthenticated() layout=no
+/orders/{id}/money/movements POST -> JobOrderMoneyProxyController#move gate=class:isAuthenticated() layout=no
+/orders/{id}/money/movements/preview POST -> JobOrderMoneyProxyController#previewMovement gate=class:isAuthenticated() layout=no
 /orders/{id}/money/operations/{operation} GET -> JobOrderMoneyProxyController#outcome gate=class:isAuthenticated() layout=no
 /orders/{id}/money/provisions POST -> JobOrderMoneyProxyController#provide gate=class:isAuthenticated() layout=no
 /orders/{id}/money/provisions/preview POST -> JobOrderMoneyProxyController#preview gate=class:isAuthenticated() layout=no
+/orders/{id}/money/recipient-candidates GET -> JobOrderMoneyProxyController#recipientCandidates gate=class:isAuthenticated() layout=no
+/orders/{id}/money/recipients POST -> JobOrderMoneyProxyController#designateRecipient gate=class:isAuthenticated() layout=no
+/orders/{id}/money/recipients/{recipient} DELETE -> JobOrderMoneyProxyController#removeRecipient gate=class:isAuthenticated() layout=no
+/orders/{id}/money/target PATCH -> JobOrderMoneyProxyController#updateTarget gate=class:isAuthenticated() layout=no
 /orders/{id}/participations/{unitId} DELETE -> JobOrderResponsibilityProxyController#withdrawSupport gate=class:isAuthenticated() layout=no
 /orders/{id}/participations/{unitId} PUT -> JobOrderResponsibilityProxyController#enrollSupport gate=class:isAuthenticated() layout=no
 /orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes

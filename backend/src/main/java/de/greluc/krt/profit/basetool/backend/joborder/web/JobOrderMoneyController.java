@@ -22,14 +22,23 @@ package de.greluc.krt.profit.basetool.backend.joborder.web;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MoneyProvisionRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateAuecJobOrderDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.DesignateJobOrderMoneyRecipientDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyHolderCandidate;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyMovementPreview;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyMovements;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyOrderChanges;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyOutcome;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyProvisionPreview;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyQueries;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyRecipientView;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyRecipients;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyView;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MoveJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.PreviewJobOrderMoneyProvisionDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.ProvideJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderMoneyInformationDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderMoneyTargetDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -40,7 +49,9 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,6 +69,9 @@ public class JobOrderMoneyController {
 
   private final JobOrderMoneyCommands commands;
   private final JobOrderMoneyQueries queries;
+  private final JobOrderMoneyMovements movements;
+  private final JobOrderMoneyRecipients recipients;
+  private final JobOrderMoneyOrderChanges changes;
 
   /**
    * Commissions an exact net amount through the existing unit writer authority.
@@ -139,7 +153,140 @@ public class JobOrderMoneyController {
   }
 
   /**
-   * Retrieves the durable result without rebooking a provision.
+   * Calculates a collection or requester handover.
+   *
+   * @param id the order
+   * @param dto the proposed terms
+   * @return exact amount, costs and resulting figures at the observed basis
+   */
+  @PostMapping("/{id}/money/movements/preview")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(operationId = "previewJobOrderMoneyMovement", summary = "Preview an aUEC movement")
+  public JobOrderMoneyMovementPreview previewMovement(
+      @PathVariable UUID id, @Valid @RequestBody MoveJobOrderMoneyDto dto) {
+    return movements.preview(id, dto);
+  }
+
+  /**
+   * Records or recovers one actual movement using its submitted identity.
+   *
+   * @param id the order
+   * @param dto the amount, parties, terms and observed revisions
+   * @return the recorded result
+   */
+  @PostMapping("/{id}/money/movements")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(operationId = "recordJobOrderMoneyMovement", summary = "Record an aUEC movement")
+  public JobOrderMoneyOutcome recordMovement(
+      @PathVariable UUID id, @Valid @RequestBody MoveJobOrderMoneyDto dto) {
+    return movements.record(id, dto).orElseThrow(MoneyProvisionRefusedException::new);
+  }
+
+  /**
+   * Searches eligible receiving accounts for an authorized outgoing movement.
+   *
+   * @param id the order
+   * @param sourceHolderId the actual source holder
+   * @param q optional name fragment
+   * @return active account references
+   */
+  @GetMapping("/{id}/money/movement-candidates")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      operationId = "findJobOrderMoneyMovementCandidates",
+      summary = "Find collection holders")
+  public List<JobOrderMoneyHolderCandidate> movementCandidates(
+      @PathVariable UUID id,
+      @RequestParam UUID sourceHolderId,
+      @RequestParam(required = false) @Nullable @Size(max = 200) String q) {
+    return movements.candidates(id, sourceHolderId, q);
+  }
+
+  /**
+   * Searches eligible requester recipient accounts.
+   *
+   * @param id the order
+   * @param q optional name fragment
+   * @return active account references
+   */
+  @GetMapping("/{id}/money/recipient-candidates")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      operationId = "findJobOrderMoneyRecipientCandidates",
+      summary = "Find handover recipients")
+  public List<JobOrderMoneyHolderCandidate> recipientCandidates(
+      @PathVariable UUID id, @RequestParam(required = false) @Nullable @Size(max = 200) String q) {
+    return queries.recipientCandidates(id, q);
+  }
+
+  /**
+   * Deliberately designates a requester recipient.
+   *
+   * @param id the order
+   * @param dto the selected party
+   * @return the current designation
+   */
+  @PostMapping("/{id}/money/recipients")
+  @ResponseStatus(HttpStatus.CREATED)
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      operationId = "designateJobOrderMoneyRecipient",
+      summary = "Designate a handover recipient")
+  public JobOrderMoneyRecipientView designateRecipient(
+      @PathVariable UUID id, @Valid @RequestBody DesignateJobOrderMoneyRecipientDto dto) {
+    return recipients.designate(id, dto);
+  }
+
+  /**
+   * Retires a requester designation while retaining its recorded handovers.
+   *
+   * @param id the order
+   * @param recipient the designation
+   */
+  @DeleteMapping("/{id}/money/recipients/{recipient}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @PreAuthorize("isAuthenticated()")
+  @Operation(operationId = "retireJobOrderMoneyRecipient", summary = "Retire a handover recipient")
+  public void retireRecipient(@PathVariable UUID id, @PathVariable UUID recipient) {
+    recipients.retire(id, recipient);
+  }
+
+  /**
+   * Updates the requested net target.
+   *
+   * @param id the order
+   * @param dto the exact amount and observed revision
+   * @return the current financial view
+   */
+  @PatchMapping("/{id}/money/target")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(operationId = "updateJobOrderMoneyTarget", summary = "Update the aUEC target")
+  public JobOrderMoneyView updateTarget(
+      @PathVariable UUID id, @Valid @RequestBody UpdateJobOrderMoneyTargetDto dto) {
+    changes.target(id, dto);
+    return queries.getMoney(id);
+  }
+
+  /**
+   * Updates the contact and comment independently of monetary edits.
+   *
+   * @param id the order
+   * @param dto the edited information and observed revision
+   * @return the current financial view
+   */
+  @PatchMapping("/{id}/money/information")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      operationId = "updateJobOrderMoneyInformation",
+      summary = "Update aUEC order information")
+  public JobOrderMoneyView updateInformation(
+      @PathVariable UUID id, @Valid @RequestBody UpdateJobOrderMoneyInformationDto dto) {
+    changes.information(id, dto);
+    return queries.getMoney(id);
+  }
+
+  /**
+   * Retrieves the durable result without rebooking an operation.
    *
    * @param id the order
    * @param operation the logical operation

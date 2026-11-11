@@ -34,6 +34,14 @@ final class WholeAuec {
   private WholeAuec() {}
 
   static BigDecimal positive(String input) {
+    BigDecimal amount = nonnegative(input);
+    if (amount.signum() == 0) {
+      throw new BadRequestException(POSITIVE_WHOLE);
+    }
+    return amount;
+  }
+
+  static BigDecimal nonnegative(String input) {
     if (!WHOLE.matcher(input).matches()) {
       throw new BadRequestException(POSITIVE_WHOLE);
     }
@@ -44,7 +52,7 @@ final class WholeAuec {
       start++;
     }
     if (start == end) {
-      throw new BadRequestException(POSITIVE_WHOLE);
+      return BigDecimal.ZERO;
     }
     if (end - start > MAX_INTEGER_DIGITS) {
       throw new BadRequestException("orders.money.amount.storageRange");

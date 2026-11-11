@@ -28,6 +28,11 @@
         </div>
         <div id="order-actions-results" class="page-actions"><th:block th:fragment="orderActions" th:with="isItemOrder=${order.type == 'ITEM'}">
             <button th:if="${!order.responsibilityInvalid and (isLogistician or canEditAsRequester) and order.type == 'MATERIAL'}" type="button" class="btn btn-ghost" data-trigger="open-modal-display" data-modal-id="edit-modal"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit}">Bearbeiten</span></button>
+            <button th:if="${order.type == 'AUEC' and money != null and currentUserId != null and (money.canEditTarget or money.canEditInformation)}"
+                    type="button" class="btn btn-ghost" data-trigger="od-money-edit" data-testid="order-edit">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
+                <span th:text="#{orders.detail.edit}"></span>
+            </button>
             <a th:if="${isItemOrder and (order.callerMayUseItemProcessingEditor() or canEditAsRequester)}"
                th:href="@{/orders/{id}/items/edit(id=${order.id})}" class="btn btn-ghost"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span th:text="#{orders.detail.edit.items}">Items bearbeiten</span></a>
             <th:block th:if="${!order.responsibilityInvalid and (order.type != 'AUEC' or (money != null and money.canDelete))}" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">

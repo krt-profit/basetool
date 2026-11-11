@@ -60,6 +60,7 @@ public class JobOrderHandleAnonymisation implements HandleAnonymisationParticipa
         "job_order_handover.recipient_handle",
         "job_order_item_handover.recipient_handle",
         "job_order_money_holder.accountless_name",
+        "job_order_money_recipient.accountless_name",
         "job_order_money_operation.selected_accountless_name");
   }
 

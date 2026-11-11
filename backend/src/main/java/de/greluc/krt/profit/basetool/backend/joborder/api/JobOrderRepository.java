@@ -482,6 +482,14 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   List<JobOrder> lockAllJobOrders();
 
   /**
+   * Locks the priority sequence without comparing an information edit's managed entity version.
+   *
+   * @return the locked order identities in queue lock order
+   */
+  @Query(value = "SELECT id FROM job_order ORDER BY id FOR NO KEY UPDATE", nativeQuery = true)
+  List<UUID> lockPriorityQueueRows();
+
+  /**
    * Locks the order's mutable scalars after the complete material and stock resources are held.
    *
    * @param id the order being edited
@@ -500,13 +508,26 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   boolean hasDurableMoneySubmission(@Param("orderId") UUID orderId);
 
   /**
-   * Checks whether the caller is a currently linked holder in any order.
+   * Checks whether the caller is a currently linked holder or recipient in any money order.
    *
    * @param callerId the account whose workspace admission is checked
    * @return whether one valid personal order relationship exists
    */
-  @Query("SELECT COUNT(h) > 0 FROM JobOrderMoneyHolder h WHERE " + JobOrderScope.ACTIVE_HOLDER_LINK)
+  @Query("SELECT COUNT(o) > 0 FROM JobOrder o WHERE " + JobOrderScope.MONEY_PARTICIPANT_LINK)
   boolean hasMoneyWorkspaceReadGrant(@Param("callerId") UUID callerId);
+
+  /**
+   * Checks the current holder or recipient relationship to a money order.
+   *
+   * @param orderId the order the caller would read
+   * @param callerId the account requesting it
+   * @return whether the linked participant may read the order
+   */
+  @Query(
+      "SELECT COUNT(o) > 0 FROM JobOrder o WHERE o.id = :orderId AND "
+          + JobOrderScope.MONEY_PARTICIPANT_LINK)
+  boolean hasMoneyPersonalReadGrant(
+      @Param("orderId") UUID orderId, @Param("callerId") UUID callerId);
 
   /**
    * Checks the current personal holder link for one order, independently of status and balance.
@@ -575,7 +596,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Modifying
   @Query(
       """
-      UPDATE JobOrder o SET o.handle = :sentinel
+      UPDATE JobOrder o SET o.handle = :sentinel,
+        o.moneyInformationVersion = o.moneyInformationVersion + 1
       WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel
       """)
   int anonymiseHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);

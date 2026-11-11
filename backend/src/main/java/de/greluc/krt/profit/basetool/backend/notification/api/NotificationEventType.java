@@ -297,6 +297,9 @@ public enum NotificationEventType {
   /** A responsible writer reported a provision for a linked aUEC holder. */
   JOB_ORDER_MONEY_PROVISIONED,
 
+  /** An actual aUEC movement was reported for a linked participant. */
+  JOB_ORDER_MONEY_MOVED,
+
   /** The order's responsibility qualifies again and its clarification prompt is obsolete. */
   JOB_ORDER_CLARIFICATION_RESOLVED,
 

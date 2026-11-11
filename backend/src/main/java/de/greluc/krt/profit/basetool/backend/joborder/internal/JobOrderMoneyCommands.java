@@ -52,6 +52,7 @@ public class JobOrderMoneyCommands {
   private final JobOrderMoneyTargetRepository targets;
   private final JobOrderMoneyHolderRepository holders;
   private final JobOrderMoneyOperationRepository operations;
+  private final JobOrderMoneyLedger ledger;
   private final AuthHelperService auth;
   private final JobOrderAccessPolicy access;
   private final JobOrderResponsibilityGuard responsibility;
@@ -116,22 +117,13 @@ public class JobOrderMoneyCommands {
       throw unavailable.previewProblem();
     }
     requireHolderVersion(holder, dto.holderVersion());
-    BigDecimal current = holdingAmount(holder.getId());
+    BigDecimal current = ledger.read(orderId).balance(holder.getId());
     return new JobOrderMoneyProvisionPreview(
         amount.toPlainString(),
         holderChoices.nameOf(holder),
         BigDecimal.ZERO.toPlainString(),
         dto.bankHandling(),
         current.add(amount).toPlainString());
-  }
-
-  private BigDecimal holdingAmount(@Nullable UUID holderId) {
-    if (holderId == null) {
-      return BigDecimal.ZERO;
-    }
-    try (var amounts = operations.amountsForHolder(holderId)) {
-      return amounts.reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
   }
 
   private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> provideChecked(
@@ -235,7 +227,8 @@ public class JobOrderMoneyCommands {
     if (!Objects.equals(actor, operation.getActorId())) {
       throw new AccessDeniedException("Caller may not replay this operation.");
     }
-    if (amount.compareTo(operation.getAmount()) != 0
+    if (operation.getKind() != JobOrderMoneyKind.PROVISION
+        || amount.compareTo(operation.getAmount()) != 0
         || bankHandling != operation.isBankHandling()
         || !operation.matchesSelection(selection)) {
       throw new BusinessConflictException("orders.money.operation.termsMismatch");
