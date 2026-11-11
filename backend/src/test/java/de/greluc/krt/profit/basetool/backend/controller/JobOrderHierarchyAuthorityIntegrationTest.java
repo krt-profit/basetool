@@ -74,6 +74,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -367,6 +368,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         item = order;
       }
     }
+    String itemId = Objects.requireNonNull(item, "Missing ITEM fixture").getId().toString();
     for (String endpoint :
         List.of(
             "/api/v1/orders",
@@ -377,7 +379,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.totalElements").value(1))
           .andExpect(jsonPath("$.content[0].type").value("ITEM"))
-          .andExpect(jsonPath("$.content[0].id").value(item.getId().toString()));
+          .andExpect(jsonPath("$.content[0].id").value(itemId));
     }
     as(
             get("/api/v1/orders")
