@@ -59,7 +59,7 @@ class JobOrderEditVersionsMigrationTest {
       }
 
       ScriptUtils.executeSqlScript(
-          connection, new ClassPathResource("db/migration/V383__job_order_edit_versions.sql"));
+          connection, new ClassPathResource("db/migration/V386__job_order_edit_versions.sql"));
 
       try (var sql = connection.createStatement();
           var rows =

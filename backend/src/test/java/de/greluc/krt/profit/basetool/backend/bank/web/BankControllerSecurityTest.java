@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditReportServic
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAuditService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankDashboardService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankExportTestSupport;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankGrantService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerService;
@@ -467,8 +468,9 @@ class BankControllerSecurityTest {
   @Test
   void statement_withVisibility_isAllowed() throws Exception {
     when(bankSecurityService.canSee(any(UUID.class))).thenReturn(true);
+    var report = BankExportTestSupport.resource(new byte[] {1, 2, 3});
     when(bankStatementReportService.generateStatement(any(), any(), any(), any()))
-        .thenReturn(new byte[] {1, 2, 3});
+        .thenReturn(report);
     mockMvc
         .perform(
             get("/api/v1/bank/accounts/{id}/statement", UUID.randomUUID())
@@ -507,8 +509,8 @@ class BankControllerSecurityTest {
             get("/api/v1/bank/export/three-month-report")
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
         .andExpect(status().isForbidden());
-    when(bankManagementReportService.generateThreeMonthReport(any()))
-        .thenReturn(new byte[] {1, 2, 3});
+    var report = BankExportTestSupport.resource(new byte[] {1, 2, 3});
+    when(bankManagementReportService.generateThreeMonthReport(any())).thenReturn(report);
     mockMvc
         .perform(
             get("/api/v1/bank/export/three-month-report")

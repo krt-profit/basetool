@@ -32,7 +32,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.CheckoutType;
-import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutAudits;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryEarmarkLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
@@ -50,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepo
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,10 +94,7 @@ class InventoryItemServiceVersionFlushTest {
   @BeforeEach
   void wireCheckoutDelegate() {
     realCheckoutService =
-        new InventoryCheckoutService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -111,7 +108,6 @@ class InventoryItemServiceVersionFlushTest {
             requestScopeResolver,
             orgUnitStampingService,
             auditService,
-            new InventoryCheckoutAudits(auditService),
             eventPublisher);
     InventoryOrderWrites orderWrites =
         new InventoryOrderWrites(

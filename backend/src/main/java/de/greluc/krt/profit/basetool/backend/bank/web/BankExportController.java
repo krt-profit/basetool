@@ -20,15 +20,17 @@
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankManagementReportService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankPdfExport;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -63,8 +65,9 @@ public class BankExportController {
       in = ParameterIn.HEADER,
       required = false,
       schema = @Schema(type = "string"))
-  public ResponseEntity<byte[]> downloadThreeMonthReport(@UserZone ZoneId userZone) {
-    byte[] pdf = bankManagementReportService.generateThreeMonthReport(userZone);
-    return PdfResponses.pdfAttachment(pdf, "bank-3-monats-report.pdf");
+  public ResponseEntity<Resource> downloadThreeMonthReport(
+      @UserZone ZoneId userZone, HttpServletRequest request) {
+    BankPdfExport pdf = bankManagementReportService.generateThreeMonthReport(userZone);
+    return BankReportCleanupFilter.attachment(request, pdf, "bank-3-monats-report.pdf");
   }
 }

@@ -58,6 +58,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankBookingReques
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankGrantRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankHolderRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendBinaryTransfer;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -69,7 +70,6 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -573,9 +573,9 @@ public class BankBackendClient {
    * @param from period start
    * @param to period end
    * @param userTimeZone the caller's IANA time zone, forwarded when not blank
-   * @return the PDF bytes, or {@code null} when the backend sent no body
+   * @return the bounded PDF transfer
    */
-  public byte @Nullable [] accountStatement(
+  public @NotNull BackendBinaryTransfer accountStatement(
       @NotNull UUID id, @NotNull Instant from, @NotNull Instant to, @Nullable String userTimeZone) {
     String uri =
         UriComponentsBuilder.fromPath("/api/v1/bank/accounts/{id}/statement")
@@ -591,9 +591,9 @@ public class BankBackendClient {
    * Downloads the management three-month report PDF (REQ-BANK-015).
    *
    * @param userTimeZone the caller's IANA time zone, forwarded when not blank
-   * @return the PDF bytes, or {@code null} when the backend sent no body
+   * @return the bounded PDF transfer
    */
-  public byte @Nullable [] threeMonthReport(@Nullable String userTimeZone) {
+  public @NotNull BackendBinaryTransfer threeMonthReport(@Nullable String userTimeZone) {
     return pdf("/api/v1/bank/export/three-month-report", new Object[0], userTimeZone);
   }
 
@@ -760,15 +760,14 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param roleCode the role bucket, already checked to be a constant name
-   * @param body the browser's body with the request's echoed {@code version}
    * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
   public OrgUnitBankAccountSettingsDto addRoleVisibility(
-      @NotNull UUID id, @NotNull String roleCode, @NotNull Map<String, Object> body) {
+      @NotNull UUID id, @NotNull String roleCode) {
     return backendApiClient.post(
         "/api/v1/bank/org-units/accounts/{id}/visibility/role/{roleCode}",
-        body,
+        null,
         OrgUnitBankAccountSettingsDto.class,
         id,
         roleCode);
@@ -796,15 +795,13 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param enabled whether all members may view the account
-   * @param body the browser's body with the request's echoed {@code version}
    * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public OrgUnitBankAccountSettingsDto setAllMembersVisibility(
-      @NotNull UUID id, boolean enabled, @NotNull Map<String, Object> body) {
+  public OrgUnitBankAccountSettingsDto setAllMembersVisibility(@NotNull UUID id, boolean enabled) {
     return backendApiClient.put(
         "/api/v1/bank/org-units/accounts/{id}/visibility/all-members/{enabled}",
-        body,
+        null,
         OrgUnitBankAccountSettingsDto.class,
         id,
         enabled);
@@ -815,15 +812,13 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param enabled whether the whole area cascade may view the account
-   * @param body the browser's body with the request's echoed {@code version}
    * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(
-      @NotNull UUID id, boolean enabled, @NotNull Map<String, Object> body) {
+  public OrgUnitBankAccountSettingsDto setAreaMembersVisibility(@NotNull UUID id, boolean enabled) {
     return backendApiClient.put(
         "/api/v1/bank/org-units/accounts/{id}/visibility/area-members/{enabled}",
-        body,
+        null,
         OrgUnitBankAccountSettingsDto.class,
         id,
         enabled);
@@ -834,15 +829,13 @@ public class BankBackendClient {
    *
    * @param id the account
    * @param userId the user to grant
-   * @param body the browser's body with the request's echoed {@code version}
    * @return the refreshed settings, or {@code null} when the backend sent no body
    */
   @Nullable
-  public OrgUnitBankAccountSettingsDto addUserVisibility(
-      @NotNull UUID id, @NotNull UUID userId, @NotNull Map<String, Object> body) {
+  public OrgUnitBankAccountSettingsDto addUserVisibility(@NotNull UUID id, @NotNull UUID userId) {
     return backendApiClient.post(
         "/api/v1/bank/org-units/accounts/{id}/visibility/user/{userId}",
-        body,
+        null,
         OrgUnitBankAccountSettingsDto.class,
         id,
         userId);
@@ -1035,9 +1028,9 @@ public class BankBackendClient {
    * @param from period start
    * @param to period end
    * @param userTimeZone the caller's IANA time zone, forwarded when not blank
-   * @return the PDF bytes, or {@code null} when the backend sent no body
+   * @return the bounded PDF transfer
    */
-  public byte @Nullable [] orgUnitAccountStatement(
+  public @NotNull BackendBinaryTransfer orgUnitAccountStatement(
       @NotNull UUID id, @NotNull Instant from, @NotNull Instant to, @Nullable String userTimeZone) {
     String uri =
         UriComponentsBuilder.fromPath("/api/v1/bank/org-units/accounts/{id}/statement")
@@ -1046,8 +1039,7 @@ public class BankBackendClient {
             .encode()
             .build()
             .toUriString();
-    return backendApiClient.execute(
-        HttpMethod.GET,
+    return backendApiClient.download(
         uri,
         webClient ->
             webClient
@@ -1057,8 +1049,7 @@ public class BankBackendClient {
                   if (userTimeZone != null && !userTimeZone.isBlank()) {
                     h.set("X-User-Time-Zone", userTimeZone);
                   }
-                }),
-        spec -> spec.bodyToMono(byte[].class));
+                }));
   }
 
   /**
@@ -1067,12 +1058,11 @@ public class BankBackendClient {
    * @param uri the backend URI template with its query
    * @param uriVariables the values expanded into the template, in order
    * @param userTimeZone the zone header to forward, or {@code null}
-   * @return the PDF bytes, or {@code null} when the backend sent no body
+   * @return the bounded PDF transfer
    */
-  private byte @Nullable [] pdf(
+  private @NotNull BackendBinaryTransfer pdf(
       @NotNull String uri, @NotNull Object[] uriVariables, @Nullable String userTimeZone) {
-    return backendApiClient.execute(
-        HttpMethod.GET,
+    return backendApiClient.download(
         uri,
         webClient ->
             webClient
@@ -1082,7 +1072,6 @@ public class BankBackendClient {
                   if (userTimeZone != null && !userTimeZone.isBlank()) {
                     h.set("X-User-Time-Zone", userTimeZone);
                   }
-                }),
-        spec -> spec.bodyToMono(byte[].class));
+                }));
   }
 }

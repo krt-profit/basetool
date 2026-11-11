@@ -82,11 +82,38 @@ public interface StockCommands {
       @NotNull Collection<OrderMaterialScope> requiredScopes);
 
   /**
-   * Locks one row for a write that follows (a handover or a production consumption), with its
-   * material, owner, location and owning org unit loaded.
+   * Plans all stock writes and requires the caller's selected source rows under the lock.
+   *
+   * @param selected the caller's named source rows
+   * @param additional the other existing rows the operation changes
+   * @param bookings every new destination with its actual merge policy
+   * @param requiredScopes additional material scopes owned by the calling domain
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when a selected row is
+   *     absent
+   */
+  void prepareWritesRequiringSources(
+      @NotNull Collection<UUID> selected,
+      @NotNull Collection<UUID> additional,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes);
+
+  /**
+   * Plans receipt of a donation whose current carrier can disappear while waiting for stock locks.
+   *
+   * @param sourceRowId the current pledged row
+   * @param destination the actual transfer destination
+   */
+  void prepareDonationReceipt(@NotNull UUID sourceRowId, @NotNull StockBookInScope destination);
+
+  /**
+   * Locks one row for a write that follows (a handover, a production consumption or a donation), in
+   * one statement without a join (ADR-0363); its associations load on first use.
    *
    * @param rowId the row
-   * @return the row under a pessimistic write lock, or empty when unknown
+   * @return the row under a pessimistic write lock, or empty when unknown or deleted while the lock
+   *     waited
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the caller's
+   *     transaction already holds the row at an older version than the one the lock read
    */
   @NotNull
   Optional<StockRow> lockRow(@NotNull UUID rowId);

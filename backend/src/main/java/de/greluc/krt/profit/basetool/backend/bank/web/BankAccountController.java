@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountType;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBalanceSeriesDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingDto;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankCapabilitiesDto;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankPdfExport;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankSecurityService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankStatementReportService;
 import de.greluc.krt.profit.basetool.backend.bank.internal.CreateBankAccountRequest;
@@ -38,12 +39,12 @@ import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
-import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -53,6 +54,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -319,6 +321,7 @@ public class BankAccountController {
    * @param from period start (inclusive, ISO-8601 instant)
    * @param to period end (inclusive, ISO-8601 instant)
    * @param userZone the resolved {@code X-User-Time-Zone} zone, or {@code null} for UTC
+   * @param request the request owning temporary export storage
    * @return PDF body with {@code application/pdf} and attachment Content-Disposition
    */
   @Operation(summary = "Download the account statement PDF for a period")
@@ -329,13 +332,14 @@ public class BankAccountController {
       in = ParameterIn.HEADER,
       required = false,
       schema = @Schema(type = "string"))
-  public ResponseEntity<byte[]> downloadStatement(
+  public ResponseEntity<Resource> downloadStatement(
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull Instant from,
       @RequestParam @NotNull Instant to,
-      @UserZone ZoneId userZone) {
-    byte[] pdf = bankStatementReportService.generateStatement(id, from, to, userZone);
-    return PdfResponses.pdfAttachment(pdf, "kontoauszug-" + id + ".pdf");
+      @UserZone ZoneId userZone,
+      HttpServletRequest request) {
+    BankPdfExport pdf = bankStatementReportService.generateStatement(id, from, to, userZone);
+    return BankReportCleanupFilter.attachment(request, pdf, "kontoauszug-" + id + ".pdf");
   }
 
   /**

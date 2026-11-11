@@ -21,11 +21,34 @@ package de.greluc.krt.profit.basetool.backend.identity.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 
 /** MapStruct mapper between Role entities and DTOs. */
 @Mapper(config = CentralMapperConfig.class)
 public interface RoleMapper {
   /** Maps a {@link Role} entity to its outbound DTO. */
-  RoleDto toDto(Role role);
+  @Contract("null -> null; !null -> !null")
+  default @Nullable RoleDto toDto(@Nullable Role role) {
+    return role == null ? null : snapshot(role);
+  }
+
+  /**
+   * Copies a role into an immutable cache-safe read model.
+   *
+   * @param role the managed role
+   * @return the detached read model
+   */
+  static @NotNull RoleDto snapshot(@NotNull Role role) {
+    return new RoleDto(
+        role.getId(),
+        role.getName(),
+        role.getDescription(),
+        role.getPermissions(),
+        role.getVersion(),
+        role.getDescriptionVersion(),
+        role.getPermissionsVersion());
+  }
 }

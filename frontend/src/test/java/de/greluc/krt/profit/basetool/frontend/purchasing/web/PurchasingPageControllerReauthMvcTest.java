@@ -54,7 +54,8 @@ class PurchasingPageControllerReauthMvcTest {
                 mock(SupplyBackendClient.class),
                 featureState,
                 mock(QualityTierCatalog.class),
-                mock(LayoutContextLoader.class)));
+                mock(LayoutContextLoader.class),
+                new PurchasingRequestState(client)));
     ReauthPageMvc.signInMember();
   }
 

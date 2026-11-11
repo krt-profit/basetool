@@ -67,7 +67,14 @@ class BackendApiClientExecuteTest {
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
     meterRegistry = new SimpleMeterRegistry();
-    client = new BackendApiClient(webClient, webClient, meterRegistry, new NoOpCacheManager());
+    client =
+        new BackendApiClient(
+            webClient,
+            webClient,
+            meterRegistry,
+            new NoOpCacheManager(),
+            de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture
+                .create());
   }
 
   @AfterEach
@@ -183,7 +190,13 @@ class BackendApiClientExecuteTest {
                     new ClientAuthorizationException(new OAuth2Error("invalid_grant"), "keycloak")))
             .build();
     BackendApiClient reauthClient =
-        new BackendApiClient(failing, failing, meterRegistry, new NoOpCacheManager());
+        new BackendApiClient(
+            failing,
+            failing,
+            meterRegistry,
+            new NoOpCacheManager(),
+            de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicyFixture
+                .create());
 
     assertThrows(ReauthenticationRequiredException.class, () -> call.apply(reauthClient));
     assertEquals(

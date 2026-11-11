@@ -24,8 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.architecture.ModuleSubjects;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import java.io.IOException;
@@ -51,10 +50,7 @@ import tools.jackson.databind.json.JsonMapper;
 class OpenApiDerivedPropertyTest {
 
   /** Production bytecode of the backend module; test classes are excluded deliberately. */
-  private static final JavaClasses CLASSES =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages("de.greluc.krt.profit.basetool.backend");
+  private static final JavaClasses CLASSES = ModuleSubjects.importBackendMainClasses();
 
   /** The committed spec, relative to the module directory tests run in. */
   private static final Path OPENAPI = Paths.get("src/main/resources/api/openapi.json");

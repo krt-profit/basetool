@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -67,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -121,6 +123,9 @@ class JobOrderItemProductionServiceTest {
 
   @BeforeEach
   void setUp() {
+    lenient()
+        .when(inventoryItemRepository.lockRowIdsOrderById(anyCollection()))
+        .thenAnswer(invocation -> List.copyOf(invocation.<Collection<UUID>>getArgument(0)));
     service =
         new JobOrderItemProductionService(
             jobOrderRepository,
@@ -188,7 +193,7 @@ class JobOrderItemProductionServiceTest {
 
     lenient().when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
     lenient()
-        .when(inventoryItemRepository.findByIdForUpdate(inventoryId))
+        .when(inventoryItemRepository.lockById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
@@ -542,7 +547,7 @@ class JobOrderItemProductionServiceTest {
     service.bookProduction(orderId, lineId, dto);
 
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
-    verify(inventoryItemRepository, never()).findByIdForUpdate(any());
+    verify(inventoryItemRepository, never()).lockById(any());
     verify(inventoryItemRepository, never()).delete(any());
     verify(auditService, times(1))
         .record(eq(AuditEventType.JOB_ORDER_PRODUCTION_BOOKED), any(), any(), any(), any());
@@ -562,7 +567,7 @@ class JobOrderItemProductionServiceTest {
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     assertThat(inventoryItem.getAmount()).isEqualTo(100.0);
     assertThat(inventoryItem.getJobOrderAllocations().get(0).getAmount()).isEqualTo(100.0);
-    verify(inventoryItemRepository, never()).findByIdForUpdate(any());
+    verify(inventoryItemRepository, never()).lockById(any());
     verify(inventoryItemRepository, never()).save(inventoryItem);
     verify(inventoryItemRepository, never()).delete(any());
     verify(auditService, times(1))

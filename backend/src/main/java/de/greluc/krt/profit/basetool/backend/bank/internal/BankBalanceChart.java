@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import java.awt.Color;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
 import org.openpdf.text.Image;
@@ -75,6 +74,29 @@ public final class BankBalanceChart {
       @NotNull Instant to,
       @NotNull String fromLabel,
       @NotNull String toLabel) {
+    BankBalanceEnvelope envelope = new BankBalanceEnvelope(from, to, opening);
+    rows.forEach(row -> envelope.add(row.createdAt(), row.amount()));
+    return render(writer, envelope, from, to, fromLabel, toLabel);
+  }
+
+  /**
+   * Renders a bounded chart envelope without retaining the report's posting rows.
+   *
+   * @param writer the destination PDF writer
+   * @param envelope the exact endpoints and per-display-column extrema
+   * @param from chart start
+   * @param to chart end
+   * @param fromLabel localized start label
+   * @param toLabel localized end label
+   * @return the vector chart image
+   */
+  public static @NotNull Image render(
+      @NotNull PdfWriter writer,
+      @NotNull BankBalanceEnvelope envelope,
+      @NotNull Instant from,
+      @NotNull Instant to,
+      @NotNull String fromLabel,
+      @NotNull String toLabel) {
     try {
       final PdfTemplate cb = writer.getDirectContent().createTemplate(WIDTH, HEIGHT);
 
@@ -89,20 +111,9 @@ public final class BankBalanceChart {
       double toMs = to.toEpochMilli();
       final double span = Math.max(1d, toMs - fromMs);
 
-      List<double[]> vertices = new ArrayList<>();
-      vertices.add(new double[] {fromMs, opening.doubleValue()});
-      BigDecimal running = opening;
-      BigDecimal dataMin = opening;
-      BigDecimal dataMax = opening;
-      for (BankBookingRow row : rows) {
-        double t = clamp((double) row.createdAt().toEpochMilli(), fromMs, toMs);
-        vertices.add(new double[] {t, running.doubleValue()});
-        running = running.add(row.amount());
-        vertices.add(new double[] {t, running.doubleValue()});
-        dataMin = dataMin.min(running);
-        dataMax = dataMax.max(running);
-      }
-      vertices.add(new double[] {toMs, running.doubleValue()});
+      final List<double[]> vertices = envelope.vertices();
+      BigDecimal dataMin = envelope.getMinimum();
+      BigDecimal dataMax = envelope.getMaximum();
 
       double lo = dataMin.doubleValue();
       double hi = dataMax.doubleValue();
@@ -190,17 +201,5 @@ public final class BankBalanceChart {
     cb.setTextMatrix(tx, y);
     cb.showText(text);
     cb.endText();
-  }
-
-  /**
-   * Clamps a timestamp into the chart's window so a boundary booking never plots outside the axes.
-   *
-   * @param value the epoch-milli timestamp
-   * @param min the window start
-   * @param max the window end
-   * @return the clamped value
-   */
-  private static double clamp(double value, double min, double max) {
-    return Math.max(min, Math.min(max, value));
   }
 }

@@ -199,7 +199,7 @@ class JobOrderItemHandoverServiceTest {
                 any(UUID.class), org.mockito.ArgumentMatchers.anyCollection()))
         .thenReturn(List.of());
     lenient()
-        .when(inventoryItemRepository.findByIdForUpdate(any(UUID.class)))
+        .when(inventoryItemRepository.lockById(any(UUID.class)))
         .thenAnswer(invocation ->
             Optional.ofNullable(sourceRows.get(invocation.getArgument(0, UUID.class))));
 

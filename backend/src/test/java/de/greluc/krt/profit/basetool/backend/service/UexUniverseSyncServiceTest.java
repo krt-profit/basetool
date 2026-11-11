@@ -62,7 +62,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexSpaceStat
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.uex.UexTerminalDto;
 import de.greluc.krt.profit.basetool.backend.repository.*;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -98,12 +97,25 @@ class UexUniverseSyncServiceTest {
   @InjectMocks private UexUniverseSyncService service;
 
   @Test
+  void identityLookupsScaleWithChunksRatherThanIncomingRows() {
+    List<UexFactionDto> rows =
+        java.util.stream.IntStream.range(0, 501)
+            .mapToObj(i -> UexFactionDto.builder().id(10000 + i).name("Batch faction " + i).build())
+            .toList();
+    when(uexClient.getFactions()).thenReturn(fetched(rows));
+    service.syncFactions();
+    verify(factionRepository, times(2)).findByIdFactionInOrNameInOrderByIdAsc(any(), any());
+    verify(factionRepository, times(501)).save(any(Faction.class));
+    verify(factionRepository, never()).findByIdFaction(any());
+    verify(factionRepository, never()).findByName(any());
+  }
+
+  @Test
   void shouldSyncCitiesSuccessfully() {
     UexCityDto cityDto = UexCityDto.builder().id(1).name("Lorville").isAvailableLive(1).build();
 
     when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto)));
-    when(cityRepository.findByIdCity(1)).thenReturn(Optional.empty());
-    when(cityRepository.findByName("Lorville")).thenReturn(Optional.empty());
+
     when(cityRepository.save(any(City.class)))
         .thenAnswer(invocation -> {
           City c = invocation.getArgument(0);
@@ -113,13 +125,14 @@ class UexUniverseSyncServiceTest {
 
     de.greluc.krt.profit.basetool.backend.catalogue.api.Location mockLocation =
         new de.greluc.krt.profit.basetool.backend.catalogue.api.Location();
-    when(locationRepository.findByCityId(any())).thenReturn(Optional.of(mockLocation));
+    when(locationRepository.findForUexChunk(any(), any(), any())).thenReturn(List.of(mockLocation));
+
     when(locationRepository.save(any())).thenReturn(mockLocation);
 
     service.syncCities();
 
     verify(uexClient, times(1)).getCities();
-    verify(cityRepository, times(2)).save(any(City.class));
+    verify(cityRepository, times(1)).save(any(City.class));
   }
 
   @Test
@@ -147,8 +160,7 @@ class UexUniverseSyncServiceTest {
   void syncCities_doesNotMaterialiseLocation_whenCityNotAvailableLive() {
     UexCityDto offline = UexCityDto.builder().id(2).name("Old Lorville").isAvailableLive(0).build();
     when(uexClient.getCities()).thenReturn(fetched(List.of(offline)));
-    when(cityRepository.findByIdCity(2)).thenReturn(Optional.empty());
-    when(cityRepository.findByName("Old Lorville")).thenReturn(Optional.empty());
+
     when(cityRepository.save(any(City.class)))
         .thenAnswer(invocation -> {
           City c = invocation.getArgument(0);
@@ -170,8 +182,10 @@ class UexUniverseSyncServiceTest {
 
     UexCityDto dto = UexCityDto.builder().id(7).name("Area18").isAvailableLive(0).build();
     when(uexClient.getCities()).thenReturn(fetched(List.of(dto)));
-    when(cityRepository.findByIdCity(7)).thenReturn(Optional.empty());
-    when(cityRepository.findByName("Area18")).thenReturn(Optional.of(existing));
+
+    when(cityRepository.findByIdCityInOrNameInOrderByIdAsc(any(), any()))
+        .thenReturn(List.of(existing));
+
     when(cityRepository.save(any(City.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncCities();
@@ -192,8 +206,7 @@ class UexUniverseSyncServiceTest {
             .isBountyHunting(1)
             .build();
     when(uexClient.getFactions()).thenReturn(fetched(List.of(dto)));
-    when(factionRepository.findByIdFaction(1)).thenReturn(Optional.empty());
-    when(factionRepository.findByName("UEE")).thenReturn(Optional.empty());
+
     when(factionRepository.save(any(Faction.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncFactions();
@@ -238,8 +251,7 @@ class UexUniverseSyncServiceTest {
             .factionName("HDC")
             .build();
     when(uexClient.getJurisdictions()).thenReturn(fetched(List.of(dto)));
-    when(jurisdictionRepository.findByIdJurisdiction(10)).thenReturn(Optional.empty());
-    when(jurisdictionRepository.findByName("Hurston Sec")).thenReturn(Optional.empty());
+
     when(jurisdictionRepository.save(any(Jurisdiction.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncJurisdictions();
@@ -273,8 +285,7 @@ class UexUniverseSyncServiceTest {
             .planetName("Crusader")
             .build();
     when(uexClient.getMoons()).thenReturn(fetched(List.of(dto)));
-    when(moonRepository.findByIdMoon(20)).thenReturn(Optional.empty());
-    when(moonRepository.findByName("Lyria")).thenReturn(Optional.empty());
+
     when(moonRepository.save(any(Moon.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncMoons();
@@ -306,8 +317,7 @@ class UexUniverseSyncServiceTest {
             .factionName("UEE")
             .build();
     when(uexClient.getOrbits()).thenReturn(fetched(List.of(dto)));
-    when(orbitRepository.findByIdOrbit(30)).thenReturn(Optional.empty());
-    when(orbitRepository.findByName("HurstonOrbit")).thenReturn(Optional.empty());
+
     when(orbitRepository.save(any(Orbit.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncOrbits();
@@ -337,8 +347,7 @@ class UexUniverseSyncServiceTest {
             .nickname("HDMS-A")
             .build();
     when(uexClient.getOutposts()).thenReturn(fetched(List.of(dto)));
-    when(outpostRepository.findByIdOutpost(40)).thenReturn(Optional.empty());
-    when(outpostRepository.findByName("HDMS-Anderson")).thenReturn(Optional.empty());
+
     when(outpostRepository.save(any(Outpost.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncOutposts();
@@ -370,8 +379,7 @@ class UexUniverseSyncServiceTest {
             .starSystemName("Stanton")
             .build();
     when(uexClient.getPlanets()).thenReturn(fetched(List.of(dto)));
-    when(planetRepository.findByIdPlanet(50)).thenReturn(Optional.empty());
-    when(planetRepository.findByName("Hurston")).thenReturn(Optional.empty());
+
     when(planetRepository.save(any(Planet.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncPlanets();
@@ -395,8 +403,7 @@ class UexUniverseSyncServiceTest {
     UexPoiDto dto =
         UexPoiDto.builder().id(60).name("Klescher").isAvailableLive(1).isAvailable(1).build();
     when(uexClient.getPoi()).thenReturn(fetched(List.of(dto)));
-    when(poiRepository.findByIdPoi(60)).thenReturn(Optional.empty());
-    when(poiRepository.findByName("Klescher")).thenReturn(Optional.empty());
+
     when(poiRepository.save(any(Poi.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncPois();
@@ -424,16 +431,14 @@ class UexUniverseSyncServiceTest {
             .isLagrange(1)
             .build();
     when(uexClient.getSpaceStations()).thenReturn(fetched(List.of(dto)));
-    when(spaceStationRepository.findByIdSpaceStation(70)).thenReturn(Optional.empty());
-    when(spaceStationRepository.findByName("Port Olisar")).thenReturn(Optional.empty());
+
     when(spaceStationRepository.save(any(SpaceStation.class)))
         .thenAnswer(i -> {
           SpaceStation s = i.getArgument(0);
           if (s.getId() == null) s.setId(UUID.randomUUID());
           return s;
         });
-    when(locationRepository.findBySpaceStationId(any())).thenReturn(Optional.empty());
-    when(locationRepository.findByName("Port Olisar")).thenReturn(Optional.empty());
+
     when(locationRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
     service.syncSpaceStations();
@@ -451,8 +456,7 @@ class UexUniverseSyncServiceTest {
             .isAvailableLive(0)
             .build();
     when(uexClient.getSpaceStations()).thenReturn(fetched(List.of(offline)));
-    when(spaceStationRepository.findByIdSpaceStation(71)).thenReturn(Optional.empty());
-    when(spaceStationRepository.findByName("Decommissioned Station")).thenReturn(Optional.empty());
+
     when(spaceStationRepository.save(any(SpaceStation.class)))
         .thenAnswer(i -> {
           SpaceStation s = i.getArgument(0);
@@ -471,8 +475,8 @@ class UexUniverseSyncServiceTest {
     City city = savedCity(3, "Rising City");
     Location marked = referenceOnly(city, "Rising City");
     when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(3, "Rising City", 1))));
-    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.of(marked));
-    when(locationRepository.findByName("Rising City")).thenReturn(Optional.of(marked));
+
+    when(locationRepository.findForUexChunk(any(), any(), any())).thenReturn(List.of(marked));
 
     service.syncCities();
 
@@ -486,8 +490,8 @@ class UexUniverseSyncServiceTest {
     City city = savedCity(4, "Renamed City");
     Location marked = referenceOnly(city, "Old Name");
     when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(4, "Renamed City", 0))));
-    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.of(marked));
-    when(locationRepository.findByName("Renamed City")).thenReturn(Optional.empty());
+
+    when(locationRepository.findForUexChunk(any(), any(), any())).thenReturn(List.of(marked));
 
     service.syncCities();
 
@@ -504,8 +508,9 @@ class UexUniverseSyncServiceTest {
     other.setId(UUID.randomUUID());
     other.setName("Shared Name");
     when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(5, "Shared Name", 1))));
-    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.of(marked));
-    when(locationRepository.findByName("Shared Name")).thenReturn(Optional.of(other));
+
+    when(locationRepository.findForUexChunk(any(), any(), any()))
+        .thenReturn(List.of(marked, other));
 
     service.syncCities();
 
@@ -521,9 +526,8 @@ class UexUniverseSyncServiceTest {
     nodePlace.setName("Krt Node Name");
     nodePlace.setStarmapObjectId(UUID.randomUUID());
     when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(6, "Krt Node Name", 1))));
-    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.empty());
-    when(locationRepository.findByName("Krt Node Name")).thenReturn(Optional.of(nodePlace));
-    when(locationRepository.findByName("Krt Node Name (UEX city 6)")).thenReturn(Optional.empty());
+
+    when(locationRepository.findForUexChunk(any(), any(), any())).thenReturn(List.of(nodePlace));
 
     service.syncCities();
 
@@ -539,8 +543,13 @@ class UexUniverseSyncServiceTest {
   void syncCities_createsNoLocation_whenBothNamesAreHeld() {
     City city = savedCity(8, "Krt Taken");
     when(uexClient.getCities()).thenReturn(fetched(List.of(cityDto(8, "Krt Taken", 1))));
-    when(locationRepository.findByCityId(city.getId())).thenReturn(Optional.empty());
-    when(locationRepository.findByName(any())).thenReturn(Optional.of(new Location()));
+
+    Location firstTaken = new Location();
+    firstTaken.setName("Krt Taken");
+    Location secondTaken = new Location();
+    secondTaken.setName("Krt Taken (UEX city 8)");
+    when(locationRepository.findForUexChunk(any(), any(), any()))
+        .thenReturn(List.of(firstTaken, secondTaken));
 
     service.syncCities();
 
@@ -555,12 +564,15 @@ class UexUniverseSyncServiceTest {
     station.setName("Quiet Station");
     Location storage = new Location();
     storage.setName("Curated Name");
+    storage.setSpaceStation(station);
     UexSpaceStationDto dto =
         UexSpaceStationDto.builder().id(72).name("Quiet Station").isAvailableLive(0).build();
     when(uexClient.getSpaceStations()).thenReturn(fetched(List.of(dto)));
-    when(spaceStationRepository.findByIdSpaceStation(72)).thenReturn(Optional.of(station));
+
     when(spaceStationRepository.save(any(SpaceStation.class))).thenAnswer(i -> i.getArgument(0));
-    when(locationRepository.findBySpaceStationId(station.getId())).thenReturn(Optional.of(storage));
+    when(spaceStationRepository.findByIdSpaceStationInOrNameInOrderByIdAsc(any(), any()))
+        .thenReturn(List.of(station));
+    when(locationRepository.findForUexChunk(any(), any(), any())).thenReturn(List.of(storage));
 
     service.syncSpaceStations();
 
@@ -577,7 +589,8 @@ class UexUniverseSyncServiceTest {
     city.setId(UUID.randomUUID());
     city.setIdCity(uexId);
     city.setName(name);
-    when(cityRepository.findByIdCity(uexId)).thenReturn(Optional.of(city));
+    when(cityRepository.findByIdCityInOrNameInOrderByIdAsc(any(), any())).thenReturn(List.of(city));
+
     when(cityRepository.save(any(City.class))).thenAnswer(i -> i.getArgument(0));
     return city;
   }
@@ -612,9 +625,7 @@ class UexUniverseSyncServiceTest {
             .cityName("Lorville")
             .build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
-    when(terminalRepository.findByIdTerminal(80)).thenReturn(Optional.empty());
-    when(terminalRepository.findFirstByNameAndIdTerminalIsNullOrderByIdAsc("Lorville TDD"))
-        .thenReturn(Optional.empty());
+
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
@@ -639,9 +650,7 @@ class UexUniverseSyncServiceTest {
             .build();
     UexTerminalDto blank = UexTerminalDto.builder().id(82).name("Blank").gameVersion("").build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto, blank)));
-    when(terminalRepository.findByIdTerminal(any())).thenReturn(Optional.empty());
-    when(terminalRepository.findFirstByNameAndIdTerminalIsNullOrderByIdAsc(any()))
-        .thenReturn(Optional.empty());
+
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
@@ -677,7 +686,9 @@ class UexUniverseSyncServiceTest {
     UexCityDto dto =
         UexCityDto.builder().id(11).name("Lorville").hasLoadingDock(0).isAvailableLive(0).build();
     when(uexClient.getCities()).thenReturn(fetched(List.of(dto)));
-    when(cityRepository.findByIdCity(11)).thenReturn(Optional.of(existing));
+    when(cityRepository.findByIdCityInOrNameInOrderByIdAsc(any(), any()))
+        .thenReturn(List.of(existing));
+
     when(cityRepository.save(any(City.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncCities();
@@ -704,7 +715,9 @@ class UexUniverseSyncServiceTest {
             .isAvailableLive(0)
             .build();
     when(uexClient.getOutposts()).thenReturn(fetched(List.of(dto)));
-    when(outpostRepository.findByIdOutpost(12)).thenReturn(Optional.of(existing));
+    when(outpostRepository.findByIdOutpostInOrNameInOrderByIdAsc(any(), any()))
+        .thenReturn(List.of(existing));
+
     when(outpostRepository.save(any(Outpost.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncOutposts();
@@ -726,7 +739,9 @@ class UexUniverseSyncServiceTest {
     UexPoiDto dto =
         UexPoiDto.builder().id(13).name("Grim HEX").hasLoadingDock(0).isAvailableLive(0).build();
     when(uexClient.getPoi()).thenReturn(fetched(List.of(dto)));
-    when(poiRepository.findByIdPoi(13)).thenReturn(Optional.of(existing));
+    when(poiRepository.findByIdPoiInOrNameInOrderByIdAsc(any(), any()))
+        .thenReturn(List.of(existing));
+
     when(poiRepository.save(any(Poi.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncPois();
@@ -753,7 +768,9 @@ class UexUniverseSyncServiceTest {
             .isAvailableLive(0)
             .build();
     when(uexClient.getSpaceStations()).thenReturn(fetched(List.of(dto)));
-    when(spaceStationRepository.findByIdSpaceStation(14)).thenReturn(Optional.of(existing));
+    when(spaceStationRepository.findByIdSpaceStationInOrNameInOrderByIdAsc(any(), any()))
+        .thenReturn(List.of(existing));
+
     when(spaceStationRepository.save(any(SpaceStation.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncSpaceStations();
@@ -780,7 +797,9 @@ class UexUniverseSyncServiceTest {
             .isAutoLoad(0)
             .build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
-    when(terminalRepository.findByIdTerminal(15)).thenReturn(Optional.of(existing));
+    when(terminalRepository.findByIdTerminalInOrNameInOrderByIdAsc(any(), any()))
+        .thenReturn(List.of(existing));
+
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
@@ -810,7 +829,9 @@ class UexUniverseSyncServiceTest {
             .isAutoLoad(0)
             .build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
-    when(terminalRepository.findByIdTerminal(16)).thenReturn(Optional.of(existing));
+    when(terminalRepository.findByIdTerminalInOrNameInOrderByIdAsc(any(), any()))
+        .thenReturn(List.of(existing));
+
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
@@ -830,9 +851,7 @@ class UexUniverseSyncServiceTest {
     UexTerminalDto dto =
         UexTerminalDto.builder().id(81).name("Area 18 TDD").hasLoadingDock(1).isAutoLoad(0).build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
-    when(terminalRepository.findByIdTerminal(81)).thenReturn(Optional.empty());
-    when(terminalRepository.findFirstByNameAndIdTerminalIsNullOrderByIdAsc("Area 18 TDD"))
-        .thenReturn(Optional.empty());
+
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();
@@ -850,9 +869,7 @@ class UexUniverseSyncServiceTest {
   void syncTerminals_recordsNullUexMirror_whenUpstreamFieldsAreNull() {
     UexTerminalDto dto = UexTerminalDto.builder().id(82).name("Empty Terminal").build();
     when(uexClient.getTerminals()).thenReturn(fetched(List.of(dto)));
-    when(terminalRepository.findByIdTerminal(82)).thenReturn(Optional.empty());
-    when(terminalRepository.findFirstByNameAndIdTerminalIsNullOrderByIdAsc("Empty Terminal"))
-        .thenReturn(Optional.empty());
+
     when(terminalRepository.save(any(Terminal.class))).thenAnswer(i -> i.getArgument(0));
 
     service.syncTerminals();

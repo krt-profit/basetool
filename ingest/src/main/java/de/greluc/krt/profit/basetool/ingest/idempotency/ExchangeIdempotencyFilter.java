@@ -47,6 +47,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingResponseWrapper;
+import org.springframework.web.util.WebUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -156,10 +157,16 @@ public class ExchangeIdempotencyFilter extends OncePerRequestFilter {
           "A write needs an Idempotency-Key of 8 to 128 characters [A-Za-z0-9._~-].");
       return;
     }
-    byte[] body = request.getInputStream().readAllBytes();
+    CachedBodyRequest buffered = WebUtils.getNativeRequest(request, CachedBodyRequest.class);
+    HttpServletRequest replayable = request;
+    if (buffered == null) {
+      buffered = new CachedBodyRequest(request, request.getInputStream().readAllBytes());
+      replayable = buffered;
+    }
     String namespace = ExchangeIdempotency.namespace(context.clientId(), context.member(), key);
     String fingerprint =
-        ExchangeIdempotency.fingerprint(request.getMethod(), request.getRequestURI(), body);
+        ExchangeIdempotency.fingerprint(
+            request.getMethod(), request.getRequestURI(), buffered.bufferedBody());
     String token;
     try {
       Optional<ExchangeIdempotency.Stored> stored = idempotency.find(namespace);
@@ -183,13 +190,7 @@ public class ExchangeIdempotencyFilter extends OncePerRequestFilter {
     }
     ContentCachingResponseWrapper wrapper = new ContentCachingResponseWrapper(response);
     try {
-      runClaimed(
-          new CachedBodyRequest(request, body),
-          wrapper,
-          filterChain,
-          context,
-          namespace,
-          fingerprint);
+      runClaimed(replayable, wrapper, filterChain, context, namespace, fingerprint);
     } finally {
       idempotency.releaseClaim(namespace, token);
       wrapper.copyBodyToResponse();
@@ -277,9 +278,12 @@ public class ExchangeIdempotencyFilter extends OncePerRequestFilter {
       @NotNull String reservation,
       long reserved,
       @NotNull ContentCachingResponseWrapper wrapper) {
+    if (wrapper.getContentSize() > properties.maxResultBytes()) {
+      return false;
+    }
     byte[] content = wrapper.getContentAsByteArray();
     String body = new String(content, StandardCharsets.UTF_8);
-    if (!cacheable(wrapper.getStatus(), body) || content.length > properties.maxResultBytes()) {
+    if (!cacheable(wrapper.getStatus(), body)) {
       return false;
     }
     ExchangeIdempotency.Stored stored =

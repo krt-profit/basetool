@@ -25,7 +25,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.architecture.ModuleSubjects;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.City;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
@@ -283,6 +283,12 @@ class TableOwnershipTest {
               Set.of(
                   "city", "game_item", "location", "material", "space_station", "starmap_object"),
               "The keyed variant of findExchangeOrgLots; the same downward read into catalogue."),
+          "MaterialExchangeOfferRepository#findActiveStockByInventoryItemIdArray",
+          new Crossing(
+              Set.of("inventory_item", "material"),
+              "Reads the active offers on the Lager rows a delete holds, with their material names,"
+                  + " binding the row ids as one array however many a wipe locks; a downward read"
+                  + " into inventory and catalogue (ADR-0362)."),
           "PersonalBlueprintRepository#grantDefaultBlueprintsToAllUsers",
           new Crossing(
               Set.of("app_user"),
@@ -391,10 +397,7 @@ class TableOwnershipTest {
   @Test
   @DisplayName("SQL outside repositories runs only in the listed registry classes")
   void dynamicNativeSqlRunsOnlyInListedClasses() {
-    JavaClasses production =
-        new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages(BASE_PACKAGE);
+    JavaClasses production = ModuleSubjects.importBackendMainClasses();
     Set<String> callers = dynamicSqlCallers(production);
     assertThat(callers)
         .as(
@@ -622,10 +625,7 @@ class TableOwnershipTest {
   }
 
   private static Collection<Class<?>> repositoryInterfaces() {
-    JavaClasses production =
-        new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages(BASE_PACKAGE);
+    JavaClasses production = ModuleSubjects.importBackendMainClasses();
     List<Class<?>> repositories = new ArrayList<>();
     for (JavaClass c : production) {
       if (c.isInterface() && c.isAssignableTo(Repository.class)) {

@@ -213,9 +213,7 @@ public class MissionPageController {
       List<T> options = load.join();
       model.addAttribute(attribute, options != null ? options : List.of());
     } catch (CompletionException e) {
-      if (e.getCause() instanceof ReauthenticationRequiredException reauth) {
-        throw reauth;
-      }
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.warn("Could not load the mission option list {}", attribute, e.getCause());
       failures.add(OPTION_LIST_KEY_PREFIX + attribute);
       model.addAttribute(attribute, List.of());

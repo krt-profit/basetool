@@ -66,6 +66,7 @@ class ScWikiClientRunHistoryTest {
   @Mock private GameItemRepository items;
   @Mock private BlueprintRepository blueprints;
   @Mock private ManufacturerRepository manufacturers;
+  @Mock private ManufacturerScwikiIdentityRepository manufacturerIdentities;
   @Mock private GameItemStatRepository stats;
   @Mock private ItemReconciliationService reconciliation;
   @Mock private AdminDashboardLiveSync dashboard;
@@ -117,6 +118,7 @@ class ScWikiClientRunHistoryTest {
             items,
             blueprints,
             manufacturers,
+            manufacturerIdentities,
             report,
             new GameItemStatWriter(stats, report),
             new ScWikiItemStatFollowUp(client, properties, stats, report),

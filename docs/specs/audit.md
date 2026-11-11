@@ -187,6 +187,8 @@ web, naming its client (REQ-AUDIT-005):
   (`ROLE_CHANGED` carrying a `grandAdmiral` boolean, REQ-ORG-021); Logistician / Mission-Manager
   capability-flag changes; **role permission-set changes** (`ROLE_PERMISSIONS_CHANGED` — the admin
   role editor's permission grid, previously the one mutation in this area that left no trace);
+  role description edits (`ROLE_DESCRIPTION_CHANGED`, role code as subject and only the new
+  numeric `sectionVersion` in details, never the description text);
   the admin's change of a member's numeric member rank 1–20 (`MEMBER_RANK_CHANGED`, recorded only
   when the rank differs from the stored one; subject and target are the member, details
   `from=<old|null> to=<new>`, REQ-ROLE-007); the assignment and withdrawal of one of the four
@@ -271,7 +273,8 @@ web, naming its client (REQ-AUDIT-005):
   write the same events. The subject is the ship, labelled by its **ship-type name** — never the
   ship's own name, which is free text — and the owner is the target. Detaching a deleted ship
   from a mission unit additionally writes `MISSION_UNIT_UPDATED` in the **Missionen** area, one
-  per unit, which closed a gap in that area's coverage.
+  per unit, which closed a gap in that area's coverage; the account deletion writes the same row
+  for every unit it releases from the departing member's ships (REQ-DATA-008).
 - **Blueprints** (`PersonalBlueprint`, `DefaultBlueprint`, `AuditDomain.BLUEPRINT`, every channel) —
   add (`BLUEPRINT_ADDED`), batch add (`BLUEPRINT_BATCH_ADDED`, only when it added one), edit of the
   acquisition date or note (`BLUEPRINT_UPDATED`, only when a field changed; the details name the
@@ -546,7 +549,9 @@ The coverage list holds the **Katalog** area
     refined material (`CATALOGUE_MATERIAL_P4K_OVERRIDE_SET` with `field` and `valueId` when an
     edit makes one, `CATALOGUE_MATERIAL_P4K_OVERRIDE_RELEASED` with `field` when the admin hands it
     back, REQ-P4K-024/025); manufacturer, ship-type and terminal visibility
-    (`*_VISIBILITY_CHANGED`, `hidden=`); locations (`CATALOGUE_LOCATION_*`); the loading-dock
+    (`*_VISIBILITY_CHANGED`, `hidden=`); the admin choice of a manufacturer's primary SC Wiki entry
+    among its Wiki duplicates (`CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED` with `from=` and `to=`
+    the Wiki UUIDs, ADR-0361); locations (`CATALOGUE_LOCATION_*`); the loading-dock
     overrides on terminals, cities, outposts, POIs and space stations
     (`CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDDEN` with `hasLoadingDock=`,
     `CATALOGUE_<KIND>_LOADING_DOCK_OVERRIDE_CLEARED`) and the terminal auto-load override
@@ -580,7 +585,7 @@ counts them (REQ-OBS-011).
 - [x] For a representative mutation of each built activity above a test asserts exactly one
   `CATALOGUE` event (type, subject, label, details); an update names changed fields only
   (`CatalogueAuditTest`, `P4kImportAuditTest`, `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`,
-  `SyncRunServiceTest`).
+  `SyncRunServiceTest`, `ManufacturerWikiIdentityServiceTest`).
 - [x] Every `CATALOGUE` event type is offered by the Katalog tab and carries a label
   (`AdminAuditLogPageControllerTest`).
 - [x] Each finished UEX or SC Wiki sync run records one `CATALOGUE_SYNC_RUN_FINISHED` summary with

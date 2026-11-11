@@ -417,6 +417,7 @@ public class OperationPageController {
       operationClient.createOperation(form);
       redirectAttributes.addFlashAttribute("successMessage", "operation.create.success");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Error creating operation", e);
       redirectAttributes.addFlashAttribute("errorMessage", "operation.create.error");
     }
@@ -451,6 +452,7 @@ public class OperationPageController {
         redirectAttributes.addFlashAttribute("errorMessage", "operation.update.error");
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Error updating operation", e);
       redirectAttributes.addFlashAttribute("errorMessage", "operation.update.error");
     }
@@ -524,6 +526,7 @@ public class OperationPageController {
       operationClient.deleteOperation(id);
       redirectAttributes.addFlashAttribute("successMessage", "operation.delete.success");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Error deleting operation", e);
       redirectAttributes.addFlashAttribute("errorMessage", "operation.delete.error");
     }

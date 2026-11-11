@@ -49,7 +49,11 @@ class CascadeLayerOrderTest {
 
   /** The layers a file may use; any file not named here is a page stylesheet. */
   private static final Map<String, Set<String>> ALLOWED =
-      Map.of("styles.css", Set.of("base", "components", "page", "utilities"));
+      Map.of(
+          "styles.css", Set.of("base", "components", "page", "utilities"),
+          "pickers.css", Set.of("components", "page"),
+          "filters.css", Set.of("components"),
+          "overflow.css", Set.of("components"));
 
   private static final Set<String> PAGE_ONLY = Set.of("page");
 

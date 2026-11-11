@@ -113,7 +113,8 @@ application through the exchange API (REQ-XCH-017), which writes through the sam
 delete and is recorded with its client. A run that changed nothing records nothing. The subject is the ship,
 labelled by its ship type, never by its free-text name; details hold ids, counts and changed field
 names, never values. Deleting a ship first detaches it from mission units and records
-`MISSION_UNIT_UPDATED` in the Missionen area for each.
+`MISSION_UNIT_UPDATED` in the Missionen area for each; so does the account deletion for the
+departing member's ships (REQ-DATA-008).
 
 **Acceptance**
 

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,4 +43,14 @@ public interface OrbitRepository extends JpaRepository<Orbit, UUID> {
    */
   @Query("SELECT e.idOrbit AS uexId, e.id AS id FROM Orbit e WHERE e.idOrbit IS NOT NULL")
   List<UexKeyRef> findUexRefs();
+
+  /**
+   * Reads the identities and name fallbacks needed by one UEX synchronization chunk.
+   *
+   * @param ids incoming UEX identifiers
+   * @param names incoming display names
+   * @return matching rows in stable local-id order
+   */
+  List<Orbit> findByIdOrbitInOrNameInOrderByIdAsc(
+      Collection<Integer> ids, Collection<String> names);
 }

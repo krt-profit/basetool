@@ -103,8 +103,7 @@ public class InventoryStolenMarkService {
         List.of(itemId), List.of(new PoolRelocation(itemId, null, null, dto.stolen())));
     InventoryItem item =
         Entities.require(
-            inventoryItemRepository.findByIdForRebook(itemId),
-            () -> "Inventory item not found: " + itemId);
+            inventoryItemRepository.lockById(itemId), () -> "Inventory item not found: " + itemId);
     orderWrites.validateRows(List.of(itemId));
     boolean isOwner = item.getUser() != null && callerId.equals(item.getUser().getId());
     if (!isOwner && !isLogistician) {
@@ -151,7 +150,7 @@ public class InventoryStolenMarkService {
     for (UUID itemId : orderedIds) {
       InventoryItem item =
           Entities.require(
-              inventoryItemRepository.findByIdForRebook(itemId),
+              inventoryItemRepository.lockById(itemId),
               () -> "Inventory item not found: " + itemId);
       orderWrites.validateRows(List.of(itemId));
       if (item.getUser() == null || !callerId.equals(item.getUser().getId())) {

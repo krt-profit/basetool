@@ -182,6 +182,36 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
       @Param("accountId") UUID accountId, @Param("from") Instant from, @Param("to") Instant to);
 
   /**
+   * Reads a chronological keyset chunk of a statement within a fixed transaction snapshot.
+   *
+   * @param accountId the account
+   * @param from inclusive period start
+   * @param to inclusive period end
+   * @param afterAt previous chunk's final instant, or absent for the first chunk
+   * @param afterId previous chunk's final posting identifier
+   * @param limit the bounded chunk size
+   * @return the next chronological posting chunk
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRow(
+      p.id, t.id, t.type, p.amount, t.note, t.justification, t.staffNote, p.createdAt, rt.id,
+      t.transferFee, t.counterpartyHandle, t.counterpartyOrgUnitName, t.counterpartyUserId)
+      FROM BankPosting p JOIN p.transaction t LEFT JOIN t.reversedTransaction rt
+      WHERE p.account.id = :accountId AND p.createdAt >= :from AND p.createdAt <= :to
+        AND (CAST(:afterAt AS timestamp) IS NULL OR p.createdAt > :afterAt
+          OR (p.createdAt = :afterAt AND p.id > :afterId))
+      ORDER BY p.createdAt ASC, p.id ASC
+      """)
+  List<BankBookingRow> findStatementChunk(
+      @Param("accountId") UUID accountId,
+      @Param("from") Instant from,
+      @Param("to") Instant to,
+      @Param("afterAt") @Nullable Instant afterAt,
+      @Param("afterId") @Nullable UUID afterId,
+      Pageable limit);
+
+  /**
    * The account balance immediately before an instant — the statement's opening balance
    * (REQ-BANK-014).
    *

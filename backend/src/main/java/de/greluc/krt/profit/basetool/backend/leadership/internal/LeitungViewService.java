@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.leadership.internal;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupRepository;
@@ -40,8 +41,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -91,15 +95,41 @@ public class LeitungViewService {
     Set<UUID> visible =
         admin ? Set.of() : requestScopeResolver.narrowToPin(visibleOrgUnitIds(callerId));
 
+    List<OrgUnit> leadership = sortedByName(orgUnitRepository.findActiveOrganisationsleitung());
+    List<OrgUnit> areas = sortedByName(orgUnitRepository.findActiveBereiche());
+    List<OrgUnit> units = sortedByName(orgUnitRepository.findActiveSquadronsAndSpecialCommands());
+    List<UUID> visibleIds =
+        Stream.of(leadership, areas, units)
+            .flatMap(List::stream)
+            .filter(unit -> admin || visible.contains(unit.getId()))
+            .map(OrgUnit::getId)
+            .toList();
+    List<UUID> squadronIds =
+        units.stream()
+            .filter(unit ->
+                unit.getKind() == OrgUnitKind.SQUADRON && (admin || visible.contains(unit.getId())))
+            .map(OrgUnit::getId)
+            .toList();
+    Map<UUID, List<OrgUnitMembership>> memberships =
+        visibleIds.isEmpty()
+            ? Map.of()
+            : membershipRepository.findAllByIdOrgUnitIdIn(visibleIds).stream()
+                .collect(Collectors.groupingBy(m -> m.getId().getOrgUnitId()));
+    Map<UUID, List<KommandoGroup>> groups =
+        squadronIds.isEmpty()
+            ? Map.of()
+            : kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(squadronIds).stream()
+                .collect(Collectors.groupingBy(group -> group.getSquadron().getId()));
+
     List<LeitungUnitDto> ols = new ArrayList<>();
-    for (OrgUnit ol : sortedByName(orgUnitRepository.findActiveOrganisationsleitung())) {
+    for (OrgUnit ol : leadership) {
       if (admin || visible.contains(ol.getId())) {
-        ols.add(unit(ol, admin, false, callerId));
+        ols.add(unit(ol, admin, false, callerId, memberships, groups));
       }
     }
 
     List<LeitungUnitDto> bereiche = new ArrayList<>();
-    for (OrgUnit bereich : sortedByName(orgUnitRepository.findActiveBereiche())) {
+    for (OrgUnit bereich : areas) {
       if (!admin && !visible.contains(bereich.getId())) {
         continue;
       }
@@ -111,12 +141,12 @@ public class LeitungViewService {
           admin
               || roleSecurity.canAppointBereichRole(
                   bereich.getId(), BereichLeadershipRole.KOORDINATOR, authentication);
-      bereiche.add(unit(bereich, canAppointLead, canManageRoster, callerId));
+      bereiche.add(unit(bereich, canAppointLead, canManageRoster, callerId, memberships, groups));
     }
 
     List<LeitungUnitDto> squadrons = new ArrayList<>();
     List<LeitungUnitDto> specialCommands = new ArrayList<>();
-    for (OrgUnit unit : sortedByName(orgUnitRepository.findActiveSquadronsAndSpecialCommands())) {
+    for (OrgUnit unit : units) {
       if (!admin && !visible.contains(unit.getId())) {
         continue;
       }
@@ -127,13 +157,14 @@ public class LeitungViewService {
                     unit.getId(), MembershipRole.STAFFELLEITER, authentication);
         boolean canManageRoster =
             admin || roleSecurity.canManageKommandoGroups(unit.getId(), authentication);
-        squadrons.add(unit(unit, canAppointLead, canManageRoster, callerId));
+        squadrons.add(unit(unit, canAppointLead, canManageRoster, callerId, memberships, groups));
       } else if (unit.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
         boolean canAppointLead =
             admin || roleSecurity.canAppointSkLead(unit.getId(), authentication);
         boolean canManageRoster =
             admin || specialCommandSecurity.canManageMembers(unit.getId(), authentication);
-        specialCommands.add(unit(unit, canAppointLead, canManageRoster, callerId));
+        specialCommands.add(
+            unit(unit, canAppointLead, canManageRoster, callerId, memberships, groups));
       }
     }
 
@@ -180,9 +211,11 @@ public class LeitungViewService {
       @NotNull OrgUnit orgUnit,
       boolean canAppointLead,
       boolean canManageRoster,
-      @Nullable UUID callerId) {
+      @Nullable UUID callerId,
+      @NotNull Map<UUID, List<OrgUnitMembership>> memberships,
+      @NotNull Map<UUID, List<KommandoGroup>> commandGroups) {
     List<LeitungMemberDto> members =
-        membershipRepository.findAllByIdOrgUnitId(orgUnit.getId()).stream()
+        memberships.getOrDefault(orgUnit.getId(), List.of()).stream()
             .map(m -> member(m, callerId))
             .sorted(
                 Comparator.comparingInt(LeitungViewService::rosterRank)
@@ -192,7 +225,7 @@ public class LeitungViewService {
             .toList();
     List<KommandoGroupDto> groups =
         orgUnit.getKind() == OrgUnitKind.SQUADRON
-            ? kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(orgUnit.getId()).stream()
+            ? commandGroups.getOrDefault(orgUnit.getId(), List.of()).stream()
                 .map(kommandoGroupMapper::toDto)
                 .toList()
             : List.of();

@@ -66,6 +66,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -73,6 +74,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -104,6 +106,7 @@ public class SupplyDonationService {
   private final AuthHelperService authHelperService;
   private final ApplicationEventPublisher eventPublisher;
   private final MeterRegistry meterRegistry;
+  private final ObjectProvider<SupplyDonationService> self;
 
   /**
    * Pages over the donations a unit received or was pledged, for the unit's managers and the
@@ -170,14 +173,14 @@ public class SupplyDonationService {
     GameItem item = need == null ? null : need.getGameItem();
     Integer quality = request.quality();
     if (request.sourceInventoryItemId() != null) {
-      row = ownedUnstolenRow(request.sourceInventoryItemId(), donor);
-      material = row.getMaterial();
-      item = row.getGameItem();
-      quality = row.getQuality();
-      stockCommands.prepareWrites(List.of(request.sourceInventoryItemId()), List.of(), List.of());
+      ownedUnstolenRow(request.sourceInventoryItemId(), donor);
       row =
           Entities.require(
               stockCommands.lockRow(request.sourceInventoryItemId()), "Stock row not found");
+      requireOwnedUnstolenRow(row, donor);
+      material = row.getMaterial();
+      item = row.getGameItem();
+      quality = row.getQuality();
     } else if (need == null) {
       material = request.materialId() == null ? null : requireMaterial(request.materialId());
       item =
@@ -330,8 +333,18 @@ public class SupplyDonationService {
    * @param request the received amount, the location and the echoed version
    * @return the received donation
    */
-  @Transactional
   public @NotNull DonationDto receive(@NotNull UUID id, @NotNull ReceiveDonationRequest request) {
+    try {
+      return self.getObject().receiveWithinTransaction(id, request, null);
+    } catch (VanishedCarrier carrier) {
+      return self.getObject().receiveWithinTransaction(id, request, carrier.rowId());
+    }
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @NotNull
+  DonationDto receiveWithinTransaction(
+      @NotNull UUID id, @NotNull ReceiveDonationRequest request, @Nullable UUID vanishedCarrier) {
     settingsService.requireEnabled();
     final UUID holder = requireCaller();
     SupplyDonation donation = lockPledged(id, request.version());
@@ -347,53 +360,7 @@ public class SupplyDonationService {
             locationRepository.findById(request.locationId()), "Location not found");
     final OrgUnit unit = requireUnit(unitId);
 
-    boolean sourceBacked = donation.getSourceInventoryItemId() != null;
-    List<UUID> sourceRows =
-        sourceBacked ? stockReads.donationEarmarkedRowIds(donation.getId()) : List.of();
-    if (sourceBacked && sourceRows.size() != 1) {
-      throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, donation.getId());
-    }
-    StockLot targetLot;
-    if (sourceBacked) {
-      StockRow carrier =
-          stockReads
-              .findRow(sourceRows.getFirst())
-              .orElseThrow(() ->
-                  new ObjectOptimisticLockingFailureException(
-                      SupplyDonation.class, donation.getId()));
-      targetLot =
-          new StockLot(
-              carrier.getMaterial(),
-              carrier.getGameItem(),
-              location,
-              carrier.getQuality(),
-              Boolean.TRUE.equals(carrier.getStolen()));
-    } else {
-      targetLot =
-          new StockLot(
-              donation.getMaterial(),
-              donation.getGameItem(),
-              location,
-              donation.getQuality(),
-              false);
-    }
-    stockCommands.prepareWrites(
-        sourceRows,
-        List.of(
-            new StockCommands.StockBookInScope(holder, targetLot, List.of(), false, unitId, true)),
-        List.of());
-    if (sourceBacked) {
-      if (!sourceRows.equals(stockReads.donationEarmarkedRowIds(donation.getId()))) {
-        throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, donation.getId());
-      }
-      UUID sourceId = sourceRows.getFirst();
-      stockCommands.lockRow(sourceId);
-      stockCommands.releaseDonationEarmark(donation.getId());
-      stockCommands.transferToPool(
-          sourceId, received, unit, holder, location, StockBookingReason.DONATION);
-    } else {
-      stockCommands.bookIntoPool(holder, unit, targetLot, received, StockBookingReason.DONATION);
-    }
+    receiveStock(donation, holder, unit, location, received, vanishedCarrier);
     boolean full = received >= donation.getPledgedAmount() - 5e-4;
     donation.setReceivedAmount(received);
     donation.setStatus(full ? DonationStatus.RECEIVED : DonationStatus.PARTIALLY_RECEIVED);
@@ -422,6 +389,86 @@ public class SupplyDonationService {
             holder));
     count(saved.getStatus().name());
     return one(saved);
+  }
+
+  private void receiveStock(
+      @NotNull SupplyDonation donation,
+      @NotNull UUID holder,
+      @NotNull OrgUnit unit,
+      @NotNull Location location,
+      double received,
+      @Nullable UUID vanishedCarrier) {
+    UUID id = donation.getId();
+    UUID originalSource = donation.getSourceInventoryItemId();
+    StockLot pledgedLot =
+        new StockLot(
+            donation.getMaterial(), donation.getGameItem(), location, donation.getQuality(), false);
+    List<UUID> sourceRows =
+        originalSource == null ? List.of() : stockReads.donationEarmarkedRowIds(id);
+    if (sourceRows.isEmpty()) {
+      UUID absentCarrier = vanishedCarrier == null ? originalSource : vanishedCarrier;
+      if (absentCarrier != null && stockReads.findRow(absentCarrier).isPresent()) {
+        throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, id);
+      }
+      stockCommands.prepareWrites(
+          List.of(),
+          List.of(
+              new StockCommands.StockBookInScope(
+                  holder, pledgedLot, List.of(), false, unit.getId(), true)),
+          List.of());
+      if (absentCarrier != null
+          && (!stockReads.donationEarmarkedRowIds(id).isEmpty()
+              || stockReads.findRow(absentCarrier).isPresent())) {
+        throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, id);
+      }
+      stockCommands.bookIntoPool(holder, unit, pledgedLot, received, StockBookingReason.DONATION);
+      return;
+    }
+
+    if (vanishedCarrier != null || sourceRows.size() != 1) {
+      throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, id);
+    }
+    UUID sourceId = sourceRows.getFirst();
+    StockRow carrier =
+        stockReads
+            .findRow(sourceId)
+            .orElseThrow(
+                () -> new ObjectOptimisticLockingFailureException(SupplyDonation.class, id));
+    StockLot targetLot =
+        new StockLot(
+            carrier.getMaterial(),
+            carrier.getGameItem(),
+            location,
+            carrier.getQuality(),
+            Boolean.TRUE.equals(carrier.getStolen()));
+    stockCommands.prepareDonationReceipt(
+        sourceId,
+        new StockCommands.StockBookInScope(
+            holder, targetLot, List.of(), false, unit.getId(), true));
+    var locked = stockCommands.lockRow(sourceId);
+    List<UUID> currentSources = stockReads.donationEarmarkedRowIds(id);
+    if (locked.isEmpty() && currentSources.isEmpty()) {
+      throw new VanishedCarrier(sourceId);
+    }
+    if (locked.isEmpty() || !currentSources.equals(sourceRows)) {
+      throw new ObjectOptimisticLockingFailureException(SupplyDonation.class, id);
+    }
+    stockCommands.releaseDonationEarmark(id);
+    stockCommands.transferToPool(
+        sourceId, received, unit, holder, location, StockBookingReason.DONATION);
+  }
+
+  /** Carries the exact row that disappeared under the receipt's stock locks. */
+  private static final class VanishedCarrier extends RuntimeException {
+    private final UUID rowId;
+
+    private VanishedCarrier(@NotNull UUID rowId) {
+      this.rowId = rowId;
+    }
+
+    private UUID rowId() {
+      return rowId;
+    }
   }
 
   /**
@@ -660,6 +707,11 @@ public class SupplyDonationService {
 
   private @NotNull StockRow ownedUnstolenRow(@NotNull UUID rowId, @NotNull UUID donor) {
     StockRow row = Entities.require(stockReads.findRow(rowId), "Stock row not found");
+    requireOwnedUnstolenRow(row, donor);
+    return row;
+  }
+
+  private static void requireOwnedUnstolenRow(@NotNull StockRow row, @NotNull UUID donor) {
     if (!donor.equals(row.getUser().getId())) {
       throw new SupplyProblemException(
           SupplyProblemCode.SUPPLY_ROW_NOT_OWNED, "The stock row does not belong to the donor");
@@ -667,7 +719,6 @@ public class SupplyDonationService {
     if (Boolean.TRUE.equals(row.getStolen())) {
       throw new BadRequestException("Stolen stock cannot be donated");
     }
-    return row;
   }
 
   private static double validAmount(

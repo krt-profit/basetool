@@ -160,12 +160,26 @@ Optimistic locking with `@Version`, surfaced as HTTP 409, with the **finest gran
 allows** (§4.5, §6.3). The specific traps — the `kernel.OptimisticLock` helper family, Mission's
 manual per-section counters and their DB-enforced atomic bump (also a ship's org-unit counter,
 ADR-0258), pessimistic locking for bulk
-reorders and bulk selections (locked in ascending id order), the `…WithinTransaction` pattern, bulk updates inside loops, and the find-or-create retry
+reorders and bulk selections (locked in ascending id order), the Lager row lock that a
+Materialbörse offer write and a Lager delete take turns on (ADR-0362), a pessimistic lock taken in
+its own join-free statement rather than as Hibernate follow-on locking (ADR-0363), the `…WithinTransaction`
+pattern, bulk updates inside loops, and the find-or-create retry
 — are enumerated in [`backend-concurrency.md`](../agents/backend-concurrency.md). **Read that before touching any
 multi-step transaction.** The frontend half — propagating the new version to every DOM element that
 carries it — is in [`frontend/AGENTS.md`](../../frontend/AGENTS.md).
 
+Transaction-bound live-sync flushes and read memos follow suspension and resumption, so inner
+`REQUIRES_NEW` outcomes and cached state remain independent of their outer transaction
+([REQ-DATA-040](../specs/data-persistence.md#req-data-040--transaction-resources-follow-suspension-and-resumption)).
+Role permissions and descriptions use independent row-locked section counters
+([REQ-SEC-088](../specs/security-and-access.md#req-sec-088--the-four-application-roles-are-assigned-in-the-basetool)).
+
 ## 8.5 API conventions
+
+Bank statement and management PDFs separate repeatable-read query snapshots from rendering and
+stream request-owned file resources. Chunked tables and viewport-bounded charts keep their data
+working sets independent of ledger length; the response lifecycle owns cleanup
+([REQ-BANK-014/015](../specs/bank.md), [ADR-0368](../adr/0368-bank-export-snapshots-and-rendering-have-separate-lifetimes.md)).
 
 Versioned `/api/v1` paths changed by hard cut (ADR-0234, no deprecation machinery), DTO-only boundaries (records + MapStruct +
 Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every error,
@@ -229,8 +243,8 @@ Two binding rules shape every UI change:
   'script'; trusted-types krt-html krt-fragment`, report-only by default and enforced by
   `APP_SECURITY_TRUSTED_TYPES=enforce`; violations reach the client-error beacon as `csp_violation`
   with the sink or policy name and whether the code came from our origin or a browser extension
-  (REQ-SEC-064). The dialog page walk fails on any violation. Enforcing in production is the one
-  open step, an owner-approved configuration change.
+  (REQ-SEC-064). The dialog page walk fails on any violation. Production runs `enforce` since
+  2026-11-10.
 - **Scripts are ES modules behind a per-page import map** (ADR-0250, REQ-FE-035, 2026-10-12). Every
   script but the error beacon is `<script type="module">`; modules import statically by absolute
   `/js/<domain>/<file>.js` paths, only within their domain or the kernel (ESLint, `ModuleScriptsTest`).
@@ -329,15 +343,16 @@ ADR-0012/0013/0031/0094.
 
 ## 8.7 Resilience of the frontend → backend call
 
-One centrally-configured WebClient, wrapped by Resilience4j (Timeout, Retry, CircuitBreaker,
-Bulkhead), with state transitions logged so a `SERVICE_UNAVAILABLE` or `BACKEND_TIMEOUT` always has
-a matching log line. The per-domain typed clients the frontend gets are built over that same
-`webClient` bean, never beside it, so the one filter chain stays the single pass
-([ADR-0032](../adr/0032-frontend-single-resilience-pass-at-webclient-filter.md) amendment).
+`BackendCallPolicy` wraps each complete `BackendApiClient` operation through body consumption and
+decoding, over the centrally configured transports. Bounded binary transfers share that policy and
+never retry after output could be visible. The canonical lifetime and failure contracts are
+[REQ-FE-029](../specs/frontend-ajax-mutations.md) and
+[ADR-0369](../adr/0369-frontend-operations-own-completion-and-wire-resources-are-derived.md), which
+amends ADR-0032's header-filter placement.
 
 **The backend clients stay in the kernel and address only the backend** (REQ-FE-029, 2026-10-03).
-`WebClientConfig` builds four clients: `webClient` and the anonymous `termsDocumentClient` carry the
-Resilience4j chain, the SSE relay's `sseWebClient` and the live-sync probe's
+`WebClientConfig` builds four clients: `webClient` and the anonymous `termsDocumentClient` run through
+the complete-operation policy, while the SSE relay's `sseWebClient` and the live-sync probe's
 `liveSyncAuthWebClient` deliberately do not. Only `WebClientConfig` builds a client, and only the
 kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE relay and the probe
 (`WebClientConfinementTest`); a controller calls its domain's typed client in
@@ -416,6 +431,8 @@ Authority: [`observability.md`](../specs/observability.md) (`REQ-OBS-*`), `monit
 
 Every user-visible string comes from `messages.properties` / `_de` / `_en` — labels, buttons,
 tooltips, errors, flash messages, placeholders, titles. No hardcoded text in HTML, JS or Java.
+The German source is `messages_de.properties`; Gradle derives the identical packaged default
+bundle (REQ-FE-037, ADR-0369).
 Inside `.properties` files German umlauts are `\uXXXX`-escaped; everywhere else they are literal
 UTF-8.
 

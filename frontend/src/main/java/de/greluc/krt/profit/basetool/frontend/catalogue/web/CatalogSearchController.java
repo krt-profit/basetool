@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,6 +71,7 @@ public class CatalogSearchController {
               q == null ? "" : q, jobOrder, raw, PickerSearch.PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to search materials", e);
       return List.of();
     }
@@ -90,6 +92,7 @@ public class CatalogSearchController {
           catalogueClient.searchLocations(q == null ? "" : q, PickerSearch.LOCATION_PAGE_SIZE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to search locations", e);
       return List.of();
     }

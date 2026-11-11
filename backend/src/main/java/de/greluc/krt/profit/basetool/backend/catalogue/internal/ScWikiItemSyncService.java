@@ -89,6 +89,7 @@ public class ScWikiItemSyncService {
   private final GameItemRepository gameItemRepository;
   private final BlueprintRepository blueprintRepository;
   private final ManufacturerRepository manufacturerRepository;
+  private final ManufacturerScwikiIdentityRepository manufacturerIdentityRepository;
   private final SyncReportService syncReportService;
   private final GameItemStatWriter gameItemStatWriter;
   private final ScWikiItemStatFollowUp statFollowUp;
@@ -287,6 +288,7 @@ public class ScWikiItemSyncService {
             syncReportService.beginRun(),
             Instant.now(),
             manufacturerRepository.findAll(),
+            manufacturerIdentityRepository.findIdentityRefs(),
             uuidlessUexRows,
             reconcile ? gameItemRepository.findByUexItemIdIsNotNull() : List.of(),
             reconcile);
@@ -847,13 +849,14 @@ public class ScWikiItemSyncService {
     }
 
     /**
-     * Captures the run id and timestamp, indexes the manufacturer table by Wiki UUID and by
-     * lower-cased name, and builds the reconciliation index over the uuid-less {@code UEX_ONLY}
-     * rows (by {@code uex_slug} and by name, ambiguous keys excluded).
+     * Captures the run id and timestamp, indexes the manufacturer table by Wiki UUID (primary links
+     * and their Wiki aliases) and by lower-cased name, and builds the reconciliation index over the
+     * uuid-less {@code UEX_ONLY} rows (by {@code uex_slug} and by name, ambiguous keys excluded).
      *
      * @param runId the sync-report run id
      * @param now the shared {@code scwiki_synced_at} timestamp
      * @param manufacturers every manufacturer row, loaded once
+     * @param identities every Wiki manufacturer UUID with its manufacturer id (ADR-0361)
      * @param uuidlessUexRows the uuid-less {@code UEX_ONLY} rows to index for reconciliation (empty
      *     when reconciliation is disabled)
      * @param allUexRows every UEX source row, including variants already linked to Wiki identities
@@ -863,17 +866,26 @@ public class ScWikiItemSyncService {
         UUID runId,
         Instant now,
         List<Manufacturer> manufacturers,
+        List<ManufacturerScwikiIdentityRepository.IdentityRef> identities,
         List<GameItem> uuidlessUexRows,
         List<GameItem> allUexRows,
         boolean reconcileEnabled) {
       this.runId = runId;
       this.now = now;
+      Map<UUID, Manufacturer> byId = new HashMap<>();
       for (Manufacturer mfr : manufacturers) {
+        byId.put(mfr.getId(), mfr);
         if (mfr.getScwikiUuid() != null) {
           manufacturersByScwikiUuid.putIfAbsent(mfr.getScwikiUuid(), mfr);
         }
         if (StringUtils.hasText(mfr.getName())) {
           manufacturersByLowerName.putIfAbsent(mfr.getName().trim().toLowerCase(Locale.ROOT), mfr);
+        }
+      }
+      for (ManufacturerScwikiIdentityRepository.IdentityRef identity : identities) {
+        Manufacturer owner = byId.get(identity.getManufacturerId());
+        if (owner != null) {
+          manufacturersByScwikiUuid.putIfAbsent(identity.getScwikiUuid(), owner);
         }
       }
       reconciliationIndex =

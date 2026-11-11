@@ -36,13 +36,15 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -68,12 +70,9 @@ import org.springframework.context.ApplicationEventPublisher;
 class InventoryCheckoutServiceAuditTest {
 
   @BeforeEach
-  void wireOrderWriteFixture() {
+  void wireCheckoutGraph() {
     service =
-        new InventoryCheckoutService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -85,7 +84,6 @@ class InventoryCheckoutServiceAuditTest {
             requestScopeResolver,
             null,
             auditService,
-            new InventoryCheckoutAudits(auditService),
             eventPublisher);
   }
 
@@ -164,19 +162,23 @@ class InventoryCheckoutServiceAuditTest {
   }
 
   @Test
-  void deleteAllGlobalInventory_recordsWipedAuditWithScopeAndCount() {
+  void deleteAllGlobalInventory_locksAuditsAndDeletesTheSameRowsAndRecordsWipedAudit() {
     ScopePredicate scope = new ScopePredicate(true, null, Set.of());
+    List<UUID> locked = List.of(UUID.randomUUID(), UUID.randomUUID());
     when(requestScopeResolver.currentScopePredicate()).thenReturn(scope);
-    when(inventoryItemRepository.deleteAllNonPersonal(true, null, Set.of())).thenReturn(42);
+    when(inventoryItemRepository.findNonPersonalIdsInScope(true, null, Set.of()))
+        .thenReturn(locked);
+    when(inventoryItemRepository.deleteAllByIdIn(locked)).thenReturn(42);
 
     int removed = service.deleteAllGlobalInventory();
 
     assertEquals(42, removed);
-    InOrder order = inOrder(offerRatchet, inventoryItemRepository);
+    InOrder order = inOrder(inventoryItemRepository, offerRatchet);
     order
-        .verify(offerRatchet)
-        .beforeWipe(scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds());
-    order.verify(inventoryItemRepository).deleteAllNonPersonal(true, null, Set.of());
+        .verify(inventoryItemRepository, org.mockito.Mockito.times(2))
+        .findNonPersonalIdsInScope(true, null, Set.of());
+    order.verify(offerRatchet).beforeDelete(locked, StockChangeReason.WIPE);
+    order.verify(inventoryItemRepository).deleteAllByIdIn(locked);
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(

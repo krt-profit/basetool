@@ -85,6 +85,17 @@ An operator asking "which endpoint, from whom, why" about 8.5 % of all traffic h
    means scanning or a looping client rather than a Tuesday. The floor is written down in
    REQ-OBS-018 and must be re-checked whenever a probe target is added.
 
+> [!note] Amended 2026-11-10 — the backend's floor without the API host probes (#2675)
+> ADR-0268 removed `api.profit-base.online` and its three probe jobs. Re-measured on production
+> over the 21 days to 2026-11-10, the backend's `no_credentials` rate is a flat **0.0333/s**
+> (maximum 0.035, p99 0.0333), down from ~0.1/s: two refusals a minute from the internal TLS probe
+> of `https://backend:11261`, the only probe the backend answers with a `401`.
+> `BackendUnauthenticatedFlood` therefore drops from `> 1/s` to **`> 0.3/s`**, nine times the
+> floor, so the decision's "an order of magnitude above the probe floor" still holds. Because the
+> backend is internal-only, a breach now means an internal caller looping without a token rather
+> than a scanner. `IngestUnauthenticatedFlood` keeps `> 1/s`: the ingest gateway's public probes
+> are unchanged.
+
 ## Alternatives rejected
 
 - **Filter probe traffic out of the counter by user agent.** A security metric an attacker can

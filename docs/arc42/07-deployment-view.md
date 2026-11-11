@@ -50,6 +50,12 @@ the user namespace ([`docs/backup.md`](../backup.md)) — and why both the desti
 
 ## 7.2 Containers are systemd units
 
+Bank exports use the backend's writable JVM temporary filesystem for private request-lived
+snapshots and completed PDF files. They are removed after response completion or failure and
+are not backup artifacts; the storage, transaction and capacity contracts are canonical in
+[REQ-BANK-014/015](../specs/bank.md) and
+[ADR-0368](../adr/0368-bank-export-snapshots-and-rendering-have-separate-lifetimes.md).
+
 Quadlet `.container`, `.network` and `.volume` files — eighteen containers, seventeen networks and
 three volumes, plus one `env.d` template per container — are generated from the compose files by
 [`scripts/generate-quadlet.py`](../../scripts/generate-quadlet.py), committed under
@@ -344,7 +350,8 @@ ancestor that has images (ADR-0137/ADR-0210 amendments, 2026-09-23).
 `deploy.sh` and the host's own `basetool-*` units are **not** part of the config bundle: a bundle cannot
 rewrite the thing that applies bundles, so they arrive with the Ansible role. The Quadlet units do
 ride the bundle. What the bundle *does* carry about those scripts is their hashes
-(`host-scripts.sha256`, generated from the commit): every tick compares the host's copies with the
+(`host-scripts.sha256`, generated from the commit, including the installed operational companions
+from `scripts/host-companions.json`): every tick compares the host's copies with the
 deployed release's, exports `basetool_host_scripts_drift`, and a release whose apply-path scripts
 (`deploy.sh`, `lib/*`, `render-env-d.py`) differ from the host's is refused before anything changes
 (`REQ-OPS-045`, ADR-0247). Provider JARs are barred from the config bundle and get their own promotable,

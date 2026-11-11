@@ -20,13 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRowLocks;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Phase;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class MaterialExchangeOfferErasureTest {
 
   @Mock private MaterialExchangeOfferRatchet offerRatchet;
+  @Mock private StockRowLocks stockRowLocks;
 
   @InjectMocks private MaterialExchangeOfferErasure participant;
 
@@ -49,10 +52,12 @@ class MaterialExchangeOfferErasureTest {
   }
 
   @Test
-  void auditsTheOffersOnTheMembersRowsAndReportsNoCount() {
+  void locksTheMembersRowsThenAuditsTheOffersOnThemAndReportsNoCount() {
     assertThat(participant.erase(userId, adminId)).isEmpty();
 
-    verify(offerRatchet).removeOffersOnRowsOf(userId);
-    verifyNoMoreInteractions(offerRatchet);
+    InOrder order = inOrder(stockRowLocks, offerRatchet);
+    order.verify(stockRowLocks).lockRowsOf(userId);
+    order.verify(offerRatchet).removeOffersOnRowsOf(userId);
+    verifyNoMoreInteractions(offerRatchet, stockRowLocks);
   }
 }

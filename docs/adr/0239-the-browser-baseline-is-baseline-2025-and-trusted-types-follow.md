@@ -1,8 +1,8 @@
 # ADR-0239 — The browser baseline is "Baseline 2025", and Trusted Types follow
 
 - **Status:** Accepted — the baseline and the language level are implemented (2026-10-04);
-  Trusted Types are implemented in report-only mode (2026-10-04), and the only step left is the
-  owner-approved switch of production to `enforce`
+  Trusted Types are implemented in report-only mode (2026-10-04) and enforced in production since
+  2026-11-10 (#2568)
 - **Date:** 2026-10-01
 - **Deciders:** @greluc (owner decision D-16)
 - **Related:** [domain modularisation plan](../archive/DOMAIN_MODULARISATION_PLAN.md) §8.2 · spec

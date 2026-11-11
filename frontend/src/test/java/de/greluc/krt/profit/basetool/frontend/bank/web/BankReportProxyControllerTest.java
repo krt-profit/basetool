@@ -19,126 +19,155 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.web;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
-import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
 import java.time.Instant;
 import java.util.UUID;
-import java.util.function.Consumer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Mono;
 
-@ExtendWith(MockitoExtension.class)
+/** Verifies streamed bank downloads and status propagation before the response is committed. */
 class BankReportProxyControllerTest {
 
-  @Mock private WebClient webClient;
-  @Mock private WebClient.RequestHeadersUriSpec<?> requestHeadersUriSpec;
-  @Mock private WebClient.RequestHeadersSpec<?> requestHeadersSpec;
-  @Mock private WebClient.ResponseSpec responseSpec;
+  private static final UUID ID = UUID.fromString("0f8fad5b-d9cb-469f-a165-70867728950e");
+  private static final Instant FROM = Instant.parse("2026-01-01T00:00:00Z");
+  private static final Instant TO = Instant.parse("2026-02-01T00:00:00Z");
+  private static final byte[] PDF = {0x25, 0x50, 0x44, 0x46};
 
+  private BackendClientHarness backend;
   private BankReportProxyController controller;
 
   @BeforeEach
   void setUp() {
-    controller =
-        new BankReportProxyController(new BankBackendClient(RealBackendApiClient.over(webClient)));
+    backend = BackendClientHarness.start();
+    controller = new BankReportProxyController(new BankBackendClient(backend.backendApiClient()));
+  }
+
+  @AfterEach
+  void tearDown() {
+    backend.close();
   }
 
   @Test
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  void downloadStatement_shouldReturnPdfBytes_andForwardPeriodToBackendUri() {
-    UUID id = UUID.randomUUID();
-    byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
-    ArgumentCaptor<String> uriCaptor = ArgumentCaptor.forClass(String.class);
-    ArgumentCaptor<Object> idCaptor = ArgumentCaptor.forClass(Object.class);
+  void streamsStatementBytesAndPreservesTheDownloadContract() throws Exception {
+    backend.answerBytes("application/pdf", PDF);
+    MockHttpServletResponse response = new MockHttpServletResponse();
 
-    doReturn(requestHeadersUriSpec).when(webClient).get();
-    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString(), any(Object[].class));
-    doReturn(requestHeadersSpec).when(requestHeadersSpec).headers(any(Consumer.class));
-    doReturn(responseSpec).when(requestHeadersSpec).retrieve();
-    doReturn(Mono.just(fakePdf)).when(responseSpec).bodyToMono(byte[].class);
+    controller.downloadStatement(ID, FROM, TO, "Europe/Berlin", response);
 
-    ResponseEntity<byte[]> response =
-        controller.downloadStatement(
-            id,
-            Instant.parse("2026-01-01T00:00:00Z"),
-            Instant.parse("2026-02-01T00:00:00Z"),
-            "Europe/Berlin");
-
-    assertEquals(HttpStatus.OK, response.getStatusCode());
-    assertArrayEquals(fakePdf, response.getBody());
-    assertEquals(MediaType.APPLICATION_PDF, response.getHeaders().getContentType());
-    String disposition = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
-    assertNotNull(disposition);
-    assertTrue(disposition.contains("attachment"));
-    assertTrue(disposition.contains("kontoauszug-" + id + ".pdf"));
-    org.mockito.Mockito.verify(requestHeadersUriSpec).uri(uriCaptor.capture(), idCaptor.capture());
-    assertTrue(uriCaptor.getValue().startsWith("/api/v1/bank/accounts/{id}/statement?"));
-    assertEquals(id, idCaptor.getValue());
-    assertTrue(uriCaptor.getValue().contains("from=2026-01-01T00:00:00Z"));
-    assertTrue(uriCaptor.getValue().contains("to=2026-02-01T00:00:00Z"));
+    assertThat(response.getContentAsByteArray()).isEqualTo(PDF);
+    assertThat(response.getContentType()).isEqualTo("application/pdf");
+    assertThat(response.getHeader(HttpHeaders.CONTENT_DISPOSITION))
+        .contains("attachment", "kontoauszug-" + ID + ".pdf");
+    assertThat(
+            backend
+                .expect(
+                    "GET", "/api/v1/bank/accounts/" + ID + "/statement?from=" + FROM + "&to=" + TO)
+                .getHeader("X-User-Time-Zone"))
+        .isEqualTo("Europe/Berlin");
   }
 
   @Test
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  void downloadStatement_shouldPropagateBackendStatus() {
-    UUID id = UUID.randomUUID();
-    doReturn(requestHeadersUriSpec).when(webClient).get();
-    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString(), any(Object[].class));
-    doReturn(requestHeadersSpec).when(requestHeadersSpec).headers(any(Consumer.class));
-    doReturn(responseSpec).when(requestHeadersSpec).retrieve();
-    doReturn(Mono.error(WebClientResponseException.create(403, "Forbidden", null, null, null)))
-        .when(responseSpec)
-        .bodyToMono(byte[].class);
+  void aRefusalPreservesItsStatusBeforeExposingAnyDownloadBytes() {
+    backend.answerProblem(403, "FORBIDDEN");
+    MockHttpServletResponse response = new MockHttpServletResponse();
 
-    ResponseStatusException ex =
-        assertThrows(
+    assertThatThrownBy(() -> controller.downloadStatement(ID, FROM, TO, null, response))
+        .isInstanceOfSatisfying(
             ResponseStatusException.class,
-            () ->
-                controller.downloadStatement(
-                    id,
-                    Instant.parse("2026-01-01T00:00:00Z"),
-                    Instant.parse("2026-02-01T00:00:00Z"),
-                    null));
-    assertEquals(403, ex.getStatusCode().value());
+            failure -> assertThat(failure.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    assertThat(response.isCommitted()).isFalse();
+    assertThat(response.getContentAsByteArray()).isEmpty();
+    assertThat(response.getHeader(HttpHeaders.CONTENT_DISPOSITION)).isNull();
   }
 
   @Test
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  void downloadThreeMonthReport_shouldReturnPdfBytes() {
-    byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
-    doReturn(requestHeadersUriSpec).when(webClient).get();
-    doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
-    doReturn(requestHeadersSpec).when(requestHeadersSpec).headers(any(Consumer.class));
-    doReturn(responseSpec).when(requestHeadersSpec).retrieve();
-    doReturn(Mono.just(fakePdf)).when(responseSpec).bodyToMono(byte[].class);
+  void streamsTheThreeMonthReportWithItsFixedFilename() throws Exception {
+    backend.answerBytes("application/pdf", PDF);
+    MockHttpServletResponse response = new MockHttpServletResponse();
 
-    ResponseEntity<byte[]> response = controller.downloadThreeMonthReport(null);
+    controller.downloadThreeMonthReport(null, response);
 
-    assertEquals(HttpStatus.OK, response.getStatusCode());
-    assertArrayEquals(fakePdf, response.getBody());
-    String disposition = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
-    assertNotNull(disposition);
-    assertTrue(disposition.contains("bank-3-monats-report.pdf"));
+    assertThat(response.getContentAsByteArray()).isEqualTo(PDF);
+    assertThat(response.getHeader(HttpHeaders.CONTENT_DISPOSITION))
+        .contains("bank-3-monats-report.pdf");
+    backend.expect("GET", "/api/v1/bank/export/three-month-report");
+  }
+
+  @Test
+  void aBodyTimeoutBeforeCommitClearsDownloadHeadersAndKeepsSecurityHeaders() throws Exception {
+    try (okhttp3.mockwebserver.MockWebServer server = new okhttp3.mockwebserver.MockWebServer()) {
+      server.start();
+      server.enqueue(
+          new okhttp3.mockwebserver.MockResponse()
+              .setHeader("Content-Type", "application/pdf")
+              .setBody(new okio.Buffer().write(PDF))
+              .setBodyDelay(2, java.util.concurrent.TimeUnit.SECONDS));
+      var properties =
+          new de.greluc.krt.profit.basetool.frontend.kernel.backend.AppHttpProperties(
+              java.time.Duration.ofSeconds(3),
+              java.time.Duration.ofSeconds(30),
+              java.time.Duration.ofSeconds(1),
+              java.time.Duration.ofSeconds(30),
+              java.time.Duration.ofSeconds(30),
+              de.greluc.krt.profit.basetool.frontend.kernel.backend.AppHttpProperties
+                  .BackendProtocol.HTTP11,
+              20,
+              de.greluc.krt.profit.basetool.frontend.kernel.backend.AppHttpProperties.BackendCodec
+                  .JSON,
+              true);
+      var policy =
+          new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicy(
+              io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.ofDefaults(),
+              io.github.resilience4j.retry.RetryRegistry.ofDefaults(),
+              io.github.resilience4j.timelimiter.TimeLimiterRegistry.ofDefaults(),
+              io.github.resilience4j.bulkhead.BulkheadRegistry.ofDefaults(),
+              properties);
+      var transport =
+          org.springframework.web.reactive.function.client.WebClient.builder()
+              .baseUrl(server.url("/").toString())
+              .build();
+      var kernel =
+          new de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient(
+              transport,
+              transport,
+              new io.micrometer.core.instrument.simple.SimpleMeterRegistry(),
+              new org.springframework.cache.support.NoOpCacheManager(),
+              policy);
+      var timed = new BankReportProxyController(new BankBackendClient(kernel));
+      java.util.concurrent.atomic.AtomicBoolean acceptedHeaders =
+          new java.util.concurrent.atomic.AtomicBoolean();
+      MockHttpServletResponse response =
+          new MockHttpServletResponse() {
+            @Override
+            public void setContentType(String type) {
+              if ("application/pdf".equals(type)) {
+                acceptedHeaders.set(true);
+              }
+              super.setContentType(type);
+            }
+          };
+      response.setHeader("X-Security-Test", "keep");
+
+      assertThatThrownBy(() -> timed.downloadStatement(ID, FROM, TO, null, response))
+          .isInstanceOfSatisfying(
+              ResponseStatusException.class,
+              failure -> assertThat(failure.getStatusCode()).isEqualTo(HttpStatus.GATEWAY_TIMEOUT));
+
+      assertThat(acceptedHeaders.get()).isTrue();
+      assertThat(response.getContentAsByteArray()).isEmpty();
+      assertThat(response.getContentType()).isNull();
+      assertThat(response.getHeader(HttpHeaders.CONTENT_DISPOSITION)).isNull();
+      assertThat(response.getHeader(HttpHeaders.CONTENT_LENGTH)).isNull();
+      assertThat(response.getHeader("X-Security-Test")).isEqualTo("keep");
+    }
   }
 }

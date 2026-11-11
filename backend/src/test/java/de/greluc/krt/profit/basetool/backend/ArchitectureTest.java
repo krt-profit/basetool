@@ -42,8 +42,6 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.domain.JavaParameterizedType;
 import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.domain.properties.HasAnnotations;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
@@ -51,6 +49,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
 import com.tngtech.archunit.library.dependencies.SliceIdentifier;
+import de.greluc.krt.profit.basetool.backend.architecture.ModuleSubjects;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.audit.internal.AuditRetentionProperties;
@@ -310,10 +309,7 @@ import org.springframework.web.bind.annotation.RestController;
 class ArchitectureTest {
 
   /** The backend's production classes; test sources, the fixtures included, are not imported. */
-  static final JavaClasses CLASSES =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages(BackendApplication.class.getPackageName());
+  static final JavaClasses CLASSES = ModuleSubjects.importBackendMainClasses();
 
   /** The backend's root package, derived from the application class. */
   static final String ROOT_PACKAGE = BackendApplication.class.getPackageName();
@@ -403,6 +399,12 @@ class ArchitectureTest {
   static final Set<Class<?>> LEAF_HELPER_CLASSES =
       Set.of(
           ActingMemberAuthorities.class,
+          de.greluc.krt.profit.basetool.backend.catalogue.internal.UexChunkIndex.class,
+          de.greluc.krt.profit.basetool.backend.catalogue.internal.UexStoragePlaceIndex.class,
+          de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStackIdentity.class,
+          de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct.class,
+          de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintSource.class,
+          de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintFactory.class,
           GameItemNamePrecedence.class,
           ItemIdentityCompatibility.class,
           ItemReconciliationIndex.class,
@@ -438,6 +440,7 @@ class ArchitectureTest {
           ExchangeMirrorProperties.class,
           HandleErasureCoverage.class,
           HandleSpellings.class,
+          de.greluc.krt.profit.basetool.backend.identity.api.UserHandleProjection.class,
           IngestGatewayProperties.class,
           InventoryAllocations.class,
           InventoryQuantityComposition.class,

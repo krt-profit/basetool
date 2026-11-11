@@ -8,7 +8,7 @@ section names one, read it before the work it covers.** Everything here is bindi
 
 ## Project
 
-Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" organization. Three Spring Boot 4 applications (`backend`, `frontend`, `ingest`) on Java 25, plus the `keycloak-spi` provider JAR, the `keycloak-theme`, the shipped `logging-support` library and the test-only `test-support` library; PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Production runs as rootless Podman + Quadlet units generated from the compose files (arc42 §7); local and test stacks run on Docker Compose. Gradle 9 with Kotlin DSL.
+Profit Basetool — a squadron-management web app (mission planning, hangar, inventory, refinery, user admin) for the "DAS KARTELL" organization. Three Spring Boot 4 applications (`backend`, `frontend`, `ingest`) on Java 25, plus the `keycloak-spi` provider JAR, the `keycloak-theme`, the shipped `logging-support` and `technical-support` libraries and the test-only `test-support` library; PostgreSQL 18, Keycloak 26 OAuth2, Redis-backed Spring Sessions. Production runs as rootless Podman + Quadlet units generated from the compose files (arc42 §7); local and test stacks run on Docker Compose. Gradle 9 with Kotlin DSL.
 
 Versions live in the **catalog `gradle/libs.versions.toml`**, never in `build.gradle.kts`; module
 conventions are the `basetool.*` plugins of `build-logic`; the **configuration cache** is always on;
@@ -113,6 +113,7 @@ command against the host.** In short:
 - **`keycloak-spi`** — Keycloak provider JAR (Discord federation + the first-login membership gate); a plain library compiled against the Keycloak SPIs, emitting Java-21 bytecode, logging through `@JBossLog`.
 - **`keycloak-theme`** — the Keycloak login/account theme (FreeMarker, not a Gradle module).
 - **`logging-support`** — the one `LogSafe` + PII-masking layout/encoder; a plain library the three apps ship (ADR-0205). Log hygiene only — never domain code.
+- **`technical-support`** — shared normalization and observation-privacy algorithms (ADR-0366). Application bean and security wiring stays in each app.
 - **`test-support`** — test-only helpers shared by the backend and frontend anonymous-surface sweeps; never on a runtime classpath.
 
 The frontend never talks to PostgreSQL or Keycloak Admin API directly. The backend never serves HTML.

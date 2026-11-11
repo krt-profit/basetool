@@ -192,7 +192,7 @@ public class InventoryQuantityCorrections implements StockQuantityCorrections {
                         Boolean.TRUE.equals(row.getStolen()))))
             .toList());
     InventoryItem row =
-        rows.findByIdForUpdate(selectedRowId)
+        rows.lockById(selectedRowId)
             .orElseThrow(() ->
                 new BusinessConflictException("orders.claim.correction.connected_stock_required"));
     requireEditable(row);

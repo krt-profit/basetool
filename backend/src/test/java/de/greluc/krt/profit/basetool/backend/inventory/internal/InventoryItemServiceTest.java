@@ -64,6 +64,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -141,10 +142,7 @@ class InventoryItemServiceTest {
             null,
             stockLevelService);
     realCheckoutService =
-        new InventoryCheckoutService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -157,7 +155,6 @@ class InventoryItemServiceTest {
             requestScopeResolver,
             orgUnitStampingService,
             auditService,
-            new InventoryCheckoutAudits(auditService),
             eventPublisher);
     inventoryItemService =
         new InventoryItemService(
@@ -2160,43 +2157,48 @@ class InventoryItemServiceTest {
   }
 
   @Test
-  void deleteAllGlobalInventory_shouldDelegateToRepositoryAndReturnDeletedCount() {
+  void deleteAllGlobalInventory_shouldDeleteTheLockedRowsAndReturnDeletedCount() {
+    List<UUID> locked = List.of(UUID.randomUUID());
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-    when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
-        .thenReturn(42);
+    when(inventoryItemRepository.findNonPersonalIdsInScope(true, null, java.util.Set.of()))
+        .thenReturn(locked);
+    when(inventoryItemRepository.deleteAllByIdIn(locked)).thenReturn(42);
 
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     assertEquals(42, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(true, null, java.util.Set.of());
+    verify(inventoryItemRepository).deleteAllByIdIn(locked);
   }
 
   @Test
   void deleteAllGlobalInventory_onEmptyGlobalInventory_shouldReturnZero() {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-    when(inventoryItemRepository.deleteAllNonPersonal(true, null, java.util.Set.of()))
-        .thenReturn(0);
+    when(inventoryItemRepository.findNonPersonalIdsInScope(true, null, java.util.Set.of()))
+        .thenReturn(List.of());
 
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     assertEquals(0, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(true, null, java.util.Set.of());
+    verify(inventoryItemRepository).deleteAllByIdIn(List.of());
   }
 
   @Test
   void deleteAllGlobalInventory_inFocusedMode_shouldScopeToActiveSquadron() {
     UUID scope = UUID.randomUUID();
+    List<UUID> locked = List.of(UUID.randomUUID());
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, scope, java.util.Set.of()));
-    when(inventoryItemRepository.deleteAllNonPersonal(false, scope, java.util.Set.of()))
-        .thenReturn(7);
+    when(inventoryItemRepository.findNonPersonalIdsInScope(false, scope, java.util.Set.of()))
+        .thenReturn(locked);
+    when(inventoryItemRepository.deleteAllByIdIn(locked)).thenReturn(7);
 
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     assertEquals(7, removed);
-    verify(inventoryItemRepository).deleteAllNonPersonal(false, scope, java.util.Set.of());
+    verify(inventoryItemRepository, org.mockito.Mockito.times(2))
+        .findNonPersonalIdsInScope(false, scope, java.util.Set.of());
   }
 
   @Test

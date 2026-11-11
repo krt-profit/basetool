@@ -66,6 +66,7 @@ class WikiEnrichmentIntegrationTest {
   @Autowired private MaterialRepository materials;
   @Autowired private MaterialExternalAliasService aliases;
   @Autowired private ManufacturerRepository manufacturers;
+  @Autowired private ManufacturerScwikiIdentityRepository manufacturerIdentities;
   @Autowired private MaterialMapper materialMapper;
   @Autowired private GameItemRepository items;
   @Autowired private ShipTypeRepository ships;
@@ -248,7 +249,12 @@ class WikiEnrichmentIntegrationTest {
         BoundProperties.bind(ScWikiProperties.class, Map.of("manufacturer-sync-enabled", true));
     var service =
         new ScWikiManufacturerSyncService(
-            client, config, manufacturers, mock(SyncReportService.class), writer);
+            client,
+            config,
+            manufacturers,
+            manufacturerIdentities,
+            mock(SyncReportService.class),
+            writer);
     try {
       assertThat(service.syncManufacturers()).isEqualTo(2);
       writer.runInNewTransaction(() -> {

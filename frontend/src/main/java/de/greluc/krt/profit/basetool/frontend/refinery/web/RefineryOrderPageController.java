@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendCli
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryImportDraftDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCountsDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderForm;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
@@ -148,8 +149,8 @@ public class RefineryOrderPageController {
    * {@code READY} only the open orders whose end has passed or is unknown, both by end ascending;
    * {@code COMPLETED} and {@code ALL} list by start descending. The search is passed to the backend
    * as {@code q}. A {@code status} list without a {@code view} is honoured as an exact filter; the
-   * default subsets map onto their segment. The segment counters are the totals of four one-row
-   * requests without the search.
+   * default subsets map onto their segment. One scoped aggregate read supplies every segment total
+   * independently of the search.
    *
    * @param view the segment: {@code RUNNING}, {@code READY}, {@code COMPLETED} or {@code ALL}
    * @param status optional exact status filter, used only when {@code view} is absent
@@ -193,25 +194,20 @@ public class RefineryOrderPageController {
     CompletableFuture<PageResponse<RefineryOrderListDto>> listFuture =
         parallelPageLoader.loadAsync(
             () -> fetchOrderPage(mine, listQuery, effectivePage, effectiveSize));
-    CompletableFuture<Long> runningFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_RUNNING, null)));
-    CompletableFuture<Long> readyFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_READY, null)));
-    CompletableFuture<Long> completedFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_COMPLETED, null)));
-    CompletableFuture<Long> allFuture =
-        parallelPageLoader.loadAsync(() -> countOrders(mine, segmentQuery(VIEW_ALL, null)));
+    CompletableFuture<RefineryOrderCountsDto> countsFuture =
+        parallelPageLoader.loadAsync(() ->
+            SectionFallback.load(
+                log, "refinery-order-counts", () -> refineryClient.orderCounts(mine), null));
     SectionFallback.run(
-        log,
-        "refinery-order-list",
-        () ->
-            CompletableFuture.allOf(
-                    listFuture, runningFuture, readyFuture, completedFuture, allFuture)
-                .join());
+        log, "refinery-order-list", () -> CompletableFuture.allOf(listFuture, countsFuture).join());
+    RefineryOrderCountsDto counts = countsFuture.join();
     model.addAttribute(
         "refineryCounts",
         new RefineryProgress.Counts(
-            runningFuture.join(), readyFuture.join(), completedFuture.join(), allFuture.join()));
+            counts == null ? null : counts.running(),
+            counts == null ? null : counts.ready(),
+            counts == null ? null : counts.completed(),
+            counts == null ? null : counts.all()));
 
     PageResponse<RefineryOrderListDto> shown = listFuture.join();
     if (shown == null) {
@@ -362,19 +358,6 @@ public class RefineryOrderPageController {
                 page,
                 size),
         null);
-  }
-
-  /**
-   * Counts the orders of a filter with a one-row request.
-   *
-   * @param mine whether the own-orders endpoint is counted instead of the scoped one
-   * @param listQuery the filter
-   * @return the total, or {@code null} on a backend failure
-   */
-  @Nullable
-  private Long countOrders(boolean mine, @NotNull ListQuery listQuery) {
-    PageResponse<RefineryOrderListDto> page = fetchOrderPage(mine, listQuery, 0, 1);
-    return page == null ? null : page.totalElements();
   }
 
   @NotNull
@@ -597,6 +580,7 @@ public class RefineryOrderPageController {
         model.addAttribute("importErrorKey", "refineryImport.error.failed");
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Refinery import relay failed (ajax)", e);
       model.addAttribute("importErrorKey", "refineryImport.error.failed");
     }

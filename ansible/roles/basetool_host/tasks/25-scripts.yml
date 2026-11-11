@@ -1,4 +1,8 @@
 ---
+- name: Read the operational companion inventory
+  ansible.builtin.set_fact:
+    basetool_host_companions: "{{ lookup('ansible.builtin.file', basetool_host_scripts_src ~ '/host-companions.json') | from_json }}"
+
 - name: Create the script directory
   ansible.builtin.file:
     path: "{{ basetool_host_release_dir }}/scripts/lib"
@@ -21,8 +25,15 @@
     - container-cleanup.sh
     - lib/container-runtime.sh
     - lib/common.sh
+    - lib/deploy-release.sh
+    - lib/deploy-observability.sh
+    - lib/deploy-drift.sh
+    - lib/deploy-config.sh
     - lib/restic-repo.sh
     - render-env-d.py
+    - env_file.py
+    - host-companions.json
+    - host_companions.py
     - render-redis-acl.py
     - mint-internal-tls.sh
 
@@ -36,20 +47,12 @@
 
 - name: Install the systemd units and their timers
   ansible.builtin.copy:
-    src: "{{ basetool_host_scripts_src }}/{{ item }}"
-    dest: "/etc/systemd/system/{{ item }}"
+    src: "{{ basetool_host_scripts_src }}/../{{ item.source }}"
+    dest: "{{ item.target }}"
     owner: root
     group: root
-    mode: "0644"
-  loop:
-    - basetool-deploy.service
-    - basetool-deploy.timer
-    - basetool-backup.service
-    - basetool-backup.timer
-    - basetool-restore-drill.service
-    - basetool-restore-drill.timer
-    - basetool-container-cleanup.service
-    - basetool-container-cleanup.timer
+    mode: "{{ item.mode }}"
+  loop: "{{ basetool_host_companions | selectattr('kind', 'equalto', 'unit') | list }}"
   notify: Reload systemd for the operational units
 
 - name: Make room for the shared sandbox drop-in
@@ -63,12 +66,12 @@
 
 - name: Install the sandbox the deploy-account units share
   ansible.builtin.copy:
-    src: "{{ basetool_host_scripts_src }}/basetool-deploy-account-sandbox.conf"
-    dest: "/etc/systemd/system/{{ item }}.d/10-deploy-account-sandbox.conf"
+    src: "{{ basetool_host_scripts_src }}/../{{ item.source }}"
+    dest: "{{ item.target }}"
     owner: root
     group: root
-    mode: "0644"
-  loop: "{{ basetool_host_deploy_account_units }}"
+    mode: "{{ item.mode }}"
+  loop: "{{ basetool_host_companions | selectattr('kind', 'equalto', 'sandbox') | list }}"
   notify: Reload systemd for the operational units
 
 - name: Read the service user's uid for the ordering drop-in
@@ -100,21 +103,17 @@
 
 - name: Install the log rotation the units write for
   ansible.builtin.copy:
-    src: "{{ basetool_host_scripts_src }}/{{ item.src }}"
-    dest: "/etc/logrotate.d/{{ item.dest }}"
+    src: "{{ basetool_host_scripts_src }}/../{{ item.source }}"
+    dest: "{{ item.target }}"
     owner: root
     group: root
-    mode: "0644"
-  loop:
-    - { src: basetool-deploy.logrotate, dest: basetool-deploy }
-    - { src: basetool-backup.logrotate, dest: basetool-backup }
-    - { src: basetool-restore-drill.logrotate, dest: basetool-restore-drill }
-    - { src: basetool-container-cleanup.logrotate, dest: basetool-container-cleanup }
+    mode: "{{ item.mode }}"
+  loop: "{{ basetool_host_companions | selectattr('kind', 'equalto', 'logrotate') | list }}"
 
 - name: Install the lock files the operational units coordinate through
   ansible.builtin.copy:
-    src: "{{ basetool_host_scripts_src }}/basetool-locks.tmpfiles"
-    dest: /etc/tmpfiles.d/basetool-locks.conf
+    src: "{{ basetool_host_scripts_src }}/../{{ (basetool_host_companions | selectattr('kind', 'equalto', 'tmpfiles') | first).source }}"
+    dest: "{{ (basetool_host_companions | selectattr('kind', 'equalto', 'tmpfiles') | first).target }}"
     owner: root
     group: root
     mode: "0644"

@@ -26,8 +26,8 @@ import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockRowLocks;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -67,7 +67,13 @@ public class MaterialExchangeService {
 
   private final MaterialExchangeOfferRepository offerRepository;
   private final MaterialExchangeInterestRepository interestRepository;
-  private final StockReads stockReads;
+
+  /**
+   * Locks the Lager row an offer write stands on before the write reads it, so the write and a
+   * Lager delete of the row take turns (ADR-0362).
+   */
+  private final StockRowLocks stockRowLocks;
+
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
@@ -113,12 +119,14 @@ public class MaterialExchangeService {
    * Releases one of the caller's own Lager rows to the board as a material or stock-backed item
    * offer (REQ-MARKET-002, REQ-MARKET-014).
    *
-   * <p>The offered amount must be positive and at most the item's current stock; an existing active
-   * offer for the row is re-released. Owner and org unit are taken from the item.
+   * <p>The row is locked first, so a Lager delete of it either audits the offer or runs first and
+   * leaves the row unknown. The offered amount must be positive and at most the item's current
+   * stock; an existing active offer for the row is re-released. Owner and org unit are taken from
+   * the item.
    *
    * @param request the item id, the offered quantity and the trade remark
    * @return the resulting offer detail, including interessenten names
-   * @throws NotFoundException if the item does not exist
+   * @throws NotFoundException if the item does not exist, or was deleted while the lock waited
    * @throws AccessDeniedException if the item does not belong to the caller
    * @throws BadRequestException if the amount exceeds the stock, or a game-item row is not produced
    *     by any active blueprint
@@ -128,7 +136,7 @@ public class MaterialExchangeService {
     UUID viewerId = requireViewerId();
     StockRow item =
         Entities.require(
-            stockReads.findRow(request.inventoryItemId()),
+            stockRowLocks.lockRowForOfferWrite(request.inventoryItemId()),
             () -> "Inventory item not found: " + request.inventoryItemId());
     if (item.getUser() == null || !viewerId.equals(item.getUser().getId())) {
       throw new AccessDeniedException("Only the item's owner may release it to the Materialbörse.");
@@ -330,14 +338,19 @@ public class MaterialExchangeService {
   /**
    * Deactivates an offer by its id ("Angebot deaktivieren" from the board detail).
    *
+   * <p>A stock-backed offer's row is locked before the offer is read, so a Lager delete of the row
+   * either sees the offer deactivated or removes it first.
+   *
    * @param offerId the offer to take off the board.
    * @return the resulting offer detail.
-   * @throws NotFoundException if the offer does not exist.
+   * @throws NotFoundException if the offer does not exist, or its row was deleted while the lock
+   *     waited.
    * @throws AccessDeniedException if the caller is not the owner.
    */
   @Transactional
   public MaterialExchangeOfferDto deactivate(UUID offerId) {
     UUID viewerId = requireViewerId();
+    offerRepository.findInventoryItemIdById(offerId).ifPresent(this::lockBackingRow);
     MaterialExchangeOffer offer =
         Entities.require(offerRepository.findById(offerId), () -> "Offer not found: " + offerId);
     requireOwner(offer, viewerId);
@@ -345,7 +358,8 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Deactivates the active offer backing a Lager row (un-checking "Für Börse freigeben").
+   * Deactivates the active offer backing a Lager row (un-checking "Für Börse freigeben"), after
+   * locking the row.
    *
    * @param inventoryItemId the Lager row whose active offer to take off the board
    * @return the resulting offer detail
@@ -355,6 +369,7 @@ public class MaterialExchangeService {
   @Transactional
   public MaterialExchangeOfferDto deactivateForItem(UUID inventoryItemId) {
     UUID viewerId = requireViewerId();
+    lockBackingRow(inventoryItemId);
     MaterialExchangeOffer offer =
         Entities.require(
             offerRepository.findByInventoryItemIdAndStatus(
@@ -483,6 +498,17 @@ public class MaterialExchangeService {
               viewerId));
     }
     return boardService.detailDto(offer, viewerId);
+  }
+
+  /**
+   * Locks the Lager row an offer stands on for this transaction, ahead of reading the offer. A row
+   * deleted while the lock waited took its offers with it, which the offer read that follows
+   * reports as not found.
+   *
+   * @param inventoryItemId the row
+   */
+  private void lockBackingRow(@NotNull UUID inventoryItemId) {
+    stockRowLocks.lockRowForOfferWrite(inventoryItemId);
   }
 
   /**

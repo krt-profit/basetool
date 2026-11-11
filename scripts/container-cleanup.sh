@@ -25,6 +25,7 @@ LOCKFILE="${BASETOOL_CLEANUP_LOCKFILE:-/run/lock/basetool-container-cleanup.lock
 START_EPOCH="$(date +%s)"
 
 DRY_RUN=false
+CLEANUP_FAILED=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -60,6 +61,9 @@ USAGE
   esac
 done
 
+RUN_LABEL=""
+[[ "${DRY_RUN}" == "true" ]] && RUN_LABEL=" (dry run)"
+
 run_prune() {
   local label="$1"
   shift
@@ -71,7 +75,9 @@ run_prune() {
   if "$@"; then
     log "${label}: OK"
   else
-    log "[WARN] ${label}: failed (exit $?), continuing with the next step"
+    local status=$?
+    CLEANUP_FAILED=true
+    log "[WARN] ${label}: failed (exit ${status}), continuing with the next step"
   fi
 }
 
@@ -104,13 +110,21 @@ df_total_bytes() {
 }
 
 write_cleanup_metrics() {
-  local reclaimed="$1" now dur
+  local reclaimed="$1" now dur previous=0
+  if [[ -r "${TEXTFILE_DIR}/container_cleanup.prom" ]]; then
+    previous="$(awk '/^basetool_container_cleanup_last_success_timestamp /{print $2}' "${TEXTFILE_DIR}/container_cleanup.prom")"
+    [[ "${previous}" =~ ^[0-9]+$ ]] || previous=0
+  fi
   now="$(date +%s)"
   dur=$(( now - START_EPOCH ))
   {
     echo "# HELP basetool_container_cleanup_last_success_timestamp Unix time of the last successful container cleanup."
     echo "# TYPE basetool_container_cleanup_last_success_timestamp gauge"
-    echo "basetool_container_cleanup_last_success_timestamp ${now}"
+    if [[ "${CLEANUP_FAILED}" == "true" ]]; then
+      echo "basetool_container_cleanup_last_success_timestamp ${previous}"
+    else
+      echo "basetool_container_cleanup_last_success_timestamp ${now}"
+    fi
     echo "# HELP basetool_container_cleanup_duration_seconds Runtime of the last container cleanup in seconds."
     echo "# TYPE basetool_container_cleanup_duration_seconds gauge"
     echo "basetool_container_cleanup_duration_seconds ${dur}"
@@ -133,7 +147,7 @@ log "runtime: ${RT_BACKEND} (${RT_CLI})"
 read -r -a RT_CLI_ARGV <<< "${RT_CLI}"
 
 echo "================================================================"
-log "starting container cleanup${DRY_RUN:+ (dry run)}"
+log "starting container cleanup${RUN_LABEL}"
 log "windows: images>${IMAGE_UNTIL}, containers>${CONTAINER_UNTIL}, networks>${NETWORK_UNTIL}; volumes are never pruned (ADR-0194)"
 echo "================================================================"
 
@@ -163,5 +177,11 @@ if [[ "${DRY_RUN}" != "true" ]]; then
 fi
 
 echo "================================================================"
-log "container cleanup finished${DRY_RUN:+ (dry run - nothing removed)}"
+if [[ "${CLEANUP_FAILED}" == "true" ]]; then
+  log "container cleanup failed; independent steps were attempted"
+else
+  log "container cleanup finished${RUN_LABEL}"
+fi
 echo "================================================================"
+
+[[ "${CLEANUP_FAILED}" == "false" ]]

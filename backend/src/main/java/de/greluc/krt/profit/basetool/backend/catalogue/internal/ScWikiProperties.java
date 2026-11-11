@@ -23,6 +23,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -123,4 +124,26 @@ public record ScWikiProperties(
     @DefaultValue("") String vehicleWeaponsFilter,
     @DefaultValue("") String weaponsFilter,
     @DefaultValue("") String weaponAttachmentsFilter,
-    @DefaultValue("9000") @NotNull @Min(100) Integer backfillKindSanityCap) {}
+    @DefaultValue("9000") @NotNull @Min(100) Integer backfillKindSanityCap) {
+
+  /**
+   * Returns the endpoints whose rows carry a unique {@code class_name} the page walk sorts by.
+   *
+   * <p>The Wiki's default order has ties, so rows at a page boundary come back on both pages and
+   * others on neither; a walk over a unique sort key enumerates every row once.
+   *
+   * @return the item, vehicle and item-kind endpoint paths
+   */
+  public Set<String> classNameSortedEndpoints() {
+    return Set.of(
+        itemsEndpoint,
+        vehiclesEndpoint,
+        vehicleItemsEndpoint,
+        vehicleWeaponsEndpoint,
+        weaponsEndpoint,
+        weaponAttachmentsEndpoint,
+        armorEndpoint,
+        clothesEndpoint,
+        foodEndpoint);
+  }
+}

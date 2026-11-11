@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,22 +41,20 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutAudits;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -64,6 +63,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -108,10 +108,7 @@ class InventoryCheckoutServiceBulkRebookTest {
   @BeforeEach
   void stubSaveEcho() {
     checkoutService =
-        new InventoryCheckoutService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -123,7 +120,6 @@ class InventoryCheckoutServiceBulkRebookTest {
             null,
             orgUnitStampingService,
             auditService,
-            new InventoryCheckoutAudits(auditService),
             eventPublisher);
     lenient()
         .when(inventoryItemRepository.save(any(InventoryItem.class)))
@@ -165,7 +161,7 @@ class InventoryCheckoutServiceBulkRebookTest {
 
   /** Registers {@code item} with the locking loader so the service can load it. */
   private void given(InventoryItem item) {
-    when(inventoryItemRepository.findByIdForRebook(item.getId())).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.lockById(item.getId())).thenReturn(Optional.of(item));
   }
 
   private static BulkRebookRequest toLocation(List<UUID> ids, UUID targetLocationId) {
@@ -208,7 +204,7 @@ class InventoryCheckoutServiceBulkRebookTest {
   void bulkRebook_location_ontoAPlaceNoPickerOffers_isRefusedBeforeAnyWrite(Location there) {
     InventoryItem moving = row(UUID.randomUUID(), location(UUID.randomUUID(), "Area18"), 12.0);
     lenient()
-        .when(inventoryItemRepository.findByIdForRebook(moving.getId()))
+        .when(inventoryItemRepository.lockById(moving.getId()))
         .thenReturn(Optional.of(moving));
     when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
 
@@ -315,6 +311,53 @@ class InventoryCheckoutServiceBulkRebookTest {
   }
 
   @Test
+  void bulkRebook_location_mergesTheWholeQuantityAndDeliveredEarmark() {
+    Location here = location(UUID.randomUUID(), "Area18");
+    Location there = location(UUID.randomUUID(), "Lorville");
+    InventoryItem source = row(UUID.randomUUID(), here, 8.0);
+    InventoryItem target = row(UUID.randomUUID(), there, 2.0);
+    target.setMaterial(source.getMaterial());
+    UUID orderId = UUID.randomUUID();
+    InventoryAllocations.addJobOrder(source, orderId, 8.0, true);
+    List<StockQuantityFragment> expected =
+        List.of(
+            source.getQuantityComposition().knownPhysical().getFirst(),
+            target.getQuantityComposition().knownPhysical().getFirst());
+    given(source);
+    when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
+    when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(invocation -> {
+          InventoryItem saved = invocation.getArgument(0);
+          saved.setId(UUID.randomUUID());
+          return saved;
+        });
+    when(inventoryItemRepository.findMergeGroupForUpdate(
+            OWNER_ID,
+            source.getMaterial().getId(),
+            there.getId(),
+            source.getQuality(),
+            false,
+            false,
+            null))
+        .thenReturn(List.of(target));
+
+    checkoutService.bulkRebook(
+        new BulkRebookRequest(
+            List.of(source.getId()), BulkRebookMode.LOCATION, null, there.getId(), null, true),
+        OWNER_ID);
+
+    ArgumentCaptor<InventoryItem> survivor = ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).saveAndFlush(survivor.capture());
+    assertThat(survivor.getValue().getQuantityComposition().knownPhysical())
+        .containsExactlyInAnyOrderElementsOf(expected);
+    assertEquals(10.0, survivor.getValue().getAmount(), 1e-9);
+    assertEquals(8.0, survivor.getValue().getJobOrderAllocations().getFirst().getAmount(), 1e-9);
+    assertTrue(survivor.getValue().getJobOrderAllocations().getFirst().getDelivered());
+    verify(offerRatchet).beforeDelete(List.of(source.getId()), StockChangeReason.REBOOK);
+    verify(inventoryItemRepository).deleteAll(List.of(target));
+  }
+
+  @Test
   void bulkRebook_location_stampsTheResolvedOrgUnitOnTheMovedRow() {
     Location here = location(UUID.randomUUID(), "Area18");
     Location there = location(UUID.randomUUID(), "Lorville");
@@ -336,7 +379,7 @@ class InventoryCheckoutServiceBulkRebookTest {
   @Test
   void bulkRebook_unknownIdAbortsBeforeAnyWrite() {
     UUID missing = UUID.randomUUID();
-    when(inventoryItemRepository.findByIdForRebook(missing)).thenReturn(Optional.empty());
+    when(inventoryItemRepository.lockById(missing)).thenReturn(Optional.empty());
 
     assertThrows(
         NotFoundException.class,

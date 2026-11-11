@@ -55,7 +55,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
@@ -647,22 +647,16 @@ public class CatalogueBackendClient {
   /**
    * Uploads a P4K catalogue as a multipart {@code file} part and enqueues its preview job.
    *
-   * @param bytes the catalogue JSON
+   * @param catalogue the streaming catalogue resource
    * @param filename the part's file name
    * @return the enqueued job, or {@code null} when the backend sent no body
    */
   @Nullable
-  public P4kImportJobDto enqueueP4kImport(byte @NotNull [] bytes, @NotNull String filename) {
+  public P4kImportJobDto enqueueP4kImport(@NotNull Resource catalogue, @NotNull String filename) {
     MultipartBodyBuilder builder = new MultipartBodyBuilder();
     builder
-        .part(
-            "file",
-            new ByteArrayResource(bytes) {
-              @Override
-              public String getFilename() {
-                return filename;
-              }
-            })
+        .part("file", catalogue)
+        .filename(filename)
         .contentType(MediaType.APPLICATION_OCTET_STREAM);
     return backendApiClient.execute(
         HttpMethod.POST,

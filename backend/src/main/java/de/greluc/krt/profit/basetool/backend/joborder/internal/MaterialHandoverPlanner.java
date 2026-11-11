@@ -85,9 +85,7 @@ public class MaterialHandoverPlanner {
     Map<UUID, MaterialHandoverFact> facts = facts(orderId, selected);
     MaterialHandoverCalculation.Booked booked = calculate(lines, facts, items);
     Set<UUID> release = releaseRows(orderId, booked);
-    Set<UUID> rows = new LinkedHashSet<>(selected);
-    rows.addAll(release);
-    stockCommands.prepareWrites(rows, List.of(), scopes);
+    stockCommands.prepareWritesRequiringSources(selected, release, List.of(), scopes);
     if (booked.allFulfilled()) {
       orders.lockAllJobOrders();
     } else {

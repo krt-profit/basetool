@@ -41,7 +41,6 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -178,13 +177,12 @@ class MaterialExchangeOfferRatchetTest {
   }
 
   @Test
-  void beforeWipeReadsTheWipesScopeAndAuditsWithReasonWipe() {
-    UUID unit = UUID.randomUUID();
+  void beforeDeleteOfTheWipesLockedRowsAuditsWithReasonWipe() {
     OfferStock offer = material(10.0, "Quantainium");
-    when(offerRepository.findActiveStockOnNonPersonalRows(false, unit, Set.of()))
+    when(offerRepository.findActiveStockByInventoryItemIds(List.of(ROW)))
         .thenReturn(List.of(offer));
 
-    int removed = ratchet.beforeWipe(false, unit, Set.of());
+    int removed = ratchet.beforeDelete(List.of(ROW), StockChangeReason.WIPE);
 
     assertThat(removed).isEqualTo(1);
     assertThat(details(AuditEventType.MARKET_OFFER_REMOVED, offer.getId(), "Quantainium"))

@@ -85,7 +85,13 @@ class AdminP4kImportPageControllerTest {
 
   private static MultipartFile catalog() {
     return new MockMultipartFile(
-        "file", "p4k.json", "application/json", "{\"items\":[]}".getBytes(StandardCharsets.UTF_8));
+        "file", "p4k.json", "application/json", "{\"items\":[]}".getBytes(StandardCharsets.UTF_8)) {
+      /** Rejects complete-upload byte-array buffering. */
+      @Override
+      public byte[] getBytes() {
+        throw new AssertionError("The relay must use the multipart resource stream");
+      }
+    };
   }
 
   private static String jobJson(String id, String kind, String status) {

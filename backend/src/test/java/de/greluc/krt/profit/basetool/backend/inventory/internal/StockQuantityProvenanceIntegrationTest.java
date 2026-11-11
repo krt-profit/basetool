@@ -149,7 +149,7 @@ class StockQuantityProvenanceIntegrationTest {
     transactions.executeWithoutResult(_ -> {
       assertThat(provenance.quantityOf(source))
           .containsExactly(new StockQuantityFragment(source, 0L, 3000L));
-      InventoryItem locked = inventoryItems.findByIdForUpdate(source).orElseThrow();
+      InventoryItem locked = inventoryItems.lockById(source).orElseThrow();
       assertThat(locked.getVersion()).isEqualTo(version);
     });
 

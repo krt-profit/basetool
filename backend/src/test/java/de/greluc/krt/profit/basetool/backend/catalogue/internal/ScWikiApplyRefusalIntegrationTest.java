@@ -58,6 +58,7 @@ class ScWikiApplyRefusalIntegrationTest {
 
   @Autowired private MaterialRepository materials;
   @Autowired private ManufacturerRepository manufacturers;
+  @Autowired private ManufacturerScwikiIdentityRepository manufacturerIdentities;
   @Autowired private MaterialExternalAliasService aliases;
   @Autowired private SyncChunkWriter writer;
   @Autowired private SyncRunProgress progress;
@@ -101,7 +102,8 @@ class ScWikiApplyRefusalIntegrationTest {
     commoditySync =
         new ScWikiCommoditySyncService(client, properties, materials, aliases, reports, writer);
     manufacturerSync =
-        new ScWikiManufacturerSyncService(client, properties, manufacturers, reports, writer);
+        new ScWikiManufacturerSyncService(
+            client, properties, manufacturers, manufacturerIdentities, reports, writer);
   }
 
   @AfterEach

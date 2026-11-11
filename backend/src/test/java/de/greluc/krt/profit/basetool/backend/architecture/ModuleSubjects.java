@@ -55,9 +55,7 @@ public final class ModuleSubjects {
    * @return every class compiled from the backend's main source set
    */
   public static @NotNull JavaClasses importBackendMainClasses() {
-    return new ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .importPackages(BACKEND_PACKAGE);
+    return ProductionClasses.CLASSES;
   }
 
   /**
@@ -98,6 +96,14 @@ public final class ModuleSubjects {
         .filter(javaClass -> !javaClass.getName().contains("$"))
         .filter(javaClass -> !PACKAGE_INFO.equals(javaClass.getSimpleName()))
         .sorted(Comparator.comparing(JavaClass::getName));
+  }
+
+  /** Holds one production import for this test class loader. */
+  private static final class ProductionClasses {
+    private static final JavaClasses CLASSES =
+        new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .importPackages(BACKEND_PACKAGE);
   }
 
   private static Optional<JavaClass> implementedMapper(JavaClass javaClass) {

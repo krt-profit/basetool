@@ -46,7 +46,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
@@ -69,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -125,10 +125,7 @@ class InventoryItemServiceBookOutTest {
   @BeforeEach
   void setUpEntities() {
     service =
-        new InventoryCheckoutService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -140,7 +137,6 @@ class InventoryItemServiceBookOutTest {
             requestScopeResolver,
             orgUnitStampingService,
             auditService,
-            new InventoryCheckoutAudits(auditService),
             eventPublisher);
     owner = new User();
     owner.setId(OWNER_ID);

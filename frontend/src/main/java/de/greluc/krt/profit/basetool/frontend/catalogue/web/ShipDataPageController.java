@@ -186,6 +186,7 @@ public class ShipDataPageController {
       catalogueClient.setManufacturerHidden(id, hidden);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update Manufacturer visibility failed", e);
       return "redirect:/ship-data?error=UpdateManufacturerVisibilityFailed";
     }
@@ -212,6 +213,7 @@ public class ShipDataPageController {
       catalogueClient.setShipTypeHidden(id, hidden);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update ShipType visibility failed", e);
       return "redirect:/ship-data?error=UpdateShipTypeVisibilityFailed";
     }
@@ -233,6 +235,7 @@ public class ShipDataPageController {
       catalogueClient.resetAllFitted();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_unfitted");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Reset all fitted failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.shipdata.unfit.failed");
     }

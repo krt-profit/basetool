@@ -380,6 +380,8 @@ public enum AuditEventType {
    * subject is the role's {@code code}; the details carry the added and removed permission names.
    */
   ROLE_PERMISSIONS_CHANGED(AuditDomain.ROLE),
+  /** A role description was edited; details contain only its new section version. */
+  ROLE_DESCRIPTION_CHANGED(AuditDomain.ROLE),
   /**
    * An admin changed a member's numeric member rank (1–20). The subject and the target are the
    * member; the details carry only the {@code from} and {@code to} ranks.
@@ -750,6 +752,8 @@ public enum AuditEventType {
   CATALOGUE_MATERIAL_ALIAS_DELETED(AuditDomain.CATALOGUE),
   /** An admin hid or showed a manufacturer. */
   CATALOGUE_MANUFACTURER_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
+  /** An admin chose which SC Wiki entry of a manufacturer listed twice in the Wiki is primary. */
+  CATALOGUE_MANUFACTURER_WIKI_PRIMARY_CHANGED(AuditDomain.CATALOGUE),
   /** An admin hid or showed a ship type. */
   CATALOGUE_SHIP_TYPE_VISIBILITY_CHANGED(AuditDomain.CATALOGUE),
   /** An admin created a location. */

@@ -167,8 +167,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -203,8 +202,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -238,8 +236,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -281,8 +278,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", "Rogue", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -304,8 +300,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -346,8 +341,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -367,8 +361,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -411,13 +404,11 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto1, itemDto2));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId2))
-        .thenReturn(Optional.of(inventoryItem2));
+    when(inventoryItemRepository.lockById(inventoryId2)).thenReturn(Optional.of(inventoryItem2));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId2))
         .thenReturn(Optional.of(inventoryItem2));
@@ -476,13 +467,11 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto1, itemDto2));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId2))
-        .thenReturn(Optional.of(inventoryItem2));
+    when(inventoryItemRepository.lockById(inventoryId2)).thenReturn(Optional.of(inventoryItem2));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId2))
         .thenReturn(Optional.of(inventoryItem2));
@@ -506,8 +495,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -529,8 +517,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -561,8 +548,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -579,8 +565,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -602,8 +587,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -632,8 +616,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -660,8 +643,7 @@ class JobOrderHandoverServiceTest {
     JobOrderHandoverCreateDto createDto =
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -697,8 +679,7 @@ class JobOrderHandoverServiceTest {
             Instant.now(), "CrossSquadronHandler", "BRV", List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -747,13 +728,11 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto1, itemDto2));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId2))
-        .thenReturn(Optional.of(inventoryItem2));
+    when(inventoryItemRepository.lockById(inventoryId2)).thenReturn(Optional.of(inventoryItem2));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId2))
         .thenReturn(Optional.of(inventoryItem2));
@@ -789,8 +768,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -831,8 +809,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));
@@ -870,8 +847,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverCreateDto(Instant.now(), "HanSolo", null, List.of(itemDto));
 
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-    when(inventoryItemRepository.findByIdForUpdate(inventoryId))
-        .thenReturn(Optional.of(inventoryItem));
+    when(inventoryItemRepository.lockById(inventoryId)).thenReturn(Optional.of(inventoryItem));
     org.mockito.Mockito.lenient()
         .when(inventoryItemRepository.findById(inventoryId))
         .thenReturn(Optional.of(inventoryItem));

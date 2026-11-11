@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test;
  * bundle has no literal umlauts, no key is declared twice, the default bundle declares every key
  * and mirrors the German values, and every static template key is declared.
  *
- * <p>Reads the source files under {@code src/main/resources} directly.
+ * <p>Reads locale sources and the generated default resource.
  */
 class MessageBundleConsistencyTest {
 
@@ -53,7 +53,8 @@ class MessageBundleConsistencyTest {
   private static final Path EN = Path.of("src/main/resources/messages_en.properties");
 
   /** Default (no-locale) fallback bundle under the module's main resources. */
-  private static final Path DEFAULT = Path.of("src/main/resources/messages.properties");
+  private static final Path DEFAULT =
+      Path.of("build/generated/default-messages/messages.properties");
 
   /**
    * The seven German umlaut characters that AGENTS.md requires to be written as {@code \\uXXXX}
@@ -164,6 +165,21 @@ class MessageBundleConsistencyTest {
     assertThat(mismatches)
         .as("keys whose default-bundle value differs from the German bundle")
         .isEmpty();
+  }
+
+  @Test
+  void theGeneratedDefaultIsByteIdenticalAndRetainsRuntimeFallback() throws IOException {
+    assertThat(Files.readAllBytes(DEFAULT)).isEqualTo(Files.readAllBytes(DE));
+    org.springframework.context.support.ResourceBundleMessageSource messages =
+        new org.springframework.context.support.ResourceBundleMessageSource();
+    messages.setBasename("messages");
+    messages.setFallbackToSystemLocale(false);
+    messages.setDefaultEncoding("UTF-8");
+    String german = messages.getMessage("frontend.ajax.saved", null, java.util.Locale.GERMAN);
+    assertThat(messages.getMessage("frontend.ajax.saved", null, java.util.Locale.FRENCH))
+        .isEqualTo(german);
+    assertThat(messages.getMessage("frontend.ajax.saved", null, java.util.Locale.ROOT))
+        .isEqualTo(german);
   }
 
   /** HTML comments, stripped before the key scan so documentation is not read as markup. */

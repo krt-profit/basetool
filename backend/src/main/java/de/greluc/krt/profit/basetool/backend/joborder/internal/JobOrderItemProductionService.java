@@ -388,10 +388,11 @@ public class JobOrderItemProductionService {
     UUID jobOrderId = jobOrder.getId();
     final UUID jobOrderItemId = line.getId();
     final ProductionSnapshot planned = snapshot(jobOrder, line);
-    stockCommands.prepareWrites(
+    stockCommands.prepareWritesRequiringSources(
         dto.consumption().stream()
             .map(JobOrderItemProductionConsumptionDto::inventoryItemId)
             .toList(),
+        List.of(),
         List.of(
             new StockCommands.StockBookInScope(
                 destination.owner().getId(),

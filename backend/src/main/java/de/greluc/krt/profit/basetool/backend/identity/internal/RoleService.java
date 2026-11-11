@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
@@ -36,7 +37,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -70,17 +70,15 @@ public class RoleService {
   private final AuthHelperService authHelperService;
 
   /**
-   * Returns a cached page of roles with every role's permission set initialised, batch-loaded
+   * Returns a cached page of immutable role read models with batch-loaded permission sets
    * (REQ-DATA-003).
    *
    * @param pageable page request
-   * @return cached page result, permissions initialised
+   * @return cached page of detached role records
    */
   @Cacheable(cacheNames = CacheConfig.ROLES_CACHE)
-  public Page<Role> getAllRoles(@NotNull Pageable pageable) {
-    Page<Role> page = roleRepository.findAll(pageable);
-    page.forEach(role -> Hibernate.initialize(role.getPermissions()));
-    return page;
+  public Page<RoleDto> getAllRoles(@NotNull Pageable pageable) {
+    return roleRepository.findAll(pageable).map(RoleMapper::snapshot);
   }
 
   /**
@@ -92,16 +90,20 @@ public class RoleService {
    *
    * @param roleName role display name, matched case-sensitively
    * @param permissions new permission set
+   * @param version the expected permission-section version
    * @return the persisted role
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no role matches
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.ROLES_CACHE, allEntries = true)
-  public Role updatePermissions(@NotNull String roleName, @NotNull Set<String> permissions) {
-    Role role = Entities.require(roleRepository.findByName(roleName), "Role not found");
+  public Role updatePermissions(
+      @NotNull String roleName, @NotNull Set<String> permissions, @NotNull Long version) {
+    Role role = Entities.require(roleRepository.lockByName(roleName), "Role not found");
+    OptimisticLock.check(role.getPermissionsVersion(), version, Role.class, role.getId());
+    role.setPermissionsVersion(role.getPermissionsVersion() + 1L);
     Set<String> previous = new HashSet<>(role.getPermissions());
     role.setPermissions(permissions);
-    Role saved = roleRepository.save(role);
+    Role saved = roleRepository.saveAndFlush(role);
 
     PermissionDifference added = difference(permissions, previous);
     PermissionDifference removed = difference(previous, permissions);
@@ -198,15 +200,26 @@ public class RoleService {
    *
    * @param roleName role display name
    * @param description new description
+   * @param version the expected description-section version
    * @return the persisted role
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no role matches
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.ROLES_CACHE, allEntries = true)
-  public Role updateRoleDescription(@NotNull String roleName, @NotNull String description) {
-    Role role = Entities.require(roleRepository.findByName(roleName), "Role not found");
+  public Role updateRoleDescription(
+      @NotNull String roleName, @NotNull String description, @NotNull Long version) {
+    Role role = Entities.require(roleRepository.lockByName(roleName), "Role not found");
+    OptimisticLock.check(role.getDescriptionVersion(), version, Role.class, role.getId());
+    role.setDescriptionVersion(role.getDescriptionVersion() + 1L);
     role.setDescription(description);
-    return roleRepository.save(role);
+    Role saved = roleRepository.saveAndFlush(role);
+    auditRecorder.record(
+        AuditEventType.ROLE_DESCRIPTION_CHANGED,
+        null,
+        role.getCode(),
+        null,
+        AuditDetails.of("sectionVersion", role.getDescriptionVersion()));
+    return saved;
   }
 
   /**

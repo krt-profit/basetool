@@ -45,6 +45,10 @@ NOT_SHIPPED = {
 }
 
 SHIPPED_INSIDE = {
+    "technical-support": (
+        "Shared normalization and observation privacy shipped by the three application boot jars.",
+        ("backend", "frontend", "ingest"),
+    ),
     "logging-support": (
         "LogSafe and the PII maskers every application's logback configuration names (ADR-0205); "
         "a plain JAR inside the three boot JARs, never an artifact of its own",
@@ -387,7 +391,7 @@ def selftest() -> int:
         failures += not cond
 
     declared = [
-        "backend", "frontend", "ingest", "keycloak-spi", "test-support", "logging-support",
+        "backend", "frontend", "ingest", "keycloak-spi", "test-support", "logging-support", "technical-support",
         "backend-exchange", "backend-bank", "ingest-relay",
     ]
     shipped, inside = classify(declared)
@@ -397,6 +401,7 @@ def selftest() -> int:
           inside["backend-exchange"][1] == ("backend",) and inside["backend-bank"][1] == ("backend",))
     check("ingest-relay is shipped inside ingest", inside["ingest-relay"][1] == ("ingest",))
     check("logging-support keeps its explicit carriers", inside["logging-support"][1] == SHIPPED_INSIDE["logging-support"][1])
+    check("technical-support keeps its explicit carriers", inside["technical-support"][1] == SHIPPED_INSIDE["technical-support"][1])
     check("test-support is neither shipped nor inside", "test-support" not in shipped and "test-support" not in inside)
     check("an application's own name is not a library", library_carrier("backend") is None)
     check("a name without the hyphen boundary is not a library", library_carrier("backendx") is None)

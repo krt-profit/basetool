@@ -7,10 +7,13 @@ The full test rules, above all the credential rule for tests and local stacks.
 
 ## Managed E2E runtime artifacts
 
-The standard Gradle E2E harness accepts the test-only `E2E_REALM_PATH` environment variable for
-its generated synthetic realm. It passes the same absolute path to `docker-compose.e2e.yml`;
-when unset, the output and mount remain `<repoRoot>/realm-export.json`. This override never changes
-the production/base Compose configuration or the committed throwaway TLS files. Set the output
-inside the agent's task directory when local temporary-file rules require it. The ignored
-`frontend/build/e2e` runtime/auth/log directory may likewise point into that directory; ordinary
-Gradle build outputs retain their standard paths.
+The standard Gradle E2E harness accepts test-only `E2E_REALM_PATH` for its generated synthetic
+realm and passes that absolute path to `docker-compose.e2e.yml`. The default remains
+`<repoRoot>/realm-export.json`. Set the path inside the agent's task directory when local
+scratch-file rules require it. The ignored `frontend/build/e2e` runtime/auth/log directory may
+point into the same directory; ordinary Gradle outputs keep their standard locations. Production
+Compose and the committed throwaway TLS files are unaffected.
+
+The harness disables implicit Compose `.env` loading. Set `E2E_ENV_PATH` to a synthetic
+`.env.test` file inside the task directory to pass it explicitly with `--env-file`; the
+harness supplies its throwaway service credentials through the subprocess environment.

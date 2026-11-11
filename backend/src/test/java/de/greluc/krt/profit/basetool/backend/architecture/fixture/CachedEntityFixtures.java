@@ -34,6 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
  */
 public final class CachedEntityFixtures {
 
+  /** Bounded test-only cache that deliberately retains a mutable entity for the invariant proof. */
+  public static final String PLANTED_CITY_CACHE = "g19-planted-city";
+
   /** Not instantiable. */
   private CachedEntityFixtures() {}
 
@@ -57,7 +60,7 @@ public final class CachedEntityFixtures {
      * @param id the city
      * @return the cached instance
      */
-    @Cacheable(cacheNames = CacheConfig.CITIES_CACHE, key = "'g19-planted-' + #id")
+    @Cacheable(cacheNames = PLANTED_CITY_CACHE, key = "'g19-planted-' + #id")
     @Transactional(readOnly = true)
     public City find(UUID id) {
       return Entities.require(cityRepository.findById(id), "City not found");

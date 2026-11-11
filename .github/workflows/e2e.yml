@@ -174,10 +174,12 @@ jobs:
         env:
           BROWSER: ${{ matrix.browser }}
           DEVICE: ${{ matrix.device }}
+          LAYOUT_ALL_DEVICES: ${{ matrix.browser == 'chromium' && matrix.device == '1600x900' }}
         run: >-
           ./gradlew :frontend:e2eTest
           -Pe2e.browser="$BROWSER"
           -Pe2e.device="$DEVICE"
+          -Pe2e.layoutAllDevices="$LAYOUT_ALL_DEVICES"
           -Pe2e.prebuilt=true
           --stacktrace
           --configuration-cache

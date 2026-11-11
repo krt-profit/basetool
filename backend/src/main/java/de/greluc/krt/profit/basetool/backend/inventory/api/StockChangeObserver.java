@@ -21,18 +21,18 @@ package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
 import java.util.Collection;
-import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Reacts to Lager rows being lowered or deleted, inside the transaction that changes them (plan
  * §5.3, REQ-MARKET-013); implemented by the Materialbörse, whose offers stand on the rows.
  *
- * <p>Every path that lowers a row calls {@link #lower}; every path that deletes rows calls a {@code
- * before…} method before the delete, whose {@code ON DELETE CASCADE} then removes the offers. Every
- * implementation joins the caller's transaction ({@code MANDATORY}).
+ * <p>Every path that lowers a row calls {@link #lower}; every path that deletes rows calls {@link
+ * #beforeDelete} before the delete, whose {@code ON DELETE CASCADE} then removes the offers. The
+ * caller holds the rows' pessimistic write locks before either call, which the Materialbörse takes
+ * too before it writes an offer on a row (ADR-0362). Every implementation joins the caller's
+ * transaction ({@code MANDATORY}).
  */
 @ObserverSpi
 public interface StockChangeObserver {
@@ -51,20 +51,9 @@ public interface StockChangeObserver {
   /**
    * Lager rows are about to be deleted.
    *
-   * @param inventoryItemIds the rows to be deleted
+   * @param inventoryItemIds the rows to be deleted, locked by the caller
    * @param reason the stock change
    * @return the number of offers the delete will remove
    */
   int beforeDelete(@NotNull Collection<UUID> inventoryItemIds, @NotNull StockChangeReason reason);
-
-  /**
-   * The shared (non-personal) Lager rows within a scope are about to be wiped.
-   *
-   * @param adminAllScope whether the wipe covers every org unit
-   * @param activeOrgUnitId the pinned org unit, or {@code null}
-   * @param memberOrgUnitIds the caller's org units when neither of the above applies
-   * @return the number of offers the wipe will remove
-   */
-  int beforeWipe(
-      boolean adminAllScope, @Nullable UUID activeOrgUnitId, @NotNull Set<UUID> memberOrgUnitIds);
 }

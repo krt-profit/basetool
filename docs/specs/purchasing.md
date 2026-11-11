@@ -243,6 +243,12 @@ per need — deals, amount bought, money funded, returned and spent, loss, overd
 unit price against the UEX reference. It is also a CSV file with one line per deal and a forum-safe text
 block. No figure, line or text names a member or a partner. A caller sees the deals they may read.
 
+The CSV uses UTF-8, semicolon-separated fields and doubled quotes inside quoted cells. Delimiters,
+quotes and CR/LF in catalogue text round-trip without replacement. It is a lossless data export:
+formula-like prefixes remain literal source text, with no added apostrophe or tab. Spreadsheet users
+import the entry column as text and disable automatic formula interpretation; double-click opening
+with automatic type detection is outside the supported import workflow.
+
 **Enforced by:** `PurchasingReportServiceTest` · **Code:** `purchasing/internal/PurchasingReportService`,
 `purchasing/web/PurchasingReportController`
 

@@ -191,4 +191,23 @@ class SingleFlightAuthorizedClientManagerTest {
 
     assertEquals(1, delegateCalls.get());
   }
+
+  @Test
+  void endedSessionEvictsOnlyItsOwnClients() {
+    OAuth2AuthorizedClientManager delegate = mock(OAuth2AuthorizedClientManager.class);
+    OAuth2AuthorizedClient fresh = clientExpiringIn(300);
+    when(delegate.authorize(any())).thenReturn(fresh);
+    SingleFlightAuthorizedClientManager manager = new SingleFlightAuthorizedClientManager(delegate);
+    manager.authorize(requestForSession("ended"));
+    manager.authorize(requestForSession("active"));
+    org.springframework.session.events.SessionDestroyedEvent event =
+        mock(org.springframework.session.events.SessionDestroyedEvent.class);
+    when(event.getSessionId()).thenReturn("ended");
+
+    manager.sessionEnded(event);
+    manager.authorize(requestForSession("active"));
+    manager.authorize(requestForSession("ended"));
+
+    verify(delegate, times(3)).authorize(any());
+  }
 }

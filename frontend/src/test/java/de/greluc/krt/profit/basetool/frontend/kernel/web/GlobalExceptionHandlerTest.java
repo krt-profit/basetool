@@ -28,10 +28,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import org.apache.tomcat.util.http.InvalidParameterException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +44,7 @@ import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -62,6 +65,38 @@ class GlobalExceptionHandlerTest {
 
   private MessageSource messageSource;
   private GlobalExceptionHandler handler;
+
+  @Test
+  void joinedSessionLossUsesTheAjaxReauthenticationResponse() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/parallel-read");
+    request.addHeader("X-Requested-With", "XMLHttpRequest");
+
+    Object result =
+        handler.handleCompletionException(
+            new CompletionException(
+                new IllegalStateException(new ReauthenticationRequiredException("expired", null))),
+            new ConcurrentModel(),
+            request);
+
+    ResponseEntity<?> response = assertInstanceOf(ResponseEntity.class, result);
+    assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    assertEquals(
+        ReauthenticationRequiredException.REAUTH_PATH,
+        response.getHeaders().getFirst("X-Reauthenticate"));
+  }
+
+  @Test
+  void anOrdinaryJoinedFailureKeepsTheCentral500Page() {
+    Object result =
+        handler.handleCompletionException(
+            new CompletionException(new IllegalStateException("unavailable")),
+            new ConcurrentModel(),
+            new MockHttpServletRequest("GET", "/parallel-read"));
+
+    ModelAndView page = assertInstanceOf(ModelAndView.class, result);
+    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, page.getStatus());
+    assertEquals("error/error", page.getViewName());
+  }
 
   @BeforeEach
   void setUp() {

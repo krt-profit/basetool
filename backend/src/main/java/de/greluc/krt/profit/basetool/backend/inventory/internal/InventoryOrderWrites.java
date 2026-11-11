@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.Poo
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.StockBookInScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -60,6 +61,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
 public class InventoryOrderWrites {
+
+  private static final int MAX_IDS_PER_QUERY = 4_096;
 
   private final InventoryItemRepository rows;
   private final OrderLinkedStockWriteObserver observer;
@@ -172,8 +175,8 @@ public class InventoryOrderWrites {
     List<UUID> orderIds = new ArrayList<>();
     List<OrderMaterialScope> scopes = new ArrayList<>(requestedScopes);
     if (!rowIds.isEmpty()) {
-      orderIds.addAll(rows.findAllocatedOrderIds(rowIds));
-      scopes.addAll(rows.findAllocatedMaterialScopes(rowIds));
+      orderIds.addAll(readBatches(rowIds, rows::findAllocatedOrderIds));
+      scopes.addAll(readBatches(rowIds, rows::findAllocatedMaterialScopes));
     }
     if (!allocationTargets.isEmpty()) {
       Map<UUID, InventoryOrderAllocationQueries.RowLot> targets =
@@ -298,7 +301,7 @@ public class InventoryOrderWrites {
       Collection<UUID> rowIds, Collection<OrderMaterialScope> requiredScopes) {
     List<OrderMaterialScope> scopes = new ArrayList<>(requiredScopes);
     if (!rowIds.isEmpty()) {
-      scopes.addAll(rows.findAllocatedMaterialScopes(rowIds));
+      scopes.addAll(readBatches(rowIds, rows::findAllocatedMaterialScopes));
     }
     observer.beforeOrderLinkedMaterialWrite(scopes);
   }
@@ -353,7 +356,7 @@ public class InventoryOrderWrites {
       @NotNull Collection<OrderMaterialScope> requiredScopes,
       @NotNull Collection<PoolAllocationTarget> allocationTargets,
       @NotNull Collection<Long> additionalLots,
-      @Nullable Consumer<List<InventoryOrderAllocationQueries.RowLot>> verifier) {
+      @Nullable RowLockCheck rowLockCheck) {
     lockEligibility();
     Map<StockBookInScope, Set<UUID>> destinations = new HashMap<>();
     Set<UUID> affected = new HashSet<>(sourceRowIds);
@@ -384,17 +387,35 @@ public class InventoryOrderWrites {
     }
     lockRowsAndTargets(affected, scopes, allocationTargets);
     lockStockLots(lotKeys);
+    Set<UUID> vanished = Set.of();
     if (!affected.isEmpty()) {
-      if (verifier == null) {
+      if (rowLockCheck == null) {
         rows.lockAllByIdOrderById(affected);
       } else {
-        rows.lockRowIdsOrderById(affected);
-        verifier.accept(rows.findRowLots(affected));
+        List<UUID> locked = rows.lockRowIdsOrderById(affected);
+        if (!rowLockCheck.requiredSources().isEmpty()
+            && !Set.copyOf(locked).containsAll(rowLockCheck.requiredSources())) {
+          throw new NotFoundException("Inventory item not found");
+        }
+        vanished = new HashSet<>(rowLockCheck.dispensableSources());
+        vanished.removeAll(locked);
+        vanished.forEach(planning().rows::remove);
+        if (rowLockCheck.refreshableSource() != null) {
+          refreshSourceSnapshot(rowLockCheck.refreshableSource());
+        }
+        if (rowLockCheck.authority() != null) {
+          rowLockCheck.authority().accept(readBatches(affected, rows::findRowLots));
+        }
       }
       validateRows(affected);
     }
     for (var destination : destinations.entrySet()) {
-      if (!destination.getValue().equals(mergeCandidates(destination.getKey()))) {
+      Set<UUID> expected = destination.getValue();
+      if (!Collections.disjoint(expected, vanished)) {
+        expected = new HashSet<>(expected);
+        expected.removeAll(vanished);
+      }
+      if (!expected.equals(mergeCandidates(destination.getKey()))) {
         throw new ObjectOptimisticLockingFailureException(
             InventoryItem.class, destination.getKey().holder());
       }
@@ -419,7 +440,103 @@ public class InventoryOrderWrites {
       @NotNull Collection<StockBookInScope> bookings,
       @NotNull Collection<OrderMaterialScope> requiredScopes,
       @NotNull Consumer<List<InventoryOrderAllocationQueries.RowLot>> verifier) {
-    prepareWrites(sourceRowIds, bookings, requiredScopes, List.of(), List.of(), verifier);
+    prepareWrites(
+        sourceRowIds,
+        bookings,
+        requiredScopes,
+        List.of(),
+        List.of(),
+        new RowLockCheck(verifier, Set.of(), null, Set.of()));
+  }
+
+  /**
+   * Resolves explicitly named sources after locking the complete write plan.
+   *
+   * @param selected the source rows that must still exist
+   * @param additional further affected stock rows
+   * @param bookings every new destination with its actual merge policy
+   * @param requiredScopes the calling domain's material scopes
+   */
+  void prepareWritesRequiringSources(
+      @NotNull Collection<UUID> selected,
+      @NotNull Collection<UUID> additional,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes) {
+    Set<UUID> sources = new HashSet<>(selected);
+    sources.addAll(additional);
+    prepareWrites(
+        sources,
+        bookings,
+        requiredScopes,
+        List.of(),
+        List.of(),
+        new RowLockCheck(null, Set.of(), null, selected));
+  }
+
+  /**
+   * Plans one named source whose deletion may be handled by its caller.
+   *
+   * @param sourceRowId the carrier that may be absent after the wait
+   * @param destinations the exact destinations the action can write
+   * @param readCurrent whether this path accepts a fresh amount and version in the same scope
+   */
+  void prepareSingleRowWrite(
+      @NotNull UUID sourceRowId,
+      @NotNull List<StockBookInScope> destinations,
+      boolean readCurrent) {
+    UUID refreshable = readCurrent && !planning().stockPhase ? sourceRowId : null;
+    prepareWrites(
+        List.of(sourceRowId),
+        destinations,
+        List.of(),
+        List.of(),
+        List.of(),
+        new RowLockCheck(null, Set.of(sourceRowId), refreshable, Set.of()));
+  }
+
+  /**
+   * Plans the selected rows while leaving absence handling to the caller.
+   *
+   * @param rowIds the named rows that the caller must resolve after locking
+   */
+  void prepareSelectedRowWrites(@NotNull Collection<UUID> rowIds) {
+    prepareWrites(
+        rowIds,
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        new RowLockCheck(null, Set.copyOf(rowIds), null, Set.of()));
+  }
+
+  /**
+   * Plans every row of a global wipe and locks their ids in one ordered statement.
+   *
+   * @param rowIds the initial finite set of in-scope rows
+   */
+  void prepareWipe(@NotNull Collection<UUID> rowIds) {
+    prepareWrites(
+        rowIds,
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        new RowLockCheck(null, Set.copyOf(rowIds), null, Set.of()));
+  }
+
+  /** Selects scalar locking and optional checks for a complete physical plan. */
+  private record RowLockCheck(
+      @Nullable Consumer<List<InventoryOrderAllocationQueries.RowLot>> authority,
+      Set<UUID> dispensableSources,
+      @Nullable UUID refreshableSource,
+      Collection<UUID> requiredSources) {}
+
+  private void refreshSourceSnapshot(UUID source) {
+    RowSnapshot planned = planning().rows.get(source);
+    RowSnapshot locked = readSnapshots(List.of(source)).get(source);
+    if (planned != null && locked != null && planned.sameResourcesAs(locked)) {
+      planning().rows.put(source, locked);
+    }
   }
 
   private Set<UUID> mergeCandidates(@NotNull StockBookInScope booking) {
@@ -494,7 +611,13 @@ public class InventoryOrderWrites {
     Set<UUID> affected = new HashSet<>(rowIds);
     holderLots.forEach((holder, holderLotKeys) ->
         affected.addAll(rows.findRowsInHolderLots(holder, holderLotKeys)));
-    prepareWrites(affected, List.of(), List.of(), List.of(), lotKeys);
+    prepareWrites(
+        affected,
+        List.of(),
+        List.of(),
+        List.of(),
+        lotKeys,
+        new RowLockCheck(null, Set.copyOf(rowIds), null, Set.of()));
   }
 
   /**
@@ -533,7 +656,7 @@ public class InventoryOrderWrites {
   public void assertRows(@NotNull Collection<UUID> rowIds) {
     if (!rowIds.isEmpty()) {
       validateRows(rowIds);
-      assertOrders(rows.findAllocatedOrderIds(rowIds));
+      assertOrders(readBatches(rowIds, rows::findAllocatedOrderIds));
     }
   }
 
@@ -559,7 +682,7 @@ public class InventoryOrderWrites {
       plan.validated.add(id);
     }
     plan.stockPhase = true;
-    observer.assertOrderLinkedMaterialWrite(
+    List<OrderMaterialScope> scopes =
         actual.values().stream()
             .filter(row -> row.material() != null)
             .flatMap(row ->
@@ -568,7 +691,37 @@ public class InventoryOrderWrites {
                         new OrderMaterialScope(
                             allocation.order(), Objects.requireNonNull(row.material()))))
             .distinct()
-            .toList());
+            .toList();
+    visitBatches(scopes, observer::assertOrderLinkedMaterialWrite);
+  }
+
+  private static <T> List<T> readBatches(
+      Collection<UUID> ids, Function<Collection<UUID>, List<T>> query) {
+    if (ids.size() <= MAX_IDS_PER_QUERY) {
+      return query.apply(ids);
+    }
+    List<T> rows = new ArrayList<>();
+    for (List<UUID> batch : batches(ids)) {
+      rows.addAll(query.apply(batch));
+    }
+    return rows;
+  }
+
+  private static <T> void visitBatches(Collection<T> values, Consumer<Collection<T>> visitor) {
+    if (values.size() <= MAX_IDS_PER_QUERY) {
+      visitor.accept(values);
+      return;
+    }
+    batches(values).forEach(visitor);
+  }
+
+  private static <T> List<List<T>> batches(Collection<T> values) {
+    List<T> list = List.copyOf(values);
+    List<List<T>> batches = new ArrayList<>();
+    for (int start = 0; start < list.size(); start += MAX_IDS_PER_QUERY) {
+      batches.add(list.subList(start, Math.min(start + MAX_IDS_PER_QUERY, list.size())));
+    }
+    return batches;
   }
 
   private Map<UUID, RowSnapshot> readSnapshots(@NotNull Collection<UUID> rowIds) {
@@ -577,13 +730,13 @@ public class InventoryOrderWrites {
     }
     Map<UUID, Set<AllocationSnapshot>> allocations = new HashMap<>();
     for (InventoryOrderAllocationQueries.OrderAllocationFact fact :
-        rows.findOrderAllocationFacts(rowIds)) {
+        readBatches(rowIds, rows::findOrderAllocationFacts)) {
       allocations
           .computeIfAbsent(fact.getRowId(), _ -> new HashSet<>())
           .add(new AllocationSnapshot(fact.getOrderId(), ScuAmounts.toQuanta(fact.getAmount())));
     }
     Map<UUID, RowSnapshot> result = new HashMap<>();
-    for (InventoryOrderAllocationQueries.RowLot row : rows.findRowLots(rowIds)) {
+    for (InventoryOrderAllocationQueries.RowLot row : readBatches(rowIds, rows::findRowLots)) {
       result.put(
           row.getId(),
           new RowSnapshot(
@@ -629,7 +782,19 @@ public class InventoryOrderWrites {
       @Nullable UUID owningUnit,
       @Nullable Long version,
       long amount,
-      Set<AllocationSnapshot> allocations) {}
+      Set<AllocationSnapshot> allocations) {
+    private boolean sameResourcesAs(RowSnapshot current) {
+      return holder.equals(current.holder)
+          && Objects.equals(material, current.material)
+          && Objects.equals(gameItem, current.gameItem)
+          && location.equals(current.location)
+          && Objects.equals(quality, current.quality)
+          && stolen == current.stolen
+          && personal == current.personal
+          && Objects.equals(owningUnit, current.owningUnit)
+          && allocations.equals(current.allocations);
+    }
+  }
 
   /** The stock plan and revalidated rows owned exclusively by one transaction. */
   @RequiredArgsConstructor
@@ -711,20 +876,6 @@ public class InventoryOrderWrites {
    * @param orderIds the affected target orders
    */
   public void assertOrders(@NotNull Collection<UUID> orderIds) {
-    observer.beforeOrderLinkedStockWrite(orderIds);
-  }
-
-  /**
-   * Validates every nonpersonal row affected by a scoped wipe.
-   *
-   * @param adminAll whether all rows are in scope
-   * @param activeUnit the pinned unit, or null
-   * @param memberUnits the caller's scoped units
-   */
-  public void assertWipe(
-      boolean adminAll, @Nullable UUID activeUnit, Collection<UUID> memberUnits) {
-    assertOrders(rows.findAllocatedOrdersInWipeScope(adminAll, activeUnit, memberUnits));
-    observer.beforeOrderLinkedMaterialWrite(
-        rows.findAllocatedMaterialScopesInWipeScope(adminAll, activeUnit, memberUnits));
+    visitBatches(orderIds, observer::beforeOrderLinkedStockWrite);
   }
 }

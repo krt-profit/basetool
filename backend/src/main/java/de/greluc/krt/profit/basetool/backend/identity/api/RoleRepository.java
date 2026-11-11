@@ -32,6 +32,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RoleRepository extends JpaRepository<Role, Long> {
   /**
+   * Locks the role before an independently versioned section write.
+   *
+   * @param name the role display name
+   * @return the locked role, or empty
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT r FROM Role r WHERE r.name = :name")
+  Optional<Role> lockByName(@Param("name") String name);
+
+  /**
    * Derived Spring-Data query - returns entities matching {@code Name}. Eagerly fetches the
    * configured relations via {@code @EntityGraph}.
    */
