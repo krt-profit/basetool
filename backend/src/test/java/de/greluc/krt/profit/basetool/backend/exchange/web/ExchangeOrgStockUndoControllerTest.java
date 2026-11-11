@@ -50,6 +50,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityProvenance;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -114,6 +116,7 @@ class ExchangeOrgStockUndoControllerTest {
   @Autowired private ExchangeSettingsRepository settingsRepository;
   @Autowired private KnownExchangeClients knownClients;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private NotificationMuteService mutes;
   @Autowired private StockReads stock;
   @Autowired private StockQuantityProvenance provenance;
   @Autowired private StockLotWritePlans lotPlans;
@@ -300,6 +303,8 @@ class ExchangeOrgStockUndoControllerTest {
   @Test
   void concurrentUndosCannotRecreateTheSameOriginalQuantityAtBothHistoricalLocations()
       throws Exception {
+    // Inbox inserts also need a foreign-key lock on the holder row.
+    mutes.setMuted(holder, NotificationType.INVENTORY_BOOKED_OUT_BY_OTHER, true);
     ExchangeClient movingClient = registerClient();
     ExchangeClient consumingClient = registerClient();
     additionalClients.put(movingClient.getId(), movingClient.getClientId());
