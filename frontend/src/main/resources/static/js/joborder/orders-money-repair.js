@@ -31,6 +31,7 @@ import {
     showPreviewAmounts,
 } from '/js/joborder/orders-money-preview.js';
 
+/** @import { bindMoneyRecovery } from '/js/joborder/orders-money-recovery.js' */
 /** @typedef {ApiDto<'JobOrderMoneyRepairView'>} Repair */
 /** @typedef {ApiDto<'JobOrderMoneyRepairQuote'>} Quote */
 /** @typedef {ApiDto<'ReplaceJobOrderBankAttemptDto'>} RepairTerms */
@@ -41,7 +42,7 @@ const modalId = 'order-money-repair-modal';
  * Repairs a failed attempt with the same logical identity and frozen fee basis.
  *
  * @param {HTMLElement} root the order workspace
- * @param {ReturnType<typeof import('/js/joborder/orders-money-recovery.js').bindMoneyRecovery>} recovery the shared outcome recovery
+ * @param {ReturnType<typeof bindMoneyRecovery>} recovery the shared outcome recovery
  */
 export function bindLinkedMoneyRepair(root, recovery) {
     const form = document.getElementById('order-money-repair-form');

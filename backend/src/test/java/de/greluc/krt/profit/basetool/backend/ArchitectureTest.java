@@ -169,6 +169,9 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.ItemHandoverRequi
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderFulfillmentContext;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankAccountQueries;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankAccounts;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankPreview;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderRecipeSelection;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
@@ -623,6 +626,9 @@ class ArchitectureTest {
           JobOrderBankEffects.class,
           JobOrderBankPort.class,
           JobOrderBankSelection.class,
+          JobOrderMoneyBankAccountQueries.class,
+          JobOrderMoneyBankAccounts.class,
+          JobOrderMoneyBankPreview.class,
           ReplaceJobOrderBankAttemptDto.class);
 
   /**

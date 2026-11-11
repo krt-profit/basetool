@@ -37,6 +37,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
@@ -274,10 +275,11 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   }
 
   private BankAccount readActive(UUID accountId) {
-    return accounts
-        .findById(accountId)
-        .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE)
-        .orElseThrow(() -> new NotFoundException("Bank account not found"));
+    return Entities.require(
+        accounts
+            .findById(accountId)
+            .filter(account -> account.getStatus() == BankAccountStatus.ACTIVE),
+        "Bank account not found");
   }
 
   /**

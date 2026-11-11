@@ -25,7 +25,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.Payme
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.PreviousAttempt;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.Terms;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
-import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import java.math.BigDecimal;
 import java.util.HashSet;
@@ -249,9 +249,9 @@ public class JobOrderLinkedMoneyRepair {
 
   private JobOrderLinkedMoneyAttempt requireRepairable(JobOrder order, UUID operationId) {
     var prior =
-        attempts
-            .findByOrderIdAndOperationIdAndActiveTrue(order.getId(), operationId)
-            .orElseThrow(() -> new NotFoundException("orders.money.operation.unknown"));
+        Entities.require(
+            attempts.findByOrderIdAndOperationIdAndActiveTrue(order.getId(), operationId),
+            "orders.money.operation.unknown");
     if (!access.mayRepair(order, prior, access.requireActiveActor(), ledger.read(order.getId()))) {
       throw new AccessDeniedException("Caller may not replace this operation.");
     }
