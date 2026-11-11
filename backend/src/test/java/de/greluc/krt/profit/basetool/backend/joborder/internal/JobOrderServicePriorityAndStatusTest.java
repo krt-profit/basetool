@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -54,19 +56,25 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -74,6 +82,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 /**
  * Unit tests for the priority and status transitions of {@link JobOrderService} and its priority
@@ -87,7 +98,7 @@ class JobOrderServicePriorityAndStatusTest {
 
   @Mock private ProfitHierarchyService profitHierarchy;
   @Mock private JobOrderResponsibilityGuard responsibilityGuard;
-  @Mock private LiveSyncPublisher liveSyncPublisher;
+  @Mock private LiveSyncFanout liveSyncFanout;
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderItemFulfillmentGuard itemFulfillment;
@@ -114,6 +125,22 @@ class JobOrderServicePriorityAndStatusTest {
   private JobOrderService service;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
+
+  @AfterEach
+  void releaseOpenFixtureTransaction() {
+    TransactionSynchronizationUtils.invokeAfterCompletion(
+        TransactionSynchronizationManager.getSynchronizations(),
+        TransactionSynchronization.STATUS_ROLLED_BACK);
+  }
+
+  private static void commitFixtureTransaction() {
+    var synchronizations = TransactionSynchronizationManager.getSynchronizations();
+    TransactionSynchronizationUtils.invokeAfterCommit(synchronizations);
+    TransactionSynchronizationManager.clearSynchronization();
+    TransactionSynchronizationUtils.invokeAfterCompletion(
+        synchronizations, TransactionSynchronization.STATUS_COMMITTED);
+    TransactionSynchronizationManager.initSynchronization();
+  }
 
   @BeforeEach
   void stubMapper() {
@@ -182,7 +209,7 @@ class JobOrderServicePriorityAndStatusTest {
                 org.mockito.Mockito.mock(
                     de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
                         .class)),
-            liveSyncPublisher,
+            new LiveSyncPublisher(liveSyncFanout, new SimpleMeterRegistry()),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
             org.mockito.Mockito.mock(JobOrderParticipationCommands.class));
@@ -258,7 +285,29 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
       verify(effects)
-          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
+          .publish(
+              new JobOrderClosedEvent(
+                  ORDER_ID, null, JobOrderLifecycleNotices.revision(o), Set.of()));
+    }
+
+    @Test
+    void cancellationAndReopeningAnnounceTheSupportSectionToOrderPeers() {
+      JobOrder o = newOrder(JobOrderStatus.OPEN, 3, 1L);
+      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
+      when(jobOrderRepository.save(o)).thenReturn(o);
+      when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of());
+
+      service.updateJobOrderStatus(
+          ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.CANCELLED, 1L));
+      commitFixtureTransaction();
+      service.updateJobOrderStatus(
+          ORDER_ID, new UpdateJobOrderStatusDto(JobOrderStatus.OPEN, o.getLifecycleVersion()));
+      commitFixtureTransaction();
+
+      verify(liveSyncFanout, times(2))
+          .publish(
+              eq(LiveSyncTopic.of(LiveSyncTopicClass.ORDER, ORDER_ID)),
+              argThat(sections -> sections.contains("participations")));
     }
 
     @Test
@@ -275,7 +324,9 @@ class JobOrderServicePriorityAndStatusTest {
       assertEquals(JobOrderStatus.REJECTED, o.getStatus());
 
       verify(effects)
-          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
+          .publish(
+              new JobOrderClosedEvent(
+                  ORDER_ID, null, JobOrderLifecycleNotices.revision(o), Set.of()));
     }
 
     private de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent
@@ -576,7 +627,9 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
       verify(effects)
-          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
+          .publish(
+              new JobOrderClosedEvent(
+                  ORDER_ID, null, JobOrderLifecycleNotices.revision(o), Set.of()));
     }
 
     @Test
@@ -589,7 +642,9 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository, never()).lockAllJobOrders();
       verify(effects)
-          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
+          .publish(
+              new JobOrderClosedEvent(
+                  ORDER_ID, null, JobOrderLifecycleNotices.revision(o), Set.of()));
     }
   }
 
@@ -667,14 +722,21 @@ class JobOrderServicePriorityAndStatusTest {
       when(jobOrderRepository.lockAllJobOrders()).thenReturn(List.of());
 
       service.completeJobOrderWithinTransaction(o);
+      commitFixtureTransaction();
 
       assertEquals(JobOrderStatus.COMPLETED, o.getStatus());
       assertNull(o.getPriority(), "priority must be cleared");
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository).lockAllJobOrders();
 
+      verify(liveSyncFanout)
+          .publish(
+              eq(LiveSyncTopic.of(LiveSyncTopicClass.ORDER, ORDER_ID)),
+              argThat(sections -> sections.contains("participations")));
       verify(effects)
-          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
+          .publish(
+              new JobOrderClosedEvent(
+                  ORDER_ID, null, JobOrderLifecycleNotices.revision(o), Set.of()));
     }
 
     @Test
@@ -689,7 +751,9 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).flush();
 
       verify(effects)
-          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
+          .publish(
+              new JobOrderClosedEvent(
+                  ORDER_ID, null, JobOrderLifecycleNotices.revision(o), Set.of()));
     }
   }
 

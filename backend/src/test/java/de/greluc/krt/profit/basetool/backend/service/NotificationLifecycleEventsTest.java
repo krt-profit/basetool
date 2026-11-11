@@ -64,19 +64,15 @@ class NotificationLifecycleEventsTest {
 
   @Test
   void aClosedOrderClearsItsOutstandingActionPrompts() {
-    JobOrderClosedEvent event = new JobOrderClosedEvent(ID, ACTOR, new NotificationRevision(1, 0));
+    UUID prompt = UUID.randomUUID();
+    JobOrderClosedEvent event =
+        new JobOrderClosedEvent(ID, ACTOR, new NotificationRevision(1, 0), Set.of(prompt));
 
     assertThat(event.eventType()).isEqualTo(NotificationEventType.JOB_ORDER_CLOSED);
     assertThat(event.entityType()).isEqualTo("JOB_ORDER");
     assertThat(event.entityId()).isEqualTo(ID);
-    assertThat(event.resolvesNotificationTypes())
-        .containsExactlyInAnyOrder(
-            NotificationType.JOB_ORDER_CREATED,
-            NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER,
-            NotificationType.JOB_ORDER_UPDATED_BY_RESPONSIBLE,
-            NotificationType.JOB_ORDER_REASSIGNED,
-            NotificationType.JOB_ORDER_REOPENED,
-            NotificationType.JOB_ORDER_CLARIFICATION_REQUIRED);
+    assertThat(event.resolvesNotificationIds()).containsExactly(prompt);
+    assertThat(event.resolvesNotificationTypes()).isEmpty();
     assertThat(event.contextOrgUnits()).isEmpty();
     assertThat(event.renderParams()).isEmpty();
   }

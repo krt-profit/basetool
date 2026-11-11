@@ -216,6 +216,48 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       @Param("entityId") UUID entityId);
 
   /**
+   * Captures existing notice identities for cleanup tied to an entity revision.
+   *
+   * @param types the notice types to match
+   * @param entityType the owning entity tag
+   * @param entityId the owning entity id
+   * @return the exact notice identities
+   */
+  @Query(
+      """
+      select n.id from Notification n
+      where n.type in :types and n.entityType = :entityType and n.entityId = :entityId
+      """)
+  List<UUID> findIdsByTypeInAndEntity(
+      @Param("types") Set<NotificationType> types,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId);
+
+  /**
+   * Deletes the specified notices within their entity scope and reports the affected recipients.
+   *
+   * @param ids the captured notice identities
+   * @param entityType the owning entity tag
+   * @param entityId the owning entity id
+   * @return the recipients of the deleted notices
+   */
+  @Query(
+      value =
+          """
+          with removed as (
+            delete from notification
+            where id in (:ids) and entity_type = :entityType and entity_id = :entityId
+            returning recipient_user_id
+          )
+          select distinct recipient_user_id from removed
+          """,
+      nativeQuery = true)
+  List<UUID> deleteCapturedNoticesReturningRecipients(
+      @Param("ids") Set<UUID> ids,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId);
+
+  /**
    * Deletes every notification of one of the given types tagged with the loose entity reference in
    * one atomic statement — clears the now-stale "action needed" items a lifecycle-terminating event
    * supersedes (REQ-NOTIF-018). Clears the persistence context so callers re-read fresh state.

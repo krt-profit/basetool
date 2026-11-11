@@ -259,8 +259,7 @@ public class JobOrderService {
   }
 
   /**
-   * Publishes a {@link JobOrderClosedEvent} so the order's open notices are cleared after commit
-   * (REQ-NOTIF-018).
+   * Reports a terminal outcome after commit.
    *
    * @param jobOrder the completed, rejected or deleted order
    * @param statusCode the order's final status code
@@ -282,7 +281,8 @@ public class JobOrderService {
     return new JobOrderClosedEvent(
         order.getId(),
         authHelperService.currentUserId().orElse(null),
-        JobOrderLifecycleNotices.revision(order));
+        JobOrderLifecycleNotices.revision(order),
+        effects.captureActionPromptIds(order.getId()));
   }
 
   /**
@@ -384,13 +384,19 @@ public class JobOrderService {
                 jobOrder,
                 AuditEventType.JOB_ORDER_STATUS_CHANGED,
                 AuditDetails.of("from", previousStatus).with("to", status));
+    publishLifecycleSections(jobOrder.getId());
+    return edit.notifying(notices);
+  }
+
+  private void publishLifecycleSections(UUID orderId) {
     liveSyncPublisher.publishAfterCommit(
-        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, jobOrder.getId()),
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, orderId),
         List.of(
             "header",
             "actions",
             "dialogs",
             "kpi",
+            "participations",
             "materials",
             "aggregated",
             "items",
@@ -399,7 +405,6 @@ public class JobOrderService {
             "item-handover-lines"));
     liveSyncPublisher.publishAfterCommit(
         LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue", "demand"));
-    return edit.notifying(notices);
   }
 
   /**
@@ -993,6 +998,7 @@ public class JobOrderService {
           "autoCompleted=true");
       publishJobOrderClosed(jobOrder);
       publishJobOrderFinished(jobOrder, "COMPLETED");
+      publishLifecycleSections(jobOrder.getId());
     }
   }
 
