@@ -46,7 +46,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Admin-only controller for the {@code /admin/p4k-import} page: uploads a p4kx catalogue as an
@@ -99,7 +98,6 @@ public class AdminP4kImportPageController {
   @ResponseBody
   @NotNull
   public ResponseEntity<Object> enqueuePreview(@RequestParam("file") @NotNull MultipartFile file) {
-    byte[] bytes = readBytes(file);
     String filename =
         file.getOriginalFilename() != null ? file.getOriginalFilename() : "p4k-catalog.json";
     return relay(
@@ -107,7 +105,7 @@ public class AdminP4kImportPageController {
         "P4K catalogue upload",
         () ->
             ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(catalogueClient.enqueueP4kImport(bytes, filename)));
+                .body(catalogueClient.enqueueP4kImport(file.getResource(), filename)));
   }
 
   /**
@@ -162,20 +160,5 @@ public class AdminP4kImportPageController {
         CacheDomain.SHIP_TYPE,
         CacheDomain.ITEM_CATALOG);
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(job);
-  }
-
-  /**
-   * Reads the uploaded multipart body into memory, mapping an I/O failure to a 400.
-   *
-   * @param file the uploaded file
-   * @return the file bytes
-   */
-  private byte @NotNull [] readBytes(@NotNull MultipartFile file) {
-    try {
-      return file.getBytes();
-    } catch (Exception _) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "The uploaded file could not be read.");
-    }
   }
 }

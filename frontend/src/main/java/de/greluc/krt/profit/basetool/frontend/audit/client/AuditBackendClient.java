@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.audit.model.AuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankAuditEventDto;
 import de.greluc.krt.profit.basetool.frontend.exchange.model.ExchangeClientDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendBinaryTransfer;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import java.time.Instant;
 import java.util.List;
@@ -124,9 +125,9 @@ public class AuditBackendClient {
    * @param from period start
    * @param to period end
    * @param userTimeZone the caller's IANA time zone, forwarded when not blank
-   * @return the PDF bytes, or {@code null} when the backend sent no body
+   * @return the bounded PDF transfer
    */
-  public byte @Nullable [] exportPdf(
+  public @NotNull BackendBinaryTransfer exportPdf(
       @NotNull String domain,
       @NotNull Instant from,
       @NotNull Instant to,
@@ -141,8 +142,7 @@ public class AuditBackendClient {
             .encode()
             .build()
             .toUriString();
-    return backendApiClient.execute(
-        HttpMethod.GET,
+    return backendApiClient.download(
         uri,
         webClient ->
             webClient
@@ -152,8 +152,7 @@ public class AuditBackendClient {
                   if (userTimeZone != null && !userTimeZone.isBlank()) {
                     h.set("X-User-Time-Zone", userTimeZone);
                   }
-                }),
-        spec -> spec.bodyToMono(byte[].class));
+                }));
   }
 
   /**
@@ -162,9 +161,9 @@ public class AuditBackendClient {
    * @param domain the area tab
    * @param from period start
    * @param to period end
-   * @return the JSON bytes, or {@code null} when the backend sent no body
+   * @return the bounded JSON transfer
    */
-  public byte @Nullable [] exportJson(
+  public @NotNull BackendBinaryTransfer exportJson(
       @NotNull String domain, @NotNull Instant from, @NotNull Instant to) {
     String uri =
         UriComponentsBuilder.fromPath(
@@ -176,11 +175,7 @@ public class AuditBackendClient {
             .encode()
             .build()
             .toUriString();
-    return backendApiClient.execute(
-        HttpMethod.GET,
-        uri,
-        webClient -> webClient.get().uri(uri, domain),
-        spec -> spec.bodyToMono(byte[].class));
+    return backendApiClient.download(uri, webClient -> webClient.get().uri(uri, domain));
   }
 
   /**

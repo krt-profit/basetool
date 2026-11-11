@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,4 +63,14 @@ public interface TerminalRepository extends JpaRepository<Terminal, UUID> {
    */
   @Query("SELECT e.idTerminal AS uexId, e.id AS id FROM Terminal e WHERE e.idTerminal IS NOT NULL")
   List<UexKeyRef> findUexTerminalRefs();
+
+  /**
+   * Reads the identities and name fallbacks needed by one UEX synchronization chunk.
+   *
+   * @param ids incoming UEX identifiers
+   * @param names incoming display names
+   * @return matching rows in stable local-id order
+   */
+  List<Terminal> findByIdTerminalInOrNameInOrderByIdAsc(
+      Collection<Integer> ids, Collection<String> names);
 }

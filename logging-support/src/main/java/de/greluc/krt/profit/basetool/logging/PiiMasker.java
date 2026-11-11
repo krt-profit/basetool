@@ -37,7 +37,7 @@ import org.jetbrains.annotations.Nullable;
  *       {@code =} become {@code ***}.
  * </ul>
  *
- * <p>Replacements contain no quotes or backslashes, so masked JSON stays valid.
+ * <p>Structured JSON values are masked by the encoder before serialization.
  */
 public final class PiiMasker {
 
@@ -67,7 +67,7 @@ public final class PiiMasker {
   /**
    * Replaces all detected PII and secret occurrences with fixed placeholders.
    *
-   * @param input the raw log line or serialized JSON to scrub; may be {@code null}
+   * @param input the raw text value to scrub; may be {@code null}
    * @return the masked text, or the same {@code input} instance when it is {@code null}, empty or
    *     PII-free
    */

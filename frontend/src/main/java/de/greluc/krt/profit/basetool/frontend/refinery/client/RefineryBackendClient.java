@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryImportDraftDto;
+import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCountsDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
@@ -86,6 +87,19 @@ public class RefineryBackendClient {
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Reads every segment total within the caller's refinery scope.
+   *
+   * @param onlyMine whether to include only the caller's orders
+   * @return the totals, or null when the backend sent no body
+   */
+  public @Nullable RefineryOrderCountsDto orderCounts(boolean onlyMine) {
+    return backendApiClient.get(
+        "/api/v1/refinery-orders/counts?onlyMine={onlyMine}",
+        RefineryOrderCountsDto.class,
+        onlyMine);
+  }
 
   /**
    * Reads one page of refinery orders for a status filter (REQ-REFINERY-019).

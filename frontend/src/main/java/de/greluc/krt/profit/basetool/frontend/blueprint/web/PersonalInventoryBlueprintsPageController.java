@@ -228,7 +228,7 @@ public class PersonalInventoryBlueprintsPageController {
    * committing.
    *
    * @param productKeys the normalized product keys staged by the user
-   * @return the batch result (added / skipped counts), or a zeroed result on backend failure
+   * @return the batch result with added and skipped counts
    */
   @PostMapping("/add-selected")
   @ResponseBody
@@ -237,13 +237,7 @@ public class PersonalInventoryBlueprintsPageController {
     if (keys.isEmpty()) {
       return new PersonalBlueprintBatchResultDto(0, 0, 0);
     }
-    PersonalBlueprintBatchResultDto result =
-        SectionFallback.load(
-            log,
-            "blueprint-batch-add",
-            () -> blueprintClient.addOwned(new PersonalBlueprintBatchCreateRequest(keys)),
-            null);
-    return result == null ? new PersonalBlueprintBatchResultDto(0, 0, 0) : result;
+    return blueprintClient.addOwned(new PersonalBlueprintBatchCreateRequest(keys));
   }
 
   /**
@@ -273,6 +267,7 @@ public class PersonalInventoryBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to update blueprint note {}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.blueprints.error.update"));
@@ -295,6 +290,7 @@ public class PersonalInventoryBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removed");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to remove blueprint {}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.blueprints.error.remove"));
@@ -317,6 +313,7 @@ public class PersonalInventoryBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removedAll");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to clear all owned blueprints", e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.blueprints.error.removeAll"));

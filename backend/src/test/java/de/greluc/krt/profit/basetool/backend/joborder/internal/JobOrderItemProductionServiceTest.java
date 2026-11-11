@@ -73,7 +73,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -104,7 +103,7 @@ class JobOrderItemProductionServiceTest {
   @Mock private BookInPolicy bookInPolicy;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
   @Mock private AuthHelperService authHelperService;
-  @InjectMocks private JobOrderItemProductionService service;
+  private JobOrderItemProductionService service;
 
   private UUID orderId;
   private UUID lineId;
@@ -117,18 +116,25 @@ class JobOrderItemProductionServiceTest {
 
   @BeforeEach
   void setUp() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockCommands",
-        new InventoryStockCommands(
-            inventoryItemRepository,
-            userRepository,
-            inventoryCheckoutService,
-            null,
+    service =
+        new JobOrderItemProductionService(
+            jobOrderRepository,
+            new InventoryStockCommands(
+                inventoryItemRepository,
+                userRepository,
+                inventoryCheckoutService,
+                null,
+                auditService,
+                bookInPolicy,
+                offerRatchet,
+                null),
+            jobOrderItemService,
             auditService,
-            bookInPolicy,
-            offerRatchet,
-            null));
+            userService,
+            userRepository,
+            locationRepository,
+            orgUnitStampingService,
+            authHelperService);
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();

@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationReq
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessHit;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessSearchContributor;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.QuickAccessSearchKind;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.shell.web.QuickAccessSearchMetrics.Outcome;
 import java.time.Duration;
 import java.time.Instant;
@@ -198,7 +199,7 @@ public class QuickAccessSearchController {
       hits = future.join();
     } catch (CompletionException e) {
       Throwable cause = e.getCause() == null ? e : e.getCause();
-      rethrowLostSession(cause);
+      SectionFallback.rethrowIfReauthenticationRequired(cause);
       Outcome outcome = cause instanceof TimeoutException ? Outcome.TIMEOUT : Outcome.ERROR;
       metrics.record(kind, outcome);
       Level level =
@@ -229,15 +230,5 @@ public class QuickAccessSearchController {
                     : messageSource.getMessage(h.statusKey(), null, h.statusKey(), locale),
                 h.date()))
         .toList();
-  }
-
-  private static void rethrowLostSession(@NotNull Throwable cause) {
-    if (cause instanceof ReauthenticationRequiredException reauth) {
-      throw reauth;
-    }
-    if (ReauthenticationRequiredException.isReauthSignal(cause)) {
-      throw new ReauthenticationRequiredException(
-          "Quick-access search lost the OAuth2 session", cause);
-    }
   }
 }

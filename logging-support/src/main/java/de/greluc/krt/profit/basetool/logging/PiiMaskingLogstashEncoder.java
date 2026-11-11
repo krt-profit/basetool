@@ -19,33 +19,62 @@
 
 package de.greluc.krt.profit.basetool.logging;
 
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.Set;
+import java.util.regex.Pattern;
 import net.logstash.logback.encoder.LogstashEncoder;
+import net.logstash.logback.mask.MaskingJsonGeneratorDecorator;
 
-/**
- * {@link LogstashEncoder} that masks PII and secrets in the rendered JSON via {@link PiiMasker};
- * the encoder of the prod JSON sink of all three applications.
- */
+/** Masks structured credentials and text values before JSON serialization. */
 public class PiiMaskingLogstashEncoder extends LogstashEncoder {
 
-  /**
-   * Encodes {@code event} with the stock JSON encoder and masks the result.
-   *
-   * @param event the logging event to render
-   * @return the masked JSON bytes, or the encoder's own bytes when nothing was masked
-   */
-  @Override
-  public byte[] encode(ILoggingEvent event) {
-    byte[] raw = super.encode(event);
-    if (raw == null || raw.length == 0) {
-      return raw;
-    }
-    String json = new String(raw, StandardCharsets.UTF_8);
-    String masked = PiiMasker.mask(json);
-    if (json.equals(masked)) {
-      return raw;
-    }
-    return masked.getBytes(StandardCharsets.UTF_8);
+  private static final Pattern STRUCTURED_CREDENTIAL =
+      Pattern.compile("(?is)((?:password|passwd|secret)[\"']?\\s*[:=]\\s*).*");
+
+  private static final Set<String> SECRET_FIELDS =
+      Set.of(
+          "password",
+          "passwd",
+          "secret",
+          "client_secret",
+          "clientsecret",
+          "token",
+          "access_token",
+          "refresh_token",
+          "id_token",
+          "authorization",
+          "session-id",
+          "session_id",
+          "apikey",
+          "api_key");
+
+  /** Installs the encoder's masking decorator without rewriting serialized JSON. */
+  public PiiMaskingLogstashEncoder() {
+    var decorator = new MaskingJsonGeneratorDecorator();
+    decorator.setDefaultMask("***");
+    decorator.addFieldMasker(context -> {
+      String name = context.currentName();
+      if (name == null) {
+        return null;
+      }
+      String key = name.toLowerCase(Locale.ROOT);
+      return SECRET_FIELDS.contains(key)
+              || key.endsWith("password")
+              || key.endsWith("passwd")
+              || key.endsWith("secret")
+              || key.endsWith("token")
+              || key.endsWith("sessionid")
+          ? "***"
+          : null;
+    });
+    decorator.addValueMasker((context, value) -> {
+      if (value instanceof String text) {
+        String masked = PiiMasker.mask(STRUCTURED_CREDENTIAL.matcher(text).replaceAll("$1***"));
+        return text.equals(masked) ? null : masked;
+      }
+      return null;
+    });
+    decorator.start();
+    addDecorator(decorator);
   }
 }

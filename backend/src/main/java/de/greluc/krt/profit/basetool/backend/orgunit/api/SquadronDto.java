@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Wire shape of a squadron.
@@ -37,7 +38,7 @@ public record SquadronDto(
     UUID id,
     String name,
     String shorthand,
-    String description,
+    @Nullable String description,
     Boolean active,
     Boolean isProfitEligible,
     Long version) {}

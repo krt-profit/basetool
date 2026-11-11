@@ -63,6 +63,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -135,7 +136,7 @@ class InventoryItemServiceTest {
             null,
             stockLevelService);
     realCheckoutService =
-        new InventoryCheckoutService(
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,

@@ -59,7 +59,12 @@ class PurchasingNavigationAdviceTest {
   private MockHttpServletRequest renderingRequest() throws NoSuchMethodException {
     PurchasingPageController pages =
         new PurchasingPageController(
-            purchasingClient, supplyClient, featureState, qualityTierCatalog, layoutContextLoader);
+            purchasingClient,
+            supplyClient,
+            featureState,
+            qualityTierCatalog,
+            layoutContextLoader,
+            new PurchasingRequestState(purchasingClient));
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setAttribute(
         HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE,

@@ -67,10 +67,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Drives real requests through the {@code webClient} bean and its siblings against a stand-in
- * backend and a second, foreign server (REQ-FE-029): a backend call carries the bearer, the
- * correlation, org-unit, locale and client-IP relays and passes the circuit breaker; a request to
- * any other origin is refused before the bearer is resolved and never reaches the foreign server.
+ * Drives real backend operations and transport siblings against a stand-in backend and a second,
+ * foreign server (REQ-FE-029): a backend call carries the bearer, the correlation, org-unit, locale
+ * and client-IP relays and passes the circuit breaker; a request to any other origin is refused
+ * before the bearer is resolved and never reaches the foreign server.
  */
 @SpringBootTest
 class WebClientBackendSeamTest {
@@ -135,7 +135,7 @@ class WebClientBackendSeamTest {
     LocaleContextHolder.setLocale(Locale.GERMANY);
     CircuitBreaker breaker = circuitBreakerRegistry.circuitBreaker("backendApi");
 
-    webClient.get().uri("/api/v1/seam/relays").retrieve().toBodilessEntity().block(timeout());
+    backendApiClient.get("/api/v1/seam/relays", String.class);
 
     RecordedRequest request = takeRequestFor(backend, "/api/v1/seam/relays");
     assertThat(request.getHeader("Authorization")).isEqualTo("Bearer " + BEARER);
@@ -152,9 +152,15 @@ class WebClientBackendSeamTest {
     breaker.transitionToForcedOpenState();
     int before = backend.getRequestCount();
 
-    assertThatThrownBy(() ->
-            webClient.get().uri("/api/v1/seam/open").retrieve().toBodilessEntity().block(timeout()))
-        .isInstanceOf(CallNotPermittedException.class);
+    assertThatThrownBy(() -> backendApiClient.get("/api/v1/seam/open", String.class))
+        .isInstanceOfSatisfying(
+            BackendServiceException.class,
+            failure -> {
+              assertThat(failure.getStatusCode()).isEqualTo(503);
+              assertThat(failure.getProblemCode())
+                  .isEqualTo(BackendServiceException.CODE_SERVICE_UNAVAILABLE);
+            })
+        .hasCauseInstanceOf(CallNotPermittedException.class);
     assertThat(backend.getRequestCount()).isEqualTo(before);
   }
 

@@ -29,7 +29,6 @@ import com.tngtech.archunit.core.domain.JavaParameterizedType;
 import com.tngtech.archunit.core.domain.JavaType;
 import com.tngtech.archunit.core.domain.JavaWildcardType;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.fixture.CachedEntityFixtures;
 import jakarta.persistence.Entity;
 import java.util.LinkedHashSet;
@@ -37,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
@@ -54,10 +52,7 @@ import org.springframework.cache.annotation.Cacheable;
  */
 class CacheableEntityRulesTest {
 
-  private static final JavaClasses PRODUCTION =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages("de.greluc.krt.profit.basetool.backend");
+  private static final JavaClasses PRODUCTION = ModuleSubjects.importBackendMainClasses();
 
   private static final JavaClasses FIXTURES =
       new ClassFileImporter().importPackagesOf(CachedEntityFixtures.class);
@@ -65,25 +60,15 @@ class CacheableEntityRulesTest {
   /** Today's count of {@code @Cacheable} methods. */
   private static final int CACHEABLE_FLOOR = 33;
 
-  private static final String IDENTITY_OR_ORG_UNIT_ENTITY_CACHE =
-      "An identity or org-unit cache holding the entity itself; it becomes a read model with its"
-          + " module (plan §5.6). Safe meanwhile only because its own mutators load through"
-          + " self-invocation, which the cached-entity invariant test holds.";
-
   /**
    * The {@code @Cacheable} methods that still return an entity, keyed {@code
    * Class#method(ParameterTypes)}, each with the reason. The list may only shrink; the catalogue's
    * caches left it when they switched to read models (plan §7.6).
    */
-  static final Map<String, String> ENTITY_CACHES =
-      entityCaches(
-          "RoleService#getAllRoles(Pageable)",
-          "SquadronService#getAllSquadrons(Pageable,boolean)",
-          "SquadronService#getAllSquadrons(boolean)");
+  static final Map<String, String> ENTITY_CACHES = Map.of();
 
   @Test
-  @DisplayName(
-      "no @Cacheable method returns an entity, except the listed identity and org-unit caches")
+  @DisplayName("no @Cacheable method returns an entity")
   void noCacheReturnsAnEntity() {
     List<JavaMethod> cacheable = cacheableMethods(PRODUCTION);
     assertThat(cacheable)
@@ -127,14 +112,6 @@ class CacheableEntityRulesTest {
         .containsExactly(
             "PlantedCityCommands#toggleLoadingDock(UUID) edits City from"
                 + " PlantedCityQueries#find(UUID)");
-  }
-
-  private static Map<String, String> entityCaches(String... keys) {
-    Map<String, String> caches = new TreeMap<>();
-    for (String key : keys) {
-      caches.put(key, IDENTITY_OR_ORG_UNIT_ENTITY_CACHE);
-    }
-    return caches;
   }
 
   private static List<JavaMethod> cacheableMethods(JavaClasses classes) {

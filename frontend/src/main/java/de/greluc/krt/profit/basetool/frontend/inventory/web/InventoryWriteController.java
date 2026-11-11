@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequ
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.LinkedHashMap;
@@ -138,6 +139,7 @@ public class InventoryWriteController {
       redirectAttributes.addFlashAttribute("inventoryForm", form);
       return "redirect:/inventory/input";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to add inventory item", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.add.failed");
       redirectAttributes.addFlashAttribute("inventoryForm", form);
@@ -411,6 +413,7 @@ public class InventoryWriteController {
       BackendErrorLogging.warn(log, "bookOutInventoryItem", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.bookout.failed");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to book out inventory item", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.inventory.bookout.failed");
     }

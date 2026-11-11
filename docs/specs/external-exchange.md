@@ -476,6 +476,10 @@ until its `iat` plus 30 s, so a client at the default 120 requests a minute hold
 and 600 covers several clients of one member; filling a store takes more than 160 members at their
 cap. A registry `requestsPerMinute` far above the default may need a larger per-member cap.
 
+Capacity checks and proof admission are atomic across members. A duplicate or expired proof
+cannot leak or double-release capacity. Expiry indexes remove only expired entries; refusing a
+full store with no expired proof does not scan its live entries to determine `Retry-After`.
+
 **The cap has its own answer** (owner decision 2026-09-27). On an exchange route a member over its
 cap gets `429 DPOP_PROOF_LIMIT` with `Retry-After`: the whole seconds until the member's earliest
 live proof no longer counts, rounded up and at least 1. Before checking the cap, the store drops
@@ -1498,6 +1502,13 @@ outlived the two minutes never frees the lock of the request that took the key a
 `ExchangeChangeRouteTest` (a body that is no JSON and one of another media type are never cached) ·
 **Status:** built — WP 3.2 (#2082)
 
+An admitted body already buffered by the payload limit is fingerprinted through an independent
+read-only byte-buffer cursor, including when other servlet wrappers surround it. It is not read
+into another full-body array. Replay response size is checked before copying or decoding its
+body; an oversized answer is delivered normally and its reservation is released without caching.
+`ExchangeBufferedBodyTest` covers wrapper preservation and oversized delivery; byte-exact
+fingerprints, claims and replay budgets retain their existing contract.
+
 ### REQ-XCH-021 — Mass changes are confirmed by the member in the browser
 
 Per client, member and resource over a rolling 24 h, a batch that takes the window above 25
@@ -1953,6 +1964,10 @@ refused before the relay with `400 SCHEMA_INVALID`, `errors[]` naming the field'
 a write the backend had committed would have ended in a `502` for an answer breaking its own schema,
 and never been cached. Every `errors[]` pointer is likewise shortened to its longest ancestor of at
 most 200 characters.
+
+Change-set sanitization removes every undeclared field independently of the fifty-warning
+reporting cap. Unknown fields in later operations are removed too. The pointer-length check
+examines all undeclared fields before relay, including fields beyond the warning cap.
 
 **Acceptance**
 
@@ -3013,6 +3028,11 @@ their rows are locked in ascending id order (ADR-0229). `dryRun`
 / `#orgStockTargets`, `ExchangeQuotas#countFurtherOps`, `V298`, `V299`, `V301` · **Status:** the
 capability, the roster, `book-in` and `book-out` built (#2589); `sell`, the moves, `note` and
 `stolen` built (#2590); the earmark ops and the targets built (#2591)
+
+The org-stock operation names have one typed `Operation` representation at the adapter boundary.
+Wire validation uses the same supported-name enum and keeps the existing `op` property and
+validation refusal shape. Planning dispatch is exhaustive; the gateway schema retains the same
+eleven wire spellings and the internal discriminator is absent from serialized payloads.
 
 ### REQ-XCH-046 — Org-stock writes are journaled, undoable and guarded per writer and pool
 

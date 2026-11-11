@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -56,7 +57,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -65,6 +65,24 @@ import org.springframework.security.access.AccessDeniedException;
 /** Unit tests for the bulk checkout functionality in {@link InventoryCheckoutService}. */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceBulkCheckoutTest {
+
+  @org.junit.jupiter.api.BeforeEach
+  void wireCheckoutGraph() {
+    inventoryItemService =
+        InventoryCheckoutFixtures.create(
+            inventoryItemRepository,
+            userRepository,
+            locationRepository,
+            null,
+            null,
+            null,
+            offerRatchet,
+            inventoryItemMapper,
+            null,
+            null,
+            auditService,
+            eventPublisher);
+  }
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
@@ -80,7 +98,7 @@ class InventoryItemServiceBulkCheckoutTest {
   @Mock private StockChangeObserver offerRatchet;
   @Mock private AuditService auditService;
   @Mock private ApplicationEventPublisher eventPublisher;
-  @InjectMocks private InventoryCheckoutService inventoryItemService;
+  private InventoryCheckoutService inventoryItemService;
 
   private User userWithId(UUID id) {
     User u = new User();

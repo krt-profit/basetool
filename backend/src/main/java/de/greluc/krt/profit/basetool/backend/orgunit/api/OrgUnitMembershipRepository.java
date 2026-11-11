@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -88,6 +89,15 @@ public interface OrgUnitMembershipRepository
    * @return memberships of this org unit; never {@code null}, possibly empty.
    */
   List<OrgUnitMembership> findAllByIdOrgUnitId(UUID orgUnitId);
+
+  /**
+   * Reads visible-unit rosters with the to-one values used by the leadership overview.
+   *
+   * @param orgUnitIds visible unit identifiers
+   * @return memberships and their user and command-group references
+   */
+  @EntityGraph(attributePaths = {"user", "kommandoGroup"})
+  List<OrgUnitMembership> findAllByIdOrgUnitIdIn(Collection<UUID> orgUnitIds);
 
   /**
    * Existence check used by the membership-management endpoints to short-circuit before issuing a

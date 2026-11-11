@@ -99,6 +99,7 @@ class OrgUnitBankAccessServiceTest {
   @Mock private BankBookingRequestService bankBookingRequestService;
   @Mock private BankAuditService bankAuditService;
   @Mock private OrgUnitRepository orgUnitRepository;
+  @Mock private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
   private OrgUnitBankAccessService service;
   private OrgUnitBankSettingsService settingsService;
@@ -116,6 +117,8 @@ class OrgUnitBankAccessServiceTest {
     when(approvalLimitRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of());
     when(approvalLimitRepository.findByAccountId(any())).thenReturn(List.of());
     when(bankPostingRepository.postingSlicesSince(anyCollection(), any())).thenReturn(List.of());
+    when(transactionManager.getTransaction(any()))
+        .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
     wireDelegates();
   }
 
@@ -144,7 +147,8 @@ class OrgUnitBankAccessServiceTest {
             bankAccountRepository,
             bankPostingRepository,
             bankAccountService,
-            bankStatementReportService);
+            bankStatementReportService,
+            transactionManager);
     settingsService =
         new OrgUnitBankSettingsService(
             service,
@@ -595,13 +599,14 @@ class OrgUnitBankAccessServiceTest {
     Instant to = Instant.now();
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
     actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelId));
+    BankPdfExport expected = org.mockito.Mockito.mock(BankPdfExport.class);
     when(bankStatementReportService.generateStatement(
             eq(accountId), eq(from), eq(to), any(), eq(true)))
-        .thenReturn(new byte[] {1, 2, 3});
+        .thenReturn(expected);
 
-    byte[] pdf = service.exportViewableStatement(accountId, from, to, null);
+    BankPdfExport pdf = service.exportViewableStatement(accountId, from, to, null);
 
-    assertThat(pdf).hasSize(3);
+    assertThat(pdf).isSameAs(expected);
     verify(bankStatementReportService)
         .generateStatement(eq(accountId), eq(from), eq(to), any(), eq(true));
   }

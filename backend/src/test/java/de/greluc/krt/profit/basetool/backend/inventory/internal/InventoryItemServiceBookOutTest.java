@@ -68,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -121,7 +122,7 @@ class InventoryItemServiceBookOutTest {
   @BeforeEach
   void setUpEntities() {
     service =
-        new InventoryCheckoutService(
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,

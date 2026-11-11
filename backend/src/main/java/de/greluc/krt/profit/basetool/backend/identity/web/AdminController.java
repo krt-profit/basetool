@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.web;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleDto;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleMapper;
 import de.greluc.krt.profit.basetool.backend.identity.internal.RoleService;
@@ -30,7 +29,6 @@ import jakarta.validation.Valid;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,8 +66,7 @@ public class AdminController {
       @RequestParam(required = false) String sort) {
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    Page<Role> p = roleService.getAllRoles(pageable);
-    return PageResponse.of(p.map(roleMapper::toDto));
+    return PageResponse.of(roleService.getAllRoles(pageable));
   }
 
   /**
@@ -77,25 +74,47 @@ public class AdminController {
    * {@code ROLE_PERMISSIONS_CHANGED} in the same transaction (REQ-AUDIT-001).
    *
    * @param name role name
-   * @param permissions new permission set
+   * @param request permission set and expected section version
    * @return the persisted role DTO
    */
   @PutMapping("/{name}/permissions")
   public RoleDto updatePermissions(
-      @PathVariable @NotNull String name, @RequestBody @Valid @NotNull Set<String> permissions) {
-    return roleMapper.toDto(roleService.updatePermissions(name, permissions));
+      @PathVariable @NotNull String name, @RequestBody @Valid @NotNull PermissionsRequest request) {
+    return roleMapper.toDto(
+        roleService.updatePermissions(name, request.permissions(), request.version()));
   }
 
   /**
    * Updates a role's descriptive text.
    *
    * @param name role name
-   * @param description new description text
+   * @param request description text and expected section version
    * @return the persisted role DTO
    */
   @PutMapping("/{name}/description")
   public RoleDto updateRoleDescription(
-      @PathVariable @NotNull String name, @RequestBody @Valid @NotNull String description) {
-    return roleMapper.toDto(roleService.updateRoleDescription(name, description));
+      @PathVariable @NotNull String name, @RequestBody @Valid @NotNull DescriptionRequest request) {
+    return roleMapper.toDto(
+        roleService.updateRoleDescription(name, request.description(), request.version()));
   }
+
+  /**
+   * A permission replacement and its section version.
+   *
+   * @param permissions the replacement permission set
+   * @param version the expected permission-section version
+   */
+  public record PermissionsRequest(
+      @jakarta.validation.constraints.NotNull Set<String> permissions,
+      @jakarta.validation.constraints.NotNull Long version) {}
+
+  /**
+   * A role description and its section version.
+   *
+   * @param description the replacement description
+   * @param version the expected description-section version
+   */
+  public record DescriptionRequest(
+      @jakarta.validation.constraints.NotNull String description,
+      @jakarta.validation.constraints.NotNull Long version) {}
 }

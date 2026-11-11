@@ -341,6 +341,11 @@ The platform modules reach the domains only through SPIs they own and the domain
 > ([`module-boundaries.md`](../specs/module-boundaries.md)).
 ## 5.3 Level 2 — inside `frontend`
 
+Mission writes use focused participant, leadership, unit/crew, frequency, plan and core adapters.
+`BackendApiClient` owns complete-operation resilience and bounded binary transfers; the wire-record
+and default-message pilots are deterministic build outputs. Canonical contracts: REQ-FE-029,
+REQ-FE-032, REQ-FE-037 and [ADR-0369](../adr/0369-frontend-operations-own-completion-and-wire-resources-are-derived.md).
+
 The frontend is packaged by domain (plan §5.9, F4, REQ-FE-032): each of the 21 domains of the
 evidence table plus `shell` (landing, legal pages, manifest, client-error beacon, licence report)
 has up to three packages, and the kernel has eight. `DomainPackageLayoutTest` fails on a main class
@@ -421,6 +426,9 @@ that has to cross that boundary — the active-OrgUnit pin, the correlation id �
   (REQ-OPS-040).
 - **`keycloak-theme/krt-theme`** — not a Gradle module: the `login` and `account` themes in the
   organisation's design, shipped inside the config bundle.
+- **`technical-support`** — a small shipped library for identical string normalization and
+  observation request-target privacy. The three applications retain bean/binding adapters and depend
+  inward on this library; it owns no domain or security wiring ([ADR-0366](../adr/0366-shared-technical-algorithms-have-one-runtime-owner.md)).
 - **`logging-support`** — a plain library, **shipped** inside the three application JARs: the
   one `LogSafe` and the PII maskers every `logback-spring.xml` names (ADR-0205). Closed to domain
   meaning — no DTO, no validation rule, no bean — so it cannot become the shared-code module the

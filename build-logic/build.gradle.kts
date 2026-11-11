@@ -15,6 +15,7 @@ dependencies {
   implementation(libs.plugins.pitest.marker())
   implementation(libs.plugins.errorprone.marker())
   implementation(libs.plugins.spotless.marker())
+  implementation(libs.plugins.node.gradle.marker())
 
   constraints {
     implementation(libs.plexus.utils)

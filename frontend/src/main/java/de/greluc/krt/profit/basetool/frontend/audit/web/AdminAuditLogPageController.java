@@ -290,6 +290,7 @@ public class AdminAuditLogPageController {
                   "ROLE_REVOKED",
                   "CAPABILITY_FLAGS_CHANGED",
                   "ROLE_PERMISSIONS_CHANGED",
+                  "ROLE_DESCRIPTION_CHANGED",
                   "MEMBER_RANK_CHANGED",
                   "USER_ROLE_ASSIGNED",
                   "USER_ROLE_WITHDRAWN",

@@ -6591,7 +6591,7 @@
           },
           "op" : {
             "type" : "string",
-            "pattern" : "^(book-in|book-out|sell|move-location|move-holder|move-pool|note|stolen|allocation-add|allocation-change|allocation-remove)$"
+            "enum" : [ "book-in", "book-out", "sell", "move-location", "move-holder", "move-pool", "note", "stolen", "allocation-add", "allocation-change", "allocation-remove" ]
           },
           "opId" : {
             "type" : "string",

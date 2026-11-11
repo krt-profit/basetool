@@ -291,6 +291,12 @@ truststore, and a TLS failure simply fails open.
 
 **Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · `DiscordSpiPrecheckPropertiesTest` (blank secret valid, <32-char secret rejected, ≥32-char secret valid) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties` · **Decision:** ADR-0051
 
+HTTP response retention is bounded independently of the request timeout. The account-existence
+precheck accepts at most 4 KiB; Discord membership/nickname replies accept at most 64 KiB. The
+shared subscriber counts each buffer group before decoding and cancels upstream on overflow,
+including chunked responses. An overflow denies membership, yields UNKNOWN for the deliberate
+account precheck, and leaves the optional nickname absent. No response body enters diagnostics.
+
 ### REQ-SEC-026 — Admin-mediated linking of a Discord registration to an existing account
 
 A member who already has a Basetool account but signs in via Discord **can slip past the fail-open

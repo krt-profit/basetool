@@ -1,0 +1,101 @@
+@layer base, components, page, utilities;
+
+@layer components {
+    .krt-combobox {
+        position: relative;
+        width: 100%;
+    }
+
+    .krt-combobox .krt-combobox__input {
+        width: 100%;
+        cursor: text;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23E77E23' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 0.65rem center;
+        background-size: 12px 8px;
+    }
+
+    .krt-combobox__listbox {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: var(--z-dropdown);
+        max-height: 18rem;
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        list-style: none;
+        background-color: var(--color-bg-dark-gray);
+        border: var(--border-accent);
+        border-top: none;
+        box-shadow: var(--shadow-dropdown);
+    }
+
+    .krt-combobox__listbox[hidden] {
+        display: none;
+    }
+
+    .krt-combobox__listbox--above {
+        border-top: var(--border-accent);
+        border-bottom: none;
+    }
+
+    .krt-combobox__option {
+        display: flex;
+        align-items: center;
+        min-height: var(--touch-target);
+        padding: 0.625rem 0.75rem;
+        color: var(--color-gray-1);
+        font-family: var(--font-body);
+        cursor: pointer;
+        border-bottom: var(--border-hairline);
+    }
+
+    .krt-combobox__option:last-child {
+        border-bottom: none;
+    }
+
+    .krt-combobox__option:hover {
+        color: var(--color-primary);
+        background-color: var(--color-gray-3);
+    }
+
+    .krt-combobox__option--active {
+        color: var(--color-bg-black);
+        background-color: var(--color-primary);
+    }
+
+    .krt-combobox__option[aria-selected='true']:not(.krt-combobox__option--active) {
+        color: var(--color-primary);
+        box-shadow: inset 3px 0 0 var(--color-primary);
+    }
+
+    .krt-combobox__option mark {
+        color: inherit;
+        font-weight: var(--fw-bold);
+        background-color: transparent;
+    }
+
+    .krt-combobox__option > .krt-combobox__label {
+        min-width: 0;
+    }
+
+    .krt-combobox__option--clear {
+        color: var(--color-gray-2-text);
+        font-style: italic;
+    }
+
+    .krt-combobox__notice {
+        padding: 0.75rem;
+        color: var(--color-gray-2-text);
+        font-family: var(--font-body);
+        font-style: italic;
+    }
+}
+
+@layer page {
+    .krt-combobox .krt-combobox__input {
+        padding: 0.75rem var(--space-8) 0.75rem 0.75rem;
+    }
+}

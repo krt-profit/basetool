@@ -60,7 +60,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -85,7 +84,7 @@ class JobOrderItemHandoverServiceTest {
   @Mock private OrgUnitMembershipService orgUnitMembershipService;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditService auditService;
-  @InjectMocks private JobOrderItemHandoverService service;
+  private JobOrderItemHandoverService service;
 
   private UUID orderId;
   private UUID lineId;
@@ -97,11 +96,18 @@ class JobOrderItemHandoverServiceTest {
 
   @BeforeEach
   void setUp() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockCommands",
-        new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
+    service =
+        new JobOrderItemHandoverService(
+            jobOrderRepository,
+            jobOrderItemHandoverRepository,
+            jobOrderItemHandoverMapper,
+            new InventoryStockCommands(
+                inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null),
+            jobOrderService,
+            userService,
+            null,
+            orgUnitRepository,
+            auditService);
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     gameItemId = UUID.randomUUID();

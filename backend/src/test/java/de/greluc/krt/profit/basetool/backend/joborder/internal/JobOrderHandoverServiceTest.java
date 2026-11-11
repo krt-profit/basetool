@@ -49,7 +49,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -69,7 +68,7 @@ class JobOrderHandoverServiceTest {
   private de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository orgUnitRepository;
 
   @Mock private AuditService auditService;
-  @InjectMocks private JobOrderHandoverService service;
+  private JobOrderHandoverService service;
 
   private UUID orderId;
   private UUID inventoryId;
@@ -81,11 +80,18 @@ class JobOrderHandoverServiceTest {
 
   @BeforeEach
   void setUp() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockCommands",
-        new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
+    service =
+        new JobOrderHandoverService(
+            jobOrderRepository,
+            jobOrderHandoverRepository,
+            new InventoryStockCommands(
+                inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null),
+            jobOrderHandoverMapper,
+            jobOrderService,
+            userService,
+            null,
+            orgUnitRepository,
+            auditService);
     orderId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
     materialId = UUID.randomUUID();

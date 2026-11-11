@@ -56,7 +56,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -74,7 +73,7 @@ class JobOrderHandoverQualityTierTest {
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private AuditService auditService;
-  @InjectMocks private JobOrderHandoverService service;
+  private JobOrderHandoverService service;
 
   private UUID orderId;
   private JobOrder order;
@@ -84,11 +83,18 @@ class JobOrderHandoverQualityTierTest {
 
   @BeforeEach
   void setUp() {
-    org.springframework.test.util.ReflectionTestUtils.setField(
-        service,
-        "stockCommands",
-        new InventoryStockCommands(
-            inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null));
+    service =
+        new JobOrderHandoverService(
+            jobOrderRepository,
+            jobOrderHandoverRepository,
+            new InventoryStockCommands(
+                inventoryItemRepository, null, null, null, auditService, null, offerRatchet, null),
+            jobOrderHandoverMapper,
+            jobOrderService,
+            userService,
+            orgUnitMembershipQueryService,
+            orgUnitRepository,
+            auditService);
     orderId = UUID.randomUUID();
     order = new JobOrder();
     order.setId(orderId);

@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryCreateDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceEntryDto;
@@ -105,6 +106,7 @@ public class MissionFinancePageController {
       BackendErrorLogging.warn(log, "addFinanceEntry", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.add");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Add finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.add");
     }
@@ -149,6 +151,7 @@ public class MissionFinancePageController {
       BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.update");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.update");
     }
@@ -176,6 +179,7 @@ public class MissionFinancePageController {
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.delete");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Delete finance entry failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.delete");
     }

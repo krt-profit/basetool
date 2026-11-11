@@ -22,6 +22,8 @@ x-backend-watch: &backend-watch
       - action: rebuild
         path: ./backend/build.gradle.kts
       - action: rebuild
+        path: ./technical-support
+      - action: rebuild
         path: ./build.gradle.kts
       - action: rebuild
         path: ./gradle/libs.versions.toml
@@ -33,6 +35,12 @@ x-frontend-watch: &frontend-watch
         path: ./frontend/src
       - action: rebuild
         path: ./frontend/build.gradle.kts
+      - action: rebuild
+        path: ./technical-support
+      - action: rebuild
+        path: ./build-logic/src/main/kotlin/de/greluc/krt/profit/basetool/conventions/GenerateWireRecords.kt
+      - action: rebuild
+        path: ./backend/src/main/resources/api/openapi.json
       - action: rebuild
         path: ./build.gradle.kts
       - action: rebuild
@@ -53,6 +61,8 @@ x-ingest-watch: &ingest-watch
         path: ./ingest/src
       - action: rebuild
         path: ./ingest/build.gradle.kts
+      - action: rebuild
+        path: ./technical-support
       - action: rebuild
         path: ./build.gradle.kts
       - action: rebuild

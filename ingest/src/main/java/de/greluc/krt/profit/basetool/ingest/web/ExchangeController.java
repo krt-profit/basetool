@@ -730,12 +730,8 @@ public class ExchangeController {
   }
 
   /**
-   * Checks a change set, relays it and checks the answer; a change set of more than {@value
-   * #LARGE_CHANGE_SET_OPS} ops is relayed within the large-set bulkhead, whose {@code RELAY_BUSY}
-   * refusal gives the write's quota count back, and one the backend's mass-change guard held back
-   * is staged for the member's confirmation. Where every op counts, the ops after the first of a
-   * change set that is not a dry run are counted against the daily write quota once it matches its
-   * schema, and a change set over the quota is refused with them given back.
+   * Sanitizes and relays a change set, stages required confirmations, and validates the response.
+   * Large sets use their dedicated bulkhead; rejected writes refund their counted quota.
    *
    * @param resource the resource: {@code org-stock}, or the segment below {@code /me} of a member
    *     resource
@@ -768,12 +764,12 @@ public class ExchangeController {
     if (!violations.isEmpty()) {
       return responses.schemaInvalid(violations);
     }
-    List<String> unknown = schemas.unknownFields(schema, body);
-    ResponseEntity<?> unreportable = responses.unreportable(unknown);
+    ExchangeSchemas.SanitizedRequest sanitized = schemas.sanitize(schema, body);
+    ResponseEntity<?> unreportable = responses.unreportable(sanitized.longPointers());
     if (unreportable != null) {
       return unreportable;
     }
-    JsonNode relayed = schemas.withoutFields(body, unknown);
+    JsonNode relayed = sanitized.body();
     if (everyOpCounts
         && !body.path("dryRun").asBoolean(false)
         && body.get("ops") instanceof ArrayNode ops
@@ -799,7 +795,8 @@ public class ExchangeController {
     if (!result.isOk() && HeldMassChanges.MASS_CHANGE_CONFIRMATION_REQUIRED.equals(result.code())) {
       return staged(context, request, resource, relayed, result, digest);
     }
-    return responses.relayed(result, "change-result.schema.json", unknown, context, request);
+    return responses.relayed(
+        result, "change-result.schema.json", sanitized.warnings(), context, request);
   }
 
   /**

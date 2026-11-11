@@ -19,8 +19,22 @@
 
 package de.greluc.krt.profit.basetool.backend.identity.internal;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 /** Data transfer record carrying Role payload. */
 public record RoleDto(
-    Long id, String name, String description, Set<String> permissions, Long version) {}
+    Long id,
+    String name,
+    String description,
+    Set<String> permissions,
+    Long version,
+    Long descriptionVersion,
+    Long permissionsVersion) {
+  /** Copies permissions so cached role records cannot be mutated by their consumers. */
+  public RoleDto {
+    permissions =
+        permissions == null ? Set.of() : Collections.unmodifiableSet(new HashSet<>(permissions));
+  }
+}

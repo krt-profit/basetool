@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.OfficerSurfaceGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.leadership.web.LeitungPageController;
 import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipFlagsForm;
@@ -132,6 +133,7 @@ public class SpecialCommandMembersPageController {
       log.debug("Load SpecialCommand detail failed", e);
       return "redirect:" + backUrl + "?error=LoadSpecialCommandDetailFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Load SpecialCommand detail failed", e);
       return "redirect:" + backUrl + "?error=LoadSpecialCommandDetailFailed";
     }
@@ -167,6 +169,7 @@ public class SpecialCommandMembersPageController {
       }
       return "redirect:" + PAGE_BASE + id + "?error=AddMemberFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Add SpecialCommand member failed", e);
       return "redirect:" + PAGE_BASE + id + "?error=AddMemberFailed";
     }
@@ -193,6 +196,7 @@ public class SpecialCommandMembersPageController {
       orgUnitClient.removeSpecialCommandMember(id, userId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Remove SpecialCommand member failed", e);
       return "redirect:" + PAGE_BASE + id + "?error=RemoveMemberFailed";
     }
@@ -229,6 +233,7 @@ public class SpecialCommandMembersPageController {
       }
       return "redirect:" + PAGE_BASE + id + "?error=PatchMemberFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Patch SpecialCommand member flags failed", e);
       return "redirect:" + PAGE_BASE + id + "?error=PatchMemberFailed";
     }

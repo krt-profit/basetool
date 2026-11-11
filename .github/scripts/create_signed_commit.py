@@ -26,6 +26,12 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from http_budget import connection_timeout, read_before_deadline
+
 
 for _stream in (sys.stdout, sys.stderr):
     with contextlib.suppress(AttributeError, ValueError):
@@ -90,7 +96,7 @@ def build_payload(
     }
 
 
-def create_commit(payload: dict, token: str) -> str:
+def create_commit(payload: dict, token: str, timeout: float = 60.0) -> str:
     """POST the GraphQL payload and return the created commit's OID.
 
     :param payload: the ``{"query", "variables"}`` body from :func:`build_payload`.
@@ -98,6 +104,8 @@ def create_commit(payload: dict, token: str) -> str:
     :return: the OID (SHA) of the commit created by ``createCommitOnBranch``.
     :raises SystemExit: on a transport error or any GraphQL ``errors`` entry.
     """
+    if timeout <= 0:
+        raise ValueError("GraphQL timeout must be positive")
     request = urllib.request.Request(
         GRAPHQL_ENDPOINT,
         data=json.dumps(payload).encode("utf-8"),
@@ -108,14 +116,18 @@ def create_commit(payload: dict, token: str) -> str:
         },
         method="POST",
     )
+    deadline = time.monotonic() + timeout
     try:
-        with urllib.request.urlopen(request) as response:
-            result = json.load(response)
+        with urllib.request.urlopen(request, timeout=connection_timeout(timeout)) as response:
+            result = json.loads(read_before_deadline(response, deadline))
+    except TimeoutError as error:
+        raise SystemExit("GraphQL commit request timed out; inspect the branch head before retrying, "
+                         "because the server may have created the commit.") from error
     except urllib.error.HTTPError as error:
-        detail = error.read().decode("utf-8", "replace")
-        raise SystemExit(f"GraphQL HTTP {error.code}: {detail}")
+        raise SystemExit(f"GraphQL HTTP {error.code}; inspect the branch head before retrying.") from error
     except urllib.error.URLError as error:
-        raise SystemExit(f"GraphQL request failed: {error.reason}")
+        raise SystemExit("GraphQL transport failed; inspect the branch head before retrying, "
+                         "because the server may have created the commit.") from error
 
     if result.get("errors"):
         raise SystemExit("GraphQL errors: " + json.dumps(result["errors"]))

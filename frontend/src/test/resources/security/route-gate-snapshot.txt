@@ -421,53 +421,53 @@
 /missions/{id}/finance-entries/{entryId}/ajax PUT produces=[application/json] -> MissionFinancePageController#updateFinanceEntryAjax gate=class:isAuthenticated() layout=yes
 /missions/{id}/finance-entries/{entryId}/delete POST -> MissionFinancePageController#deleteFinanceEntry gate=class:isAuthenticated() layout=yes
 /missions/{id}/finance-entries/{entryId}/update POST -> MissionFinancePageController#updateFinanceEntry gate=class:isAuthenticated() layout=yes
-/missions/{id}/frequencies POST -> MissionWriteController#addOrUpdateFrequency gate=method:@missionManagerGate.isGranted() layout=yes
-/missions/{id}/frequencies/ajax PUT produces=[application/json] -> MissionWriteController#addOrUpdateFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
-/missions/{id}/frequencies/custom/ajax POST produces=[application/json] -> MissionWriteController#addCustomFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
-/missions/{id}/frequencies/custom/{frequencyId}/ajax PUT produces=[application/json] -> MissionWriteController#updateCustomFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
-/missions/{id}/frequencies/{frequencyId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
-/missions/{id}/frequencies/{frequencyId}/delete POST -> MissionWriteController#deleteFrequency gate=method:@missionManagerGate.isGranted() layout=yes
-/missions/{id}/managers/{userId} DELETE -> MissionWriteController#removeManager gate=class:isAuthenticated() layout=yes
-/missions/{id}/managers/{userId} POST -> MissionWriteController#addManager gate=class:isAuthenticated() layout=yes
-/missions/{id}/objectives/ajax POST produces=[application/json] -> MissionWriteController#addObjectiveAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/objectives/reorder/ajax PUT produces=[application/json] -> MissionWriteController#reorderObjectivesAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/objectives/{objectiveId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteObjectiveAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/objectives/{objectiveId}/ajax PUT produces=[application/json] -> MissionWriteController#updateObjectiveAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/owner/ajax PUT produces=[application/json] -> MissionWriteController#setMissionOwner gate=class:isAuthenticated() layout=yes
-/missions/{id}/owning-org-unit/ajax PUT produces=[application/json] -> MissionWriteController#setMissionOwningOrgUnit gate=class:isAuthenticated() layout=yes
-/missions/{id}/participant POST -> MissionWriteController#addParticipant gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/ajax POST produces=[application/json] -> MissionWriteController#addParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/frequencies POST -> MissionFrequencyWriteController#addOrUpdateFrequency gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/ajax PUT produces=[application/json] -> MissionFrequencyWriteController#addOrUpdateFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/custom/ajax POST produces=[application/json] -> MissionFrequencyWriteController#addCustomFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/custom/{frequencyId}/ajax PUT produces=[application/json] -> MissionFrequencyWriteController#updateCustomFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/{frequencyId}/ajax DELETE produces=[application/json] -> MissionFrequencyWriteController#deleteFrequencyAjax gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/frequencies/{frequencyId}/delete POST -> MissionFrequencyWriteController#deleteFrequency gate=method:@missionManagerGate.isGranted() layout=yes
+/missions/{id}/managers/{userId} DELETE -> MissionLeadershipWriteController#removeManager gate=class:isAuthenticated() layout=yes
+/missions/{id}/managers/{userId} POST -> MissionLeadershipWriteController#addManager gate=class:isAuthenticated() layout=yes
+/missions/{id}/objectives/ajax POST produces=[application/json] -> MissionPlanWriteController#addObjectiveAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/objectives/reorder/ajax PUT produces=[application/json] -> MissionPlanWriteController#reorderObjectivesAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/objectives/{objectiveId}/ajax DELETE produces=[application/json] -> MissionPlanWriteController#deleteObjectiveAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/objectives/{objectiveId}/ajax PUT produces=[application/json] -> MissionPlanWriteController#updateObjectiveAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/owner/ajax PUT produces=[application/json] -> MissionLeadershipWriteController#setMissionOwner gate=class:isAuthenticated() layout=yes
+/missions/{id}/owning-org-unit/ajax PUT produces=[application/json] -> MissionLeadershipWriteController#setMissionOwningOrgUnit gate=class:isAuthenticated() layout=yes
+/missions/{id}/participant POST -> MissionParticipantWriteController#addParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/ajax POST produces=[application/json] -> MissionParticipantWriteController#addParticipantAjax gate=class:isAuthenticated() layout=yes
 /missions/{id}/participants/check-in-all/ajax POST produces=[application/json] -> MissionCheckInWriteController#checkInAllAjax gate=class:isAuthenticated() layout=no
 /missions/{id}/participants/check-out-all/ajax POST produces=[application/json] -> MissionCheckInWriteController#checkOutAllAjax gate=class:isAuthenticated() layout=no
 /missions/{id}/participants/unassigned/ajax GET produces=[application/json] -> MissionPageController#getUnassignedParticipantsAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteParticipantAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/ajax PUT produces=[application/json] -> MissionWriteController#updateParticipantAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/check-in POST -> MissionWriteController#checkInParticipant gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/check-in/ajax POST produces=[application/json] -> MissionWriteController#checkInParticipantAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/check-out POST -> MissionWriteController#checkOutParticipant gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/check-out/ajax POST produces=[application/json] -> MissionWriteController#checkOutParticipantAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/delete POST -> MissionWriteController#deleteParticipant gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/payout-preference POST -> MissionWriteController#updatePayoutPreference gate=class:isAuthenticated() layout=yes
-/missions/{id}/participants/{participantId}/update POST -> MissionWriteController#updateParticipant gate=class:isAuthenticated() layout=yes
-/missions/{id}/party-lead POST -> MissionWriteController#setPartyLead gate=class:isAuthenticated() layout=yes
-/missions/{id}/party-lead/ajax PUT produces=[application/json] -> MissionWriteController#setPartyLeadAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/steps/ajax POST produces=[application/json] -> MissionWriteController#addStepAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/steps/reorder/ajax PUT produces=[application/json] -> MissionWriteController#reorderStepsAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/steps/{stepId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteStepAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/steps/{stepId}/ajax PUT produces=[application/json] -> MissionWriteController#updateStepAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/steps/{stepId}/done/ajax PATCH produces=[application/json] -> MissionWriteController#toggleStepDoneAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/units POST -> MissionWriteController#addUnit gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/ajax POST produces=[application/json] -> MissionWriteController#addUnitAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteUnitAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/ajax PUT produces=[application/json] -> MissionWriteController#updateUnitAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/crew POST -> MissionWriteController#addCrew gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/crew/ajax POST produces=[application/json] -> MissionWriteController#addCrewAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/crew/{crewId}/ajax DELETE produces=[application/json] -> MissionWriteController#deleteCrewAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/crew/{crewId}/ajax PUT produces=[application/json] -> MissionWriteController#updateCrewAjax gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/crew/{crewId}/delete POST -> MissionWriteController#deleteCrew gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/crew/{crewId}/update POST -> MissionWriteController#updateCrew gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/delete POST -> MissionWriteController#deleteUnit gate=class:isAuthenticated() layout=yes
-/missions/{id}/units/{unitId}/update POST -> MissionWriteController#updateUnit gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/ajax DELETE produces=[application/json] -> MissionParticipantWriteController#deleteParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/ajax PUT produces=[application/json] -> MissionParticipantWriteController#updateParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/check-in POST -> MissionParticipantWriteController#checkInParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/check-in/ajax POST produces=[application/json] -> MissionParticipantWriteController#checkInParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/check-out POST -> MissionParticipantWriteController#checkOutParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/check-out/ajax POST produces=[application/json] -> MissionParticipantWriteController#checkOutParticipantAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/delete POST -> MissionParticipantWriteController#deleteParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/payout-preference POST -> MissionParticipantWriteController#updatePayoutPreference gate=class:isAuthenticated() layout=yes
+/missions/{id}/participants/{participantId}/update POST -> MissionParticipantWriteController#updateParticipant gate=class:isAuthenticated() layout=yes
+/missions/{id}/party-lead POST -> MissionLeadershipWriteController#setPartyLead gate=class:isAuthenticated() layout=yes
+/missions/{id}/party-lead/ajax PUT produces=[application/json] -> MissionLeadershipWriteController#setPartyLeadAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/ajax POST produces=[application/json] -> MissionPlanWriteController#addStepAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/reorder/ajax PUT produces=[application/json] -> MissionPlanWriteController#reorderStepsAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/{stepId}/ajax DELETE produces=[application/json] -> MissionPlanWriteController#deleteStepAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/{stepId}/ajax PUT produces=[application/json] -> MissionPlanWriteController#updateStepAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/steps/{stepId}/done/ajax PATCH produces=[application/json] -> MissionPlanWriteController#toggleStepDoneAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units POST -> MissionUnitWriteController#addUnit gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/ajax POST produces=[application/json] -> MissionUnitWriteController#addUnitAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/ajax DELETE produces=[application/json] -> MissionUnitWriteController#deleteUnitAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/ajax PUT produces=[application/json] -> MissionUnitWriteController#updateUnitAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew POST -> MissionUnitWriteController#addCrew gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/ajax POST produces=[application/json] -> MissionUnitWriteController#addCrewAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/{crewId}/ajax DELETE produces=[application/json] -> MissionUnitWriteController#deleteCrewAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/{crewId}/ajax PUT produces=[application/json] -> MissionUnitWriteController#updateCrewAjax gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/{crewId}/delete POST -> MissionUnitWriteController#deleteCrew gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/crew/{crewId}/update POST -> MissionUnitWriteController#updateCrew gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/delete POST -> MissionUnitWriteController#deleteUnit gate=class:isAuthenticated() layout=yes
+/missions/{id}/units/{unitId}/update POST -> MissionUnitWriteController#updateUnit gate=class:isAuthenticated() layout=yes
 /navigation/appearance GET headers=[X-Requested-With=XMLHttpRequest] -> NavigationAppearanceController#read gate=class:isAuthenticated() layout=no
 /navigation/appearance PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationAppearanceController#replace gate=class:isAuthenticated() layout=no
 /navigation/appearance/start-page/{mode} PUT headers=[X-Requested-With=XMLHttpRequest] -> NavigationPreferencesController#replaceStartPage gate=class:isAuthenticated() layout=no

@@ -55,6 +55,22 @@ exists, a `package` rule assigns its tree (for example `audit`, `kernel`, `orgun
 **Enforced by:** `DomainMapTest`, `DomainMapChecksTest` · **Code:** `DomainMap`, `ModuleSubjects`
 (test source set, package `…backend.architecture`)
 
+
+**Cross-application technical algorithms have a separate owner.** `technical-support` depends on
+Micrometer observation only and owns inbound-string normalization and observation URL privacy.
+The backend, frontend and ingest depend on it; it depends on none of their packages. Application
+components and binding facades retain local registration and delegate to that library (ADR-0366).
+No domain logic or security policy enters it, and logging-support remains limited to log hygiene.
+
+The internal ownership seams retain the domain map: inventory checkout delegates merges, bulk
+rebooking and transfer notices to focused services; org-stock planning and execution share one
+sealed plan model beneath the change-set adapter. Mission HTTP handlers are grouped by core,
+schedule, roster, units/crew and steps/objectives while retaining every route, gate, transaction
+and section-version contract. The route/gate inventory is pinned by `MissionHttpRoutesParityTest`.
+Equivalent production bytecode imports use one class-loader-local `ModuleSubjects` graph; planted
+fixtures retain independent imports and every architecture selection floor remains binding.
+Test graphs construct real collaborators through explicit constructors (ADR-0365).
+
 ### REQ-MOD-002 — Every class belongs to exactly one module; no dead rule; unique simple names
 
 Guard G-09: a backend production class that no rule assigns fails the build, with a message naming

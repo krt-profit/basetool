@@ -164,8 +164,10 @@ as clean. A restore for hardware loss / accidental deletion (no compromise suspe
 
 A backup that has never been restored is unverified. A **weekly** restore drill pulls the latest
 off-site snapshot, restores **both** database dumps into a **throwaway** PostgreSQL instance, and
-verifies them with sanity queries (backend: `flyway_schema_history` present and non-empty + a
-public-table-count floor; Keycloak: a public-table-count floor). The drill touches **no**
+requires `pg_restore --exit-on-error` to complete without an ignored failure, then verifies public
+table floors, validated check/foreign-key constraints and representative data against the dump.
+The backend compares exact nonzero counts for `flyway_schema_history` and `org_unit`; Keycloak
+compares `realm` and `client`. Counts are read without logging row contents. The drill touches **no**
 production state, and a failure makes the unit report `failed` so it is caught.
 
 **The databases are not the whole claim** (added 2026-09-18). A host whose dumps restore perfectly
@@ -185,11 +187,16 @@ content, so nothing it logs can carry a key — and reports each through
 - [ ] A snapshot missing the edge certificates, the ACME state or the redis ACL reports
   `artifact_ok=0` for that artifact, which `RestoreDrillArtifactNotRestorable` pages on.
 - [ ] Every run writes `basetool_restore_drill_last_success_timestamp` (bumped only when both
-  dumps restored); `RestoreDrillStaleOrMissing` pages when it is older than 8 days — one weekly drill
+  dumps restored and passed their content/constraint checks); `RestoreDrillStaleOrMissing` pages when it is older than 8 days — one weekly drill
   missed, plus a day of slack — or absent. It said 35 days until 2026-09-22, which let four
   consecutive weekly drills fail before anyone was told.
 
 **Enforced by:** `scripts/restore-drill.sh` · `scripts/basetool-restore-drill.{service,timer}` · **Runbook:** [`docs/backup.md`](../backup.md)
+
+No restore diagnostic is classified as harmless by default. A failing COPY, constraint creation,
+content query or representative count comparison fails the drill and preserves its previous success
+timestamp, even when the schema and Flyway table exist. Synthetic regression fixtures include
+missing and partially restored data with an otherwise plausible schema.
 
 ### REQ-OPS-012 — Backup credentials are host-only secrets
 

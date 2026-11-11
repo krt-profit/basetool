@@ -19,25 +19,26 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.security;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.security.ReauthenticationHandoff.isAjax;
+import static de.greluc.krt.profit.basetool.frontend.kernel.security.ReauthenticationHandoff.isEventStream;
+import static de.greluc.krt.profit.basetool.frontend.kernel.security.ReauthenticationHandoff.isWebSocketUpgrade;
+import static de.greluc.krt.profit.basetool.frontend.kernel.security.ReauthenticationHandoff.writeOneShotEvent;
+
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
-import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.env.Environment;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -72,19 +73,6 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
    */
   public static final String SSE_GATE_EVENT = "terms-gate";
 
-  /**
-   * Name of the one-shot SSE event that hands an {@code EventSource} off to the login flow. The
-   * same name {@code NotificationPageController} writes when the stream itself loses its token, so
-   * {@code notifications.js} needs no new listener.
-   */
-  static final String SSE_REAUTH_EVENT = "reauth";
-
-  /**
-   * Response header carrying the login URL to an AJAX caller, identical to the one {@code
-   * GlobalExceptionHandler} writes (REQ-SEC-012).
-   */
-  static final String REAUTH_HEADER = "X-Reauthenticate";
-
   /** Session attribute holding the epoch millis at which the cached "accepted" was read. */
   static final String SESSION_CHECKED_AT = "krt.terms.checkedAt";
 
@@ -118,7 +106,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
         return;
       }
-      sendReauthentication(request, response);
+      ReauthenticationHandoff.send(request, response);
       return;
     }
     if (mayProceed) {
@@ -145,92 +133,6 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     }
     log.debug("Consent missing; routing {} to the consent page", request.getRequestURI());
     response.sendRedirect(consentUrl);
-  }
-
-  /**
-   * Answers a request whose OAuth2 token can no longer be refreshed: a {@code reauth} event for an
-   * {@code EventSource}, a {@code 401} with {@code X-Reauthenticate} for an XHR, a redirect to the
-   * login for a navigation.
-   *
-   * @param request the request whose session can no longer produce a token; never {@code null}
-   * @param response the response to write the handoff onto; never {@code null}
-   * @throws IOException if the response cannot be written
-   */
-  private static void sendReauthentication(
-      @NotNull HttpServletRequest request, @NotNull HttpServletResponse response)
-      throws IOException {
-    String reauthUrl = request.getContextPath() + ReauthenticationRequiredException.REAUTH_PATH;
-    if (isEventStream(request)) {
-      log.debug("Token unrefreshable; handing the SSE stream off to the login flow");
-      writeOneShotEvent(response, SSE_REAUTH_EVENT, reauthUrl);
-      return;
-    }
-    if (isAjax(request)) {
-      log.debug("Token unrefreshable; signalling re-authentication to the AJAX caller");
-      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-      response.setHeader(REAUTH_HEADER, reauthUrl);
-      return;
-    }
-    log.warn(
-        "Token unrefreshable for {} {}; redirecting to the login flow.",
-        request.getMethod(),
-        request.getRequestURI());
-    response.sendRedirect(reauthUrl);
-  }
-
-  /**
-   * Whether this request is a WebSocket upgrade, determined by the {@code Upgrade} header.
-   *
-   * @param request the current request
-   * @return {@code true} when the caller is opening a WebSocket
-   */
-  private static boolean isWebSocketUpgrade(@NotNull HttpServletRequest request) {
-    return "websocket".equalsIgnoreCase(request.getHeader(HttpHeaders.UPGRADE));
-  }
-
-  /**
-   * Whether this is a {@code krtFetch} XHR call, marked by {@code X-Requested-With}, rather than a
-   * browser navigation.
-   *
-   * @param request the current request
-   * @return {@code true} for an AJAX call
-   */
-  private static boolean isAjax(@NotNull HttpServletRequest request) {
-    return "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
-  }
-
-  /**
-   * Whether this request is an {@code EventSource} subscription, determined by an {@code Accept} of
-   * {@code text/event-stream}.
-   *
-   * @param request the current request
-   * @return {@code true} when the caller subscribes to an SSE stream
-   */
-  private static boolean isEventStream(@NotNull HttpServletRequest request) {
-    String accept = request.getHeader(HttpHeaders.ACCEPT);
-    return accept != null
-        && accept.toLowerCase(Locale.ROOT).contains(MediaType.TEXT_EVENT_STREAM_VALUE);
-  }
-
-  /**
-   * Answers an SSE subscription with a single named event carrying one URL and a {@code 200}, then
-   * completes the response, so the client navigates instead of reconnecting.
-   *
-   * @param response the response to write the event into
-   * @param eventName the SSE event name the client listens for
-   * @param url the context-relative path the client should navigate to
-   * @throws IOException if writing the event fails
-   */
-  private static void writeOneShotEvent(
-      @NotNull HttpServletResponse response, @NotNull String eventName, @NotNull String url)
-      throws IOException {
-    response.setStatus(HttpServletResponse.SC_OK);
-    response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
-    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
-    PrintWriter writer = response.getWriter();
-    writer.write("event: " + eventName + "\ndata: " + url + "\n\n");
-    writer.flush();
   }
 
   /**
@@ -296,9 +198,13 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     try {
       TermsStatusDto status = backendApiClient.get(TERMS_STATUS_URI, TermsStatusDto.class);
       accepted = status == null || status.accepted();
-    } catch (BackendServiceException _) {
+    } catch (BackendServiceException failure) {
+      SectionFallback.rethrowIfReauthenticationRequired(failure);
       log.debug("Consent status unreadable; letting the request through (backend still enforces).");
       return true;
+    } catch (RuntimeException failure) {
+      SectionFallback.rethrowIfReauthenticationRequired(failure);
+      throw failure;
     }
     if (session != null) {
       session.setAttribute(SESSION_ACCEPTED, accepted);

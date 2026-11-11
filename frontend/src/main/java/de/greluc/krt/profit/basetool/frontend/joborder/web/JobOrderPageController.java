@@ -535,6 +535,7 @@ public class JobOrderPageController {
     try {
       return jobOrderClient.inventoryForMaterial(id, matId);
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to fetch inventory items for job order {} and material {}", id, matId, e);
       throw new ResponseStatusException(
           HttpStatus.INTERNAL_SERVER_ERROR, "Failed to load inventory items");

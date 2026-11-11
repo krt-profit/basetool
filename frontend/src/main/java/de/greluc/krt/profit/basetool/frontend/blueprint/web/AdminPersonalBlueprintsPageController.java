@@ -180,6 +180,7 @@ public class AdminPersonalBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.noteUpdated");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Admin failed to update blueprint note {}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.blueprints.error.update"));
@@ -206,6 +207,7 @@ public class AdminPersonalBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "personalInventory.blueprints.toast.removed");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Admin failed to remove blueprint {}", id, e);
       redirectAttributes.addFlashAttribute(
           "errorToast", classifyError(e, "personalInventory.blueprints.error.remove"));
@@ -281,6 +283,7 @@ public class AdminPersonalBlueprintsPageController {
       redirectAttributes.addFlashAttribute(
           "successToast", "admin.personalInventory.blueprints.purge.toast.done");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Admin failed to clear all users' blueprints", e);
       redirectAttributes.addFlashAttribute(
           "errorToast", "admin.personalInventory.blueprints.purge.error");

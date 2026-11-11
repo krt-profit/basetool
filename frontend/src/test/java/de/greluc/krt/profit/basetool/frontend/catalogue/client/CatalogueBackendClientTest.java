@@ -288,7 +288,10 @@ class CatalogueBackendClientTest {
     backend.answerJson("{}");
     backend.answerJson("{}");
 
-    client.enqueueP4kImport("{\"items\":[]}".getBytes(StandardCharsets.UTF_8), "catalog.json");
+    client.enqueueP4kImport(
+        new org.springframework.core.io.ByteArrayResource(
+            "{\"items\":[]}".getBytes(StandardCharsets.UTF_8)),
+        "catalog.json");
     assertThat(client.p4kImportJobs()).isEmpty();
     client.p4kImportJob(ID);
     client.applyP4kImportJob(ID, true, false);

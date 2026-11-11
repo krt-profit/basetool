@@ -23,8 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.platform.internal.ApiDomains;
 import java.util.ArrayList;
 import java.util.List;
@@ -145,10 +143,7 @@ class ApiDomainsMatchTheDomainMapTest {
 
   @Test
   void everyControllerIsTaggedWithItsModulesApiDomain() {
-    JavaClasses classes =
-        new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("de.greluc.krt.profit.basetool.backend");
+    JavaClasses classes = ModuleSubjects.importBackendMainClasses();
     List<Class<?>> controllers =
         classes.stream()
             .filter(c -> c.isAnnotatedWith(RestController.class))

@@ -96,6 +96,16 @@ public class MissionOperationSummaryCache implements MissionOperationLookup {
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
           @Override
+          public void suspend() {
+            TransactionSynchronizationManager.unbindResource(MissionOperationSummaryCache.this);
+          }
+
+          @Override
+          public void resume() {
+            TransactionSynchronizationManager.bindResource(MissionOperationSummaryCache.this, memo);
+          }
+
+          @Override
           public void afterCompletion(int status) {
             TransactionSynchronizationManager.unbindResourceIfPossible(
                 MissionOperationSummaryCache.this);

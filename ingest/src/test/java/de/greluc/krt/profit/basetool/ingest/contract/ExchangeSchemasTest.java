@@ -30,6 +30,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** The gateway's schema checks agree with the conformance fixtures (REQ-XCH-011, REQ-XCH-026). */
 class ExchangeSchemasTest {
@@ -38,6 +39,43 @@ class ExchangeSchemasTest {
 
   private final JsonMapper mapper = JsonMapper.builder().build();
   private final ExchangeSchemas schemas = new ExchangeSchemas(new ExchangeDocuments(), mapper);
+
+  @Test
+  void sanitizationRemovesEveryUnknownFieldAfterTheWarningBudgetIsExhausted() {
+    String schema = "change-set.schema.json#/$defs/refineryOrderChangeSet";
+    ObjectNode request =
+        (ObjectNode)
+            mapper.readTree(
+                """
+                {"ops":[{"op":"pickup","id":"o-1","versions":{"gameData":3}},
+                        {"op":"pickup","id":"o-2","versions":{"gameData":4}}]}
+                """);
+    for (int i = 0; i < 70; i++) {
+      ((ObjectNode) request.at("/ops/0")).put("future" + i, i);
+      ((ObjectNode) request.at("/ops/1")).put("future" + i, i);
+    }
+    ExchangeSchemas.SanitizedRequest result = schemas.sanitize(schema, request);
+    assertThat(result.warnings()).hasSize(ExchangeSchemas.MAX_REPORTED);
+    assertThat(result.longPointers()).isEmpty();
+    assertThat(schemas.unknownFields(schema, result.body())).isEmpty();
+    assertThat(request.at("/ops/1/future69").intValue()).isEqualTo(69);
+    assertThat(result.body().at("/ops/1/versions/gameData").intValue()).isEqualTo(4);
+  }
+
+  @Test
+  void aLongPointerAfterFiftyWarningsIsStillReportedBeforeRelay() {
+    ObjectNode request = (ObjectNode) mapper.readTree("{\"kind\":\"ITEM\",\"refs\":[]}");
+    for (int i = 0; i < 50; i++) {
+      request.put("future" + i, true);
+    }
+    String longName = "x".repeat(ExchangeSchemas.MAX_POINTER + 1);
+    request.put(longName, true);
+    ExchangeSchemas.SanitizedRequest result =
+        schemas.sanitize("resolve-request.schema.json", request);
+    assertThat(result.warnings()).hasSize(ExchangeSchemas.MAX_REPORTED);
+    assertThat(result.longPointers()).containsExactly("/" + longName);
+    assertThat(result.body().has(longName)).isFalse();
+  }
 
   @Test
   void everyFixtureIsJudgedAsItsFolderSays() throws IOException {

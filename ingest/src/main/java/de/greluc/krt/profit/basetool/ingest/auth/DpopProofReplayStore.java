@@ -26,14 +26,13 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.PriorityQueue;
+import java.util.NavigableSet;
+import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.cache.Cache;
@@ -50,27 +49,21 @@ import org.springframework.security.oauth2.jwt.DPoPProofReplayValidator;
  */
 public final class DpopProofReplayStore {
 
-  /** How often expired proofs are swept at the latest. */
-  static final Duration CLEANUP_INTERVAL = Duration.ofSeconds(10);
-
   /** The prefix of the partition of a token without a subject: the proof's key. */
   static final String KEY_PARTITION_PREFIX = "key:";
 
   /** Orders a member's live proofs by when they expire, the earliest first. */
   private static final Comparator<Held> BY_EXPIRY =
-      Comparator.comparing(held -> held.entry().expiresAt());
+      Comparator.comparing((Held held) -> held.entry().expiresAt()).thenComparing(Held::jtiHash);
 
   /** Live proofs by the SHA-256 of their {@code jti}. */
   private final ConcurrentMap<String, Entry> proofs = new ConcurrentHashMap<>();
 
-  /** Each member partition's live proofs, earliest expiry first; changed only under its key. */
-  private final ConcurrentMap<String, PriorityQueue<Held>> perMember = new ConcurrentHashMap<>();
+  /** Each member partition's live proofs, earliest expiry first, guarded by the store monitor. */
+  private final Map<String, NavigableSet<Held>> perMember = new HashMap<>();
 
-  /** Whether a sweep is running. */
-  private final AtomicBoolean cleaning = new AtomicBoolean(false);
-
-  /** When the last sweep finished, in epoch milliseconds. */
-  private final AtomicLong lastCleanup;
+  /** Live proofs ordered by expiry, guarded by the store monitor. */
+  private final NavigableSet<Held> byExpiry = new TreeSet<>(BY_EXPIRY);
 
   /** The most live proofs one member may hold. */
   private final int maxPerMember;
@@ -111,7 +104,6 @@ public final class DpopProofReplayStore {
     this.maxPerMember = maxPerMember;
     this.maxTotal = maxTotal;
     this.clock = clock;
-    this.lastCleanup = new AtomicLong(clock.millis());
     this.replayed = counter(meterRegistry, pathScope, MetricNames.DPOP_REPLAY_REPLAYED);
     this.memberCap = counter(meterRegistry, pathScope, MetricNames.DPOP_REPLAY_MEMBER_CAP);
     this.full = counter(meterRegistry, pathScope, MetricNames.DPOP_REPLAY_FULL);
@@ -147,46 +139,31 @@ public final class DpopProofReplayStore {
    *     refused, and for a member at its cap when it may try again
    */
   @NotNull
-  Claim claim(@NotNull String jtiHash, @NotNull Instant expiresAt, @NotNull String partition) {
-    cleanupIfDue();
+  synchronized Claim claim(
+      @NotNull String jtiHash, @NotNull Instant expiresAt, @NotNull String partition) {
+    cleanup();
     if (proofs.containsKey(jtiHash)) {
       replayed.increment();
       return Claim.REPLAYED;
     }
     if (proofs.size() >= maxTotal) {
-      cleanup();
-      if (proofs.size() >= maxTotal) {
-        full.increment();
-        Instant now = clock.instant();
-        return Claim.full(retryAfterSeconds(now, earliestExpiry(now)));
-      }
+      full.increment();
+      Instant now = clock.instant();
+      return Claim.full(retryAfterSeconds(now, earliestExpiry(now)));
     }
     Instant now = clock.instant();
     Held held = new Held(jtiHash, new Entry(expiresAt, partition));
-    AtomicReference<Instant> oldest = new AtomicReference<>();
-    perMember.compute(
-        partition,
-        (_, queue) -> {
-          PriorityQueue<Held> live = queue == null ? new PriorityQueue<>(BY_EXPIRY) : queue;
-          dropExpired(live, now);
-          Held first = live.peek();
-          if (first != null && live.size() >= maxPerMember) {
-            oldest.set(first.entry().expiresAt());
-          } else {
-            live.add(held);
-          }
-          return live;
-        });
-    Instant capUntil = oldest.get();
-    if (capUntil != null) {
+    NavigableSet<Held> live = perMember.computeIfAbsent(partition, _ -> new TreeSet<>(BY_EXPIRY));
+    if (live.size() >= maxPerMember) {
       memberCap.increment();
-      return Claim.memberCap(retryAfterSeconds(now, capUntil));
+      return Claim.memberCap(retryAfterSeconds(now, live.first().entry().expiresAt()));
     }
     if (proofs.putIfAbsent(jtiHash, held.entry()) != null) {
-      release(held);
       replayed.increment();
       return Claim.REPLAYED;
     }
+    live.add(held);
+    byExpiry.add(held);
     return Claim.STORED;
   }
 
@@ -209,54 +186,16 @@ public final class DpopProofReplayStore {
    * @return the earliest expiry of a proof that still counts, or {@code now}
    */
   private @NotNull Instant earliestExpiry(@NotNull Instant now) {
-    Instant earliest = null;
-    for (Entry entry : proofs.values()) {
-      Instant expiresAt = entry.expiresAt();
-      if (!now.isAfter(expiresAt) && (earliest == null || expiresAt.isBefore(earliest))) {
-        earliest = expiresAt;
-      }
-    }
-    return earliest == null ? now : earliest;
+    return byExpiry.isEmpty() ? now : byExpiry.first().entry().expiresAt();
   }
 
-  /**
-   * Drops a member's expired proofs from its queue and from the store; runs under the member's key.
-   *
-   * @param live the member's live proofs
-   * @param now the current time
-   */
-  private void dropExpired(@NotNull PriorityQueue<Held> live, @NotNull Instant now) {
-    Held first = live.peek();
-    while (first != null && now.isAfter(first.entry().expiresAt())) {
-      live.poll();
-      proofs.remove(first.jtiHash(), first.entry());
-      first = live.peek();
-    }
-  }
-
-  /** Sweeps expired proofs when the last sweep is older than {@link #CLEANUP_INTERVAL}. */
-  private void cleanupIfDue() {
-    if (clock.millis() - lastCleanup.get() > CLEANUP_INTERVAL.toMillis()) {
-      cleanup();
-    }
-  }
-
-  /** Forgets every expired proof and takes it off its member's queue. */
-  void cleanup() {
-    if (!cleaning.compareAndSet(false, true)) {
-      return;
-    }
-    try {
-      Instant now = clock.instant();
-      for (Map.Entry<String, Entry> proof : proofs.entrySet()) {
-        if (now.isAfter(proof.getValue().expiresAt())
-            && proofs.remove(proof.getKey(), proof.getValue())) {
-          release(new Held(proof.getKey(), proof.getValue()));
-        }
-      }
-      lastCleanup.set(clock.millis());
-    } finally {
-      cleaning.set(false);
+  /** Forgets the expired prefix of the expiry index. */
+  synchronized void cleanup() {
+    Instant now = clock.instant();
+    while (!byExpiry.isEmpty() && now.isAfter(byExpiry.first().entry().expiresAt())) {
+      Held expired = byExpiry.pollFirst();
+      proofs.remove(expired.jtiHash(), expired.entry());
+      release(expired);
     }
   }
 

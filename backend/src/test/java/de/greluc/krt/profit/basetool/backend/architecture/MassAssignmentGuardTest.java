@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import de.greluc.krt.profit.basetool.backend.architecture.MassAssignmentGuardRules.Component;
 import de.greluc.krt.profit.basetool.backend.architecture.MassAssignmentGuardRules.Handler;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankDepositRequest;
@@ -105,10 +104,7 @@ import org.junit.jupiter.api.Test;
  */
 class MassAssignmentGuardTest {
 
-  private static final JavaClasses PRODUCTION =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages("de.greluc.krt.profit.basetool.backend");
+  private static final JavaClasses PRODUCTION = ModuleSubjects.importBackendMainClasses();
 
   private static final JavaClasses FIXTURES =
       new ClassFileImporter()
