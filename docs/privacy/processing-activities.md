@@ -83,8 +83,11 @@ requires it and duplicating it into further files spreads personal data for no g
 ### A3 — Banking and settlement
 
 - **Purpose:** keep the organisation's in-game ledger auditable.
-- **Data:** postings and transactions including the counterparty and the **player handle used at the
-  time of booking**, retained as a tamper-evident record.
+- **Data:** postings and transactions with their counterparties and player-handle snapshots.
+  Linked requests record the applicant and the actual depositor or payee, including a named
+  counterparty without a tool account. Authorisation records identify the deciding member and
+  custodian alongside the funding account, amount and time. The member's data export shows their
+  own participation in an authorisation without identifying the other participant.
 - **Legal basis:** Art. 6(1)(f) — traceability and integrity of the organisation's financial records.
 - **Where:** `bank_*`.
 - **Retention:** the link to the account is cleared on deletion; the historic handle stays in the

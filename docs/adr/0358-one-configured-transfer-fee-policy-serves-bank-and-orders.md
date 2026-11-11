@@ -1,6 +1,6 @@
 # ADR-0358 - One configured transfer-fee policy serves Bank and orders
 
-- **Status:** Accepted - shared configured policy implemented; coupled order consumers pending
+- **Status:** Accepted — configured fee policy and linked Bank fees implemented, Order composition pending
 - **Date:** 2026-11-09
 - **Deciders:** Repository owner (@greluc)
 - **Amends:** ADR-0052 (shared calculation home and true same-player withdrawal exemption)
@@ -55,8 +55,9 @@ must describe the same fee once rather than charging it twice.
   retaining its two-decimal fee and whole-aUEC final payout rounding.
 - `TransferFeePolicyTest` covers shared arithmetic, a restored historical basis after a setting
   change, normalization and fallback behavior. Existing Bank fee-mode/KRT tests and Operations
-  payout regressions remain the accounting guards. Coupled pending/replay, historical corrections
-  and genuine no-transfer exemption still require their owning-domain implementation and evidence.
+  payout regressions remain the accounting guards. Bank attempts retain the submitted rate and fee
+  through staff confirmation, including KRT-funded custody fees and the genuine same-player
+  withdrawal exemption. Composed Order replay and historical corrections remain pending.
 
 ## Alternatives considered
 

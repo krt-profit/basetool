@@ -1,6 +1,6 @@
 # Role and Permission Matrix (Profit Basetool)
 
-> **Approved JobOrder contract and implementation scope:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Section 3.3 describes the internal Bank-free checkpoint. Optional Bank handling and its acceptance remain planned.
+> **Approved JobOrder contract and implementation scope:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Section 3.3 describes the internal Bank-free checkpoint. Bank authority for linked payments is covered in section 3.11. Order composition and public acceptance remain pending.
 
 > **Last reviewed: 2026-09-22** — re-verified against every `@PreAuthorize` of the 88 backend
 > `@RestController`s and the frontend page/proxy controllers, after the members-only cut
@@ -935,6 +935,16 @@ automatically registered as holders** (REQ-BANK-029, ADR-0040); if someone loses
 bank roles, their role-driven holder is automatically deactivated (the remaining balance
 stays and must be settled). Manually registered (non-staff) holders are
 left untouched by this.
+
+**Linked aUEC Bank decisions.** An authorised purpose owner submits on behalf of the current
+authenticated member. Account-linked direct execution uses the corresponding staff grant and the
+KRT direct ceiling. The request and final approval use ordinary account admission, four-eyes and
+staff attestation. Final authorisation of existing funds uses withdrawal authority and checks the
+full principal on one account. Bank staff can decide a linked custody transfer under the existing
+holder-transfer right. Both custodians must be registered Bank holders. Bank Management and Admin
+retain their existing reach, and only Admin has the ordinary four-eyes exception. Order access
+grants no access to the Bank queue, private notes, custody balances or reversals. Public Order
+actions await composition.
 
 #### 3.11.1 Org-unit access for officers/leads (epic #666)
 

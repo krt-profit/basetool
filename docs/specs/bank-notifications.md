@@ -1,8 +1,8 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** BANK · **Related ADRs:** [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
 
-> **Status:** Implemented baseline. The optional aUEC target amendments below are accepted/planned,
-> not implemented; new criteria are unchecked and existing tests establish baseline behavior only.
+> **Status:** Bank-owned linked request and direct outcome notices are implemented. Cross-domain
+> grouping and the composed aUEC journey remain part of the approved target.
 > **Approved target:** [orders-auec-bank.md](orders-auec-bank.md) (REQ-ORDERS-076), ADR-0357.
 
 # Bank notifications
@@ -19,11 +19,9 @@ and has a seeded, admin-editable rule. Each can be muted (REQ-NOTIF-027).
 
 ### REQ-BANK-057 — An approved request is ready to confirm
 
-> **Approved aUEC target - not implemented:** extend readiness to accepted linked request types,
-> including authorisation without posting and holder-transfer requests. Account-owner approval
-> remains readiness for final Bank confirmation, not a monetary order effect. Retain required-
-> approver tasks and ADR-0353 attestation without an extra mandatory in-app approval. Clear/replace
-> stale prompts on decision or current responsibility/access change.
+> Linked authorisation requests use the same readiness path and ADR-0353 attestation.
+> A holder-transfer request goes directly to the Bank queue. The account-owner step applies to
+> the linked actions that require it.
 
 `BankBookingRequestService#applyOwnerApprovalWithinTransaction` (reached by
 `OrgUnitBankRequestService#grantOwnerApproval`) publishes `BANK_BOOKING_REQUEST_APPROVED` when the
@@ -45,13 +43,8 @@ REQ-NOTIF-025) and leaves every other grantee's alone.
 
 ### REQ-BANK-059 — A direct booking by bank staff tells the members it affects
 
-> **Approved aUEC target - not implemented:** linked direct outcomes publish through the owning
-> synchronous command's post-commit causes too, without relying solely on current controller
-> call sites. Request confirmation does not also emit a duplicate direct success. No-ledger
-> authorisation is not a payout/deposit and must not invent a payment notice. Keep existing deposit
-> suppression and actual direct-booking audiences.
->
-> Group the same logical outcome/recipient across Bank/order roles, retaining necessary approval
+> **Approved composition target:** Group the same logical outcome/recipient across Bank/order
+> roles, retaining necessary approval
 > tasks, mute and priority. Later staff decisions use that actor, not the applicant. Rollback,
 > replay and duplicate callbacks announce no extra mutation. Private notes and unrelated Bank data
 > do not enter order notices. REQ-ORDERS-073/-075/-076 owns the order meaning.
@@ -65,6 +58,14 @@ withdrawal, a transfer's source account and every account leg of a reversal publ
 `BANK_ACCOUNT_DEBITED` (the account's responsible holders, `ACCOUNT_RESPONSIBLE`; coded `debitCode`
 `WITHDRAWAL`, `TRANSFER` or `REVERSAL`). Deposits are never announced, because a split deposit fans out
 over every squadron account. A booking that an over-limit request replaced announces nothing.
+
+The linked Bank command publishes direct booking notices in its transaction. A direct no-ledger
+authorisation emits `BANK_FUNDS_AUTHORISED` for the funding account's responsible holders, with
+the authorised amount and the deciding employee. Its rule excludes that employee and honours
+per-type muting. A linked request uses the ordinary request lifecycle, with the actual decider and
+without a second direct notice. A holder-transfer request reaches Bank management under the
+existing request-created rule and appears in the ordinary Bank staff queue. It has no account
+grantee or approval task.
 
 ### REQ-BANK-060 — A deactivated holder who still holds money tells the bank management
 

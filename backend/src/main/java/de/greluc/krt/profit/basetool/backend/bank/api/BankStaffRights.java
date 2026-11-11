@@ -82,8 +82,11 @@ public record BankStaffRights(
    * @param accountId the (source) account
    * @return {@code true} iff the actor holds the capability
    */
-  public boolean canBook(@NotNull BankBookingRequestType type, @NotNull UUID accountId) {
-    if (!staff) {
+  public boolean canBook(@NotNull BankBookingRequestType type, @Nullable UUID accountId) {
+    if (type == BankBookingRequestType.HOLDER_TRANSFER) {
+      return staff;
+    }
+    if (!staff || accountId == null) {
       return false;
     }
     if (management) {

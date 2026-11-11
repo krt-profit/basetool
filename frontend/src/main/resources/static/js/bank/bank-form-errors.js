@@ -32,8 +32,7 @@ export function clearErrors(form) {
 }
 
 /**
- * Shows a localized message in the error slot of the named field, falling back
- * to the form's `_global` slot and finally to an error toast.
+ * Shows a localized message at the visible field, in the form's global slot, or in an error toast.
  *
  * @param {HTMLFormElement} form the bank AJAX form
  * @param {string} field the field name the message belongs to
@@ -41,7 +40,7 @@ export function clearErrors(form) {
  */
 export function showError(form, field, message) {
     let slot = form.querySelector(`.bank-field-error[data-error-for="${field}"]`);
-    if (!slot) {
+    if (!slot || slot.closest('[hidden]')) {
         slot = form.querySelector('.bank-field-error[data-error-for="_global"]');
     }
     if (slot) {

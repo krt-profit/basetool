@@ -340,6 +340,9 @@ public enum NotificationType {
    */
   BANK_ACCOUNT_DEBITED,
 
+  /** Bank staff directly authorised funds on the recipient's account without a booking. */
+  BANK_FUNDS_AUTHORISED,
+
   /**
    * A bank holder was deactivated but still holds aUEC (REQ-BANK-060), rendered with {@code holder}
    * and {@code balance}.
@@ -587,6 +590,7 @@ public enum NotificationType {
           BANK_PAYOUT_RECEIVED,
           BANK_HOLDER_TRANSFER_RECEIVED,
           BANK_ACCOUNT_DEBITED,
+          BANK_FUNDS_AUTHORISED,
           BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
           ORG_LEADERSHIP_ROLE_MISMATCH,
           ORG_MEMBER_DEPARTED,

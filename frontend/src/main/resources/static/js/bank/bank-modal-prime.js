@@ -39,6 +39,10 @@ import { syncRequestTypeRows } from '/js/bank/bank-request-rows.js';
 function primeModal(trigger, modal) {
     const form = /** @type {HTMLFormElement | null} */ (modal.querySelector('form.bank-ajax-form'));
     if (form) {
+        form.toggleAttribute(
+            'data-server-request-sync',
+            Boolean(trigger.closest('[data-linked-holder-id]')),
+        );
         clearErrors(form);
         const staffNote = /** @type {HTMLInputElement | null} */ (
             form.querySelector('[name="staffNote"]')

@@ -6,9 +6,11 @@ bank_account_approval_limit bank
 bank_account_grant bank
 bank_account_view_grant bank
 bank_audit_event bank
+bank_authorisation bank
 bank_booking_request bank
 bank_holder bank
 bank_holder_posting bank
+bank_linked_attempt bank
 bank_posting bank
 bank_transaction bank
 blueprint catalogue

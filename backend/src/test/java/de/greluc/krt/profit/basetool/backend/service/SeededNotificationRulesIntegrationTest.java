@@ -211,6 +211,11 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.ACCOUNT_RESPONSIBLE),
         rule(
+            NotificationEventType.BANK_FUNDS_AUTHORISED,
+            NotificationType.BANK_FUNDS_AUTHORISED,
+            true,
+            SelectorKind.ACCOUNT_RESPONSIBLE),
+        rule(
             NotificationEventType.BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
             NotificationType.BANK_HOLDER_DEACTIVATED_WITH_BALANCE,
             true,

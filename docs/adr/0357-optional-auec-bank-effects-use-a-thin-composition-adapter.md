@@ -1,6 +1,6 @@
 # ADR-0357 - Optional aUEC Bank effects use a thin composition adapter
 
-- **Status:** Accepted - implementation pending
+- **Status:** Accepted — Bank capabilities implemented, Order composition pending
 - **Date:** 2026-11-09
 - **Deciders:** Repository owner (@greluc)
 - **Amends:** ADR-0021 (authorisation-only outcome), ADR-0254 (optional purpose command/outcome coverage)
@@ -63,6 +63,13 @@ hidden by merely deduplicating the later order callback.
 Notifications and live propagation remain post-commit effects. They are not used to settle financial
 invariants. The connected-client Bank exchange contract and its separate admission policy are not
 expanded by this integration.
+
+## Implementation
+
+The Bank API, request and ledger effects, single synchronous handler and pre-effect preparation
+are implemented. V401 retains attempt identity and no-ledger evidence. The existing Bank staff
+workflow presents the new request types. The application adapter and acceptance through public
+Order actions remain pending.
 
 ## Consequences
 

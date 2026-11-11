@@ -61,9 +61,9 @@ public class BankRequestController {
 
   /**
    * Pages over the booking requests in the given lifecycle state the caller may act on
-   * (REQ-BANK-023). Management sees every account; an employee sees only requests on accounts they
-   * are granted on. Defaults to the {@code PENDING} work queue, newest first. Each row says in
-   * {@code callerMayConfirm} whether the caller may confirm it, by the confirm endpoint's own rule.
+   * (REQ-BANK-023). Account requests follow staff visibility. Holder transfers appear for all Bank
+   * staff. Defaults to the {@code PENDING} work queue, newest first. Each row says in {@code
+   * callerMayConfirm} whether the caller may confirm it, by the confirm endpoint's own rule.
    *
    * @param status the lifecycle states to include (repeatable or comma-separated); defaults to
    *     {@code PENDING} when omitted
@@ -90,16 +90,14 @@ public class BankRequestController {
   }
 
   /**
-   * Confirms a pending request: records the holder(s) and books the deposit / withdrawal / transfer
-   * onto the ledger (REQ-BANK-023/-040/-041). Requires the per-account capability matching the
-   * request type and, for an over-limit request, the responsible-holder approval attestation plus,
-   * without an in-app approval, a staff note naming the approver — all enforced in the service.
+   * Confirms the full request as a ledger booking or a no-ledger authorisation (REQ-BANK-023). The
+   * service checks current staff authority, fixed linked terms and any required attestation.
    *
    * @param id the request to confirm
    * @param request the holder(s), the over-limit approval attestation and the echoed version
    * @return the confirmed request
    */
-  @Operation(summary = "Confirm a pending booking request and book it onto the ledger")
+  @Operation(summary = "Confirm a pending booking or funds authorisation request")
   @PostMapping("/{id}/confirm")
   public BankBookingRequestDto confirm(
       @PathVariable UUID id, @NotNull @Valid @RequestBody ConfirmBankBookingRequest request) {
@@ -113,8 +111,7 @@ public class BankRequestController {
   }
 
   /**
-   * Rejects a pending request with a reason; no money moves (REQ-BANK-023). Requires visibility of
-   * the request's account, enforced in the service.
+   * Rejects a pending request with a reason under the request's staff visibility rules.
    *
    * @param id the request to reject
    * @param request the rejection reason and the echoed version

@@ -31,13 +31,13 @@ import org.jetbrains.annotations.Nullable;
  * requester's list and the staff confirmation queue; type and status arrive as enum names.
  *
  * @param id the request id
- * @param accountId the target org-unit account id
- * @param accountNo the target account's human-readable number
- * @param accountName the target account's display name
+ * @param accountId the account id, absent for a holder transfer
+ * @param accountNo the human-readable account number, absent for a holder transfer
+ * @param accountName the account's display name, absent for a holder transfer
  * @param orgUnitId the owning org unit's id
  * @param orgUnitName the owning org unit's long-form name
  * @param orgUnitShorthand the owning org unit's shorthand, or {@code null}
- * @param type movement enum name ({@code DEPOSIT} / {@code WITHDRAWAL} / {@code TRANSFER})
+ * @param type the requested Bank action
  * @param amount the requested whole-aUEC amount
  * @param note the requester's optional note, or {@code null}
  * @param justification the requester's optional justification (Begr&uuml;ndung) for a {@code
@@ -46,11 +46,11 @@ import org.jetbrains.annotations.Nullable;
  *     confirmed with one
  * @param status lifecycle enum name (PENDING / CONFIRMED / REJECTED / CANCELLED)
  * @param requesterHandle the requesting officer/lead's effective-name snapshot
- * @param holderId the holder recorded at confirmation, or {@code null} while not confirmed
- * @param holderHandle the recorded holder's display name (REQ-BANK-003), or {@code null} while not
- *     confirmed
- * @param resultingTransactionId the booked ledger transaction id, or {@code null} while not
- *     confirmed
+ * @param holderId the frozen or confirmed holder, or {@code null} for an unconfirmed ordinary
+ *     request
+ * @param holderHandle the frozen or confirmed holder's display name (REQ-BANK-003)
+ * @param resultingTransactionId the resulting ledger transaction id, or {@code null} without a
+ *     booking
  * @param deciderHandle the deciding bank employee's handle, or {@code null} while pending/cancelled
  * @param rejectReason the rejection reason, or {@code null} unless rejected
  * @param decidedAt when the request reached its terminal state, or {@code null} while pending
@@ -69,10 +69,9 @@ import org.jetbrains.annotations.Nullable;
  *     confirmation (REQ-BANK-044)
  * @param splitPercent the whole-percent (1–100) distributed across squadron accounts, or {@code
  *     null} when not a split
- * @param counterpartyUserId the Empf&auml;nger named on a {@code WITHDRAWAL} request
- *     (REQ-BANK-055), or {@code null} when confirmation should derive the requester
- * @param counterpartyHandle name snapshot of that Empf&auml;nger; {@code null} exactly when none is
- *     named
+ * @param counterpartyUserId the registered depositor or payee, if supplied
+ * @param counterpartyHandle the name of the actual depositor or payee, including an accountless
+ *     player
  * @param counterpartyOrgUnitId the Empf&auml;nger's chosen org unit, or {@code null}
  * @param counterpartyOrgUnitName name snapshot of that org unit, or {@code null}
  * @param purposeKind what another module raised the request for (REQ-BANK-061), as an enum name, or
@@ -84,13 +83,14 @@ import org.jetbrains.annotations.Nullable;
  * @param version the optimistic-locking version echoed on cancel/confirm/reject
  * @param callerMayConfirm on the staff queue, whether the caller may confirm this request now;
  *     {@code null} on every other read (REQ-BANK-023)
+ * @param linked frozen and final evidence of an order-linked request, or {@code null}
  */
 @DtoMirror
 public record BankBookingRequestDto(
     UUID id,
-    UUID accountId,
-    String accountNo,
-    String accountName,
+    @Nullable UUID accountId,
+    @Nullable String accountNo,
+    @Nullable String accountName,
     @Nullable UUID orgUnitId,
     @Nullable String orgUnitName,
     @Nullable String orgUnitShorthand,
@@ -125,7 +125,8 @@ public record BankBookingRequestDto(
     @Nullable UUID purposeRef,
     @Nullable String clientName,
     Long version,
-    @Nullable Boolean callerMayConfirm) {
+    @Nullable Boolean callerMayConfirm,
+    @Nullable LinkedBankRequestDetails linked) {
 
   /**
    * Whether the staff queue offers this caller the confirm action; an unjudged row offers none.
@@ -135,4 +136,35 @@ public record BankBookingRequestDto(
   public boolean mayConfirm() {
     return Boolean.TRUE.equals(callerMayConfirm);
   }
+
+  /** Returns the message key for the Bank outcome shown to the caller. */
+  public String statusLabelKey() {
+    return "bank.request.status."
+        + (linked != null && linked.authorisationId() != null ? "AUTHORISED" : status);
+  }
+
+  /** Returns whether this request moves custody between Bank holders. */
+  public boolean holderTransfer() {
+    return "HOLDER_TRANSFER".equals(type);
+  }
+
+  /** Returns whether the requester may open the ordinary correction form. */
+  public boolean canEdit() {
+    return "PENDING".equals(status) && !ownerApprovalGranted && linked == null;
+  }
+
+  /**
+   * Evidence for an order-linked request.
+   *
+   * @param destinationHolderId the frozen destination holder for a transfer
+   * @param destinationHolderHandle the destination holder's display name
+   * @param fee the whole-aUEC fee under the submitted terms
+   * @param authorisationId the resulting authority reference on an approved no-ledger request
+   */
+  @DtoMirror
+  public record LinkedBankRequestDetails(
+      @Nullable UUID destinationHolderId,
+      @Nullable String destinationHolderHandle,
+      BigDecimal fee,
+      @Nullable UUID authorisationId) {}
 }

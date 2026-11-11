@@ -35,8 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Tells the members a direct booking by bank staff affects (REQ-BANK-059): the member paid out to,
  * the member who must take over aUEC moved between holders, and the responsible holders of a
- * debited or reversed account. Deposits are never announced, and a booking that confirms a request
- * already has its own notice, so only the booking controllers call this, not the ledger.
+ * debited or reversed account. Announces direct no-ledger authorisations to the responsible holders
+ * of the funding account. A confirmed request has its own lifecycle notice.
  */
 @Service
 @RequiredArgsConstructor
@@ -59,13 +59,28 @@ public class BankDirectBookingNotifier {
   @Transactional(propagation = Propagation.MANDATORY)
   public void withdrawalBooked(
       @NotNull BankWithdrawalRequest request, @NotNull BankTransactionDto booked) {
+    withdrawalBooked(request, booked, true);
+  }
+
+  /**
+   * Announces the debit and, for an actual payout, notifies the registered counterparty.
+   *
+   * @param request the withdrawal
+   * @param booked the booked transaction
+   * @param gamePayment whether the holder actually paid another player
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  void withdrawalBooked(
+      @NotNull BankWithdrawalRequest request,
+      @NotNull BankTransactionDto booked,
+      boolean gamePayment) {
     BankTransaction transaction = transactionRepository.findById(booked.id()).orElse(null);
     String accountNo = accountNo(request.accountId());
     if (transaction == null || accountNo == null) {
       return;
     }
     ActorRef actor = actors.current();
-    if (request.counterpartyUserId() != null) {
+    if (gamePayment && request.counterpartyUserId() != null) {
       eventPublisher.publishEvent(
           BankNotices.payoutBooked(
               booked.id(),
@@ -155,6 +170,21 @@ public class BankDirectBookingNotifier {
     eventPublisher.publishEvent(
         BankNotices.holderTransferBooked(
             booked.id(), recipient, request.amount(), actors.current()));
+  }
+
+  /**
+   * Announces a direct authorisation to the funding account's responsible holders.
+   *
+   * @param authorisationId the recorded authorisation
+   * @param account the funding account
+   * @param amount the authorised amount
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  void fundsAuthorised(
+      @NotNull UUID authorisationId, @NotNull BankAccount account, @NotNull BigDecimal amount) {
+    eventPublisher.publishEvent(
+        BankNotices.fundsAuthorised(
+            authorisationId, account.getId(), account.getAccountNo(), amount, actors.current()));
   }
 
   private @Nullable String accountNo(UUID accountId) {

@@ -101,7 +101,8 @@ class BankRequestQueueSegmentTest {
         null,
         null,
         0L,
-        callerMayConfirm);
+        callerMayConfirm,
+        null);
   }
 
   /** Absent, blank and unknown values open the pending segment. */

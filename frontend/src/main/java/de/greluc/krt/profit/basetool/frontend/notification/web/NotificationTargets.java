@@ -121,6 +121,7 @@ final class NotificationTargets {
               detail("BANK_ACCOUNT", "/org-unit-bank/accounts/")),
           Map.entry("BANK_GRANT_CHANGED", detail("BANK_ACCOUNT_GRANT", "/bank/accounts/")),
           Map.entry("BANK_ACCOUNT_DEBITED", page("/org-unit-bank")),
+          Map.entry("BANK_FUNDS_AUTHORISED", page("/org-unit-bank")),
           Map.entry(
               "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", detail("BANK_HOLDER", "/bank/holders/")),
           Map.entry(

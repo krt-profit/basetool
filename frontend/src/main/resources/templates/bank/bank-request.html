@@ -22,7 +22,7 @@
                       th:text="#{'bank.request.type.' + ${r.type()}}">Auszahlung</span>
                 <span class="chip" data-testid="bank-request-page-status"
                       th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : '')"
-                      th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                      th:text="#{__${r.statusLabelKey()}__}">Ausstehend</span>
                 <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}" class="chip chip--success"
                       th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
                 <span th:if="${pending and approvalOpen}" class="chip chip--warning" data-testid="bank-request-page-waiting"
@@ -30,7 +30,7 @@
             </div>
 
             <div class="bank-booking-detail-body">
-                <div class="bank-detail-item">
+                <div class="bank-detail-item" th:if="${r.accountId() != null}">
                     <span class="bank-detail-label" th:text="#{bank.request.col.account}">Konto</span>
                     <span class="bank-detail-value" data-testid="bank-request-page-account"
                           th:text="${r.accountNo()} + ' &middot; ' + ${r.accountName()} + (${r.orgUnitShorthand() != null} ? ' (' + ${r.orgUnitShorthand()} + ')' : '')">KB-0001 &middot; Staffel ALPHA (ALP)</span>
@@ -39,10 +39,24 @@
                     <span class="bank-detail-label" th:text="#{bank.request.page.target}">Zielkonto</span>
                     <span class="bank-detail-value" th:text="${r.targetAccountNo()}">KB-0002</span>
                 </div>
+                <div class="bank-detail-item" th:if="${r.linked() != null and r.holderHandle() != null}">
+                    <span class="bank-detail-label" th:text="#{bank.field.holder}">Halter</span>
+                    <span class="bank-detail-value" th:text="${@handles.display(r.holderHandle())}">nova</span>
+                </div>
+                <div class="bank-detail-item" th:if="${r.linked() != null and r.linked().destinationHolderHandle() != null}">
+                    <span class="bank-detail-label" th:text="#{bank.field.holder.target}">Ziel-Halter</span>
+                    <span class="bank-detail-value" th:text="${@handles.display(r.linked().destinationHolderHandle())}">talon</span>
+                </div>
+                <div class="bank-detail-item" th:if="${r.counterpartyHandle() != null}">
+                    <span class="bank-detail-label"
+                          th:text="${r.type() == 'DEPOSIT'} ? #{bank.field.counterparty.depositor} : #{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                    <span class="bank-detail-value" th:text="${@handles.display(r.counterpartyHandle())}">lyra</span>
+                </div>
                 <div class="bank-detail-item">
                     <span class="bank-detail-label" th:text="#{bank.request.col.amount}">Betrag</span>
                     <span class="bank-detail-value data-value" data-testid="bank-request-page-amount"
                           th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
+                    <th:block th:replace="~{bank/fragments/bank-request-linked :: fee(${r})}"></th:block>
                 </div>
                 <div class="bank-detail-item">
                     <span class="bank-detail-label" th:text="#{bank.request.col.requester}">Antragsteller</span>

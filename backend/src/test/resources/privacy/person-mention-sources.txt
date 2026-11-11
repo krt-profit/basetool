@@ -100,6 +100,7 @@ exempt-column|bank_booking_request.purpose_kind
 exempt-column|bank_booking_request.required_approver
 exempt-column|bank_booking_request.status
 exempt-column|bank_booking_request.type
+exempt-column|bank_linked_attempt.purpose_kind
 exempt-column|bank_transaction.counterparty_org_unit_name
 exempt-column|bank_transaction.type
 exempt-column|blueprint_dismantle_return.wiki_name_snapshot

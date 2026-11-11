@@ -591,6 +591,16 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "bankFundsAuthorisations",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "amount" : 6000000.0000,
+      "authorised_at" : "<instant>",
+      "member_authorised" : false,
+      "member_is_custodian" : true
+    } ],
+    "truncated" : false
+  }, {
     "key" : "auditActionsByMember",
     "legalBasis" : "ART_15",
     "rows" : [ {

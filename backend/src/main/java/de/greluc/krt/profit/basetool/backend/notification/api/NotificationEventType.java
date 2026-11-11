@@ -398,6 +398,9 @@ public enum NotificationEventType {
    */
   BANK_ACCOUNT_DEBITED,
 
+  /** Bank staff directly authorised funds on an account without a booking (REQ-BANK-059). */
+  BANK_FUNDS_AUTHORISED,
+
   /**
    * The roster reconciliation deactivated a bank holder who still holds aUEC (REQ-BANK-060). The
    * default rule notifies the bank management.

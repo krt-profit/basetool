@@ -33,6 +33,12 @@ first). The storage choice and the unified-viewer architecture are recorded in
 > [aUEC orders](orders-auec.md). Optional Bank linkage, outcomes and clarification retain their
 > [separate audit requirements](orders-auec-bank.md).
 >
+> **Bank audit scope:** Final debit-equivalent authority records `FUNDS_AUTHORISED` in the Bank
+> trail, with the funding account, authorisation reference and amount. A requested authorisation
+> also records the staff decision in the existing request audit. These entries commit with their
+> effects and use the existing Bank activity filter. Private staff and approval notes stay in
+> the Bank request or booking.
+>
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
 > **Status: shipped** (ADR-0298, ADR-0300, ADR-0302, map #2800) for the coverage additions of the

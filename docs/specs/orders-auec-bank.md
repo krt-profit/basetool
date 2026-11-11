@@ -1,6 +1,7 @@
 > **Doc type:** Living spec - approved target. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS / BANK
-> **Status:** Accepted / planned; not implemented. All acceptance criteria below are pending.
+> **Status:** The [Bank-owned capabilities](bank.md#req-bank-061--purpose-reference) are implemented.
+> Order composition, the public default journey and their acceptance remain pending.
 > **Related ADRs:** [ADR-0357](../adr/0357-optional-auec-bank-effects-use-a-thin-composition-adapter.md),
 > [ADR-0358](../adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md),
 > ADR-0232, ADR-0251, ADR-0254, ADR-0352, ADR-0353.
@@ -15,9 +16,8 @@ order effects, attempts, recovery and reversal consequences. The core monetary m
 rules live in [orders-core.md](orders-core.md). Reusable Bank authority, request, ledger and fee
 contracts remain in [bank.md](bank.md). Their requirements are linked here rather than redefined.
 
-This specification records the approved planning outcome. It changes no running application,
-schema or production data and authorises no implementation. The connected-client Bank surface in
-[bank-exchange.md](bank-exchange.md) remains a separate frozen contract.
+The Bank command, request and ledger capabilities belong to [bank.md](bank.md). The connected-client
+Bank surface is governed by the frozen contract in [bank-exchange.md](bank-exchange.md).
 
 ## Requirements
 

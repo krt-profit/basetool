@@ -81,7 +81,7 @@ public class ExchangeBankRequestWriteService {
                 requestWrites.raise(
                     bankActors.of(caller),
                     new BankOwnRequestWrites.NewRequest(
-                        body.type(),
+                        body.type().bankType(),
                         body.sourceAccountId(),
                         body.targetAccountId(),
                         body.amount(),

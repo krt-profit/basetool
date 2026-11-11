@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
+import static de.greluc.krt.profit.basetool.backend.bank.internal.BankPostingWriter.ACCOUNT_ID_ORDER;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedOutcome;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -47,6 +49,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -76,6 +79,7 @@ public class BankLedgerService {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
   private final BankPostingWriter writer;
   private final BankBookingGuards guards;
+  private final BankLinkedDecisions linkedDecisions;
 
   /**
    * Books a deposit (REQ-BANK-004): one positive account leg on the receiving account and one
@@ -99,19 +103,44 @@ public class BankLedgerService {
   @Transactional
   public BankTransactionDto bookDeposit(@NotNull BankDepositRequest request) {
     if (request.splitEnabled()) {
-      BankHolder holder = writer.requireHolder(request.holderId());
+      final BankHolder holder = writer.requireHolder(request.holderId());
       guards.requireActiveHolder(holder);
       return bookSplitDeposit(request, holder);
     }
+    return postDeposit(request, null);
+  }
+
+  /**
+   * Books a linked deposit using its submitted actual depositor.
+   *
+   * @param request the validated single-account deposit
+   * @param counterparty the frozen depositor snapshot
+   * @return the posted transaction
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  BankTransactionDto bookLinkedDeposit(
+      @NotNull BankDepositRequest request, @NotNull CounterpartySnapshot counterparty) {
+    if (request.splitEnabled()) {
+      throw new BadRequestException("A linked deposit must use a single account");
+    }
+    return postDeposit(request, counterparty);
+  }
+
+  @NotNull
+  private BankTransactionDto postDeposit(
+      @NotNull BankDepositRequest request, @Nullable CounterpartySnapshot linkedCounterparty) {
     BankAccount account = writer.lockAccount(request.accountId());
     guards.requireActive(account);
-    BankHolder holder = writer.requireHolder(request.holderId());
+    final BankHolder holder = writer.requireHolder(request.holderId());
     guards.requireActiveHolder(holder);
     CounterpartySnapshot counterparty =
-        resolveCounterparty(
-            request.counterpartyUserId(),
-            request.counterpartyExternalName(),
-            request.counterpartyOrgUnitId());
+        linkedCounterparty == null
+            ? resolveCounterparty(
+                request.counterpartyUserId(),
+                request.counterpartyExternalName(),
+                request.counterpartyOrgUnitId())
+            : linkedCounterparty;
 
     Instant now = Instant.now();
     BankTransaction tx =
@@ -133,9 +162,10 @@ public class BankLedgerService {
         counterparty == null ? null : counterparty.userId(),
         "+"
             + request.amount().toPlainString()
-            + " aUEC @"
-            + holder.getHandle()
-            + counterpartyDetail(counterparty, "<-"));
+            + " aUEC"
+            + (linkedCounterparty == null
+                ? " @" + holder.getHandle() + counterpartyDetail(counterparty, "<-")
+                : ""));
     return toDto(tx);
   }
 
@@ -184,7 +214,8 @@ public class BankLedgerService {
           "There is no active squadron account to distribute the split to");
     }
 
-    TreeSet<UUID> lockOrder = new TreeSet<>(squadronIds);
+    TreeSet<UUID> lockOrder = new TreeSet<>(ACCOUNT_ID_ORDER);
+    lockOrder.addAll(squadronIds);
     lockOrder.add(request.accountId());
     Map<UUID, BankAccount> locked = new LinkedHashMap<>();
     for (UUID id : lockOrder) {
@@ -296,17 +327,45 @@ public class BankLedgerService {
   @NotNull
   @Transactional
   public BankTransactionDto bookWithdrawal(@NotNull BankWithdrawalRequest request) {
-    BankAccount account = writer.lockAccount(request.accountId());
-    guards.requireActive(account);
-    BankBookingGuards.requireDebitJustification(account, request.justification());
+    return postWithdrawal(request, null, null);
+  }
+
+  /**
+   * Books a linked withdrawal using its submitted actual payee and fee.
+   *
+   * @param request the validated debit
+   * @param counterparty the frozen payee snapshot
+   * @param fee the whole-aUEC fee fixed at submission
+   * @return the posted transaction
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  BankTransactionDto bookLinkedWithdrawal(
+      @NotNull BankWithdrawalRequest request,
+      @NotNull CounterpartySnapshot counterparty,
+      @NotNull BigDecimal fee) {
+    return postWithdrawal(request, counterparty, fee);
+  }
+
+  @NotNull
+  private BankTransactionDto postWithdrawal(
+      @NotNull BankWithdrawalRequest request,
+      @Nullable CounterpartySnapshot linkedCounterparty,
+      @Nullable BigDecimal submittedFee) {
+    BankAccount account = lockActiveDebitAccount(request.accountId(), request.justification());
     final BankHolder holder = writer.requireHolder(request.holderId());
     CounterpartySnapshot counterparty =
-        resolveCounterparty(
-            request.counterpartyUserId(),
-            request.counterpartyExternalName(),
-            request.counterpartyOrgUnitId());
+        linkedCounterparty == null
+            ? resolveCounterparty(
+                request.counterpartyUserId(),
+                request.counterpartyExternalName(),
+                request.counterpartyOrgUnitId())
+            : linkedCounterparty;
 
-    BigDecimal fee = transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot());
+    BigDecimal fee =
+        submittedFee == null
+            ? transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot())
+            : submittedFee;
     BigDecimal debit = request.feeInclusive() ? request.amount() : request.amount().add(fee);
     if (request.feeInclusive()) {
       guards.requireAmountExceedsFee(request.amount(), fee);
@@ -333,11 +392,34 @@ public class BankLedgerService {
         counterparty == null ? null : counterparty.userId(),
         "-"
             + plain(debit)
-            + " aUEC @"
-            + holder.getHandle()
-            + counterpartyDetail(counterparty, "->")
+            + " aUEC"
+            + (linkedCounterparty == null
+                ? " @" + holder.getHandle() + counterpartyDetail(counterparty, "->")
+                : "")
             + feeDetail(fee, request.feeInclusive()));
     return toDto(tx);
+  }
+
+  /**
+   * Checks final debit coverage without writing either ledger.
+   *
+   * @param accountId the funding account
+   * @param amount the full principal in whole aUEC
+   * @param justification the debit justification, if required
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  void authorise(
+      @NotNull UUID accountId, @NotNull BigDecimal amount, @Nullable String justification) {
+    guards.requireAccountCoverage(lockActiveDebitAccount(accountId, justification), amount);
+  }
+
+  @NotNull
+  private BankAccount lockActiveDebitAccount(
+      @NotNull UUID accountId, @Nullable String justification) {
+    BankAccount account = writer.lockAccount(accountId);
+    guards.requireActive(account);
+    BankBookingGuards.requireDebitJustification(account, justification);
+    return account;
   }
 
   /**
@@ -361,6 +443,28 @@ public class BankLedgerService {
   @Transactional
   public BankTransactionDto bookTransfer(
       @NotNull BankTransferRequest request, boolean destinationVisible) {
+    return postTransfer(request, destinationVisible, null);
+  }
+
+  /**
+   * Books a linked transfer after the owning command admits its destination.
+   *
+   * @param request the validated transfer
+   * @param fee the whole-aUEC fee fixed at submission
+   * @return the posted transaction
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  BankTransactionDto bookLinkedTransfer(
+      @NotNull BankTransferRequest request, @NotNull BigDecimal fee) {
+    return postTransfer(request, true, fee);
+  }
+
+  @NotNull
+  private BankTransactionDto postTransfer(
+      @NotNull BankTransferRequest request,
+      boolean destinationVisible,
+      @Nullable BigDecimal submittedFee) {
     if (request.sourceAccountId().equals(request.destinationAccountId())) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_SELF_TRANSFER,
@@ -373,7 +477,7 @@ public class BankLedgerService {
 
     BankAccount source;
     BankAccount destination;
-    if (request.sourceAccountId().compareTo(request.destinationAccountId()) < 0) {
+    if (ACCOUNT_ID_ORDER.compare(request.sourceAccountId(), request.destinationAccountId()) < 0) {
       source = writer.lockAccount(request.sourceAccountId());
       destination = writer.lockAccount(request.destinationAccountId());
     } else {
@@ -389,10 +493,15 @@ public class BankLedgerService {
     guards.requireActiveHolder(destinationHolder);
 
     final boolean holderChanges = !sourceHolder.getId().equals(destinationHolder.getId());
-    BigDecimal fee =
-        holderChanges
-            ? transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot())
-            : BigDecimal.ZERO;
+    BigDecimal fee = submittedFee;
+    if (fee == null) {
+      fee =
+          holderChanges
+              ? transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot())
+              : BigDecimal.ZERO;
+    } else if (!holderChanges && fee.signum() != 0) {
+      throw new BadRequestException("A same-holder transfer cannot charge a game fee");
+    }
     final boolean inclusive = request.feeInclusive() && holderChanges;
     BigDecimal debit = inclusive ? request.amount() : request.amount().add(fee);
     final BigDecimal credit = inclusive ? request.amount().subtract(fee) : request.amount();
@@ -424,11 +533,9 @@ public class BankLedgerService {
         plain(debit)
             + " aUEC -> "
             + destination.getAccountNo()
-            + " ("
-            + sourceHolder.getHandle()
-            + " -> "
-            + destinationHolder.getHandle()
-            + ")"
+            + (submittedFee == null
+                ? " (" + sourceHolder.getHandle() + " -> " + destinationHolder.getHandle() + ")"
+                : "")
             + feeDetail(fee, inclusive));
     return toDto(tx);
   }
@@ -451,6 +558,31 @@ public class BankLedgerService {
   @NotNull
   @Transactional
   public BankTransactionDto bookHolderTransfer(@NotNull BankHolderTransferRequest request) {
+    return postHolderTransfer(request, null, null);
+  }
+
+  /**
+   * Books a linked custody transfer and debits the CARTEL account for its submitted fee.
+   *
+   * @param request the validated custody transfer
+   * @param fee the whole-aUEC fee fixed at submission
+   * @param staffNote the confirming employee's private note
+   * @return the posted transaction
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  BankTransactionDto bookLinkedHolderTransfer(
+      @NotNull BankHolderTransferRequest request,
+      @NotNull BigDecimal fee,
+      @Nullable String staffNote) {
+    return postHolderTransfer(request, fee, staffNote);
+  }
+
+  @NotNull
+  private BankTransactionDto postHolderTransfer(
+      @NotNull BankHolderTransferRequest request,
+      @Nullable BigDecimal submittedFee,
+      @Nullable String staffNote) {
     if (request.sourceHolderId().equals(request.destinationHolderId())) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_SELF_TRANSFER,
@@ -459,18 +591,12 @@ public class BankLedgerService {
     BankHolder sourceHolder = writer.requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = writer.requireHolder(request.destinationHolderId());
 
-    BigDecimal fee = transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot());
-    BankAccount cartel = null;
-    if (fee.signum() > 0) {
-      UUID cartelId =
-          accountRepository
-              .findFirstByType(BankAccountType.CARTEL)
-              .map(BankAccount::getId)
-              .orElseThrow(() ->
-                  new BankConflictException(
-                      BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
-                      "The KRT (CARTEL) account that bears the Umbuchung fee does not exist"));
-      cartel = writer.lockAccount(cartelId);
+    BigDecimal fee =
+        submittedFee == null
+            ? transferFeePolicy.feeOn(request.amount(), transferFeePolicy.snapshot())
+            : submittedFee;
+    BankAccount cartel = lockHolderTransferFeeAccount(fee);
+    if (cartel != null) {
       guards.requireActive(cartel);
       guards.requireAccountCoverage(cartel, fee);
     }
@@ -478,7 +604,14 @@ public class BankLedgerService {
     Instant now = Instant.now();
     BankTransaction tx =
         writer.persistTransaction(
-            BankTransactionType.HOLDER_TRANSFER, request.note(), null, null, null, fee, now, null);
+            BankTransactionType.HOLDER_TRANSFER,
+            request.note(),
+            null,
+            staffNote,
+            null,
+            fee,
+            now,
+            null);
     writer.persistHolderPosting(tx, sourceHolder, request.amount().add(fee).negate(), now);
     writer.persistHolderPosting(tx, destinationHolder, request.amount(), now);
     if (cartel != null) {
@@ -490,12 +623,36 @@ public class BankLedgerService {
         tx.getId(),
         null,
         plain(request.amount())
-            + " aUEC "
-            + sourceHolder.getHandle()
-            + " -> "
-            + destinationHolder.getHandle()
+            + " aUEC"
+            + (submittedFee == null
+                ? " " + sourceHolder.getHandle() + " -> " + destinationHolder.getHandle()
+                : "")
             + feeDetail(fee, false));
     return toDto(tx);
+  }
+
+  /**
+   * Locks the KRT account when it pays a custody-transfer fee.
+   *
+   * @param fee the Bank fee in whole aUEC
+   * @return the locked account, or {@code null} when no fee is due
+   * @throws BankConflictException when a fee is due and the KRT account does not exist
+   */
+  @Nullable
+  @Transactional(propagation = Propagation.MANDATORY)
+  BankAccount lockHolderTransferFeeAccount(@NotNull BigDecimal fee) {
+    if (fee.signum() <= 0) {
+      return null;
+    }
+    UUID cartelId =
+        accountRepository
+            .findFirstByType(BankAccountType.CARTEL)
+            .map(BankAccount::getId)
+            .orElseThrow(() ->
+                new BankConflictException(
+                    BankConflictException.CODE_BANK_ACCOUNT_CLOSED,
+                    "The KRT (CARTEL) account that bears the Umbuchung fee does not exist"));
+    return writer.lockAccount(cartelId);
   }
 
   /**
@@ -516,9 +673,10 @@ public class BankLedgerService {
   @NotNull
   @Transactional
   public BankTransactionDto reverseTransaction(@NotNull UUID transactionId, @Nullable String note) {
+    final BankLinkedDecisions.Prepared linked = linkedDecisions.forTransaction(transactionId);
     final BankTransaction original =
         Entities.require(
-            transactionRepository.findById(transactionId), "Bank transaction not found");
+            transactionRepository.findByIdForUpdate(transactionId), "Bank transaction not found");
     if (original.getType() == BankTransactionType.WIPE_RESET
         || original.getType() == BankTransactionType.REVERSAL) {
       throw new BankConflictException(
@@ -540,7 +698,7 @@ public class BankLedgerService {
         accountLegs.stream()
             .map(BankCounterLeg::accountId)
             .distinct()
-            .sorted()
+            .sorted(ACCOUNT_ID_ORDER)
             .collect(
                 Collectors.toMap(id -> id, writer::lockAccount, (a, _) -> a, LinkedHashMap::new));
     lockedAccounts.values().forEach(guards::requireActive);
@@ -549,14 +707,13 @@ public class BankLedgerService {
       BigDecimal negated = leg.amount().negate();
       if (negated.signum() < 0) {
         BankAccount account = Objects.requireNonNull(lockedAccounts.get(leg.accountId()));
-        BigDecimal removal = negated.negate();
-        BigDecimal balance = postingRepository.accountBalance(leg.accountId());
-        if (balance.compareTo(removal) < 0) {
-          throw guards.accountOverdraft(account.getAccountNo(), balance);
-        }
+        guards.requireAccountCoverage(account, negated.negate());
       }
     }
 
+    if (linked != null) {
+      linkedDecisions.requireReversalAuthority();
+    }
     Instant now = Instant.now();
     BankTransaction reversal =
         writer.persistTransaction(
@@ -580,6 +737,9 @@ public class BankLedgerService {
         reversal.getId(),
         null,
         "reversed " + original.getType() + " " + shortId(original.getId()));
+    if (linked != null) {
+      linked.complete(new BankLinkedOutcome.Reversed(original.getId(), reversal.getId()));
+    }
     return toDto(reversal);
   }
 
@@ -675,7 +835,7 @@ public class BankLedgerService {
    * @throws NotFoundException when the named registered counterparty user does not exist
    */
   @Nullable
-  private CounterpartySnapshot resolveCounterparty(
+  CounterpartySnapshot resolveCounterparty(
       @Nullable UUID userId, @Nullable String externalName, @Nullable UUID orgUnitId) {
     String external = StringNormalization.trimToNull(externalName);
     if (userId != null && external != null) {

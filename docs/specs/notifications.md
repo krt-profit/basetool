@@ -102,6 +102,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `BANK_PAYOUT_BOOKED` | `BANK_PAYOUT_RECEIVED` | V278 | `EVENT_RECIPIENT` (the member paid out to) | REQ-BANK-059 |
 | `BANK_HOLDER_TRANSFER_BOOKED` | `BANK_HOLDER_TRANSFER_RECEIVED` | V278 | `EVENT_RECIPIENT` (the receiving holder's member) | REQ-BANK-059 |
 | `BANK_ACCOUNT_DEBITED` | `BANK_ACCOUNT_DEBITED` | V278 | `ACCOUNT_RESPONSIBLE`; coded `debitCode` | REQ-BANK-059 |
+| `BANK_FUNDS_AUTHORISED` | `BANK_FUNDS_AUTHORISED` | V401 | `ACCOUNT_RESPONSIBLE`; direct no-ledger authorisation | REQ-BANK-059 |
 | `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | V278 | `ROLE` `BANK_MANAGEMENT`; replaces itself | REQ-BANK-060 |
 | `BANK_HOLDER_NOTICE_CLEARED` | none (no rule) | — | supersedes the holder's deactivated-with-balance notice | REQ-BANK-060 |
 | `ORG_LEADERSHIP_ROLE_MISMATCH` | `ORG_LEADERSHIP_ROLE_MISMATCH` | V279 | `ROLE` `ADMIN`; coded `seatCode`, `rankCode`, `mismatchCode`; replaces itself | REQ-ORG-029 |
@@ -1330,6 +1331,7 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
 | `BANK_ACCOUNT_RESPONSIBLE_ASSIGNED` | `/org-unit-bank/accounts/{id}` |
 | `BANK_GRANT_CHANGED` | `/bank/accounts/{id}` |
 | `BANK_ACCOUNT_DEBITED` | `/org-unit-bank` (the notice names the transaction, not the account) |
+| `BANK_FUNDS_AUTHORISED` | `/org-unit-bank` |
 | `BANK_HOLDER_DEACTIVATED_WITH_BALANCE` | `/bank/holders/{id}` |
 | `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | `/materialboerse?view=offers&scope=mine&selected={id}` |
 | `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | `/materialboerse?view=requests&scope=mine&selected={id}` |

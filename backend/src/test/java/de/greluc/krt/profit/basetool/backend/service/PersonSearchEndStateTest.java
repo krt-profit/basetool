@@ -94,6 +94,7 @@ class PersonSearchEndStateTest {
     VALID.put("bank_account.status", "ACTIVE");
     VALID.put("bank_transaction.type", "DEPOSIT");
     VALID.put("bank_booking_request.type", "DEPOSIT");
+    VALID.put("bank_booking_request.account_id", UUID.randomUUID());
     VALID.put("bank_booking_request.status", "PENDING");
     VALID.put("bank_booking_request.amount", 1);
     VALID.put("bank_audit_event.event_type", "ACCOUNT_CREATED");

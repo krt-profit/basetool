@@ -144,6 +144,7 @@ class NotificationTargetsTest {
         target("BANK_ACCOUNT_RESPONSIBLE_ASSIGNED", "BANK_ACCOUNT"));
     assertEquals("/bank/accounts/" + ID, target("BANK_GRANT_CHANGED", "BANK_ACCOUNT_GRANT"));
     assertEquals("/org-unit-bank", target("BANK_ACCOUNT_DEBITED", "BANK_TRANSACTION"));
+    assertEquals("/org-unit-bank", target("BANK_FUNDS_AUTHORISED", "BANK_AUTHORISATION"));
     assertEquals(
         "/bank/holders/" + ID, target("BANK_HOLDER_DEACTIVATED_WITH_BALANCE", "BANK_HOLDER"));
   }

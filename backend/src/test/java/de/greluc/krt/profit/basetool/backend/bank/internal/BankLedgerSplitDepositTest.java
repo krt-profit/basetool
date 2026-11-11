@@ -107,7 +107,8 @@ class BankLedgerSplitDepositTest {
             userRepository,
             orgUnitMembershipQueryService,
             writer,
-            guards);
+            guards,
+            null);
   }
 
   /**

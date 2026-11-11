@@ -116,6 +116,7 @@ public class AdminAuditLogPageController {
                   "MANAGEMENT_REPORT_EXPORTED",
                   "BOOKING_REQUEST_CREATED",
                   "BOOKING_REQUEST_CONFIRMED",
+                  "FUNDS_AUTHORISED",
                   "BOOKING_REQUEST_REJECTED",
                   "BOOKING_REQUEST_CANCELLED",
                   "BOOKING_REQUEST_UPDATED",

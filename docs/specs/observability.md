@@ -2108,7 +2108,9 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   sensitive audited area had **zero** volume signal; this counter is that signal — **counts only,
   never amounts, account numbers or holder identities** (REQ-OBS-006). It backs
   `BankAuditSilenceAnomaly` (the bank analogue of `AuditSilenceAnomaly`) and a bank-volume panel on
-  the operations dashboard.
+  the operations dashboard. `FUNDS_AUTHORISED` counts final debit-equivalent authorisations
+  through the same bounded event type. The existing request count and age gauges include linked
+  requests while they are pending.
 - `basetool_ratelimit_rejections_total{bucket,key_source}` counter at the `RateLimitingFilter` reject
   branch (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget), paired since
   #1041 item 19 with `basetool_ratelimit_requests_total{bucket}` bumped on **every** bucket
