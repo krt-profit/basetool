@@ -843,8 +843,9 @@ and [`frontend/AGENTS.md`](frontend/AGENTS.md). Highlights:
 
 - **Brand colour** `#E77E23` (orange). Logo only in this orange, white,
   or black.
-- **Surfaces** canvas `#0F0F0F`, panel `#282C30`, bar `#1A1D21`, control
-  `#373E43`, 4 px radius (dark-mode aesthetic).
+- **Surfaces** the website's Design 3.0: canvas `#0D0F12`, box `#1A1E24`, tile `#20252C`, bar
+  `#14171C`, control `#2F3640`; radii by role — boxes 10 px, tiles 8 px, controls 6 px, inner
+  elements 4 px (dark-mode aesthetic).
 - **Type** `Lato` only (Light 300 standard, Bold 700 emphasis). Headlines are
   Lato **Bold + uppercase only** with display letter-spacing (~0.05em) — there is
   no separate display face (Audiowide/Ethnocentric retired 2026-06).

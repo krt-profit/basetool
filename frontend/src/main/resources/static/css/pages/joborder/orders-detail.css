@@ -252,8 +252,9 @@
     }
     .od-assignee {
         padding: 0.6rem 0.9rem;
-        background: var(--color-surface-input);
+        background: var(--surface-card);
         border: var(--border-hairline);
+        border-radius: var(--radius-tile);
     }
     .od-assignee__name {
         color: var(--color-white);
@@ -303,8 +304,9 @@
         gap: var(--space-3);
         align-items: end;
         padding: var(--space-3);
-        background: var(--color-surface-input);
+        background: var(--surface-card);
         border: var(--border-hairline);
+        border-radius: var(--radius-tile);
     }
     .od-line + .od-line {
         margin-top: var(--space-3);

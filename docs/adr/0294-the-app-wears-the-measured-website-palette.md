@@ -1,6 +1,6 @@
 # ADR-0294 — The app wears the measured website palette
 
-- **Status:** Accepted
+- **Status:** Accepted — the colour values are superseded by [ADR-0371](0371-the-basetool-follows-the-websites-design-3-0.md)
 - **Date:** 2026-10-19
 - **Deciders:** @greluc
 - **Related:** spec [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-002) ·

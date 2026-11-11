@@ -335,6 +335,11 @@ Two binding rules shape every UI change:
   page-level `z-index` is a step of the ascending `--z-*` scale beside it; every `var()` must name a
   declared property (REQ-UI-001, ADR-0243, `ColourTokenCopyTest`, `ZIndexScaleTest`,
   `CustomPropertyExistenceTest`).
+- **Surfaces and radii follow the website's Design 3.0** (2026-11-11). A box, a lighter tile
+  inside it and a sunken third level, each with the `#2A3038` frame; zebra and row hover follow the
+  surface a table sits on; boxes, tiles, controls and inner elements take 10, 8, 6 and 4 px. Where
+  the website would fail WCAG, the app departs from it: controls keep their 3:1 border and
+  department tags stay filled (REQ-UI-003, REQ-UI-007, ADR-0371).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

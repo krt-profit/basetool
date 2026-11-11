@@ -4,7 +4,7 @@ The DAS KARTELL design system and how its submodule gets into a worktree.
 
 The UI is a **binding requirement**: follow the DAS KARTELL design system. The rules —
 brand colours, Lato-only typography (headlines = Lato Bold + uppercase), the authoritative department colours, the
-sci-fi HUD style with a 4 px radius and the website palette, "no native browser dialogs", and the four responsive device
+sci-fi HUD style with the website's Design 3.0 surfaces and radii by role, "no native browser dialogs", and the four responsive device
 classes — live in [`docs/specs/ui-design-system.md`](../specs/ui-design-system.md). The
 visual source of truth is the design skill at
 [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
