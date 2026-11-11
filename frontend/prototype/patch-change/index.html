@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE – Patchwechsel</title>
+<link rel="stylesheet" href="../../../.claude/skills/das-kartell-design/tokens.css">
+<link rel="stylesheet" href="../../../.claude/skills/das-kartell-design/colors_and_type.css">
+<link rel="stylesheet" href="../../../.claude/skills/das-kartell-design/krt-components.css">
+<style>
+  body { background: var(--color-bg-black, #0F0F0F); color: var(--color-gray-1); margin: 0; padding: 24px 24px 110px; font-family: var(--font-body, Lato, sans-serif); }
+  .proto-note { font-size: .75rem; color: var(--color-gray-2-text); margin-bottom: 16px; border-left: 3px solid var(--color-primary); padding: 6px 10px; background: #1A1D21; }
+  .proto-note strong { color: var(--color-white); }
+  .screens { display: flex; gap: 0; margin-bottom: 20px; }
+  h1 { font-size: 1.3rem; text-transform: uppercase; margin: 0 0 4px; }
+  h2 { text-transform: uppercase; font-size: .8rem; letter-spacing: .1em; color: var(--color-gray-2-text); margin: 22px 0 10px; }
+  h3 { text-transform: uppercase; font-size: .85rem; letter-spacing: .06em; color: var(--color-white); margin: 0 0 10px; }
+  .muted { color: var(--color-gray-2-text); font-size: .8rem; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr); gap: 16px; align-items: start; }
+  .grid3 { display: grid; grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .field { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
+  .field label { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--color-gray-2-text); }
+  .field input, .field select { background: var(--control-bg); border: 1px solid var(--control-border); color: var(--color-white); padding: 8px 10px; font: inherit; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  th { text-align: left; background: #1A1D21; color: var(--color-gray-2-text); text-transform: uppercase; font-size: .66rem; letter-spacing: .08em; padding: 8px 10px; }
+  td { padding: 8px 10px; border-top: 1px solid #36373B; vertical-align: middle; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.off td { color: var(--color-gray-2-text); }
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+  .kpi { background: #1A1D21; border: 1px solid #36373B; padding: 8px 10px; border-radius: 4px; }
+  .kpi b { display: block; font-size: 1.15rem; color: var(--color-white); font-variant-numeric: tabular-nums; }
+  .kpi span { font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: var(--color-gray-2-text); }
+  .steps { display: flex; gap: 0; margin-bottom: 14px; }
+  .step { flex: 1; padding: 8px 10px; border-bottom: 3px solid #36373B; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--color-gray-2-text); }
+  .step.done { border-bottom-color: var(--color-gray-2); color: var(--color-gray-1); }
+  .step.current { border-bottom-color: var(--color-primary); color: var(--color-white); font-weight: 700; }
+  .wizard { max-width: 760px; }
+  .loc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+  .loc-card { all: unset; box-sizing: border-box; cursor: pointer; padding: 12px; border: 1px solid var(--control-border); background: var(--control-bg); border-radius: 4px; }
+  .loc-card b { display: block; color: var(--color-white); text-transform: uppercase; font-size: .85rem; }
+  .loc-card span { font-size: .72rem; color: var(--color-gray-2-text); }
+  .loc-card.sel { border-color: var(--color-primary); background: rgba(231,126,35,.10); box-shadow: inset 0 -3px 0 0 var(--color-primary); }
+  .gate { max-width: 860px; margin: 0 auto; }
+  .backdrop { position: relative; min-height: 520px; border: 1px dashed #36373B; padding: 16px; }
+  .backdrop .fake { opacity: .25; filter: blur(1px); }
+  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; }
+  .krt-modal.static { position: relative; max-width: 520px; }
+  .arrow { display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: var(--color-primary); padding-top: 40px; }
+  .pick-list { display: flex; flex-direction: column; gap: 6px; }
+  .pick { all: unset; cursor: pointer; display: flex; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--control-border); background: var(--control-bg); border-radius: 4px; }
+  .pick.sel { border-color: var(--color-primary); background: rgba(231,126,35,.10); color: var(--color-white); font-weight: 700; }
+  .sticky { position: sticky; top: 16px; }
+  .confirm { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+  .confirm input { background: var(--control-bg); border: 1px solid var(--control-border); color: var(--color-white); padding: 8px 10px; font: inherit; border-radius: 4px; }
+  .footbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #36373B; }
+  .exc { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .state-dump { margin-top: 28px; font: .7rem/1.4 var(--font-mono, monospace); color: var(--color-gray-2-text); background: #1A1D21; padding: 8px 10px; white-space: pre-wrap; border-left: 3px solid #36373B; }
+  .switcher { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #fff; color: #141414; border-radius: 999px; display: flex; align-items: center; gap: 12px; padding: 6px 10px; font: 700 .8rem Lato, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,.6); z-index: 10; }
+  .switcher button { border: 0; background: #141414; color: #fff; border-radius: 999px; width: 28px; height: 28px; cursor: pointer; font-weight: 700; }
+  .disabled-action { opacity: .45; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="proto-note"><strong>PROTOTYPE, wegwerfen.</strong> Frage: Wie sehen der Patchwechsel-Dialog des Admins und die Home-Location-Abfrage beim Login aus? Drei Varianten über <code>?variant=A|B|C</code>, die Pfeiltasten oder die Leiste unten; Flächen über die Reiter. „Weitere Flächen" (Historie, Umzug ausstehend, Profil) ist in allen Varianten gleich. Daten sind erfunden, nichts wird gespeichert.</div>
+<div id="root"></div>
+<div class="state-dump" id="state"></div>
+<div class="switcher"><button type="button" data-action="prev" aria-label="Vorige Variante">&#8592;</button><span id="variant-label"></span><button type="button" data-action="next" aria-label="Nächste Variante">&#8594;</button></div>
+<script>
+const VARIANTS = { A: 'Assistent', B: 'Eine Seite + Live-Vorschau', C: 'Wirkungsmatrix' };
+const SCREENS = { admin: 'Admin: Patchwechsel', member: 'Mitglied: Abfrage beim Login', more: 'Weitere Flächen' };
+const GROUPS = [
+  { key: 'consumables', name: 'Verbrauchsgüter', types: 'Essen, Trinken, Medpens, FPS-Verbrauchsgüter, Magazine, Munition', rows: 1284, members: 63, rebuild: true, wipe: true },
+  { key: 'fps', name: 'FPS-Ausrüstung', types: 'Rüstung, Waffen, Kleidung, übrige Anbauteile', rows: 2110, members: 71, rebuild: false, wipe: true },
+  { key: 'components', name: 'Schiffskomponenten & Fahrzeugwaffen', types: 'Fahrzeugteile, Fahrzeugwaffen', rows: 640, members: 44, rebuild: false, wipe: true },
+  { key: 'raw', name: 'Materialien: roh', types: 'Rohstoffe, Erze, Gase', rows: 410, members: 39, rebuild: false, wipe: true, material: true },
+  { key: 'refined', name: 'Materialien: raffiniert', types: 'Raffinierte Materialien', rows: 980, members: 52, rebuild: false, wipe: true, material: true },
+  { key: 'norefine', name: 'Materialien: nicht raffinierbar', types: 'Nicht raffinierbare Materialien', rows: 120, members: 18, rebuild: false, wipe: true, material: true },
+  { key: 'other', name: 'Sonstige Items', types: 'alles ohne Gruppe (z. B. neue Typen)', rows: 75, members: 22, rebuild: false, wipe: true },
+  { key: 'ships', name: 'Ingame gekaufte Schiffe', types: 'nur Herkunft „Ingame gekauft"', rows: 38, members: 21, rebuild: false, wipe: true, ships: true }
+];
+const HOMES = ['Lorville', 'Area18', 'New Babbage', 'Orison', 'Levski'];
+const MEMBER_PREVIEW = [
+  { loc: 'Port Tressler', rows: 12, pool: 4, unit: 'Staffel Sub-Radar', ships: 1 },
+  { loc: 'Area18', rows: 5, pool: 0, unit: '', ships: 0 },
+  { loc: 'Everus Harbor', rows: 3, pool: 1, unit: 'Staffel Profit', ships: 2 },
+  { loc: 'ohne Ort', rows: 0, pool: 0, unit: '', ships: 1 },
+  { loc: 'Lorville', rows: 7, pool: 0, unit: '', ships: 0, alreadyHome: true }
+];
+const params = new URLSearchParams(location.search);
+const state = {
+  variant: VARIANTS[params.get('variant')] ? params.get('variant') : 'A',
+  screen: SCREENS[params.get('screen')] ? params.get('screen') : 'admin',
+  kind: 'REBUILD', label: '4.4', live: '2026-11-14T20:00', step: 1,
+  groups: Object.fromEntries(GROUPS.map(g => [g.key, g.rebuild])),
+  refinery: true, currency: false, home: true,
+  exceptions: [{ name: 'Quantanium', mode: 'behalten' }],
+  confirm: '', triggered: false, choice: null, relocated: false
+};
+function applyKind(kind) {
+  state.kind = kind;
+  GROUPS.forEach(g => { state.groups[g.key] = kind === 'REBUILD' ? g.rebuild : g.wipe; });
+  state.refinery = true; state.currency = false; state.home = true;
+}
+function totals() {
+  const active = GROUPS.filter(g => state.groups[g.key]);
+  const rows = active.filter(g => !g.ships).reduce((s, g) => s + g.rows, 0);
+  const ships = active.filter(g => g.ships).reduce((s, g) => s + g.rows, 0);
+  const members = active.length ? Math.max(...active.map(g => g.members)) : 0;
+  const anyStock = active.some(g => !g.ships);
+  return { rows, ships, members, orders: anyStock ? 6 : 0, offers: anyStock ? 11 : 0, donations: anyStock ? 3 : 0, refinery: state.refinery ? 24 : 0, asked: state.home ? 87 : 0 };
+}
+const fmt = n => n.toLocaleString('de-DE');
+const sw = (key, checked, text) => `<label class="krt-switch"><input type="checkbox" role="switch" data-toggle="${key}" ${checked ? 'checked' : ''}> ${text}</label>`;
+function kindControl() {
+  return `<div class="krt-segmented" role="radiogroup">${['REBUILD', 'FULL_WIPE'].map(k => `<button type="button" class="krt-segmented__item" role="radio" aria-checked="${state.kind === k}" data-kind="${k}">${k === 'REBUILD' ? 'LTP-Rebuild' : 'Full Wipe'}</button>`).join('')}</div>`;
+}
+function headFields() {
+  return `<div class="row"><div class="field"><label>Patch-Art</label>${kindControl()}</div>
+    <div class="field"><label>Patch-Bezeichnung</label><input data-input="label" value="${state.label}"></div>
+    <div class="field"><label>Live-Zeit (Stichtag)</label><input type="datetime-local" data-input="live" value="${state.live}"></div></div>
+    <p class="muted">Vorbelegt aus dem letzten P4K-Import. Die Live-Zeit entscheidet, was betroffen ist: nur was vor ihr angelegt wurde. Nach dem Auslösen ist sie fest.</p>`;
+}
+function groupTable(withCounts, withPresets) {
+  return `<table><thead><tr><th>Wipe-Gruppe</th><th>Enthält</th>${withPresets ? '<th>Rebuild</th><th>Full Wipe</th>' : ''}<th>Aktiv</th>${withCounts ? '<th class="num">Posten</th><th class="num">Mitglieder</th>' : ''}</tr></thead><tbody>
+    ${GROUPS.map(g => `<tr class="${state.groups[g.key] ? '' : 'off'}"><td><b>${g.name}</b></td><td class="muted">${g.types}</td>${withPresets ? `<td>${g.rebuild ? '<span class="chip chip--primary">an</span>' : '<span class="chip chip--muted">aus</span>'}</td><td>${g.wipe ? '<span class="chip chip--primary">an</span>' : '<span class="chip chip--muted">aus</span>'}</td>` : ''}<td>${sw('g:' + g.key, state.groups[g.key], '')}</td>${withCounts ? `<td class="num">${state.groups[g.key] ? fmt(g.rows) + (g.ships ? ' Schiffe' : '') : '–'}</td><td class="num">${state.groups[g.key] ? g.members : '–'}</td>` : ''}</tr>`).join('')}
+  </tbody></table>`;
+}
+function exceptions() {
+  return `<div class="field" style="margin-top:12px"><label>Ausnahmen (einzelne Items / Materialien)</label>
+    <div class="exc">${state.exceptions.map((e, i) => `<span class="filter-chip">${e.name}: ${e.mode}<button type="button" class="filter-chip__remove" data-remove-exc="${i}" aria-label="Entfernen">&#215;</button></span>`).join('')}
+    <button type="button" class="btn btn-ghost" data-action="add-exc">+ Ausnahme</button></div></div>`;
+}
+function options() {
+  return `<div class="row" style="flex-direction:column;align-items:flex-start;gap:0">
+    ${sw('refinery', state.refinery, 'Laufende Raffinerieaufträge beenden (vor der Live-Zeit begonnen)')}
+    ${sw('currency', state.currency, 'Währungs-Wipe: Bank-Reset und aUEC-Aufträge')}
+    ${sw('home', state.home, 'Home-Location-Abfrage beim nächsten Login')}</div>
+    ${state.home ? `<p class="muted">Wählbare Home Locations: ${HOMES.join(', ')}. <a href="#" class="muted">Liste pflegen</a></p>` : ''}`;
+}
+function kpis() {
+  const t = totals();
+  return `<div class="kpis">
+    <div class="kpi"><b>${fmt(t.rows)}</b><span>Lagerposten gelöscht</span></div>
+    <div class="kpi"><b>${fmt(t.ships)}</b><span>Ingame-Schiffe gelöscht</span></div>
+    <div class="kpi"><b>${t.members}</b><span>Mitglieder betroffen</span></div>
+    <div class="kpi"><b>${t.refinery}</b><span>Raffinerieaufträge storniert</span></div>
+    <div class="kpi"><b>${t.orders} / ${t.offers} / ${t.donations}</b><span>Aufträge / Angebote / Spenden</span></div>
+    <div class="kpi"><b>${t.asked}</b><span>Mitglieder werden gefragt</span></div>
+  </div>${state.currency ? '<div class="alert alert-danger" style="margin-top:8px">Währungs-Wipe setzt alle Kartellbank-Salden auf 0.</div>' : ''}`;
+}
+function confirmBlock() {
+  const ok = state.confirm === state.label;
+  return `<div class="confirm"><label class="muted">Zum Bestätigen die Patch-Bezeichnung <b>${state.label}</b> eintippen</label>
+    <input data-input="confirm" value="${state.confirm}" placeholder="${state.label}" autocomplete="off">
+    <button type="button" class="btn btn-danger" data-action="trigger" ${ok ? '' : 'disabled'}>Patchwechsel ${state.label} auslösen</button></div>
+    ${state.triggered ? `<div class="alert alert-success" style="margin-top:8px">Patchwechsel ${state.label} ausgelöst (Prototyp, nichts gespeichert).</div>` : ''}`;
+}
+function adminA() {
+  const titles = ['Patch', 'Wipe', 'Optionen', 'Prüfen & auslösen'];
+  const steps = `<div class="steps">${titles.map((t, i) => `<div class="step ${i + 1 === state.step ? 'current' : i + 1 < state.step ? 'done' : ''}">${i + 1}. ${t}</div>`).join('')}</div>`;
+  let body = '';
+  if (state.step === 1) body = headFields();
+  if (state.step === 2) body = groupTable(false, false) + exceptions();
+  if (state.step === 3) body = options();
+  if (state.step === 4) body = `<h3>Patch ${state.label} · ${state.kind === 'REBUILD' ? 'LTP-Rebuild' : 'Full Wipe'} · live ${state.live.replace('T', ' ')}</h3>${kpis()}${confirmBlock()}`;
+  return `<div class="krt-modal krt-modal--danger krt-modal--wide static wizard" style="max-width:760px"><div class="krt-modal-head"><h3 style="margin:0">Patchwechsel erfassen</h3></div>
+    <div class="krt-modal-body">${steps}${body}</div>
+    <div class="krt-modal-foot"><button type="button" class="btn btn-ghost" data-action="back" ${state.step === 1 ? 'disabled' : ''}>Zurück</button>${state.step < 4 ? '<button type="button" class="btn btn--cta" data-action="fwd">Weiter</button>' : ''}</div></div>`;
+}
+function adminB() {
+  return `<div class="grid2"><div class="hud-box"><h3>Patchwechsel erfassen</h3>${headFields()}<h2>Wipe</h2>${groupTable(true, false)}${exceptions()}<h2>Weitere Wirkungen</h2>${options()}</div>
+    <div class="hud-box sticky"><h3>Vorschau</h3><p class="muted">Aktualisiert sich bei jeder Änderung links.</p>${kpis()}${confirmBlock()}</div></div>`;
+}
+function adminC() {
+  const t = totals();
+  const effects = [
+    ...GROUPS.map(g => ({ name: 'Wipe: ' + g.name, key: 'g:' + g.key, rebuild: g.rebuild, wipe: g.wipe, on: state.groups[g.key], hit: state.groups[g.key] ? fmt(g.rows) + (g.ships ? ' Schiffe' : ' Posten') : '–' })),
+    { name: 'Raffinerieaufträge beenden', key: 'refinery', rebuild: true, wipe: true, on: state.refinery, hit: state.refinery ? '24 Aufträge' : '–' },
+    { name: 'Währungs-Wipe (Bank, aUEC)', key: 'currency', rebuild: false, wipe: false, on: state.currency, hit: state.currency ? 'alle Salden' : '–' },
+    { name: 'Home-Location-Abfrage', key: 'home', rebuild: true, wipe: true, on: state.home, hit: state.home ? '87 Mitglieder' : '–' }
+  ];
+  return `<div class="card card--accent"><div class="card-head"><h3 class="card-title">Patchwechsel</h3>${headFields()}</div>
+    <table><thead><tr><th>Wirkung</th><th>Vorgabe Rebuild</th><th>Vorgabe Full Wipe</th><th>Aktiv</th><th class="num">Betroffen</th></tr></thead><tbody>
+    ${effects.map(e => `<tr class="${e.on ? '' : 'off'}"><td><b>${e.name}</b></td><td>${e.rebuild ? 'an' : 'aus'}</td><td>${e.key === 'currency' ? 'vorgeschlagen' : e.wipe ? 'an' : 'aus'}</td><td>${sw(e.key, e.on, '')}</td><td class="num">${e.hit}</td></tr>`).join('')}
+    </tbody></table>${exceptions()}
+    <div class="footbar"><span class="muted">${fmt(t.rows)} Posten · ${t.ships} Schiffe · ${t.members} Mitglieder · Aufträge/Angebote/Spenden ${t.orders}/${t.offers}/${t.donations}</span><div style="min-width:280px">${confirmBlock()}</div></div></div>`;
+}
+function memberTable() {
+  return `<table><thead><tr><th>Jetziger Ort</th><th class="num">Posten</th><th>davon für Einheiten</th><th class="num">Schiffe</th></tr></thead><tbody>
+    ${MEMBER_PREVIEW.map(p => `<tr class="${p.alreadyHome && state.choice === p.loc ? 'off' : ''}"><td>${p.loc}${p.alreadyHome && state.choice === p.loc ? ' <span class="chip chip--muted">bleibt</span>' : ''}</td><td class="num">${p.rows}</td><td>${p.pool ? p.pool + ' für ' + p.unit : '–'}</td><td class="num">${p.ships}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+function confirmMember() {
+  return state.relocated
+    ? `<div class="alert alert-success">Umgezogen nach ${state.choice}. Weiter zum Basetool.</div>`
+    : `<button type="button" class="btn btn--cta" data-action="relocate" ${state.choice ? '' : 'disabled'}>${state.choice ? 'Nach ' + state.choice + ' umziehen' : 'Home Location wählen'}</button>
+       <p class="muted">Die Wahl ist endgültig. Es zieht alles um, was vor der Live-Zeit angelegt wurde. Bis dahin sind diese Posten für andere gesperrt.</p>`;
+}
+function memberA() {
+  return `<div class="gate"><div class="greeting"><h1>Patch ${state.label}: Neue Home Location</h1><p>Star Citizen hat mit Patch ${state.label} alles an eine neue Residenz geliefert. Wähle sie, damit dein Lager und deine Schiffe mitziehen.</p></div>
+    <div class="hud-box"><h3>1. Home Location wählen</h3><div class="loc-cards">${HOMES.map(h => `<button type="button" class="loc-card ${state.choice === h ? 'sel' : ''}" data-choose="${h}"><b>${h}</b><span>${h === 'Levski' ? 'Nyx' : 'Stanton'}</span></button>`).join('')}</div>
+    <h3 style="margin-top:16px">2. Was umzieht</h3>${memberTable()}<div style="margin-top:14px">${confirmMember()}</div></div></div>`;
+}
+function memberB() {
+  const total = MEMBER_PREVIEW.filter(p => !(p.alreadyHome && state.choice === p.loc));
+  return `<div class="backdrop"><div class="fake"><h1>Dashboard</h1><div class="grid-auto-cards"><div class="card">Nächste Mission</div><div class="card">Mein Lager</div><div class="card">Hangar-Bereitschaft</div></div></div>
+    <div class="overlay"><div class="krt-modal static"><div class="krt-modal-head"><h3 style="margin:0">Patch ${state.label}: Home Location</h3></div>
+    <div class="krt-modal-body"><div class="field"><label>Neue Home Location</label><select data-select-home><option value="">– wählen –</option>${HOMES.map(h => `<option ${state.choice === h ? 'selected' : ''}>${h}</option>`).join('')}</select></div>
+    <p class="muted" style="margin-top:10px">Zieht um: <b>${total.reduce((s, p) => s + p.rows, 0)} Posten</b> (davon ${total.reduce((s, p) => s + p.pool, 0)} für Einheiten) und <b>${total.reduce((s, p) => s + p.ships, 0)} Schiffe</b> aus ${total.filter(p => p.rows || p.ships).length} Orten. <a href="#" class="muted">Details</a></p></div>
+    <div class="krt-modal-foot" style="flex-direction:column;align-items:stretch">${confirmMember()}</div></div></div></div>`;
+}
+function memberC() {
+  return `<h1>Patch ${state.label}: Umzug</h1><p class="muted">Links, was du vor der Live-Zeit wo hattest. Rechts, wohin es zieht.</p>
+    <div class="grid3"><div class="hud-box"><h3>Von</h3><div class="pick-list">${MEMBER_PREVIEW.map(p => `<div class="pick ${p.alreadyHome && state.choice === p.loc ? 'disabled-action' : ''}"><span>${p.loc}</span><span class="muted">${p.rows} Posten${p.pool ? ' (' + p.pool + ' ' + p.unit + ')' : ''} · ${p.ships} Schiffe</span></div>`).join('')}</div></div>
+    <div class="arrow">&#10148;</div>
+    <div class="hud-box"><h3>Nach</h3><div class="pick-list">${HOMES.map(h => `<button type="button" class="pick ${state.choice === h ? 'sel' : ''}" data-choose="${h}"><span>${h}</span><span class="muted">${h === 'Levski' ? 'Nyx' : 'Stanton'}</span></button>`).join('')}</div><div style="margin-top:14px">${confirmMember()}</div></div></div>`;
+}
+function more() {
+  return `<h2>Admin: Historie der Patchwechsel</h2><div class="card card--flush"><table><thead><tr><th>Patch</th><th>Art</th><th>Live-Zeit</th><th>Ausgelöst</th><th>Wirkungen</th><th>Abfrage</th><th></th></tr></thead><tbody>
+    <tr><td><span class="data-value">4.4</span></td><td>LTP-Rebuild</td><td>14.11.2026 20:00</td><td>Admin · 14.11.2026 21:12</td><td class="muted">1.284 Posten, 24 Aufträge</td><td><span class="chip chip--warning">offen · 41 / 87 umgezogen</span></td><td><button type="button" class="btn btn-ghost">Bezeichnung korrigieren</button> <button type="button" class="btn btn-quiet-danger">Abfrage beenden</button></td></tr>
+    <tr><td><span class="data-value">4.3</span></td><td>Full Wipe</td><td>02.08.2026 18:00</td><td>Admin · 02.08.2026 18:40</td><td class="muted">6.020 Posten, 52 Schiffe, Bank-Reset</td><td><span class="chip chip--muted">abgelöst</span></td><td></td></tr>
+    </tbody></table></div>
+    <h2>Logistiker-Sicht: Pool-Bestand eines noch nicht umgezogenen Halters</h2><div class="card card--flush"><table><thead><tr><th>Material</th><th>Halter</th><th>Ort</th><th class="num">Menge</th><th></th></tr></thead><tbody>
+    <tr><td>Laranite (q 612)</td><td>Mitglied A <span class="chip chip--warning">Umzug ausstehend</span></td><td>Port Tressler</td><td class="num">32 SCU</td><td><button type="button" class="btn btn-ghost disabled-action" disabled title="Gesperrt bis Mitglied A nach Patch 4.4 umgezogen ist">Ausbuchen</button></td></tr>
+    <tr><td>Laranite (q 590)</td><td>Mitglied A</td><td>Area18</td><td class="num">8 SCU</td><td><button type="button" class="btn btn-ghost">Ausbuchen</button> <span class="muted">nach der Live-Zeit angelegt, nicht gesperrt</span></td></tr>
+    </tbody></table></div>
+    <h2>Profil: Meine Home Location</h2><div class="hud-box" style="max-width:480px"><div class="field"><label>Meine Home Location</label><select>${HOMES.map(h => `<option ${h === 'Lorville' ? 'selected' : ''}>${h}</option>`).join('')}</select></div><p class="muted">Füllt den Lagerort beim Einbuchen, beim Einlagern aus der Raffinerie und beim Anlegen eines Schiffs vor. Verschiebt nichts.</p><button type="button" class="btn btn--cta">Speichern</button></div>`;
+}
+function render() {
+  const tabs = `<nav class="krt-segmented screens" role="radiogroup">${Object.entries(SCREENS).map(([k, v]) => `<button type="button" class="krt-segmented__item" role="radio" aria-checked="${state.screen === k}" data-screen="${k}">${v}</button>`).join('')}</nav>`;
+  const v = state.variant;
+  let body;
+  if (state.screen === 'admin') body = v === 'A' ? adminA() : v === 'B' ? adminB() : adminC();
+  else if (state.screen === 'member') body = v === 'A' ? memberA() : v === 'B' ? memberB() : memberC();
+  else body = more();
+  document.getElementById('root').innerHTML = tabs + body;
+  document.getElementById('variant-label').textContent = `${v} (${VARIANTS[v]})`;
+  document.getElementById('state').textContent = JSON.stringify({ variant: v, screen: state.screen, kind: state.kind, label: state.label, live: state.live, groups: state.groups, refinery: state.refinery, currency: state.currency, home: state.home, exceptions: state.exceptions, totals: totals(), memberChoice: state.choice, relocated: state.relocated }, null, 1);
+}
+function syncUrl() {
+  const p = new URLSearchParams({ variant: state.variant, screen: state.screen });
+  history.replaceState(null, '', '?' + p.toString());
+}
+function cycle(delta) {
+  const keys = Object.keys(VARIANTS);
+  state.variant = keys[(keys.indexOf(state.variant) + delta + keys.length) % keys.length];
+  syncUrl(); render();
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-action],[data-kind],[data-screen],[data-choose],[data-remove-exc]');
+  if (!t) return;
+  if (t.dataset.screen) { state.screen = t.dataset.screen; syncUrl(); }
+  if (t.dataset.kind) applyKind(t.dataset.kind);
+  if (t.dataset.choose) state.choice = t.dataset.choose;
+  if (t.dataset.removeExc) state.exceptions.splice(Number(t.dataset.removeExc), 1);
+  const a = t.dataset.action;
+  if (a === 'prev') return cycle(-1);
+  if (a === 'next') return cycle(1);
+  if (a === 'fwd') state.step = Math.min(4, state.step + 1);
+  if (a === 'back') state.step = Math.max(1, state.step - 1);
+  if (a === 'add-exc') state.exceptions.push({ name: 'Medpen (CureLife)', mode: 'zusätzlich löschen' });
+  if (a === 'trigger') state.triggered = true;
+  if (a === 'relocate') state.relocated = true;
+  render();
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.toggle) {
+    const k = t.dataset.toggle;
+    if (k.startsWith('g:')) state.groups[k.slice(2)] = t.checked; else state[k] = t.checked;
+    render();
+  }
+  if (t.hasAttribute('data-select-home')) { state.choice = t.value || null; render(); }
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.input) {
+    state[t.dataset.input] = t.value;
+    if (t.dataset.input === 'confirm') {
+      const btn = document.querySelector('[data-action="trigger"]');
+      if (btn) btn.disabled = state.confirm !== state.label;
+    }
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (e.key === 'ArrowLeft') cycle(-1);
+  if (e.key === 'ArrowRight') cycle(1);
+});
+render();
+</script>
+</body>
+</html>
