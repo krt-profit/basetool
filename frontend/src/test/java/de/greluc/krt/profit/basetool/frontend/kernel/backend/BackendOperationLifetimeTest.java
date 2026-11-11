@@ -267,9 +267,9 @@ class BackendOperationLifetimeTest {
               return Mono.just(
                   ClientResponse.create(HttpStatus.OK)
                       .body(
-                          Flux.range(0, 100)
-                              .<DataBuffer>map(_ ->
+                          Flux.<DataBuffer>just(
                                   DefaultDataBufferFactory.sharedInstance.wrap(new byte[16 * 1024]))
+                              .concatWith(Flux.never())
                               .doOnCancel(cancellations::incrementAndGet))
                       .build());
             })
