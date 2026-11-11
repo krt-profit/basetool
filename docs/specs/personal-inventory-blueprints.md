@@ -6,11 +6,12 @@
 ## Context & goal
 
 The personal blueprint collection (`/personal-inventory/blueprints`) uses the **master-detail
-layout (V3)** approved in the design system. Binding visual sources: the V3 block of
-`.claude/skills/das-kartell-design/proposals/blueprints-page-varianten.html` and the canonised
-components in `krt-components.css` (`.master-detail`, `.master-list`, `.master-row(.is-active)`,
-`.detail-pane`, `.quality-block`/`.quality-row`/`.quality-affects`, `.empty-state`, `.tab-nav`,
-`.krt-modal*`).
+layout (V3)** approved in the design system. Binding sources: this spec and the canonised
+components in the design-system submodule's `krt-components.css` (`.master-detail`, `.master-list`,
+`.master-row(.is-active)`, `.detail-pane`, `.quality-block`/`.quality-row`/`.quality-affects`,
+`.empty-state`, `.tab-nav`, `.krt-modal*`), shown on the specimens `components/MasterDetail/`,
+`components/TabNav/` and `components/Modal/` (`preview.html` each) under
+`.claude/skills/das-kartell-design/`.
 
 The rebuild is a pure presentation restructure: every endpoint, form, and behaviour of the
 previous table layout is preserved.

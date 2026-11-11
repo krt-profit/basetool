@@ -486,8 +486,8 @@ is idempotent (a second click on an all-zero bank is a no-op with a notice).
 - [x] After the reset every account balance and every holder **global** balance is zero;
   pre-wipe statements still render correctly.
 - [x] The button sits in the admin area, is admin-only, and uses the danger-modal
-  pattern with type-to-confirm (`btn-danger` + danger `.krt-modal` + `.confirm-input`),
-  matching the A1 mockup (`proposals/bank-admin-varianten.html`).
+  pattern with type-to-confirm (`btn-danger` + danger `.krt-modal` + `.confirm-input`) of the
+  design system's bank patterns (specimen `components/BankPatterns/preview.html`).
 - [x] The audit log contains the summary event (actor, account count, total zeroed).
 
 **Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/web/BankAdminController` · **Issues:** #556
@@ -595,12 +595,11 @@ sets remain bounded by their chunk or viewport sizes.
 > `.krt-switch` toggles instead of checkboxes; their state, storage and `layout` / `group` swap are
 > unchanged.
 
-The bank landing page (`/bank`) is a **dashboard** in the design system's **D1 card
-grid** layout (`proposals/bank-dashboard-varianten.html`): one `.kpi-card` per visible
-account showing the current balance and the **net change over the last 30 days**
-(sign-colored `.kpi-delta--pos/--neg`), plus a compact 30-day trend visualization
-(server-computed inline SVG sparkline — no charting library exists or is introduced;
-visual spec: `preview/components-kpi-sparkline.html`). Cards link to the account
+The bank landing page (`/bank`) is a **dashboard** in the design system's **card grid**
+layout: one `.kpi-card` per visible account showing the current balance and the **net change
+over the last 30 days** (sign-colored `.kpi-delta--pos/--neg`), plus a compact 30-day trend
+visualization (server-computed inline SVG sparkline — no charting library exists or is
+introduced; visual spec: `components/KpiCard/preview.html`). Cards link to the account
 detail; closed accounts render dimmed (`.kpi-card--closed`). Cards are ordered
 alphabetically (case-insensitive) by account name in both perspectives. This
 **A→Z-by-name, case-insensitive ordering is the canonical order for every bank account list** —
@@ -647,16 +646,14 @@ The entire bank UI (and both PDFs) follows the DAS KARTELL design system
 (`docs/specs/ui-design-system.md`; visual source of truth:
 `.claude/skills/das-kartell-design/README.md`): Lato-only typography, brand colors,
 HUD styling with a 4 px radius, the four responsive device classes, and **no native browser
-dialogs** (KRT modals / `showKrtConfirm` only). The design system additionally ships
-**final-draft mockups for all four bank pages** (`proposals/bank-dashboard-varianten.html`,
-`bank-konto-detail-varianten.html`, `bank-verwaltung-varianten.html`,
-`bank-admin-varianten.html`; submodule pin ≥ `2ba5678`) plus a dedicated bank component
-layer in `krt-components.css` (`.kpi-*`, `.holder-*`, `.stack-*`, `.matrix-flag`,
-`.krt-modal`, `.confirm-input` — documented in the submodule `README.md` "Bank
-patterns" block). The bank pages are **built to match these mockups** using the shipped
-component classes; deviations need an owner decision. Every user-visible string lives
-in `messages.properties` / `_de` / `_en` under new `bank.*`, `admin.bank.*` and
-`nav.bank.*` keys (umlauts as `\uXXXX` escapes in `.properties`).
+dialogs** (KRT modals / `showKrtConfirm` only). The design system additionally ships a
+dedicated bank component layer in `krt-components.css` (`.kpi-*`, `.holder-*`, `.stack-*`,
+`.matrix-flag`, `.krt-modal`, `.confirm-input` — documented in the submodule `README.md`
+section "Bank", specimens `components/KpiCard/preview.html` and
+`components/BankPatterns/preview.html`). The bank pages are **built from these shipped
+component classes** as this spec describes them; deviations need an owner decision. Every
+user-visible string lives in `messages.properties` / `_de` / `_en` under new `bank.*`,
+`admin.bank.*` and `nav.bank.*` keys (umlauts as `\uXXXX` escapes in `.properties`).
 
 > **Amended (2026-07-03) — account-detail density:** both account-detail booking tables (bank-staff
 > `bank/bank-account-detail.html` and the member `bank/org-unit-bank-account-detail.html`) drop the wide

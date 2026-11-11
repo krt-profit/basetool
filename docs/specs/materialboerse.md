@@ -29,10 +29,11 @@ offer:
   offer. Either way an item offer has no quality.
 
 Either way other members register interest and the anbieter takes the negotiation from there. The
-design is fixed by the DAS KARTELL design proposal
-`.claude/skills/das-kartell-design/proposals/materialboerse-final.html` (locked
-master-detail layout). Data model + visibility decisions are recorded in ADR-0082 (offer model),
-ADR-0086 (partial offers) and ADR-0087 (item offers).
+page is built on the DAS KARTELL design system's locked master-detail layout (`.master-detail` /
+`.master-list` / `.master-row` / `.detail-pane`, specimen
+`.claude/skills/das-kartell-design/components/MasterDetail/preview.html`) as this spec describes it.
+Data model + visibility decisions are recorded in ADR-0082 (offer model), ADR-0086 (partial offers)
+and ADR-0087 (item offers).
 
 The board also carries the **inverse** listing — a **request (Gesuch)**: instead of releasing owned
 stock, a member advertises what they **want** — a material or a craftable item, with a free-form
