@@ -154,7 +154,17 @@ function bindProvisionForm(root, form, recovery) {
             preview.reset();
         }
     };
-    krtEvents.on('click', 'od-money-open', () => void recovery.openWhenRecovered(openPending));
+    krtEvents.on('click', 'od-money-open', () => {
+        void recovery.openWhenRecovered(() => {
+            if (
+                document.querySelector(
+                    '#order-money-results [data-trigger="od-money-open"]:enabled',
+                )
+            ) {
+                openPending();
+            }
+        });
+    });
     form.addEventListener('input', updateDraft);
     form.addEventListener('change', updateDraft);
     input.addEventListener('blur', () => {

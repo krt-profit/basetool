@@ -371,7 +371,17 @@ export function bindMoneyMovement(root, recovery) {
         krtModal.open(modalId);
     };
 
-    krtEvents.on('click', 'od-money-move', () => void recovery.openWhenRecovered(open));
+    krtEvents.on('click', 'od-money-move', () => {
+        void recovery.openWhenRecovered(() => {
+            if (
+                document.querySelector(
+                    '#order-money-results [data-trigger="od-money-move"]:enabled',
+                )
+            ) {
+                open();
+            }
+        });
+    });
     form.closest('dialog')?.addEventListener('close', () => {
         if (!krtModal.isOpen(modalId)) reassignment.reset();
     });

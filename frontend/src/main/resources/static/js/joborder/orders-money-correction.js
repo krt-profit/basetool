@@ -26,6 +26,7 @@ import {
     showPreviewAmounts,
 } from '/js/joborder/orders-money-preview.js';
 
+/** @import { bindMoneyRecovery } from '/js/joborder/orders-money-recovery.js' */
 /** @typedef {Omit<ApiDto<'CorrectJobOrderMoneyDto'>, 'operationId'>} CorrectionTerms */
 /** @typedef {NonNullable<CorrectionTerms['entries']>[number]} CorrectionEntry */
 /** @typedef {{element: HTMLElement, select: HTMLSelectElement, amount: HTMLInputElement, provision: HTMLInputElement, attribution: HTMLInputElement}} Line */
@@ -38,7 +39,7 @@ const wholeAmount = /^[0-9]+$/;
  * Opens one connected correction on an existing history entry.
  *
  * @param {HTMLElement} root the account and order recovery scope
- * @param {ReturnType<typeof import('/js/joborder/orders-money-recovery.js').bindMoneyRecovery>} recovery the shared operation recovery
+ * @param {ReturnType<typeof bindMoneyRecovery>} recovery the shared operation recovery
  */
 export function bindMoneyCorrection(root, recovery) {
     const form = document.getElementById('order-money-correction-form');
@@ -250,7 +251,9 @@ export function bindMoneyCorrection(root, recovery) {
     krtEvents.on('click', 'od-money-correct', (button) => {
         const original = button.dataset.originalOperation;
         if (!original) return;
-        void recovery.openWhenRecovered(() => open(original));
+        void recovery.openWhenRecovered(() => {
+            if (choices().has(original)) open(original);
+        });
     });
     add.addEventListener('click', () => {
         const next = [...choices().keys()].find((id) =>

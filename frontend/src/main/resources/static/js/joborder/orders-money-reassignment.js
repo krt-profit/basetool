@@ -23,7 +23,8 @@ import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 import { setMoneyOptions } from '/js/joborder/orders-money-holders.js';
 import { showMovementField } from '/js/joborder/orders-money-movement-parties.js';
 
-/** @typedef {ReturnType<typeof import('/js/joborder/orders-money-holders.js').orderHolders>[number]} Holder */
+/** @import { orderHolders } from '/js/joborder/orders-money-holders.js' */
+/** @typedef {ReturnType<typeof orderHolders>[number]} Holder */
 /** @typedef {ApiDto<'JobOrderMoneyReassignmentDestination'>} Destination */
 /** @typedef {Pick<ApiDto<'ReassignJobOrderMoneyDto'>, 'destinationOrderId' | 'destinationHolderId' | 'destinationVersion' | 'confirmSamePerson'>} DestinationTerms */
 

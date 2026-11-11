@@ -121,11 +121,13 @@ export function bindMoneyRecovery(root, restoreRefused) {
      * Removes a resolved operation and refreshes its visible effects.
      *
      * @param {Submission} terms the submitted terms
+     * @returns {Promise<boolean>} whether the money section was refreshed
      */
     const finish = async (terms) => {
         await forget(terms);
         showFrontendSuccessToast(root.dataset.recorded || '');
-        await refresh();
+        const [moneyRefreshed] = (await refresh()) || [];
+        return moneyRefreshed === true;
     };
 
     /**
@@ -157,8 +159,7 @@ export function bindMoneyRecovery(root, restoreRefused) {
             /** @type {MoneyOutcome | null} */
             const outcome = await krtFetch.getJson(`${url}/operations/${terms.operationId}`);
             if (outcome?.operationId === terms.operationId) {
-                await finish(terms);
-                return true;
+                return await finish(terms);
             }
         } catch (error) {
             if (error instanceof Error && 'status' in error) {
