@@ -75,8 +75,9 @@ function samePlayer(holder, recipient) {
  * @param {string} url the scoped order money route
  * @param {string} self the signed-in account
  * @param {() => boolean} usesBank whether the action uses Bank handling
+ * @param {(id: string) => boolean} canReturnFromBank whether the designation can fund a personal return
  */
-export function bindMovementParties(form, purpose, url, self, usesBank) {
+export function bindMovementParties(form, purpose, url, self, usesBank, canReturnFromBank) {
     const source = form.elements.namedItem('sourceHolderId');
     const mode = form.elements.namedItem('destinationMode');
     const destination = form.elements.namedItem('destinationHolderId');
@@ -109,11 +110,18 @@ export function bindMovementParties(form, purpose, url, self, usesBank) {
         source.disabled ? undefined : orderHolders().find(({ id }) => id === source.value);
     const canSpend = () => moveForOthers() || selectedSource()?.userId === self;
     const ownsHolding = () => orderHolders().some(({ userId }) => userId === self);
-    const canReturn = () =>
-        recipients().some(
+    const returnableDesignations = () => {
+        const people = recipients().filter(
             (row) =>
                 row.returnable && (moveForOthers() || requesterReturn() || row.userId === self),
         );
+        if (!usesBank()) return people;
+        const banks = bankRecipients()
+            .filter(({ id }) => canReturnFromBank(id))
+            .map((row) => ({ ...row, holderId: '', userId: '', returnable: true }));
+        return [...people, ...banks];
+    };
+    const canReturn = () => returnableDesignations().length > 0;
 
     const chosenParty = bindMoneyPartyChoice(choice, (query) => {
         if (settling() || returning()) {
@@ -131,18 +139,12 @@ export function bindMovementParties(form, purpose, url, self, usesBank) {
     const sync = () => {
         const holders = orderHolders();
         const designations = recipients();
+        const returnable = returning() ? returnableDesignations() : [];
         if (returning()) {
-            setMoneyOptions(
-                recipient,
-                designations.filter(
-                    (row) =>
-                        row.returnable &&
-                        (moveForOthers() || requesterReturn() || row.userId === self),
-                ),
-            );
+            setMoneyOptions(recipient, returnable);
         }
 
-        const currentRecipient = designations.find(({ id }) => id === recipient.value);
+        const currentRecipient = returnable.find(({ id }) => id === recipient.value);
         const foreignSource =
             moveForOthers() ||
             collecting() ||

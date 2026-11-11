@@ -125,7 +125,7 @@ class JobOrderMoneyAccountCommands {
     var position =
         holdings.findByOrderIdAndBankAccountId(orderId, Objects.requireNonNull(bank.accountId()));
     long revision = position.map(JobOrderMoneyAccountHolding::getRevision).orElse(0L);
-    OptimisticLock.checkOptionalClient(
+    OptimisticLock.check(
         revision,
         version,
         JobOrderMoneyAccountHolding.class,

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -32,6 +33,9 @@ interface JobOrderMoneyRecipientRepository extends JpaRepository<JobOrderMoneyRe
   Optional<JobOrderMoneyRecipient> findByOrderIdAndId(UUID orderId, UUID id);
 
   List<JobOrderMoneyRecipient> findAllByOrderIdOrderById(UUID orderId);
+
+  List<JobOrderMoneyRecipient> findAllByOrderIdAndBankAccountIdInAndCorrectedIntoIdIsNull(
+      UUID orderId, Set<UUID> bankAccountIds);
 
   @Query(
       """

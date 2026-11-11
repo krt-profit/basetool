@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.Accou
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +44,8 @@ public class JobOrderMoneyBankAccountQueries {
   private final JobOrderMoneyAccountHoldingRepository holdings;
   private final JobOrderMoneyHolderRepository playerHoldings;
   private final JobOrderMoneyRecipients recipients;
+  private final JobOrderMoneyRecipientRepository designations;
+  private final JobOrderMoneyLedger ledger;
 
   /**
    * Returns candidates for a readable Order and the caller's current action grants.
@@ -82,7 +85,31 @@ public class JobOrderMoneyBankAccountQueries {
         refs(choices.designation(), Map.of()),
         refs(choices.withdrawal(), revisions),
         active ? refs(choices.transfer(), Map.of()) : List.of(),
-        choices.custodians());
+        choices.custodians(),
+        unitWriter ? personalReturnAccounts(orderId, choices.withdrawal()) : Map.of());
+  }
+
+  private Map<UUID, UUID> personalReturnAccounts(UUID orderId, List<AccountRef> withdrawal) {
+    if (withdrawal.isEmpty()) {
+      return Map.of();
+    }
+    var admitted = withdrawal.stream().map(AccountRef::id).collect(Collectors.toUnmodifiableSet());
+    var eligible =
+        designations.findAllByOrderIdAndBankAccountIdInAndCorrectedIntoIdIsNull(orderId, admitted);
+    if (eligible.isEmpty()) {
+      return Map.of();
+    }
+    var booked = ledger.read(orderId);
+    return eligible.stream()
+        .filter(designation ->
+            booked
+                    .availableForPersonalReturn(Objects.requireNonNull(designation.getId()), null)
+                    .signum()
+                > 0)
+        .collect(
+            Collectors.toUnmodifiableMap(
+                designation -> Objects.requireNonNull(designation.getId()),
+                designation -> Objects.requireNonNull(designation.getBankAccountId())));
   }
 
   private boolean ownsSettlement(UUID orderId, UUID actor) {

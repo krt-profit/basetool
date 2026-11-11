@@ -135,6 +135,7 @@ class JobOrderMoneyLedger {
    * @param balances effective balances by canonical holder
    * @param accountBalances effective balances by order-local Bank account position
    * @param requesterBalances effective net handover by requester designation
+   * @param personalRequesterBalances effective net handover from personal holders by designation
    * @param accountRequesterBalances effective net handover by collection position and designation
    * @param provided actual new funds recorded for this order
    * @param handedOver effective net handover to requester recipients
@@ -157,6 +158,7 @@ class JobOrderMoneyLedger {
       Map<UUID, BigDecimal> balances,
       Map<UUID, BigDecimal> accountBalances,
       Map<UUID, BigDecimal> requesterBalances,
+      Map<UUID, BigDecimal> personalRequesterBalances,
       Map<AccountReceipt, BigDecimal> accountRequesterBalances,
       BigDecimal provided,
       BigDecimal handedOver,
@@ -181,6 +183,7 @@ class JobOrderMoneyLedger {
       Map<UUID, BigDecimal> balances = new HashMap<>();
       Map<UUID, BigDecimal> accountBalances = new HashMap<>();
       Map<UUID, BigDecimal> requesterBalances = new HashMap<>();
+      Map<UUID, BigDecimal> personalRequesterBalances = new HashMap<>();
       Map<AccountReceipt, BigDecimal> accountRequesterBalances = new HashMap<>();
       BigDecimal provision = BigDecimal.ZERO;
       BigDecimal fees = BigDecimal.ZERO;
@@ -207,7 +210,9 @@ class JobOrderMoneyLedger {
           UUID currentRecipient = recipientAliases.getOrDefault(recipientId, recipientId);
           BigDecimal delivered = fact.handoverEffect(effective);
           requesterBalances.merge(currentRecipient, delivered, BigDecimal::add);
-          if (accountHoldingId != null) {
+          if (accountHoldingId == null) {
+            personalRequesterBalances.merge(currentRecipient, delivered, BigDecimal::add);
+          } else {
             accountRequesterBalances.merge(
                 new AccountReceipt(accountHoldingId, currentRecipient), delivered, BigDecimal::add);
           }
@@ -224,6 +229,7 @@ class JobOrderMoneyLedger {
           balances,
           accountBalances,
           requesterBalances,
+          personalRequesterBalances,
           accountRequesterBalances,
           provision,
           requesterBalances.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add),
@@ -257,9 +263,10 @@ class JobOrderMoneyLedger {
       return balances.values().stream().allMatch(amount -> amount.signum() >= 0)
           && accountBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
           && requesterBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
+          && personalRequesterBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
           && accountRequesterBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
           && availability.coveredBy(
-              balances, accountBalances, requesterBalances, accountRequesterBalances);
+              balances, accountBalances, personalRequesterBalances, accountRequesterBalances);
     }
 
     boolean canCorrect(JobOrderMoneyOperation fact) {
@@ -283,19 +290,18 @@ class JobOrderMoneyLedger {
           : null;
     }
 
-    BigDecimal netForRecipient(UUID recipientId) {
-      return requesterBalances.getOrDefault(recipientId, BigDecimal.ZERO);
+    BigDecimal availableForPersonalReturn(UUID recipientId, @Nullable UUID excludedAttemptId) {
+      UUID recipient = recipientAliases.getOrDefault(recipientId, recipientId);
+      return personalRequesterBalances
+          .getOrDefault(recipient, BigDecimal.ZERO)
+          .subtract(availability.forPersonalReceipt(recipient, excludedAttemptId))
+          .min(availableForDesignation(recipient, excludedAttemptId));
     }
 
-    BigDecimal availableForRecipient(UUID recipientId) {
-      return availableForRecipient(recipientId, null);
-    }
-
-    BigDecimal availableForRecipient(UUID recipientId, @Nullable UUID excludedAttemptId) {
-      UUID canonical = recipientAliases.getOrDefault(recipientId, recipientId);
+    private BigDecimal availableForDesignation(UUID recipient, @Nullable UUID excludedAttemptId) {
       return requesterBalances
-          .getOrDefault(canonical, BigDecimal.ZERO)
-          .subtract(availability.forRecipient(canonical, excludedAttemptId));
+          .getOrDefault(recipient, BigDecimal.ZERO)
+          .subtract(availability.forRecipient(recipient, excludedAttemptId));
     }
 
     BigDecimal availableForAccountReturn(
@@ -305,7 +311,7 @@ class JobOrderMoneyLedger {
       return accountRequesterBalances
           .getOrDefault(receipt, BigDecimal.ZERO)
           .subtract(availability.forAccountReceipt(receipt, excludedAttemptId))
-          .min(availableForRecipient(recipient, excludedAttemptId));
+          .min(availableForDesignation(recipient, excludedAttemptId));
     }
 
     BigDecimal balance(@Nullable UUID holderId) {

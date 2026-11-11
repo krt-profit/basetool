@@ -133,7 +133,7 @@ function bindRecipients(url) {
             krtModal.isOpen(recipientModal)
         ) {
             update();
-            if (mode.value === 'bank') void bankAccounts.load();
+            if (mode.value === 'bank') void bankAccounts.refreshSelection();
         }
     });
     form.addEventListener('submit', async (event) => {

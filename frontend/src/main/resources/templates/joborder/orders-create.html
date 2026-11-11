@@ -12,7 +12,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='orders.create.back', eyebrowHref=@{/orders},
         titleText=(${editOrderId != null} ? #{orders.create.editTitle} : #{orders.create.title}))}"></th:block>
 
-    <div class="form-layout card orders-create" th:data-creation-writer-units="${creationWritableUnitIds}" th:with="itemMode=${editOrderId != null or startInItemMode == true}">
+    <div class="form-layout card orders-create" th:data-creation-writer-units="${creationWritableUnitIds}" th:with="auecMode=${startInAuecMode == true},itemMode=${!auecMode and (editOrderId != null or startInItemMode == true)}">
         <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
         <div th:if="${success}" class="alert alert-success" role="status" th:text="#{__${success}__}">Erfolg</div>
 
@@ -21,7 +21,7 @@
              th:hidden="${editOrderId != null}">
             <label class="krt-segmented__item" data-testid="order-mode-material">
                 <input type="radio" name="orderModeToggle" value="material"
-                       th:checked="${!itemMode}"
+                       th:checked="${!itemMode and !auecMode}"
                        data-trigger="order-mode-toggle" />
                 <span th:text="#{orders.create.kind.material}">Materialauftrag</span>
             </label>
@@ -32,12 +32,16 @@
                 <span th:text="#{orders.create.kind.item}">Item-Auftrag</span>
             </label>
             <label class="krt-segmented__item" data-testid="order-mode-auec">
-                <input type="radio" name="orderModeToggle" value="auec" data-trigger="order-mode-toggle" />
+                <input type="radio" name="orderModeToggle" value="auec" th:checked="${auecMode}" data-trigger="order-mode-toggle" />
                 <span th:text="#{orders.create.kind.auec}"></span>
             </label>
         </div>
 
-        <div id="mode-material" th:hidden="${itemMode}">
+        <noscript th:if="${editOrderId == null and !auecMode}">
+            <a class="btn btn-ghost" th:href="@{/orders/create(mode='auec')}" th:text="#{orders.create.kind.auec}"></a>
+        </noscript>
+
+        <div id="mode-material" th:hidden="${itemMode or auecMode}">
             <form class="orders-create__form" th:action="@{/orders/create}" method="post" th:object="${jobOrderForm}">
                 <input type="hidden" th:field="*{source}" />
 
@@ -174,7 +178,7 @@
             </form>
         </div>
         <th:block th:if="${editOrderId == null}">
-            <div th:replace="~{joborder/fragments/order-money-create :: form}"></div>
+            <div th:replace="~{joborder/fragments/order-money-create :: form(auecMode=${auecMode})}"></div>
         </th:block>
     </div>
 
@@ -248,7 +252,6 @@
     const MSG_UPDATE_FAILED = /*[[#{error.joborder.update.failed}]]*/ 'Update failed.';
 </script>
 <script type="module" th:src="@{/js/joborder/orders-create.js}" th:attr="nonce=${cspNonce}"></script>
-<script type="module" th:src="@{/js/joborder/orders-money-create.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

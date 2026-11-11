@@ -119,7 +119,7 @@ class JobOrderLinkedMoneyPosting {
     UUID recipientId = attempt.getRecipientId();
     if (returning
         && current
-                .availableForRecipient(Objects.requireNonNull(recipientId), attempt.getId())
+                .availableForPersonalReturn(Objects.requireNonNull(recipientId), attempt.getId())
                 .compareTo(attempt.getAmount())
             < 0) {
       throw JobOrderLinkedMoneyAttempt.conflict();

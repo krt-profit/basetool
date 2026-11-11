@@ -185,6 +185,21 @@ class OrdersCreateFormPatternRenderTest {
         .doesNotContain("data-testid=\"order-material-select\"", "id=\"item-lines\"");
   }
 
+  /** Opens the native aUEC form from the link rendered for browsers without JavaScript. */
+  @Test
+  @WithMockUser
+  void auecFormCanBeOpenedWithoutJavaScript() throws Exception {
+    assertThat(render("/orders/create"))
+        .containsPattern("(?s)<noscript>\\s*<a [^>]*href=\"/orders/create\\?mode=auec\"");
+
+    String html = render("/orders/create?mode=auec");
+    assertThat(html)
+        .containsPattern("name=\"orderModeToggle\" value=\"auec\"[^>]*checked=\"checked\"")
+        .contains("id=\"mode-auec\">")
+        .contains("id=\"mode-material\" hidden=\"hidden\"");
+    assertThat(forms(html).get(2)).contains("action=\"/orders/auec\"", "method=\"post\"");
+  }
+
   /** The item editor hides the kind segment and the material form and saves changes. */
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})

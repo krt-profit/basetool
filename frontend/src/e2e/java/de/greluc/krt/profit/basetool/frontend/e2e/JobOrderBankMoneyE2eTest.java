@@ -31,6 +31,9 @@ import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Route;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -162,11 +165,142 @@ class JobOrderBankMoneyE2eTest {
                 .filter(amount -> amount.signum() > 0)
                 .count());
         assertFalse(result.toString().contains("Private fixture rejection"));
+        returnPersonalReceipt(order, staff, seeder, fixture, money, designation);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(order, "joborder-bank-money-order");
         E2eSupport.dump(staff, "joborder-bank-money-staff");
         throw failure;
       }
+    }
+  }
+
+  private static void returnPersonalReceipt(
+      Page order,
+      Page staff,
+      BackendSeeder seeder,
+      Fixture fixture,
+      String money,
+      String designation) {
+    String writer = seeder.getUserId(WRITER, password(WRITER));
+    String payer = seeder.registerBankHolder(STAFF, password(STAFF), writer);
+    assertEquals(
+        201,
+        seeder.bankDeposit(STAFF, password(STAFF), fixture.collectionAccount(), payer, 1_000_000));
+    order.getByTestId("order-money-provide").click();
+    order.getByTestId("order-money-bank-free").check();
+    order.getByTestId("order-money-amount").fill(ONE_MILLION);
+    String holder =
+        post(order, money + "/provisions", "order-money-save").get("holderId").getAsString();
+
+    order.getByTestId("order-money-move").click();
+    order.getByTestId("order-money-movement-kind").selectOption("HANDOVER");
+    order.getByTestId("order-money-source-holder").selectOption(holder);
+    order.getByTestId("order-money-handover-recipient").selectOption(designation);
+    order.getByTestId("order-money-movement-amount").fill("300000");
+    var handoverAccount = order.getByTestId("order-money-movement-bank-account");
+    handoverAccount.selectOption(fixture.collectionAccount());
+    order.getByTestId("order-money-movement-bank-custodian").selectOption(payer);
+    order.getByTestId("order-money-movement-bank-target-custodian").selectOption(fixture.holderA());
+    order.getByTestId("order-money-movement-bank-payment").check();
+    var handover = post(order, money + "/movements", "order-money-movement-save");
+    assertEquals("POSTED", handover.get("state").getAsString());
+    figure(staff, "order-money-handed-over", "9.300.000");
+
+    staff.getByTestId("order-money-move").click();
+    staff.getByTestId("order-money-movement-kind").selectOption("REQUESTER_RETURN");
+    staff.locator("#order-money-movement-source-type").selectOption("player");
+    staff.getByTestId("order-money-handover-recipient").selectOption(designation);
+    staff.getByTestId("order-money-destination-holder").selectOption(holder);
+    staff.getByTestId("order-money-movement-amount").fill("100000");
+    var source = staff.getByTestId("order-money-movement-bank-account");
+    assertThat(source).hasValue(fixture.requesterAccount());
+    assertThat(source).isDisabled();
+    assertThat(staff.getByTestId("order-money-source-holder")).isHidden();
+    staff.getByTestId("order-money-movement-bank-custodian").selectOption(fixture.holderA());
+    staff.getByTestId("order-money-movement-bank-justification").fill("E2E requester return");
+    var preview =
+        staff.waitForResponse(
+            result -> result.url().endsWith(money + "/movements/settlement/preview"),
+            () -> staff.getByTestId("order-money-movement-bank-payment").check());
+    assertTrue(preview.ok(), () -> preview.status() + " " + preview.text());
+    if (json(preview.text()).get("fee").getAsBigDecimal().signum() > 0) {
+      staff.getByTestId("order-money-movement-top-up").check();
+    }
+    var returned = post(staff, money + "/movements/settlement", "order-money-movement-save");
+    assertEquals("POSTED", returned.get("state").getAsString());
+    assertEquals("REQUESTER_RETURN", returned.get("kind").getAsString());
+    assertTrue(returned.get("actualPayment").getAsBoolean());
+    assertEquals(holder, returned.get("destinationHolderId").getAsString());
+    figure(order, "order-money-handed-over", "9.200.000");
+    var current = json(seeder.getBody(WRITER, password(WRITER), "/api/v1" + money));
+    assertEquals(
+        "9000000",
+        current
+            .getAsJsonArray("accountReturns")
+            .get(0)
+            .getAsJsonObject()
+            .get("availableAmount")
+            .getAsString());
+  }
+
+  /** Records the reported payout through the source account and its paying custodian. */
+  @Test
+  void settlesWithAnAccountlessBeneficiary() {
+    assumeTrue(STACK.managesStack(), "requires isolated Bank and Order fixtures");
+    var seeder = new BackendSeeder();
+    var fixture = seed(seeder);
+    String writer = seeder.getUserId(WRITER, password(WRITER));
+    String custodian = seeder.registerBankHolder(STAFF, password(STAFF), writer);
+    assertEquals(
+        201,
+        seeder.bankDeposit(
+            STAFF, password(STAFF), fixture.collectionAccount(), custodian, 1_000_000));
+
+    String base = STACK.baseUrl();
+    var options = new Browser.NewContextOptions().setIgnoreHTTPSErrors(true);
+    try (var playwright = Playwright.create();
+        var browser = E2eSupport.launchBrowser(playwright, true);
+        var context = browser.newContext(options)) {
+      var order = context.newPage();
+      E2eSupport.login(order, base, WRITER, password(WRITER));
+      E2eSupport.navigate(order, base + "/orders/create?lang=de");
+      String orderPath =
+          JobOrderMoneyE2eTest.createOrder(
+              order, base, fixture.collectionUnit(), fixture.requesterUnit(), ONE_MILLION);
+      String money = orderPath + "/money";
+      order.getByTestId("order-money-provide").click();
+      order.getByTestId("order-money-bank-free").check();
+      order.getByTestId("order-money-amount").fill(ONE_MILLION);
+      String holder =
+          post(order, money + "/provisions", "order-money-save").get("holderId").getAsString();
+      figure(order, "order-money-holdings", "1.000.000");
+
+      order.getByTestId("order-money-move").click();
+      assertThat(order.getByTestId("order-money-movement-bank")).isChecked();
+      order.getByTestId("order-money-movement-kind").selectOption("SETTLEMENT");
+      order.getByTestId("order-money-source-holder").selectOption(holder);
+      String beneficiary = "E2E Beneficiary";
+      order.getByTestId("order-money-destination-choice").fill(beneficiary);
+      order.locator("li[role='option'][data-value='accountless']:visible").click();
+      order.getByTestId("order-money-movement-amount").fill("300000");
+      order
+          .getByTestId("order-money-movement-bank-account")
+          .selectOption(fixture.collectionAccount());
+      order.getByTestId("order-money-movement-bank-custodian").selectOption(custodian);
+      assertThat(order.getByTestId("order-money-movement-bank-target-custodian")).isHidden();
+      order.getByTestId("order-money-movement-bank-justification").fill("E2E beneficiary payment");
+      order.getByTestId("order-money-movement-bank-payment").check();
+
+      var settled = post(order, money + "/movements/settlement", "order-money-movement-save");
+      assertEquals("POSTED", settled.get("state").getAsString());
+      assertEquals("SETTLEMENT", settled.get("kind").getAsString());
+      assertTrue(settled.get("actualPayment").getAsBoolean());
+      assertEquals(beneficiary, settled.get("counterpartyName").getAsString());
+      assertEquals(
+          700_000 - settled.get("actualFee").getAsLong(),
+          balance(seeder, fixture.collectionAccount()));
+      var result = json(seeder.getBody(WRITER, password(WRITER), "/api/v1" + money));
+      assertEquals("300000", result.get("settled").getAsString());
     }
   }
 
@@ -258,11 +392,27 @@ class JobOrderBankMoneyE2eTest {
   private static String designate(Page order, String money, String account) {
     order.getByTestId("order-money-designate-recipient").click();
     order.getByTestId("order-money-recipient-mode").selectOption("bank");
-    order.getByTestId("order-money-recipient-bank-account").selectOption(account);
-    String designation =
-        post(order, money + "/recipients", "order-money-recipient-save").get("id").getAsString();
-    assertThat(order.locator("[data-money-bank-recipient='" + designation + "']")).isAttached();
-    return designation;
+    var accounts = order.getByTestId("order-money-recipient-bank-account");
+    accounts.selectOption(account);
+    String options = "**" + money + "/bank-accounts";
+    List<Route> pending = new ArrayList<>();
+    order.route(options, pending::add);
+    try {
+      order
+          .locator("#order-money-results")
+          .evaluate(
+              "container => document.dispatchEvent("
+                  + "new CustomEvent('krt:swapped', { detail: { container } }))");
+      order.waitForCondition(() -> !pending.isEmpty());
+      assertThat(accounts).hasValue(account);
+      String designation =
+          post(order, money + "/recipients", "order-money-recipient-save").get("id").getAsString();
+      assertThat(order.locator("[data-money-bank-recipient='" + designation + "']")).isAttached();
+      return designation;
+    } finally {
+      order.unroute(options);
+      pending.forEach(Route::resume);
+    }
   }
 
   private static void prepareTransfer(

@@ -64,6 +64,35 @@ class JobOrderMoneyE2eTest {
   private static final String AMOUNT = "9007199254740993";
   private static final String GROUPED_AMOUNT = "9.007.199.254.740.993";
 
+  /** Submits the localized target through the browser's native form navigation. */
+  @Test
+  void nativeCreateSubmitsCanonicalTargetAndRedirects() {
+    assumeTrue(STACK.managesStack(), "requires the isolated managed order stack");
+    new BackendSeeder().ensureIridiumMembership(USERNAME, PASSWORD);
+    String baseUrl = STACK.baseUrl();
+    try (Playwright playwright = Playwright.create();
+        Browser browser = E2eSupport.launchBrowser(playwright, true);
+        BrowserContext context =
+            browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      E2eSupport.login(page, baseUrl, USERNAME, PASSWORD);
+      E2eSupport.navigate(page, baseUrl + "/orders/create?lang=de");
+      fillCreateForm(page, IRIDIUM, IRIDIUM, "6000000");
+      assertEquals("6.000.000", shownAmount(page.getByTestId("order-auec-target")));
+      var request =
+          page.waitForRequest(
+              candidate ->
+                  candidate.url().endsWith("/orders/auec") && candidate.isNavigationRequest(),
+              () -> page.locator("#mode-auec form").evaluate("form => form.submit()"));
+      assertEquals("POST", request.method());
+      assertTrue(
+          request.headers().get("content-type").startsWith("application/x-www-form-urlencoded"));
+      assertTrue(List.of(request.postData().split("&")).contains("target=6000000"));
+      awaitCreatedOrder(page, baseUrl);
+      assertThat(page.getByTestId("order-money-target")).containsText("6.000.000");
+    }
+  }
+
   /** Records one Bank-free provision and reads the same committed outcome after response loss. */
   @Test
   void recoversExactCommittedProvisionAfterReload() {
@@ -987,12 +1016,21 @@ class JobOrderMoneyE2eTest {
 
   static String createOrder(
       Page page, String baseUrl, String responsibleUnit, String requestingUnit, String target) {
+    fillCreateForm(page, responsibleUnit, requestingUnit, target);
+    page.getByTestId("order-auec-submit").click();
+    return awaitCreatedOrder(page, baseUrl);
+  }
+
+  private static void fillCreateForm(
+      Page page, String responsibleUnit, String requestingUnit, String target) {
     page.getByTestId("order-mode-auec").click();
     page.locator("#auec-responsible-org-unit").selectOption(responsibleUnit);
     page.locator("#auec-requesting-org-unit").selectOption(requestingUnit);
     page.getByTestId("order-auec-handle").fill("E2E Money " + UUID.randomUUID());
     page.getByTestId("order-auec-target").fill(target);
-    page.getByTestId("order-auec-submit").click();
+  }
+
+  private static String awaitCreatedOrder(Page page, String baseUrl) {
     page.waitForURL(url ->
         url.startsWith(baseUrl + "/orders/")
             && URI.create(url).getPath().matches("/orders/[0-9a-f-]{36}"));

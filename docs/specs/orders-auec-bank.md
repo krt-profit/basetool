@@ -62,6 +62,14 @@ A requester-account return reverses the direction and requires debit-equivalent 
 requester account. Its principal is bounded by the still-unreturned receipt from that particular
 collection position, with pending returns deducted. Final confirmation restores that position and
 reduces the net handover without new provision or unit credit.
+Returns to a personal holding draw only from receipts funded by personal holdings, even when
+the same requester designation also received money from a collection account. Each path deducts
+its own pending returns from the corresponding receipts.
+For a return from a designated Bank account to a personal holding, the ordinary return action
+uses that designation's account as the withdrawal source. The action offers the designation to
+current order unit writers with Bank access for that withdrawal and an available personal receipt.
+The Bank options disclose the source only when it is among that caller's admitted withdrawal
+accounts. The general order view retains its independent Bank account visibility check.
 
 The order suggests the responsible unit's eligible collection account. An authorised designation
 can use the requesting unit's account or another eligible Bank account. The form uses the order's
@@ -79,6 +87,7 @@ million provision, regardless of how many related Bank records explain it.
 - [ ] Early deposit, existing-fund provision, collection, delivery and return each have an explicit ordinary-action Bank choice.
 - [ ] The same provision is not counted again when later deposited, withdrawn or transferred in the Bank.
 - [ ] Ordinary progress/completion creates no implicit Bank transaction.
+- [ ] A receipt funded by a collection account is unavailable to a return into a personal holding and remains returnable to its original position.
 - [ ] Each new operation preselects Bank handling; an earlier Bank-free choice does not silently carry forward.
 - [ ] A denied, incomplete or unavailable Bank path produces no automatic Bank-free effect and does not bypass existing-fund approvals.
 
@@ -338,6 +347,11 @@ approval waiting is not itself a new deadline or technical failure.
   `JobOrderLinkedBankSettlementIntegrationTest`. These cases exercise coupled audit rollback,
   cancellation and hierarchy races, rejected-payment binding, fee attribution and both reversal
   modes. [Hosted App CI](https://github.com/krt-profit/basetool/actions/runs/43098702371)
+- The final focused review run passed 115 backend and 80 frontend cases. Its PostgreSQL tests
+  verify that a new account provision checks the collection position version, an exact replay
+  remains recoverable, and an account receipt cannot fund a return into a personal holding.
+  The privacy cases verify that only the current corrected designation can be used for returns.
+  The Exchange wire contract and OpenAPI generation checks passed in the same run.
 - `BankLinkedPaymentsIntegrationTest` verifies the ten-million authorisation against six
   million of coverage, applicant and accountless depositor attribution, balanced account-only
   transfers, and the retained KRT-funded holder transfer fee. `JobOrderLinkedBankIntegrationTest`

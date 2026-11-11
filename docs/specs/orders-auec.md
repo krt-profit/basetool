@@ -447,8 +447,10 @@ exposing version information. Exact schema, SQL and classes follow these contrac
 target change, cancellation, responsibility transfer, deletion, paired reassignment and audit
 rollback with real PostgreSQL. The Bank increment owns joint Bank effects.
 
-Holder revision starts at zero before first insertion. Contact and comment use an information
-revision separate from target, lifecycle and responsibility. The shared order row stabilizes
+Personal and Bank collection position revisions start at zero before first insertion. A new Bank
+collection provision checks the echoed position revision before entering the Bank queue. A matching
+replay can recover the recorded result even after the revision advances. Contact and comment use an
+information revision separate from target, lifecycle and responsibility. The shared order row stabilizes
 money effects and the current write grants. Handover checks its holder and target observations.
 A possible terminal transition takes the existing priority queue guard before scoped order rows.
 Paired writes acquire the required account identity guards, the shared hierarchy guard, then both
@@ -462,6 +464,8 @@ The common overview and central detail remain the workspace. Creation requires r
 responsible Profit unit, contact and target; comment is optional. Holders, recipients, commitments
 and Bank details can follow later. Show only kind-relevant inputs. After create, open the order
 detail and retain the list/filter return context.
+Use the shared create transport in REQ-FE-006. AJAX submits the form and follows the server's
+detail target. A native form submission redirects to the same detail.
 
 The ordinary money entry points are provision and movement, with correction on a history entry.
 The movement's purpose reveals only needed fields for collection, handover, return, release,

@@ -186,8 +186,8 @@ public class JobOrderMoneyQueries {
         unitWriter,
         designations.stream()
             .filter(designation ->
-                booked.netForRecipient(designation.id()).signum() > 0
-                    && booked.availableForRecipient(designation.id()).signum() > 0)
+                !booked.recipientAliases().containsKey(designation.id())
+                    && booked.availableForPersonalReturn(designation.id(), null).signum() > 0)
             .map(JobOrderMoneyRecipientView::id)
             .toList(),
         linked.stream()

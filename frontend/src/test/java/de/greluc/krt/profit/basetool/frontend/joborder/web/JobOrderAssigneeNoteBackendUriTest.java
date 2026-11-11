@@ -60,7 +60,8 @@ class JobOrderAssigneeNoteBackendUriTest {
         new JobOrderWriteController(
             new JobOrderBackendClient(RealBackendApiClient.over(webClient)),
             mock(MutationResponseHelper.class),
-            mock(LiveSyncLocalBus.class));
+            mock(LiveSyncLocalBus.class),
+            mock(JobOrderCreation.class));
   }
 
   @AfterEach

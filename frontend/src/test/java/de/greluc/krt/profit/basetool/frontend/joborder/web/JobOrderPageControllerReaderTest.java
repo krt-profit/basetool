@@ -314,7 +314,7 @@ class JobOrderPageControllerReaderTest {
 
     assertThat(
             creationController.viewCreateForm(
-                null, new JobOrderPrefill(null, null, null, null, null, null), model))
+                null, null, new JobOrderPrefill(null, null, null, null, null, null), model))
         .isEqualTo("joborder/orders-create");
 
     assertThat(model.asMap())
@@ -335,7 +335,7 @@ class JobOrderPageControllerReaderTest {
     Model model = new ExtendedModelMap();
 
     creationController.viewCreateForm(
-        null, new JobOrderPrefill(null, null, null, null, null, null), model);
+        null, null, new JobOrderPrefill(null, null, null, null, null, null), model);
 
     assertThat(model.asMap())
         .containsEntry("materials", List.of())

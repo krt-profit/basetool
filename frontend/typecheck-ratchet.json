@@ -111,7 +111,6 @@
       "joborder/joborder-hooks.js",
       "joborder/material-collection.js",
       "joborder/orders-create.js",
-      "joborder/orders-money-create.js",
       "joborder/orders-money-bank.js",
       "joborder/orders-money-account-movement.js",
       "joborder/orders-money-player-bank.js",

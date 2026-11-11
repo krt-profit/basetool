@@ -36,6 +36,7 @@ const emptyAccounts = {
     transfer: [],
     settlementDeposit: [],
     custodians: [],
+    personalReturnAccounts: {},
 };
 
 /**
@@ -70,41 +71,59 @@ export function bindBankMode(form) {
  *
  * @param {string} url the Order money route
  * @param {HTMLSelectElement} select the account control
- * @param {() => Exclude<keyof BankAccounts, 'custodians'>} purpose the current purpose
+ * @param {() => Exclude<keyof BankAccounts, 'custodians' | 'personalReturnAccounts'>} purpose the current purpose
  * @param {() => void} onChange the editor's draft refresh
+ * @param {() => string | undefined} [fixedAccount] the source fixed by the selected designation
  */
-export function bindBankAccounts(url, select, purpose, onChange) {
+export function bindBankAccounts(url, select, purpose, onChange, fixedAccount = () => undefined) {
     const group = select.closest('.form-group');
     const problem = group?.querySelector('[data-money-bank-account-error]');
     /** @type {BankAccounts} */
     let accounts = emptyAccounts;
+    /** @type {NonNullable<BankAccounts['personalReturnAccounts']>} */
+    let personalReturnAccounts = {};
     let generation = 0;
     let desired = '';
     let suggest = false;
 
+    const eligibleAccounts = () => {
+        const rows = accounts[purpose()] || [];
+        const fixed = fixedAccount();
+        return fixed ? rows.filter(({ id }) => id === fixed) : rows;
+    };
+
     const sync = () => {
         const current = select.value;
-        const rows = accounts[purpose()] || [];
+        const rows = eligibleAccounts();
         setMoneyOptions(
             select,
             rows.flatMap(({ id, name }) => (id && name ? [{ id, label: name }] : [])),
         );
-        if (desired && rows.some(({ id }) => id === desired)) select.value = desired;
+        const fixed = fixedAccount();
+        if (fixed && rows.some(({ id }) => id === fixed)) select.value = fixed;
+        else if (desired && rows.some(({ id }) => id === desired)) select.value = desired;
         else if (suggest && !current && rows[0]?.id) select.value = rows[0].id;
     };
 
     /**
-     * Refreshes authorized references before allowing a selection.
+     * Loads authorized references and reconciles the selected account.
      *
      * @param {string} [restored] the submitted account selected in the refused draft
      * @param {boolean} [initial] whether to suggest the responsible unit's account
+     * @param {boolean} [retainSelection] whether an open designation keeps its current candidates while refreshing
      */
-    const load = async (restored = select.value || desired, initial = false) => {
+    const load = async (
+        restored = select.value || desired,
+        initial = false,
+        retainSelection = false,
+    ) => {
         const request = ++generation;
         desired = restored;
         suggest = initial;
-        accounts = emptyAccounts;
-        sync();
+        if (!retainSelection) {
+            accounts = emptyAccounts;
+            sync();
+        }
         problem?.setAttribute('hidden', '');
         onChange();
         try {
@@ -112,8 +131,16 @@ export function bindBankAccounts(url, select, purpose, onChange) {
             const result = await krtFetch.getJson(`${url}/bank-accounts`);
             if (request !== generation) return;
             accounts = result || emptyAccounts;
+            const withdrawableIds = new Set((accounts.withdrawal || []).map(({ id }) => id));
+            personalReturnAccounts = Object.fromEntries(
+                Object.entries(accounts.personalReturnAccounts || {}).filter(([, id]) =>
+                    withdrawableIds.has(id),
+                ),
+            );
         } catch (error) {
             if (request !== generation) return;
+            accounts = emptyAccounts;
+            personalReturnAccounts = {};
             if (problem instanceof HTMLElement) {
                 const forbidden =
                     error instanceof Error && 'status' in error && error.status === 403;
@@ -134,11 +161,13 @@ export function bindBankAccounts(url, select, purpose, onChange) {
 
     return {
         load,
+        refreshSelection: () => load(select.value || desired, false, true),
         sync,
         custodians: () => accounts.custodians || [],
+        personalReturnAccount: (/** @type {string} */ id) => personalReturnAccounts[id],
         /** @returns {BankAccount | undefined} the selected eligible account */
         selection() {
-            return (accounts[purpose()] || []).find(({ id }) => id === select.value);
+            return eligibleAccounts().find(({ id }) => id === select.value);
         },
     };
 }

@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryInputPageCo
 import de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryListPageController;
 import de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderCreation;
 import de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderWriteController;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -200,7 +201,8 @@ class BackendFallbackReauthenticationTest {
                 new JobOrderWriteController(
                         rejecting(JobOrderBackendClient.class, failure),
                         new MutationResponseHelper(),
-                        mock(LiveSyncLocalBus.class))
+                        mock(LiveSyncLocalBus.class),
+                        mock(JobOrderCreation.class))
                     .unlinkMaterial(ID, ID, attributes);
         case MISSION ->
             () ->

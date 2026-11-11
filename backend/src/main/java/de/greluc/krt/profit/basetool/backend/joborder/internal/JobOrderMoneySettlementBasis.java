@@ -103,7 +103,7 @@ class JobOrderMoneySettlementBasis {
       OptimisticLock.check(
           target.getVersion(), dto.targetVersion(), JobOrderMoneyTarget.class, orderId);
       if (current
-              .availableForRecipient(Objects.requireNonNull(designation.getId()))
+              .availableForPersonalReturn(Objects.requireNonNull(designation.getId()), null)
               .compareTo(terms.amount())
           < 0) {
         throw new UnavailableSettlement("orders.money.settlement.return.excess");

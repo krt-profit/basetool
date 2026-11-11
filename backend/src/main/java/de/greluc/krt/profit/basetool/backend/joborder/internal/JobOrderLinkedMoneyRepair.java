@@ -503,23 +503,18 @@ public class JobOrderLinkedMoneyRepair {
     boolean returning = prior.getKind() == JobOrderMoneyKind.REQUESTER_RETURN;
     BigDecimal principal = returning ? BigDecimal.ZERO : amount;
     BigDecimal shortage = principal.subtract(available).max(BigDecimal.ZERO);
-    if (returning
-        && account != null
-        && current
-                .availableForAccountReturn(
-                    account, Objects.requireNonNull(prior.getRecipientId()), prior.getId())
-                .compareTo(amount)
-            < 0) {
-      throw JobOrderLinkedMoneyAttempt.conflict();
+    if (returning) {
+      UUID recipient = Objects.requireNonNull(prior.getRecipientId());
+      BigDecimal receipt =
+          account == null
+              ? current.availableForPersonalReturn(recipient, prior.getId())
+              : current.availableForAccountReturn(account, recipient, prior.getId());
+      if (receipt.compareTo(amount) < 0) {
+        throw JobOrderLinkedMoneyAttempt.conflict();
+      }
     }
     if (provision.compareTo(shortage.add(fee)) > 0
-        || (prior.getKind() == JobOrderMoneyKind.SETTLEMENT && shortage.signum() > 0)
-        || (returning
-            && current
-                    .availableForRecipient(
-                        Objects.requireNonNull(prior.getRecipientId()), prior.getId())
-                    .compareTo(amount)
-                < 0)) {
+        || (prior.getKind() == JobOrderMoneyKind.SETTLEMENT && shortage.signum() > 0)) {
       throw JobOrderLinkedMoneyAttempt.conflict();
     }
     BigDecimal binding = principal.add(fee).subtract(provision).max(BigDecimal.ZERO);

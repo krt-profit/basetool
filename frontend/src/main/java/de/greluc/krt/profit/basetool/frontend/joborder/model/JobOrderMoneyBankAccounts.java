@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -32,6 +33,7 @@ import java.util.UUID;
  * @param transfer the accounts the caller may transfer from
  * @param settlementDeposit accounts available for a personal settlement deposit
  * @param custodians the custodians the caller may select
+ * @param personalReturnAccounts eligible Bank sources by requester designation
  */
 @DtoMirror
 public record JobOrderMoneyBankAccounts(
@@ -40,7 +42,8 @@ public record JobOrderMoneyBankAccounts(
     List<JobOrderMoneyBankAccountCandidate> withdrawal,
     List<JobOrderMoneyBankAccountCandidate> transfer,
     List<JobOrderMoneyBankAccountCandidate> settlementDeposit,
-    List<JobOrderMoneyBankCustodian> custodians) {
+    List<JobOrderMoneyBankCustodian> custodians,
+    Map<UUID, UUID> personalReturnAccounts) {
 
   /**
    * A registered custodian selectable for a player withdrawal.

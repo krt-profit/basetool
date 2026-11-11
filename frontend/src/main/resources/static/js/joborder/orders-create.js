@@ -863,7 +863,7 @@ krtEvents.on('click', 'orders-add-item', () => addItemLine());
  * Submits an order create or update form and follows the answer's target URL.
  *
  * @param {HTMLFormElement} form the form to submit
- * @param {string} invalidMessage the toast for a 400 answer
+ * @param {string | undefined} invalidMessage the toast for a 400 answer, if overridden
  * @param {string} failedMessage the toast for any other failure
  * @param {HTMLElement | null} submitter the control that triggered the submit
  */
@@ -874,6 +874,7 @@ function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
         toast: false,
         errorMessage: failedMessage,
         onError(status, problem) {
+            if (invalidMessage === undefined) return false;
             const retired = krtFetch.catalogueRetiredMessage(problem);
             const fallback = status === 400 ? invalidMessage : failedMessage;
             showFrontendErrorToast(retired || fallback);
@@ -915,6 +916,15 @@ if (_itemCreateForm) {
                 ? MSG_UPDATE_FAILED
                 : MSG_CREATE_FAILED;
         _submitOrderCreate(_itemCreateForm, MSG_ITEM_INVALID, failed, e.submitter);
+    });
+}
+
+const auecCreateForm = document.querySelector('#mode-auec form');
+if (auecCreateForm instanceof HTMLFormElement) {
+    auecCreateForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const failed = auecCreateForm.dataset.error || '';
+        _submitOrderCreate(auecCreateForm, undefined, failed, event.submitter);
     });
 }
 

@@ -58,7 +58,7 @@ import java.util.UUID;
  * @param holderIdentityHistory changes to holder identity and current account links
  * @param canRecordSettlement whether the caller currently owns a permitted settlement action
  * @param canCorrectRecipient whether the caller can correct a false recipient designation
- * @param returnableRecipientIds designations with a positive retained net receipt
+ * @param returnableRecipientIds designations with funds available to return to a personal holder
  * @param linkedAttempts retained Bank-linked submissions and their order-side outcomes
  * @param accountHoldings the order-local balances attributed to Bank accounts
  * @param accountReturns the available order-local requester receipts by collection position

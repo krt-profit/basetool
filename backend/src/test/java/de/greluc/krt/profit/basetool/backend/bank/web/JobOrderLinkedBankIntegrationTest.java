@@ -444,7 +444,41 @@ class JobOrderLinkedBankIntegrationTest {
   }
 
   @Test
+  void accountProvisionRequiresCurrentPositionVersionButMatchingReplayDoesNot() throws Exception {
+    UUID order = createOrder("600000");
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    Map<String, Object> terms =
+        new HashMap<>(accountAuthorisationTerms(UUID.randomUUID(), account, "200000"));
+    terms.remove("holderVersion");
+    provide(order, terms).andExpect(status().isConflict());
+    assertThat(ownLinkedRequests()).isEmpty();
+
+    terms.put("holderVersion", 0L);
+    provide(order, terms)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    confirm(ownRequestOfType("AUTHORISATION"), Actor.MANAGEMENT, null, null)
+        .andExpect(status().isOk());
+    terms.remove("holderVersion");
+    provide(order, terms)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("AUTHORISED"));
+
+    terms.put("operationId", UUID.randomUUID());
+    provide(order, terms).andExpect(status().isConflict());
+    terms.put("holderVersion", 0L);
+    provide(order, terms).andExpect(status().isConflict());
+    assertThat(ownLinkedRequests()).hasSize(1);
+
+    terms.put("holderVersion", accountProvisionVersion(order, account));
+    provide(order, terms)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+  }
+
+  @Test
   void requesterAccountReturnsFundsToTheirOriginalCollectionPosition() throws Exception {
+    setFeeRate("0");
     UUID order = createOrder("600000");
     UUID collection = world.account(Account.OWN_ORG_UNIT);
     UUID requester = world.account(Account.CARTEL);
@@ -456,6 +490,36 @@ class JobOrderLinkedBankIntegrationTest {
     String designation = designateBankRequester(order, requester);
     handOverAccountFunds(order, collection, requester, designation, "600000");
     assertFigures(order, "0", "600000", "0", "COMPLETED");
+
+    JsonNode delivered =
+        response(
+            money(order)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.returnableRecipientIds").isEmpty()));
+    perform(
+            post(MONEY + "/movements/settlement", order).with(writer()),
+            Map.of(
+                "operationId",
+                UUID.randomUUID(),
+                "kind",
+                "REQUESTER_RETURN",
+                "recipientId",
+                designation,
+                "destinationName",
+                "Actual accountless recipient",
+                "destinationVersion",
+                0,
+                "targetVersion",
+                delivered.path("targetVersion").asLong(),
+                "amount",
+                "200000",
+                "rate",
+                "0",
+                "bankHandling",
+                true,
+                "bank",
+                withdrawal(requester, world.holder(Holder.MANAGEMENT_HOLDER))))
+        .andExpect(status().isConflict());
 
     UUID returned = UUID.randomUUID();
     requestAccountReturn(order, collection, requester, designation, returned, "200000");
@@ -620,6 +684,8 @@ class JobOrderLinkedBankIntegrationTest {
         operation,
         "amount",
         amount,
+        "holderVersion",
+        0,
         "bankHandling",
         true,
         "bank",
@@ -693,6 +759,8 @@ class JobOrderLinkedBankIntegrationTest {
             Map.of(
                 "amount",
                 "400000",
+                "holderVersion",
+                0,
                 "bankHandling",
                 true,
                 "bank",
@@ -732,6 +800,8 @@ class JobOrderLinkedBankIntegrationTest {
                 authorisation,
                 "amount",
                 "100000",
+                "holderVersion",
+                accountProvisionVersion(order, collection),
                 "bankHandling",
                 true,
                 "bank",
@@ -1026,6 +1096,8 @@ class JobOrderLinkedBankIntegrationTest {
                 UUID.randomUUID(),
                 "amount",
                 amount,
+                "holderVersion",
+                accountProvisionVersion(order, account),
                 "bankHandling",
                 true,
                 "bank",
@@ -1040,6 +1112,16 @@ class JobOrderLinkedBankIntegrationTest {
                     depositor)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("WAITING"));
+  }
+
+  private long accountProvisionVersion(UUID order, UUID account) throws Exception {
+    JsonNode money = response(money(order).andExpect(status().isOk()));
+    for (JsonNode position : money.path("accountHoldings")) {
+      if (account.toString().equals(position.path("bankAccountId").asString())) {
+        return position.path("version").asLong();
+      }
+    }
+    return 0;
   }
 
   private void confirmDepositToAccount(String depositor, UUID custodian) throws Exception {
@@ -1463,6 +1545,9 @@ class JobOrderLinkedBankIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("WAITING"));
     assertFigures(order, "600000", "0", "0", "IN_PROGRESS");
+    mvc.perform(get(MONEY + "/bank-accounts", order).with(as(Actor.ADMIN)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.personalReturnAccounts").isEmpty());
 
     setFeeRate("0.01");
     if (gamePayment) {
@@ -1488,6 +1573,17 @@ class JobOrderLinkedBankIntegrationTest {
     String heldAfterHandover = gamePayment ? "198000" : "200000";
     String fee = gamePayment ? "2000" : "0";
     assertFigures(order, heldAfterHandover, "400000", fee, "COMPLETED");
+    money(order)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.returnableRecipientIds[0]").value(recipient.path("id").asString()))
+        .andExpect(jsonPath("$.recipients[0].bankAccountId").value(targetAccount.toString()));
+    String designation = "$.personalReturnAccounts['" + recipient.path("id").asString() + "']";
+    mvc.perform(get(MONEY + "/bank-accounts", order).with(as(Actor.ADMIN)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(designation).value(targetAccount.toString()));
+    mvc.perform(get(MONEY + "/bank-accounts", order).with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.personalReturnAccounts").isEmpty());
 
     perform(
             post("/api/v1/bank/transactions/{id}/reversal", transaction).with(as(Actor.MANAGEMENT)),
@@ -1500,6 +1596,12 @@ class JobOrderLinkedBankIntegrationTest {
       assertFigures(order, heldAfterHandover, "400000", fee, "COMPLETED");
     } else {
       assertFigures(order, "600000", "0", "0", "IN_PROGRESS");
+      money(order)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.returnableRecipientIds").isEmpty());
+      mvc.perform(get(MONEY + "/bank-accounts", order).with(as(Actor.ADMIN)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.personalReturnAccounts").isEmpty());
     }
   }
 

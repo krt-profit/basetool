@@ -21,30 +21,53 @@ package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockPart;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /** Verifies creation enters the created order's common workspace through every form transport. */
 class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
+
+  private static final UUID CREATED_ID = UUID.fromString("00000000-0000-0000-0000-000000000053");
+  private static final CreateAuecJobOrderDto AUEC_FORM =
+      new CreateAuecJobOrderDto(
+          UUID.fromString("00000000-0000-0000-0000-000000000051"),
+          UUID.fromString("00000000-0000-0000-0000-000000000052"),
+          "Creator",
+          "Submitted comment",
+          "9007199254740993");
 
   @Autowired private WebApplicationContext context;
   private MockMvc mvc;
@@ -59,37 +82,7 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
   @WithMockUser
   void successfulCreationUsesReturnedIdentityForItsCentralDetail(boolean item, boolean ajax)
       throws Exception {
-    UUID createdId = UUID.fromString("00000000-0000-0000-0000-000000000053");
-    JobOrderDto created =
-        new JobOrderDto(
-            createdId,
-            53,
-            null,
-            null,
-            "Creator",
-            null,
-            null,
-            "OPEN",
-            item ? "ITEM" : "MATERIAL",
-            false,
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(),
-            Instant.parse("2026-11-09T10:00:00Z"),
-            0L,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            0L,
-            0L);
+    JobOrderDto created = createdOrder(item ? "ITEM" : "MATERIAL");
     when(backendApiClient.post(
             eq(item ? "/api/v1/orders/items" : "/api/v1/orders"), any(), eq(JobOrderDto.class)))
         .thenReturn(created);
@@ -113,11 +106,112 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
     if (ajax) {
       mvc.perform(request.header("X-Requested-With", "XMLHttpRequest"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.targetUrl").value("/orders/" + createdId));
+          .andExpect(jsonPath("$.targetUrl").value("/orders/" + CREATED_ID));
     } else {
       mvc.perform(request)
           .andExpect(status().is3xxRedirection())
-          .andExpect(redirectedUrl("/orders/" + createdId));
+          .andExpect(redirectedUrl("/orders/" + CREATED_ID));
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @WithMockUser
+  void successfulAuecCreationUsesExactTargetAndServerIdentity(boolean ajax) throws Exception {
+    when(backendApiClient.post("/api/v1/orders/auec", AUEC_FORM, JobOrderDto.class))
+        .thenReturn(createdOrder("AUEC"));
+
+    var response = mvc.perform(auecRequest(ajax));
+    if (ajax) {
+      response
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.targetUrl").value("/orders/" + CREATED_ID))
+          .andExpect(jsonPath("$.id").doesNotExist());
+    } else {
+      response
+          .andExpect(status().is3xxRedirection())
+          .andExpect(redirectedUrl("/orders/" + CREATED_ID))
+          .andExpect(flash().attribute("successToast", "success.joborder.create"));
+    }
+    verify(liveSyncLocalBus).publish("orders", List.of("queue"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @WithMockUser
+  void refusedAuecCreationReturnsFormOrBackendProblem(boolean ajax) throws Exception {
+    when(backendApiClient.post("/api/v1/orders/auec", AUEC_FORM, JobOrderDto.class))
+        .thenThrow(
+            new BackendServiceException(
+                "Denied", null, 403, "ACCESS_DENIED", null, List.of(), "Writer required."));
+
+    var response = mvc.perform(auecRequest(ajax));
+    if (ajax) {
+      response
+          .andExpect(status().isForbidden())
+          .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+          .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+          .andExpect(jsonPath("$.detail").value("Writer required."));
+    } else {
+      response
+          .andExpect(status().is3xxRedirection())
+          .andExpect(redirectedUrl("/orders/create"))
+          .andExpect(flash().attribute("errorToast", "orders.money.create.error"))
+          .andExpect(flash().attribute("startInAuecMode", true))
+          .andExpect(flash().attribute("auecTarget", AUEC_FORM.target()));
+    }
+    verifyNoInteractions(liveSyncLocalBus);
+  }
+
+  private static RequestBuilder auecRequest(boolean ajax) {
+    Map<String, String> fields =
+        Map.of(
+            "responsibleOrgUnitId", AUEC_FORM.responsibleOrgUnitId().toString(),
+            "requestingOrgUnitId", AUEC_FORM.requestingOrgUnitId().toString(),
+            "handle", AUEC_FORM.handle(),
+            "comment", AUEC_FORM.comment(),
+            "target", AUEC_FORM.target());
+    if (ajax) {
+      MockMultipartHttpServletRequestBuilder request = multipart("/orders/auec");
+      fields.forEach((name, value) ->
+          request.part(new MockPart(name, value.getBytes(StandardCharsets.UTF_8))));
+      return request.with(csrf()).header("X-Requested-With", "XMLHttpRequest");
+    }
+    MockHttpServletRequestBuilder request =
+        post("/orders/auec").contentType(MediaType.APPLICATION_FORM_URLENCODED).with(csrf());
+    fields.forEach(request::param);
+    return request;
+  }
+
+  private static JobOrderDto createdOrder(String type) {
+    return new JobOrderDto(
+        CREATED_ID,
+        53,
+        null,
+        null,
+        "Creator",
+        null,
+        null,
+        "OPEN",
+        type,
+        false,
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        Instant.parse("2026-11-09T10:00:00Z"),
+        0L,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 }

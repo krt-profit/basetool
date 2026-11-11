@@ -92458,6 +92458,13 @@
               "$ref" : "#/components/schemas/JobOrderMoneyBankAccountCandidate"
             }
           },
+          "personalReturnAccounts" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string",
+              "format" : "uuid"
+            }
+          },
           "settlementDeposit" : {
             "type" : "array",
             "items" : {

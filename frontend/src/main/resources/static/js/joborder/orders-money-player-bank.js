@@ -57,6 +57,9 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
     }
     const collecting = () => kind.value === 'COLLECTION';
     const samePlayer = () => kind.value === 'PURPOSE_HANDOVER';
+    const returning = () => kind.value === 'REQUESTER_RETURN';
+    /** @type {string | undefined} */
+    let returnAccount;
     const deliversToAccount = () =>
         kind.value === 'HANDOVER' && bankRecipients().some(({ id }) => id === recipient.value);
     const type = () =>
@@ -64,7 +67,7 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
             ? effect.value === 'HOLDER_TRANSFER'
                 ? 'HOLDER_TRANSFER'
                 : 'DEPOSIT'
-            : ['REQUESTER_RETURN', 'SETTLEMENT'].includes(kind.value)
+            : returning() && !returnAccount
               ? 'DEPOSIT'
               : deliversToAccount()
                 ? 'TRANSFER'
@@ -81,7 +84,7 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
               : collecting()
                 ? 'collection'
                 : 'settlementDeposit';
-    const accounts = bindBankAccounts(url, account, purpose, onChange);
+    const accounts = bindBankAccounts(url, account, purpose, onChange, () => returnAccount);
     let previousPurpose = purpose();
 
     /**
@@ -91,11 +94,14 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
      * @param {boolean} enabled whether the personal Bank fields apply
      */
     const sync = (draft, enabled) => {
+        const previousReturnAccount = returnAccount;
+        returnAccount = returning() ? accounts.personalReturnAccount(recipient.value) : undefined;
         showMovementField(effect, enabled && collecting());
         showMovementField(account, enabled && !holderTransfer());
+        if (returnAccount) account.disabled = true;
         showMovementField(custodian, enabled);
         const nextPurpose = purpose();
-        if (nextPurpose !== previousPurpose) {
+        if (nextPurpose !== previousPurpose || returnAccount !== previousReturnAccount) {
             previousPurpose = nextPurpose;
             accounts.sync();
         }
@@ -115,11 +121,16 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
             choices.flatMap(({ id, name, userId: owner }) =>
                 userId && owner === userId && id && name ? [{ id, label: name }] : [],
             );
-        setMoneyOptions(custodian, matching(type() === 'DEPOSIT' ? destinationUser : sourceUser));
-        const receivers = deliversToAccount()
-            ? choices.flatMap(({ id, name }) => (id && name ? [{ id, label: name }] : []))
-            : matching(destinationUser);
-        setMoneyOptions(target, receivers);
+        const eligible = choices.flatMap(({ id, name }) =>
+            id && name ? [{ id, label: name }] : [],
+        );
+        setMoneyOptions(
+            custodian,
+            returnAccount
+                ? eligible
+                : matching(type() === 'DEPOSIT' ? destinationUser : sourceUser),
+        );
+        setMoneyOptions(target, deliversToAccount() ? eligible : matching(destinationUser));
     };
 
     /** @returns {BankSelection | null} complete Bank terms for this purpose */
@@ -149,5 +160,10 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
         };
     };
 
-    return { refresh: accounts.load, sync, selection };
+    return {
+        refresh: accounts.load,
+        canReturnFromBank: (/** @type {string} */ id) => !!accounts.personalReturnAccount(id),
+        sync,
+        selection,
+    };
 }

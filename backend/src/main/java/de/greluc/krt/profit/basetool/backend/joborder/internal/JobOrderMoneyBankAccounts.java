@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort.CustodianRef;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -30,9 +31,10 @@ import java.util.UUID;
  * @param collection accounts for deposits
  * @param settlementDeposit accounts for an authorized settlement deposit
  * @param designation accounts for requester designation
- * @param withdrawal accounts for provision from Bank funds
+ * @param withdrawal accounts for Bank-funded provision and payouts
  * @param transfer accounts for active transfers to a designated account
  * @param custodians selectable registered custodians
+ * @param personalReturnAccounts admitted withdrawal account by returnable requester designation
  */
 public record JobOrderMoneyBankAccounts(
     List<Candidate> collection,
@@ -40,7 +42,8 @@ public record JobOrderMoneyBankAccounts(
     List<Candidate> designation,
     List<Candidate> withdrawal,
     List<Candidate> transfer,
-    List<CustodianRef> custodians) {
+    List<CustodianRef> custodians,
+    Map<UUID, UUID> personalReturnAccounts) {
 
   /**
    * Account reference with the observed scoped position revision.

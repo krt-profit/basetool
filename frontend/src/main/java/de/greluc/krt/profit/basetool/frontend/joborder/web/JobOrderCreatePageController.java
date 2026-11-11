@@ -56,6 +56,7 @@ public class JobOrderCreatePageController {
    * catalogs and both owner-pickers (ADR-0149).
    *
    * @param source optional origin marker carried by the form
+   * @param mode optional order type to display
    * @param prefill optional material or item line and requesting unit to start the form with
    * @param model Thymeleaf model populated with form and reference catalogs
    * @return the {@code orders-create} view name
@@ -63,7 +64,13 @@ public class JobOrderCreatePageController {
   @NotNull
   @GetMapping("/create")
   public String viewCreateForm(
-      @RequestParam(required = false) String source, JobOrderPrefill prefill, Model model) {
+      @RequestParam(required = false) String source,
+      @RequestParam(required = false) String mode,
+      JobOrderPrefill prefill,
+      Model model) {
+    if ("auec".equals(mode)) {
+      model.addAttribute("startInAuecMode", true);
+    }
     if (!model.containsAttribute("jobOrderForm")) {
       JobOrderForm form = new JobOrderForm();
       form.setSource(source);

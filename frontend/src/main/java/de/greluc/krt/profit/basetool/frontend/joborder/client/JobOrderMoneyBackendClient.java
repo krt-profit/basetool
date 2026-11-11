@@ -20,9 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.client;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CorrectJobOrderMoneyDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.DesignateJobOrderMoneyRecipientDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyBankAccounts;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyCorrectionPreview;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyHolderCandidate;
@@ -60,16 +58,6 @@ public class JobOrderMoneyBackendClient {
 
   private static final String MONEY = "/api/v1/orders/{id}/money";
   private final BackendApiClient backend;
-
-  /**
-   * Creates an aUEC order with its initial net target.
-   *
-   * @param request the shared creation fields and exact target
-   * @return the created order
-   */
-  public JobOrderDto create(@NotNull CreateAuecJobOrderDto request) {
-    return backend.post("/api/v1/orders/auec", request, JobOrderDto.class);
-  }
 
   /**
    * Reads the authorized order's monetary projections.

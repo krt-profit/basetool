@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBacke
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CorrectJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.DesignateJobOrderMoneyRecipientDto;
-import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyOutcome;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MoveJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.PreviewJobOrderMoneyProvisionDto;
@@ -35,20 +34,21 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.ReplaceJobOrderBank
 import de.greluc.krt.profit.basetool.frontend.joborder.model.SettleJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyInformationDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyTargetDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
-import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,24 +66,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderMoneyProxyController {
 
   private final JobOrderMoneyBackendClient money;
-  private final LiveSyncLocalBus liveSyncLocalBus;
+  private final JobOrderCreation orderCreation;
 
   /**
-   * Creates the monetary order through the common workspace.
+   * Creates an aUEC order from the workspace's AJAX form submission.
    *
-   * @param request the shared create fields and net target
-   * @return the created order or the backend refusal
+   * @param form the shared order fields and exact net target
+   * @return the detail target or the propagated backend problem
    */
-  @PostMapping("/auec")
-  public ResponseEntity<Object> create(@RequestBody @Valid CreateAuecJobOrderDto request) {
+  @PostMapping(value = "/auec", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> createAuecOrderAjax(
+      @Valid @ModelAttribute("auecJobOrderForm") @NotNull CreateAuecJobOrderDto form) {
     return relay(
         log,
         "create aUEC order",
-        () -> {
-          JobOrderDto order = money.create(request);
-          liveSyncLocalBus.publish("orders", List.of("queue"));
-          return ResponseEntity.ok(order);
-        });
+        () -> ResponseEntity.ok(Map.of("targetUrl", orderCreation.createAuecOrder(form))));
   }
 
   /**

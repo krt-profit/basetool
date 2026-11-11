@@ -498,7 +498,8 @@
 /operations/{id}/update POST -> OperationPageController#updateOperation gate=method:@missionManagerGate.isGranted() layout=yes
 /operations/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> OperationPageController#updateOperationAjax gate=method:@missionManagerGate.isGranted() layout=yes
 /orders GET -> JobOrderPageController#viewOrders gate=class:isAuthenticated() layout=yes
-/orders/auec POST -> JobOrderMoneyProxyController#create gate=class:isAuthenticated() layout=no
+/orders/auec POST -> JobOrderWriteController#createAuecOrder gate=class:isAuthenticated() layout=yes
+/orders/auec POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderMoneyProxyController#createAuecOrderAjax gate=class:isAuthenticated() layout=no
 /orders/create GET -> JobOrderCreatePageController#viewCreateForm gate=class:isAuthenticated() layout=yes
 /orders/create POST -> JobOrderWriteController#createOrder gate=class:isAuthenticated() layout=yes
 /orders/create POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#createOrderAjax gate=class:isAuthenticated() layout=yes

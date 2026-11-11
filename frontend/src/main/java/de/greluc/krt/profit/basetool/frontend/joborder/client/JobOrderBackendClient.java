@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AssigneeNoteRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemRequestDto;
@@ -630,6 +631,17 @@ public class JobOrderBackendClient {
   @Nullable
   public JobOrderDto createOrder(@NotNull CreateJobOrderDto dto) {
     return backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class);
+  }
+
+  /**
+   * Creates an aUEC order with its exact net target.
+   *
+   * @param dto the shared creation fields and target
+   * @return the created order, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public JobOrderDto createAuecOrder(@NotNull CreateAuecJobOrderDto dto) {
+    return backendApiClient.post("/api/v1/orders/auec", dto, JobOrderDto.class);
   }
 
   /**

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderCreation.ORDERS_QUEUE_SECTION;
+import static de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderCreation.postCreateTarget;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.propagateBackendError;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
@@ -26,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AssigneeNoteRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemLineDto;
@@ -52,13 +55,13 @@ import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +77,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -116,8 +120,8 @@ public class JobOrderWriteController {
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
-  /** The single {@code orders} queue section a create/mutation pokes. */
-  private static final List<String> ORDERS_QUEUE_SECTION = List.of("queue");
+  /** Persists the shared aUEC form and resolves its detail destination. */
+  private final JobOrderCreation orderCreation;
 
   /**
    * Persists a new item order, dropping lines without an item, blueprint or positive amount.
@@ -369,17 +373,6 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Returns the created order's central detail target.
-   *
-   * @param created the persisted backend answer
-   * @return the common detail URL of its non-null identity
-   */
-  @NotNull
-  private static String postCreateTarget(@NotNull JobOrderDto created) {
-    return "/orders/" + Objects.requireNonNull(created.id());
-  }
-
-  /**
    * Builds the validated {@link CreateJobOrderMaterialDto} list from a material-order form,
    * dropping rows without a material id or a positive amount.
    *
@@ -424,6 +417,44 @@ public class JobOrderWriteController {
           liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return ResponseEntity.ok(Map.of("targetUrl", postCreateTarget(created)));
         });
+  }
+
+  /**
+   * Creates an aUEC order and redirects to its detail or back to the creation form.
+   *
+   * @param form the shared order fields and exact net target
+   * @param bindingResult the form binding and validation outcome
+   * @param redirectAttributes the flash carrier for feedback and submitted values
+   * @return the post-create redirect
+   */
+  @NotNull
+  @PostMapping("/auec")
+  public String createAuecOrder(
+      @Valid @ModelAttribute("auecJobOrderForm") @Nullable CreateAuecJobOrderDto form,
+      @NotNull BindingResult bindingResult,
+      @NotNull RedirectAttributes redirectAttributes) {
+    if (!bindingResult.hasErrors() && form != null) {
+      try {
+        String targetUrl = orderCreation.createAuecOrder(form);
+        redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
+        return "redirect:" + targetUrl;
+      } catch (BackendServiceException e) {
+        SectionFallback.rethrowIfReauthenticationRequired(e);
+        log.debug("Failed to create aUEC order (status {})", e.getStatusCode());
+      }
+    }
+    redirectAttributes.addFlashAttribute("errorToast", "orders.money.create.error");
+    redirectAttributes.addFlashAttribute("startInAuecMode", true);
+    if (form != null) {
+      JobOrderForm sharedForm = new JobOrderForm();
+      sharedForm.setResponsibleOrgUnitId(form.responsibleOrgUnitId());
+      sharedForm.setRequestingOrgUnitId(form.requestingOrgUnitId());
+      sharedForm.setHandle(form.handle());
+      sharedForm.setComment(form.comment());
+      redirectAttributes.addFlashAttribute("jobOrderForm", sharedForm);
+      redirectAttributes.addFlashAttribute("auecTarget", form.target());
+    }
+    return "redirect:/orders/create";
   }
 
   /**

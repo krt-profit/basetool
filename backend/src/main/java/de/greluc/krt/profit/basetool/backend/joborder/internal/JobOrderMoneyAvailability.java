@@ -36,6 +36,7 @@ final class JobOrderMoneyAvailability {
   private final Map<UUID, BigDecimal> holders;
   private final Map<UUID, BigDecimal> accounts;
   private final Map<UUID, BigDecimal> recipients;
+  private final Map<UUID, BigDecimal> personalReceipts;
   private final Map<AccountReceipt, BigDecimal> accountReceipts;
   private final Map<UUID, Binding> byAttempt;
 
@@ -46,6 +47,7 @@ final class JobOrderMoneyAvailability {
     Map<UUID, BigDecimal> held = new HashMap<>();
     Map<UUID, BigDecimal> onAccounts = new HashMap<>();
     Map<UUID, BigDecimal> delivered = new HashMap<>();
+    Map<UUID, BigDecimal> personalDelivered = new HashMap<>();
     Map<AccountReceipt, BigDecimal> accountDelivered = new HashMap<>();
     Map<UUID, Binding> byAttempt = new HashMap<>();
     for (JobOrderLinkedMoneyAttempt attempt : attempts) {
@@ -66,14 +68,17 @@ final class JobOrderMoneyAvailability {
         recipient = canonicalRecipient.apply(Objects.requireNonNull(attempt.getRecipientId()));
         principal = attempt.getAmount();
         delivered.merge(recipient, principal, BigDecimal::add);
-        if (account != null) {
+        if (account == null) {
+          personalDelivered.merge(recipient, principal, BigDecimal::add);
+        } else {
           accountDelivered.merge(
               new AccountReceipt(account, recipient), principal, BigDecimal::add);
         }
       }
       byAttempt.put(attempt.getId(), new Binding(holder, account, source, recipient, principal));
     }
-    return new JobOrderMoneyAvailability(held, onAccounts, delivered, accountDelivered, byAttempt);
+    return new JobOrderMoneyAvailability(
+        held, onAccounts, delivered, personalDelivered, accountDelivered, byAttempt);
   }
 
   BigDecimal forHolder(UUID holderId, @Nullable UUID excludedAttemptId) {
@@ -100,6 +105,16 @@ final class JobOrderMoneyAvailability {
         : bound;
   }
 
+  BigDecimal forPersonalReceipt(UUID recipientId, @Nullable UUID excludedAttemptId) {
+    BigDecimal bound = personalReceipts.getOrDefault(recipientId, BigDecimal.ZERO);
+    Binding excluded = byAttempt.get(excludedAttemptId);
+    return excluded != null
+            && excluded.accountHoldingId() == null
+            && recipientId.equals(excluded.recipientId())
+        ? bound.subtract(excluded.principal())
+        : bound;
+  }
+
   BigDecimal forAccountReceipt(AccountReceipt receipt, @Nullable UUID excludedAttemptId) {
     BigDecimal bound = accountReceipts.getOrDefault(receipt, BigDecimal.ZERO);
     Binding excluded = byAttempt.get(excludedAttemptId);
@@ -113,11 +128,11 @@ final class JobOrderMoneyAvailability {
   boolean coveredBy(
       Map<UUID, BigDecimal> balances,
       Map<UUID, BigDecimal> accountBalances,
-      Map<UUID, BigDecimal> requesterBalances,
+      Map<UUID, BigDecimal> personalRequesterBalances,
       Map<AccountReceipt, BigDecimal> accountRequesterBalances) {
     return covered(holders, balances)
         && covered(accounts, accountBalances)
-        && covered(recipients, requesterBalances)
+        && covered(personalReceipts, personalRequesterBalances)
         && covered(accountReceipts, accountRequesterBalances);
   }
 

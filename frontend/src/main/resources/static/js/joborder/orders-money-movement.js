@@ -137,9 +137,16 @@ export function bindMoneyMovement(root, recovery) {
     krtNumberInput.enhance(amount);
 
     const bank = bindBankMode(form);
-    const parties = bindMovementParties(form, kind, url, self, bank.enabled);
-    const account = bindAccountMovement(form, kind, bank.enabled, parties.canReturn);
     const playerBank = bindPlayerBankMovement(form, kind, url, () => sync(true));
+    const parties = bindMovementParties(
+        form,
+        kind,
+        url,
+        self,
+        bank.enabled,
+        playerBank.canReturnFromBank,
+    );
+    const account = bindAccountMovement(form, kind, bank.enabled, parties.canReturn);
     const reassignment = bindReassignmentDestination(form, url, (live) => sync(live));
     const isReassignment = () => kind.value === 'REASSIGNMENT';
     const isReturning = () => kind.value === 'REQUESTER_RETURN';
@@ -426,7 +433,7 @@ export function bindMoneyMovement(root, recovery) {
         }
         sync();
         krtModal.open(modalId);
-        if (playerBankEnabled()) void playerBank.refresh('');
+        if (bank.enabled()) void playerBank.refresh('');
     };
 
     krtEvents.on('click', 'od-money-move', () => {
@@ -447,7 +454,7 @@ export function bindMoneyMovement(root, recovery) {
     form.addEventListener('change', (event) => {
         sync();
         if (
-            playerBankEnabled() &&
+            bank.enabled() &&
             (event.target === kind ||
                 (event.target instanceof HTMLInputElement && event.target.name === 'bankHandling'))
         ) {
@@ -471,7 +478,7 @@ export function bindMoneyMovement(root, recovery) {
             sync(true);
         } else if (section === 'order-money-results') {
             sync(true, true);
-            if (playerBankEnabled()) void playerBank.refresh();
+            if (bank.enabled()) void playerBank.refresh();
         }
     });
     form.addEventListener('submit', async (event) => {
