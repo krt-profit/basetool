@@ -88,6 +88,10 @@ class JobOrderMoneyOperation {
 
   @Nullable
   @Column(updatable = false)
+  private UUID peerOrderId;
+
+  @Nullable
+  @Column(updatable = false)
   private UUID destinationHolderId;
 
   @Nullable
@@ -171,6 +175,56 @@ class JobOrderMoneyOperation {
     this.recordedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
   }
 
+  static JobOrderMoneyOperation reassignment(
+      UUID orderId,
+      UUID peerOrderId,
+      UUID operationId,
+      UUID holderId,
+      UUID actorId,
+      BigDecimal amount,
+      JobOrderMoneyKind kind,
+      boolean createsNamedDestination) {
+    var fact = marker(orderId, operationId, holderId, actorId, amount, kind);
+    fact.peerOrderId = peerOrderId;
+    if (createsNamedDestination) {
+      fact.selectionKind = JobOrderMoneySelection.Kind.ACCOUNTLESS;
+    }
+    return fact;
+  }
+
+  static JobOrderMoneyOperation correction(
+      UUID orderId, UUID operationId, UUID holderId, UUID actorId, @Nullable UUID peerOrderId) {
+    var fact =
+        marker(
+            orderId, operationId, holderId, actorId, BigDecimal.ZERO, JobOrderMoneyKind.CORRECTION);
+    fact.peerOrderId = peerOrderId;
+    return fact;
+  }
+
+  private static JobOrderMoneyOperation marker(
+      UUID orderId,
+      UUID operationId,
+      UUID holderId,
+      UUID actorId,
+      BigDecimal amount,
+      JobOrderMoneyKind kind) {
+    return new JobOrderMoneyOperation(
+        orderId,
+        operationId,
+        holderId,
+        actorId,
+        new JobOrderMoneySelection(JobOrderMoneySelection.Kind.EXISTING, holderId, null),
+        null,
+        false,
+        amount,
+        kind,
+        null,
+        null,
+        null,
+        null,
+        null);
+  }
+
   boolean matchesSelection(JobOrderMoneySelection selection) {
     if (selection.kind() != selectionKind) {
       return false;
@@ -179,7 +233,9 @@ class JobOrderMoneyOperation {
       case SELF -> true;
       case EXISTING ->
           Objects.equals(
-              kind == JobOrderMoneyKind.COLLECTION ? destinationHolderId : holderId,
+              (kind == JobOrderMoneyKind.COLLECTION || kind == JobOrderMoneyKind.REQUESTER_RETURN)
+                  ? destinationHolderId
+                  : holderId,
               selection.reference());
       case LINKED -> Objects.equals(selectedUserId, selection.reference());
       case ACCOUNTLESS -> Objects.equals(selectedAccountlessName, selection.name());
@@ -187,16 +243,42 @@ class JobOrderMoneyOperation {
   }
 
   BigDecimal providedAmount() {
-    return kind == JobOrderMoneyKind.PROVISION ? amount : Objects.requireNonNull(newProvision);
+    return kind == JobOrderMoneyKind.PROVISION
+        ? amount
+        : Objects.requireNonNullElse(newProvision, BigDecimal.ZERO);
   }
 
   BigDecimal feeAmount() {
     return fee == null ? BigDecimal.ZERO : fee;
   }
 
-  BigDecimal sourceEffect() {
-    return kind == JobOrderMoneyKind.PROVISION
-        ? amount
-        : providedAmount().subtract(amount).subtract(feeAmount());
+  JobOrderMoneyAmounts amounts() {
+    return new JobOrderMoneyAmounts(amount, providedAmount(), feeAmount());
+  }
+
+  BigDecimal holderEffect(JobOrderMoneyAmounts effective) {
+    return switch (kind) {
+      case PROVISION, PURPOSE_INFLOW -> effective.amount();
+      case REQUESTER_RETURN -> effective.provision().subtract(effective.fee());
+      case CORRECTION -> BigDecimal.ZERO;
+      case COLLECTION, HANDOVER, PURPOSE_HANDOVER, RELEASE, SHORTAGE, SETTLEMENT, PURPOSE_OUTFLOW ->
+          effective.provision().subtract(effective.amount()).subtract(effective.fee());
+    };
+  }
+
+  BigDecimal handoverEffect(JobOrderMoneyAmounts effective) {
+    return switch (kind) {
+      case HANDOVER, PURPOSE_HANDOVER -> effective.amount();
+      case REQUESTER_RETURN -> effective.amount().negate();
+      case PROVISION,
+          COLLECTION,
+          RELEASE,
+          SHORTAGE,
+          SETTLEMENT,
+          PURPOSE_INFLOW,
+          PURPOSE_OUTFLOW,
+          CORRECTION ->
+          BigDecimal.ZERO;
+    };
   }
 }

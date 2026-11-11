@@ -1,6 +1,6 @@
 # 10. Quality requirements
 
-> **JobOrder acceptance boundary:** [Shared JobOrder](../specs/orders-core.md), [material contributions](../specs/orders-material-claims.md), [aUEC consistency](../specs/orders-auec.md) and [bank lifecycle](../specs/orders-auec-bank.md) own their acceptance and evidence status. Current hierarchy/read or material tests are not proof of the remaining writer/lifecycle, monetary replay or Bank workflows. New acceptance stays unchecked until the relevant database, security, contract and browser evidence is recorded there.
+> **JobOrder acceptance boundary:** [Shared JobOrder](../specs/orders-core.md), [material contributions](../specs/orders-material-claims.md), [aUEC consistency](../specs/orders-auec.md) and [bank lifecycle](../specs/orders-auec-bank.md) own their acceptance and evidence status. Each path has its own database, security, contract and browser evidence. The Bank-free reassignment and correction cases exercise the order edit guards. Coupled Bank outcomes have their own acceptance criteria.
 
 ## 10.1 The quality tree
 

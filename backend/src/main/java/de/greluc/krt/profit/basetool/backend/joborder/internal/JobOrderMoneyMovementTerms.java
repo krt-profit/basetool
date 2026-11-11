@@ -57,7 +57,15 @@ record JobOrderMoneyMovementTerms(
     UUID recipientId = dto.recipientId();
     JobOrderMoneySelection selected =
         switch (dto.kind()) {
-          case PROVISION -> throw invalidSelection();
+          case PROVISION,
+              REQUESTER_RETURN,
+              RELEASE,
+              SHORTAGE,
+              SETTLEMENT,
+              PURPOSE_OUTFLOW,
+              PURPOSE_INFLOW,
+              CORRECTION ->
+              throw invalidSelection();
           case COLLECTION -> {
             if (recipientId != null
                 || dto.targetVersion() != null

@@ -1,6 +1,6 @@
 # Role and Permission Matrix (Profit Basetool)
 
-> **Approved planned JobOrder contract, not implemented:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Existing runtime matrices and verification statements remain the implementation baseline. Planned acceptance remains unchecked; this documentation does not assert that the new permissions already exist.
+> **Approved JobOrder contract and implementation scope:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Section 3.3 describes the internal Bank-free checkpoint. Optional Bank handling and its acceptance remain planned.
 
 > **Last reviewed: 2026-09-22** — re-verified against every `@PreAuthorize` of the 88 backend
 > `@RestController`s and the frontend page/proxy controllers, after the members-only cut
@@ -463,7 +463,7 @@ somebody's Art. 15 request than to the member themselves.
 
 ### 3.3 Inventory (Lager) & Job Orders
 
-#### Approved planned JobOrder rights (implementation pending)
+#### Approved JobOrder rights and Bank-free checkpoint
 
 This target replaces the JobOrder-specific legacy flags, read reductions and write limits in the
 current matrix below. It does not widen unrelated Lager, blueprint, mission or Bank rights.
@@ -494,12 +494,19 @@ follows effective net handover. If responsibility is ineligible, only read and t
 even on completed/cancelled orders: all other user changes and coupled financial results wait for
 valid responsibility. Mandatory automatic support ending remains required.
 
-The internal Bank-free checkpoint supports aUEC creation and immediate provision, collection and
-requester handover. Either unit writer can change the target and contact information and designate
-requester recipients. A holder can record their own outgoing and incoming movements, and a linked
-payee can record their own handover. Only the sender or a responsible writer can explicitly supply
-additional funds for that sender. A linked holder or payee can read their concrete order and recover
-accepted outcomes through the ordinary workspace. Typed names carry no account grant. An accepted
+The internal Bank-free checkpoint supports creation, provision, collection, handover, settlement and
+financial correction. The current responsible writer can maintain holder names and links, merge
+same-person records, and coordinate permitted movements and corrections. Either current unit writer
+can correct a mistaken direct requester designation. Its original operation references remain in the
+history and the corrected recipient determines the personal read grant. A genuine retired payee
+retains the personal read grant for a recorded handover while correctly linked.
+
+On both orders in a purpose reassignment or its correction, the actor needs current responsible-unit
+writer rights or personal authority over the affected holding. A connected correction involving
+another person's holding needs a responsible writer. A requester-side writer or the linked payee
+can record a genuine requester return. Ordinary procurement and target/contact edits on a cancelled
+order require reopening. Permitted settlement and corrections preserve the cancellation. A correctly
+linked participant can recover accepted outcomes under the current order read scope. An accepted
 monetary submission closes the administrator's hard-delete path.
 Current responsible-unit writers coordinate aUEC commitments. Supporting Staffel writers
 manage their own commitment and may explicitly credit a provision they are authorised to record.

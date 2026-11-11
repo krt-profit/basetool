@@ -37,6 +37,7 @@ import org.springframework.stereotype.Component;
 public class JobOrderMoneyPrivacy {
 
   private final JobOrderMoneyHolderRepository holders;
+  private final JobOrderMoneyHolderChangeRepository holderChanges;
   private final JobOrderMoneyOperationRepository operations;
   private final JobOrderMoneyRecipientRepository recipients;
   private final JobOrderMoneyTargetChangeRepository targetChanges;
@@ -52,12 +53,15 @@ public class JobOrderMoneyPrivacy {
     }
     int retiredHolderRecipients = recipients.retireErasedHolderRecipients(userId, names, orderIds);
     int holderRows = holders.anonymiseNames(userId, names, orderIds, HandleAnonymisation.SENTINEL);
-    int operationRows = operations.anonymiseSubmittedNames(names, orderIds);
+    int operationRows = operations.anonymiseSubmittedNames(userId, names, orderIds);
+    int changeRows =
+        holderChanges.anonymiseNames(userId, names, orderIds, HandleAnonymisation.SENTINEL);
     int recipientRows = recipients.anonymiseNames(names, orderIds, HandleAnonymisation.SENTINEL);
     report.accept(Rewritten.ORDER_MONEY_RECIPIENTS, recipientRows + retiredHolderRecipients);
     report.accept(Rewritten.ORDER_MONEY_HOLDERS, holderRows);
     report.accept(Rewritten.ORDER_MONEY_OPERATIONS, operationRows);
-    if (holderRows > 0 || operationRows > 0 || recipientRows > 0 || retiredHolderRecipients > 0) {
+    report.accept(Rewritten.ORDER_MONEY_HOLDER_CHANGES, changeRows);
+    if (holderRows + operationRows + recipientRows + retiredHolderRecipients + changeRows > 0) {
       publishChanges(orderIds);
     }
   }

@@ -170,7 +170,7 @@ These terms come with ADR-0335…0347 (map #2884); the rules are in
 
 ## 12.9 Approved JobOrder terminology
 
-These definitions name the owner-approved model, including its still-planned money contracts.
+These definitions cover the shared order model, the Bank-free checkpoint and planned Bank coupling.
 Runtime scope, rules and acceptance status live once in [orders-core.md](../specs/orders-core.md),
 [orders-auec.md](../specs/orders-auec.md), [orders-auec-bank.md](../specs/orders-auec-bank.md)
 and [material contributions](../specs/orders-material-claims.md).
@@ -191,6 +191,7 @@ and [material contributions](../specs/orders-material-claims.md).
 | **Geldzusage / unit commitment** | A unit-level planned money contribution, separate from actual holdings and handover; explicit new provision credits it once. Material capacity/proration rules do not apply to money commitments. |
 | **Nettoübergabe / net handover** | Effective requester handovers less actual requester returns and applicable corrections; this is the aUEC target basis, excluding game fees. |
 | **Geldvorgang / logical operation** | Persistent identity for submitted monetary terms, linked corrections and stored outcomes. HTTP request correlation and separate Bank attempts are not another payment. |
+| **Zweckwechsel / purpose reassignment** | An explicit reassignment of the same player's reported holding from one order to another, recorded as paired purpose outflow and inflow. |
 | **Bank-Warten / local binding** | Integration-dependent unavailability until the agreed final Bank outcome; neither a global Bank reservation nor a new order-transfer dispatch/receipt workflow. |
 | **Klärungsbedarf / clarification** | A visible discrepancy hint after the agreed real-payment Bank reversal, without a fictional game refund or a separate exception queue. |
 

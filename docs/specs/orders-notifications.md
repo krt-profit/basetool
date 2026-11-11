@@ -42,8 +42,11 @@ the delivery guard rechecks the specific holder link. Matching replays and accou
 personal notice. `JOB_ORDER_MONEY_MOVED` addresses only a linked sender or receiver affected by
 another person's recorded payment. The delivery guard rechecks that specific account and its
 current order access. The final handover groups these affected recipients with completion,
-preserving the existing preference and priority order. The live order room carries only section
-invalidations.
+preserving the existing preference and priority order. Settlement and financial correction use the
+same targeted notice policy for affected linked accounts. A paired write refreshes both order rooms
+and groups duplicate linked audiences. A holder or designation identity edit refreshes the affected
+order sections and queue access. A superseded identity cannot receive a notice through the erroneous
+link. The live order room carries only section invalidations.
 
 Each logical cause/revision gives at most one grouped notice per recipient across relevant roles
 and the same Bank/order decision. Preserve distinct necessary Bank approval tasks. Existing type

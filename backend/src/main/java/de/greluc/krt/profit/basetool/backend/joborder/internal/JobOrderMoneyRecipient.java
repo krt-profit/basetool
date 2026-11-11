@@ -19,12 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -59,6 +63,18 @@ class JobOrderMoneyRecipient {
   @Column(nullable = false)
   private boolean active = true;
 
+  @Nullable private UUID correctedIntoId;
+
+  @Column(updatable = false)
+  @Nullable
+  private UUID correctsId;
+
+  @Nullable private UUID correctionActorId;
+
+  @Column(updatable = false)
+  @Nullable
+  private Instant correctedAt;
+
   JobOrderMoneyRecipient(UUID orderId, JobOrderMoneySelection selection) {
     this.orderId = orderId;
     switch (selection.kind()) {
@@ -67,6 +83,28 @@ class JobOrderMoneyRecipient {
       case ACCOUNTLESS -> accountlessName = selection.name();
       default -> throw new IllegalArgumentException("A requester designation requires a party.");
     }
+  }
+
+  void recordCorrectionOf(JobOrderMoneyRecipient prior, UUID actor, boolean available) {
+    correctsId = Objects.requireNonNull(prior.id);
+    correctionActorId = actor;
+    correctedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    active = available;
+  }
+
+  void supersede(UUID replacementId) {
+    correctedIntoId = replacementId;
+    remove();
+  }
+
+  boolean isSuperseded() {
+    return correctedIntoId != null;
+  }
+
+  boolean hasDirectIdentity() {
+    return holderId == null
+        && (userId != null
+            || (accountlessName != null && !HandleAnonymisation.isReserved(accountlessName)));
   }
 
   void remove() {

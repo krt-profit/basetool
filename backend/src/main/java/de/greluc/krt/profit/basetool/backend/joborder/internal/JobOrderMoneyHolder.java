@@ -72,6 +72,17 @@ class JobOrderMoneyHolder {
     return new JobOrderMoneyHolder(orderId, null, name);
   }
 
+  void replaceIdentity(@Nullable UUID linkedAccountId, @Nullable String name) {
+    userId = linkedAccountId;
+    accountlessName = name;
+    recordChange();
+  }
+
+  void retireInto(UUID survivorId) {
+    mergedIntoId = survivorId;
+    replaceIdentity(null, null);
+  }
+
   void recordChange() {
     revision = Math.incrementExact(revision);
   }

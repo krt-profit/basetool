@@ -46,10 +46,13 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEditor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGate;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommitmentCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialProvisionCredit;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.WriteMoneyCommitmentDto;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderMaterialController;
+import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderSupportController;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeRequest;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -144,7 +147,11 @@ class TenancyGuardTest {
           new ScopeGateway(JobOrderEditor.class, "editPlanned", VERSIONED_EDIT_PARAMETERS),
           new ScopeGateway(JobOrderEditor.class, "editUnversioned", UNVERSIONED_EDIT_PARAMETERS),
           new ScopeGateway(
-              JobOrderEditor.class, "editWithoutProjection", UNVERSIONED_EDIT_PARAMETERS));
+              JobOrderEditor.class, "editWithoutProjection", UNVERSIONED_EDIT_PARAMETERS),
+          new ScopeGateway(
+              JobOrderMoneyCommitmentCommands.class,
+              "put",
+              List.of(UUID.class, UUID.class, WriteMoneyCommitmentDto.class)));
 
   /** Org-unit references that are no tenancy boundary, each with the reason. */
   private static final Map<String, String> NOT_TENANT_SCOPE =
@@ -178,6 +185,10 @@ class TenancyGuardTest {
               key(JobOrderParticipation.class, "claimingOrgUnit"),
               "a part of its JobOrder, read through the order; contribution writes recheck the"
                   + " current claiming-unit authority"),
+          Map.entry(
+              "de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommitment#unit",
+              "a contribution role inside its JobOrder; the order scopes reads and contribution"
+                  + " writes check current unit authority"),
           Map.entry(
               key(MaterialProvisionCredit.class, "claimingOrgUnitId"),
               "a historical attribution snapshot read through its JobOrder; it grants no current"
@@ -420,6 +431,15 @@ class TenancyGuardTest {
           Map.entry(
               new HandlerKey(JobOrderMaterialController.class, "unlinkInventoryItem"),
               "JobOrderEditor checks the order gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderSupportController.class, "enroll"),
+              "JobOrderEditor checks the support gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderSupportController.class, "withdraw"),
+              "JobOrderEditor checks the support gate on the loaded order"),
+          Map.entry(
+              new HandlerKey(JobOrderSupportController.class, "putMoneyCommitment"),
+              "the commitment command checks the order gate and unit contribution authority"),
           Map.entry(
               new HandlerKey(MissionFinanceEntryController.class, "updateFinanceEntry"),
               "the service method carries @missionAccessPolicy.canEditFinanceEntry"),

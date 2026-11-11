@@ -33,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
  * @param destinationName the receiving party's permitted label
  * @param overpayment overpayment that would result from this handover
  * @param shortfall additional funds still required before booking
+ * @param destinationAfter receiving order holding after a return
  */
 public record JobOrderMoneyMovementPreview(
     String amount,
@@ -43,4 +44,5 @@ public record JobOrderMoneyMovementPreview(
     @Nullable String sourceName,
     @Nullable String destinationName,
     String overpayment,
-    String shortfall) {}
+    String shortfall,
+    @Nullable String destinationAfter) {}

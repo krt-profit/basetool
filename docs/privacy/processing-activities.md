@@ -23,7 +23,7 @@ requires it and duplicating it into further files spreads personal data for no g
 | **Members**                      | Register via Keycloak (credentials or Discord), approved by an admin                                                        |
 | **Applicants**                   | Registered but not yet decided (`PENDING`) or refused (`REJECTED`)                                                          |
 | **External trade partners** | Entered by a trade delegate as a partner of a purchasing deal; individuals by handle, organisations by name (A12) |
-| **Non-registered third parties** | Named in free-text fields by a member: external mission participants, job-order handover recipients |
+| **Non-registered third parties** | Named by a member as an external mission participant, handover recipient, aUEC holder or settlement beneficiary |
 | **Visitors**                     | Reach the landing page, Impressum, terms and privacy pages without an account — the only pages without a login (ADR-0159)  |
 
 ---

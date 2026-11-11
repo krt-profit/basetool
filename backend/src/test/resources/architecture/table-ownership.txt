@@ -61,6 +61,8 @@ job_order_material joborder
 job_order_money_commitment joborder
 job_order_money_commitment_change joborder
 job_order_money_holder joborder
+job_order_money_holder_change joborder
+job_order_money_correction_entry joborder
 job_order_money_operation joborder
 job_order_money_recipient joborder
 job_order_money_refused_attempt joborder

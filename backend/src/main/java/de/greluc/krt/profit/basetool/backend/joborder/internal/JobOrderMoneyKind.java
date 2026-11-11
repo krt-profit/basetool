@@ -28,7 +28,21 @@ public enum JobOrderMoneyKind {
   /** Records an actual transfer to a designated requester recipient. */
   HANDOVER,
   /** Changes money held by the same person from procurement to requester purpose. */
-  PURPOSE_HANDOVER;
+  PURPOSE_HANDOVER,
+  /** Returns a previously handed-over requester amount to order holdings. */
+  REQUESTER_RETURN,
+  /** Ends the purpose assignment without a game transfer. */
+  RELEASE,
+  /** Records a real loss of funds that had been provided. */
+  SHORTAGE,
+  /** Records an actual settlement payment to a named beneficiary. */
+  SETTLEMENT,
+  /** Moves held money to the same person's holding on another order. */
+  PURPOSE_OUTFLOW,
+  /** Receives purpose-bound money from the same person's holding on another order. */
+  PURPOSE_INFLOW,
+  /** Records an effective revision of one or more original financial facts. */
+  CORRECTION;
 
   boolean delivers() {
     return this == HANDOVER || this == PURPOSE_HANDOVER;

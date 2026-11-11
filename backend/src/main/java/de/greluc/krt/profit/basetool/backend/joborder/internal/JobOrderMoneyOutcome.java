@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,6 +41,9 @@ import org.jetbrains.annotations.Nullable;
  * @param fee exact fee paid by the order
  * @param rate the retained fee rate for a movement
  * @param provision new money supplied in this operation
+ * @param peerOrderId paired order when the caller may read it
+ * @param corrections connected corrections accepted in this operation
+ * @param correctionBasis current editable basis for this original in the order history
  */
 public record JobOrderMoneyOutcome(
     UUID operationId,
@@ -55,13 +59,19 @@ public record JobOrderMoneyOutcome(
     @Nullable String recipientName,
     String fee,
     @Nullable String rate,
-    String provision) {
+    String provision,
+    @Nullable UUID peerOrderId,
+    List<JobOrderMoneyCorrectionView> corrections,
+    @Nullable JobOrderMoneyCorrectionBasisView correctionBasis) {
 
   static JobOrderMoneyOutcome of(
       JobOrderMoneyOperation operation,
       @Nullable String holderName,
       @Nullable String actorName,
-      @Nullable String recipientName) {
+      @Nullable String recipientName,
+      @Nullable UUID peerOrderId,
+      List<JobOrderMoneyCorrectionView> corrections,
+      @Nullable JobOrderMoneyCorrectionBasisView correctionBasis) {
     return new JobOrderMoneyOutcome(
         operation.getOperationId(),
         operation.getHolderId(),
@@ -76,6 +86,9 @@ public record JobOrderMoneyOutcome(
         recipientName,
         operation.feeAmount().toPlainString(),
         operation.getFeeRate() == null ? null : operation.getFeeRate().toPlainString(),
-        operation.providedAmount().toPlainString());
+        operation.providedAmount().toPlainString(),
+        peerOrderId,
+        corrections,
+        correctionBasis);
   }
 }

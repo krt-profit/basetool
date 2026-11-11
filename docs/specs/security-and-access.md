@@ -127,7 +127,12 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
 
 ### REQ-SEC-074 — Who may call an operation is pinned in one reviewed file
 
-> **Approved planned JobOrder amendment (not implemented):** Pin the planned JobOrder user, personal and narrow integration command gates together with the hierarchy/invalid-responsibility rules. Include outcome lookup/replay, linked-identity corrections and both-order reassignment authority; a static role or possession of an operation ID is not sufficient. See [the approved shared JobOrder contract](orders-core.md), [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
+> **JobOrder command scope:** The authorization matrix covers the Bank-free settlement, correction,
+> identity maintenance and recovery endpoints. Their service gates use the current order scope.
+> Both orders must have valid responsibility and the actor must hold current authority on each
+> side of a paired movement or correction. Outcome recovery checks current readership. See
+> [shared order rules](orders-core.md), [aUEC orders](orders-auec.md) and the planned
+> [Bank integration contract](orders-auec-bank.md).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
@@ -3528,7 +3533,11 @@ unbounded and PII (REQ-OBS-011). The `UserCallsignCollision` alert is the second
 
 ### REQ-SEC-046 — Merging two accounts of one member is an admin decision, and it moves belongings only
 
-> **Approved planned JobOrder amendment (not implemented):** Extend the existing account-merge participants to the planned stable order-local holder/account links and financial attribution without rewriting monetary facts from present membership/name. Preserve history and correct a financial duplicate through its monetary correction, not by identity merge alone. See [the approved aUEC contract](orders-auec.md).
+> **JobOrder account merge:** The job-order participant carries the current holder and recipient links
+> to the surviving account. When both accounts have a holder on the same order, the source becomes
+> an alias of the survivor. Recorded actors, original financial references and both effective
+> amounts remain in the history. A separate linked financial correction resolves double-reported
+> money. See [aUEC orders](orders-auec.md).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
@@ -4757,9 +4766,11 @@ Preparing third-party name scrubbing reads only user identifiers and the four su
 `HandleSpellings` name columns through an identity projection. It does not load complete user
 entities; the subject's protected spellings and all third-party redaction remain identical.
 
-The aUEC export includes the subject's holder links, directly related money operations,
-requester designations and recorded target amendments. It excludes unrelated people and
-private Bank data. The [aUEC contract](orders-auec.md) owns participant-visible history.
+The aUEC export includes the subject's holder links and related identity history, directly related
+money operations and corrections, requester designations and recorded target amendments. A corrected
+payee is associated with their payment. The wrongly selected account can receive its own identity
+record without receiving the payment through that link. The [aUEC contract](orders-auec.md) owns
+participant-visible history.
 The [planned Bank coupling](orders-auec-bank.md) owns later Bank access rules.
 
 Every member MUST be able to export their own data from the application, and an admin MUST be able
@@ -5224,7 +5235,9 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 
 ### REQ-SEC-060 — Admin Personensuche across every free-text surface
 
-> **Approved planned JobOrder amendment (not implemented):** Register new JobOrder holder/counterparty names and historical person references with the existing privacy-owned search coverage. Do not infer account identity from a raw name or leak shared order data through an unrestricted directory. See [the approved aUEC contract](orders-auec.md).
+> **JobOrder money names:** The job-order search participant registers holder and recipient labels,
+> submitted accountless names and holder identity history. Exact account selection uses a separately
+> authorised picker. Personensuche remains an administrator action. See [aUEC orders](orders-auec.md).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
@@ -5452,7 +5465,10 @@ from a statute rather than from operational taste.
 
 ### REQ-SEC-062 — A granted Art. 17 request anonymises the surviving handle snapshots
 
-> **Approved planned JobOrder amendment (not implemented):** Extend the owning anonymisation/erasure contracts to planned surviving order-holder and history snapshots. Monetary traceability does not create a permanent privacy exemption; an audit retention/purge must not erase the separate effective balance basis. See [the approved aUEC contract](orders-auec.md).
+> **JobOrder money history:** The job-order participant anonymises surviving monetary name snapshots
+> under this contract. Account deletion clears active links and retained account references. The
+> order keeps operation IDs and amounts for the effective balance. Activity audit has its own
+> retention policy. See [aUEC orders](orders-auec.md).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
@@ -5460,8 +5476,7 @@ When an admin grants the member's wish, the member's handle MUST be replaced by 
 **every** place a handle snapshot survives an account deletion. Rows are **not** removed and no fact
 about what happened is altered — only the name goes.
 
-**Twelve columns in eight statements**, and the reason it is all of them: erasing eleven reads as a
-completed erasure while still naming the person on the twelfth. The union of
+**Registered snapshot columns.** The union of
 `HandleAnonymisationParticipant#columns()` over the registered participants is the authoritative
 list; `HandleAnonymisationCoverageTest` holds it equal to the `ANONYMISED` dispositions of
 `HandleErasureCoverage` and to the live schema.
@@ -5485,6 +5500,9 @@ tables.
 | `job_order.handle`                                                        | **the whole text, case-insensitively** — no id beside it    |
 | `job_order_handover.recipient_handle`                                     | likewise                                                    |
 | `job_order_item_handover.recipient_handle`                                | likewise                                                    |
+| `job_order_money_holder.accountless_name` and `job_order_money_recipient.accountless_name` | attributed account or whole spelling, according to the record |
+| `job_order_money_holder_change.previous_name` and `name` | attributed account or whole spelling, according to the record |
+| `job_order_money_operation.selected_accountless_name` | attributed holder or whole spelling, according to the recorded purpose |
 
 **Every statement is a whole-value comparison or an id match — never a substring rewrite.** Three
 substring `REPLACE` statements over `audit_event.details`, `bank_audit_event.details` and
@@ -5495,7 +5513,7 @@ irreversibly rewrite the amount annotation on the whole financial trail. A name 
 payloads is now an admin's manual step, found through the Personensuche (REQ-SEC-060) and classified
 as such in `HandleErasureCoverage`.
 
-**The text-matched columns have no user id at all**: a handover recipient or a job-order contact is
+**Some snapshots have no account reference.** A handover recipient or a job-order contact is
 typed in by hand and may name somebody with no account. So the match is on the text and must ignore
 case, because whoever typed it was not copying from a roster. That also makes them the only targets
 reachable for an *already deleted* account — and it can over-match, since a handle is not a unique
@@ -6013,7 +6031,11 @@ REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
 
 ### REQ-SEC-077 — A request body never carries what the server manages
 
-> **Approved planned JobOrder amendment (not implemented):** Planned JobOrder writes carry only action inputs, relevant versions and submitted operation identity/terms. Effective balances, authorisation results, completion and audit/history fields remain server-managed; safe combined provision is an explicit input, not permission to submit a fabricated balance. See [the approved aUEC contract](orders-auec.md).
+> **JobOrder money commands:** The Bank-free command bodies carry the chosen action, selected
+> references, economic terms and observed revisions. The server determines effective balances,
+> authority, lifecycle and history. A connected correction names the original operations and their
+> revised terms. The server derives the resulting balances and any reciprocal purpose leg.
+> See [aUEC orders](orders-auec.md).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 

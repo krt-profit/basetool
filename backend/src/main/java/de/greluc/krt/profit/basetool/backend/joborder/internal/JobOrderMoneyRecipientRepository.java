@@ -35,8 +35,10 @@ interface JobOrderMoneyRecipientRepository extends JpaRepository<JobOrderMoneyRe
 
   @Query(
       """
-      SELECT coalesce(r.userId, canonical.userId, holder.userId) FROM JobOrderMoneyRecipient r
-        LEFT JOIN JobOrderMoneyHolder holder ON holder.id = r.holderId
+      SELECT coalesce(resolved.userId, canonical.userId, holder.userId)
+        FROM JobOrderMoneyRecipient r
+        JOIN JobOrderMoneyRecipient resolved ON resolved.id = coalesce(r.correctedIntoId, r.id)
+        LEFT JOIN JobOrderMoneyHolder holder ON holder.id = resolved.holderId
         LEFT JOIN JobOrderMoneyHolder canonical ON canonical.id = holder.mergedIntoId
       WHERE r.orderId = :orderId AND r.id = :id
       """)
@@ -45,8 +47,16 @@ interface JobOrderMoneyRecipientRepository extends JpaRepository<JobOrderMoneyRe
   @Modifying
   @Query(
       """
+      UPDATE JobOrderMoneyRecipient r SET r.correctedIntoId = :target
+      WHERE r.orderId = :orderId AND r.correctedIntoId = :source
+      """)
+  void redirectCorrections(UUID orderId, UUID source, UUID target);
+
+  @Modifying
+  @Query(
+      """
       UPDATE JobOrderMoneyRecipient r SET r.userId = :target
-      WHERE r.userId = :source AND r.orderId IN :orderIds
+      WHERE r.userId = :source AND r.orderId IN :orderIds AND r.correctedIntoId IS NULL
       """)
   int moveAccounts(UUID source, UUID target, List<UUID> orderIds);
 

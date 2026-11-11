@@ -37,7 +37,7 @@ function formatWholeAuec(amount) {
  * @template {object} Terms
  * @template {object} Ready
  * @param {HTMLFormElement} form the money form
- * @param {string} url the preview URL
+ * @param {string | ((terms: Terms) => {url: string, payload: object})} url the preview request
  * @param {() => Terms | null} readTerms the draft at its observed revisions
  * @param {(output: HTMLElement, body: unknown, terms: Terms) => Ready | null | undefined} render
  *     the preview renderer; null indicates incomplete terms and undefined indicates a failed preview
@@ -45,6 +45,7 @@ function formatWholeAuec(amount) {
 export function bindMoneyPreview(form, url, readTerms, render) {
     const output = form.querySelector('[data-money-preview]');
     const retry = form.querySelector('[data-money-preview-retry]');
+    const problem = form.querySelector('[data-money-preview-error]');
     const save = form.querySelector('button[type="submit"]');
     if (
         !(output instanceof HTMLElement) ||
@@ -66,6 +67,7 @@ export function bindMoneyPreview(form, url, readTerms, render) {
         ready = null;
         output.hidden = true;
         retry.hidden = true;
+        problem?.setAttribute('hidden', '');
         save.disabled = true;
     };
 
@@ -75,10 +77,10 @@ export function bindMoneyPreview(form, url, readTerms, render) {
      * @param {Terms} terms the proposed terms
      */
     const request = async (terms) => {
+        const target = typeof url === 'string' ? { url, payload: terms } : url(terms);
         const result = await krtFetch.write({
             method: 'POST',
-            url,
-            payload: terms,
+            ...target,
             toast: false,
             onError: () => true,
             onNetworkError: () => true,
@@ -88,6 +90,17 @@ export function bindMoneyPreview(form, url, readTerms, render) {
             result.ok && !result.redirected ? render(output, result.body, terms) : undefined;
         if (rendered === undefined) {
             retry.hidden = false;
+            const details = result.body;
+            if (
+                problem &&
+                details &&
+                typeof details === 'object' &&
+                'detail' in details &&
+                typeof details.detail === 'string'
+            ) {
+                problem.textContent = details.detail;
+                problem.removeAttribute('hidden');
+            }
             if (result.status === 409) {
                 await joborderHooks.refreshOrderSection?.('money', { broadcast: false });
             }

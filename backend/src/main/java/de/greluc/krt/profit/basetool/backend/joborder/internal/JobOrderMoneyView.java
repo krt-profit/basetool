@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Reconstructed manual money figures for one order.
@@ -45,6 +46,19 @@ import java.util.List;
  * @param canMoveForOthers whether the caller may record arbitrary order movements
  * @param canRecordRequesterHandover whether the caller may record delivery to the requester
  * @param targetChanges explicit amendments to the requested net amount
+ * @param purposeInflow funds reassigned from other orders
+ * @param purposeOutflow funds reassigned to other orders
+ * @param released funds released from the order purpose
+ * @param shortages actual later losses
+ * @param settled principal paid to a third-party beneficiary
+ * @param settlementOpen whether a terminal order retains purpose-bound funds or an overpayment
+ * @param responsibilityValid whether the current responsibility permits money actions
+ * @param canMaintainHolders whether the caller can maintain identities and coordinate settlement
+ * @param canRecordRequesterReturn whether the caller represents the requesting unit
+ * @param holderIdentityHistory changes to holder identity and current account links
+ * @param canRecordSettlement whether the caller currently owns a permitted settlement action
+ * @param canCorrectRecipient whether the caller can correct a false recipient designation
+ * @param returnableRecipientIds designations with a positive retained net receipt
  */
 public record JobOrderMoneyView(
     String target,
@@ -67,4 +81,17 @@ public record JobOrderMoneyView(
     long informationVersion,
     boolean canMoveForOthers,
     boolean canRecordRequesterHandover,
-    List<JobOrderMoneyTargetChangeView> targetChanges) {}
+    List<JobOrderMoneyTargetChangeView> targetChanges,
+    String purposeInflow,
+    String purposeOutflow,
+    String released,
+    String shortages,
+    String settled,
+    boolean settlementOpen,
+    boolean responsibilityValid,
+    boolean canMaintainHolders,
+    boolean canRecordRequesterReturn,
+    List<JobOrderMoneyHolderChangeView> holderIdentityHistory,
+    boolean canRecordSettlement,
+    boolean canCorrectRecipient,
+    List<UUID> returnableRecipientIds) {}

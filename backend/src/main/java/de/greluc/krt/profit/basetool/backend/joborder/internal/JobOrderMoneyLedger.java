@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import java.math.BigDecimal;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,68 +32,166 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
-/** Rebuilds the order's booked funds from its effective monetary facts. */
+/** Rebuilds the order's booked funds from original facts and their linked corrections. */
 @Component
 @RequiredArgsConstructor
 class JobOrderMoneyLedger {
 
   private final JobOrderMoneyOperationRepository operations;
   private final JobOrderMoneyHolderRepository holders;
+  private final JobOrderMoneyCorrectionEntryRepository corrections;
+  private final JobOrderMoneyRecipients recipients;
 
   Ledger read(UUID orderId) {
-    List<JobOrderMoneyOperation> facts =
-        operations.findAllByOrderIdOrderByRecordedAtAscIdAsc(orderId);
+    var facts = facts(orderId);
     Map<UUID, JobOrderMoneyHolder> byId =
         holders.findAllByOrderIdOrderById(orderId).stream()
             .collect(
                 Collectors.toMap(
                     holder -> Objects.requireNonNull(holder.getId()), Function.identity()));
-    return Ledger.fold(facts, byId);
+    var entries = corrections.findAllByOrderIdOrderByIdAsc(orderId);
+    return Ledger.fold(
+        facts,
+        byId,
+        recipients.correctedRecipientAliases(orderId),
+        entries,
+        revisedAmounts(Map.of(), entries));
+  }
+
+  List<JobOrderMoneyOperation> facts(UUID orderId) {
+    return operations.findAllByOrderIdOrderByRecordedAtAscIdAsc(orderId);
   }
 
   BigDecimal delivered(UUID orderId) {
-    return delivered(operations.findAllByOrderIdOrderByRecordedAtAscIdAsc(orderId));
+    return sumHandover(
+        facts(orderId),
+        revisedAmounts(Map.of(), corrections.findAllByOrderIdOrderByIdAsc(orderId)));
   }
 
-  private static BigDecimal delivered(List<JobOrderMoneyOperation> facts) {
+  BigDecimal deliveredAfter(UUID orderId, Map<UUID, BigDecimal> correctedAmounts) {
+    var revisions = revisedAmounts(Map.of(), corrections.findAllByOrderIdOrderByIdAsc(orderId));
+    correctedAmounts.forEach((id, amount) ->
+        revisions.put(id, new JobOrderMoneyAmounts(amount, BigDecimal.ZERO, BigDecimal.ZERO)));
+    return sumHandover(facts(orderId), revisions);
+  }
+
+  private static BigDecimal sumHandover(
+      List<JobOrderMoneyOperation> facts, Map<UUID, JobOrderMoneyAmounts> revisions) {
     return facts.stream()
-        .filter(fact -> fact.getKind().delivers())
-        .map(JobOrderMoneyOperation::getAmount)
+        .map(fact -> fact.handoverEffect(amounts(fact, revisions)))
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
+  private static JobOrderMoneyAmounts amounts(
+      JobOrderMoneyOperation fact, Map<UUID, JobOrderMoneyAmounts> revisions) {
+    JobOrderMoneyAmounts revised = revisions.get(fact.getOperationId());
+    return revised == null ? fact.amounts() : revised;
+  }
+
+  private static Map<UUID, JobOrderMoneyAmounts> revisedAmounts(
+      Map<UUID, JobOrderMoneyAmounts> previous, List<JobOrderMoneyCorrectionEntry> entries) {
+    var revisions = new HashMap<>(previous);
+    entries.forEach(entry -> revisions.put(entry.getOriginalOperationId(), entry.revised()));
+    return revisions;
+  }
+
   /**
-   * A consistent fold of the accepted facts and current holder identities.
+   * One order's effective financial figures and their reconstructible basis.
    *
-   * @param facts accepted money operations
+   * @param facts accepted original and correction operations
    * @param identities original holders and retained aliases
+   * @param recipientAliases erroneous designations and their current replacements
+   * @param corrections linked effects in committed order
+   * @param revisions latest effect for each corrected original fact
    * @param balances effective balances by canonical holder
+   * @param requesterBalances effective net handover by requester designation
    * @param provided actual new funds recorded for this order
-   * @param handedOver net delivered to requester recipients
+   * @param handedOver effective net handover to requester recipients
    * @param fees fees paid by this order
+   * @param purposeInflow money reassigned from another order
+   * @param purposeOutflow money reassigned to another order
+   * @param released money released from the order's purpose
+   * @param shortages real later losses
+   * @param settled principal paid to a third-party beneficiary
    */
   record Ledger(
       List<JobOrderMoneyOperation> facts,
       Map<UUID, JobOrderMoneyHolder> identities,
+      Map<UUID, UUID> recipientAliases,
+      List<JobOrderMoneyCorrectionEntry> corrections,
+      Map<UUID, JobOrderMoneyAmounts> revisions,
       Map<UUID, BigDecimal> balances,
+      Map<UUID, BigDecimal> requesterBalances,
       BigDecimal provided,
       BigDecimal handedOver,
-      BigDecimal fees) {
+      BigDecimal fees,
+      BigDecimal purposeInflow,
+      BigDecimal purposeOutflow,
+      BigDecimal released,
+      BigDecimal shortages,
+      BigDecimal settled) {
 
     static Ledger fold(
-        List<JobOrderMoneyOperation> facts, Map<UUID, JobOrderMoneyHolder> identities) {
+        List<JobOrderMoneyOperation> facts,
+        Map<UUID, JobOrderMoneyHolder> identities,
+        Map<UUID, UUID> recipientAliases,
+        List<JobOrderMoneyCorrectionEntry> corrections,
+        Map<UUID, JobOrderMoneyAmounts> revisions) {
       Map<UUID, BigDecimal> balances = new HashMap<>();
+      Map<UUID, BigDecimal> requesterBalances = new HashMap<>();
       BigDecimal provision = BigDecimal.ZERO;
       BigDecimal fees = BigDecimal.ZERO;
+      var movements = new EnumMap<JobOrderMoneyKind, BigDecimal>(JobOrderMoneyKind.class);
       for (JobOrderMoneyOperation fact : facts) {
-        provision = provision.add(fact.providedAmount());
-        fees = fees.add(fact.feeAmount());
-        add(balances, identities, fact.getHolderId(), fact.sourceEffect());
+        JobOrderMoneyAmounts effective = amounts(fact, revisions);
+        provision = provision.add(effective.provision());
+        fees = fees.add(effective.fee());
+        add(balances, identities, fact.getHolderId(), fact.holderEffect(effective));
         if (fact.getDestinationHolderId() != null) {
-          add(balances, identities, fact.getDestinationHolderId(), fact.getAmount());
+          add(balances, identities, fact.getDestinationHolderId(), effective.amount());
         }
+        UUID recipientId = fact.getRecipientId();
+        if (recipientId != null) {
+          UUID currentRecipient = recipientAliases.getOrDefault(recipientId, recipientId);
+          requesterBalances.merge(
+              currentRecipient, fact.handoverEffect(effective), BigDecimal::add);
+        }
+        movements.merge(fact.getKind(), effective.amount(), BigDecimal::add);
       }
-      return new Ledger(facts, identities, balances, provision, delivered(facts), fees);
+      return new Ledger(
+          facts,
+          identities,
+          recipientAliases,
+          corrections,
+          revisions,
+          balances,
+          requesterBalances,
+          provision,
+          requesterBalances.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add),
+          fees,
+          movements.getOrDefault(JobOrderMoneyKind.PURPOSE_INFLOW, BigDecimal.ZERO),
+          movements.getOrDefault(JobOrderMoneyKind.PURPOSE_OUTFLOW, BigDecimal.ZERO),
+          movements.getOrDefault(JobOrderMoneyKind.RELEASE, BigDecimal.ZERO),
+          movements.getOrDefault(JobOrderMoneyKind.SHORTAGE, BigDecimal.ZERO),
+          movements.getOrDefault(JobOrderMoneyKind.SETTLEMENT, BigDecimal.ZERO));
+    }
+
+    Ledger revised(List<JobOrderMoneyCorrectionEntry> entries) {
+      return fold(
+          facts, identities, recipientAliases, corrections, revisedAmounts(revisions, entries));
+    }
+
+    JobOrderMoneyAmounts effective(JobOrderMoneyOperation fact) {
+      return amounts(fact, revisions);
+    }
+
+    boolean nonnegative() {
+      return balances.values().stream().allMatch(amount -> amount.signum() >= 0)
+          && requesterBalances.values().stream().allMatch(amount -> amount.signum() >= 0);
+    }
+
+    BigDecimal netForRecipient(UUID recipientId) {
+      return requesterBalances.getOrDefault(recipientId, BigDecimal.ZERO);
     }
 
     BigDecimal balance(@Nullable UUID holderId) {

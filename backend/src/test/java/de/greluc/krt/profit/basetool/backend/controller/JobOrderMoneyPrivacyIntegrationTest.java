@@ -25,7 +25,9 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -169,8 +171,42 @@ class JobOrderMoneyPrivacyIntegrationTest {
             0,
             "holderName",
             unitlessName.toUpperCase(Locale.ROOT));
-    provision(order, writer(), namedTerms).andExpect(status().isOk());
+    String namedHolder =
+        json.readTree(
+                provision(order, writer(), namedTerms)
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsByteArray())
+            .path("holderId")
+            .asString();
+    changeHolder(
+            order,
+            namedHolder,
+            writer(),
+            Map.of("kind", "NAME", "version", 1, "name", unitlessName))
+        .andExpect(status().isNoContent());
     ResultActions beforeErasure = personSearch(unitlessName);
+    String alternateName = "E2E recorded alias " + UUID.randomUUID();
+    UUID aliasOperation = UUID.randomUUID();
+    String aliasHolder = provisionNamed(order, aliasOperation, "2", alternateName);
+    changeHolder(
+            order,
+            aliasHolder,
+            writer(),
+            Map.of(
+                "kind",
+                "MERGE",
+                "version",
+                1,
+                "targetHolderId",
+                originalHolder,
+                "targetVersion",
+                2))
+        .andExpect(status().isNoContent());
+    personSearch(alternateName)
+        .andExpect(jsonPath("$.hits[*].column", hasItem("selected_accountless_name")))
+        .andExpect(jsonPath("$.hits[*].column", hasItem("previous_name")));
 
     transactions.executeWithoutResult(_ -> {
       anonymisation.anonymise(unitless, List.of(unitlessName));
@@ -198,15 +234,32 @@ class JobOrderMoneyPrivacyIntegrationTest {
             jsonPath("$.detail").value("This operation was submitted with different terms."));
     beforeErasure
         .andExpect(jsonPath("$.hits[*].column", hasItem("accountless_name")))
-        .andExpect(jsonPath("$.hits[*].column", hasItem("selected_accountless_name")));
+        .andExpect(jsonPath("$.hits[*].column", hasItem("selected_accountless_name")))
+        .andExpect(jsonPath("$.hits[*].column", hasItem("previous_name")))
+        .andExpect(jsonPath("$.hits[*].column", hasItem("name")));
     personSearch(unitlessName)
         .andExpect(jsonPath("$.hits[*].column", not(hasItem("accountless_name"))))
-        .andExpect(jsonPath("$.hits[*].column", not(hasItem("selected_accountless_name"))));
+        .andExpect(jsonPath("$.hits[*].column", not(hasItem("selected_accountless_name"))))
+        .andExpect(jsonPath("$.hits[*].column", not(hasItem("previous_name"))))
+        .andExpect(jsonPath("$.hits[*].table", not(hasItem("job_order_money_holder_change"))));
+    personSearch(alternateName)
+        .andExpect(jsonPath("$.hits[*].column", not(hasItem("selected_accountless_name"))))
+        .andExpect(jsonPath("$.hits[*].column", not(hasItem("previous_name"))));
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, aliasOperation)
+                .with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.holderId").value(aliasHolder))
+        .andExpect(jsonPath("$.holderName").value(HandleAnonymisation.SENTINEL));
     mvc.perform(get("/api/v1/orders/{id}/money", order).with(writer()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.provided").value("17"))
-        .andExpect(jsonPath("$.holdings").value("17"))
-        .andExpect(jsonPath("$.history.length()").value(3));
+        .andExpect(jsonPath("$.provided").value("19"))
+        .andExpect(jsonPath("$.holdings").value("19"))
+        .andExpect(jsonPath("$.history.length()").value(4))
+        .andExpect(jsonPath("$.holderIdentityHistory[0].name").value(HandleAnonymisation.SENTINEL))
+        .andExpect(
+            jsonPath("$.holderIdentityHistory[0].previousName")
+                .value(HandleAnonymisation.SENTINEL));
   }
 
   @Test
@@ -217,21 +270,303 @@ class JobOrderMoneyPrivacyIntegrationTest {
     String ownHolder = provisionFor(order, ownOperation, "9007199254740993", unitless);
     provisionFor(order, otherOperation, "4", survivor);
 
-    JsonNode export =
-        json.readTree(
-            mvc.perform(
-                    get("/api/v1/users/me/export")
-                        .with(signedInMember(unitless))
-                        .accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsByteArray());
+    JsonNode export = exportFor(unitless);
     JsonNode holder = singleExportRow(export, "jobOrderMoneyHolders");
     assertThat(holder.path("holder_id").asString()).isEqualTo(ownHolder);
     JsonNode operation = singleExportRow(export, "jobOrderMoneyOperations");
     assertThat(operation.path("operation_id").asString()).isEqualTo(ownOperation.toString());
     assertThat(operation.path("amount").asString()).isEqualTo("9007199254740993");
+  }
+
+  @Test
+  void explicitHolderMaintenancePreservesHistoryAndRequiresResponsibleAuthority() throws Exception {
+    UUID order = createOrder();
+    UUID original = UUID.randomUUID();
+    UUID duplicate = UUID.randomUUID();
+    String main = provisionNamed(order, original, "10", unitlessName);
+    String sameName = provisionNamed(order, duplicate, "4", unitlessName);
+    String designation = recipient(order, Map.of("holderId", main));
+    UUID handover = purposeHandover(order, main, designation);
+    mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
+        .andExpect(status().isForbidden());
+
+    changeHolder(order, main, writer(), Map.of("kind", "LINK", "version", 2, "userId", unitless))
+        .andExpect(status().isNoContent());
+    mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
+        .andExpect(status().isOk());
+    String correctedName = "Corrected " + unitlessName;
+    changeHolder(
+            order,
+            sameName,
+            signedInMember(unitless),
+            Map.of("kind", "NAME", "version", 1, "name", correctedName))
+        .andExpect(status().isForbidden());
+    changeHolder(
+            order, sameName, writer(), Map.of("kind", "NAME", "version", 1, "name", correctedName))
+        .andExpect(status().isNoContent());
+    changeHolder(
+            order,
+            sameName,
+            writer(),
+            Map.of("kind", "MERGE", "version", 2, "targetHolderId", main, "targetVersion", 3))
+        .andExpect(status().isNoContent());
+
+    assertMergedSelectionRefused(order, "holderId", sameName);
+    ageHolderIdentityAudit(order);
+    mvc.perform(
+            delete("/api/v1/audit/JOB_ORDER").param("before", "2000-02-01T00:00:00Z").with(admin()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.deletedCount").value(3));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(signedInMember(unitless)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("14"))
+        .andExpect(jsonPath("$.holdings").value("11"))
+        .andExpect(jsonPath("$.netHandedOver").value("3"))
+        .andExpect(jsonPath("$.holders.length()").value(1))
+        .andExpect(jsonPath("$.holders[0].id").value(main))
+        .andExpect(jsonPath("$.holders[0].userId").value(unitless.toString()))
+        .andExpect(
+            jsonPath(
+                "$.holderIdentityHistory[*].kind", containsInAnyOrder("LINK", "NAME", "MERGE")))
+        .andExpect(
+            jsonPath("$.holderIdentityHistory[?(@.kind == 'NAME')].name", hasItem(correctedName)))
+        .andExpect(
+            jsonPath(
+                "$.history[*].operationId",
+                containsInAnyOrder(
+                    original.toString(), duplicate.toString(), handover.toString())));
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, duplicate)
+                .with(signedInMember(unitless)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.holderId").value(sameName))
+        .andExpect(jsonPath("$.holderName").value(unitlessName))
+        .andExpect(jsonPath("$.amount").value("4"));
+  }
+
+  @Test
+  void correctingAFalseHolderLinkRevokesReadershipAndRetainsTheHandover() throws Exception {
+    UUID order = createOrder();
+    UUID original = UUID.randomUUID();
+    String holder = provisionFor(order, original, "10", unitless);
+    String designation = recipient(order, Map.of("holderId", holder));
+    UUID handover = purposeHandover(order, holder, designation);
+    String returnDestination = provisionFor(order, UUID.randomUUID(), "1", writer);
+    mvc.perform(
+            delete("/api/v1/orders/{id}/money/recipients/{recipient}", order, designation)
+                .with(writer()))
+        .andExpect(status().isNoContent());
+    mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
+        .andExpect(status().isOk());
+
+    changeHolder(
+            order,
+            holder,
+            writer(),
+            Map.of("kind", "CORRECT_LINK", "version", 2, "userId", survivor))
+        .andExpect(status().isNoContent());
+    mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, handover)
+                .with(signedInMember(unitless)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, handover)
+                .with(signedInMember(survivor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.holderId").value(holder))
+        .andExpect(jsonPath("$.recipientId").value(designation))
+        .andExpect(jsonPath("$.amount").value("3"));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(signedInMember(survivor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.returnableRecipientIds.length()").value(1))
+        .andExpect(jsonPath("$.returnableRecipientIds", not(hasItem(designation))));
+    requesterReturn(order, designation, returnDestination, 1, writer())
+        .andExpect(status().isConflict());
+    assertThat(exportFor(unitless).toString())
+        .doesNotContain(original.toString(), handover.toString());
+    JsonNode export = exportFor(survivor);
+    JsonNode change = singleExportRow(export, "jobOrderMoneyHolderChanges");
+    assertThat(change.path("kind").asString()).isEqualTo("CORRECT_LINK");
+    assertThat(change.path("holder_id").asString()).isEqualTo(holder);
+  }
+
+  @Test
+  void correctingDirectRequesterDesignationRevokesFalseHistoricalReadGrant() throws Exception {
+    UUID order = createOrder();
+    String source = provisionFor(order, UUID.randomUUID(), "10", writer);
+    String falseRecipient = recipient(order, Map.of("userId", unitless));
+    UUID handover = requesterHandover(order, source, falseRecipient, "HANDOVER", "0.005");
+    mvc.perform(
+            delete("/api/v1/orders/{id}/money/recipients/{recipient}", order, falseRecipient)
+                .with(writer()))
+        .andExpect(status().isNoContent());
+    mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
+        .andExpect(status().isOk());
+
+    String correctPath = "/api/v1/orders/{id}/money/recipients/{recipient}/identity";
+    mvc.perform(
+            patch(correctPath, order, falseRecipient)
+                .with(signedInMember(unitless))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("userId", survivor))))
+        .andExpect(status().isForbidden());
+    String corrected =
+        json.readTree(
+                mvc.perform(
+                        patch(correctPath, order, falseRecipient)
+                            .with(writer())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json.writeValueAsString(Map.of("userId", survivor))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.correctsId").value(falseRecipient))
+                    .andExpect(jsonPath("$.userId").value(survivor.toString()))
+                    .andExpect(jsonPath("$.active").value(false))
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsByteArray())
+            .path("id")
+            .asString();
+
+    mvc.perform(get("/api/v1/orders/{id}", order).with(signedInMember(unitless)))
+        .andExpect(status().isForbidden());
+    mvc.perform(get("/api/v1/orders").param("type", "AUEC").with(signedInMember(unitless)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[*].id", not(hasItem(order.toString()))));
+    mvc.perform(get("/api/v1/orders").param("type", "AUEC").with(signedInMember(survivor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[*].id", hasItem(order.toString())));
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, handover)
+                .with(signedInMember(unitless)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, handover)
+                .with(signedInMember(survivor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.recipientId").value(falseRecipient))
+        .andExpect(
+            jsonPath("$.recipientName")
+                .value(users.findById(survivor).orElseThrow().getEffectiveName()))
+        .andExpect(jsonPath("$.amount").value("3"));
+
+    assertThat(exportFor(unitless).toString()).doesNotContain(handover.toString());
+    JsonNode received = singleExportRow(exportFor(survivor), "jobOrderMoneyOperations");
+    assertThat(received.path("operation_id").asString()).isEqualTo(handover.toString());
+
+    requesterReturn(order, falseRecipient, source, 2, writer()).andExpect(status().isConflict());
+    requesterReturn(order, corrected, source, 2, signedInMember(survivor))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.amount").value("2"));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("10"))
+        .andExpect(jsonPath("$.holdings").value("9"))
+        .andExpect(jsonPath("$.netHandedOver").value("1"));
+  }
+
+  private ResultActions requesterReturn(
+      UUID order,
+      String designation,
+      String destination,
+      long destinationVersion,
+      RequestPostProcessor actor)
+      throws Exception {
+    return mvc.perform(
+        post("/api/v1/orders/{id}/money/movements/settlement", order)
+            .with(actor)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(
+                json.writeValueAsString(
+                    Map.of(
+                        "operationId",
+                        UUID.randomUUID(),
+                        "kind",
+                        "REQUESTER_RETURN",
+                        "recipientId",
+                        designation,
+                        "destinationHolderId",
+                        destination,
+                        "destinationVersion",
+                        destinationVersion,
+                        "targetVersion",
+                        0,
+                        "amount",
+                        "2",
+                        "rate",
+                        "0.005",
+                        "bankHandling",
+                        false))));
+  }
+
+  private UUID purposeHandover(UUID order, String holder, String designation) throws Exception {
+    return requesterHandover(order, holder, designation, "PURPOSE_HANDOVER", "0");
+  }
+
+  private UUID requesterHandover(
+      UUID order, String holder, String designation, String kind, String rate) throws Exception {
+    UUID handover = UUID.randomUUID();
+    mvc.perform(
+            post("/api/v1/orders/{id}/money/movements", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "operationId", handover,
+                            "kind", kind,
+                            "sourceHolderId", holder,
+                            "sourceVersion", 1,
+                            "targetVersion", 0,
+                            "recipientId", designation,
+                            "amount", "3",
+                            "rate", rate,
+                            "bankHandling", false))))
+        .andExpect(status().isOk());
+    return handover;
+  }
+
+  private ResultActions changeHolder(
+      UUID order, String holder, RequestPostProcessor user, Map<String, ?> change)
+      throws Exception {
+    return mvc.perform(
+        patch("/api/v1/orders/{id}/money/holders/{holder}/identity", order, holder)
+            .with(user)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(change)));
+  }
+
+  private String provisionNamed(UUID order, UUID operation, String amount, String name)
+      throws Exception {
+    return json.readTree(
+            provision(
+                    order,
+                    writer(),
+                    Map.of(
+                        "operationId", operation,
+                        "amount", amount,
+                        "bankHandling", false,
+                        "holderVersion", 0,
+                        "holderName", name))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsByteArray())
+        .path("holderId")
+        .asString();
+  }
+
+  private JsonNode exportFor(UUID subject) throws Exception {
+    return json.readTree(
+        mvc.perform(
+                get("/api/v1/users/me/export")
+                    .with(signedInMember(subject))
+                    .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray());
   }
 
   private static JsonNode singleExportRow(JsonNode export, String sectionKey) {
@@ -246,14 +581,23 @@ class JobOrderMoneyPrivacyIntegrationTest {
     throw new AssertionError("Missing export section " + sectionKey);
   }
 
+  private void ageHolderIdentityAudit(UUID order) {
+    jdbc.update(
+        """
+        UPDATE audit_event SET occurred_at = TIMESTAMPTZ '2000-01-01 00:00:00+00'
+        WHERE subject_id = ? AND event_type = 'JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED'
+        """,
+        order);
+  }
+
+  private RequestPostProcessor admin() {
+    return jwt()
+        .jwt(token -> token.subject(writer.toString()))
+        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+  }
+
   private ResultActions personSearch(String query) throws Exception {
-    return mvc.perform(
-            get("/api/v1/users/admin/person-search")
-                .param("q", query)
-                .with(
-                    jwt()
-                        .jwt(token -> token.subject(writer.toString()))
-                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+    return mvc.perform(get("/api/v1/users/admin/person-search").param("q", query).with(admin()))
         .andExpect(status().isOk());
   }
 

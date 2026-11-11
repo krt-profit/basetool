@@ -22,26 +22,30 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A committed order money fact projected with visible participant names.
+ * Recorded result of one accepted money operation.
  *
- * @param operationId the logical operation
- * @param holderId the provision or source holder
- * @param amount the booked principal in whole aUEC
- * @param bankHandling whether Bank handling was selected
- * @param recordedAt when the provision was booked
- * @param holderName the current visible holder name
- * @param actorName the current visible actor name
- * @param kind the booked purpose
- * @param destinationHolderId the credited collection holder
- * @param recipientId the designated handover recipient
- * @param recipientName the visible destination or recipient label
- * @param fee the fee in whole aUEC
- * @param rate the applied fee rate
- * @param provision the explicitly supplied additional funds
+ * @param operationId submitted logical identity
+ * @param holderId credited provision holder or debited movement holder
+ * @param amount exact net whole aUEC
+ * @param bankHandling the submitted choice
+ * @param recordedAt the booking time
+ * @param holderName the permitted current holder label
+ * @param actorName the permitted current original actor label
+ * @param kind the recorded purpose
+ * @param destinationHolderId original receiving collection holder, if any
+ * @param recipientId original requester designation, if any
+ * @param recipientName the permitted destination label
+ * @param fee exact fee paid by the order
+ * @param rate the retained fee rate for a movement
+ * @param provision new money supplied in this operation
+ * @param peerOrderId paired order when the caller may read it
+ * @param corrections connected corrections accepted in this operation
+ * @param correctionBasis current editable basis for this original in the order history
  */
 @DtoMirror
 public record JobOrderMoneyOutcome(
@@ -58,4 +62,7 @@ public record JobOrderMoneyOutcome(
     @Nullable String recipientName,
     String fee,
     @Nullable String rate,
-    String provision) {}
+    String provision,
+    @Nullable UUID peerOrderId,
+    List<JobOrderMoneyCorrectionView> corrections,
+    @Nullable JobOrderMoneyCorrectionBasisView correctionBasis) {}

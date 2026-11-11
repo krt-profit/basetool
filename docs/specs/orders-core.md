@@ -209,8 +209,10 @@ no open promises.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest` covers MATERIAL and ITEM lifecycle
 rights, cancellation and the preservation of historical promises and booked work.
-`JobOrderStatusQueueRaceIntegrationTest` covers terminal queue changes. The strict money
-completion contract follows its own implementation slice. **Issues:** #3195, #3200, #3201
+`JobOrderStatusQueueRaceIntegrationTest` covers terminal queue changes. The Bank-free completion,
+return and settlement cases are part of the
+[money lifecycle contract](orders-auec.md#req-orders-063--auec-lifecycle-follows-effective-net-handover).
+**Issues:** #3195, #3200, #3201
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 
@@ -227,8 +229,9 @@ If the responsible unit ceases to satisfy the fixed original Profit boundary and
 retain the order and history, flag clarification, and permit only existing authorized reading
 and transfer to a valid responsible unit. Existing current-unit/leadership/admin recovery authority
 keeps this transfer usable even when the former unit no longer passes the general Profit gate. This applies to all statuses, including completed or
-cancelled orders. No collection, correction, settlement or coupled Bank operation bypasses this
-gate. Once valid responsibility is restored, ordinary rules apply.
+cancelled orders. The Bank-free writer checks this gate for settlement, financial correction and
+identity maintenance on every affected order. Coupled Bank operations have the same prerequisite.
+Once valid responsibility is restored, ordinary rules apply.
 
 A supporting Staffel that becomes ineligible immediately loses active support and open promises;
 past contributions remain. Existing orders and legacy flags are not silently reparented.
@@ -249,8 +252,8 @@ where authorized; historical names alone do not create access.
 `StockRowViewCharacterisationTest`, `JobOrderModuleContractTest`,
 `JobOrderAssigneeGrantIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
 `ProfitHierarchyNoticeIntegrationTest` and `V379ProfitHierarchyMigrationTest` cover current
-MATERIAL/ITEM mutations, linked stock, recovery and retained legacy history. Future participation
-and money mutations must apply the same prerequisite.
+MATERIAL/ITEM mutations, linked stock, recovery and retained legacy history. The Bank-free writes
+use the same hierarchy and order edit guards.
 **Issues:** #3193, #3197, #3200
 
 ### REQ-ORDERS-056 — One shared overview leads to a central detail

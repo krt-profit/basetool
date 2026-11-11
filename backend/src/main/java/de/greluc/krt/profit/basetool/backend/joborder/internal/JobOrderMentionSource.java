@@ -64,6 +64,14 @@ public class JobOrderMentionSource implements PersonMentionSource {
             LinkKind.JOB_ORDER),
         new Target(
             "JOB_ORDER",
+            "job_order_money_holder_change",
+            "previous_name",
+            "order_id",
+            LinkKind.JOB_ORDER),
+        new Target(
+            "JOB_ORDER", "job_order_money_holder_change", "name", "order_id", LinkKind.JOB_ORDER),
+        new Target(
+            "JOB_ORDER",
             "job_order_money_recipient",
             "accountless_name",
             "order_id",
@@ -82,7 +90,10 @@ public class JobOrderMentionSource implements PersonMentionSource {
         "job_order.status",
         "job_order.type",
         "job_order_handover_item.location_name",
+        "job_order_money_holder_change.kind",
         "job_order_money_operation.selection_kind",
+        // Commitment change reasons are enum codes.
+        "job_order_money_commitment_change.reason",
         "job_order_money_operation.kind",
         // The database accepts only the MaterialProvisionEvidence enum codes.
         "material_provision_credit.evidence");

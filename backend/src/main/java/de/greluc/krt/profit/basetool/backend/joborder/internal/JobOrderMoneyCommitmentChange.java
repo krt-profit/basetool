@@ -59,6 +59,10 @@ class JobOrderMoneyCommitmentChange {
   @Column(updatable = false)
   private UUID operationId;
 
+  @Nullable
+  @Column(updatable = false)
+  private UUID correctionOperationId;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, updatable = false, length = 32)
   private MoneyCommitmentChangeDto.Reason reason;
@@ -86,12 +90,33 @@ class JobOrderMoneyCommitmentChange {
     this.recordedAt = Instant.now();
   }
 
+  static JobOrderMoneyCommitmentChange corrected(
+      JobOrderMoneyCommitment commitment, BigDecimal before, UUID correctionOperationId) {
+    var change =
+        new JobOrderMoneyCommitmentChange(
+            commitment, MoneyCommitmentChangeDto.Reason.CORRECTED, before, null);
+    change.correctionOperationId = correctionOperationId;
+    return change;
+  }
+
+  BigDecimal creditBasis() {
+    return beforeAmount;
+  }
+
+  BigDecimal creditedAmount() {
+    return beforeAmount.subtract(afterAmount);
+  }
+
   UUID getCommitmentId() {
     return commitment.getId();
   }
 
   MoneyCommitmentChangeDto toDto() {
     return new MoneyCommitmentChangeDto(
-        reason, beforeAmount.toPlainString(), afterAmount.toPlainString(), operationId, recordedAt);
+        reason,
+        beforeAmount.toPlainString(),
+        afterAmount.toPlainString(),
+        correctionOperationId == null ? operationId : correctionOperationId,
+        recordedAt);
   }
 }

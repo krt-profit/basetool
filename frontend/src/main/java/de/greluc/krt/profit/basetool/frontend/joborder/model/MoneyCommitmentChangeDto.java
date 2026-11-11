@@ -44,6 +44,7 @@ public record MoneyCommitmentChangeDto(
     WITHDRAWN,
     CREDITED,
     FULFILLED,
+    CORRECTED,
     PARTICIPATION_ENDED,
     RESPONSIBILITY_ENDED,
     UNIT_INELIGIBLE,

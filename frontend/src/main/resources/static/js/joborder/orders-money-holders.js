@@ -31,8 +31,9 @@ const accountlessValue = 'accountless';
  *
  * @param {HTMLSelectElement} select the combobox source
  * @param {(query: string) => Promise<HolderCandidate[]>} findAccounts the permitted search
+ * @param {() => boolean} allowName whether this action permits an accountless name
  */
-export function bindMoneyPartyChoice(select, findAccounts) {
+export function bindMoneyPartyChoice(select, findAccounts, allowName = () => true) {
     const group = select.closest('.form-group');
     const label = select.dataset.freeTextLabel || '';
     krtSearchableSelect(select, {
@@ -43,7 +44,7 @@ export function bindMoneyPartyChoice(select, findAccounts) {
             const choices = accounts.flatMap(({ id, displayName }) =>
                 id && displayName ? [{ value: id, label: displayName }] : [],
             );
-            return name
+            return name && allowName()
                 ? [
                       {
                           value: accountlessValue,

@@ -295,7 +295,7 @@ The quantity/evidence contract and its acceptance status live in
 [REQ-ORDERS-024](../specs/orders-material-claims.md); this runtime map is not a second acceptance
 record.
 
-## 6.13 Bank-free order provision, handover and response recovery
+## 6.13 Bank-free money movements, correction and response recovery
 
 1. The common creation command records the aUEC order and its independently versioned target in
    one transaction. Reporting an own holding, selecting a linked account, or naming an accountless
@@ -308,9 +308,12 @@ record.
    queue before its order row. The movement, lifecycle change and audit commit together.
    Participants receive section invalidations after commit. An affected linked account can
    receive a targeted notice.
-4. A browser with an unknown outcome queries the same operation after reload. The order rechecks
+4. A purpose reassignment or its correction locks both orders in PostgreSQL ID order. A linked
+   correction appends revised effects without removing its original amounts. An actual requester
+   return uses the same net handover projection as the lifecycle decision.
+5. A browser with an unknown outcome queries the same operation after reload. The order rechecks
    access and reconstructs exact amounts from the accepted monetary facts; current holder and actor
    labels follow the privacy rules.
 
-See [the aUEC order contract](../specs/orders-auec.md) for the Bank-free checks and remaining
-settlement and Bank acceptance.
+See [the aUEC order contract](../specs/orders-auec.md) for settlement and correction, and the
+[Bank integration contract](../specs/orders-auec-bank.md) for coupled outcomes.

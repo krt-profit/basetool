@@ -1,6 +1,6 @@
 # 8. Cross-cutting concepts
 
-> **JobOrder implementation scope:** [Shared access/hierarchy](../specs/orders-core.md) and [material contributions](../specs/orders-material-claims.md) define the MATERIAL/ITEM foundation below. Broader shared writer/lifecycle changes, [monetary edits and history](../specs/orders-auec.md) and [synchronous bank coordination](../specs/orders-auec-bank.md) remain planned. Material coordination does not provide the future money-operation deduplication or submitted-operation recovery contract.
+> **JobOrder implementation scope:** [Shared access/hierarchy](../specs/orders-core.md) and [material contributions](../specs/orders-material-claims.md) define the MATERIAL/ITEM foundation below. The [Bank-free monetary contract](../specs/orders-auec.md) owns submitted-operation recovery, financial corrections and holder and recipient identity. [Synchronous Bank coordination](../specs/orders-auec-bank.md) remains planned.
 
 These rules hold across modules. Each names its authority; this section exists to make them
 findable from one place, not to restate them.

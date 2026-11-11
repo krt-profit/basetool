@@ -1821,8 +1821,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse; the two
   `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events of REQ-ORDERS-047 and `JOB_ORDER_MONEY_*` events count under
   `JOB_ORDER`). Order IDs, holders, amounts and submitted terms stay out of metric labels.
-  Targeted movement notices use the existing bounded notification-type counter. The new
-  authenticated order routes use the existing HTTP observations. Silence
+  Financial correction, holder identity maintenance and each recorded purpose reassignment leg count
+  under the same `JOB_ORDER` domain. Targeted movement and correction notices use the existing
+  bounded notification-type counter. Authenticated settlement and correction routes use the existing
+  HTTP observations. A terminal order's settlement indication is derived from its money view. The
+  order keeps its existing lifecycle status and queue metric labels. Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
   **30 d** while others stay active — the domain-lost-its-wiring failure mode the global sum masks).

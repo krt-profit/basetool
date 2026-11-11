@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS · **Related ADRs:** [ADR-0359](../adr/0359-orders-record-money-operations-and-replay-their-outcomes.md), [ADR-0358](../adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)
-> **Status:** The internal Bank-free checkpoint covers creation, provision, unit commitments and their attribution, collection, requester handover and target-based completion. Settlement and Bank handling remain part of the owner-approved target. The checklists cover the complete workflow.
+> **Status:** The internal Bank-free checkpoint covers creation, provision, unit commitments, handover, settlement, financial corrections and holder and recipient maintenance. Optional Bank handling remains part of the owner-approved target. The checklists cover the complete workflow.
 
 # aUEC procurement orders
 
@@ -73,7 +73,11 @@ entry. A known account must be consciously selected. A name alone never links an
 grants personal rights. Reuse stable holder identities within the order; do not create another
 linked holder for the same account. Name correction, explicit later account linking and deliberate
 same-person merging preserve amounts and references. Suspected free-text duplicates are not
-automatically merged; duplicate money requires a financial correction.
+automatically merged. Correct double-reported money through a linked financial correction. An
+actual change of holder uses a movement. A responsible-unit writer can correct a holder name,
+explicitly link an active account or merge two records for the same person. A merge retains the
+original holder IDs as history references and combines their effective holdings under the selected
+survivor. The resulting account link grants rights only to the selected account.
 
 Holdings remain independent across orders. There is no common pool or coverage check against
 other orders, the full game wallet or global Bank custody. Duplicate use of the same real money
@@ -88,15 +92,19 @@ of manual reporting, not a guarantee supplied by this model.
 - [ ] A personal incoming entry cannot invent additional funds for a foreign source.
 - [ ] The same player can hold independently reported amounts for two orders; the UI does not claim global coverage.
 
-**Enforced by:** `JobOrderMoneyIntegrationTest`, `JobOrderMoneyPrivacyIntegrationTest` and the
-initial browser paths. Explicit later identity corrections and movement grants require their
-own verification.
+**Enforced by:** `JobOrderMoneyIntegrationTest` and `JobOrderMoneyPrivacyIntegrationTest` exercise
+holder authority, explicit linking, same-person merging and history retention. `JobOrderMoneyE2eTest`
+contains the holder maintenance and live draft cases.
 
 Initial provision accepts the reader's own linked holder, or a responsible writer's explicitly
 selected account, existing holder or newly named accountless person. An outgoing holder can add an
 inline receiving holder through their actual collection. A personal incoming recorder cannot add
-foreign funds. Account links are selected explicitly. A retired requester designation retains
-its historical handover and current linked recipient readership when it has a recorded handover.
+foreign funds. A genuinely retired requester designation retains linked recipient readership when
+it has a recorded handover. Either current unit writer can correct a mistaken direct designation.
+Correcting a mistaken holder link also updates any associated requester designation. Past
+operations retain the original designation ID and resolve the current recipient through the
+correction. The superseded designation gives no personal read grant and is unavailable for new
+movements and returns.
 
 ### REQ-ORDERS-059 — Unit commitments are planning with one-time provision attribution
 
@@ -133,8 +141,17 @@ possible. Material's uncovered-capacity/proportional-cut policy
 **Enforced by:** Job-order support and money integration tests exercise unit authority,
 explicit credit and replay, parallel credit, reassignment, completion and cancellation in
 PostgreSQL. Job-order browser tests verify the live commitment, retained peer input and the
-history link to the money operation. Connected correction and Bank confirmation retain their
-own acceptance checks.
+history link to the money operation. `JobOrderMoneyIntegrationTest` contains the Bank-free case
+for correcting the credit after a later revision and the case for an ended occurrence. Bank
+confirmation has its own acceptance checks.
+
+After a 6,000,000 aUEC commitment is credited with a reported provision of 4,000,000 aUEC,
+the outstanding amount is 2,000,000 aUEC. If the unit deliberately revises that outstanding
+amount to 5,000,000 aUEC and the original provision is then corrected to 3,000,000 aUEC,
+the corrected effective credit is 3,000,000 aUEC. The missing 1,000,000 aUEC increases
+the outstanding amount of the same active occurrence to 6,000,000 aUEC. A correction
+to an ended occurrence changes the historical credit and leaves its outstanding amount
+at zero. A later occurrence for the same unit is independent.
 
 ### REQ-ORDERS-060 — A completed transfer books both sides and its fixed fee once
 
@@ -185,11 +202,17 @@ Overfunding and actual overpayment are allowed and displayed separately; neither
 target automatically. Completion or cancellation never automatically releases money, refunds it
 or removes its history.
 
-Use the existing basic movement action to release remaining money at the same holder, document
-an actual return to a named beneficiary, or reassign a purpose amount at the same holder to another
-order. A release/reassignment without game movement has no game fee. Cross-order reassignment
-requires current rights and valid responsibility in both orders; its paired outflow/inflow commit
-together. It is not new procurement or a global wallet/reservation mechanism.
+Use the movement action to release remaining money from the order's purpose, record a real
+shortage, pay a named beneficiary or reassign the same player's money to another order. Release,
+shortage and reassignment carry no game transfer fee. A beneficiary payment debits the holder's
+principal and charges its game transfer fee separately. Its principal leaves the order's holdings
+without changing the requester's net handover. Explicit additional funds can cover its fee.
+
+Cross-order reassignment requires current rights and valid responsibility on both orders. An
+eligible active destination receives the purpose inflow as the source records the purpose outflow.
+Each side commits under the same operation ID. An account link identifies the same player across
+orders. For accountless holders, select their record on each order and confirm that both refer to
+the same person. The two effects are reported separately from new procurement.
 
 If the holder is also a designated requester recipient, an explicit same-person purpose handover
 reduces their procurement holding and increases net handover without a fictitious self-transfer,
@@ -199,6 +222,8 @@ An actual requester return reduces net handover and credits the receiving order 
 counting the returned principal as new procurement. Its fee is separately covered by the returning
 player's existing order holding or explicitly newly provided fee money. Do not silently reduce the
 net return or decrease handover again for that fee. Preserve the original handover and return.
+The return is bounded by the returning recipient's effective net receipt for that designation.
+The corrected party can return money against the original designation's historical receipt.
 
 **Acceptance**
 
@@ -208,8 +233,10 @@ net return or decrease handover again for that fee. Preserve the original handov
 - [ ] A net requester return of 2 reduces net handover by 2 and adds 2 at the recipient; fee funding is explained separately.
 - [ ] Completion alone neither releases residual money nor manufactures a return.
 
-**Enforced by:** `JobOrderMoneyIntegrationTest` covers the same-person purpose handover, overpayment
-and retained residual holdings. Refund, release and cross-order purpose changes require their own checks.
+**Enforced by:** `JobOrderMoneyIntegrationTest` contains PostgreSQL cases for same-person handover,
+retained residuals, fee-funded requester returns, cancelled-order settlement, inverse-direction
+reassignment and rollback of both sides after an audit failure. `JobOrderMoneyE2eTest` contains the
+reassignment and destination refresh journey.
 
 ### REQ-ORDERS-062 — Corrections preserve truth and connected consistency
 
@@ -222,8 +249,15 @@ A financial correction may need a connected set of affected entries. It must pro
 nonnegative holding/availability state and correct associated commitment and fulfilment effects.
 If 10 was recorded, 9 used and the true input was 8, an isolated edit producing −1 is refused:
 correct the connected false entries together or explicitly provide actual additional funds.
-Do not invent a reverse game transfer. Personal correction rights stop where foreign authority
-is required. The strict invalid-responsibility gate applies even to correction and settlement.
+Do not invent a reverse game transfer. In the fee-free example, correcting the provision to 8 and
+the outflow to 7 in one submission leaves the source holding at 1 and the receiving holding at 7.
+The original 10 and 9 entries remain visible. The original operation supplies the rate for any
+revised fee. A correction preserves the funding rules for the original purpose.
+
+A correction of a cross-order reassignment includes both reciprocal legs and can include affected
+local entries. The changed amounts, any linked commitment credit, lifecycle effects and audit
+commit together. Personal correction rights stop where foreign authority is required. The strict
+invalid-responsibility gate applies even to correction and settlement.
 
 **Acceptance**
 
@@ -233,7 +267,10 @@ is required. The strict invalid-responsibility gate applies even to correction a
 - [ ] Correcting a false attributed contribution adjusts its credit once; true later consumption does not.
 - [ ] Identity merging does not silently remove financially duplicated entries.
 
-**Enforced by:** Required future connected-correction, loss, attribution and access checks.
+**Enforced by:** `JobOrderMoneyIntegrationTest` contains the isolated-negative and connected
+correction cases, replay, linked commitment credit, retained provision after loss and reciprocal
+correction with a dependent local movement. `JobOrderMoneyPrivacyIntegrationTest` contains the
+holder maintenance and history cases.
 
 ### REQ-ORDERS-063 — aUEC lifecycle follows effective net handover
 
@@ -246,7 +283,8 @@ Either authorised unit side may record an agreed target change immediately, with
 actor and history, without a second approval workflow. Increasing a completed target above net
 handover returns it to IN_PROGRESS; reducing it to/below net handover completes it and shows any
 overpayment. Returns/corrections that make a completed order underfulfilled also recompute that
-state. A CANCELLED order stays cancelled until deliberate reopening.
+state. A CANCELLED order stays cancelled until deliberate reopening. Ordinary target and contact
+edits resume after reopening.
 
 Both unit sides may cancel and deliberately reopen, as defined in the core. Cancellation stops
 normal procurement and retains all money/history. The normal movement/correction actions support
@@ -275,10 +313,11 @@ operation history under the existing privacy/anonymisation contracts in REQ-ORDE
 - [ ] Concurrent first submission and hard-delete yield one coherent permitted outcome without losing a submitted operation or committing a booking against a deleted order.
 
 **Enforced by:** `JobOrderMoneyIntegrationTest` covers the initial lifecycle, target amendments,
-completion, cancellation and deletion races in PostgreSQL. The Bank increment owns its delayed
-outcomes. The current accepted operation closes hard-delete. A pre-submission refusal leaves
-that path open. Target changes retain the prior amount, new amount, actor and time in the order
-history. An already completed order's residual funds remain visible for settlement.
+completion, cancellation, settlement and deletion races in PostgreSQL. The Bank increment owns
+its delayed outcomes. The first accepted operation closes hard-delete. A pre-submission refusal
+leaves that path open. Target changes retain the prior amount, new amount, actor and time in the
+order history. The money section indicates settlement open when a terminal order has residual
+holdings or the requester has received more than the target.
 
 ### REQ-ORDERS-064 — Effective operation history is the monetary authority
 
@@ -310,19 +349,20 @@ retention exemption. No private Bank approval note enters the order view.
 **Enforced by:** `JobOrderMoneyIntegrationTest` and `JobOrderMoneyPrivacyIntegrationTest` cover
 Bank-free projection, persisted history, consolidation and erasure.
 
-For a Bank-free operation, the accepted terms and effect share one durable fact. One committed
-read snapshot supplies the current target, holder identities and reconstructed amounts. A
-collection credits its receiving holder with the net principal. A requester handover credits
-only fulfilment. Account consolidation preserves original financial references. Names and actor
-labels resolve through the current privacy state.
+For an original Bank-free operation, the accepted terms and effect share one durable fact. A
+correction records its own operation and the previous and revised amounts for each original.
+The same effective history supplies the holdings and net handover used for previews, detail and
+lifecycle decisions. Correction of a contribution carries the credit change and occurrence
+reference. Names and actor labels resolve through the current privacy state.
 
-When both accounts have a holder on the same order, the source holder becomes an alias of the
-survivor and both provisions count toward the survivor's holdings. Provision and account-privacy
-writes take their account locks before affected order locks. Account deletion clears live links
-and historical account references. A granted erasure also redacts retained names and removes
-matching submitted spellings. The original operation ID still supports authorised outcome recovery.
-The personal export includes the member's holder links, directly related money operations,
-requester designations and target changes they recorded.
+When both consolidated accounts have a holder on the same order, the source holder becomes an alias
+of the survivor and both provisions count toward the survivor's holdings. Identity edits record
+previous and current identity, actor and time. Account deletion clears live links and historical
+account references. A granted erasure redacts retained name snapshots, including historical names
+linked to the person's holder and matching accountless spellings. The original operation ID still
+supports authorised outcome recovery. Personal export covers the member's holder links and identity
+history, directly related money operations, requester designations and recorded target changes. A
+false designation can remain in identity history without granting access to the actual payment.
 
 ### REQ-ORDERS-065 — One persistent operation survives retries and lost responses
 
@@ -357,10 +397,12 @@ and current authority against PostgreSQL. `JobOrderMoneyE2eTest` covers actual c
 loss and recovery from a missed request followed by a stale retry.
 Bank waiting and replacement attempts require their own checks.
 
-The immediate provision and movement endpoints use the caller's operation UUID and record one
-accepted attempt. The same authorized actor may replay matching terms with old versions or a
-changed current fee configuration. A new attempt with stale holder, target or fee basis can be
-permanently refused without a financial or audit effect. Refusal leaves the pre-submission
+The Bank-free provision, movement and financial correction endpoints use the caller's operation
+UUID. A paired movement or correction records reciprocal entries under that UUID. Each order's
+current read access governs recovery of its result. A link to the other order requires read access
+there. The same authorised actor may replay matching terms with old versions or a changed current
+fee configuration. A new attempt with stale holder, recipient, target or fee basis can be permanently
+refused without a financial or audit effect. Refusal leaves the pre-submission
 deletion boundary open. The authorized
 `GET /api/v1/orders/{id}/money/operations/{operation}` returns the recorded effect,
 `409 MONEY_PROVISION_REFUSED` for that permanent refusal, or `404` for an unknown result.
@@ -400,14 +442,17 @@ exposing version information. Exact schema, SQL and classes follow these contrac
 - [ ] PostgreSQL races cover first creation, replacement/confirm/cancel and inverse-direction transfers without deadlock-prone lock inversion.
 
 **Enforced by:** `JobOrderMoneyIntegrationTest` exercises concurrent provision, same-source debits,
-target change, cancellation, responsibility transfer, deletion and audit rollback with real
-PostgreSQL. The Bank increment owns joint Bank effects.
+target change, cancellation, responsibility transfer, deletion, paired reassignment and audit
+rollback with real PostgreSQL. The Bank increment owns joint Bank effects.
 
 Holder revision starts at zero before first insertion. Contact and comment use an information
 revision separate from target, lifecycle and responsibility. The shared order row stabilizes
 money effects and the current write grants. Handover checks its holder and target observations.
-A possible terminal transition takes the existing priority queue guard before the scoped row.
-Terms, holder revisions, lifecycle consequences and audit commit in one transaction.
+A possible terminal transition takes the existing priority queue guard before scoped order rows.
+Paired writes acquire the required account identity guards, the shared hierarchy guard, then both
+order rows in PostgreSQL ID order. Each write rechecks both orders' current authority, eligibility
+and relevant observations under the locks. Terms, holder revisions, lifecycle consequences and
+audit commit in one transaction.
 
 ### REQ-ORDERS-067 — Few contextual actions provide truthful live feedback
 
@@ -417,9 +462,9 @@ and Bank details can follow later. Show only kind-relevant inputs. After create,
 detail and retain the list/filter return context.
 
 The ordinary money entry points are provision and movement, with correction on a history entry.
-The movement's purpose reveals only needed fields for collection, handover, return, release or
-cross-order purpose change. Suggest one's own holder and existing parties; permit new parties
-inline only under the agreed grants. Explicitly distinguish selected accounts from free-text
+The movement's purpose reveals only needed fields for collection, handover, return, release,
+shortage, beneficiary payment or cross-order purpose change. Suggest one's own holder and existing
+parties. Permit new parties inline under the agreed grants. Explicitly distinguish selected accounts from free-text
 holders. No prior holder directory, setup wizard, collection-account prerequisite or extra
 exception workflow is required.
 
@@ -458,12 +503,14 @@ every participant.
 - [ ] All admitted requester/helper/holder/payee rooms receive permitted refreshes, with current access checks.
 - [ ] A completed order with residual money or Bank clarification still shows those facts.
 
-**Enforced by:** Required future render, shared-section parity and multi-user browser checks.
+**Enforced by:** `JobOrderMoneyE2eTest` contains Bank-free recovery, live draft, holder maintenance,
+recipient correction and reassignment journeys. The Bank-default and coupled result cases belong
+to the Bank integration acceptance.
 
-The initial workspace exposes the minimal aUEC form, a manual-holdings section and the explicit
-Bank-free action. `JobOrderMoneyE2eTest.recoversExactCommittedProvisionAfterReload` forwards the real
-provision request and drops only the successful browser response, then retrieves the same
-operation on reload. The Bank-free checkpoint alone is not the release of the money workflow.
+The workspace exposes the minimal aUEC form, a manual holdings section and the explicit Bank-free
+action. Settlement uses the existing movement dialog. A correction starts from the history and
+can include further affected original entries. It previews the resulting balances before saving.
+Identity maintenance uses the relevant holder or recipient row.
 
 ### REQ-ORDERS-068 — Both operating modes have verifiable end-to-end evidence
 
@@ -509,7 +556,8 @@ from the order.
 - [ ] Verify mutation audit, grouped notices and peer updates against the same operation cause.
 
 **Enforced by:** `JobOrderMoneyIntegrationTest` verifies each fee-free row and the full 100,000-aUEC
-fee reconciliation using PostgreSQL. Later increments supply the Bank, settlement and correction evidence.
+fee reconciliation using PostgreSQL. The settlement and correction cases are listed under
+REQ-ORDERS-061 and REQ-ORDERS-062. Bank integration has a separate evidence gate.
 
 ## Out of scope
 

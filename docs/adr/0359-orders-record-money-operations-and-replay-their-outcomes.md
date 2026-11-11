@@ -1,6 +1,6 @@
 # ADR-0359 — Orders record money operations and replay their outcomes
 
-- **Status:** Accepted - Bank-free provision checkpoint implemented; movement and Bank outcomes pending
+- **Status:** Accepted - internal Bank-free movements and corrections implemented, optional Bank outcomes pending
 - **Date:** 2026-11-09
 - **Deciders:** @greluc
 - **Related:** [aUEC orders](../specs/orders-auec.md), REQ-ORDERS-057…068; [edit modules](../specs/aggregate-edit-modules.md), REQ-SEC-085 / REQ-ORDERS-046; [ADR-0287](0287-mission-and-job-order-each-edit-through-one-edit-module.md) (amended for scoped order edits); [ADR-0232](0232-modules-interact-through-commands-observers-and-after-commit-events.md); [technical decision](https://github.com/krt-profit/basetool/issues/3202#issuecomment-6741369845)
@@ -64,8 +64,15 @@ logical UUID. Current labels are projected from the holder and actor, while the 
 selection remains separately recoverable subject to name erasure. A stale, unrecorded attempt or
 one checked while the order is inactive reserves its UUID under the same guard as a definitive
 refusal. The reservation carries no financial effect, actor, or submitted terms and does not
-block hard deletion. The [aUEC specification](../specs/orders-auec.md) records the implemented
-checkpoint and its verification.
+block hard deletion.
+
+A financial correction appends an operation and links it to each revised original. The original
+and the applicable rate remain available to reconstruct the history. A paired purpose movement or
+correction stores a reciprocal order-local fact under one logical UUID. The editor acquires both
+order rows in PostgreSQL ID order and commits both results and audit records in one transaction.
+Holder merges retain an order-local alias. Correcting a false requester designation retains the
+historical reference and resolves current access through its replacement. The
+[aUEC specification](../specs/orders-auec.md) records the checkpoint and its verification.
 
 ## Alternatives considered
 

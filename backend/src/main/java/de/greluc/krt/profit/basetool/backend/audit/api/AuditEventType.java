@@ -168,6 +168,9 @@ public enum AuditEventType {
   /** Actual aUEC reported as purpose-bound to one order. */
   JOB_ORDER_MONEY_PROVIDED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_MOVED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_CORRECTED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_REASSIGNED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_RECIPIENT_CHANGED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_TARGET_CHANGED(AuditDomain.JOB_ORDER),
   /** A unit's outstanding aUEC commitment changed. */

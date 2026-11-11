@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,19 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
   Optional<JobOrderMoneyHolder> findByOrderIdAndId(UUID orderId, UUID id);
 
   List<JobOrderMoneyHolder> findAllByOrderIdOrderById(UUID orderId);
+
+  List<JobOrderMoneyHolder> findAllByMergedIntoIdIn(Collection<UUID> sourceIds);
+
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyHolderAliases$Pair(original, survivor)
+      FROM JobOrderMoneyHolder original
+      JOIN JobOrderMoneyHolder survivor ON survivor.orderId = original.orderId
+      WHERE original.userId = :source AND survivor.userId = :target
+        AND original.orderId IN :orderIds
+      """)
+  List<JobOrderMoneyHolderAliases.Pair> collidingHolders(
+      UUID source, UUID target, List<UUID> orderIds);
 
   @Query("SELECT h.userId FROM JobOrderMoneyHolder h WHERE h.orderId = :orderId AND h.id = :id")
   Optional<UUID> accountFor(UUID orderId, UUID id);
@@ -64,9 +78,15 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
                   OR lower(p.selected_accountless_name) IN (SELECT name FROM spellings)
             UNION
             SELECT r.order_id FROM job_order_money_recipient r
-            WHERE r.user_id = :userId OR lower(r.accountless_name) IN (SELECT name FROM spellings)
+            WHERE r.user_id = :userId OR r.correction_actor_id = :userId
+                  OR lower(r.accountless_name) IN (SELECT name FROM spellings)
             UNION
             SELECT t.order_id FROM job_order_money_target_change t WHERE t.actor_id = :userId
+            UNION
+            SELECT c.order_id FROM job_order_money_holder_change c
+            WHERE :userId IN (c.actor_id, c.previous_user_id, c.user_id)
+               OR lower(c.previous_name) IN (SELECT name FROM spellings)
+               OR lower(c.name) IN (SELECT name FROM spellings)
             UNION
             SELECT h.job_order_id FROM job_order_handover h
             WHERE lower(h.recipient_handle) IN (SELECT name FROM spellings)
@@ -105,37 +125,7 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
       nativeQuery = true)
   void unlinkAccount(UUID userId, List<UUID> orderIds);
 
-  @Modifying
-  @Query(
-      value =
-          """
-          UPDATE job_order_money_holder survivor
-          SET revision = survivor.revision + 1
-          FROM job_order_money_holder original
-          WHERE survivor.order_id = original.order_id
-            AND survivor.user_id = :target AND original.user_id = :source
-            AND original.order_id IN (:orderIds)
-          """,
-      nativeQuery = true)
-  int reviseCollidingHolders(UUID source, UUID target, List<UUID> orderIds);
-
-  @Modifying
-  @Query(
-      value =
-          """
-          UPDATE job_order_money_holder alias
-          SET user_id = NULL, accountless_name = NULL,
-              merged_into_id = survivor.id, revision = alias.revision + 1
-          FROM job_order_money_holder original
-          JOIN job_order_money_holder survivor ON survivor.order_id = original.order_id
-          WHERE original.user_id = :source AND survivor.user_id = :target
-            AND original.order_id IN (:orderIds)
-            AND (alias.id = original.id OR alias.merged_into_id = original.id)
-          """,
-      nativeQuery = true)
-  void mergeCollidingHolders(UUID source, UUID target, List<UUID> orderIds);
-
-  @Modifying
+  @Modifying(flushAutomatically = true)
   @Query(
       value =
           """

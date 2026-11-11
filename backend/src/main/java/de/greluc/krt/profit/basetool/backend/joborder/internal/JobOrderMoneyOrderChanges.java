@@ -64,6 +64,7 @@ public class JobOrderMoneyOrderChanges {
         order -> {
           access.requireActiveActor();
           access.requireUnitWriter(order);
+          requireOpenForEdits(order);
           return changesState(order.getStatus(), requested, ledger.delivered(orderId));
         },
         (order, queueLocked) -> targetLocked(order, dto, actor, requested, queueLocked));
@@ -77,6 +78,7 @@ public class JobOrderMoneyOrderChanges {
       boolean queueLocked) {
     access.requireActiveActor();
     access.requireUnitWriter(order);
+    requireOpenForEdits(order);
     JobOrderMoneyTarget target = targets.findById(order.getId()).orElseThrow();
     OptimisticLock.check(
         target.getVersion(), dto.version(), JobOrderMoneyTarget.class, order.getId());
@@ -127,6 +129,7 @@ public class JobOrderMoneyOrderChanges {
         order -> {
           access.requireActiveActor();
           access.requireUnitWriter(order);
+          requireOpenForEdits(order);
           OptimisticLock.check(
               order.getMoneyInformationVersion(), dto.version(), JobOrder.class, orderId);
           String handle = dto.handle().strip();
@@ -148,6 +151,12 @@ public class JobOrderMoneyOrderChanges {
                           JobOrderLifecycleNotices.needChanged(
                               order, actor, access.responsible(order)))));
         });
+  }
+
+  private static void requireOpenForEdits(JobOrder order) {
+    if (order.getStatus() == JobOrderStatus.CANCELLED) {
+      throw new BusinessConflictException("orders.money.movement.inactive");
+    }
   }
 
   private static boolean changesState(

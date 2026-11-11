@@ -70,6 +70,7 @@ public class HandleAnonymisationService {
    * @param orderMoneyHolders rows rewritten in {@code job_order_money_holder}
    * @param orderMoneyOperations rows rewritten in {@code job_order_money_operation}
    * @param orderMoneyRecipients rows rewritten in {@code job_order_money_recipient}
+   * @param orderMoneyHolderChanges rows rewritten in {@code job_order_money_holder_change}
    */
   public record AnonymisationResult(
       int activityAudit,
@@ -82,7 +83,8 @@ public class HandleAnonymisationService {
       int itemHandovers,
       int orderMoneyHolders,
       int orderMoneyOperations,
-      int orderMoneyRecipients) {
+      int orderMoneyRecipients,
+      int orderMoneyHolderChanges) {
 
     /**
      * The total number of rows rewritten across every column.
@@ -100,7 +102,8 @@ public class HandleAnonymisationService {
           + itemHandovers
           + orderMoneyHolders
           + orderMoneyOperations
-          + orderMoneyRecipients;
+          + orderMoneyRecipients
+          + orderMoneyHolderChanges;
     }
   }
 
@@ -141,7 +144,8 @@ public class HandleAnonymisationService {
             rewritten.getOrDefault(Rewritten.ITEM_HANDOVERS, 0),
             rewritten.getOrDefault(Rewritten.ORDER_MONEY_HOLDERS, 0),
             rewritten.getOrDefault(Rewritten.ORDER_MONEY_OPERATIONS, 0),
-            rewritten.getOrDefault(Rewritten.ORDER_MONEY_RECIPIENTS, 0));
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_RECIPIENTS, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_HOLDER_CHANGES, 0));
 
     auditRecorder.record(
         AuditEventType.HANDLE_SNAPSHOTS_ANONYMISED,
@@ -159,6 +163,7 @@ public class HandleAnonymisationService {
             .with("orderMoneyHolders", result.orderMoneyHolders())
             .with("orderMoneyOperations", result.orderMoneyOperations())
             .with("orderMoneyRecipients", result.orderMoneyRecipients())
+            .with("orderMoneyHolderChanges", result.orderMoneyHolderChanges())
             .with("spellings", names.size()));
 
     for (HandleAnonymisationParticipant participant : ordered) {

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import jakarta.persistence.EntityManager;
@@ -80,6 +81,12 @@ public class JobOrderEditor {
   /** Scoped money mutation and the audit and notices that commit with it. */
   record MoneyEdit<T>(T result, JobOrderEdit edit) {}
 
+  /** One financial change with an audit outcome in each affected order. */
+  record MoneyPairEdit<T>(T result, JobOrderEdit source, JobOrderEdit destination) {}
+
+  /** Both managed orders after all row locks and current authority checks. */
+  record MoneyPairBasis(JobOrder source, JobOrder destination, boolean queueLocked) {}
+
   /**
    * Applies one monetary edit while responsibility, lifecycle and deletion are serialized.
    *
@@ -99,9 +106,7 @@ public class JobOrderEditor {
       Predicate<JobOrder> needsQueue,
       BiFunction<JobOrder, Boolean, MoneyEdit<T>> mutation) {
     profitHierarchy.lockForOrderWrite();
-    JobOrder order =
-        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-    authorizeMoney(order);
+    JobOrder order = requireMoneyOrder(id);
     boolean queueLocked = needsQueue.test(order);
     if (queueLocked) {
       jobOrderRepository.lockPriorityQueueRows();
@@ -112,6 +117,55 @@ public class JobOrderEditor {
     MoneyEdit<T> result = mutation.apply(order, queueLocked);
     recordOutcome(result.edit());
     return result.result();
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  <T> T editMoneyPair(
+      UUID sourceId,
+      UUID destinationId,
+      BiFunction<JobOrder, JobOrder, MoneyPairEdit<T>> mutation) {
+    return editMoneyPair(
+        sourceId,
+        destinationId,
+        _ -> false,
+        basis -> mutation.apply(basis.source(), basis.destination()));
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  <T> T editMoneyPair(
+      UUID sourceId,
+      UUID destinationId,
+      Predicate<JobOrder> needsQueue,
+      Function<MoneyPairBasis, MoneyPairEdit<T>> mutation) {
+    profitHierarchy.lockForOrderWrite();
+    JobOrder source = requireMoneyOrder(sourceId);
+    final JobOrder destination = requireMoneyOrder(destinationId);
+    boolean queueLocked = needsQueue.test(source);
+    List<UUID> locked =
+        queueLocked
+            ? jobOrderRepository.lockPriorityQueueRows()
+            : jobOrderRepository.lockForOrderEarmarks(List.of(sourceId, destinationId));
+    if (!locked.contains(sourceId)) {
+      throw new NotFoundException("JobOrder not found: " + sourceId);
+    }
+    if (!locked.contains(destinationId)) {
+      throw new NotFoundException("JobOrder not found: " + destinationId);
+    }
+    entityManager.refresh(source);
+    entityManager.refresh(destination);
+    authorizeMoney(source);
+    authorizeMoney(destination);
+    MoneyPairEdit<T> result = mutation.apply(new MoneyPairBasis(source, destination, queueLocked));
+    recordOutcome(result.source());
+    recordOutcome(result.destination());
+    return result.result();
+  }
+
+  private JobOrder requireMoneyOrder(UUID id) {
+    JobOrder order =
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    authorizeMoney(order);
+    return order;
   }
 
   private void authorizeMoney(JobOrder order) {

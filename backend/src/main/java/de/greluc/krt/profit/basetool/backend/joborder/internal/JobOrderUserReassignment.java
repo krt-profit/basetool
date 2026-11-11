@@ -49,6 +49,7 @@ public class JobOrderUserReassignment implements UserReassignmentParticipant {
   private final OwnedRowsMover mover;
   private final JobOrderMoneyRecipientRepository recipients;
   private final JobOrderMoneyHolderRepository holders;
+  private final JobOrderMoneyHolderAliases holderAliases;
   private final JobOrderMoneyPrivacy moneyPrivacy;
   private final JobOrderMoneyIdentityLock identityLock;
 
@@ -70,7 +71,11 @@ public class JobOrderUserReassignment implements UserReassignmentParticipant {
         "material_claim.claimed_by_user_id",
         "job_order_money_operation.actor_id",
         "job_order_money_operation.selected_user_id",
-        "job_order_money_target_change.actor_id");
+        "job_order_money_target_change.actor_id",
+        "job_order_money_recipient.correction_actor_id",
+        "job_order_money_holder_change.actor_id",
+        "job_order_money_holder_change.previous_user_id",
+        "job_order_money_holder_change.user_id");
   }
 
   @Override
@@ -92,16 +97,18 @@ public class JobOrderUserReassignment implements UserReassignmentParticipant {
     if (orderIds.isEmpty()) {
       return assignments;
     }
-    int collisions = holders.reviseCollidingHolders(source, target, orderIds);
-    holders.mergeCollidingHolders(source, target, orderIds);
+    List<JobOrderMoneyHolderAliases.Pair> collisions =
+        holders.collidingHolders(source, target, orderIds);
+    holderAliases.merge(collisions);
     int movedLinks = holders.moveLinkedHolders(source, target, orderIds);
     int movedRecipients = recipients.moveAccounts(source, target, orderIds);
-    if (collisions + movedLinks + movedRecipients == 0) {
+    int holderChanges = collisions.size() + movedLinks;
+    if (holderChanges + movedRecipients == 0) {
       return assignments;
     }
     List<Moved> moved = new ArrayList<>(assignments);
-    if (collisions + movedLinks > 0) {
-      moved.add(new Moved(HOLDERS.qualified(), collisions + movedLinks));
+    if (holderChanges > 0) {
+      moved.add(new Moved(HOLDERS.qualified(), holderChanges));
     }
     if (movedRecipients > 0) {
       moved.add(new Moved(RECIPIENTS.qualified(), movedRecipients));

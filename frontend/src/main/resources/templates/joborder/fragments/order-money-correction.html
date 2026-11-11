@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="action">
+    <button th:if="${entry.correctionBasis != null and currentUserId != null}" type="button"
+            class="btn btn-ghost" data-trigger="od-money-correct" data-testid="order-money-correct"
+            th:data-original-operation="${entry.operationId}" th:data-original-kind="${entry.kind}"
+            th:data-original-amount="${entry.correctionBasis.amount}"
+            th:data-original-provision="${entry.correctionBasis.provision}"
+            th:data-original-holders="${#strings.listJoin(entry.correctionBasis.holderIds, ',')}"
+            th:data-original-affects-target="${entry.correctionBasis.affectsTarget}"
+            th:data-original-attributed="${entry.correctionBasis.attributed}"
+            th:text="#{orders.money.correction.edit}"></button>
+</th:block>
+
+<th:block th:fragment="dialog">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='order-money-correction-modal',
+        titleKey='orders.money.correction.edit', variant='krt-modal--wide',
+        body=~{joborder/fragments/order-money-correction :: form})}"></th:block>
+</th:block>
+
+<form th:fragment="form" id="order-money-correction-form">
+    <div class="krt-modal-body">
+        <p th:text="#{orders.money.correction.description}"></p>
+        <div class="alert alert-info" role="status" data-money-correction-basis hidden
+             th:text="#{orders.money.correction.basisChanged}"></div>
+        <fieldset>
+            <div data-money-correction-lines></div>
+            <button type="button" class="btn btn-ghost" data-money-correction-add
+                    th:text="#{orders.money.correction.add}"></button>
+        </fieldset>
+        <dl data-money-preview hidden>
+            <dt th:text="#{orders.money.holdings}"></dt><dd data-preview-value="holdings"></dd>
+            <dt th:text="#{orders.money.provided}"></dt><dd data-preview-value="provided"></dd>
+            <dt th:text="#{orders.money.handedOver}"></dt><dd data-preview-value="handedOver"></dd>
+            <dt th:text="#{orders.money.fees}"></dt><dd data-preview-value="fees"></dd>
+            <div data-money-correction-peer hidden>
+                <dt th:text="#{orders.money.correction.peerHoldings}"></dt>
+                <dd data-preview-value="linkedHoldings"></dd>
+            </div>
+        </dl>
+        <p class="alert alert-danger" role="alert" data-money-preview-error hidden></p>
+        <button type="button" class="btn btn-ghost" data-money-preview-retry hidden
+                th:text="#{orders.money.preview.retry}"></button>
+        <template data-money-correction-line-template>
+            <div class="form-grid">
+                <label>
+                    <span th:text="#{orders.money.correction.original}"></span>
+                    <select name="originalOperation" required></select>
+                </label>
+                <label>
+                    <span th:text="#{orders.money.correction.correctAmount}"></span>
+                    <input name="amount" type="text" inputmode="numeric" data-number-input="exact-whole"
+                           data-number-allow-zero th:data-invalid="#{orders.money.correction.invalidAmount}" required>
+                </label>
+                <label>
+                    <span th:text="#{orders.money.correction.correctProvision}"></span>
+                    <input name="provision" type="text" inputmode="numeric" data-number-input="exact-whole"
+                           data-number-allow-zero th:data-invalid="#{orders.money.correction.invalidAmount}">
+                </label>
+                <label>
+                    <input name="removeAttribution" type="checkbox">
+                    <span th:text="#{orders.money.correction.removeAttribution}"></span>
+                </label>
+                <button type="button" class="btn btn-ghost" data-money-correction-remove
+                        th:text="#{orders.money.correction.removeEntry}"></button>
+            </div>
+        </template>
+    </div>
+    <div class="krt-modal-foot">
+        <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                data-modal-id="order-money-correction-modal" th:text="#{general.cancel}"></button>
+        <button type="submit" class="btn btn--cta" data-testid="order-money-correction-save" disabled th:text="#{orders.detail.save}"></button>
+    </div>
+</form>
+</body>
+</html>

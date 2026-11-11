@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -33,4 +34,7 @@ interface JobOrderMoneyCommitmentChangeRepository
    * @return current and historical changes in application order
    */
   List<JobOrderMoneyCommitmentChange> findByOrderIdOrderByIdAsc(UUID orderId);
+
+  Optional<JobOrderMoneyCommitmentChange> findByOrderIdAndOperationId(
+      UUID orderId, UUID operationId);
 }

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +60,9 @@ public class JobOrderMoneyQueries {
   private final JobOrderMoneyLedger ledger;
   private final JobOrderMoneyRecipients recipients;
   private final JobOrderMoneyTargetChangeRepository targetChanges;
+  private final JobOrderMoneyCorrectionEntryRepository corrections;
+  private final JobOrderMoneyHolderHistory holderHistory;
+  private final JobOrderMoneyPairedCorrectionChoices pairedCorrectionChoices;
 
   /**
    * Reconstructs current reported amounts from effective monetary facts.
@@ -88,19 +93,51 @@ public class JobOrderMoneyQueries {
                     booked.balance(holder.getId()).toPlainString(),
                     holder.getRevision()))
             .toList();
+    Map<UUID, List<JobOrderMoneyCorrectionView>> correctionViews =
+        booked.corrections().stream()
+            .collect(
+                Collectors.groupingBy(
+                    JobOrderMoneyCorrectionEntry::getCorrectionOperationId,
+                    Collectors.mapping(JobOrderMoneyCorrectionEntry::view, Collectors.toList())));
+    var visiblePeers = visiblePeers(booked.facts());
+    boolean validResponsibility = !responsibilityInvalid(order);
+    UUID actor =
+        auth.currentUserId().filter(id -> holderChoices.activeUser(id).isPresent()).orElse(null);
+    boolean responsible = validResponsibility && actor != null && moneyAccess.responsible(order);
+    boolean requester = validResponsibility && actor != null && moneyAccess.requester(order);
+    Set<UUID> correctablePaired =
+        validResponsibility && actor != null
+            ? pairedCorrectionChoices.eligibleOriginals(order, actor, visiblePeers)
+            : Set.of();
     List<JobOrderMoneyOutcome> history =
         booked.facts().stream()
             .map(fact ->
                 JobOrderMoneyOutcome.of(
                     fact,
-                    label(booked.holder(fact.getHolderId()), names),
+                    sourceName(fact, booked, names, recipientsById),
                     fact.getActorId() == null ? null : names.get(fact.getActorId()),
-                    destinationName(fact, booked, names, recipientsById)))
+                    destinationName(fact, booked, names, recipientsById),
+                    visiblePeer(fact, visiblePeers),
+                    correctionViews.getOrDefault(fact.getOperationId(), List.of()),
+                    validResponsibility
+                        ? correctionBasis(
+                            fact,
+                            booked,
+                            recipientsById,
+                            actor,
+                            responsible,
+                            requester,
+                            correctablePaired.contains(fact.getOperationId()))
+                        : null))
             .toList();
-    boolean validResponsibility = !responsibilityInvalid(order);
-    boolean activeAccount = auth.currentUserId().flatMap(holderChoices::activeUser).isPresent();
-    boolean self = validResponsibility && activeAccount && order.getStatus().isActive();
-    boolean unitWriter = validResponsibility && activeAccount && moneyAccess.unitWriter(order);
+    boolean self = validResponsibility && actor != null && order.getStatus().isActive();
+    boolean unitWriter = responsible || requester;
+    boolean editsOrder = unitWriter && order.getStatus() != JobOrderStatus.CANCELLED;
+    boolean ownsSettlement =
+        actor != null
+            && (rows.stream().anyMatch(row -> actor.equals(row.userId()))
+                || designations.stream()
+                    .anyMatch(designation -> actor.equals(designation.userId())));
     BigDecimal outstanding = target.getAmount().subtract(booked.handedOver());
     return new JobOrderMoneyView(
         target.getAmount().toPlainString(),
@@ -118,12 +155,48 @@ public class JobOrderMoneyQueries {
         outstanding.negate().max(BigDecimal.ZERO).toPlainString(),
         designations,
         self && unitWriter,
-        unitWriter,
-        unitWriter,
+        editsOrder,
+        editsOrder,
         order.getMoneyInformationVersion(),
         self && moneyAccess.responsible(order),
         self && moneyAccess.requester(order),
-        targetHistory(orderId));
+        targetHistory(orderId),
+        booked.purposeInflow().toPlainString(),
+        booked.purposeOutflow().toPlainString(),
+        booked.released().toPlainString(),
+        booked.shortages().toPlainString(),
+        booked.settled().toPlainString(),
+        !order.getStatus().isActive()
+            && (booked.holdings().signum() > 0 || outstanding.signum() < 0),
+        validResponsibility,
+        responsible,
+        requester,
+        holderHistory.views(orderId),
+        validResponsibility
+            && order.getStatus() != JobOrderStatus.REJECTED
+            && (unitWriter || ownsSettlement),
+        unitWriter,
+        designations.stream()
+            .filter(designation -> booked.netForRecipient(designation.id()).signum() > 0)
+            .map(JobOrderMoneyRecipientView::id)
+            .toList());
+  }
+
+  private Set<UUID> visiblePeers(List<JobOrderMoneyOperation> facts) {
+    var peers =
+        facts.stream()
+            .map(JobOrderMoneyOperation::getPeerOrderId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return orders.findAllById(peers).stream()
+        .filter(access::canSeeJobOrder)
+        .map(JobOrder::getId)
+        .collect(Collectors.toSet());
+  }
+
+  private static @Nullable UUID visiblePeer(JobOrderMoneyOperation operation, Set<UUID> visible) {
+    UUID peer = operation.getPeerOrderId();
+    return peer != null && visible.contains(peer) ? peer : null;
   }
 
   private List<JobOrderMoneyTargetChangeView> targetHistory(UUID orderId) {
@@ -147,11 +220,63 @@ public class JobOrderMoneyQueries {
         .toList();
   }
 
+  private static @Nullable JobOrderMoneyCorrectionBasisView correctionBasis(
+      JobOrderMoneyOperation operation,
+      JobOrderMoneyLedger.Ledger booked,
+      Map<UUID, JobOrderMoneyRecipientView> designations,
+      @Nullable UUID actor,
+      boolean responsible,
+      boolean requester,
+      boolean pairedAuthorized) {
+    if (actor == null
+        || operation.isBankHandling()
+        || operation.getKind() == JobOrderMoneyKind.CORRECTION
+        || (operation.getPeerOrderId() != null && !pairedAuthorized)) {
+      return null;
+    }
+    var source = booked.holder(operation.getHolderId());
+    UUID destinationId = operation.getDestinationHolderId();
+    var destination = destinationId == null ? source : booked.holder(destinationId);
+    UUID recipientId = operation.getRecipientId();
+    UUID recipientAccount =
+        recipientId == null ? null : Objects.requireNonNull(designations.get(recipientId)).userId();
+    if (!responsible
+        && (!actor.equals(source.getUserId())
+            || !actor.equals(destination.getUserId())
+            || (recipientId != null && !requester && !actor.equals(recipientAccount)))) {
+      return null;
+    }
+    var amounts = booked.effective(operation);
+    UUID sourceId = Objects.requireNonNull(source.getId());
+    UUID targetId = Objects.requireNonNull(destination.getId());
+    return new JobOrderMoneyCorrectionBasisView(
+        amounts.amount().toPlainString(),
+        amounts.provision().toPlainString(),
+        sourceId.equals(targetId) ? List.of(sourceId) : List.of(sourceId, targetId),
+        operation.getKind().delivers() || operation.getKind() == JobOrderMoneyKind.REQUESTER_RETURN,
+        operation.getCommitmentId() != null);
+  }
+
+  private static @Nullable String sourceName(
+      JobOrderMoneyOperation operation,
+      JobOrderMoneyLedger.Ledger booked,
+      Map<UUID, String> names,
+      Map<UUID, JobOrderMoneyRecipientView> designations) {
+    UUID recipientId = operation.getRecipientId();
+    return operation.getKind() == JobOrderMoneyKind.REQUESTER_RETURN && recipientId != null
+        ? Objects.requireNonNull(designations.get(recipientId)).name()
+        : label(booked.holder(operation.getHolderId()), names);
+  }
+
   private static @Nullable String destinationName(
       JobOrderMoneyOperation operation,
       JobOrderMoneyLedger.Ledger booked,
       Map<UUID, String> names,
       Map<UUID, JobOrderMoneyRecipientView> designations) {
+    if (operation.getKind() == JobOrderMoneyKind.SETTLEMENT) {
+      UUID beneficiary = operation.getSelectedUserId();
+      return beneficiary == null ? operation.getSelectedAccountlessName() : names.get(beneficiary);
+    }
     UUID destinationId = operation.getDestinationHolderId();
     if (destinationId != null) {
       return label(booked.holder(destinationId), names);
@@ -173,6 +298,10 @@ public class JobOrderMoneyQueries {
     facts.forEach(operation -> {
       if (operation.getActorId() != null) {
         ids.add(operation.getActorId());
+      }
+      UUID beneficiary = operation.getSelectedUserId();
+      if (operation.getKind() == JobOrderMoneyKind.SETTLEMENT && beneficiary != null) {
+        ids.add(beneficiary);
       }
     });
     return holderChoices.namesOf(ids);
@@ -228,12 +357,34 @@ public class JobOrderMoneyQueries {
         aliasTarget == null ? holder : holders.findById(aliasTarget).orElseThrow();
     return JobOrderMoneyOutcome.of(
         operation,
-        holderChoices.nameOf(current),
+        operation.getKind() == JobOrderMoneyKind.REQUESTER_RETURN
+            ? recipients
+                .party(
+                    recipients.require(
+                        operation.getOrderId(), Objects.requireNonNull(operation.getRecipientId())))
+                .name()
+            : holderChoices.nameOf(current),
         holderChoices.nameOf(operation.getActorId()),
-        movementDestinationName(operation));
+        movementDestinationName(operation),
+        visiblePeer(operation, visiblePeers(List.of(operation))),
+        operation.getKind() == JobOrderMoneyKind.CORRECTION
+            ? corrections
+                .findAllByOrderIdAndCorrectionOperationIdOrderByIdAsc(
+                    operation.getOrderId(), operation.getOperationId())
+                .stream()
+                .map(JobOrderMoneyCorrectionEntry::view)
+                .toList()
+            : List.of(),
+        null);
   }
 
   private @Nullable String movementDestinationName(JobOrderMoneyOperation operation) {
+    if (operation.getKind() == JobOrderMoneyKind.SETTLEMENT) {
+      UUID beneficiary = operation.getSelectedUserId();
+      return beneficiary == null
+          ? operation.getSelectedAccountlessName()
+          : holderChoices.nameOf(beneficiary);
+    }
     UUID destinationId = operation.getDestinationHolderId();
     if (destinationId != null) {
       JobOrderMoneyHolder destination = holders.findById(destinationId).orElseThrow();

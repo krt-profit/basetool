@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import java.util.Collection;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -47,7 +48,16 @@ class JobOrderMoneyIdentityLock {
 
   @Transactional(propagation = Propagation.MANDATORY)
   void lockAccounts(UUID accountId, @Nullable UUID first, @Nullable UUID second) {
-    Stream.of(accountId, first, second)
+    lock(Stream.of(accountId, first, second));
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  void lockAffectedAccounts(UUID actor, Collection<UUID> affectedAccounts) {
+    lock(Stream.concat(Stream.of(actor), affectedAccounts.stream()));
+  }
+
+  private void lock(Stream<UUID> accounts) {
+    accounts
         .filter(Objects::nonNull)
         .mapToInt(JobOrderMoneyIdentityLock::key)
         .distinct()

@@ -18,56 +18,88 @@
  */
 
 import { krtEvents } from '/js/kernel/event-delegation.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtNumberInput } from '/js/kernel/krt-number-input.js';
-import {
-    bindMoneyPartyChoice,
-    orderHolders,
-    orderMoneyProjection,
-    setMoneyOptions,
-} from '/js/joborder/orders-money-holders.js';
+import { orderHolders, orderMoneyProjection } from '/js/joborder/orders-money-holders.js';
 import { bindMoneyPreview, showPreviewAmounts } from '/js/joborder/orders-money-preview.js';
+import {
+    bindMovementParties,
+    showMovementField,
+} from '/js/joborder/orders-money-movement-parties.js';
+import { bindReassignmentDestination } from '/js/joborder/orders-money-reassignment.js';
 import {
     readAttributionChoice,
     refreshAttributionChoices,
 } from '/js/joborder/orders-money-commitments.js';
 
-/** @typedef {Omit<ApiDto<'MoveJobOrderMoneyDto'>, 'operationId'>} MovementDraft */
-/** @typedef {ApiDto<'JobOrderMoneyMovementPreview'>} MovementPreview */
-/** @import { bindMoneyRecovery } from '/js/joborder/orders-money-recovery.js' */
+/** @import { bindMoneyRecovery, MovementDraft } from '/js/joborder/orders-money-recovery.js' */
 /** @typedef {ReturnType<typeof bindMoneyRecovery>} Recovery */
+/** @typedef {ApiDto<'JobOrderMoneyMovementPreview'>} MovementPreview */
+/** @typedef {ApiDto<'JobOrderMoneyReassignmentPreview'>} ReassignmentPreview */
 
 const modalId = 'order-money-movement-modal';
+const handovers = new Set(['HANDOVER', 'PURPOSE_HANDOVER']);
+const activePurposes = new Set(['COLLECTION', ...handovers]);
 
 /**
- * Reads the currently selectable requester recipients.
+ * Shows exact server-calculated amounts, parties and the applicable lifecycle effect.
  *
- * @returns {{id: string, holderId: string, userId: string, label: string}[]} the active designations
+ * @param {HTMLElement} output the shared preview
+ * @param {MovementPreview | ReassignmentPreview} result the authorised effects
+ * @param {boolean} handover whether net handover rises
+ * @param {boolean} returning whether a requester return lowers net handover
+ * @param {boolean} hasDestination whether the action involves a receiving party
+ * @param {string} nameUnavailable the localized missing party label
  */
-function recipients() {
-    const rows = orderMoneyProjection()?.querySelectorAll('[data-money-recipient]') || [];
-    return Array.from(rows, (row) => ({
-        id: row.getAttribute('data-money-recipient') || '',
-        holderId: row.getAttribute('data-holder-id') || '',
-        userId: row.getAttribute('data-user-id') || '',
-        label: row.getAttribute('data-recipient-label') || '',
-    }));
+function renderMovement(output, result, handover, returning, hasDestination, nameUnavailable) {
+    const { amount, fee, provision, sourceAfter } = result;
+    const shortfall = 'shortfall' in result ? result.shortfall : undefined;
+    const overpayment = 'overpayment' in result ? result.overpayment : undefined;
+    const destinationAfter =
+        'destinationAfter' in result && typeof result.destinationAfter === 'string'
+            ? result.destinationAfter
+            : undefined;
+    showPreviewAmounts(output, {
+        amount,
+        fee,
+        charge: returning ? fee : (BigInt(amount || '0') + BigInt(fee || '0')).toString(),
+        provision,
+        sourceAfter,
+        destinationAfter,
+        overpayment,
+        shortfall,
+    });
+    for (const [name, value] of Object.entries({
+        source: result.sourceName,
+        destination: result.destinationName,
+    })) {
+        const label = output.querySelector(`[data-preview-label="${name}"]`);
+        if (label) label.textContent = value ?? nameUnavailable;
+    }
+    output.querySelector('[data-preview-destination]')?.toggleAttribute('hidden', !hasDestination);
+    output
+        .querySelector('[data-preview-shortfall]')
+        ?.toggleAttribute('hidden', !shortfall || shortfall === '0');
+    output
+        .querySelector('[data-preview-overpayment]')
+        ?.toggleAttribute('hidden', !overpayment || overpayment === '0');
+    output
+        .querySelector('[data-preview-destination-balance]')
+        ?.toggleAttribute('hidden', destinationAfter === undefined);
+    const projection = orderMoneyProjection()?.dataset;
+    const remaining = BigInt(projection?.remaining || '0');
+    const completes = handover && remaining > 0n && BigInt(amount || '0') >= remaining;
+    const reopens =
+        returning &&
+        projection?.status === 'COMPLETED' &&
+        BigInt(projection.netHandedOver || '0') - BigInt(amount || '0') <
+            BigInt(projection.target || '0');
+    output.querySelector('[data-preview-completes]')?.toggleAttribute('hidden', !completes);
+    output.querySelector('[data-preview-reopens]')?.toggleAttribute('hidden', !reopens);
 }
 
 /**
- * Enables only the fields relevant to the selected purpose.
- *
- * @param {HTMLSelectElement | HTMLInputElement} input the contextual field
- * @param {boolean} enabled whether it applies to the draft
- */
-function showField(input, enabled) {
-    input.disabled = !enabled;
-    input.closest('.form-group')?.toggleAttribute('hidden', !enabled);
-}
-
-/**
- * Records one actual collection, delivery or same-player purpose change.
+ * Binds one movement editor and persistent outcome recovery to the aUEC order.
  *
  * @param {HTMLElement} root the authenticated account and order scope
  * @param {Recovery} recovery the shared money operation recovery
@@ -76,11 +108,6 @@ export function bindMoneyMovement(root, recovery) {
     const form = document.getElementById('order-money-movement-form');
     if (!(form instanceof HTMLFormElement)) throw new Error('The order movement form is missing');
     const kind = form.elements.namedItem('kind');
-    const source = form.elements.namedItem('sourceHolderId');
-    const destinationMode = form.elements.namedItem('destinationMode');
-    const destination = form.elements.namedItem('destinationHolderId');
-    const destinationChoice = form.elements.namedItem('destinationChoice');
-    const recipient = form.elements.namedItem('recipientId');
     const amount = form.elements.namedItem('amount');
     const bankFree = form.elements.namedItem('bankFree');
     const topUp = form.elements.namedItem('topUp');
@@ -89,11 +116,6 @@ export function bindMoneyMovement(root, recovery) {
     const changed = form.querySelector('[data-money-basis-changed]');
     if (
         !(kind instanceof HTMLSelectElement) ||
-        !(source instanceof HTMLSelectElement) ||
-        !(destinationMode instanceof HTMLSelectElement) ||
-        !(destination instanceof HTMLSelectElement) ||
-        !(destinationChoice instanceof HTMLSelectElement) ||
-        !(recipient instanceof HTMLSelectElement) ||
         !(amount instanceof HTMLInputElement) ||
         !(bankFree instanceof HTMLInputElement) ||
         !(topUp instanceof HTMLInputElement) ||
@@ -111,180 +133,192 @@ export function bindMoneyMovement(root, recovery) {
     let saving = false;
     krtNumberInput.enhance(amount);
 
-    const chosenParty = bindMoneyPartyChoice(destinationChoice, (query) => {
-        if (!source.value) return Promise.resolve([]);
-        const params = new URLSearchParams({ sourceHolderId: source.value, q: query });
-        return krtFetch.getJson(`${url}/movement-candidates?${params}`);
-    });
+    const parties = bindMovementParties(form, kind, url, self);
+    const reassignment = bindReassignmentDestination(form, url, (live) => sync(live));
+    const isReassignment = () => kind.value === 'REASSIGNMENT';
+    const isReturning = () => kind.value === 'REQUESTER_RETURN';
 
-    const moveForOthers = () => orderMoneyProjection()?.dataset.canMoveForOthers === 'true';
-    const recordForRequester = () =>
-        orderMoneyProjection()?.dataset.canRecordRequesterHandover === 'true';
-    const selectedSource = () => orderHolders().find(({ id }) => id === source.value);
-    const canSpendSource = () => moveForOthers() || selectedSource()?.userId === self;
-    const isCollection = () => kind.value === 'COLLECTION';
-
-    /** Refreshes the authorized parties while retaining explicit choices. */
-    const updateOptions = () => {
-        const holders = orderHolders();
-        const designations = recipients();
-        const hasOwnRecipient = designations.some(({ userId }) => userId === self);
-        const canChooseForeignSource =
-            isCollection() || recordForRequester() || hasOwnRecipient || moveForOthers();
-        setMoneyOptions(
-            source,
-            holders.filter((row) => canChooseForeignSource || row.userId === self),
-        );
-
-        const canSpend = canSpendSource();
-        const availableHolders = holders.filter(
-            (row) => row.id !== source.value && (canSpend || row.userId === self),
-        );
-        setMoneyOptions(destination, availableHolders);
-        const selfOption = destinationMode.querySelector('option[value="self"]');
-        if (selfOption instanceof HTMLOptionElement) {
-            selfOption.hidden = canSpend || holders.some((row) => row.userId === self);
-            selfOption.disabled = selfOption.hidden;
+    const updatePurposes = () => {
+        const state = orderMoneyProjection()?.dataset;
+        const valid =
+            !!state && state.responsibilityValid !== 'false' && state.status !== 'REJECTED';
+        const active = state?.status === 'OPEN' || state?.status === 'IN_PROGRESS';
+        const hasOwnScope = parties.moveForOthers() || parties.ownsHolding();
+        for (const option of kind.options) {
+            const permitted = activePurposes.has(option.value)
+                ? active && state?.canRecordMovement === 'true'
+                : option.value === 'REQUESTER_RETURN'
+                  ? parties.canReturn()
+                  : hasOwnScope;
+            option.disabled = !valid || !permitted;
+            option.hidden = option.disabled && option.value !== kind.value;
         }
-        const newOption = destinationMode.querySelector('option[value="new"]');
-        if (newOption instanceof HTMLOptionElement) newOption.disabled = !canSpend;
-
-        const sourceUser = selectedSource()?.userId;
-        const sameHolder = (/** @type {(typeof designations)[number]} */ designation) =>
-            designation.holderId === source.value ||
-            (!!sourceUser && designation.userId === sourceUser);
-        setMoneyOptions(
-            recipient,
-            designations.filter(
-                (row) =>
-                    (canSpend || recordForRequester() || row.userId === self) &&
-                    (kind.value === 'PURPOSE_HANDOVER' ? sameHolder(row) : !sameHolder(row)),
-            ),
-        );
-
-        const collecting = isCollection();
-        showField(destinationMode, collecting);
-        showField(destination, collecting && destinationMode.value === 'existing');
-        chosenParty.setEnabled(collecting && canSpend && destinationMode.value === 'new');
-        showField(recipient, !collecting);
     };
 
-    /** @returns {MovementDraft | null} the complete draft before accepting a top-up */
+    /** @returns {MovementDraft | null} the complete terms before selecting additional funds */
     const readBase = () => {
-        const projection = orderMoneyProjection();
-        const holder = selectedSource();
+        const state = orderMoneyProjection()?.dataset;
         if (
-            projection?.dataset.canRecordMovement !== 'true' ||
-            !holder ||
+            !state ||
+            kind.selectedOptions.item(0)?.disabled ||
             !amount.value ||
             !bankFree.checked
         ) {
             return null;
         }
-        const common = {
-            amount: amount.value,
-            sourceHolderId: holder.id,
-            sourceVersion: holder.version,
-            bankHandling: false,
-        };
-        if (kind.value === 'HANDOVER' || kind.value === 'PURPOSE_HANDOVER') {
-            if (!recipient.value) return null;
-            return {
-                ...common,
-                kind: kind.value,
-                targetVersion: Number(projection.dataset.targetVersion || 0),
-                recipientId: recipient.value,
-            };
-        }
-        const collection = { ...common, kind: /** @type {const} */ ('COLLECTION') };
-        if (destinationMode.value === 'existing') {
-            const target = orderHolders().find(({ id }) => id === destination.value);
-            return target
+        const common = { amount: amount.value, bankHandling: false };
+        const holder = parties.source();
+        const targetVersion = Number(state.targetVersion || 0);
+        if (kind.value === 'REQUESTER_RETURN') {
+            const destination = parties.selection();
+            const recipientId = parties.recipientId();
+            return destination && recipientId
                 ? {
-                      ...collection,
-                      destinationHolderId: target.id,
-                      destinationVersion: target.version,
+                      command: 'movements/settlement',
+                      terms: {
+                          ...common,
+                          ...destination,
+                          kind: 'REQUESTER_RETURN',
+                          recipientId,
+                          sourceHolderId: holder?.id,
+                          sourceVersion: holder?.version,
+                          targetVersion,
+                      },
                   }
                 : null;
         }
-        if (destinationMode.value === 'self' && self && !canSpendSource()) {
-            return { ...collection, destinationUserId: self, destinationVersion: 0 };
+        if (!holder) return null;
+        const source = { ...common, sourceHolderId: holder.id, sourceVersion: holder.version };
+        switch (kind.value) {
+            case 'REASSIGNMENT': {
+                const destination = reassignment.selection(holder);
+                return destination
+                    ? {
+                          command: 'movements/reassignment',
+                          terms: { ...source, ...destination },
+                          destinationNumber: reassignment.displayNumber(),
+                      }
+                    : null;
+            }
+            case 'HANDOVER':
+            case 'PURPOSE_HANDOVER': {
+                const recipientId = parties.recipientId();
+                return recipientId
+                    ? {
+                          command: 'movements',
+                          terms: { ...source, kind: kind.value, targetVersion, recipientId },
+                      }
+                    : null;
+            }
+            case 'COLLECTION': {
+                const destination = parties.selection();
+                return destination
+                    ? {
+                          command: 'movements',
+                          terms: { ...source, ...destination, kind: 'COLLECTION' },
+                      }
+                    : null;
+            }
+            case 'SETTLEMENT': {
+                const destination = parties.selection();
+                return destination
+                    ? {
+                          command: 'movements/settlement',
+                          terms: { ...source, ...destination, kind: 'SETTLEMENT' },
+                      }
+                    : null;
+            }
+            case 'RELEASE':
+            case 'SHORTAGE':
+                return { command: 'movements/settlement', terms: { ...source, kind: kind.value } };
+            default:
+                return null;
         }
-        const party = chosenParty.selection();
-        if (destinationMode.value !== 'new' || !canSpendSource() || !party) return null;
-        if ('name' in party)
-            return { ...collection, destinationName: party.name, destinationVersion: 0 };
-        const target = orderHolders().find(({ userId }) => userId === party.userId);
-        return {
-            ...collection,
-            destinationUserId: party.userId,
-            destinationVersion: target?.version || 0,
-        };
     };
 
     const showAttribution = () =>
-        showField(commitment, !!(topUp.checked && offered && commitment.options.length > 1));
+        showMovementField(
+            commitment,
+            !!(
+                activePurposes.has(kind.value) &&
+                topUp.checked &&
+                offered &&
+                commitment.options.length > 1
+            ),
+        );
+
+    /** @returns {MovementDraft | null} the draft including any consciously selected fee funding */
+    const readTerms = () => {
+        const draft = readBase();
+        if (!draft || !topUp.checked || !offered || draft.command === 'movements/reassignment') {
+            return draft;
+        }
+        if (draft.command === 'movements/settlement') {
+            return { ...draft, terms: { ...draft.terms, provision: offered } };
+        }
+        const attribution = readAttributionChoice(commitment);
+        return attribution
+            ? { ...draft, terms: { ...draft.terms, ...attribution, provision: offered } }
+            : null;
+    };
 
     const preview = bindMoneyPreview(
         form,
-        `${url}/movements/preview`,
-        () => {
-            const base = readBase();
-            if (!base || !topUp.checked || !offered) return base;
-            const attribution = readAttributionChoice(commitment);
-            return attribution ? { ...base, ...attribution, provision: offered } : null;
-        },
-        (output, body, terms) => {
-            const result = /** @type {MovementPreview | null} */ (body);
-            if (
-                !result ||
-                typeof result.amount !== 'string' ||
-                typeof result.fee !== 'string' ||
-                typeof result.shortfall !== 'string' ||
-                typeof result.rate !== 'string'
-            ) {
+        (draft) => ({ url: `${url}/${draft.command}/preview`, payload: draft.terms }),
+        readTerms,
+        (output, body, draft) => {
+            const result = /** @type {MovementPreview | ReassignmentPreview | null} */ (body);
+            if (!result || typeof result.amount !== 'string' || typeof result.fee !== 'string') {
                 return undefined;
             }
-            const { amount, fee, provision, sourceAfter, overpayment, shortfall } = result;
-            showPreviewAmounts(output, {
-                amount,
-                fee,
-                charge: (BigInt(amount) + BigInt(fee)).toString(),
-                provision,
-                sourceAfter,
-                overpayment,
-                shortfall,
-            });
-            for (const [name, value] of Object.entries({
-                source: result.sourceName,
-                destination: result.destinationName,
-            })) {
-                const label = output.querySelector(`[data-preview-label="${name}"]`);
-                if (label) label.textContent = value ?? root.dataset.nameUnavailable ?? '';
-            }
-            const unfunded = shortfall !== '0';
-            output.querySelector('[data-preview-shortfall]')?.toggleAttribute('hidden', !unfunded);
-            output
-                .querySelector('[data-preview-overpayment]')
-                ?.toggleAttribute('hidden', !overpayment || overpayment === '0');
-            const remaining = BigInt(orderMoneyProjection()?.dataset.remaining || '0');
-            const completes =
-                terms.kind !== 'COLLECTION' && remaining > 0n && BigInt(amount) >= remaining;
-            output.querySelector('[data-preview-completes]')?.toggleAttribute('hidden', !completes);
-            const provisionOffer = unfunded ? shortfall : fee;
+            const handover = draft.command === 'movements' && handovers.has(draft.terms.kind);
+            const returning =
+                draft.command === 'movements/settlement' && draft.terms.kind === 'REQUESTER_RETURN';
+            const hasDestination =
+                draft.command !== 'movements/settlement' ||
+                (draft.terms.kind !== 'RELEASE' && draft.terms.kind !== 'SHORTAGE');
+            renderMovement(
+                output,
+                result,
+                handover,
+                returning,
+                hasDestination,
+                root.dataset.nameUnavailable || '',
+            );
+            if (draft.command === 'movements/reassignment') return draft;
+            if (!('rate' in result) || typeof result.rate !== 'string') return undefined;
+
+            const { rate, shortfall, fee } = result;
+            const unfunded = typeof shortfall === 'string' && shortfall !== '0';
+            const offer = unfunded ? shortfall : fee;
             if (!topUp.checked) {
-                offered = canSpendSource() && provisionOffer !== '0' ? provisionOffer : '';
+                const mayFund = returning ? parties.returnFeeAuthority() : parties.canSpend();
+                const feeOnly = draft.command === 'movements/settlement';
+                offered =
+                    mayFund && offer && offer !== '0' && (!feeOnly || BigInt(offer) <= BigInt(fee))
+                        ? offer
+                        : '';
             }
             showPreviewAmounts(form, { offer: offered });
             topUp.closest('label')?.toggleAttribute('hidden', !offered);
             showAttribution();
-            return unfunded ? null : { ...terms, rate: result.rate };
+            if (unfunded) return null;
+            return draft.command === 'movements'
+                ? { command: draft.command, terms: { ...draft.terms, rate } }
+                : { command: draft.command, terms: { ...draft.terms, rate } };
         },
     );
 
-    /** @param {boolean} [live] whether the basis changed through a section update */
-    const sync = (live = false) => {
-        updateOptions();
+    /**
+     * Refreshes current choices and invalidates any preview whose scope changed.
+     *
+     * @param {boolean} [live] whether this refresh came from a server change
+     * @param {boolean} [refreshPeer] whether to reread the destination holder versions
+     */
+    const sync = (live = false, refreshPeer = false) => {
+        updatePurposes();
+        parties.sync();
+        reassignment.refresh(isReassignment(), parties.source(), refreshPeer);
         const next = JSON.stringify(readBase());
         if (next !== basis) {
             if (live && amount.value) changed.hidden = false;
@@ -297,27 +331,41 @@ export function bindMoneyMovement(root, recovery) {
         if (!saving) preview.refresh();
     };
 
-    /** @param {MovementDraft | null} [refused] the rejected terms to review */
+    /** @param {MovementDraft | null} [refused] the rejected movement terms to review */
     const open = (refused = null) => {
         form.reset();
-        refreshAttributionChoices(commitment, refused?.commitmentId || '');
+        reassignment.reset();
+        refreshAttributionChoices(
+            commitment,
+            refused?.command === 'movements' ? refused.terms.commitmentId || '' : '',
+        );
         preview.reset();
-        chosenParty.clear();
-        changed.hidden = !refused;
+        parties.clear();
+        changed.hidden = refused === null;
         offered = '';
         topUp.closest('label')?.setAttribute('hidden', '');
-        if (refused) kind.value = refused.kind;
-        updateOptions();
-        const own = orderHolders().find(({ userId }) => userId === self);
-        source.value = refused?.sourceHolderId || own?.id || '';
         if (refused) {
-            amount.value = refused.amount;
-            if (refused.destinationName || refused.destinationUserId) destinationMode.value = 'new';
-            if (refused.destinationName) chosenParty.restoreName(refused.destinationName);
-            if (refused.destinationUserId) chosenParty.restoreAccount(refused.destinationUserId);
-            updateOptions();
-            recipient.value = refused.recipientId || '';
-            destination.value = refused.destinationHolderId || '';
+            kind.value =
+                refused.command === 'movements/reassignment' ? 'REASSIGNMENT' : refused.terms.kind;
+        }
+        updatePurposes();
+        if (!refused && kind.selectedOptions.item(0)?.disabled) {
+            kind.value = Array.from(kind.options).find((option) => !option.disabled)?.value || '';
+        }
+        parties.sync();
+        const own = orderHolders().find(({ userId }) => userId === self);
+        parties.setSource(refused?.terms.sourceHolderId || (isReturning() ? '' : own?.id) || '');
+        if (refused) {
+            amount.value = refused.terms.amount;
+            if (refused.command === 'movements/reassignment') {
+                reassignment.restore(
+                    refused.destinationNumber,
+                    refused.terms.destinationHolderId || '',
+                    !refused.terms.destinationHolderId && refused.terms.confirmSamePerson === true,
+                );
+            } else {
+                parties.restore(refused.terms);
+            }
         }
         sync();
         krtModal.open(modalId);
@@ -326,6 +374,9 @@ export function bindMoneyMovement(root, recovery) {
     krtEvents.on('click', 'od-money-move', () => {
         if (recovery.pending()) void recovery.recover();
         else open();
+    });
+    form.closest('dialog')?.addEventListener('close', () => {
+        if (!krtModal.isOpen(modalId)) reassignment.reset();
     });
     form.addEventListener('input', () => sync());
     form.addEventListener('change', () => sync());
@@ -345,19 +396,20 @@ export function bindMoneyMovement(root, recovery) {
             }
             sync(true);
         } else if (section === 'order-money-results') {
-            sync(true);
+            sync(true, true);
         }
     });
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const terms = preview.ready();
-        if (!terms || saving) return;
+        const draft = preview.ready();
+        if (!draft || saving) return;
         saving = true;
         fields.disabled = true;
         try {
-            if (await recovery.submit({ command: 'movements', terms }, event.submitter)) {
+            if (await recovery.submit(draft, event.submitter)) {
                 krtModal.close(modalId);
                 form.reset();
+                reassignment.reset();
                 preview.reset();
             }
         } finally {

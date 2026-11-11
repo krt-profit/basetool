@@ -34,6 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * @param destinationName the destination label
  * @param overpayment the projected amount over the target
  * @param shortfall the additional amount needed to fund the draft
+ * @param destinationAfter the receiving order holding after the movement, if applicable
  */
 @DtoMirror
 public record JobOrderMoneyMovementPreview(
@@ -45,4 +46,5 @@ public record JobOrderMoneyMovementPreview(
     @Nullable String sourceName,
     @Nullable String destinationName,
     String overpayment,
-    String shortfall) {}
+    String shortfall,
+    @Nullable String destinationAfter) {}

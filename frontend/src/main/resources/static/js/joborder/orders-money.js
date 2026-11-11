@@ -25,6 +25,9 @@ import { bindProvisionPreview } from '/js/joborder/orders-money-preview.js';
 import { bindMoneyRecovery } from '/js/joborder/orders-money-recovery.js';
 import { bindMoneyMovement } from '/js/joborder/orders-money-movement.js';
 import { bindMoneySettings } from '/js/joborder/orders-money-settings.js';
+import { bindMoneyCorrection } from '/js/joborder/orders-money-correction.js';
+import { bindHolderIdentity } from '/js/joborder/orders-money-holder-identity.js';
+import { bindRecipientIdentity } from '/js/joborder/orders-money-recipient-identity.js';
 import {
     initMoneyCommitments,
     readAttributionChoice,
@@ -37,13 +40,18 @@ const form = document.getElementById('order-money-provision-form');
 
 initMoneyCommitments();
 if (root && form instanceof HTMLFormElement) {
-    const recovery = bindMoneyRecovery(root, ({ command, terms }) => {
+    const recovery = bindMoneyRecovery(root, (submission) => {
+        const { command, terms } = submission;
         if (command === 'provisions') provision.restore(terms);
-        else movement.restore(terms);
+        else if (command === 'corrections') correction.restore(terms);
+        else movement.restore(submission);
     });
     const provision = bindProvisionForm(root, form, recovery);
     const movement = bindMoneyMovement(root, recovery);
+    const correction = bindMoneyCorrection(root, recovery);
     bindMoneySettings(root);
+    bindHolderIdentity(root);
+    bindRecipientIdentity(root);
     void recovery.recover();
 }
 

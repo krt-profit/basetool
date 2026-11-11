@@ -26,8 +26,12 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -94,13 +98,12 @@ public class JobOrderMoneyRecipients {
     for (JobOrderMoneyRecipient prior : recipients.findAllByOrderIdOrderById(order.getId())) {
       Party existing = party(prior);
       if (prior.isActive() && existing.sameKnownPerson(candidateParty)) {
-        return new JobOrderEditor.MoneyEdit<>(view(prior, existing), JobOrderEdit.unchanged(order));
+        return new JobOrderEditor.MoneyEdit<>(view(prior), JobOrderEdit.unchanged(order));
       }
     }
     JobOrderMoneyRecipient saved = recipients.save(candidate);
     effects.designationChanged(order, candidateParty.accountId() != null);
-    return new JobOrderEditor.MoneyEdit<>(
-        view(saved, candidateParty), designationAudit(order, saved));
+    return new JobOrderEditor.MoneyEdit<>(view(saved), designationAudit(order, saved));
   }
 
   /**
@@ -136,20 +139,66 @@ public class JobOrderMoneyRecipients {
     return recipients.accountFor(orderId, id).orElse(null);
   }
 
-  List<JobOrderMoneyRecipientView> views(UUID orderId) {
+  UUID supersede(JobOrderMoneyRecipient original, JobOrderMoneyRecipient replacement) {
+    UUID replacementId = Objects.requireNonNull(recipients.save(replacement).getId());
+    original.supersede(replacementId);
+    recipients.redirectCorrections(
+        original.getOrderId(), Objects.requireNonNull(original.getId()), replacementId);
+    return replacementId;
+  }
+
+  void refreshDesignationsForCorrectedHolder(UUID orderId, UUID holderId) {
+    List<JobOrderMoneyRecipient> originals =
+        recipients.findAllByOrderIdOrderById(orderId).stream()
+            .filter(row -> !row.isSuperseded() && row.getHolderId() != null)
+            .filter(row -> holderId.equals(party(row).holderId()))
+            .toList();
+    var selection =
+        new JobOrderMoneySelection(JobOrderMoneySelection.Kind.EXISTING, holderId, null);
+    for (JobOrderMoneyRecipient original : originals) {
+      var replacement = new JobOrderMoneyRecipient(orderId, selection);
+      if (!original.isActive()) {
+        replacement.remove();
+      }
+      supersede(original, replacement);
+    }
+  }
+
+  Map<UUID, UUID> correctedRecipientAliases(UUID orderId) {
     return recipients.findAllByOrderIdOrderById(orderId).stream()
-        .map(recipient -> view(recipient, party(recipient)))
+        .filter(JobOrderMoneyRecipient::isSuperseded)
+        .collect(
+            Collectors.toUnmodifiableMap(
+                row -> Objects.requireNonNull(row.getId()),
+                row -> Objects.requireNonNull(row.getCorrectedIntoId())));
+  }
+
+  List<JobOrderMoneyRecipientView> views(UUID orderId) {
+    List<JobOrderMoneyRecipient> designations = recipients.findAllByOrderIdOrderById(orderId);
+    Map<UUID, JobOrderMoneyRecipient> byId =
+        designations.stream()
+            .collect(
+                Collectors.toMap(row -> Objects.requireNonNull(row.getId()), Function.identity()));
+    Map<UUID, String> names =
+        holderChoices.namesOf(
+            designations.stream()
+                .flatMap(row -> Stream.of(row.getUserId(), row.getCorrectionActorId()))
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList());
+    return designations.stream()
+        .map(row -> view(row, id -> Objects.requireNonNull(byId.get(id)), names::get))
         .toList();
   }
 
   Party party(JobOrderMoneyRecipient recipient) {
+    return party(currentRecipient(recipient, this::findRecipient), holderChoices::nameOf);
+  }
+
+  private Party party(JobOrderMoneyRecipient recipient, Function<UUID, @Nullable String> names) {
     UUID id = recipient.getHolderId();
     if (id == null) {
-      UUID userId = recipient.getUserId();
-      return new Party(
-          null,
-          userId,
-          userId == null ? recipient.getAccountlessName() : holderChoices.nameOf(userId));
+      return new Party(null, recipient.getUserId(), recordedName(recipient, names));
     }
     JobOrderMoneyHolder holder = holders.findById(id).orElseThrow();
     UUID canonical = holder.getMergedIntoId();
@@ -159,13 +208,45 @@ public class JobOrderMoneyRecipients {
     return new Party(holder.getId(), holder.getUserId(), holderChoices.nameOf(holder));
   }
 
-  private static JobOrderMoneyRecipientView view(JobOrderMoneyRecipient recipient, Party party) {
+  JobOrderMoneyRecipientView view(JobOrderMoneyRecipient recipient) {
+    return view(recipient, this::findRecipient, holderChoices::nameOf);
+  }
+
+  private JobOrderMoneyRecipientView view(
+      JobOrderMoneyRecipient recipient,
+      Function<UUID, JobOrderMoneyRecipient> find,
+      Function<UUID, @Nullable String> names) {
+    Party party = party(currentRecipient(recipient, find), names);
+    UUID previousId = recipient.getCorrectsId();
+    UUID actor = recipient.getCorrectionActorId();
     return new JobOrderMoneyRecipientView(
         Objects.requireNonNull(recipient.getId()),
         party.accountId(),
         party.name(),
         recipient.isActive(),
-        party.holderId());
+        party.holderId(),
+        recipient.hasDirectIdentity() && !recipient.isSuperseded(),
+        previousId,
+        previousId == null ? null : recordedName(find.apply(previousId), names),
+        previousId == null ? null : recordedName(recipient, names),
+        recipient.getCorrectedAt(),
+        actor == null ? null : names.apply(actor));
+  }
+
+  private static JobOrderMoneyRecipient currentRecipient(
+      JobOrderMoneyRecipient recipient, Function<UUID, JobOrderMoneyRecipient> find) {
+    UUID replacement = recipient.getCorrectedIntoId();
+    return replacement == null ? recipient : find.apply(replacement);
+  }
+
+  private JobOrderMoneyRecipient findRecipient(UUID id) {
+    return recipients.findById(id).orElseThrow();
+  }
+
+  private static @Nullable String recordedName(
+      JobOrderMoneyRecipient recipient, Function<UUID, @Nullable String> names) {
+    UUID account = recipient.getUserId();
+    return account == null ? recipient.getAccountlessName() : names.apply(account);
   }
 
   private static JobOrderEdit designationAudit(JobOrder order, JobOrderMoneyRecipient recipient) {

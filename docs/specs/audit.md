@@ -27,7 +27,11 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
-> **Approved planned JobOrder amendment (not implemented):** Extend same-transaction owning-domain audit coverage to the approved JobOrder mutations: provision/movement/correction and fees, target/lifecycle/responsibility, holder identity/link/merge, participation/promises and automatic reductions/endings, bank linkage/outcomes/clarification and cross-order effects. Add event filters and DE/EN labels together. Safe IDs/enums/amounts/counts replace names and free text in details; replay/no-op creates no second mutation audit. Participant history is a separate authorised contract in [the approved aUEC contract](orders-auec.md), not this admin-only trail.
+> **JobOrder audit scope:** The internal Bank-free checkpoint records settlement, corrections,
+> holder maintenance and reciprocal order movements with the financial write. The activity filter
+> and both locales include the event types. Participant history has its own authorised contract in
+> [aUEC orders](orders-auec.md). Optional Bank linkage, outcomes and clarification retain their
+> [separate audit requirements](orders-auec-bank.md).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
@@ -136,12 +140,18 @@ web, naming its client (REQ-AUDIT-005):
   An accepted money provision records `JOB_ORDER_MONEY_PROVIDED` in the same transaction as the
   durable operation, with its logical operation ID and exact amount. A Bank-free movement records
   `JOB_ORDER_MONEY_MOVED` with its logical operation ID, purpose, net amount, exact fee and explicit
-  new funds. `JOB_ORDER_MONEY_RECIPIENT_CHANGED` records the designation ID and whether it is active.
+  new funds. A requester return, release, shortage or beneficiary payment uses the same event with
+  its own purpose. `JOB_ORDER_MONEY_REASSIGNED` records each order's purpose leg in the same
+  transaction. `JOB_ORDER_MONEY_CORRECTED` links a correction to its original operations, with one
+  record per affected order. `JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED` records the identity action
+  and holder references. `JOB_ORDER_MONEY_RECIPIENT_CHANGED` records the designation ID and whether
+  it is active, or the original and replacement IDs for a correction. These details carry no names
+  or free text.
   `JOB_ORDER_MONEY_TARGET_CHANGED` records the previous and new target. An information edit uses
   `JOB_ORDER_UPDATED`. Automatic completion uses `JOB_ORDER_COMPLETED` in the same transaction.
   Matching replays and pre-submission refusals record no activity audit.
   `JOB_ORDER_MONEY_COMMITMENT_CHANGED` records the unit, commitment occurrence, before and
-  outstanding amounts, and reason. Credited provision adds the logical operation ID. The same
+  outstanding amounts, and reason. Credit and correction add the logical operation ID. The same
   transaction records the affected occurrence and its order-visible history.
   Adding or removing an assignee who is not a direct member of the processing unit (REQ-ORDERS-047)
   records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in place of

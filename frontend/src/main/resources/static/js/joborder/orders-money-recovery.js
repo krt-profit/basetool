@@ -24,7 +24,19 @@ import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 /** @typedef {ApiDto<'ProvideJobOrderMoneyDto'>} ProvisionTerms */
 /** @typedef {ApiDto<'MoveJobOrderMoneyDto'>} MovementTerms */
 /** @typedef {ApiDto<'JobOrderMoneyOutcome'>} MoneyOutcome */
-/** @typedef {{ command: 'provisions', terms: Omit<ProvisionTerms, 'operationId'> } | { command: 'movements', terms: Omit<MovementTerms, 'operationId'> }} Draft */
+/** @typedef {Omit<ApiDto<'SettleJobOrderMoneyDto'>, 'operationId'>} SettlementTerms */
+/** @typedef {Omit<ApiDto<'ReassignJobOrderMoneyDto'>, 'operationId'>} ReassignmentTerms */
+/** @typedef {Omit<ApiDto<'CorrectJobOrderMoneyDto'>, 'operationId'>} CorrectionTerms */
+/**
+ * @typedef {{ command: 'movements', terms: Omit<MovementTerms, 'operationId'> }
+ *     | { command: 'movements/settlement', terms: SettlementTerms }
+ *     | { command: 'movements/reassignment', terms: ReassignmentTerms, destinationNumber: string }}
+ *     MovementDraft
+ */
+/**
+ * @typedef {{ command: 'provisions', terms: Omit<ProvisionTerms, 'operationId'> }
+ *     | MovementDraft | { command: 'corrections', terms: CorrectionTerms }} Draft
+ */
 /** @typedef {Draft & { operationId: string }} Submission */
 
 /**

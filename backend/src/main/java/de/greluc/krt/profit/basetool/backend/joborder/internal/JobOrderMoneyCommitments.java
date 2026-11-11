@@ -158,6 +158,19 @@ class JobOrderMoneyCommitments {
       BigDecimal before,
       @Nullable UUID operationId) {
     changes.save(new JobOrderMoneyCommitmentChange(commitment, reason, before, operationId));
+    publishChange(commitment, reason, before, operationId);
+  }
+
+  void recordCorrection(JobOrderMoneyCommitment commitment, BigDecimal before, UUID correctionId) {
+    changes.save(JobOrderMoneyCommitmentChange.corrected(commitment, before, correctionId));
+    publishChange(commitment, Reason.CORRECTED, before, correctionId);
+  }
+
+  private void publishChange(
+      JobOrderMoneyCommitment commitment,
+      Reason reason,
+      BigDecimal before,
+      @Nullable UUID operationId) {
     JobOrder order = commitment.getOrder();
     UUID unitId = commitment.getUnit().getId();
     AuditDetails details =

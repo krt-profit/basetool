@@ -25,13 +25,14 @@ import { caretAfter, dropDigitBesideSeparator, formatParts } from '/js/kernel/kr
 const fields = new WeakMap();
 
 /**
- * Reads positive whole digits without changing a non-whole or malformed value.
+ * Reads whole digits without changing a non-whole or malformed value.
  *
  * @param {string} text the displayed number
  * @param {Separators} seps the page separators
+ * @param {boolean} allowZero whether zero is a valid value
  * @returns {string} canonical digits, or an empty string for invalid input
  */
-function canonicalWhole(text, seps) {
+function canonicalWhole(text, seps, allowZero) {
     const [integer, fraction, ...extra] = text.trim().split(seps.decimal);
     if (extra.length || (fraction !== undefined && !/^0+$/.test(fraction))) return '';
     const [first, ...rest] = integer.split(seps.group);
@@ -39,7 +40,8 @@ function canonicalWhole(text, seps) {
     if (rest.length && (first.length > 3 || rest.some((part) => !/^\d{3}$/.test(part)))) {
         return '';
     }
-    return [first, ...rest].join('').replace(/^0+/, '');
+    const normalized = [first, ...rest].join('').replace(/^0+/, '');
+    return normalized || (allowZero ? '0' : '');
 }
 
 /**
@@ -62,7 +64,7 @@ function editWhole(text, caret, seps) {
 }
 
 /**
- * Installs a localized text field whose valid value is an exact positive whole number.
+ * Installs a localized text field whose valid value is an exact whole number.
  *
  * @param {HTMLInputElement} input the exact whole field
  * @param {Separators} seps the page separators
@@ -73,13 +75,14 @@ function editWhole(text, caret, seps) {
 export function enhanceExactWhole(input, seps, readText, writeText) {
     const existing = fields.get(input);
     if (existing) return existing;
+    const allowZero = input.hasAttribute('data-number-allow-zero');
     let previous = readText(input);
 
     /** @param {string} text the visible field value */
     const show = (text) => {
         if (text !== readText(input)) writeText(input, text);
         previous = text;
-        const invalid = text.trim() !== '' && !canonicalWhole(text, seps);
+        const invalid = text.trim() !== '' && !canonicalWhole(text, seps, allowZero);
         const message = invalid
             ? input.dataset.invalid ||
               krtI18nText(window.krtNumberI18n?.whole, 'krtNumberI18n.whole')
@@ -89,13 +92,13 @@ export function enhanceExactWhole(input, seps, readText, writeText) {
 
     /** @param {string} text the value to format when committed */
     const commit = (text) => {
-        const amount = canonicalWhole(text, seps);
+        const amount = canonicalWhole(text, seps, allowZero);
         show(amount ? formatParts({ neg: false, int: amount, frac: null }, seps) : text);
     };
 
     Object.defineProperty(input, 'value', {
         configurable: true,
-        get: () => canonicalWhole(readText(input), seps),
+        get: () => canonicalWhole(readText(input), seps, allowZero),
         set(value) {
             commit(String(value ?? ''));
         },
@@ -122,7 +125,7 @@ export function enhanceExactWhole(input, seps, readText, writeText) {
             kind === 'insertFromPaste' ||
             kind === 'insertFromDrop' ||
             kind === 'insertReplacementText';
-        if (inserted && !canonicalWhole(text, seps)) {
+        if (inserted && !canonicalWhole(text, seps, allowZero)) {
             show(text);
             return;
         }

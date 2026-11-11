@@ -5,8 +5,16 @@
     <p th:if="${money == null}" class="alert alert-danger" role="alert" th:text="#{orders.money.load.error}"></p>
     <section th:if="${money != null}" class="od-kpi od-money" aria-labelledby="order-money-heading"
              th:data-can-provide-self="${money.canProvideSelf}" th:data-can-provide-on-behalf="${money.canProvideOnBehalf}"
-             th:data-can-record-movement="${!order.responsibilityInvalid and (order.status == 'OPEN' or order.status == 'IN_PROGRESS')
-                 and (money.canMoveForOthers or money.canProvideSelf or money.canRecordRequesterHandover)}"
+             data-order-money-projection
+             th:with="active=${order.status == 'OPEN' or order.status == 'IN_PROGRESS'},
+                      canMove=${money.responsibilityValid and (money.canRecordSettlement or
+                         (active and (money.canMoveForOthers or money.canProvideSelf or money.canRecordRequesterHandover)))}"
+             th:data-order-active="${active}" th:data-responsibility-valid="${money.responsibilityValid}"
+             th:data-can-record-movement="${canMove}"
+             th:data-can-maintain-holders="${money.canMaintainHolders}"
+             th:data-can-correct-recipient="${money.canCorrectRecipient}"
+             th:data-can-record-requester-return="${money.canRecordRequesterReturn}"
+             th:data-can-record-requester-return-for-others="${money.canRecordRequesterReturn}"
              th:data-can-move-for-others="${money.canMoveForOthers}"
              th:data-can-record-requester-handover="${money.canRecordRequesterHandover}"
              th:data-can-designate-recipient="${money.canDesignateRecipient}"
@@ -30,13 +38,14 @@
                 <div th:replace="~{joborder/fragments/order-money :: figure('orders.money.overpaid', ${money.overpaid}, 'order-money-overpaid')}"></div>
             </th:block>
         </div>
+        <p th:if="${money.settlementOpen}" class="alert alert-info" data-testid="order-money-settlement-open"
+           th:text="#{orders.money.settlement.open}"></p>
         <p class="text-muted" th:text="#{orders.money.manual}"></p>
-        <div th:if="${currentUserId != null and !order.responsibilityInvalid and (order.status == 'OPEN' or order.status == 'IN_PROGRESS')}"
-             class="od-pane-actions" th:with="canProvide=${money.canProvideSelf or money.canProvideOnBehalf},
-                 canMove=${!#lists.isEmpty(money.holders) and (money.canMoveForOthers or money.canProvideSelf or money.canRecordRequesterHandover)}">
+        <div th:if="${currentUserId != null and money.responsibilityValid}"
+             class="od-pane-actions" th:with="canProvide=${money.canProvideSelf or money.canProvideOnBehalf}">
             <button th:if="${canProvide}" type="button" class="btn btn--cta" data-trigger="od-money-open"
                     data-testid="order-money-provide" th:text="#{orders.money.provide}"></button>
-            <button th:if="${canMove}" type="button" class="btn" th:classappend="${canProvide ? 'btn-ghost' : 'btn--cta'}"
+            <button th:if="${canMove and (!#lists.isEmpty(money.holders) or !#lists.isEmpty(money.recipients))}" type="button" class="btn" th:classappend="${canProvide ? 'btn-ghost' : 'btn--cta'}"
                     data-trigger="od-money-move" data-testid="order-money-move" th:text="#{orders.money.move}"></button>
         </div>
         <section class="card" th:unless="${#lists.isEmpty(money.holders)}" aria-labelledby="order-money-holders">
@@ -49,10 +58,11 @@
                     th:data-version="${holder.version}" th:data-holder-label="${label}">
                     <span th:text="${label}"></span>
                     <span th:text="#{orders.money.amount.display(${@moneyFormat.exactWhole(holder.amount, #locale)})}"></span>
+                    <th:block th:replace="~{joborder/fragments/order-money-holder-identity :: action}"></th:block>
                 </li>
             </ul>
         </section>
-        <section class="card" th:if="${money.canDesignateRecipient or money.recipients.?[active].size() > 0}"
+        <section class="card" th:if="${money.canDesignateRecipient or !#lists.isEmpty(money.recipients)}"
                  aria-labelledby="order-money-recipients">
             <div class="split">
                 <h3 id="order-money-recipients" class="section-title" th:text="#{orders.money.recipients}"></h3>
@@ -65,16 +75,22 @@
                     th:with="name=${@handles.display(recipient.name) ?: #messages.msg('orders.money.nameUnavailable')},
                              label=${#messages.msg(recipient.userId != null ? 'orders.money.holder.linkedLabel' : 'orders.money.holder.accountlessLabel', name)}"
                     th:data-money-recipient="${recipient.id}" th:data-holder-id="${recipient.holderId}"
-                    th:data-user-id="${recipient.userId}" th:data-recipient-label="${label}">
+                    th:data-user-id="${recipient.userId}" th:data-recipient-label="${label}"
+                    th:data-money-recipient-active="${recipient.active}"
+                    th:data-money-recipient-returnable="${money.returnableRecipientIds.contains(recipient.id)}">
                     <span th:text="${label}"></span>
                     <button th:if="${money.canDesignateRecipient and currentUserId != null}" type="button"
                             class="btn btn-ghost" data-trigger="od-money-remove-recipient"
                             th:data-recipient-id="${recipient.id}" th:aria-label="#{orders.money.recipient.removeNamed(${name})}"
                             th:text="#{orders.money.recipient.remove}"></button>
+                    <th:block th:replace="~{joborder/fragments/order-money-recipient-identity :: action}"></th:block>
                 </li>
             </ul>
+            <th:block th:replace="~{joborder/fragments/order-money-recipient-identity :: retired}"></th:block>
         </section>
-        <section class="card" th:if="${!#lists.isEmpty(money.history) or !#lists.isEmpty(money.targetChanges)}" aria-labelledby="order-money-history">
+        <section class="card" th:if="${!#lists.isEmpty(money.history) or !#lists.isEmpty(money.targetChanges)
+                     or !#lists.isEmpty(money.holderIdentityHistory)
+                     or !#lists.isEmpty(money.recipients.?[correctsId != null])}" aria-labelledby="order-money-history">
             <h3 id="order-money-history" class="section-title" th:text="#{orders.money.history}"></h3>
             <ul th:unless="${#lists.isEmpty(money.history)}" class="od-assignee-list">
                 <li class="od-assignee split" th:each="entry : ${money.history}" data-testid="order-money-history-entry"
@@ -87,10 +103,40 @@
                                 <strong th:text="#{orders.money.history.provision(${principal})}"></strong>
                                 <div th:text="#{orders.money.history.names(${holder}, ${actor})}"></div>
                             </th:block>
-                            <th:block th:unless="${entry.kind == 'PROVISION'}">
+                            <th:block th:if="${entry.kind == 'CORRECTION'}">
+                                <strong th:text="#{orders.money.history.CORRECTION}"></strong>
+                                <a th:if="${entry.peerOrderId != null}" th:href="@{/orders/{id}(id=${entry.peerOrderId})}"
+                                   th:text="#{orders.money.history.relatedOrder}"></a>
+                                <div th:text="#{orders.money.history.recordedBy(${actor})}"></div>
+                                <ul>
+                                    <li th:each="change : ${entry.corrections}">
+                                        <a th:href="|#order-money-operation-${change.originalOperationId}|"
+                                           th:text="#{orders.money.correction.original}"></a>
+                                        <span th:text="#{orders.money.correction.amountChange(
+                                            ${@moneyFormat.exactWhole(change.previousAmount, #locale)},
+                                            ${@moneyFormat.exactWhole(change.amount, #locale)})}"></span>
+                                        <span th:if="${change.previousProvision != change.provision}"
+                                              th:text="#{orders.money.correction.provisionChange(
+                                                  ${@moneyFormat.exactWhole(change.previousProvision, #locale)},
+                                                  ${@moneyFormat.exactWhole(change.provision, #locale)})}"></span>
+                                        <span th:if="${change.previousFee != change.fee}"
+                                              th:text="#{orders.money.correction.feeChange(
+                                                  ${@moneyFormat.exactWhole(change.previousFee, #locale)},
+                                                  ${@moneyFormat.exactWhole(change.fee, #locale)})}"></span>
+                                        <span th:if="${change.credit != null and change.previousCredit != change.credit}"
+                                              th:text="#{orders.money.correction.creditChange(
+                                                  ${@moneyFormat.exactWhole(change.previousCredit, #locale)},
+                                                  ${@moneyFormat.exactWhole(change.credit, #locale)})}"></span>
+                                    </li>
+                                </ul>
+                            </th:block>
+                            <th:block th:if="${entry.kind != 'PROVISION' and entry.kind != 'CORRECTION'}">
                                 <strong th:text="${#messages.msg('orders.money.history.' + entry.kind, principal)}"></strong>
-                                <div th:text="#{orders.money.history.parties(${holder},
+                                <div th:if="${entry.recipientName != null}" th:text="#{orders.money.history.parties(${holder},
                                     ${@handles.display(entry.recipientName) ?: #messages.msg('orders.money.nameUnavailable')}, ${actor})}"></div>
+                                <div th:unless="${entry.recipientName != null}" th:text="#{orders.money.history.names(${holder}, ${actor})}"></div>
+                                <a th:if="${entry.peerOrderId != null}" th:href="@{/orders/{id}(id=${entry.peerOrderId})}"
+                                   th:text="#{orders.money.history.relatedOrder}"></a>
                                 <span th:if="${entry.fee != null and entry.fee != '0'}"
                                       th:text="#{orders.money.history.fee(${@moneyFormat.exactWhole(entry.fee, #locale)})}"></span>
                                 <span th:if="${entry.provision != null and entry.provision != '0'}"
@@ -98,6 +144,7 @@
                             </th:block>
                         </th:block>
                     </div>
+                    <th:block th:replace="~{joborder/fragments/order-money-correction :: action}"></th:block>
                     <time class="od-money-date" th:datetime="${entry.recordedAt}" th:data-utc="${entry.recordedAt}"></time>
                 </li>
             </ul>
@@ -113,6 +160,8 @@
                     <time class="od-money-date" th:datetime="${change.recordedAt}" th:data-utc="${change.recordedAt}"></time>
                 </li>
             </ul>
+            <th:block th:replace="~{joborder/fragments/order-money-holder-identity :: history}"></th:block>
+            <th:block th:replace="~{joborder/fragments/order-money-recipient-identity :: history}"></th:block>
         </section>
     </section>
 </th:block>
@@ -147,6 +196,9 @@
             titleKey='orders.money.recipient.add', body=~{joborder/fragments/order-money-settings :: recipientForm})}"></th:block>
         <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='order-money-edit-modal',
             titleKey='orders.detail.edit', body=~{joborder/fragments/order-money-settings :: editForms})}"></th:block>
+        <th:block th:replace="~{joborder/fragments/order-money-holder-identity :: dialog}"></th:block>
+        <th:block th:replace="~{joborder/fragments/order-money-recipient-identity :: dialog}"></th:block>
+        <th:block th:replace="~{joborder/fragments/order-money-correction :: dialog}"></th:block>
     </div>
 </th:block>
 

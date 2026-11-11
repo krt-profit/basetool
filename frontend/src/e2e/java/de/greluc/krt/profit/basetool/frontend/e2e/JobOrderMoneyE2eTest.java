@@ -212,6 +212,22 @@ class JobOrderMoneyE2eTest {
       assertThat(row.locator(".status-in_progress")).isVisible();
       assertThat(writer.getByTestId("order-money-holdings")).containsText("1.234");
       assertThat(writer.getByTestId("order-money-remaining")).containsText(GROUPED_AMOUNT);
+
+      String correctedHolder = "E2E Corrected Holder " + suffix;
+      writer.getByTestId("order-money-holder-maintain").click();
+      writer.getByTestId("order-money-holder-identity-name").fill(correctedHolder);
+      var correction =
+          writer.waitForResponse(
+              response ->
+                  response.url().endsWith("/identity")
+                      && "PATCH".equals(response.request().method()),
+              () -> writer.getByTestId("order-money-holder-identity-save").click());
+      assertEquals(204, correction.status());
+      assertThat(writer.getByTestId("order-money-holder-identity-history"))
+          .containsText(correctedHolder);
+      assertThat(reader.getByTestId("order-money-history-entry")).containsText(correctedHolder);
+      assertThat(reader.getByTestId("order-money-amount")).hasValue("78");
+      assertThat(writer.getByTestId("order-money-holdings")).containsText("1.234");
     }
   }
 
@@ -494,6 +510,17 @@ class JobOrderMoneyE2eTest {
       assertThat(page.getByTestId("order-money-remaining")).containsText("0 aUEC");
       assertThat(page.getByTestId("order-money-history-entry")).hasCount(6);
 
+      page.getByTestId("order-money-recipient-correct").click();
+      chooseAccountless(page, "order-money-recipient-identity-party", "Corrected requester");
+      awaitPatch(
+          page,
+          orderPath + "/money/recipients/" + recipientId + "/identity",
+          "order-money-recipient-identity-save");
+      assertThat(page.getByTestId("order-money-recipient-identity-history"))
+          .containsText("Corrected requester");
+      assertThat(page.locator("#order-status-badge.status-completed")).isVisible();
+      assertThat(page.getByTestId("order-money-handed-over")).containsText("10 aUEC");
+
       page.getByTestId("order-edit").click();
       Locator target = page.getByTestId("order-money-edit-target");
       target.fill("12");
@@ -603,6 +630,128 @@ class JobOrderMoneyE2eTest {
       peer.getByTestId("order-money-commitment-unit").selectOption(otherUnit);
       assertThat(draft).hasValue("");
       assertThat(peer.locator("[data-commitment-changed]")).isHidden();
+    }
+  }
+
+  /**
+   * Moves one player's purpose money and updates the open destination without another provision.
+   */
+  @Test
+  void reassignsHeldMoneyAndRefreshesTheOtherOrder() {
+    assumeTrue(STACK.managesStack(), "requires the isolated managed order stack");
+    var seeder = new BackendSeeder();
+    seeder.ensureIridiumMembership(USERNAME, PASSWORD);
+    String baseUrl = STACK.baseUrl();
+    try (Playwright playwright = Playwright.create();
+        Browser browser = E2eSupport.launchBrowser(playwright, true);
+        BrowserContext context =
+            browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page source = context.newPage();
+      Page destination = context.newPage();
+      E2eSupport.login(source, baseUrl, USERNAME, PASSWORD);
+      E2eSupport.navigate(source, baseUrl + "/orders/create?lang=de");
+      String sourcePath = createOrder(source, baseUrl, IRIDIUM, "10000000");
+      E2eSupport.navigate(destination, baseUrl + "/orders/create?lang=de");
+      String destinationPath = createOrder(destination, baseUrl, IRIDIUM, "10000000");
+      String destinationNumber =
+          json(seeder.getBody(USERNAME, PASSWORD, "/api/v1" + destinationPath))
+              .get("displayId")
+              .getAsString();
+      waitForRoom(destination, "order:" + destinationPath.substring("/orders/".length()));
+
+      prepareSelfProvision(source, "10000000");
+      String holder =
+          json(awaitPost(source, sourcePath + "/money/provisions", "order-money-save"))
+              .get("holderId")
+              .getAsString();
+      assertThat(source.getByTestId("order-money-holdings")).containsText("10.000.000");
+
+      beginMovement(source, "REASSIGNMENT", holder, "8000000");
+      source.getByTestId("order-money-destination-number").fill(destinationNumber);
+      String reassignment = sourcePath + "/money/movements/reassignment";
+      var preview =
+          source.waitForResponse(
+              response -> response.url().endsWith(reassignment + "/preview"),
+              () -> source.getByTestId("order-money-movement-bank-free").check());
+      assertTrue(preview.ok(), () -> preview.status() + " " + preview.text());
+      JsonObject terms = json(preview.text());
+      assertEquals("2000000", terms.get("sourceAfter").getAsString());
+      assertEquals("8000000", terms.get("destinationAfter").getAsString());
+      assertEquals("0", terms.get("fee").getAsString());
+      assertEquals("0", terms.get("provision").getAsString());
+      waitForRoom(source, "order:" + destinationPath.substring("/orders/".length()));
+
+      prepareSelfProvision(destination, "1");
+      awaitPost(destination, destinationPath + "/money/provisions", "order-money-save");
+      assertThat(
+              source
+                  .getByTestId("order-money-movement-preview")
+                  .locator("[data-preview-value='destinationAfter']"))
+          .hasText("8.000.001");
+      assertEquals("8.000.000", shownAmount(source.getByTestId("order-money-movement-amount")));
+      assertThat(source.locator("#order-money-movement-form [data-money-basis-changed]"))
+          .isVisible();
+
+      awaitPost(source, reassignment, "order-money-movement-save");
+      assertThat(source.getByTestId("order-money-holdings")).containsText("2.000.000");
+      assertThat(source.getByTestId("order-money-provided")).containsText("10.000.000");
+      assertThat(destination.getByTestId("order-money-holdings")).containsText("8.000.001");
+      assertThat(destination.getByTestId("order-money-provided")).containsText("1 aUEC");
+      assertThat(destination.getByTestId("order-money-history-entry")).hasCount(2);
+      assertThat(destination.locator("#order-status-badge.status-active")).isVisible();
+    }
+  }
+
+  /** Corrects a provision and its dependent collection through one history action. */
+  @Test
+  void correctsConnectedAmountsWithoutRewritingTheOriginalHistory() {
+    assumeTrue(STACK.managesStack(), "requires the isolated monetary order stack");
+    new BackendSeeder().ensureIridiumMembership(USERNAME, PASSWORD);
+    String baseUrl = STACK.baseUrl();
+    try (Playwright playwright = Playwright.create();
+        Browser browser = E2eSupport.launchBrowser(playwright, true);
+        BrowserContext context =
+            browser.newContext(new Browser.NewContextOptions().setIgnoreHTTPSErrors(true))) {
+      Page page = context.newPage();
+      E2eSupport.login(page, baseUrl, USERNAME, PASSWORD);
+      E2eSupport.navigate(page, baseUrl + "/orders/create?lang=de");
+      String path = createOrder(page, baseUrl, IRIDIUM, "10");
+
+      prepareSelfProvision(page, "10");
+      String holder =
+          json(awaitPost(page, path + "/money/provisions", "order-money-save"))
+              .get("holderId")
+              .getAsString();
+      beginMovement(page, "COLLECTION", holder, "9");
+      page.getByTestId("order-money-destination-mode").selectOption("new");
+      chooseAccountless(page, "order-money-destination-choice", "Correction collector");
+      page.getByTestId("order-money-movement-bank-free").check();
+      String collector =
+          json(awaitPost(page, path + "/money/movements", "order-money-movement-save"))
+              .get("destinationHolderId")
+              .getAsString();
+
+      page.getByTestId("order-money-correct").first().click();
+      Locator dialog = page.locator("#order-money-correction-modal");
+      Locator amounts = dialog.locator("input[name='amount']");
+      amounts.first().fill("8");
+      assertThat(dialog.locator("[data-money-preview-error]")).isVisible();
+      assertThat(page.getByTestId("order-money-correction-save")).isDisabled();
+
+      dialog.locator("[data-money-correction-add]").click();
+      amounts.nth(1).fill("7");
+      assertThat(dialog.locator("[data-preview-value='holdings']")).containsText("8");
+      awaitPost(page, path + "/money/corrections", "order-money-correction-save");
+
+      assertThat(dialog).isHidden();
+      assertThat(page.getByTestId("order-money-provided")).containsText("8 aUEC");
+      assertThat(page.locator("[data-money-holder='" + holder + "']")).containsText("1 aUEC");
+      assertThat(page.locator("[data-money-holder='" + collector + "']")).containsText("7 aUEC");
+      Locator history = page.getByTestId("order-money-history-entry");
+      assertThat(history).hasCount(3);
+      assertThat(history.first()).containsText("10 aUEC");
+      assertThat(history.nth(1)).containsText("9 aUEC");
+      assertThat(history.last()).containsText("10 auf 8 aUEC");
     }
   }
 

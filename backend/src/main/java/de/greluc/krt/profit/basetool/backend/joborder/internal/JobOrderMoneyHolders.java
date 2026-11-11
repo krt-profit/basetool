@@ -69,16 +69,7 @@ class JobOrderMoneyHolders {
   JobOrderMoneyHolder resolve(UUID orderId, UUID actor, JobOrderMoneySelection selection) {
     return switch (selection.kind()) {
       case SELF -> linked(orderId, actor);
-      case EXISTING -> {
-        JobOrderMoneyHolder holder =
-            holders
-                .findByOrderIdAndId(orderId, Objects.requireNonNull(selection.reference()))
-                .orElseThrow(() -> new BadRequestException("orders.money.holder.notFound"));
-        if (holder.getMergedIntoId() != null) {
-          throw new UnavailableHolderException(UnavailableReason.MERGED_HOLDER);
-        }
-        yield holder;
-      }
+      case EXISTING -> requireCurrent(orderId, Objects.requireNonNull(selection.reference()));
       case LINKED -> {
         UUID id = Objects.requireNonNull(selection.reference());
         if (activeUser(id).isEmpty()) {
@@ -89,6 +80,17 @@ class JobOrderMoneyHolders {
       case ACCOUNTLESS ->
           JobOrderMoneyHolder.named(orderId, Objects.requireNonNull(selection.name()));
     };
+  }
+
+  JobOrderMoneyHolder requireCurrent(UUID orderId, UUID holderId) {
+    JobOrderMoneyHolder holder =
+        holders
+            .findByOrderIdAndId(orderId, holderId)
+            .orElseThrow(() -> new BadRequestException("orders.money.holder.notFound"));
+    if (holder.getMergedIntoId() != null) {
+      throw new UnavailableHolderException(UnavailableReason.MERGED_HOLDER);
+    }
+    return holder;
   }
 
   Optional<User> activeUser(UUID id) {

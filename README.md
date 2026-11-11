@@ -22,11 +22,11 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Operations & payouts** — group missions under an *Operation*, track per-participant finances and confirm payouts behind an asymmetric mark/clear gate.
 - **Members only** — the landing page and the legal pages are the whole public surface (ADR-0159). Everything else needs a login, and every account holds at least member rights. A person without an account can still take part in an Einsatz: the mission leadership records them as an external participant.
 - **Job orders & cross-order material demand** — a prioritised queue of material and item orders with one complete permitted workspace and remembered filters. Current unit writers can transfer Profit responsibility, coordinate Staffel participation, and cancel or reopen work on the central order page. Requesters can safely adjust remaining need after partial delivery. The *Materialbedarf* overview shows remaining material need, earmarked stock and outstanding Staffel promises separately. Explicitly attributed provision credits a promise once; its contribution history remains distinct from current stock coverage. An authorised editor (Bearbeiter) can read their concrete order and maintain their own note outside their unit, without general Profit access (ADR-0301).
-  The [internal aUEC checkpoint](docs/specs/orders-auec.md) supports reported holdings, Bank-free
-  collection and handover, exact transfer fees and recovery of submitted operations. Effective
-  handovers complete the current net target. Responsible Profit units and supporting Staffeln can
-  record planned contributions and explicitly credit fresh provision in the same workspace.
-  Settlement and Bank integration remain planned.
+  The [internal Bank-free aUEC checkpoint](docs/specs/orders-auec.md) tracks reported holdings,
+  unit commitments, exact fees and net handovers. The order detail also handles returns, settlement,
+  same-holder reassignment and financial corrections. Holder and recipient maintenance preserves
+  the original operation history, and submitted operations can be recovered after response loss.
+  [Optional Bank handling](docs/specs/orders-auec-bank.md) remains planned.
 - **Hangar & inventory** — track ships and personal inventories per member, with a server-paginated org-unit fleet overview and personal hangar; admins keep a member's hangar from the member's page.
 - **Lager (warehouse)** — org-scoped, append-only stock tracking: book stock in/out, transfer it (Umbuchen) — individually or for a whole marked selection at once — earmark slices to job orders and missions, and track both materials (with quality) and craftable game items. Each unit's Logisticians set minimum and target levels per material and quality tier, or per game item, in the „Mindestbestände“ tab, which shows the free stock allocated to each level from the top tier down and the amount already requested. A low level marks its material or game item „niedrig“ in the global Lager, offers a prefilled job order and need, and tells the direct Logisticians and seat holders once, until the target is reached again.
 - **Refinery & materials** — refinery job orders, material handovers and a planet-aware materials matrix; new orders can be pre-filled from a desktop-extractor screenshot JSON.

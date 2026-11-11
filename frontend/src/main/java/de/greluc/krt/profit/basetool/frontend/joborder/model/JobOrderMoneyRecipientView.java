@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,6 +32,12 @@ import org.jetbrains.annotations.Nullable;
  * @param name the visible recipient label
  * @param active whether the recipient can be selected for a new handover
  * @param holderId the corresponding holder, if any
+ * @param correctable whether this direct designation can still be corrected
+ * @param correctsId original designation for an explicit correction
+ * @param previousName previous recorded recipient label
+ * @param correctionName recorded replacement label
+ * @param correctedAt time of the correction
+ * @param correctionActorName visible label of the original recorder
  */
 @DtoMirror
 public record JobOrderMoneyRecipientView(
@@ -38,4 +45,10 @@ public record JobOrderMoneyRecipientView(
     @Nullable UUID userId,
     @Nullable String name,
     boolean active,
-    @Nullable UUID holderId) {}
+    @Nullable UUID holderId,
+    boolean correctable,
+    @Nullable UUID correctsId,
+    @Nullable String previousName,
+    @Nullable String correctionName,
+    @Nullable Instant correctedAt,
+    @Nullable String correctionActorName) {}

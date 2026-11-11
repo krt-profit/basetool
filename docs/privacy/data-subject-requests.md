@@ -63,8 +63,9 @@ can, from text alone. So the read-through remains part of the procedure: before 
 verbatim, read it, and if an entry names another person redact that name rather than withholding the
 whole entry. The right is to a copy of *their* data, not to everything that mentions them.
 
-The aUEC export sections contain the member's holder links and provisions they recorded, received
-or were explicitly selected for. They include exact amounts, timestamps and order references.
+The aUEC export sections contain the member's holder links and related identity history,
+requester designations, recorded target changes and money operations or corrections that they
+recorded or participated in. They include exact amounts, timestamps and order references.
 
 > [!warning] "Nothing was removed" does not mean "nothing to look for" — corrected 2026-09-16
 > This section used to say that when the document reports no removals, there is nothing to read
@@ -102,8 +103,8 @@ In short:
 - **Reassigned to an admin**: missions and refinery orders — operational history that must stay
   readable.
 - **Unlinked**: mission participation survives as *"Gelöschter Nutzer"* with no name; the
-  material-claim stamp is nulled. aUEC order holder links and operation account references are
-  cleared. The order retains its operation identities and amounts for financial traceability.
+  material-claim stamp is nulled. The aUEC order clears account links and account references in
+  operations and identity history. It retains the operation IDs, correction lineage and amounts.
 - **Kept**: the audit trail and bank booking history, including the **handle used at the time**,
   under Art. 6(1)(f). The two are not kept for the same length of time: the **bank booking history
   is permanent**, while the **audit trail is bounded at 24 months** after the recorded activity
@@ -122,7 +123,8 @@ answer is no, together with their right to complain and to a judicial remedy.
 survives a deletion - both audit trails (the actor handle, the
 subject label and the details payload), the bank booking history, the four handle columns on the
 booking requests, the bank custodian registry, the job-order contact, the two job-order handover
-recipients, aUEC holder labels, submitted accountless names and the render parameters of the
+recipients, aUEC holder and recipient labels, holder identity history, submitted accountless names
+and the render parameters of the
 notifications other administrators received. **No row is
 removed** and no fact about what happened changes; only the name goes. That is why it can be granted
 at all: deleting the rows would take a counterparty's own evidence with it. It leaves a marker event
@@ -134,7 +136,7 @@ nickname and the optional RSI handle (REQ-SEC-072) — because a handover or a j
 whichever name they use for the person.
 
 > [!warning] The text-matched columns can over-match, so review the hits first
-> Handover recipients, job-order contacts, accountless aUEC names and audit subject labels are
+> Handover recipients, job-order contacts, unlinked accountless aUEC names and audit subject labels are
 > matched on the text, case-insensitively, which means the
 > anonymisation can **over-match** if two people ever used the same spelling. Run the
 > [name search](#finding-every-mention-of-a-person) and look at the hits before granting. That is

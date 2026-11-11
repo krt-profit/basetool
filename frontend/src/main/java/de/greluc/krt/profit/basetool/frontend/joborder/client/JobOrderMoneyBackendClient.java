@@ -19,25 +19,33 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.client;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.CorrectJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.DesignateJobOrderMoneyRecipientDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyCorrectionPreview;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyHolderCandidate;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyMovementPreview;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyOutcome;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyProvisionPreview;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyReassignmentDestination;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyReassignmentPreview;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyRecipientView;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyView;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MoveJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.PreviewJobOrderMoneyProvisionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ProvideJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.SettleJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyInformationDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyTargetDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 
@@ -131,6 +139,104 @@ public class JobOrderMoneyBackendClient {
   }
 
   /**
+   * Projects a settlement against the exact holder and fulfilment revisions.
+   *
+   * @param id the order
+   * @param request the proposed settlement
+   * @return the fee, funding and effects calculated by the backend
+   */
+  public JobOrderMoneyMovementPreview previewSettlement(
+      @NotNull UUID id, @NotNull SettleJobOrderMoneyDto request) {
+    return backend.post(
+        MONEY + "/movements/settlement/preview", request, JobOrderMoneyMovementPreview.class, id);
+  }
+
+  /**
+   * Posts a settlement or replays its accepted outcome.
+   *
+   * @param id the order
+   * @param request the settlement and observed revisions
+   * @return the durable monetary outcome
+   */
+  public JobOrderMoneyOutcome settle(@NotNull UUID id, @NotNull SettleJobOrderMoneyDto request) {
+    return backend.post(MONEY + "/movements/settlement", request, JobOrderMoneyOutcome.class, id);
+  }
+
+  /**
+   * Searches accounts scoped to the selected settlement and its authorized sending party.
+   *
+   * @param id the order
+   * @param kind the settlement purpose
+   * @param sourceHolderId the holder paying a beneficiary, if applicable
+   * @param recipientId the returning requester designation, if applicable
+   * @param query the typed account name fragment
+   * @return selectable account references
+   */
+  public List<JobOrderMoneyHolderCandidate> settlementCandidates(
+      @NotNull UUID id,
+      @NotNull String kind,
+      @Nullable UUID sourceHolderId,
+      @Nullable UUID recipientId,
+      @NotNull String query) {
+    return backend.get(
+        MONEY
+            + "/movements/settlement/candidates?kind={kind}&sourceHolderId={holder}"
+            + "&recipientId={recipient}&q={query}",
+        new ParameterizedTypeReference<>() {},
+        id,
+        kind,
+        Objects.toString(sourceHolderId, ""),
+        Objects.toString(recipientId, ""),
+        query);
+  }
+
+  /**
+   * Finds the exact accessible destination number and its current selectable holders.
+   *
+   * @param id the source order
+   * @param sourceHolderId the holder who owns the money
+   * @param number the displayed destination order number
+   * @return the destination and relevant holder versions
+   */
+  public JobOrderMoneyReassignmentDestination reassignmentDestination(
+      @NotNull UUID id, @NotNull UUID sourceHolderId, int number) {
+    return backend.get(
+        MONEY + "/movements/reassignment/destination?sourceHolderId={holder}&number={number}",
+        JobOrderMoneyReassignmentDestination.class,
+        id,
+        sourceHolderId,
+        number);
+  }
+
+  /**
+   * Projects both balances of a purpose reassignment.
+   *
+   * @param id the source order
+   * @param request the proposed reassignment
+   * @return the backend's exact fee-free result
+   */
+  public JobOrderMoneyReassignmentPreview previewReassignment(
+      @NotNull UUID id, @NotNull ReassignJobOrderMoneyDto request) {
+    return backend.post(
+        MONEY + "/movements/reassignment/preview",
+        request,
+        JobOrderMoneyReassignmentPreview.class,
+        id);
+  }
+
+  /**
+   * Posts both purpose legs or replays the source outcome for the same submission.
+   *
+   * @param id the source order
+   * @param request the reassignment and observed holder revisions
+   * @return the durable source outcome
+   */
+  public JobOrderMoneyOutcome reassign(
+      @NotNull UUID id, @NotNull ReassignJobOrderMoneyDto request) {
+    return backend.post(MONEY + "/movements/reassignment", request, JobOrderMoneyOutcome.class, id);
+  }
+
+  /**
    * Finds accounts that can be selected as a destination of the specified source.
    *
    * @param id the order
@@ -208,6 +314,30 @@ public class JobOrderMoneyBackendClient {
   public JobOrderMoneyView updateInformation(
       @NotNull UUID id, @NotNull UpdateJobOrderMoneyInformationDto request) {
     return backend.patch(MONEY + "/information", request, JobOrderMoneyView.class, id);
+  }
+
+  /**
+   * Previews an exact connected correction before submission.
+   *
+   * @param id the order
+   * @param request revised effective terms and their observed versions
+   * @return the correction preview
+   */
+  public JobOrderMoneyCorrectionPreview previewCorrection(
+      @NotNull UUID id, @NotNull CorrectJobOrderMoneyDto request) {
+    return backend.post(
+        MONEY + "/corrections/preview", request, JobOrderMoneyCorrectionPreview.class, id);
+  }
+
+  /**
+   * Submits a correction or returns its already recorded result.
+   *
+   * @param id the order
+   * @param request the logical operation and corrected terms
+   * @return the durable outcome
+   */
+  public JobOrderMoneyOutcome correct(@NotNull UUID id, @NotNull CorrectJobOrderMoneyDto request) {
+    return backend.post(MONEY + "/corrections", request, JobOrderMoneyOutcome.class, id);
   }
 
   /**

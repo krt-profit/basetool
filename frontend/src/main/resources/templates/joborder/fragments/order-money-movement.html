@@ -13,10 +13,15 @@
                     <option value="COLLECTION" th:text="#{orders.money.movement.collection}"></option>
                     <option value="HANDOVER" th:text="#{orders.money.movement.handover}"></option>
                     <option value="PURPOSE_HANDOVER" th:text="#{orders.money.movement.purposeHandover}"></option>
+                    <option value="REQUESTER_RETURN" th:text="#{orders.money.movement.requesterReturn}"></option>
+                    <option value="RELEASE" th:text="#{orders.money.movement.release}"></option>
+                    <option value="SHORTAGE" th:text="#{orders.money.movement.shortage}"></option>
+                    <option value="SETTLEMENT" th:text="#{orders.money.movement.settlement}"></option>
+                    <option value="REASSIGNMENT" th:text="#{orders.money.movement.reassignment}"></option>
                 </select>
             </div>
             <div class="form-group">
-                <label for="order-money-source-holder" th:text="#{orders.money.movement.source}"></label>
+                <label for="order-money-source-holder" th:data-source-label="#{orders.money.movement.source}" th:data-fee-payer-label="#{orders.money.movement.feePayer}" th:text="#{orders.money.movement.source}"></label>
                 <select id="order-money-source-holder" name="sourceHolderId" data-testid="order-money-source-holder" required>
                     <option value="" th:text="#{orders.create.select}"></option>
                 </select>
@@ -38,10 +43,32 @@
             </div>
             <div th:replace="~{joborder/fragments/order-money-movement :: partyChoice('order-money-destination-choice', 'destinationChoice')}"></div>
             <div class="form-group" hidden>
-                <label for="order-money-handover-recipient" th:text="#{orders.money.recipient}"></label>
+                <label for="order-money-handover-recipient" th:data-recipient-label="#{orders.money.recipient}" th:data-returner-label="#{orders.money.movement.returner}" th:text="#{orders.money.recipient}"></label>
                 <select id="order-money-handover-recipient" name="recipientId" data-testid="order-money-handover-recipient" required disabled>
                     <option value="" th:text="#{orders.create.select}"></option>
                 </select>
+            </div>
+            <div class="form-group" hidden>
+                <label for="order-money-destination-number" th:text="#{orders.money.movement.destinationNumber}"></label>
+                <input id="order-money-destination-number" name="destinationNumber" type="text" inputmode="numeric"
+                       data-number-input="exact-whole" data-testid="order-money-destination-number"
+                       th:data-invalid="#{orders.money.amount.invalid}" required disabled>
+                <p data-money-destination-unavailable role="status" hidden
+                   th:text="#{orders.money.movement.destinationUnavailable}"></p>
+            </div>
+            <div class="form-group" hidden>
+                <label for="order-money-cross-order-holder" th:text="#{orders.money.movement.destinationHolder}"></label>
+                <select id="order-money-cross-order-holder" name="crossOrderHolder"
+                        th:data-new-holder-label="#{orders.money.movement.addSameHolder}"
+                        data-testid="order-money-cross-order-holder" required disabled>
+                    <option value="" th:text="#{orders.create.select}"></option>
+                </select>
+            </div>
+            <div class="form-group" hidden>
+                <label class="cluster gap-2">
+                    <input type="checkbox" name="confirmSamePerson" data-testid="order-money-confirm-same-person" required disabled>
+                    <span th:text="#{orders.money.movement.confirmSamePerson}"></span>
+                </label>
             </div>
             <div class="form-group">
                 <label for="order-money-movement-amount" th:text="#{orders.money.movement.net}"></label>
@@ -71,7 +98,7 @@
                     <dt class="fact-k" th:text="#{orders.money.movement.source}"></dt>
                     <dd class="fact-v" data-preview-label="source"></dd>
                 </div>
-                <div>
+                <div data-preview-destination>
                     <dt class="fact-k" th:text="#{orders.money.movement.destination}"></dt>
                     <dd class="fact-v" data-preview-label="destination"></dd>
                 </div>
@@ -95,6 +122,10 @@
                     <dt class="fact-k" th:text="#{orders.money.preview.holding}"></dt>
                     <dd class="fact-v" data-preview-value="sourceAfter"></dd>
                 </div>
+                <div data-preview-destination-balance hidden>
+                    <dt class="fact-k" th:text="#{orders.money.movement.destinationBalance}"></dt>
+                    <dd class="fact-v" data-preview-value="destinationAfter"></dd>
+                </div>
                 <div data-preview-shortfall hidden>
                     <dt class="fact-k" th:text="#{orders.money.movement.shortfall}"></dt>
                     <dd class="fact-v" data-preview-value="shortfall"></dd>
@@ -105,7 +136,9 @@
                 </div>
             </dl>
             <p data-preview-completes hidden th:text="#{orders.money.movement.completes}"></p>
+            <p data-preview-reopens hidden th:text="#{orders.money.movement.reopens}"></p>
         </div>
+        <p class="alert alert-warning" role="status" data-money-preview-error hidden></p>
         <button type="button" class="btn btn-ghost" data-money-preview-retry hidden
                 th:text="#{orders.money.preview.retry}"></button>
     </div>

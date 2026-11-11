@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,10 +31,22 @@ import org.jetbrains.annotations.Nullable;
  * @param name current permitted label
  * @param active whether fresh handovers may use the designation
  * @param holderId the deliberately designated order-local holder, when present
+ * @param correctable whether this is a direct designation that can still be corrected
+ * @param correctsId original designation for an explicit correction
+ * @param previousName previous recorded recipient label, when permitted
+ * @param correctionName recorded replacement label, when permitted
+ * @param correctedAt time the direct designation was corrected
+ * @param correctionActorName label of the original recorder, when permitted
  */
 public record JobOrderMoneyRecipientView(
     UUID id,
     @Nullable UUID userId,
     @Nullable String name,
     boolean active,
-    @Nullable UUID holderId) {}
+    @Nullable UUID holderId,
+    boolean correctable,
+    @Nullable UUID correctsId,
+    @Nullable String previousName,
+    @Nullable String correctionName,
+    @Nullable Instant correctedAt,
+    @Nullable String correctionActorName) {}

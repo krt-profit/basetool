@@ -29,6 +29,8 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -79,6 +81,18 @@ class JobOrderMoneyEffects {
     }
   }
 
+  void reassignmentRecorded(
+      JobOrder source,
+      JobOrder destination,
+      JobOrderMoneyOperation outflow,
+      @Nullable UUID account,
+      UUID actor,
+      boolean destinationStarted,
+      boolean newLinkedHolder) {
+    movementRecorded(source, outflow, account, null, actor, false, false);
+    publishMoney(destination, destinationStarted, newLinkedHolder);
+  }
+
   void designationChanged(JobOrder order, boolean linked) {
     publishMoney(order, false, linked);
   }
@@ -93,14 +107,16 @@ class JobOrderMoneyEffects {
       boolean newLinkedHolder) {
     publishMoney(order, lifecycleChanged, newLinkedHolder);
     boolean grouped =
-        order.getStatus() == JobOrderStatus.COMPLETED || fact.getCommitmentId() != null;
+        order.getStatus() == JobOrderStatus.COMPLETED
+            || fact.getCommitmentId() != null
+            || (lifecycleChanged && fact.getKind() == JobOrderMoneyKind.REQUESTER_RETURN);
     List<NotificationEvent> notices = new ArrayList<>();
     if (source != null && !source.equals(actor)) {
       notices.add(
           new JobOrderMoneyMovedEvent(
               order.getId(),
-              fact.getHolderId(),
-              null,
+              fact.getKind() == JobOrderMoneyKind.REQUESTER_RETURN ? null : fact.getHolderId(),
+              fact.getKind() == JobOrderMoneyKind.REQUESTER_RETURN ? fact.getRecipientId() : null,
               source,
               actor,
               source,
@@ -127,6 +143,44 @@ class JobOrderMoneyEffects {
       events.publishEvent(new NotificationCause(Objects.requireNonNull(fact.getId()), notices));
     }
   }
+
+  void correctionRecorded(
+      JobOrder order,
+      Collection<CorrectionParty> parties,
+      JobOrderMoneyOperation fact,
+      UUID actor,
+      boolean lifecycleChanged,
+      boolean affectsRecipients,
+      boolean affectsCredit) {
+    publishMoney(order, lifecycleChanged, affectsRecipients);
+    boolean grouped = lifecycleChanged || affectsCredit;
+    var affected = new HashSet<UUID>();
+    List<NotificationEvent> notices = new ArrayList<>();
+    for (var party : parties) {
+      UUID account = party.accountId();
+      if (!account.equals(actor) && affected.add(account)) {
+        notices.add(
+            new JobOrderMoneyMovedEvent(
+                order.getId(),
+                party.holderId(),
+                party.recipientId(),
+                account,
+                actor,
+                account,
+                null,
+                grouped,
+                order.getDisplayId()));
+      }
+    }
+    if (grouped) {
+      notices.forEach(orderEffects::publish);
+    } else if (!notices.isEmpty()) {
+      events.publishEvent(new NotificationCause(Objects.requireNonNull(fact.getId()), notices));
+    }
+  }
+
+  /** Current linked participant whose financial history changed. */
+  record CorrectionParty(@Nullable UUID holderId, @Nullable UUID recipientId, UUID accountId) {}
 
   void targetChanged(JobOrder order) {
     publishMoney(order, false, true);
