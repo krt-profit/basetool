@@ -23,6 +23,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -330,6 +331,135 @@ class JobOrderSupportReadIntegrationTest {
   }
 
   @Test
+  void transferEndsTheFormerRemainderAndRetainsThePromotedCommitment() throws Exception {
+    String tag = UUID.randomUUID().toString();
+    var outgoing = new Squadron();
+    outgoing.setName("Outgoing commitment " + tag);
+    outgoing.setShorthand("OC" + tag);
+    outgoing.setParent(profit);
+    outgoing = units.saveAndFlush(outgoing);
+    String path = "/api/v1/orders/" + createMoneyOrder(outgoing);
+    String participationPath = path + "/participations";
+    String oldPath = participationPath + "/" + outgoing.getId();
+    String incomingPath = participationPath + "/" + support.getId();
+    as(
+            put(oldPath + "/money-commitment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            true,
+            false)
+        .andExpect(status().isNoContent());
+    as(
+            put(incomingPath + "/money-commitment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"3000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+    String original =
+        as(get(participationPath), true, false)
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String outgoingCommitment =
+        com.jayway.jsonpath.JsonPath.read(original, "$.moneyCommitments[0].id");
+    String incomingCommitment =
+        com.jayway.jsonpath.JsonPath.read(original, "$.moneyCommitments[1].id");
+
+    as(
+            post(path + "/money/provisions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"operationId":"%s","amount":"4000000","bankHandling":false,
+                     "holderVersion":0,"commitmentId":"%s"}
+                    """
+                        .formatted(UUID.randomUUID(), outgoingCommitment)),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(
+            patch(path + "/responsible-org-unit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"responsibleOrgUnitId":"%s","version":0}
+                    """
+                        .formatted(support.getId())),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(get(participationPath), true, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].id").value(outgoingCommitment))
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("0"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].reason").value("CREDITED"))
+        .andExpect(
+            jsonPath("$.moneyCommitments[0].changes[2].reason").value("RESPONSIBILITY_ENDED"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[2].before").value("2000000"))
+        .andExpect(jsonPath("$.moneyCommitments[1].id").value(incomingCommitment))
+        .andExpect(jsonPath("$.moneyCommitments[1].outstanding").value("3000000"))
+        .andExpect(jsonPath("$.moneyCommitments[1].endedAt").doesNotExist())
+        .andExpect(jsonPath("$.participations[0].active").value(false));
+
+    as(put(oldPath), true, false).andExpect(status().isNoContent());
+    as(get(participationPath), true, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(2))
+        .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists());
+    as(
+            put(oldPath + "/money-commitment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"9000000\"}"),
+            true,
+            false)
+        .andExpect(status().isNoContent());
+    as(get(participationPath), true, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].id").value(outgoingCommitment))
+        .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists())
+        .andExpect(jsonPath("$.moneyCommitments[2].outstanding").value("9000000"));
+    as(get(path + "/money"), true, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("4000000"));
+  }
+
+  @Test
+  void cancellingAndReopeningLeavesTheOpenCommitmentHistorical() throws Exception {
+    String path = "/api/v1/orders/" + createMoneyOrder();
+    String supportPath = path + "/participations";
+    String commitmentPath = supportPath + "/" + support.getId() + "/money-commitment";
+    as(put(commitmentPath).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"amount\":\"6000000\"}"), false, true)
+        .andExpect(status().isNoContent());
+    as(put(path + "/status").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"status\":\"CANCELLED\",\"version\":0}"), true, false)
+        .andExpect(status().isOk());
+    as(get(supportPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("0"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].reason").value("ORDER_ENDED"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].before").value("6000000"));
+
+    as(put(path + "/status").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"status\":\"OPEN\",\"version\":1}"), true, false)
+        .andExpect(status().isOk());
+    as(get(supportPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(1))
+        .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists());
+    as(put(commitmentPath).contentType(MediaType.APPLICATION_JSON)
+            .content("{\"amount\":\"7000000\"}"), false, true)
+        .andExpect(status().isNoContent());
+    as(get(supportPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(2))
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("0"))
+        .andExpect(jsonPath("$.moneyCommitments[1].outstanding").value("7000000"));
+  }
+
+  @Test
   void activeSupportWithNoOpenPromiseRemainsUnitWorkAndCountsBeforePagination() throws Exception {
     JobOrder first = supported(JobOrderType.MATERIAL, true);
     JobOrder second = supported(JobOrderType.ITEM, true);
@@ -551,6 +681,10 @@ class JobOrderSupportReadIntegrationTest {
   }
 
   private String createMoneyOrder() throws Exception {
+    return createMoneyOrder(responsible);
+  }
+
+  private String createMoneyOrder(OrgUnit orderResponsible) throws Exception {
     String body =
         as(
                 post("/api/v1/orders/auec")
@@ -560,7 +694,7 @@ class JobOrderSupportReadIntegrationTest {
                         {"responsibleOrgUnitId":"%s","requestingOrgUnitId":"%s",
                          "handle":"Commitment witness","target":"10000000"}
                         """
-                            .formatted(responsible.getId(), requester.getId())),
+                            .formatted(orderResponsible.getId(), requester.getId())),
                 true,
                 false)
             .andExpect(status().isCreated())

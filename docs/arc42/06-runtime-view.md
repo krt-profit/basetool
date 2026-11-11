@@ -1,6 +1,6 @@
 # 6. Runtime view
 
-> **Approved planned runtime, not implemented:** [aUEC procurement](../specs/orders-auec.md) defines immediate bank-free effects and persistent operation/outcome identity; [optional bank coupling](../specs/orders-auec-bank.md) defines atomic final bank/order effects, pending unavailability and the different reversal cases. The scenarios below remain the current runtime baseline, not verification of those planned flows.
+> [aUEC procurement](../specs/orders-auec.md) owns the Bank-free order runtime. The [planned Bank coupling](../specs/orders-auec-bank.md) owns delayed Bank effects and reversals.
 
 These scenarios exercise rules that are not visible in the static view. Their canonical
 requirements own behavior and verification status.
@@ -295,7 +295,7 @@ The quantity/evidence contract and its acceptance status live in
 [REQ-ORDERS-024](../specs/orders-material-claims.md); this runtime map is not a second acceptance
 record.
 
-## 6.13 Bank-free order provision and response recovery
+## 6.13 Bank-free order provision, handover and response recovery
 
 1. The common creation command records the aUEC order and its independently versioned target in
    one transaction. Reporting an own holding, selecting a linked account, or naming an accountless
@@ -303,12 +303,14 @@ record.
 2. The order edit acquires the involved account identity guards, then the hierarchy and order
    write guards. It checks current authority and compares an existing accepted attempt before
    considering the holder version of a new submission.
-3. A fresh booking commits the operation, holder revision, initial lifecycle change and audit
-   together. After commit, participants receive section invalidations, and the affected linked
-   account can receive its own notice.
+3. A fresh movement applies the source debit, recipient credit, explicit new funds and fixed
+   fee in one booking. If a handover can reach the current target, the edit locks the priority
+   queue before its order row. The movement, lifecycle change and audit commit together.
+   Participants receive section invalidations after commit. An affected linked account can
+   receive a targeted notice.
 4. A browser with an unknown outcome queries the same operation after reload. The order rechecks
    access and reconstructs exact amounts from the accepted monetary facts; current holder and actor
    labels follow the privacy rules.
 
-See [the aUEC order contract](../specs/orders-auec.md) for the initial checkpoint and remaining
-movement, settlement and Bank acceptance.
+See [the aUEC order contract](../specs/orders-auec.md) for the Bank-free checks and remaining
+settlement and Bank acceptance.

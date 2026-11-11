@@ -37,7 +37,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderUpdatedByRequesterEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -107,6 +106,7 @@ public class JobOrderService {
   private final LiveSyncPublisher liveSyncPublisher;
   private final JobOrderUnitHistory unitHistory;
   private final JobOrderParticipationCommands participationCommands;
+  private final JobOrderMoneyCommitments moneyCommitments;
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
@@ -270,28 +270,6 @@ public class JobOrderService {
   }
 
   /**
-   * Builds the {@link JobOrderUpdatedByRequesterEvent} that notifies the responsible org unit's
-   * officers and leads after commit (REQ-ORDERS-023). Reads only scalars.
-   *
-   * @param jobOrder the persisted, flushed job order after the requester edit
-   * @return the event to publish
-   */
-  private JobOrderUpdatedByRequesterEvent updatedByRequesterEvent(@NotNull JobOrder jobOrder) {
-    OrgUnit responsible = jobOrder.getResponsibleOrgUnit();
-    OrgUnit requesting = jobOrder.getRequestingOrgUnit();
-    return new JobOrderUpdatedByRequesterEvent(
-        jobOrder.getId(),
-        jobOrder.getDisplayId(),
-        jobOrder.getHandle(),
-        new OrgUnitRef(responsible.getId(), responsible.getKind()),
-        responsible.getShorthand(),
-        requesting == null ? null : new OrgUnitRef(requesting.getId(), requesting.getKind()),
-        requesting == null ? null : requesting.getShorthand(),
-        authHelperService.currentUserId().orElse(null),
-        JobOrderLifecycleNotices.revision(jobOrder));
-  }
-
-  /**
    * Reports a terminal outcome after commit.
    *
    * @param jobOrder the completed, rejected or deleted order
@@ -352,6 +330,9 @@ public class JobOrderService {
       itemFulfillment.lock(order.getId());
     }
     JobOrderStatus previous = order.getStatus();
+    if (order.getType() == JobOrderType.AUEC && previous == JobOrderStatus.COMPLETED) {
+      throw new BadRequestException("orders.money.completion.requiresHandover");
+    }
     if ((status == JobOrderStatus.CANCELLED && !previous.isActive())
         || (previous == JobOrderStatus.CANCELLED && status != JobOrderStatus.OPEN)) {
       throw new BadRequestException("orders.status.transition.invalid");
@@ -401,10 +382,13 @@ public class JobOrderService {
 
     List<Object> notices = new ArrayList<>();
     if (isTerminal && !wasTerminal) {
+      moneyCommitments.endOpenForOrder(jobOrder);
       stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
       notices.add(closedEvent(jobOrder));
       notices.add(finishedNotice(jobOrder, status.name()));
-    } else if (previousStatus == JobOrderStatus.CANCELLED) {
+    } else if (previousStatus == JobOrderStatus.CANCELLED
+        || (previousStatus == JobOrderStatus.COMPLETED
+            && jobOrder.getType() == JobOrderType.AUEC)) {
       notices.add(
           JobOrderLifecycleNotices.reopened(
               jobOrder, authHelperService.currentUserId().orElse(null)));
@@ -422,6 +406,18 @@ public class JobOrderService {
                 AuditDetails.of("from", previousStatus).with("to", status));
     publishLifecycleSections(jobOrder);
     return edit.notifying(notices);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  void reopenUnderfulfilledMoneyOrder(JobOrder order) {
+    JobOrderEdit edit = applyStatus(order, JobOrderStatus.IN_PROGRESS);
+    auditRecorder.record(
+        AuditEventType.JOB_ORDER_STATUS_CHANGED,
+        order.getId(),
+        JobOrderAuditLabel.of(order),
+        null,
+        edit.details());
+    edit.notices().forEach(effects::publish);
   }
 
   private void publishLifecycleSections(JobOrder order) {
@@ -754,7 +750,11 @@ public class JobOrderService {
                               .with("materials", outcome.order().getMaterials().size())
                               .with("orphanedClaimsWithdrawn", outcome.orphanedClaimsWithdrawn())
                               .with("byRequester", true))
-                      .notifying(List.of(updatedByRequesterEvent(outcome.order())));
+                      .notifying(
+                          List.of(
+                              JobOrderLifecycleNotices.requesterChanged(
+                                  outcome.order(),
+                                  authHelperService.currentUserId().orElse(null))));
                 }));
   }
 
@@ -822,7 +822,10 @@ public class JobOrderService {
             AuditDetails.of("lines", refreshed.getItems().size())
                 .with("orphanedClaimsWithdrawn", orphanedClaimsWithdrawn)
                 .with("byRequester", true))
-        .notifying(List.of(updatedByRequesterEvent(refreshed)));
+        .notifying(
+            List.of(
+                JobOrderLifecycleNotices.requesterChanged(
+                    refreshed, authHelperService.currentUserId().orElse(null))));
   }
 
   private static void assertItemOrderEditable(@NotNull JobOrder order, boolean requester) {
@@ -1026,6 +1029,7 @@ public class JobOrderService {
     changeLifecycle(jobOrder, JobOrderStatus.COMPLETED);
 
     if (!wasTerminal) {
+      moneyCommitments.endOpenForOrder(jobOrder);
       jobOrderRepository.flush();
       jobOrderPriorityService.normalizePriorities();
       stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
@@ -1082,6 +1086,7 @@ public class JobOrderService {
     jobOrder.setResponsibleOrgUnit(target);
     jobOrder.setResponsibilityVersion(Math.incrementExact(jobOrder.getResponsibilityVersion()));
     participationCommands.becomeResponsible(jobOrder, target);
+    moneyCommitments.endForLostResponsibility(jobOrder, OrgUnit.idOf(previous));
     liveSyncPublisher.publishAfterCommit(
         LiveSyncTopic.of(LiveSyncTopicClass.ORDER, jobOrder.getId()),
         List.of(

@@ -35,6 +35,16 @@ import java.util.List;
  * @param canProvideSelf whether the caller can report a new own provision
  * @param canProvideOnBehalf whether the caller is also the current responsible writer
  * @param canDelete whether an administrator can delete before any accepted submission
+ * @param fees exact fees charged to the order
+ * @param overpaid net amount delivered above the target
+ * @param recipients current and historical recipient designations
+ * @param canDesignateRecipient whether the caller may edit the current designations
+ * @param canEditTarget whether the caller may edit the requested net amount
+ * @param canEditInformation whether the caller may edit general order information
+ * @param informationVersion the contextual order information revision
+ * @param canMoveForOthers whether the caller may record arbitrary order movements
+ * @param canRecordRequesterHandover whether the caller may record delivery to the requester
+ * @param targetChanges explicit amendments to the requested net amount
  */
 public record JobOrderMoneyView(
     String target,
@@ -47,4 +57,14 @@ public record JobOrderMoneyView(
     List<JobOrderMoneyOutcome> history,
     boolean canProvideSelf,
     boolean canProvideOnBehalf,
-    boolean canDelete) {}
+    boolean canDelete,
+    String fees,
+    String overpaid,
+    List<JobOrderMoneyRecipientView> recipients,
+    boolean canDesignateRecipient,
+    boolean canEditTarget,
+    boolean canEditInformation,
+    long informationVersion,
+    boolean canMoveForOthers,
+    boolean canRecordRequesterHandover,
+    List<JobOrderMoneyTargetChangeView> targetChanges) {}

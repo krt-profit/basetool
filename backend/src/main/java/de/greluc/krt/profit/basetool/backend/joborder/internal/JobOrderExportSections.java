@@ -90,16 +90,45 @@ public class JobOrderExportSections implements PersonalDataExportSection {
             306,
             "jobOrderMoneyOperations",
             ART_15_20,
-            "Provisions the member recorded, received, or was explicitly selected for.",
+            "Provisions and movements the member recorded or directly participated in.",
             """
-            SELECT o.display_id AS job_order, p.operation_id, p.holder_id,
-                   CAST(p.amount AS text) AS amount, p.bank_handling, p.recorded_at
+            SELECT o.display_id AS job_order, p.operation_id, p.holder_id, p.kind,
+                   CAST(p.amount AS text) AS amount, p.bank_handling, p.recorded_at,
+                   CAST(p.fee AS text) AS fee, CAST(p.new_provision AS text) AS new_provision
             FROM job_order_money_operation p
             JOIN job_order o ON o.id = p.order_id
             JOIN job_order_money_holder h ON h.id = p.holder_id
             JOIN job_order_money_holder linked ON linked.id = COALESCE(h.merged_into_id, h.id)
+            LEFT JOIN job_order_money_recipient r ON r.id = p.recipient_id
+            LEFT JOIN job_order_money_holder receiving ON receiving.id = COALESCE(p.destination_holder_id, r.holder_id)
+            LEFT JOIN job_order_money_holder recipient ON recipient.id = COALESCE(receiving.merged_into_id, receiving.id)
             WHERE linked.user_id = :userId OR p.actor_id = :userId OR p.selected_user_id = :userId
+               OR r.user_id = :userId OR recipient.user_id = :userId
             ORDER BY p.recorded_at, p.id
+            """),
+        new Section(
+            307,
+            "jobOrderMoneyRecipients",
+            ART_15_20,
+            "The member's active and historical requester recipient designations.",
+            """
+            SELECT o.display_id AS job_order, r.id AS recipient_id, r.active
+            FROM job_order_money_recipient r JOIN job_order o ON o.id = r.order_id
+            LEFT JOIN job_order_money_holder h ON h.id = r.holder_id
+            LEFT JOIN job_order_money_holder linked ON linked.id = COALESCE(h.merged_into_id, h.id)
+            WHERE r.user_id = :userId OR linked.user_id = :userId
+            ORDER BY o.display_id, r.id
+            """),
+        new Section(
+            308,
+            "jobOrderMoneyTargetChanges",
+            ART_15_20,
+            "The member's recorded changes to requested net aUEC amounts.",
+            """
+            SELECT o.display_id AS job_order, CAST(t.previous_target AS text) AS previous_target,
+                   CAST(t.target AS text) AS target, t.recorded_at
+            FROM job_order_money_target_change t JOIN job_order o ON o.id = t.order_id
+            WHERE t.actor_id = :userId ORDER BY t.recorded_at, t.id
             """));
   }
 }

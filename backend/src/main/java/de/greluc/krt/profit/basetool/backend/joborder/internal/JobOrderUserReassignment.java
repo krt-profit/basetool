@@ -44,7 +44,10 @@ public class JobOrderUserReassignment implements UserReassignmentParticipant {
   private static final OwnedRows HOLDERS =
       new OwnedRows("job_order_money_holder", "user_id", List.of("order_id"));
 
+  private static final OwnedRows RECIPIENTS = OwnedRows.of("job_order_money_recipient", "user_id");
+
   private final OwnedRowsMover mover;
+  private final JobOrderMoneyRecipientRepository recipients;
   private final JobOrderMoneyHolderRepository holders;
   private final JobOrderMoneyPrivacy moneyPrivacy;
   private final JobOrderMoneyIdentityLock identityLock;
@@ -56,7 +59,7 @@ public class JobOrderUserReassignment implements UserReassignmentParticipant {
 
   @Override
   public @NotNull List<OwnedRows> followsTheMember() {
-    return List.of(ASSIGNEES, HOLDERS);
+    return List.of(ASSIGNEES, HOLDERS, RECIPIENTS);
   }
 
   @Override
@@ -66,7 +69,8 @@ public class JobOrderUserReassignment implements UserReassignmentParticipant {
         "job_order_item_handover.executing_user_id",
         "material_claim.claimed_by_user_id",
         "job_order_money_operation.actor_id",
-        "job_order_money_operation.selected_user_id");
+        "job_order_money_operation.selected_user_id",
+        "job_order_money_target_change.actor_id");
   }
 
   @Override
@@ -91,11 +95,17 @@ public class JobOrderUserReassignment implements UserReassignmentParticipant {
     int collisions = holders.reviseCollidingHolders(source, target, orderIds);
     holders.mergeCollidingHolders(source, target, orderIds);
     int movedLinks = holders.moveLinkedHolders(source, target, orderIds);
-    if (collisions + movedLinks == 0) {
+    int movedRecipients = recipients.moveAccounts(source, target, orderIds);
+    if (collisions + movedLinks + movedRecipients == 0) {
       return assignments;
     }
     List<Moved> moved = new ArrayList<>(assignments);
-    moved.add(new Moved(HOLDERS.qualified(), collisions + movedLinks));
+    if (collisions + movedLinks > 0) {
+      moved.add(new Moved(HOLDERS.qualified(), collisions + movedLinks));
+    }
+    if (movedRecipients > 0) {
+      moved.add(new Moved(RECIPIENTS.qualified(), movedRecipients));
+    }
     moneyPrivacy.publishChanges(orderIds);
     return List.copyOf(moved);
   }

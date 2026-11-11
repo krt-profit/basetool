@@ -26,6 +26,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Loads current and historical unit commitments within their order. */
 interface JobOrderMoneyCommitmentRepository extends JpaRepository<JobOrderMoneyCommitment, UUID> {
@@ -47,6 +49,19 @@ interface JobOrderMoneyCommitmentRepository extends JpaRepository<JobOrderMoneyC
    */
   @EntityGraph(attributePaths = "unit")
   List<JobOrderMoneyCommitment> findByOrderIdOrderByOpenedAtAscIdAsc(UUID orderId);
+
+  /**
+   * Reads the owning unit without loading the mutable occurrence.
+   *
+   * @param orderId the order receiving the contribution
+   * @param commitmentId the selected occurrence
+   * @return the unit that owns the occurrence
+   */
+  @Query(
+      "SELECT c.unit.id FROM JobOrderMoneyCommitment c WHERE c.order.id = :orderId AND c.id ="
+          + " :commitmentId")
+  Optional<UUID> unitIdForOccurrence(
+      @Param("orderId") UUID orderId, @Param("commitmentId") UUID commitmentId);
 
   /**
    * Finds an occurrence in the concrete order, including when it has ended.

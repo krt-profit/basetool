@@ -718,22 +718,19 @@ centralised:
   `@PreAuthorize`, since an annotation value cannot invoke a method). The alias is baked into each
   constant (`o`/`m`/`s`/`r`/`i`) rather than parameterized — a compile-time constant cannot accept a
   runtime substitution — so this is a handful of named per-aggregate constants, not one generic
-  template. The three aggregates with an escape tail beyond the plain triple (Operation's
-  ownerless-leadership + mission-participant escapes, Mission's cross-staffel public escape, JobOrder's
-  SK-public-queue escape — REQ-ORG-003) carry the tail baked into their own constant; the three
-  strict-staffel aggregates (Ship, RefineryOrder, InventoryItem) use the plain triple unchanged.
-  The module's access policy cites its fragment, so the list query and the per-row gate sit next to each other (plan section 5.4).
+  template. Operation and Mission carry their aggregate-specific scope conditions in their own
+  constants. Ship, RefineryOrder and InventoryItem use the strict unit triple. The shared JobOrder
+  read predicate follows [the order workspace rules](orders-core.md), including current personal
+  holder and recipient links under [the aUEC contract](orders-auec.md). The list query and
+  per-row gate cite the same aggregate scope.
 
-Both are **read-only, wire-format-preserving refactors**: every migrated `@Query` value is
-byte-for-byte the same JPQL the compiler previously inlined, so the multi-tenant scope semantics of
-REQ-ORG-002/003 are unchanged. Neither introduces `JpaSpecificationExecutor` — every scoped query in
-this codebase is a hand-written `@Query`, not a `Specification`, and there was no behavioural reason
-to switch.
+The lookup and scope extractions preserve the wire format. Scoped repository queries use the
+aggregate's hand-written `@Query` fragment.
 
 **Acceptance**: `LookupTableRepository`'s exists-pair is exercised by every existing
 `*RepositoryTest`/service test that already covered the 8 migrated repositories' duplicate-name
 checks. The six scope fragments are pinned byte for byte by `ScopeFragmentsGoldenTest` against
-`scope/scope-fragments.txt`, which was recorded before the fragments moved. For each of the six aggregates a parity test
+`scope/scope-fragments.txt`, which records the current approved fragments. For each of the six aggregates a parity test
 (`ShipScopeParityTest`, `InventoryScopeParityTest`, `RefineryScopeParityTest`, `OperationScopeParityTest`, `MissionScopeParityTest`,
 `JobOrderScopeParityTest`) runs the list query against the real schema and the row gate over the nine callers of the access-policy
 differential tests (`ScopeParityCallers`): the list never shows a row the gate refuses, and the two agree on every row another member
@@ -1122,7 +1119,7 @@ pass the migration and fail every later write to `personal_blueprint`, `default_
 `inventory_item` or `ship`; the migration that renames a column recreates the functions that name
 it.
 
-The ownership map, 123 tables. Its machine-readable copy is
+The machine-readable ownership map is
 `backend/src/test/resources/architecture/table-ownership.txt`, which the test reads; a new table is
 added to both. `deletion_request` sits with identity, as do the GDPR classes once the transitional
 `privacy` module dissolves (plan §7.6).
@@ -1143,7 +1140,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `inventory` | 4 | `inventory_item`, `inventory_item_donation_allocation`, `inventory_item_job_order_allocation`, `inventory_item_mission_allocation` |
 | `mission` | 12 | `mission`, `mission_crew`, `mission_crew_job_types`, `mission_finance_entry`, `mission_frequency`, `mission_managers`, `mission_objective`, `mission_ownership`, `mission_participant`, `mission_participant_org_unit`, `mission_step`, `mission_unit` |
 | `refinery` | 2 | `refinery_good`, `refinery_order` |
-| `joborder` | 14 | `job_order`, `job_order_assignees`, `job_order_handover`, `job_order_handover_item`, `job_order_item`, `job_order_item_handover`, `job_order_item_handover_entry`, `job_order_item_material`, `job_order_material`, `job_order_participation`, `job_order_unit_read_history`, `material_claim`, `material_provision_credit`, `material_provision_fragment` |
+| `joborder` | 20 | `job_order`, `job_order_assignees`, `job_order_handover`, `job_order_handover_item`, `job_order_item`, `job_order_item_handover`, `job_order_item_handover_entry`, `job_order_item_material`, `job_order_material`, `job_order_money_holder`, `job_order_money_operation`, `job_order_money_recipient`, `job_order_money_refused_attempt`, `job_order_money_target`, `job_order_money_target_change`, `job_order_participation`, `job_order_unit_read_history`, `material_claim`, `material_provision_credit`, `material_provision_fragment` |
 | `materialexchange` | 4 | `material_exchange_interest`, `material_exchange_offer`, `material_exchange_request`, `material_exchange_request_interest` |
 | `operation` | 2 | `operation`, `operation_payout_status` |
 | `bank` | 10 | `bank_account`, `bank_account_approval_limit`, `bank_account_grant`, `bank_account_view_grant`, `bank_audit_event`, `bank_booking_request`, `bank_holder`, `bank_holder_posting`, `bank_posting`, `bank_transaction` |

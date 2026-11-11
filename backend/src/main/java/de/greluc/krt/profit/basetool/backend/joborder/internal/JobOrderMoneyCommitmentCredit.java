@@ -44,8 +44,11 @@ class JobOrderMoneyCommitmentCredit {
   private final JobOrderParticipationRepository participations;
 
   void assertAttributionAuthority(JobOrder order, UUID commitmentId) {
-    JobOrderMoneyCommitment commitment = requireOccurrence(order, commitmentId);
-    if (!authority.canCorrect(order, commitment.getUnit().getId())) {
+    UUID unitId =
+        commitments
+            .unitIdForOccurrence(order.getId(), commitmentId)
+            .orElseThrow(() -> new BusinessConflictException("orders.money.commitment.changed"));
+    if (!authority.canCorrect(order, unitId)) {
       throw new AccessDeniedException("orders.money.commitment.forbidden");
     }
   }

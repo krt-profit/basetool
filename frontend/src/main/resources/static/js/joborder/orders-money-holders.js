@@ -21,10 +21,110 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtSearchableSelect } from '/js/kernel/krt-searchable-select.js';
 
 /** @typedef {ApiDto<'JobOrderMoneyHolderCandidate'>} HolderCandidate */
-/** @typedef {ApiDto<'ProvideJobOrderMoneyDto'>} ProvisionTerms */
+/** @typedef {Omit<ApiDto<'ProvideJobOrderMoneyDto'>, 'operationId'>} ProvisionTerms */
 /** @typedef {Pick<ApiDto<'PreviewJobOrderMoneyProvisionDto'>, 'holderId' | 'holderUserId' | 'holderName' | 'holderVersion'>} HolderSelection */
 
 const accountlessValue = 'accountless';
+
+/**
+ * Offers explicit account and accountless choices through a scoped search.
+ *
+ * @param {HTMLSelectElement} select the combobox source
+ * @param {(query: string) => Promise<HolderCandidate[]>} findAccounts the permitted search
+ */
+export function bindMoneyPartyChoice(select, findAccounts) {
+    const group = select.closest('.form-group');
+    const label = select.dataset.freeTextLabel || '';
+    krtSearchableSelect(select, {
+        explicitChoice: true,
+        remoteSource: async (query) => {
+            const name = query.trim();
+            const accounts = await findAccounts(name);
+            const choices = accounts.flatMap(({ id, displayName }) =>
+                id && displayName ? [{ value: id, label: displayName }] : [],
+            );
+            return name
+                ? [
+                      {
+                          value: accountlessValue,
+                          label: label.replace('{0}', () => name),
+                          data: { holderName: name },
+                      },
+                      ...choices,
+                  ]
+                : choices;
+        },
+    });
+    const value = group?.querySelector('input[type="hidden"]');
+    const search = group?.querySelector('input[role="combobox"]');
+    if (!(value instanceof HTMLInputElement) || !(search instanceof HTMLInputElement)) {
+        throw new Error('The order party search was not initialized');
+    }
+    search.maxLength = Number(group?.getAttribute('data-name-limit'));
+    return {
+        /** @param {boolean} enabled whether the current action permits this choice */
+        setEnabled(enabled) {
+            search.disabled = !enabled;
+            value.disabled = !enabled;
+            group?.toggleAttribute('hidden', !enabled);
+        },
+        clear() {
+            value.krtCombobox?.setValue('');
+        },
+        /** @param {string} name a deliberately entered name without an account */
+        restoreName(name) {
+            value.krtCombobox?.setValue(
+                accountlessValue,
+                label.replace('{0}', () => name),
+                {
+                    holderName: name,
+                },
+            );
+        },
+        /** @param {string} id the selected linked account */
+        restoreAccount(id) {
+            value.krtCombobox?.setValue(id, orderHolders().find((row) => row.userId === id)?.label);
+        },
+        /** @returns {{userId: string} | {name: string} | null} the explicit selection */
+        selection() {
+            if (value.value === accountlessValue) {
+                return value.dataset.holderName ? { name: value.dataset.holderName } : null;
+            }
+            return value.value ? { userId: value.value } : null;
+        },
+    };
+}
+
+/** @returns {HTMLElement | null} the current live money projection */
+export function orderMoneyProjection() {
+    return document.querySelector('#order-money-results [data-can-provide-self]');
+}
+
+/** @returns {{id: string, userId: string, label: string, version: number}[]} order-local holders */
+export function orderHolders() {
+    const rows = orderMoneyProjection()?.querySelectorAll('[data-money-holder]') || [];
+    return Array.from(rows, (row) => ({
+        id: row.getAttribute('data-money-holder') || '',
+        userId: row.getAttribute('data-user-id') || '',
+        label: row.getAttribute('data-holder-label') || '',
+        version: Number(row.getAttribute('data-version') || 0),
+    }));
+}
+
+/**
+ * Retains an existing selection while refreshing its available rows.
+ *
+ * @param {HTMLSelectElement} select the selector with its initial blank option
+ * @param {{id: string, label: string}[]} rows the authorized rows
+ */
+export function setMoneyOptions(select, rows) {
+    const selected = select.value;
+    select.replaceChildren(
+        select.options[0],
+        ...rows.map(({ id, label }) => new Option(label, id)),
+    );
+    select.value = rows.some(({ id }) => id === selected) ? selected : '';
+}
 
 /**
  * Keeps self, existing holders and explicitly chosen new parties in one provision dialog.
@@ -45,41 +145,11 @@ export function bindHolderChoices(form, root) {
     }
 
     const moneyUrl = `/orders/${root.dataset.orderId}/money`;
-    const freeTextLabel = newParty.dataset.freeTextLabel || '';
-    krtSearchableSelect(newParty, {
-        explicitChoice: true,
-        remoteSource: async (query) => {
-            const name = query.trim();
-            /** @type {HolderCandidate[]} */
-            const accounts = await krtFetch.getJson(
-                `${moneyUrl}/holder-candidates?q=${encodeURIComponent(name)}`,
-            );
-            const choices = accounts.flatMap(({ id, displayName }) =>
-                id && displayName ? [{ value: id, label: displayName }] : [],
-            );
-            return name
-                ? [
-                      {
-                          value: accountlessValue,
-                          label: freeTextLabel.replace('{0}', () => name),
-                          data: { holderName: name },
-                      },
-                      ...choices,
-                  ]
-                : choices;
-        },
-    });
-
-    const choice = form.elements.namedItem('holderChoice');
-    const search = form.querySelector('[data-money-new-field] input[role="combobox"]');
-    if (!(choice instanceof HTMLInputElement) || !(search instanceof HTMLInputElement)) {
-        throw new Error('The order holder search was not initialized');
-    }
-    search.maxLength = Number(
-        search.closest('[data-money-new-field]')?.getAttribute('data-name-limit'),
+    const party = bindMoneyPartyChoice(newParty, (query) =>
+        krtFetch.getJson(`${moneyUrl}/holder-candidates?q=${encodeURIComponent(query)}`),
     );
 
-    /** @type {Element[]} */
+    /** @type {ReturnType<typeof orderHolders>} */
     let holders = [];
     let canSelf = false;
     let canOnBehalf = false;
@@ -97,68 +167,35 @@ export function bindHolderChoices(form, root) {
             .closest('[data-money-existing-field]')
             ?.toggleAttribute('hidden', mode.value !== 'existing');
         const searching = mode.value === 'new';
-        search.disabled = !canOnBehalf || !searching;
-        choice.disabled = search.disabled;
-        search.closest('[data-money-new-field]')?.toggleAttribute('hidden', !searching);
+        party.setEnabled(canOnBehalf && searching);
     };
 
     /** Refreshes the available parties without dropping an applicable selected holder. */
     const refresh = () => {
-        const projection = document.querySelector('[data-can-provide-self]');
-        holders = Array.from(projection?.querySelectorAll('[data-money-holder]') || []);
-        canSelf = projection?.getAttribute('data-can-provide-self') === 'true';
-        canOnBehalf = projection?.getAttribute('data-can-provide-on-behalf') === 'true';
-
-        const selected = existing.value;
-        existing.replaceChildren(
-            existing.options[0],
-            ...holders.map(
-                (holder) =>
-                    new Option(
-                        holder.getAttribute('data-holder-label') || '',
-                        holder.getAttribute('data-money-holder') || '',
-                    ),
-            ),
-        );
-        if (Array.from(existing.options).some((option) => option.value === selected)) {
-            existing.value = selected;
-        }
+        const projection = orderMoneyProjection();
+        holders = orderHolders();
+        canSelf = projection?.dataset.canProvideSelf === 'true';
+        canOnBehalf = projection?.dataset.canProvideOnBehalf === 'true';
+        setMoneyOptions(existing, holders);
         sync();
     };
-
-    /**
-     * Uses zero for a new holder and the rendered revision of any established holder.
-     *
-     * @param {Element | undefined} holder the selected order-local row
-     * @returns {number} the holder revision
-     */
-    function versionOf(holder) {
-        return Number(holder?.getAttribute('data-version') || 0);
-    }
 
     /** @returns {HolderSelection | null} the authorized, explicit holder terms */
     const selection = () => {
         if (mode.value === 'self') {
-            const self = holders.find(
-                (holder) => holder.getAttribute('data-user-id') === root.dataset.accountId,
-            );
-            return canSelf ? { holderVersion: versionOf(self) } : null;
+            const self = holders.find(({ userId }) => userId === root.dataset.accountId);
+            return canSelf ? { holderVersion: self?.version ?? 0 } : null;
         }
         if (!canOnBehalf) return null;
         if (mode.value === 'existing') {
-            const holder = holders.find(
-                (row) => row.getAttribute('data-money-holder') === existing.value,
-            );
-            return holder ? { holderId: existing.value, holderVersion: versionOf(holder) } : null;
+            const holder = holders.find(({ id }) => id === existing.value);
+            return holder ? { holderId: holder.id, holderVersion: holder.version } : null;
         }
-        if (mode.value !== 'new' || !choice.value) return null;
-        if (choice.value === accountlessValue) {
-            return choice.dataset.holderName
-                ? { holderName: choice.dataset.holderName, holderVersion: 0 }
-                : null;
-        }
-        const holder = holders.find((row) => row.getAttribute('data-user-id') === choice.value);
-        return { holderUserId: choice.value, holderVersion: versionOf(holder) };
+        const selection = mode.value === 'new' ? party.selection() : null;
+        if (!selection) return null;
+        if ('name' in selection) return { holderName: selection.name, holderVersion: 0 };
+        const holder = holders.find(({ userId }) => userId === selection.userId);
+        return { holderUserId: selection.userId, holderVersion: holder?.version ?? 0 };
     };
 
     mode.addEventListener('change', sync);
@@ -169,7 +206,7 @@ export function bindHolderChoices(form, root) {
             return canSelf || canOnBehalf;
         },
         reset() {
-            choice.krtCombobox?.setValue('');
+            party.clear();
             refresh();
         },
         /**
@@ -183,16 +220,10 @@ export function bindHolderChoices(form, root) {
                 existing.value = terms.holderId;
             } else if (terms.holderUserId) {
                 mode.value = 'new';
-                const holder = holders.find(
-                    (row) => row.getAttribute('data-user-id') === terms.holderUserId,
-                );
-                const label = holder?.getAttribute('data-holder-label');
-                if (label) choice.krtCombobox?.setValue(terms.holderUserId, label);
+                party.restoreAccount(terms.holderUserId);
             } else if (terms.holderName) {
                 mode.value = 'new';
-                const name = terms.holderName;
-                const label = freeTextLabel.replace('{0}', () => name);
-                choice.krtCombobox?.setValue(accountlessValue, label, { holderName: name });
+                party.restoreName(terms.holderName);
             }
             sync();
         },

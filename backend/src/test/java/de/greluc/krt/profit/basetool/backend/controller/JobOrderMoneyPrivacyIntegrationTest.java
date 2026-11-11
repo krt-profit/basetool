@@ -292,6 +292,142 @@ class JobOrderMoneyPrivacyIntegrationTest {
         .andExpect(jsonPath("$.amount").value("9007199254740993"));
   }
 
+  @Test
+  void recipientMergeAndErasurePreserveTheBookedPurposeAndRemoveOldPersonalAccess()
+      throws Exception {
+    UUID order = createOrder();
+    String holder = provisionFor(order, UUID.randomUUID(), "10", writer);
+    String linked = recipient(order, Map.of("userId", unitless));
+    String accountless = recipient(order, Map.of("name", unitlessName));
+    assertThat(linked).isNotEqualTo(accountless);
+    String namedHolder =
+        json.readTree(
+                provision(
+                        order,
+                        writer(),
+                        Map.of(
+                            "operationId",
+                            UUID.randomUUID(),
+                            "holderName",
+                            unitlessName,
+                            "holderVersion",
+                            0,
+                            "amount",
+                            "1",
+                            "bankHandling",
+                            false))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsByteArray())
+            .path("holderId")
+            .asString();
+    String holderDesignation = recipient(order, Map.of("holderId", namedHolder));
+    UUID movement = UUID.randomUUID();
+    mvc.perform(
+            post("/api/v1/orders/{id}/money/movements", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "operationId",
+                            movement,
+                            "kind",
+                            "HANDOVER",
+                            "sourceHolderId",
+                            holder,
+                            "sourceVersion",
+                            1,
+                            "targetVersion",
+                            0,
+                            "recipientId",
+                            linked,
+                            "amount",
+                            "5",
+                            "rate",
+                            "0.005",
+                            "bankHandling",
+                            false))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.recipientId").value(linked));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(signedInMember(unitless)))
+        .andExpect(status().isOk());
+
+    accountMerge.merge(unitless, survivor, writer);
+
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(signedInMember(unitless)))
+        .andExpect(status().isForbidden());
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(signedInMember(survivor)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.netHandedOver").value("5"));
+    transactions.executeWithoutResult(_ -> {
+      anonymisation.anonymise(survivor, List.of(unitlessName));
+      users.findById(survivor).orElseThrow().setInKeycloak(false);
+      accountDeletion.deleteUser(
+          survivor, KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
+    });
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(signedInMember(survivor)))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, movement).with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.recipientId").value(linked))
+        .andExpect(jsonPath("$.recipientName").doesNotExist())
+        .andExpect(jsonPath("$.kind").value("HANDOVER"))
+        .andExpect(jsonPath("$.amount").value("5"));
+    mvc.perform(get("/api/v1/orders/{id}/money", order).with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.holdings").value("6"))
+        .andExpect(jsonPath("$.netHandedOver").value("5"))
+        .andExpect(jsonPath("$.recipients[*].name", hasItem(HandleAnonymisation.SENTINEL)))
+        .andExpect(jsonPath("$.recipients[?(@.active == true)]").isEmpty());
+    mvc.perform(
+            post("/api/v1/orders/{id}/money/recipients", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("holderId", namedHolder))))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            post("/api/v1/orders/{id}/money/movements", order)
+                .with(writer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        Map.of(
+                            "operationId",
+                            UUID.randomUUID(),
+                            "kind",
+                            "HANDOVER",
+                            "sourceHolderId",
+                            holder,
+                            "sourceVersion",
+                            2,
+                            "targetVersion",
+                            0,
+                            "recipientId",
+                            holderDesignation,
+                            "amount",
+                            "2",
+                            "rate",
+                            "0.005",
+                            "bankHandling",
+                            false))))
+        .andExpect(status().isConflict());
+  }
+
+  private String recipient(UUID order, Map<String, ?> selection) throws Exception {
+    var result =
+        mvc.perform(
+                post("/api/v1/orders/{id}/money/recipients", order)
+                    .with(writer())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(selection)))
+            .andExpect(status().isCreated())
+            .andReturn();
+    return json.readTree(result.getResponse().getContentAsByteArray()).path("id").asString();
+  }
+
   private void assertMergedSelectionRefused(UUID order, String reference, String value)
       throws Exception {
     UUID operation = UUID.randomUUID();

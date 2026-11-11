@@ -43,6 +43,7 @@ public record MoneyCommitmentChangeDto(
     CREDITED,
     FULFILLED,
     PARTICIPATION_ENDED,
+    RESPONSIBILITY_ENDED,
     UNIT_INELIGIBLE,
     ORDER_ENDED
   }

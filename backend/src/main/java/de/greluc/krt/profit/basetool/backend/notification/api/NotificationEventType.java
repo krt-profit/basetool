@@ -297,6 +297,8 @@ public enum NotificationEventType {
   /** A responsible writer reported a provision for a linked aUEC holder. */
   JOB_ORDER_MONEY_PROVISIONED,
 
+  /** An actual aUEC movement was reported for a linked participant. */
+  JOB_ORDER_MONEY_MOVED,
   /** A unit's outstanding aUEC commitment changed. */
   JOB_ORDER_MONEY_COMMITMENT_CHANGED,
 

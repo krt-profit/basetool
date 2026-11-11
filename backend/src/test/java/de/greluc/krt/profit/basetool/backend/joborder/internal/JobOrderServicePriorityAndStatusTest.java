@@ -212,7 +212,8 @@ class JobOrderServicePriorityAndStatusTest {
             new LiveSyncPublisher(liveSyncFanout, new SimpleMeterRegistry()),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
-            org.mockito.Mockito.mock(JobOrderParticipationCommands.class));
+            org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
+            org.mockito.Mockito.mock(JobOrderMoneyCommitments.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     lenient()
         .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))

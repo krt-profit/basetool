@@ -32,13 +32,17 @@ function formatWholeAuec(amount) {
 /** @typedef {ApiDto<'JobOrderMoneyProvisionPreview'>} ProvisionPreview */
 
 /**
- * Enables saving while the displayed server preview matches the draft.
+ * Enables saving while the server preview matches the draft.
  *
- * @param {HTMLFormElement} form the provision form
- * @param {string} url the order's money URL
- * @param {() => PreviewTerms | null} readTerms the valid proposal at its observed holder revision
+ * @template {object} Terms
+ * @template {object} Ready
+ * @param {HTMLFormElement} form the money form
+ * @param {string} url the preview URL
+ * @param {() => Terms | null} readTerms the draft at its observed revisions
+ * @param {(output: HTMLElement, body: unknown, terms: Terms) => Ready | null | undefined} render
+ *     the preview renderer; null indicates incomplete terms and undefined indicates a failed preview
  */
-export function bindProvisionPreview(form, url, readTerms) {
+export function bindMoneyPreview(form, url, readTerms, render) {
     const output = form.querySelector('[data-money-preview]');
     const retry = form.querySelector('[data-money-preview-retry]');
     const save = form.querySelector('button[type="submit"]');
@@ -47,18 +51,19 @@ export function bindProvisionPreview(form, url, readTerms) {
         !(retry instanceof HTMLButtonElement) ||
         !(save instanceof HTMLButtonElement)
     ) {
-        throw new Error('The order provision preview controls are missing');
+        throw new Error('The order money preview controls are missing');
     }
-    /** @type {PreviewTerms | null} */
+    /** @type {Terms | null} */
     let candidate = null;
-    let shown = false;
+    /** @type {Ready | null} */
+    let ready = null;
     let timer = 0;
 
     /** Invalidates the old preview before waiting for a new response. */
     const reset = () => {
         window.clearTimeout(timer);
         candidate = null;
-        shown = false;
+        ready = null;
         output.hidden = true;
         retry.hidden = true;
         save.disabled = true;
@@ -67,39 +72,30 @@ export function bindProvisionPreview(form, url, readTerms) {
     /**
      * Shows an authorised preview when it still describes the draft.
      *
-     * @param {PreviewTerms} terms the proposed terms
+     * @param {Terms} terms the proposed terms
      */
     const request = async (terms) => {
         const result = await krtFetch.write({
             method: 'POST',
-            url: `${url}/provisions/preview`,
+            url,
             payload: terms,
             toast: false,
             onError: () => true,
             onNetworkError: () => true,
         });
         if (candidate !== terms) return;
-        /** @type {ProvisionPreview | null} */
-        const preview = result.body;
-        if (!result.ok || result.redirected || !preview || typeof preview.amount !== 'string') {
+        const rendered =
+            result.ok && !result.redirected ? render(output, result.body, terms) : undefined;
+        if (rendered === undefined) {
             retry.hidden = false;
             if (result.status === 409) {
                 await joborderHooks.refreshOrderSection?.('money', { broadcast: false });
             }
             return;
         }
-        const values = {
-            amount: preview.amount,
-            fee: preview.fee,
-            holding: preview.resultingHolding,
-        };
-        for (const [name, value] of Object.entries(values)) {
-            const element = output.querySelector(`[data-preview-value="${name}"]`);
-            if (element && typeof value === 'string') element.textContent = formatWholeAuec(value);
-        }
-        shown = true;
+        ready = rendered;
         output.hidden = false;
-        save.disabled = false;
+        save.disabled = ready === null;
     };
 
     /** Replaces the preview for each distinct valid draft. */
@@ -121,7 +117,40 @@ export function bindProvisionPreview(form, url, readTerms) {
         refresh,
         ready() {
             const terms = readTerms();
-            return shown && JSON.stringify(candidate) === JSON.stringify(terms) ? terms : null;
+            return JSON.stringify(candidate) === JSON.stringify(terms) ? ready : null;
         },
     };
+}
+
+/**
+ * Displays exact server amounts in the current language.
+ *
+ * @param {HTMLElement} output the preview container
+ * @param {Record<string, string | undefined>} values exact whole-aUEC strings
+ */
+export function showPreviewAmounts(output, values) {
+    for (const [name, value] of Object.entries(values)) {
+        const element = output.querySelector(`[data-preview-value="${name}"]`);
+        if (element && typeof value === 'string') element.textContent = formatWholeAuec(value);
+    }
+}
+
+/**
+ * Projects the exact provision and the resulting holding.
+ *
+ * @param {HTMLFormElement} form the provision form
+ * @param {string} url the order's money URL
+ * @param {() => PreviewTerms | null} readTerms the draft at its observed holder revision
+ */
+export function bindProvisionPreview(form, url, readTerms) {
+    return bindMoneyPreview(form, `${url}/provisions/preview`, readTerms, (output, body, terms) => {
+        const preview = /** @type {ProvisionPreview | null} */ (body);
+        if (!preview || typeof preview.amount !== 'string') return undefined;
+        showPreviewAmounts(output, {
+            amount: preview.amount,
+            fee: preview.fee,
+            holding: preview.resultingHolding,
+        });
+        return terms;
+    });
 }

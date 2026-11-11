@@ -138,6 +138,9 @@ public final class HandleErasureCoverage {
               "Replaces the linked holder's fallback label by account ID and accountless labels"
                   + " by whole spelling."),
           anonymised(
+              "job_order_money_recipient.accountless_name",
+              "Redacts accountless recipient names by whole spelling and retires the designation."),
+          anonymised(
               "job_order_money_operation.selected_accountless_name",
               "Clears the submitted accountless spelling without changing the booked operation"
                   + " or treating erased terms as a valid retry."),

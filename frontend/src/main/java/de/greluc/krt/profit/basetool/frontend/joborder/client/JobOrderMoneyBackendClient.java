@@ -20,13 +20,19 @@
 package de.greluc.krt.profit.basetool.frontend.joborder.client;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.DesignateJobOrderMoneyRecipientDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyHolderCandidate;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyMovementPreview;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyOutcome;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyProvisionPreview;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyRecipientView;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyView;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.MoveJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.PreviewJobOrderMoneyProvisionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ProvideJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyInformationDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyTargetDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.util.List;
 import java.util.UUID;
@@ -101,11 +107,115 @@ public class JobOrderMoneyBackendClient {
   }
 
   /**
+   * Projects the movement against its observed revisions and applicable fee rate.
+   *
+   * @param id the order
+   * @param request the proposed movement
+   * @return the server's exact preview
+   */
+  public JobOrderMoneyMovementPreview previewMovement(
+      @NotNull UUID id, @NotNull MoveJobOrderMoneyDto request) {
+    return backend.post(
+        MONEY + "/movements/preview", request, JobOrderMoneyMovementPreview.class, id);
+  }
+
+  /**
+   * Records or replays an exact movement under its submitted identity.
+   *
+   * @param id the order
+   * @param request the movement and captured terms
+   * @return the recorded outcome
+   */
+  public JobOrderMoneyOutcome move(@NotNull UUID id, @NotNull MoveJobOrderMoneyDto request) {
+    return backend.post(MONEY + "/movements", request, JobOrderMoneyOutcome.class, id);
+  }
+
+  /**
+   * Finds accounts that can be selected as a destination of the specified source.
+   *
+   * @param id the order
+   * @param sourceHolderId the movement's source holder
+   * @param query the typed name fragment
+   * @return selectable account identities and labels
+   */
+  public List<JobOrderMoneyHolderCandidate> movementCandidates(
+      @NotNull UUID id, @NotNull UUID sourceHolderId, @NotNull String query) {
+    return backend.get(
+        MONEY + "/movement-candidates?sourceHolderId={source}&q={query}",
+        new ParameterizedTypeReference<>() {},
+        id,
+        sourceHolderId,
+        query);
+  }
+
+  /**
+   * Finds accounts that can be designated for the order's handover.
+   *
+   * @param id the order
+   * @param query the typed name fragment
+   * @return selectable account identities and labels
+   */
+  public List<JobOrderMoneyHolderCandidate> recipientCandidates(
+      @NotNull UUID id, @NotNull String query) {
+    return backend.get(
+        MONEY + "/recipient-candidates?q={query}",
+        new ParameterizedTypeReference<>() {},
+        id,
+        query);
+  }
+
+  /**
+   * Designates a handover recipient.
+   *
+   * @param id the order
+   * @param request the explicit recipient selection
+   * @return the resulting designation
+   */
+  public JobOrderMoneyRecipientView designateRecipient(
+      @NotNull UUID id, @NotNull DesignateJobOrderMoneyRecipientDto request) {
+    return backend.post(MONEY + "/recipients", request, JobOrderMoneyRecipientView.class, id);
+  }
+
+  /**
+   * Ends a recipient's designation.
+   *
+   * @param id the order
+   * @param recipientId the order-local recipient
+   */
+  public void removeRecipient(@NotNull UUID id, @NotNull UUID recipientId) {
+    backend.delete(MONEY + "/recipients/{recipient}", Void.class, id, recipientId);
+  }
+
+  /**
+   * Updates the net target at its independent revision.
+   *
+   * @param id the order
+   * @param request the target and observed revision
+   * @return the current money view
+   */
+  public JobOrderMoneyView updateTarget(
+      @NotNull UUID id, @NotNull UpdateJobOrderMoneyTargetDto request) {
+    return backend.patch(MONEY + "/target", request, JobOrderMoneyView.class, id);
+  }
+
+  /**
+   * Updates the contact and comment at their independent revision.
+   *
+   * @param id the order
+   * @param request the information and observed revision
+   * @return the current money view
+   */
+  public JobOrderMoneyView updateInformation(
+      @NotNull UUID id, @NotNull UpdateJobOrderMoneyInformationDto request) {
+    return backend.patch(MONEY + "/information", request, JobOrderMoneyView.class, id);
+  }
+
+  /**
    * Reads an outcome under the order's current access policy.
    *
    * @param id the order
    * @param operation the submitted identity
-   * @return the recorded provision
+   * @return the recorded order money outcome
    */
   public JobOrderMoneyOutcome outcome(@NotNull UUID id, @NotNull UUID operation) {
     return backend.get(

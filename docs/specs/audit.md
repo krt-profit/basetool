@@ -134,7 +134,12 @@ web, naming its client (REQ-AUDIT-005):
   Active Staffel support starts with `JOB_ORDER_PARTICIPATION_ENROLLED` and ends with
   `JOB_ORDER_PARTICIPATION_ENDED`, with safe participation and unit ids and a bounded reason.
   An accepted money provision records `JOB_ORDER_MONEY_PROVIDED` in the same transaction as the
-  durable operation, with its logical operation ID and exact amount. Replay does not record it again.
+  durable operation, with its logical operation ID and exact amount. A Bank-free movement records
+  `JOB_ORDER_MONEY_MOVED` with its logical operation ID, purpose, net amount, exact fee and explicit
+  new funds. `JOB_ORDER_MONEY_RECIPIENT_CHANGED` records the designation ID and whether it is active.
+  `JOB_ORDER_MONEY_TARGET_CHANGED` records the previous and new target. An information edit uses
+  `JOB_ORDER_UPDATED`. Automatic completion uses `JOB_ORDER_COMPLETED` in the same transaction.
+  Matching replays and pre-submission refusals record no activity audit.
   `JOB_ORDER_MONEY_COMMITMENT_CHANGED` records the unit, commitment occurrence, before and
   outstanding amounts, and reason. Credited provision adds the logical operation ID. The same
   transaction records the affected occurrence and its order-visible history.

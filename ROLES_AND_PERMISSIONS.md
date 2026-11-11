@@ -490,11 +490,13 @@ follows effective net handover. If responsibility is ineligible, only read and t
 even on completed/cancelled orders: all other user changes and coupled financial results wait for
 valid responsibility. Mandatory automatic support ending remains required.
 
-The internal Bank-free checkpoint supports aUEC creation, own provision by a full order reader,
-and provision on behalf by a current responsible writer. A consciously linked holder can read
-their order and recover its accepted outcomes through the ordinary workspace, without unit
-membership or Bank access. A typed name grants neither account access nor an Inbox recipient.
-Once a monetary submission is accepted, even an administrator cannot hard-delete its order.
+The internal Bank-free checkpoint supports aUEC creation and immediate provision, collection and
+requester handover. Either unit writer can change the target and contact information and designate
+requester recipients. A holder can record their own outgoing and incoming movements, and a linked
+payee can record their own handover. Only the sender or a responsible writer can explicitly supply
+additional funds for that sender. A linked holder or payee can read their concrete order and recover
+accepted outcomes through the ordinary workspace. Typed names carry no account grant. An accepted
+monetary submission closes the administrator's hard-delete path.
 Current responsible-unit writers coordinate aUEC commitments. Supporting Staffel writers
 manage their own commitment and may explicitly credit a provision they are authorised to record.
 The first commitment of an eligible Staffel starts its shared participation. An individual

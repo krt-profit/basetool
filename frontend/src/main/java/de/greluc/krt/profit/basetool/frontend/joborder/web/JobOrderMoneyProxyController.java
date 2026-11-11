@@ -23,10 +23,14 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.DesignateJobOrderMoneyRecipientDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyOutcome;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.MoveJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.PreviewJobOrderMoneyProvisionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ProvideJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyInformationDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyTargetDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
@@ -34,9 +38,12 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -123,6 +130,137 @@ public class JobOrderMoneyProxyController {
   }
 
   /**
+   * Projects a movement against the order's current financial basis.
+   *
+   * @param id the order
+   * @param request the proposed movement
+   * @return the preview or the backend refusal
+   */
+  @PostMapping("/{id}/money/movements/preview")
+  public ResponseEntity<Object> previewMovement(
+      @PathVariable UUID id, @RequestBody @Valid MoveJobOrderMoneyDto request) {
+    return relay(
+        log,
+        "preview order money movement",
+        () -> ResponseEntity.ok(money.previewMovement(id, request)));
+  }
+
+  /**
+   * Records an actual collection or handover under one operation identity.
+   *
+   * @param id the order
+   * @param request the submitted movement
+   * @return the recorded outcome or the backend refusal
+   */
+  @PostMapping("/{id}/money/movements")
+  public ResponseEntity<Object> move(
+      @PathVariable UUID id, @RequestBody @Valid MoveJobOrderMoneyDto request) {
+    return relay(
+        log, "record order money movement", () -> ResponseEntity.ok(money.move(id, request)));
+  }
+
+  /**
+   * Offers accounts for a collection from the selected holder.
+   *
+   * @param id the order
+   * @param sourceHolderId the source holder
+   * @param q the typed name fragment
+   * @return the candidates or the backend refusal
+   */
+  @GetMapping("/{id}/money/movement-candidates")
+  public ResponseEntity<Object> movementCandidates(
+      @PathVariable UUID id,
+      @RequestParam UUID sourceHolderId,
+      @RequestParam(defaultValue = "") @Size(max = 200) String q) {
+    return relay(
+        log,
+        "search movement destination accounts",
+        () -> ResponseEntity.ok(money.movementCandidates(id, sourceHolderId, q)));
+  }
+
+  /**
+   * Offers accounts for an authorized recipient designation.
+   *
+   * @param id the order
+   * @param q the typed name fragment
+   * @return the candidates or the backend refusal
+   */
+  @GetMapping("/{id}/money/recipient-candidates")
+  public ResponseEntity<Object> recipientCandidates(
+      @PathVariable UUID id, @RequestParam(defaultValue = "") @Size(max = 200) String q) {
+    return relay(
+        log,
+        "search handover recipient accounts",
+        () -> ResponseEntity.ok(money.recipientCandidates(id, q)));
+  }
+
+  /**
+   * Designates a recipient for this order.
+   *
+   * @param id the order
+   * @param request the explicit recipient selection
+   * @return the designation or the backend refusal
+   */
+  @PostMapping("/{id}/money/recipients")
+  public ResponseEntity<Object> designateRecipient(
+      @PathVariable UUID id, @RequestBody @Valid DesignateJobOrderMoneyRecipientDto request) {
+    return relay(
+        log,
+        "designate order handover recipient",
+        () ->
+            ResponseEntity.status(HttpStatus.CREATED).body(money.designateRecipient(id, request)));
+  }
+
+  /**
+   * Ends a recipient's designation while preserving existing history.
+   *
+   * @param id the order
+   * @param recipient the order-local recipient
+   * @return the backend result
+   */
+  @DeleteMapping("/{id}/money/recipients/{recipient}")
+  public ResponseEntity<Object> removeRecipient(
+      @PathVariable UUID id, @PathVariable UUID recipient) {
+    return relay(
+        log,
+        "remove order handover recipient",
+        () -> {
+          money.removeRecipient(id, recipient);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Changes the net target without editing the order information.
+   *
+   * @param id the order
+   * @param request the target and observed revision
+   * @return the updated money view or the backend refusal
+   */
+  @PatchMapping("/{id}/money/target")
+  public ResponseEntity<Object> updateTarget(
+      @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderMoneyTargetDto request) {
+    return relay(
+        log, "update order money target", () -> ResponseEntity.ok(money.updateTarget(id, request)));
+  }
+
+  /**
+   * Changes the contact and comment without editing the net target.
+   *
+   * @param id the order
+   * @param request the information and observed revision
+   * @return the updated money view or the backend refusal
+   */
+  @PatchMapping("/{id}/money/information")
+  public ResponseEntity<Object> updateInformation(
+      @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderMoneyInformationDto request) {
+    return relay(
+        log,
+        "update money order information",
+        () -> ResponseEntity.ok(money.updateInformation(id, request)));
+  }
+
+  /**
    * Looks up a submitted outcome through the backend's current authorization.
    *
    * @param id the order
@@ -132,6 +270,6 @@ public class JobOrderMoneyProxyController {
   @GetMapping("/{id}/money/operations/{operation}")
   public ResponseEntity<Object> outcome(@PathVariable UUID id, @PathVariable UUID operation) {
     return relay(
-        log, "read order provision outcome", () -> ResponseEntity.ok(money.outcome(id, operation)));
+        log, "read order money outcome", () -> ResponseEntity.ok(money.outcome(id, operation)));
   }
 }

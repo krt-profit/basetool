@@ -49,4 +49,8 @@ class JobOrderMoneyTarget {
     this.orderId = orderId;
     this.amount = amount;
   }
+
+  void replace(BigDecimal target) {
+    amount = target;
+  }
 }

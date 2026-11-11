@@ -24,8 +24,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MoneyCommitmentChangeDto.Reason;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.math.BigDecimal;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 class JobOrderMoneyCommitments {
   private static final int COMMITMENT_BATCH_SIZE = 200;
   private final JobOrderMoneyCommitmentRepository commitments;
+  private final JobOrderParticipationRepository participations;
   private final JobOrderMoneyCommitmentChangeRepository changes;
   private final AuditRecorder audit;
   private final JobOrderChangeEffects effects;
@@ -71,6 +74,30 @@ class JobOrderMoneyCommitments {
       commitments
           .findByOrderIdAndUnitIdAndEndedAtIsNull(order.getId(), unitId)
           .ifPresent(commitment -> end(commitment, Reason.PARTICIPATION_ENDED));
+    }
+  }
+
+  /**
+   * Ends the former responsible unit's commitment when it has no remaining active role.
+   *
+   * @param order the locked order with its new responsibility
+   * @param previousUnit the unit that relinquished responsibility
+   */
+  public void endForLostResponsibility(JobOrder order, @Nullable UUID previousUnit) {
+    if (order.getType() != JobOrderType.AUEC
+        || previousUnit == null
+        || previousUnit.equals(OrgUnit.idOf(order.getResponsibleOrgUnit()))) {
+      return;
+    }
+    boolean supporting =
+        participations
+            .findByJobOrderIdAndClaimingOrgUnitId(order.getId(), previousUnit)
+            .filter(JobOrderParticipation::isActive)
+            .isPresent();
+    if (!supporting) {
+      commitments
+          .findByOrderIdAndUnitIdAndEndedAtIsNull(order.getId(), previousUnit)
+          .ifPresent(commitment -> end(commitment, Reason.RESPONSIBILITY_ENDED));
     }
   }
 

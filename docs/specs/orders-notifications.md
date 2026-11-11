@@ -39,7 +39,11 @@ an administrator who independently qualifies through an affected functional rela
 An accepted provision for a linked holder is registered as `JOB_ORDER_MONEY_PROVISIONED`.
 The notice is limited to that account even when a configured rule selects additional users, and
 the delivery guard rechecks the specific holder link. Matching replays and accountless entries create no additional
-personal notice. The live order room carries only section invalidations.
+personal notice. `JOB_ORDER_MONEY_MOVED` addresses only a linked sender or receiver affected by
+another person's recorded payment. The delivery guard rechecks that specific account and its
+current order access. The final handover groups these affected recipients with completion,
+preserving the existing preference and priority order. The live order room carries only section
+invalidations.
 
 Each logical cause/revision gives at most one grouped notice per recipient across relevant roles
 and the same Bank/order decision. Preserve distinct necessary Bank approval tasks. Existing type

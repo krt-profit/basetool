@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -34,13 +36,23 @@ class JobOrderMoneyIdentityLock {
   private final JobOrderMoneyHolderRepository holders;
 
   @Transactional(propagation = Propagation.MANDATORY)
+  void lockAccounts(UUID accountId) {
+    lockAccounts(accountId, null, null);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
   void lockAccounts(UUID accountId, @Nullable UUID otherAccountId) {
-    int accountKey = key(accountId);
-    int otherKey = otherAccountId == null ? accountKey : key(otherAccountId);
-    holders.lockAccountIdentity(Math.min(accountKey, otherKey));
-    if (accountKey != otherKey) {
-      holders.lockAccountIdentity(Math.max(accountKey, otherKey));
-    }
+    lockAccounts(accountId, otherAccountId, null);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  void lockAccounts(UUID accountId, @Nullable UUID first, @Nullable UUID second) {
+    Stream.of(accountId, first, second)
+        .filter(Objects::nonNull)
+        .mapToInt(JobOrderMoneyIdentityLock::key)
+        .distinct()
+        .sorted()
+        .forEach(holders::lockAccountIdentity);
   }
 
   private static int key(UUID accountId) {

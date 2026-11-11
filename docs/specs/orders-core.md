@@ -83,8 +83,10 @@ also support itself. Eligible Staffeln can enroll while the order is active. Wit
 observed participation version. Making a supporter responsible removes it from active support while
 preserving its contribution lines and history under its responsibility. This role transition is
 not a withdrawal of its contributions. The former responsible Staffel is not automatically enrolled
-as a supporter. Withdrawing support ends its open promises, preserving past contributions. REJECTED, COMPLETED and
-CANCELLED end open promises; reopening does not revive them. Empty promises do not end support.
+as a supporter. The effect on its outstanding money commitment follows
+[REQ-ORDERS-059](orders-auec.md#req-orders-059--unit-commitments-are-planning-with-one-time-provision-attribution).
+Withdrawing support ends its open promises and preserves past contributions. REJECTED, COMPLETED and
+CANCELLED end open promises. Reopening leaves them historical. An empty promise leaves support active.
 
 **Acceptance**
 
@@ -260,8 +262,8 @@ and active-support unit work are independent of command authority, and creation 
 created-order identity. A managed Chromium journey uses distinct requester and processor accounts:
 it rejects an unrelated live room, observes peer queue updates without reload, preserves an open
 personal-note draft and its independent version, then saves and applies the deferred detail update.
-The internal Bank-free checkpoint adds aUEC creation, reported amounts and submitted-operation
-recovery to the same workspace.
+The internal Bank-free checkpoint adds aUEC creation, reported amounts, immediate money movements,
+target and information edits, and submitted-operation recovery to the same workspace.
 
 All kinds share the overview and a type filter. Its scopes are Meine (requesting units),
 Ich bearbeite (personal Bearbeiter), Zu bearbeiten (responsible or supporting own units under

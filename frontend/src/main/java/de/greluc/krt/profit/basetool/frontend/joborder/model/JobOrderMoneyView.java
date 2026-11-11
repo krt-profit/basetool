@@ -36,6 +36,16 @@ import java.util.List;
  * @param canProvideSelf whether the reader can report their own funds
  * @param canProvideOnBehalf whether the writer can report another player's funds
  * @param canDelete whether the caller can hard-delete the order
+ * @param fees the effective fees charged to the order
+ * @param overpaid the excess handed over above the target
+ * @param recipients the designated recipient identities
+ * @param canDesignateRecipient whether the caller can manage recipients
+ * @param canEditTarget whether the caller can edit the net target
+ * @param canEditInformation whether the caller can edit the contact and comment
+ * @param informationVersion the independent information revision
+ * @param canMoveForOthers whether the caller can move other holders' funds
+ * @param canRecordRequesterHandover whether the caller can record delivery for the requester
+ * @param targetChanges the recorded changes to the order's net target
  */
 @DtoMirror
 public record JobOrderMoneyView(
@@ -49,4 +59,14 @@ public record JobOrderMoneyView(
     List<JobOrderMoneyOutcome> history,
     boolean canProvideSelf,
     boolean canProvideOnBehalf,
-    boolean canDelete) {}
+    boolean canDelete,
+    String fees,
+    String overpaid,
+    List<JobOrderMoneyRecipientView> recipients,
+    boolean canDesignateRecipient,
+    boolean canEditTarget,
+    boolean canEditInformation,
+    long informationVersion,
+    boolean canMoveForOthers,
+    boolean canRecordRequesterHandover,
+    List<JobOrderMoneyTargetChangeView> targetChanges) {}

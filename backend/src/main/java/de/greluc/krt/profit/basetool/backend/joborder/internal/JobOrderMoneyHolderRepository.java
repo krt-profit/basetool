@@ -38,6 +38,9 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
 
   List<JobOrderMoneyHolder> findAllByOrderIdOrderById(UUID orderId);
 
+  @Query("SELECT h.userId FROM JobOrderMoneyHolder h WHERE h.orderId = :orderId AND h.id = :id")
+  Optional<UUID> accountFor(UUID orderId, UUID id);
+
   @Query(
       value = "SELECT 1 FROM pg_advisory_xact_lock(" + IDENTITY_LOCK_SPACE + ", :key)",
       nativeQuery = true)
@@ -59,6 +62,11 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
             SELECT p.order_id FROM job_order_money_operation p
             WHERE p.actor_id = :userId OR p.selected_user_id = :userId
                   OR lower(p.selected_accountless_name) IN (SELECT name FROM spellings)
+            UNION
+            SELECT r.order_id FROM job_order_money_recipient r
+            WHERE r.user_id = :userId OR lower(r.accountless_name) IN (SELECT name FROM spellings)
+            UNION
+            SELECT t.order_id FROM job_order_money_target_change t WHERE t.actor_id = :userId
             UNION
             SELECT h.job_order_id FROM job_order_handover h
             WHERE lower(h.recipient_handle) IN (SELECT name FROM spellings)

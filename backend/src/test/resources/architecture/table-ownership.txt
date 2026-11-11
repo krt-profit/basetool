@@ -62,8 +62,10 @@ job_order_money_commitment joborder
 job_order_money_commitment_change joborder
 job_order_money_holder joborder
 job_order_money_operation joborder
+job_order_money_recipient joborder
 job_order_money_refused_attempt joborder
 job_order_money_target joborder
+job_order_money_target_change joborder
 job_order_participation joborder
 job_order_unit_read_history joborder
 job_type catalogue

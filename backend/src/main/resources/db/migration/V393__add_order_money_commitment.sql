@@ -50,4 +50,4 @@ VALUES ('cf585dc6-1e65-441c-b108-05cd1c643d83',
         TRUE, TRUE);
 
 INSERT INTO notification_rule_selector (id, rule_id, kind)
-VALUES (gen_random_uuid(), 'cf585dc6-1e65-441c-b108-05cd1c643d83', 'EVENT_RECIPIENT');
+VALUES (gen_random_uuid(), 'cf585dc6-1e65-441c-b108-05cd1c643d83', 'EVENT_RECIPIENTS');

@@ -20,19 +20,24 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderMoneyMovedEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderMoneyProvisionedEvent;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-/** Registers participant invalidations and the one affected-person notice for a new provision. */
+/** Registers committed money invalidations and targeted participant notices. */
 @Component
 @RequiredArgsConstructor
 class JobOrderMoneyEffects {
@@ -42,6 +47,7 @@ class JobOrderMoneyEffects {
 
   private final LiveSyncPublisher live;
   private final ApplicationEventPublisher events;
+  private final JobOrderChangeEffects orderEffects;
 
   void provisionRecorded(
       JobOrder order,
@@ -61,15 +67,86 @@ class JobOrderMoneyEffects {
     if (recipient == null || recipient.equals(actor)) {
       return;
     }
-    events.publishEvent(
-        new NotificationCause(
-            Objects.requireNonNull(attempt.getId()),
-            List.of(
-                new JobOrderMoneyProvisionedEvent(
-                    order.getId(),
-                    attempt.getHolderId(),
-                    recipient,
-                    actor,
-                    order.getDisplayId()))));
+    boolean grouped = attempt.getCommitmentId() != null;
+    var notice =
+        new JobOrderMoneyProvisionedEvent(
+            order.getId(), attempt.getHolderId(), recipient, actor, grouped, order.getDisplayId());
+    if (grouped) {
+      orderEffects.publish(notice);
+    } else {
+      events.publishEvent(
+          new NotificationCause(Objects.requireNonNull(attempt.getId()), List.of(notice)));
+    }
+  }
+
+  void designationChanged(JobOrder order, boolean linked) {
+    publishMoney(order, false, linked);
+  }
+
+  void movementRecorded(
+      JobOrder order,
+      JobOrderMoneyOperation fact,
+      @Nullable UUID source,
+      @Nullable UUID recipient,
+      UUID actor,
+      boolean lifecycleChanged,
+      boolean newLinkedHolder) {
+    publishMoney(order, lifecycleChanged, newLinkedHolder);
+    boolean grouped =
+        order.getStatus() == JobOrderStatus.COMPLETED || fact.getCommitmentId() != null;
+    List<NotificationEvent> notices = new ArrayList<>();
+    if (source != null && !source.equals(actor)) {
+      notices.add(
+          new JobOrderMoneyMovedEvent(
+              order.getId(),
+              fact.getHolderId(),
+              null,
+              source,
+              actor,
+              source,
+              recipient,
+              grouped,
+              order.getDisplayId()));
+    }
+    if (recipient != null && !recipient.equals(actor) && !recipient.equals(source)) {
+      notices.add(
+          new JobOrderMoneyMovedEvent(
+              order.getId(),
+              fact.getDestinationHolderId(),
+              fact.getRecipientId(),
+              recipient,
+              actor,
+              source,
+              recipient,
+              grouped,
+              order.getDisplayId()));
+    }
+    if (grouped) {
+      notices.forEach(orderEffects::publish);
+    } else if (!notices.isEmpty()) {
+      events.publishEvent(new NotificationCause(Objects.requireNonNull(fact.getId()), notices));
+    }
+  }
+
+  void targetChanged(JobOrder order) {
+    publishMoney(order, false, true);
+  }
+
+  void informationChanged(JobOrder order) {
+    live.publishAfterCommit(
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
+        List.of("money", "header", "details", "dialogs"));
+    live.publishAfterCommit(
+        LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
+  }
+
+  private void publishMoney(JobOrder order, boolean lifecycleChanged, boolean membershipChanged) {
+    live.publishAfterCommit(
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
+        lifecycleChanged ? LIFECYCLE_SECTIONS : List.of("money"));
+    if (lifecycleChanged || membershipChanged) {
+      live.publishAfterCommit(
+          LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
+    }
   }
 }

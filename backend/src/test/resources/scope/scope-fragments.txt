@@ -36,12 +36,21 @@
       OR (:activeOrgUnitId IS NULL AND p.claimingOrgUnit.id IN :memberOrgUnitIds)))
   OR EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o
     AND a.user.id = :callerId)
-  OR (o.type = 'AUEC' AND EXISTS (SELECT h.id FROM JobOrderMoneyHolder h
-    WHERE h.orderId = o.id AND
-      h.userId = :callerId AND EXISTS (SELECT u.id FROM User u WHERE u.id = h.userId
-        AND u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
-        AND u.inKeycloak = true AND u.enabledInKeycloak = true)
-  ))
+  OR
+(o.type = 'AUEC' AND (
+  EXISTS (SELECT h.id FROM JobOrderMoneyHolder h WHERE h.orderId = o.id AND h.userId = :callerId)
+  OR EXISTS (SELECT r.id FROM JobOrderMoneyRecipient r WHERE r.orderId = o.id
+    AND (r.active = true OR EXISTS (SELECT m.id FROM JobOrderMoneyOperation m
+      WHERE m.orderId = o.id AND m.recipientId = r.id))
+    AND (r.userId = :callerId OR EXISTS (SELECT h.id FROM JobOrderMoneyHolder h
+      WHERE h.orderId = o.id AND h.userId = :callerId AND
+        (h.id = r.holderId OR EXISTS (SELECT alias.id FROM JobOrderMoneyHolder alias
+          WHERE alias.id = r.holderId AND alias.mergedIntoId = h.id)))))
+) AND
+EXISTS (SELECT u.id FROM User u WHERE u.id = :callerId
+  AND u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
+  AND u.inKeycloak = true AND u.enabledInKeycloak = true)
+)
 )
 === end
 === REFINERY_ORDER_SCOPE_TRIPLE

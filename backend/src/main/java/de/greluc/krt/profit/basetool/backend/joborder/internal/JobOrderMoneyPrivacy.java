@@ -38,6 +38,8 @@ public class JobOrderMoneyPrivacy {
 
   private final JobOrderMoneyHolderRepository holders;
   private final JobOrderMoneyOperationRepository operations;
+  private final JobOrderMoneyRecipientRepository recipients;
+  private final JobOrderMoneyTargetChangeRepository targetChanges;
   private final LiveSyncPublisher liveSync;
   private final JobOrderMoneyIdentityLock identityLock;
 
@@ -48,11 +50,14 @@ public class JobOrderMoneyPrivacy {
     if (orderIds.isEmpty()) {
       return;
     }
+    int retiredHolderRecipients = recipients.retireErasedHolderRecipients(userId, names, orderIds);
     int holderRows = holders.anonymiseNames(userId, names, orderIds, HandleAnonymisation.SENTINEL);
     int operationRows = operations.anonymiseSubmittedNames(names, orderIds);
+    int recipientRows = recipients.anonymiseNames(names, orderIds, HandleAnonymisation.SENTINEL);
+    report.accept(Rewritten.ORDER_MONEY_RECIPIENTS, recipientRows + retiredHolderRecipients);
     report.accept(Rewritten.ORDER_MONEY_HOLDERS, holderRows);
     report.accept(Rewritten.ORDER_MONEY_OPERATIONS, operationRows);
-    if (holderRows > 0 || operationRows > 0) {
+    if (holderRows > 0 || operationRows > 0 || recipientRows > 0 || retiredHolderRecipients > 0) {
       publishChanges(orderIds);
     }
   }
@@ -62,7 +67,10 @@ public class JobOrderMoneyPrivacy {
     if (orderIds.isEmpty()) {
       return;
     }
+    recipients.retireErasedHolderRecipients(userId, new String[0], orderIds);
     holders.unlinkAccount(userId, orderIds);
+    recipients.unlinkAccount(userId, orderIds);
+    targetChanges.unlinkActor(userId, orderIds);
     publishChanges(orderIds);
   }
 

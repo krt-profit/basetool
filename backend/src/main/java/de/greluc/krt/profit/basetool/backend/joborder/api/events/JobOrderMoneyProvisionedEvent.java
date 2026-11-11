@@ -34,10 +34,16 @@ import org.jetbrains.annotations.NotNull;
  * @param holderId the credited order-local identity
  * @param contextRecipientUserId the affected account at booking
  * @param actorSub the account that reported the provision
+ * @param groupedWithOrderRevision whether delivery shares the order revision guard
  * @param displayId the order's running number
  */
 public record JobOrderMoneyProvisionedEvent(
-    UUID entityId, UUID holderId, UUID contextRecipientUserId, UUID actorSub, int displayId)
+    UUID entityId,
+    UUID holderId,
+    UUID contextRecipientUserId,
+    UUID actorSub,
+    boolean groupedWithOrderRevision,
+    int displayId)
     implements NotificationEvent {
 
   @Override
