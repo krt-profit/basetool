@@ -20,15 +20,18 @@
 package de.greluc.krt.profit.basetool.frontend.materialexchange.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Outbound mirror of the backend {@code MaterialExchangeItemReleaseRequest}: lists a craftable item
- * on the Materialbörse.
+ * Outbound mirror of the backend {@code MaterialExchangeItemReleaseRequest}: lists an item on the
+ * Materialbörse, named by exactly one of its blueprint product and its catalogue row (ADR-0371).
  *
- * @param productKey the normalized blueprint product key
+ * @param productKey the normalized blueprint product key, or {@code null}
+ * @param gameItemId the catalogue row of an item no blueprint produces, or {@code null}
  * @param quantity the offered whole-piece quantity
  * @param remark the trade remark, or {@code null}
  */
 @DtoMirror
 public record MaterialExchangeItemReleaseRequest(
-    String productKey, Integer quantity, String remark) {}
+    @Nullable String productKey, @Nullable UUID gameItemId, Integer quantity, String remark) {}

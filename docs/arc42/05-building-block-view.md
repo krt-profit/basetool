@@ -527,11 +527,11 @@ identity Prometheus sends (ADR-0265, REQ-OBS-005). Rules, dashboards and probes:
 
 `catalogue.internal.ItemReconciliationIndex` holds scalar source identity candidates;
 `ItemReconciliationService` validates and locks a verified pair and calls the owner-implemented
-`catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply
-and purchasing update only their own references and emit their own audit/live events. The
-catalogue archives both original item/price/stat sets in `game_item_redirect` before retiring
-the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical ids
-have a separate reference seam for bulk reads.
+`catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply,
+purchasing and the Materialbörse update only their own references and emit their own audit/live
+events. The catalogue archives both original item/price/stat sets in `game_item_redirect` before
+retiring the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical
+ids have a separate reference seam for bulk reads.
 
 `ScWikiRequestExecutor` owns pacing/retry transport, `ScWikiClient` owns the scoped game build,
 and `SyncChunkWriter` owns isolated application transactions. `SyncRunService` persists attempt

@@ -19,6 +19,11 @@ import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
+import {
+    itemIdentityOf,
+    itemOptionsUrl,
+    renderItemOption,
+} from '/js/materialexchange/exchange-item-options.js';
 
 function initMaterialgesuchModal() {
     /**
@@ -45,6 +50,7 @@ function initMaterialgesuchModal() {
      * @property {string} kind `MATERIAL` or `ITEM`
      * @property {string | null} materialId the picked material
      * @property {string | null} productKey the picked blueprint product
+     * @property {string | null} gameItemId the picked item no blueprint produces
      * @property {string} quantityType `SCU` or `PIECE`
      * @property {((body: any) => void | Promise<unknown>) | null} onDone runs with the response body on success
      * @property {(() => void) | null} onCancel runs when the dialog is dismissed
@@ -66,6 +72,7 @@ function initMaterialgesuchModal() {
         kind: 'MATERIAL',
         materialId: null,
         productKey: null,
+        gameItemId: null,
         quantityType: 'SCU',
         onDone: null,
         onCancel: null,
@@ -83,8 +90,8 @@ function initMaterialgesuchModal() {
     /** @type {number | null} */
     let itemTimer = null;
     let itemListOpen = false;
-    /** @type {Array<{ productKey: string, name: string, manufacturerName?: string, manufacturerNameDe?: string | null }>} */
-    let productItems = [];
+    /** @type {import('/js/materialexchange/exchange-item-options.js').ExchangeItemOption[]} */
+    let itemOptions = [];
 
     /**
      * Fills the `{0}` placeholder of a localized template.
@@ -206,6 +213,7 @@ function initMaterialgesuchModal() {
             kind: ctx.kind === 'ITEM' ? 'ITEM' : 'MATERIAL',
             materialId: null,
             productKey: null,
+            gameItemId: null,
             quantityType: ctx.quantityType === 'PIECE' ? 'PIECE' : 'SCU',
             onDone,
             onCancel,
@@ -304,6 +312,7 @@ function initMaterialgesuchModal() {
         state.kind = kind === 'ITEM' ? 'ITEM' : 'MATERIAL';
         state.materialId = null;
         state.productKey = null;
+        state.gameItemId = null;
         state.quantityType = 'SCU';
         applyKindBlocks();
         applyQuantityUnit();
@@ -439,27 +448,26 @@ function initMaterialgesuchModal() {
     }
 
     /**
-     * Loads the offerable products matching a query into the item picker.
+     * Loads the items matching a query into the item picker.
      *
      * @param {string} query the search text; empty for the unfiltered list
      */
     function loadItemPicker(query) {
         const seq = ++itemSeq;
-        const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
         krtFetch
-            .getJson(url)
+            .getJson(itemOptionsUrl(query))
             .then((items) => {
                 if (seq !== itemSeq) {
                     return;
                 }
-                productItems = Array.isArray(items) ? items : [];
+                itemOptions = Array.isArray(items) ? items : [];
                 renderItemPicker();
             })
             .catch(() => {
                 if (seq !== itemSeq) {
                     return;
                 }
-                productItems = [];
+                itemOptions = [];
                 renderItemPicker();
             });
     }
@@ -499,7 +507,7 @@ function initMaterialgesuchModal() {
         if (!list) {
             return;
         }
-        if (!productItems.length) {
+        if (!itemOptions.length) {
             krtHtml.set(
                 list,
                 krtHtml`<li class="krt-combobox__notice">${i18n.itemPickerEmpty || ''}</li>`,
@@ -507,25 +515,19 @@ function initMaterialgesuchModal() {
             list.hidden = !itemListOpen;
             return;
         }
-        const html = productItems.map((it) => {
-            const manufacturer = localisedName(it.manufacturerName, it.manufacturerNameDe);
-            return krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
-                it.productKey
-            }" data-name="${it.name}"><strong>${it.name}</strong>${
-                manufacturer ? krtHtml` <small>${manufacturer}</small>` : ''
-            }</li>`;
-        });
-        krtHtml.set(list, html);
+        krtHtml.set(list, itemOptions.map(renderItemOption));
         list.hidden = !itemListOpen;
     }
 
     /**
-     * Takes over a picked blueprint product.
+     * Takes over a picked item.
      *
      * @param {Element} li the clicked picker option
      */
-    function pickProduct(li) {
-        state.productKey = li.getAttribute('data-product-key');
+    function pickItemOption(li) {
+        const identity = itemIdentityOf(li);
+        state.productKey = identity.productKey;
+        state.gameItemId = identity.gameItemId;
         setValue('[data-mg-item-picker-input]', li.getAttribute('data-name'));
         closeItemList();
     }
@@ -602,7 +604,7 @@ function initMaterialgesuchModal() {
         }
 
         if (state.kind === 'ITEM') {
-            if (!state.productKey) {
+            if (!state.productKey && !state.gameItemId) {
                 showError(i18n.subjectRequired);
                 return;
             }
@@ -611,6 +613,7 @@ function initMaterialgesuchModal() {
                 url: '/materialboerse/item-requests/ajax',
                 payload: {
                     productKey: state.productKey,
+                    gameItemId: state.gameItemId,
                     minQuality: minQuality === undefined ? null : minQuality,
                     quantity,
                     remark,
@@ -690,7 +693,7 @@ function initMaterialgesuchModal() {
         }
         const pli = target.closest('[data-mg-item-picker-list] .krt-combobox__option');
         if (pli) {
-            pickProduct(pli);
+            pickItemOption(pli);
         }
     });
 

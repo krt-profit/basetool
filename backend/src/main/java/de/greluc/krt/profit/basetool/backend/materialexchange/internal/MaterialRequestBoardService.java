@@ -151,8 +151,9 @@ public class MaterialRequestBoardService {
             : interestRepository.findRequestIdsInterestedByViewer(viewerId, requestIds);
     Map<UUID, List<OrgUnitReferenceDto>> badges =
         ownerOrgUnitBadges(ownerIdsOf(requests.getContent()));
-    Map<String, GameItemReferenceDto> gameItems =
-        exchangeItemReferences.byProductKey(itemProductKeysOf(requests.getContent()));
+    ExchangeItemReferences.PageItems gameItems =
+        exchangeItemReferences.ofPage(
+            itemProductKeysOf(requests.getContent()), itemGameItemIdsOf(requests.getContent()));
 
     Page<MaterialRequestDto> dtos =
         requests.map(request ->
@@ -228,7 +229,8 @@ public class MaterialRequestBoardService {
             : ownerOrgUnitBadges(Set.of(ownerId)).getOrDefault(ownerId, List.of());
     GameItemReferenceDto gameItem =
         request.getKind() == MaterialExchangeRequestKind.ITEM
-            ? exchangeItemReferences.ofProductKey(request.getItemProductKey())
+            ? exchangeItemReferences.ofEntry(
+                request.getItemProductKey(), request.getItemGameItemId())
             : null;
     return toDto(request, gameItem, viewerId, badges, count, viewerInterested, names);
   }
@@ -305,7 +307,7 @@ public class MaterialRequestBoardService {
   }
 
   /**
-   * The product keys of a page's item requests, the input of the batched game-item resolution.
+   * The product keys of a page's item requests, one input of the batched game-item resolution.
    *
    * @param requests the board page's requests
    * @return the item requests' product keys; material requests contribute nothing
@@ -320,19 +322,34 @@ public class MaterialRequestBoardService {
   }
 
   /**
+   * The catalogue rows of a page's item requests, the other input of the batched game-item
+   * resolution.
+   *
+   * @param requests the board page's requests
+   * @return the item requests' catalogue rows; material requests contribute nothing
+   */
+  private static List<UUID> itemGameItemIdsOf(
+      @NotNull Collection<MaterialExchangeRequest> requests) {
+    return requests.stream()
+        .filter(request -> request.getKind() == MaterialExchangeRequestKind.ITEM)
+        .map(MaterialExchangeRequest::getItemGameItemId)
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  /**
    * Looks up the game item of one request in a page's resolved references.
    *
    * @param request the request
-   * @param gameItems product key to reference for the page
+   * @param gameItems the page's references
    * @return the reference of an item request, or {@code null}
    */
   @Nullable
   private static GameItemReferenceDto gameItemOf(
       @NotNull MaterialExchangeRequest request,
-      @NotNull Map<String, GameItemReferenceDto> gameItems) {
-    String key = request.getItemProductKey();
-    return request.getKind() == MaterialExchangeRequestKind.ITEM && key != null
-        ? gameItems.get(key)
+      @NotNull ExchangeItemReferences.PageItems gameItems) {
+    return request.getKind() == MaterialExchangeRequestKind.ITEM
+        ? gameItems.of(request.getItemProductKey(), request.getItemGameItemId())
         : null;
   }
 

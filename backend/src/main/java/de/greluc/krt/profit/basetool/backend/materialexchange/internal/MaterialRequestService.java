@@ -22,10 +22,9 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -79,11 +78,10 @@ public class MaterialRequestService {
   private final MaterialRequestBoardService boardService;
 
   /**
-   * Resolves and validates a blueprint product for an item request (REQ-MARKET-015): {@code
-   * resolveByProductKey(...)} is both the "an item for which a blueprint exists" gate and the
-   * source of the canonical display name snapshotted onto the request.
+   * Resolves the item an item request names, by blueprint product or catalogue row, gating it and
+   * supplying the display name snapshotted onto the request (REQ-MARKET-015, ADR-0371).
    */
-  private final BlueprintProducts blueprintProductService;
+  private final ExchangeItemSubjects itemSubjects;
 
   /**
    * Resolves the acting member's active {@link
@@ -155,29 +153,29 @@ public class MaterialRequestService {
   }
 
   /**
-   * Posts a craftable-item Gesuch to the board (REQ-MARKET-015); the product key must resolve to an
-   * active blueprint product, whose name is snapshotted.
+   * Posts an item Gesuch to the board (REQ-MARKET-015); the item is named by an active blueprint
+   * product or by the catalogue row of an item the Lager books (ADR-0371), and its name is
+   * snapshotted.
    *
-   * @param request the blueprint product key, the whole-piece quantity, an optional minimum quality
-   *     and the description
+   * @param request the blueprint product key or catalogue row, the whole-piece quantity, an
+   *     optional minimum quality and the description
    * @return the resulting request detail, including supplier names
-   * @throws NotFoundException if the caller is unknown or the product key resolves to no active
-   *     blueprint product
+   * @throws NotFoundException if the caller is unknown, the product key resolves to no active
+   *     blueprint product or the catalogue row is unknown
+   * @throws BadRequestException if both or neither identities are given, or the row is no item the
+   *     Lager books
+   * @throws RetiredGameItemException if the P4K retired the catalogue row
    */
   @Transactional
   public MaterialRequestDto createItemRequest(MaterialItemRequestCreateRequest request) {
     UUID viewerId = requireViewerId();
     User owner =
         Entities.require(userRepository.findById(viewerId), () -> "User not found: " + viewerId);
-    ResolvedProduct product =
-        Entities.require(
-            blueprintProductService.resolveByProductKey(request.productKey()),
-            () -> "No craftable item (blueprint product) for key: " + request.productKey());
+    ExchangeItemSubject subject = itemSubjects.named(request.productKey(), request.gameItemId());
 
     MaterialExchangeRequest entity = new MaterialExchangeRequest();
     entity.setKind(MaterialExchangeRequestKind.ITEM);
-    entity.setItemProductKey(product.productKey());
-    entity.setItemName(product.productName());
+    subject.applyTo(entity);
     entity.setItemQuantity(request.quantity());
     entity.setMinQuality(request.minQuality());
     entity.setOwner(owner);
@@ -192,8 +190,8 @@ public class MaterialRequestService {
         saved.getId(),
         requestLabel(saved),
         owner.getId(),
-        AuditDetails.of("kind", MaterialExchangeRequestKind.ITEM)
-            .with("product", product.productKey())
+        subject
+            .withIdentity(AuditDetails.of("kind", MaterialExchangeRequestKind.ITEM))
             .with("minQuality", request.minQuality())
             .with("qty", request.quantity())
             .with("remarkLen", remarkLength(request.remark())));
@@ -452,16 +450,17 @@ public class MaterialRequestService {
   }
 
   /**
-   * Builds the PII-free {@code kind=… subject=…} audit details of a request: the material id or the
-   * blueprint product key.
+   * Builds the PII-free {@code kind=… subject=…} audit details of a request: the material id, or
+   * the blueprint product key or catalogue row of an item.
    *
    * @param request the request
    * @return the composed audit details
    */
   private static AuditDetails requestSubjectDetails(MaterialExchangeRequest request) {
     if (request.getKind() == MaterialExchangeRequestKind.ITEM) {
-      return AuditDetails.of("kind", MaterialExchangeRequestKind.ITEM)
-          .with("product", request.getItemProductKey());
+      return new ExchangeItemSubject(
+              request.getItemProductKey(), request.getItemGameItemId(), request.getItemName())
+          .withIdentity(AuditDetails.of("kind", MaterialExchangeRequestKind.ITEM));
     }
     return AuditDetails.of("kind", MaterialExchangeRequestKind.MATERIAL)
         .with("material", request.getRequestedMaterial().getId());

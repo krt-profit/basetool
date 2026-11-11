@@ -32,14 +32,16 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves the blueprint product keys of Materialbörse item offers and requests to the game items
- * they name, so the board can show a component's type, size, grade and class (REQ-MARKET-023).
+ * Resolves the items Materialbörse item offers and requests name, by blueprint product key or by
+ * catalogue row (ADR-0371), to game-item references, so the board can show a component's type,
+ * size, grade and class (REQ-MARKET-023).
  *
- * <p>A whole page resolves in two queries, whatever its size; a page without an item row issues
- * none.
+ * <p>A whole page resolves in at most three queries, whatever its size; a page without an item row
+ * issues none.
  */
 @Component
 @RequiredArgsConstructor
@@ -52,57 +54,123 @@ public class ExchangeItemReferences {
   private final GameItemRepository gameItemRepository;
 
   /**
-   * Resolves product keys to game-item references.
+   * Resolves the identities of a page's item entries to game-item references.
    *
-   * @param productKeys the product keys of a page's item rows; {@code null} and blank entries are
+   * @param productKeys the product keys of the page's item entries; {@code null} and blank entries
+   *     are ignored
+   * @param gameItemIds the catalogue rows of the page's item entries; {@code null} entries are
    *     ignored
-   * @return product key to reference; keys that name no catalogued game item are absent
+   * @return the references, looked up by each entry's identity
    */
   @NotNull
-  public Map<String, GameItemReferenceDto> byProductKey(
-      @NotNull Collection<@Nullable String> productKeys) {
+  public PageItems ofPage(
+      @NotNull Collection<@Nullable String> productKeys,
+      @NotNull Collection<@Nullable UUID> gameItemIds) {
     Set<String> keys = new LinkedHashSet<>();
     for (String key : productKeys) {
       if (key != null && !key.isBlank()) {
         keys.add(key);
       }
     }
-    if (keys.isEmpty()) {
-      return Map.of();
+    Set<UUID> rows = new LinkedHashSet<>();
+    for (UUID id : gameItemIds) {
+      if (id != null) {
+        rows.add(id);
+      }
     }
-    Map<String, UUID> itemIds = blueprintProducts.outputItemIdsByProductKey(keys);
-    if (itemIds.isEmpty()) {
-      return Map.of();
+    Map<String, UUID> itemIdsByKey =
+        keys.isEmpty() ? Map.of() : blueprintProducts.outputItemIdsByProductKey(keys);
+    Set<UUID> ids = new LinkedHashSet<>(itemIdsByKey.values());
+    ids.addAll(rows);
+    if (ids.isEmpty()) {
+      return PageItems.EMPTY;
     }
-    Map<UUID, GameItemReferenceDto> byId = new HashMap<>();
-    for (GameItem item : gameItemRepository.findAllById(Set.copyOf(itemIds.values()))) {
-      byId.put(item.getId(), GameItemReferenceDto.of(item));
-    }
-    Set<UUID> unresolvedIds = new LinkedHashSet<>(itemIds.values());
-    unresolvedIds.removeAll(byId.keySet());
-    Map<UUID, UUID> redirects =
-        unresolvedIds.isEmpty() ? Map.of() : gameItemRepository.findLocalIdRedirects(unresolvedIds);
-    Map<String, GameItemReferenceDto> references = new HashMap<>();
-    itemIds.forEach((key, id) -> {
-      GameItemReferenceDto reference = byId.get(redirects.getOrDefault(id, id));
+    Map<UUID, GameItemReferenceDto> byId = referencesById(ids);
+    Map<String, GameItemReferenceDto> byKey = new HashMap<>();
+    itemIdsByKey.forEach((key, id) -> {
+      GameItemReferenceDto reference = byId.get(id);
       if (reference != null) {
-        references.put(key, reference);
+        byKey.put(key, reference);
       }
     });
-    return references;
+    Map<UUID, GameItemReferenceDto> byRow = new HashMap<>();
+    for (UUID row : rows) {
+      GameItemReferenceDto reference = byId.get(row);
+      if (reference != null) {
+        byRow.put(row, reference);
+      }
+    }
+    return new PageItems(Map.copyOf(byKey), Map.copyOf(byRow));
   }
 
   /**
-   * Resolves one product key, for a single detail read.
+   * Resolves the identity of one item entry, for a single detail read.
    *
-   * @param productKey the product key, or {@code null}
-   * @return the reference, or {@code null} when the key names no catalogued game item
+   * @param productKey the entry's product key, or {@code null}
+   * @param gameItemId the entry's catalogue row, or {@code null}
+   * @return the reference, or {@code null} when the identity names no catalogued game item
    */
   @Nullable
-  public GameItemReferenceDto ofProductKey(@Nullable String productKey) {
-    if (productKey == null) {
-      return null;
+  public GameItemReferenceDto ofEntry(@Nullable String productKey, @Nullable UUID gameItemId) {
+    Set<String> keys = productKey == null ? Set.of() : Set.of(productKey);
+    Set<UUID> rows = gameItemId == null ? Set.of() : Set.of(gameItemId);
+    return ofPage(keys, rows).of(productKey, gameItemId);
+  }
+
+  /**
+   * Loads game-item references by id, following the redirect of an id a catalogue reconciliation
+   * retired to its surviving item.
+   *
+   * @param ids the ids to resolve; not empty
+   * @return the resolvable ids' references
+   */
+  @NotNull
+  private Map<UUID, GameItemReferenceDto> referencesById(@NotNull Set<UUID> ids) {
+    Map<UUID, GameItemReferenceDto> loaded = new HashMap<>();
+    for (GameItem item : gameItemRepository.findAllById(ids)) {
+      loaded.put(item.getId(), GameItemReferenceDto.of(item));
     }
-    return byProductKey(Set.of(productKey)).get(productKey);
+    Set<UUID> unresolved = new LinkedHashSet<>(ids);
+    unresolved.removeAll(loaded.keySet());
+    Map<UUID, UUID> redirects =
+        unresolved.isEmpty() ? Map.of() : gameItemRepository.findLocalIdRedirects(unresolved);
+    Map<UUID, GameItemReferenceDto> byId = new HashMap<>();
+    for (UUID id : ids) {
+      GameItemReferenceDto reference = loaded.get(redirects.getOrDefault(id, id));
+      if (reference != null) {
+        byId.put(id, reference);
+      }
+    }
+    return byId;
+  }
+
+  /**
+   * The game items of a page's item entries, by product key and by catalogue row.
+   *
+   * @param byProductKey product key to reference
+   * @param byGameItemId catalogue row to reference
+   */
+  public record PageItems(
+      @NotNull @Unmodifiable Map<String, GameItemReferenceDto> byProductKey,
+      @NotNull @Unmodifiable Map<UUID, GameItemReferenceDto> byGameItemId) {
+
+    /** The page without item entries. */
+    static final PageItems EMPTY = new PageItems(Map.of(), Map.of());
+
+    /**
+     * Looks up the reference of one entry's identity.
+     *
+     * @param productKey the entry's product key, or {@code null}
+     * @param gameItemId the entry's catalogue row, or {@code null}
+     * @return the reference, or {@code null} when the identity is absent or names no catalogued
+     *     game item
+     */
+    @Nullable
+    public GameItemReferenceDto of(@Nullable String productKey, @Nullable UUID gameItemId) {
+      if (productKey != null) {
+        return byProductKey.get(productKey);
+      }
+      return gameItemId == null ? null : byGameItemId.get(gameItemId);
+    }
   }
 }

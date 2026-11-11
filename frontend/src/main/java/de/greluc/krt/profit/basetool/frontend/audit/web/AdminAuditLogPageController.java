@@ -330,6 +330,7 @@ public class AdminAuditLogPageController {
                   "MARKET_REQUEST_DEACTIVATED",
                   "MARKET_REQUEST_INTEREST_SIGNALLED",
                   "MARKET_REQUEST_INTEREST_WITHDRAWN",
+                  "MARKET_CATALOGUE_REASSIGNED",
                   "MARKET_AUDIT_EXPORTED",
                   "MARKET_AUDIT_PURGED")),
           Map.entry(

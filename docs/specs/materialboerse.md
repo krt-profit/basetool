@@ -22,8 +22,9 @@ offer:
   of their own stock rows — offering the whole row or only a **part** of its stock (ADR-0086) — with a
   free-form Markdown remark ("was suchst du im Gegenzug?"); material and quality are read **live** from
   the item, and the offered amount is the owner's stored, clamped-to-stock choice (REQ-MARKET-002);
-- an **item offer** (#1185, REQ-MARKET-012) — a **craftable item** ("an item for which a blueprint
-  exists"). It comes in two flavours: a **free-stated** offer (no Lager row, the member states the
+- an **item offer** (#1185, REQ-MARKET-012) — an item the Lager books: a **blueprint product**, or a
+  stocked item no active blueprint produces, named by its **catalogue row** (ADR-0371). It comes in
+  two flavours: a **free-stated** offer (no Lager row, the member states the
   quantity, craft-on-demand) and a **stock-backed** offer (REQ-MARKET-014, ADR-0108) released from a
   game-item Lager row, whose quantity is read/clamped against that row's stock exactly like a material
   offer. Either way an item offer has no quality.
@@ -32,11 +33,11 @@ Either way other members register interest and the anbieter takes the negotiatio
 page is built on the DAS KARTELL design system's locked master-detail layout (`.master-detail` /
 `.master-list` / `.master-row` / `.detail-pane`, specimen
 `.claude/skills/das-kartell-design/components/MasterDetail/preview.html`) as this spec describes it.
-Data model + visibility decisions are recorded in ADR-0082 (offer model), ADR-0086 (partial offers)
-and ADR-0087 (item offers).
+Data model + visibility decisions are recorded in ADR-0082 (offer model), ADR-0086 (partial offers),
+ADR-0087 (item offers) and ADR-0371 (items without a blueprint).
 
 The board also carries the **inverse** listing — a **request (Gesuch)**: instead of releasing owned
-stock, a member advertises what they **want** — a material or a craftable item, with a free-form
+stock, a member advertises what they **want** — a material or an item, with a free-form
 Markdown description, an optional minimum quality (0–1000, for both kinds) and a desired quantity
 (SCU or Stück). A request has **no backing Lager row** (it is closest to a free-stated item offer),
 so none of the offer's stock-derived rules apply (no clamp-on-read, no ratchet, no
@@ -97,7 +98,7 @@ from the board CTA ("Material anbieten") rather than a specific Lager checkbox, 
 a **searchable material/item picker** whose dropdown list is **closed on open** and reveals itself
 only when the member clicks into or types in the picker input — it is never force-opened as the modal
 appears (its absolutely-positioned list would otherwise cover the fields below it) — and closes again
-on a selection, an outside click, or Escape. The blueprint-product picker of the "Item anbieten"
+on a selection, an outside click, or Escape. The item picker of the "Item anbieten"
 dialog (REQ-MARKET-012) behaves identically. Above that picker a **Material/Item radio** (default
 Material) narrows the combobox to one row kind — the release picker otherwise lists **both** the
 caller's material rows and their stock-backed game-item rows (REQ-MARKET-014). The chosen kind is
@@ -304,11 +305,13 @@ one `audit_event` row under `AuditDomain.MARKET`, in the
 business transaction, with a PII-free `key=value` details payload (kind/ids/quality/offered
 amount/stock/remark **length** only — never the remark body, never usernames). Item offers
 (REQ-MARKET-012) **reuse** the same five `MARKET_*` event types with a kind-aware details payload
-(`kind`/`product` key/`qty` instead of the material `q`/`amt`/`stock`); the subject label is the
-material name for a material offer or the item's display name for an item offer (both non-personal
-game-asset names). The unified audit viewer has a Materialbörse tab, whose event-type filter also
-carries the area's generic `MARKET_AUDIT_EXPORTED` / `MARKET_AUDIT_PURGED` events. See
-[`audit.md`](audit.md) (REQ-AUDIT-001/002).
+(`kind`/`product` key or catalogue row `gameItem`/`qty` instead of the material `q`/`amt`/`stock`);
+the subject label is the material name for a material offer or the item's display name for an item
+offer (both non-personal game-asset names). A catalogue reconciliation that moves an item offer or
+request named by a retired catalogue row to the surviving row writes `MARKET_CATALOGUE_REASSIGNED`
+per moved entry (ADR-0371). The unified audit viewer has a Materialbörse tab, whose event-type filter
+also carries that event and the area's generic `MARKET_AUDIT_EXPORTED` / `MARKET_AUDIT_PURGED`
+events. See [`audit.md`](audit.md) (REQ-AUDIT-001/002).
 
 **Acceptance**
 - [ ] Each mutation records its `MARKET_*` event; no name or remark body appears in `details`.
@@ -434,7 +437,7 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 `materialexchange/api/events/MaterialExchangeInterestRegisteredEvent`, `notification/api/NotificationEventType`,
 `notification/api/NotificationType`, `db/migration/V211__seed_material_exchange_interest_notification_rule.sql`
 
-### REQ-MARKET-012 — Offer a craftable item (blueprint product) with a stated quantity
+### REQ-MARKET-012 — Offer an item with a stated quantity
 
 > This requirement describes the **free-stated** item offer (no backing Lager row). Since
 > [design §8](../archive/DESIGN_ITEM_INVENTORY.md) shipped, a member may instead release an item offer **from item stock** — a **stock-backed** item
@@ -442,24 +445,35 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 > (REQ-MARKET-014, ADR-0108). The two are flavours of the one `ITEM` kind; everything below still holds
 > for the free-stated flavour, and the free-stated flavour remains fully supported.
 
-A member may list a **craftable item** on the board via the "Item anbieten" entry of the
-„Angebot erstellen" menu (beside "Material anbieten"). Only items **an active blueprint produces** are offerable: the item picker is
-the blueprint-product type-ahead, and the release is rejected server-side unless the chosen
-normalized `productKey` resolves through `BlueprintProductService.resolveByProductKey(...)` (#1185).
-Because a free-stated item offer has **no** backing Lager row, the member **states the quantity** (a
-whole number ≥ 1) — unlike a material offer, whose amount is read live — and there is **no quality**
-and **no location**. The offer is a discriminated kind of the same `MaterialExchangeOffer` aggregate
-(`kind ∈ {MATERIAL, ITEM}`, ADR-0087): it stores the resolved `productKey`, the canonical display
-name snapshotted at release, and the quantity; owner + squadron badge are stamped from the acting
+A member may list an **item** on the board via the "Item anbieten" entry of the
+„Angebot erstellen" menu (beside "Material anbieten"). Offerable are the items the Lager books
+(REQ-INV-029), each named by **exactly one** identity (ADR-0371; both or neither is a `400`):
+
+- a **blueprint product** — an item an active blueprint produces, named by its normalized
+  `productKey`, which must resolve through `BlueprintProductService.resolveByProductKey(...)`
+  (#1185, `404` otherwise);
+- a **stocked item no active blueprint produces**, named by its catalogue row (`gameItemId`). The
+  row must be listed (REQ-P4K-013) and of a type the Lager books
+  (`StockItemCatalogue#isStockedByType`, ADR-0370), else `400`. A catalogue row an active blueprint
+  produces is stored under its product key, so one item never lists under two identities.
+
+The item picker (`/materialboerse/item-options`) searches the blueprint products and the stocked
+items without a blueprint (`GET /api/v1/game-items?withoutBlueprint=true`) and lists both in one
+name order. Because a free-stated item offer has **no** backing Lager row, the member **states the
+quantity** (a whole number ≥ 1) — unlike a material offer, whose amount is read live — and there is
+**no quality** and **no location**. The offer is a discriminated kind of the same
+`MaterialExchangeOffer` aggregate (`kind ∈ {MATERIAL, ITEM}`, ADR-0087): it stores the resolved
+`productKey` or `gameItemId` (the V407 kind check keeps exactly one), the canonical display name
+snapshotted at release, and the quantity; owner + squadron badge are stamped from the acting
 member. Free-stated item offers are **not** de-duplicated (a member may list the same item several
 times) — their `inventory_item_id` is `NULL`, distinct under the V210 one-active-offer-per-Lager-row
 partial-unique index, which governs material offers and stock-backed item offers (REQ-MARKET-014). On
 the board, an item offer
 renders its item name, an "Item" marker and its quantity (Stück) — no quality; a non-zero
 min-quality filter therefore excludes item offers. Every state-mutating item-offer activity reuses
-the `MARKET_*` audit events with a kind-aware, PII-free `kind`/`product`/`qty` details payload
-(REQ-MARKET-008), lands on the same live-synced board (REQ-MARKET-010, reusing the `board` section
-key), and honours the location-never-exposed / interessenten-anonymity rules unchanged
+the `MARKET_*` audit events with a kind-aware, PII-free `kind`/`product` or `gameItem`/`qty` details
+payload (REQ-MARKET-008), lands on the same live-synced board (REQ-MARKET-010, reusing the `board`
+section key), and honours the location-never-exposed / interessenten-anonymity rules unchanged
 (REQ-MARKET-004/006).
 
 The shared release/edit modal carries the item-quantity field (`[data-mb-qty-block]`, "Menge
@@ -473,6 +487,11 @@ the item-quantity field leaks into every material release (the shipped #1252 def
 **Acceptance**
 - [ ] "Item anbieten" lists an item with a stated quantity; a `productKey` no active blueprint
 produces is rejected (404), and nothing is persisted.
+- [ ] A stocked item no active blueprint produces is listed under its `gameItemId`; a catalogue row
+of a type the Lager does not book is rejected (400), as is a release naming both identities or
+neither.
+- [ ] The item picker lists the blueprint products and the stocked items without a blueprint in one
+name order.
 - [ ] An item offer carries no quality and no location; the board renders its name + quantity, and a
 min-quality filter excludes it.
 - [ ] The same member may hold several active offers for the same item.
@@ -482,13 +501,18 @@ contain the display name or remark body.
 anbieten" (item field hidden), an item offer only "Menge (Stück)" (amount field hidden) — never both.
 
 **Enforced by:** `MaterialExchangeServiceTest`, `MaterialExchangeRepositoryDataTest`,
-`MaterialboersePageControllerMvcTest`, `MaterialboardQuantityFieldExclusivityE2eTest` · **Code:**
-`MaterialExchangeService#releaseItem`,
-`MaterialExchangeItemReleaseRequest`, `MaterialExchangeOffer` (`kind`/`itemProductKey`/`itemName`/
-`itemQuantity`), `MaterialExchangeOfferRepository#findBoard`,
-`db/migration/V213__add_material_exchange_item_offers.sql`, `materialexchange/materialboerse.html`,
-`materialexchange/fragments/materialboerse-modal.html` (the shared modal), `materialboerse-release.js`,
-`materialboerse.css`
+`MaterialExchangeCatalogueRowDataTest`, `InventoryBookableItemsTest`, `GameItemControllerTest`,
+`ExchangeItemOptionTest`, `MaterialboersePageControllerMvcTest`,
+`MaterialboardQuantityFieldExclusivityE2eTest` · **Code:**
+`MaterialExchangeService#releaseItem`, `ExchangeItemSubjects`, `ExchangeItemSubject`,
+`MaterialExchangeItemReleaseRequest`, `MaterialExchangeOffer` (`kind`/`itemProductKey`/
+`itemGameItemId`/`itemName`/`itemQuantity`), `MaterialExchangeOfferRepository#findBoard`,
+`StockItemCatalogue#findBookableItemsWithoutBlueprint`/`#isStockedByType`,
+`db/migration/V213__add_material_exchange_item_offers.sql`,
+`db/migration/V407__name_exchange_items_by_catalogue_row.sql`, `materialexchange/materialboerse.html`,
+`materialexchange/fragments/materialboerse-modal.html` (the shared modal),
+`MaterialboersePageController#itemOptions`, `ExchangeItemOption`, `exchange-item-options.js`,
+`materialboerse-release.js`, `materialboerse.css`
 
 ### REQ-MARKET-014 — Release an item offer from item stock (stock-backed item offer)
 
@@ -506,8 +530,9 @@ game-item row releases a **stock-backed item offer**: a `MaterialExchangeOffer` 
 - **Identity derived from the row's game item.** A stock row keys on a `GameItem`, an offer on the
   blueprint `product_key` (ADR-0087). The release derives `itemProductKey`/`itemName` from the row's
   game item via its blueprint product (`BlueprintProductService.resolveByGameItem`) — the same identity
-  a free-stated offer of that item carries. The Lager also books items no active blueprint produces
-  (REQ-INV-029, ADR-0370); such a row has no product, and its release is refused with `400`.
+  a free-stated offer of that item carries. A row whose item no active blueprint produces — the Lager
+  books those through their type (REQ-INV-029, ADR-0370) — is offered under its catalogue row
+  (`itemGameItemId`, ADR-0371), whatever its type; only a retired item is refused (REQ-P4K-013).
   The `inventory_item_id` is the physical truth, so the product-key↔item fuzziness stays a display
   concern only.
 - **One active offer per row.** The V210 partial-unique index applies as-is (the row's non-null FK), so
@@ -541,7 +566,8 @@ the location-never-exposed / interessenten-anonymity / live-sync rules are uncha
 **Acceptance**
 - [ ] The release picker returns the caller's game-item rows as well as material rows; releasing a
 game-item row creates an `ITEM` offer with `inventory_item_id` set, `itemQuantity` ≤ the row's stock,
-and `itemProductKey`/`itemName` derived from the row's game item.
+and `itemProductKey` (or, for an item no active blueprint produces, `itemGameItemId`) and `itemName`
+derived from the row's game item.
 - [ ] Releasing a quantity above the row's stock is rejected (400); a whole-number rule is enforced.
 - [ ] A second active release for the same game-item row re-activates the one offer (V210), never a
 duplicate.
@@ -560,7 +586,7 @@ leaf (owner-only; the global item view has no toggle). Its checked state comes f
 `InventoryItemCatalogQueryDataTest`, `MaterialboersePageControllerMvcTest`,
 `InventoryPageControllerMvcTest` (item-leaf toggle) · **Code:**
 `MaterialExchangeService#release`/`#releaseFromItemStock`/`#updateOffer`,
-`BlueprintProductService#resolveByGameItem`,
+`ExchangeItemSubjects#stocked`, `BlueprintProductService#resolveByGameItem`,
 `MaterialExchangeOfferRepository#clampItemQuantityToStock`/`#findBoard`,
 `InventoryItemRepository#findReleasableForUser`, `MaterialExchangeBoardService` (effective item
 quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToStock`,
@@ -577,9 +603,9 @@ A `KRT_MEMBER` posts a wanted-listing via the "Material suchen" / "Item suchen" 
 `{MATERIAL, ITEM}`, a **sibling aggregate** to the offer, ADR-0116): a **material** request names a
 catalogue `Material` (picked from the material-catalogue type-ahead, not the caller's Lager) and a
 desired quantity in the material's own unit (SCU or Stück per `Material.quantityType`); an **item**
-request names a craftable item (blueprint product, validated through
-`BlueprintProductService.resolveByProductKey(...)` exactly like an item offer, REQ-MARKET-012) and a
-whole-piece quantity. **Either kind** may carry an optional **minimum quality** (0–1000) — a stated
+request names an item by its blueprint product or, for a stocked item no active blueprint produces,
+by its catalogue row — validated exactly like a free-stated item offer (REQ-MARKET-012, ADR-0371) —
+and a whole-piece quantity. **Either kind** may carry an optional **minimum quality** (0–1000) — a stated
 requester preference, kept even for an item request although items have no intrinsic quality — plus a
 free-form Markdown description (≤ 20 000 chars). There is **no backing Lager row**: owner + org unit
 are stamped from the acting member (like a free-stated item offer), so none of the offer's
@@ -592,6 +618,7 @@ never exposed (REQ-MARKET-004 holds verbatim), and posting is signal-only (REQ-M
 **Acceptance**
 - [ ] A material request stores its material id, desired amount and optional min quality; an item
 request resolves + snapshots the blueprint product (404 if the key resolves to no active blueprint)
+or the catalogue row of a stocked item without a blueprint (400 for a type the Lager does not book)
 and stores the whole-piece quantity + optional min quality. Neither carries a Lager row.
 - [ ] A min quality outside 0–1000 is rejected (400, `@Min(0) @Max(1000)` on the request DTOs,
 backed by the `ck_material_exchange_request_min_quality` DB `CHECK`); a non-positive amount /
@@ -599,10 +626,12 @@ non-whole item quantity is rejected (400).
 - [ ] An account below member is refused; a `KRT_MEMBER` sees requests from every squadron.
 
 **Enforced by:** `MaterialRequestServiceTest`, `MaterialExchangeRequestRepositoryDataTest`,
-`MaterialRequestControllerTest`, `MaterialgesuchPageControllerMvcTest` · **Code:**
-`MaterialRequestService#createMaterialRequest/#createItemRequest`, `MaterialExchangeRequest`,
-`MaterialRequestCreateRequest`, `MaterialItemRequestCreateRequest`, `MaterialRequestController`,
-`db/migration/V224__add_material_exchange_request.sql`
+`MaterialExchangeCatalogueRowDataTest`, `MaterialRequestControllerTest`,
+`MaterialgesuchPageControllerMvcTest` · **Code:**
+`MaterialRequestService#createMaterialRequest/#createItemRequest`, `ExchangeItemSubjects`,
+`MaterialExchangeRequest`, `MaterialRequestCreateRequest`, `MaterialItemRequestCreateRequest`,
+`MaterialRequestController`, `db/migration/V224__add_material_exchange_request.sql`,
+`db/migration/V407__name_exchange_items_by_catalogue_row.sql`
 
 ### REQ-MARKET-016 — Request lifecycle (edit / deactivate), owner-only, optimistic-locked
 
@@ -653,7 +682,7 @@ switch. A request row shows the subject, the requester with badges, „Q≥ <min
 the desired quantity; the detail shows when it was posted, three figures (Min. Qualität, Menge,
 Lieferanten) and „Ich kann liefern". The
 create/edit modal carries the Material/Item radio, the catalogue pickers
-(material search + blueprint product), the optional min-quality field (both kinds) and the desired
+(material search + item search, REQ-MARKET-012), the optional min-quality field (both kinds) and the desired
 quantity (SCU/Stück, no stock cap). Every interaction updates the DOM in place through `krtFetch`
 (REQ-FE-001…014, no full-page reload); the description renders server-side via `@markdown`; no native
 dialogs. Because several members see the board at once, a peer's request create / deactivate /
@@ -683,7 +712,8 @@ the materialboerse modules is whitelisted (parity test).
 
 Every state-mutating request activity (create, edit, deactivate, fulfilment signal, fulfilment
 withdraw) writes exactly one `audit_event` row under `AuditDomain.MARKET`, in the business
-transaction, with a PII-free `key=value` details payload (`kind` / material-id or product-key /
+transaction, with a PII-free `key=value` details payload (`kind` / material-id, product-key or
+catalogue row /
 `minQuality` / `amt` or `qty` / description **length** only — never the description body, never
 usernames, never location). The subject label is the material name or the item's display name. The
 new event types are `MARKET_REQUEST_CREATED` / `MARKET_REQUEST_UPDATED` / `MARKET_REQUEST_DEACTIVATED`
@@ -732,10 +762,12 @@ or wanted.
   item whose product names no catalogued game item render as before, with the plain name only.
 - `MaterialExchangeOfferDto` and `MaterialRequestDto` carry a `gameItem` reference
   (`GameItemReferenceDto`), resolved from the row's blueprint product key to the product's output
-  item. The flat `itemName` stays the displayed name.
-- A board page resolves all its item rows in two queries (`ExchangeItemReferences`): one scan of the
-  active blueprint products, one batch load of the game items. A page without an item row issues
-  neither, so no read adds a query per row.
+  item, or from the row's catalogue row itself (ADR-0371), following the redirect of a row a
+  catalogue merge retired. The flat `itemName` stays the displayed name.
+- A board page resolves all its item rows in at most three queries (`ExchangeItemReferences`): one
+  scan of the active blueprint products, skipped for a page without product keys, one batch load of
+  the game items, and the redirect lookup only for an id the batch load missed. A page without an
+  item row issues none, so no read adds a query per row.
 - The chips sit in the list and detail fragments the live refresh fetches (REQ-MARKET-001), so a
   peer's change keeps them. The change is read-only; the `MARKET` audit trail is unchanged.
 
@@ -745,6 +777,8 @@ or wanted.
   the detail, also after an in-place refresh of the list.
 - [x] Material offers and requests render as before.
 - [x] The game items of a board page resolve in one batch.
+- [ ] An item offer or request named by its catalogue row shows the same chips as one named by its
+  product.
 
 **Enforced by:** `MaterialboersePatternRenderTest` chip cases, `ExchangeItemReferencesTest`,
 `MaterialExchangeServiceTest` and `MaterialRequestServiceTest` game-item cases,

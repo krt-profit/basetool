@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.client.MaterialExchangeBackendClient.BoardFilter;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.ExchangeItemOption;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferDto;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialReq
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -83,8 +85,8 @@ public class MaterialboersePageController {
    */
   private static final Set<String> SORT_KEYS = Set.of(DEFAULT_SORT, "menge", "mat", "neu");
 
-  /** Cap on the number of blueprint-products the item-offer type-ahead requests. */
-  private static final int PRODUCT_PICKER_LIMIT = 25;
+  /** Cap on the number of entries the item type-ahead of the offer and request dialogs shows. */
+  private static final int ITEM_PICKER_LIMIT = 25;
 
   /** Cap on the number of catalogue materials the material-request type-ahead requests. */
   private static final int MATERIAL_PICKER_LIMIT = 25;
@@ -210,9 +212,9 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Lists a craftable item on the board.
+   * Lists an item on the board without a Lager row.
    *
-   * @param body the {@code {productKey, quantity, remark}} payload.
+   * @param body the {@code {productKey | gameItemId, quantity, remark}} payload.
    * @return the backend result, or its error status + body.
    */
   @PostMapping("/item-offers/ajax")
@@ -223,18 +225,25 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Returns blueprint-producible items matching a name fragment, for the "Item anbieten"
-   * type-ahead.
+   * Returns the items matching a name fragment for the "Item anbieten" and "Item suchen"
+   * type-aheads: the blueprint products and the stocked items no blueprint produces, in one name
+   * order (ADR-0371).
    *
-   * @param q a product-name fragment, or {@code null} for the first products.
-   * @return the matching products, or the backend error status + body.
+   * @param q an item-name fragment, or {@code null} for the first items.
+   * @return the matching options, or the backend error status + body.
    */
-  @GetMapping("/offerable-products")
+  @GetMapping("/item-options")
   @ResponseBody
-  public ResponseEntity<Object> offerableProducts(@RequestParam(required = false) String q) {
+  public ResponseEntity<Object> itemOptions(@RequestParam(required = false) String q) {
     return proxy(
-        "Load Materialbörse offerable products failed",
-        () -> materialExchangeClient.offerableProducts(q, PRODUCT_PICKER_LIMIT));
+        "Load Materialbörse item options failed",
+        () ->
+            ExchangeItemOption.merge(
+                Objects.requireNonNullElse(
+                    materialExchangeClient.offerableProducts(q, ITEM_PICKER_LIMIT), List.of()),
+                PageResponse.contentOf(
+                    materialExchangeClient.itemsWithoutBlueprint(q, ITEM_PICKER_LIMIT)),
+                ITEM_PICKER_LIMIT));
   }
 
   /**
@@ -361,9 +370,9 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Posts a craftable-item wanted-listing to the board ("Item suchen").
+   * Posts an item wanted-listing to the board ("Item suchen").
    *
-   * @param body the {@code {productKey, minQuality, quantity, remark}} payload.
+   * @param body the {@code {productKey | gameItemId, minQuality, quantity, remark}} payload.
    * @return the backend result, or its error status + body.
    */
   @PostMapping("/item-requests/ajax")

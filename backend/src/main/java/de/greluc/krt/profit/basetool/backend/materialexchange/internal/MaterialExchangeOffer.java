@@ -51,8 +51,8 @@ import org.jetbrains.annotations.Nullable;
  *   <li>A {@link MaterialExchangeOfferKind#MATERIAL} offer overlays an {@code InventoryItem},
  *       reading material and quality live from {@link #inventoryItemId} and offering {@link
  *       #offeredAmount}; the item's location is never exposed (REQ-MARKET-004).
- *   <li>A {@link MaterialExchangeOfferKind#ITEM} offer names a craftable item by {@link
- *       #itemProductKey} with {@link #itemQuantity}; it is free-stated (no {@link
+ *   <li>A {@link MaterialExchangeOfferKind#ITEM} offer names its item by {@link #itemProductKey} or
+ *       {@link #itemGameItemId} with {@link #itemQuantity}; it is free-stated (no {@link
  *       #inventoryItemId}) or stock-backed, capped by the Lager row's stock (REQ-MARKET-014).
  * </ul>
  *
@@ -74,8 +74,8 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private UUID id;
 
   /**
-   * The offer kind, deciding whether {@link #inventoryItemId} or {@link #itemProductKey}/{@link
-   * #itemName}/{@link #itemQuantity} is populated; a DB {@code CHECK} enforces the exclusivity.
+   * The offer kind, deciding whether {@link #offeredAmount} or the item identity, {@link #itemName}
+   * and {@link #itemQuantity} are populated; a DB {@code CHECK} enforces the exclusivity.
    */
   @Enumerated(EnumType.STRING)
   @Column(name = "offer_kind", nullable = false, length = 16)
@@ -90,16 +90,26 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
   private UUID inventoryItemId;
 
   /**
-   * The normalized blueprint {@code product_key} of an item offer ({@code null} for a material
-   * offer), validated on release so only items an active blueprint produces can be listed.
+   * The normalized blueprint {@code product_key} of an item an active blueprint produces; {@code
+   * null} for a material offer and for an item named by {@link #itemGameItemId} (ADR-0371).
    */
   @Column(name = "item_product_key", length = 255)
+  @Nullable
   private String itemProductKey;
 
   /**
-   * The display spelling of the offered item, snapshotted from the resolved blueprint product at
-   * release time ({@code null} for a material offer). Stored so the board and detail never have to
-   * re-resolve the product; it is the audit subject label of an item offer.
+   * The catalogue row of an item no active blueprint produces; {@code null} for a material offer
+   * and for an item named by {@link #itemProductKey} (ADR-0371). A DB {@code CHECK} keeps exactly
+   * one of the two set on an item offer.
+   */
+  @Column(name = "item_game_item_id")
+  @Nullable
+  private UUID itemGameItemId;
+
+  /**
+   * The display spelling of the offered item, snapshotted from the resolved product or catalogue
+   * row at release time ({@code null} for a material offer). Stored so the board and detail never
+   * have to re-resolve it; it is the audit subject label of an item offer.
    */
   @Column(name = "item_name", length = 255)
   private String itemName;
@@ -172,6 +182,8 @@ public class MaterialExchangeOffer extends AbstractEntity<UUID> {
         + inventoryItemId
         + ", itemProductKey="
         + itemProductKey
+        + ", itemGameItemId="
+        + itemGameItemId
         + ", itemQuantity="
         + itemQuantity
         + ", ownerId="

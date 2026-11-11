@@ -51,8 +51,8 @@ import org.jetbrains.annotations.Nullable;
  * <ul>
  *   <li>A {@link MaterialExchangeRequestKind#MATERIAL} request names {@link #requestedMaterial} and
  *       {@link #requestedAmount}.
- *   <li>An {@link MaterialExchangeRequestKind#ITEM} request names a craftable item by {@link
- *       #itemProductKey} with {@link #itemQuantity}.
+ *   <li>An {@link MaterialExchangeRequestKind#ITEM} request names its item by {@link
+ *       #itemProductKey} or {@link #itemGameItemId} with {@link #itemQuantity}.
  * </ul>
  *
  * <p>An optional {@link #minQuality} applies to either kind. There is no backing Lager row.
@@ -73,9 +73,9 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
   private UUID id;
 
   /**
-   * The request kind, deciding whether {@link #requestedMaterial}/{@link #requestedAmount} or
-   * {@link #itemProductKey}/{@link #itemName}/{@link #itemQuantity} is populated; a DB {@code
-   * CHECK} enforces the exclusivity.
+   * The request kind, deciding whether {@link #requestedMaterial}/{@link #requestedAmount} or the
+   * item identity, {@link #itemName} and {@link #itemQuantity} are populated; a DB {@code CHECK}
+   * enforces the exclusivity.
    */
   @Enumerated(EnumType.STRING)
   @Column(name = "request_kind", nullable = false, length = 16)
@@ -90,16 +90,26 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
   private Material requestedMaterial;
 
   /**
-   * The normalized blueprint {@code product_key} of an item request ({@code null} for a material
-   * request), validated on posting so only items an active blueprint produces can be requested.
+   * The normalized blueprint {@code product_key} of an item an active blueprint produces; {@code
+   * null} for a material request and for an item named by {@link #itemGameItemId} (ADR-0371).
    */
   @Column(name = "item_product_key", length = 255)
+  @Nullable
   private String itemProductKey;
 
   /**
-   * The display spelling of the requested item, snapshotted from the resolved blueprint product at
-   * posting time ({@code null} for a material request). Stored so the board and detail never have
-   * to re-resolve the product; it is the audit subject label of an item request.
+   * The catalogue row of an item no active blueprint produces; {@code null} for a material request
+   * and for an item named by {@link #itemProductKey} (ADR-0371). A DB {@code CHECK} keeps exactly
+   * one of the two set on an item request.
+   */
+  @Column(name = "item_game_item_id")
+  @Nullable
+  private UUID itemGameItemId;
+
+  /**
+   * The display spelling of the requested item, snapshotted from the resolved product or catalogue
+   * row at posting time ({@code null} for a material request). Stored so the board and detail never
+   * have to re-resolve it; it is the audit subject label of an item request.
    */
   @Column(name = "item_name", length = 255)
   private String itemName;
@@ -178,6 +188,8 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
         + (requestedMaterial != null ? requestedMaterial.getId() : null)
         + ", itemProductKey="
         + itemProductKey
+        + ", itemGameItemId="
+        + itemGameItemId
         + ", itemQuantity="
         + itemQuantity
         + ", requestedAmount="

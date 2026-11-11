@@ -374,9 +374,9 @@
 /manifest.webmanifest GET -> WebAppManifestController#manifest gate=none layout=no
 /materialboerse GET -> MaterialboersePageController#board gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/item-offers/ajax POST -> MaterialboersePageController#releaseItem gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/item-options GET -> MaterialboersePageController#itemOptions gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/item-requests/ajax POST -> MaterialboersePageController#createItemRequest gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/items/{inventoryItemId}/deactivate/ajax POST -> MaterialboersePageController#deactivateForItem gate=class:hasRole('KRT_MEMBER') layout=yes
-/materialboerse/offerable-products GET -> MaterialboersePageController#offerableProducts gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/offers/ajax POST -> MaterialboersePageController#release gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/offers/{id}/deactivate/ajax POST -> MaterialboersePageController#deactivate gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/offers/{id}/interest/ajax DELETE -> MaterialboersePageController#withdrawInterest gate=class:hasRole('KRT_MEMBER') layout=yes
