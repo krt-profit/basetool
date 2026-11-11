@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationCauseGuard;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetricNames;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
@@ -48,6 +49,7 @@ public class NotificationCreationService {
   private final NotificationEventPreparation eventPreparation;
   private final NotificationRepository notificationRepository;
   private final MeterRegistry meterRegistry;
+  private final List<NotificationCauseGuard> causeGuards;
 
   /**
    * Applies an original event's cleanup, reconciliation and ordinary per-type delivery.
@@ -78,7 +80,10 @@ public class NotificationCreationService {
       return Set.of();
     }
     List<NotificationEventPreparation.Prepared> prepared =
-        cause.events().stream().map(eventPreparation::resolve).toList();
+        cause.events().stream()
+            .filter(event -> causeGuards.stream().allMatch(guard -> guard.isCurrent(event)))
+            .map(eventPreparation::resolve)
+            .toList();
     Set<UUID> changed = new HashSet<>();
     prepared.forEach(event -> changed.addAll(eventPreparation.removeObsolete(event)));
     Map<UUID, Notification> selected = new LinkedHashMap<>();

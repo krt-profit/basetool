@@ -55,6 +55,10 @@
                                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                                 <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
                             </label>
+                            <label class="orders-filter-check">
+                                <input type="checkbox" name="status" value="CANCELLED" th:checked="${selectedStatuses != null and selectedStatuses.contains('CANCELLED')}">
+                                <span th:text="#{status.CANCELLED}">Storniert</span>
+                            </label>
                         </div>
                     </fieldset>
                     <div th:if="${squadronFilterAvailable}" id="ordersSquadronField" class="orders-filter-field" data-filter-chip-ignore
@@ -215,9 +219,7 @@
         <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
-    <th:block th:if="${isLogisticianOrAbove}">
-        <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
-    </th:block>
+    <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
     </section>
 </main>
 </th:block>
@@ -229,7 +231,7 @@
     const KRT_ORDERS_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Die Liste konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
 <script type="module" th:src="@{/js/joborder/orders-index.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:if="${isLogisticianOrAbove}" th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const KRT_ORDERS_REORDER_I18N = {
         success: /*[[#{success.joborder.priority}]]*/ 'Priority updated.',
         error: /*[[#{error.joborder.priority.failed}]]*/ 'Could not update priority.',
@@ -242,7 +244,7 @@
         }
     };
 </script>
-<script type="module" th:if="${isLogisticianOrAbove}" th:src="@{/js/joborder/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/joborder/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>

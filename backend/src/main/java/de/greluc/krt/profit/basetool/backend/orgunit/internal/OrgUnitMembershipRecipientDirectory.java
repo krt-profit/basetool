@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgunit.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgUnitRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterDirectory;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ import org.springframework.stereotype.Service;
 public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDirectory {
 
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+  private final OrgUnitWriterDirectory writers;
 
   /**
    * The members flagged as Lead of an org unit.
@@ -80,6 +82,18 @@ public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDire
   @NotNull
   public Set<UUID> leadershipOf(@NotNull UUID orgUnitId) {
     return orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(orgUnitId);
+  }
+
+  /**
+   * Resolves active functional writers whose current reach includes the affected unit.
+   *
+   * @param orgUnitId the affected unit
+   * @return current writer account ids
+   */
+  @Override
+  @NotNull
+  public Set<UUID> writersOf(@NotNull UUID orgUnitId) {
+    return writers.writerUserIds(Set.of(orgUnitId));
   }
 
   /**

@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProduct
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderNumberHitDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSupportDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
@@ -167,6 +168,44 @@ public class JobOrderBackendClient {
       @NotNull UUID id, @NotNull ReassignResponsibleOrgUnitRequest request) {
     return backendApiClient.patch(
         "/api/v1/orders/{id}/responsible-org-unit", request, JobOrderDto.class, id);
+  }
+
+  /**
+   * Reads visible Staffel participation and authorized enrollment choices.
+   *
+   * @param id the readable order
+   * @return the support projection, or null when the backend sends no body
+   */
+  @Nullable
+  public JobOrderSupportDto support(@NotNull UUID id) {
+    return backendApiClient.get("/api/v1/orders/{id}/participations", JobOrderSupportDto.class, id);
+  }
+
+  /**
+   * Enrolls a Staffel as a supporter of an order.
+   *
+   * @param id the order receiving support
+   * @param unitId the eligible Staffel
+   */
+  public void enrollSupport(@NotNull UUID id, @NotNull UUID unitId) {
+    backendApiClient.put(
+        "/api/v1/orders/{id}/participations/{unitId}", null, Void.class, id, unitId);
+  }
+
+  /**
+   * Ends a Staffel's participation and open promises at the observed version.
+   *
+   * @param id the supported order
+   * @param unitId the supporting Staffel
+   * @param version the observed participation version
+   */
+  public void withdrawSupport(@NotNull UUID id, @NotNull UUID unitId, @Nullable Long version) {
+    backendApiClient.delete(
+        "/api/v1/orders/{id}/participations/{unitId}?version={version}",
+        Void.class,
+        id,
+        unitId,
+        version);
   }
 
   /**
@@ -549,6 +588,19 @@ public class JobOrderBackendClient {
   @Nullable
   public JobOrderDto updateItemOrder(@NotNull UUID id, @NotNull CreateJobOrderItemRequestDto dto) {
     return backendApiClient.put("/api/v1/orders/{id}/items", dto, JobOrderDto.class, id);
+  }
+
+  /**
+   * Updates the requesting unit's item need and comment.
+   *
+   * @param id the order
+   * @param dto the item lines, comment and observed need version
+   * @return the updated order, or null when the backend sends no body
+   */
+  @Nullable
+  public JobOrderDto updateItemOrderAsRequester(
+      @NotNull UUID id, @NotNull CreateJobOrderItemRequestDto dto) {
+    return backendApiClient.put("/api/v1/orders/{id}/items/requested", dto, JobOrderDto.class, id);
   }
 
   /**

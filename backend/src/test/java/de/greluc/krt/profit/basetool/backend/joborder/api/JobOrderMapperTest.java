@@ -80,7 +80,8 @@ class JobOrderMapperTest {
           return orders.stream()
               .collect(
                   java.util.stream.Collectors.toMap(
-                      JobOrder::getId, _ -> new JobOrderAuthorityFlags(false, true, true, false)));
+                      JobOrder::getId,
+                      _ -> new JobOrderAuthorityFlags(false, true, true, false, true, false)));
         });
     mapper.setOrderAuthority(authority);
   }

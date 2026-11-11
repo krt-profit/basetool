@@ -72,6 +72,10 @@ function initOrdersDetail() {
         topicClass: 'ORDER',
         sections: {
             header: { container: '#order-header-results', fragmentValue: 'header' },
+            participations: {
+                container: '#order-participations-results',
+                fragmentValue: 'participations',
+            },
             actions: { container: '#order-actions-results', fragmentValue: 'actions' },
             dialogs: { container: '#order-dialogs-results', fragmentValue: 'dialogs' },
             kpi: { container: '#order-kpi-results', fragmentValue: 'kpi' },
@@ -753,7 +757,9 @@ export function updateHandoverIndexes() {
 }
 
 document.addEventListener('krt:swapped', (event) => {
-    if (event.detail.container?.id !== 'order-header-results') return;
+    const containerId = event.detail.container?.id;
+    if (containerId === 'order-dialogs-results') resetInventoryCache();
+    if (containerId !== 'order-header-results') return;
     const invalid =
         document.getElementById('order-head-meta')?.dataset.responsibilityInvalid === 'true';
     if (!invalid) return;

@@ -230,7 +230,11 @@ class JobOrderStolenChipRenderTest extends JobOrderPageMvcTestBase {
         false,
         false,
         null,
-        false);
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   /**

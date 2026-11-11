@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialProvision
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialProvisionCorrections;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialProvisionOptions;
 import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -108,7 +107,9 @@ public class MaterialContributionController {
   @Operation(
       operationId = "correctMaterialProvision",
       summary = "Correct a false material provision fact")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @requestScopeResolver.canViewJobOrders()")
+  @PreAuthorize(
+      "isAuthenticated() and @materialProvisionOptions.mayCorrectProvision(#jobOrderId,"
+          + " #provisionId)")
   public List<MaterialContributionHistoryDto> correct(
       @PathVariable UUID jobOrderId,
       @PathVariable UUID provisionId,

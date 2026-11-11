@@ -24,6 +24,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -65,36 +67,47 @@ public class JobOrderEarmarkTargets implements EarmarkTargets.JobOrders {
   @Transactional(readOnly = true)
   public @Nullable Set<UUID> requiredMaterialIds(@NotNull UUID jobOrderId) {
     return requirementsOf(
-        jobOrderId, jobOrderAccessPolicy::canSeeJobOrder, jobOrderItemService::requiredMaterialIds);
+        jobOrderId, this::ordinaryEarmarkAllowed, jobOrderItemService::requiredMaterialIds);
   }
 
   @Override
   @Transactional(readOnly = true)
   public @Nullable Set<UUID> requiredGameItemIds(@NotNull UUID jobOrderId) {
     return requirementsOf(
-        jobOrderId, jobOrderAccessPolicy::canSeeJobOrder, jobOrderItemService::requiredGameItemIds);
+        jobOrderId, this::ordinaryEarmarkAllowed, jobOrderItemService::requiredGameItemIds);
   }
 
   @Override
   @Transactional(readOnly = true)
   public @Nullable Set<UUID> requiredMaterialIdsInScope(@NotNull UUID jobOrderId) {
     return requirementsOf(
-        jobOrderId,
-        jobOrderAccessPolicy::canSeeJobOrderInScope,
-        jobOrderItemService::requiredMaterialIds);
+        jobOrderId, this::poolEarmarkAllowed, jobOrderItemService::requiredMaterialIds);
   }
 
   @Override
   @Transactional(readOnly = true)
   public @Nullable Set<UUID> requiredGameItemIdsInScope(@NotNull UUID jobOrderId) {
     return requirementsOf(
-        jobOrderId,
-        jobOrderAccessPolicy::canSeeJobOrderInScope,
-        jobOrderItemService::requiredGameItemIds);
+        jobOrderId, this::poolEarmarkAllowed, jobOrderItemService::requiredGameItemIds);
+  }
+
+  private boolean ordinaryEarmarkAllowed(JobOrder order) {
+    if (!jobOrderAccessPolicy.canSeeJobOrder(order)) {
+      return false;
+    }
+    if (order.getStatus() == JobOrderStatus.CANCELLED) {
+      throw new BadRequestException("error.job_order.earmark.cancelled");
+    }
+    return true;
+  }
+
+  private boolean poolEarmarkAllowed(JobOrder order) {
+    return order.getStatus() != JobOrderStatus.CANCELLED
+        && jobOrderAccessPolicy.canSeeJobOrderInScope(order);
   }
 
   /**
-   * Reads requirements only after the target passes the selected order-read contract.
+   * Reads attachment requirements after checking the target's scope and status.
    *
    * @param jobOrderId the job order
    * @param visibility the caller's required read contract

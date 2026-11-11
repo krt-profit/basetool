@@ -26,9 +26,13 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
  * @param canEdit whether the current responsible-unit writer may process this order
  * @param canTransferResponsibility whether current-unit recovery authority permits transfer
  * @param canEditAsRequester whether the current requesting-unit writer may edit requested need
+ * @param canCancel whether either current unit writer may cancel the active order
+ * @param canReopen whether either current unit writer may reopen the cancellation
  */
 public record JobOrderAuthorityFlags(
     boolean responsibilityInvalid,
     boolean canEdit,
     boolean canTransferResponsibility,
-    boolean canEditAsRequester) {}
+    boolean canEditAsRequester,
+    boolean canCancel,
+    boolean canReopen) {}

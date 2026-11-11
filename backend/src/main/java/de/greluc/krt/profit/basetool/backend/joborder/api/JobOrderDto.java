@@ -56,6 +56,10 @@ import org.jetbrains.annotations.NotNull;
  * @param originalProfitBoundaryUnknown whether the original Profit boundary is unverifiable
  * @param canTransferResponsibility whether current-unit recovery authority permits a transfer
  * @param canEditAsRequester whether the current requesting-unit writer may edit requested need
+ * @param canCancel whether the caller may cancel active work
+ * @param canReopen whether the caller may reopen this cancellation
+ * @param lifecycleVersion the observed lifecycle revision
+ * @param responsibilityVersion the observed responsibility revision
  */
 public record JobOrderDto(
     UUID id,
@@ -81,7 +85,11 @@ public record JobOrderDto(
     boolean responsibilityInvalid,
     boolean originalProfitBoundaryUnknown,
     Boolean canTransferResponsibility,
-    Boolean canEditAsRequester) {
+    Boolean canEditAsRequester,
+    Boolean canCancel,
+    Boolean canReopen,
+    Long lifecycleVersion,
+    Long responsibilityVersion) {
 
   /**
    * Returns a copy of this DTO with the assignee rows replaced.
@@ -115,7 +123,11 @@ public record JobOrderDto(
         responsibilityInvalid,
         originalProfitBoundaryUnknown,
         canTransferResponsibility,
-        canEditAsRequester);
+        canEditAsRequester,
+        canCancel,
+        canReopen,
+        lifecycleVersion,
+        responsibilityVersion);
   }
 
   /**
@@ -150,6 +162,10 @@ public record JobOrderDto(
         responsibilityInvalid,
         originalProfitBoundaryUnknown,
         canTransferResponsibility,
-        canEditAsRequester);
+        canEditAsRequester,
+        canCancel,
+        canReopen,
+        lifecycleVersion,
+        responsibilityVersion);
   }
 }

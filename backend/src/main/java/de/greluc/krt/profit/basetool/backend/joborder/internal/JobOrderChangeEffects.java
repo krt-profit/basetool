@@ -34,7 +34,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.Notificatio
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterDirectory;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
@@ -122,22 +123,58 @@ public class JobOrderChangeEffects {
     group(order, NoticeKind.INELIGIBLE, unitId);
   }
 
+  /** The command's actual change to one Staffel's support for the order. */
+  public enum ParticipationChange {
+    /** The Staffel began active support. */
+    ENROLLED,
+    /** The Staffel ended active support. */
+    WITHDRAWN,
+    /** The Staffel's contribution relationship continues under responsibility. */
+    BECAME_RESPONSIBLE
+  }
+
+  /**
+   * Groups explicit support changes and refreshes a supporter becoming responsible.
+   *
+   * @param order the affected order
+   * @param unitId the Staffel whose support changed
+   * @param change the recorded participation transition
+   */
+  public void participationChanged(
+      @NotNull JobOrder order, @NotNull UUID unitId, @NotNull ParticipationChange change) {
+    NoticeKind kind =
+        switch (change) {
+          case ENROLLED -> NoticeKind.SUPPORT_ENROLLED;
+          case WITHDRAWN -> NoticeKind.SUPPORT_WITHDRAWN;
+          case BECAME_RESPONSIBLE -> null;
+        };
+    if (kind == null) {
+      publishMaterialSections(order);
+    } else {
+      group(order, kind, unitId);
+    }
+  }
+
   private MaterialGroup group(JobOrder order, NoticeKind kind, UUID unitId) {
     Revision revision = batch().revisions.computeIfAbsent(order.getId(), _ -> new Revision());
     ActorRef actor = new ActorRef(auth.currentUserId().orElse(null), ActorRef.UNKNOWN_NAME);
     MaterialGroup group =
         revision.materials.computeIfAbsent(
             new GroupKey(kind, actor), _ -> new MaterialGroup(order, actor));
-    group.unitIds.add(unitId);
+    group.affectedUnits.add(unitId);
     if (order.getResponsibleOrgUnit() != null) {
-      group.unitIds.add(order.getResponsibleOrgUnit().getId());
+      group.coordinationUnits.add(order.getResponsibleOrgUnit().getId());
     }
+    publishMaterialSections(order);
+    return group;
+  }
+
+  private void publishMaterialSections(JobOrder order) {
     liveSync.publishAfterCommit(
         LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
-        List.of("materials", "aggregated", "kpi", "actions"));
+        List.of("materials", "aggregated", "kpi", "actions", "participations"));
     liveSync.publishAfterCommit(
         LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue", "demand"));
-    return group;
   }
 
   /**
@@ -184,8 +221,12 @@ public class JobOrderChangeEffects {
 
   private static @NotNull NoticePriority priority(@NotNull NotificationEvent event) {
     return switch (event.eventType()) {
-      case JOB_ORDER_FINISHED -> NoticePriority.FINISHED;
+      case JOB_ORDER_FINISHED, JOB_ORDER_REOPENED -> NoticePriority.FINISHED;
+      case JOB_ORDER_REASSIGNED -> NoticePriority.RESPONSIBILITY;
+      case JOB_ORDER_CLARIFICATION_REQUIRED -> NoticePriority.CLARIFICATION;
       case JOB_ORDER_UPDATED_BY_REQUESTER -> NoticePriority.REQUESTER_UPDATE;
+      case JOB_ORDER_UPDATED_BY_RESPONSIBLE -> NoticePriority.RESPONSIBLE_UPDATE;
+      case JOB_ORDER_PARTICIPATION_CHANGED -> NoticePriority.PARTICIPATION;
       default -> NoticePriority.OTHER;
     };
   }
@@ -193,8 +234,13 @@ public class JobOrderChangeEffects {
   /** Delivery precedence for the original notice policies. */
   private enum NoticePriority {
     FINISHED,
+    RESPONSIBILITY,
+    CLARIFICATION,
+    PARTICIPATION,
+    AFFECTED_MATERIAL,
     REQUESTER_UPDATE,
-    OTHER
+    OTHER,
+    RESPONSIBLE_UPDATE
   }
 
   /** The data-only material audience and rendering facts collected for one original preference. */
@@ -203,7 +249,8 @@ public class JobOrderChangeEffects {
     private final Integer displayId;
     private final String handle;
     private final ActorRef actor;
-    private final Set<UUID> unitIds = new LinkedHashSet<>();
+    private final Set<UUID> affectedUnits = new LinkedHashSet<>();
+    private final Set<UUID> coordinationUnits = new LinkedHashSet<>();
     private final Set<String> materials = new TreeSet<>();
 
     private MaterialGroup(JobOrder order, ActorRef actor) {
@@ -218,7 +265,13 @@ public class JobOrderChangeEffects {
   private enum NoticeKind {
     CHANGED,
     ENDED,
-    INELIGIBLE
+    INELIGIBLE,
+    SUPPORT_ENROLLED,
+    SUPPORT_WITHDRAWN;
+
+    boolean isParticipationChange() {
+      return this == SUPPORT_ENROLLED || this == SUPPORT_WITHDRAWN;
+    }
   }
 
   /** Preserves the actor and original preference of each bounded material group. */
@@ -229,6 +282,71 @@ public class JobOrderChangeEffects {
     private final UUID causeId = UUID.randomUUID();
     private final List<NotificationEvent> originals = new ArrayList<>();
     private final Map<GroupKey, MaterialGroup> materials = new LinkedHashMap<>();
+  }
+
+  private static NotificationEvent notice(
+      NoticeKind kind, MaterialGroup group, Set<UUID> recipients) {
+    String materials = String.join(", ", group.materials);
+    return switch (kind) {
+      case CHANGED ->
+          JobOrderNotices.materialContributionsChanged(
+              group.orderId, group.displayId, group.handle, recipients, materials, group.actor);
+      case ENDED, INELIGIBLE ->
+          JobOrderNotices.promisesEnded(
+              group.orderId,
+              group.displayId,
+              group.handle,
+              recipients,
+              materials,
+              kind == NoticeKind.INELIGIBLE
+                  ? AutomaticEndingReason.INELIGIBLE_UNIT
+                  : AutomaticEndingReason.ORDER_CHANGED,
+              group.actor);
+      case SUPPORT_ENROLLED, SUPPORT_WITHDRAWN ->
+          JobOrderNotices.participationChanged(
+              group.orderId,
+              group.displayId,
+              group.handle,
+              recipients,
+              kind == NoticeKind.SUPPORT_ENROLLED,
+              group.actor);
+    };
+  }
+
+  private static void appendMaterialNotices(
+      Map<NoticePriority, List<NotificationEvent>> originals,
+      NoticeKind kind,
+      MaterialGroup group,
+      Map<UUID, Set<UUID>> audiences) {
+    Set<UUID> affected = recipients(group.affectedUnits, audiences);
+    Set<UUID> coordination = recipients(group.coordinationUnits, audiences);
+    if (kind.isParticipationChange()) {
+      affected.addAll(coordination);
+      appendGroup(originals, NoticePriority.PARTICIPATION, kind, group, affected);
+    } else {
+      coordination.removeAll(affected);
+      appendGroup(originals, NoticePriority.AFFECTED_MATERIAL, kind, group, affected);
+      appendGroup(originals, NoticePriority.OTHER, kind, group, coordination);
+    }
+  }
+
+  private static Set<UUID> recipients(Set<UUID> units, Map<UUID, Set<UUID>> audiences) {
+    return units.stream()
+        .flatMap(unit -> audiences.getOrDefault(unit, Set.of()).stream())
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+  }
+
+  private static void appendGroup(
+      Map<NoticePriority, List<NotificationEvent>> originals,
+      NoticePriority priority,
+      NoticeKind kind,
+      MaterialGroup group,
+      Set<UUID> recipients) {
+    if (!recipients.isEmpty()) {
+      originals
+          .computeIfAbsent(priority, _ -> new ArrayList<>())
+          .add(notice(kind, group, recipients));
+    }
   }
 
   /** Publishes scalar notice causes after the material coordinator's final reconciliation. */
@@ -250,42 +368,21 @@ public class JobOrderChangeEffects {
       Set<UUID> affectedUnits =
           revisions.values().stream()
               .flatMap(revision -> revision.materials.values().stream())
-              .flatMap(group -> group.unitIds.stream())
+              .flatMap(group ->
+                  Stream.concat(group.affectedUnits.stream(), group.coordinationUnits.stream()))
               .collect(Collectors.toSet());
       Map<UUID, Set<UUID>> audiences = writers.writerUserIdsByUnit(affectedUnits);
       for (Revision revision : revisions.values()) {
-        List<NotificationEvent> originals = new ArrayList<>(revision.originals);
-        for (var entry : revision.materials.entrySet()) {
-          MaterialGroup group = entry.getValue();
-          Set<UUID> recipients =
-              group.unitIds.stream()
-                  .flatMap(unit -> audiences.getOrDefault(unit, Set.of()).stream())
-                  .collect(Collectors.toUnmodifiableSet());
-          if (!recipients.isEmpty()) {
-            originals.add(
-                entry.getKey().kind() == NoticeKind.CHANGED
-                    ? JobOrderNotices.materialContributionsChanged(
-                        group.orderId,
-                        group.displayId,
-                        group.handle,
-                        recipients,
-                        String.join(", ", group.materials),
-                        group.actor)
-                    : JobOrderNotices.promisesEnded(
-                        group.orderId,
-                        group.displayId,
-                        group.handle,
-                        recipients,
-                        String.join(", ", group.materials),
-                        entry.getKey().kind() == NoticeKind.INELIGIBLE
-                            ? AutomaticEndingReason.INELIGIBLE_UNIT
-                            : AutomaticEndingReason.ORDER_CHANGED,
-                        group.actor));
-          }
-        }
+        Map<NoticePriority, List<NotificationEvent>> originals =
+            new EnumMap<>(NoticePriority.class);
+        revision.originals.forEach(
+            event -> originals.computeIfAbsent(priority(event), _ -> new ArrayList<>()).add(event));
+        revision.materials.forEach(
+            (key, group) -> appendMaterialNotices(originals, key.kind(), group, audiences));
         if (!originals.isEmpty()) {
-          originals.sort(Comparator.comparing(JobOrderChangeEffects::priority));
-          events.publishEvent(new NotificationCause(revision.causeId, originals));
+          events.publishEvent(
+              new NotificationCause(
+                  revision.causeId, originals.values().stream().flatMap(List::stream).toList()));
         }
       }
     }

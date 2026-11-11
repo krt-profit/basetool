@@ -61,7 +61,7 @@ public class JobOrderHandoverService {
 
   private final JobOrderRepository jobOrderRepository;
   private final MaterialPromiseCoordinator materialPromises;
-  private final JobOrderResponsibilityGuard responsibilityGuard;
+  private final JobOrderAccessPolicy accessPolicy;
   private final MaterialHandoverPlanner handoverPlanner;
   private final JobOrderHandoverRepository jobOrderHandoverRepository;
   private final StockCommands stockCommands;
@@ -133,13 +133,14 @@ public class JobOrderHandoverService {
     var scopes = materialPromises.materialScopesOfOrder(jobOrderId);
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
-    responsibilityGuard.assertWritable(jobOrder);
+    accessPolicy.assertCanFulfill(jobOrder);
 
     if (jobOrder.getType() == JobOrderType.ITEM) {
       throw new BadRequestException(JobOrderStockErrors.MATERIAL_ORDER_REQUIRED);
     }
     final MaterialHandoverCalculation.Booked booked =
         handoverPlanner.prepare(jobOrder, items, scopes);
+    accessPolicy.assertCanFulfill(jobOrder);
 
     JobOrderHandover handover = new JobOrderHandover();
     handover.setJobOrder(jobOrder);
@@ -222,7 +223,7 @@ public class JobOrderHandoverService {
 
     JobOrder managedJobOrder =
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
-    responsibilityGuard.assertWritable(managedJobOrder);
+    accessPolicy.assertCanFulfill(managedJobOrder);
 
     boolean allFulfilled = booked.allFulfilled();
 

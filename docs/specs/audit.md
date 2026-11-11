@@ -130,6 +130,9 @@ web, naming its client (REQ-AUDIT-005):
   quality-tier catalogue create, update, deactivate and delete (`QUALITY_TIER_*`, REQ-ORDERS-036). A requesting-owner edit (REQ-ORDERS-023) reuses the
   existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` / `JOB_ORDER_MATERIAL_UNLINKED` events with a
   bounded `byRequester=true` details flag (no new event type; the actor already identifies who edited).
+  Cancellation and reopening record `JOB_ORDER_STATUS_CHANGED` with the previous and next states.
+  Active Staffel support starts with `JOB_ORDER_PARTICIPATION_ENROLLED` and ends with
+  `JOB_ORDER_PARTICIPATION_ENDED`, with safe participation and unit ids and a bounded reason.
   Adding or removing an assignee who is not a direct member of the processing unit (REQ-ORDERS-047)
   records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in place of
   `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is SK-public; the assignee is the
@@ -925,9 +928,11 @@ owner-domain events do not implement or replace the planned catalogue-admin audi
 The hierarchy foundation records every automatic ending of an ineligible legacy material promise
 as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `UNIT_INELIGIBLE`.
 An actual active-to-ended Staffel participation is recorded once as
-`JOB_ORDER_PARTICIPATION_ENDED`, including when it has no open promise. Details contain only the
-participation/unit identities and bounded reason `UNIT_INELIGIBLE`; existing contribution facts
-remain unchanged. Replayed maintenance does not add a second participation-ending event.
+`JOB_ORDER_PARTICIPATION_ENDED`, including when it has no open promise. Details carry the
+participation and unit identities and the applicable reason `UNIT_INELIGIBLE`, `WITHDRAWN` or
+`BECAME_RESPONSIBLE`. Explicit enrolment and first-promise enrolment record
+`JOB_ORDER_PARTICIPATION_ENROLLED`. Existing contribution facts survive the participation
+transition. Replayed maintenance adds no second ending event.
 Responsibility transfer uses `JOB_ORDER_REASSIGNED`, preserving from/to identities and whether the
 original Profit boundary remains unknown, plus the observed valid `profitOrgUnit` identity.
 New creation records the verified root too; an unknown legacy original is never filled from it.

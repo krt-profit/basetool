@@ -32,6 +32,11 @@ public interface OrgUnitEligibilityObserver {
    * Ends ineligible active relationships while preserving history.
    *
    * @param affectedUnitIds the changed unit and its affected descendants
+   * @param previous the Profit eligibility snapshot before the hierarchy write
+   * @param current the Profit eligibility snapshot after the hierarchy write
    */
-  void onEligibilityChanged(@NotNull Set<UUID> affectedUnitIds);
+  void onEligibilityChanged(
+      @NotNull Set<UUID> affectedUnitIds,
+      @NotNull ProfitHierarchySnapshot previous,
+      @NotNull ProfitHierarchySnapshot current);
 }

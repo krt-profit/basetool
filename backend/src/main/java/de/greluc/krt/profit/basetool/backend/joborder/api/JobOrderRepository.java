@@ -25,7 +25,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -437,6 +436,16 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   List<UUID> findIdsAffectedByUnits(@Param("unitIds") Collection<UUID> unitIds, Pageable pageable);
 
   /**
+   * Loads order parties and active-account facts for one bounded clarification batch.
+   *
+   * @param ids the affected order identifiers
+   * @return order rows with their units and assignee accounts
+   */
+  @EntityGraph(
+      attributePaths = {"responsibleOrgUnit", "requestingOrgUnit", "assignees", "assignees.user"})
+  List<JobOrder> findNotificationContextByIdIn(Collection<UUID> ids);
+
+  /**
    * Counts every order whose current responsibility fails the active Profit hierarchy.
    *
    * @return the bounded clarification backlog across all lifecycle states
@@ -467,6 +476,26 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT o FROM JobOrder o ORDER BY o.id")
   List<JobOrder> lockAllJobOrders();
+
+  /**
+   * Locks the order's mutable scalars after the complete material and stock resources are held.
+   *
+   * @param id the order being edited
+   * @return the locked order id, or empty after deletion
+   */
+  @Query(value = "SELECT id FROM job_order WHERE id = :id FOR NO KEY UPDATE", nativeQuery = true)
+  Optional<UUID> lockForScopedEdit(@Param("id") UUID id);
+
+  /**
+   * Locks all planned earmark targets in priority-queue row order after physical stock locks.
+   *
+   * @param ids the order targets
+   * @return the existing locked target identities
+   */
+  @Query(
+      value = "SELECT id FROM job_order WHERE id IN (:ids) ORDER BY id FOR NO KEY UPDATE",
+      nativeQuery = true)
+  List<UUID> lockForOrderEarmarks(@Param("ids") Collection<UUID> ids);
 
   /** The two-key PostgreSQL advisory namespace of an order's ITEM fulfillment section. */
   int ITEM_FULFILLMENT_LOCK_SPACE = 0x4A4F4946;
@@ -516,18 +545,6 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       WHERE lower(o.handle) = lower(:handle) AND o.handle <> :sentinel
       """)
   int anonymiseHandle(@Param("handle") String handle, @Param("sentinel") String sentinel);
-
-  /**
-   * Finds orders with any material or item handover for batched requester-edit authority.
-   *
-   * @param ids the bounded candidate order identities
-   * @return candidates with at least one handover
-   */
-  @Query(
-      "SELECT o.id FROM JobOrder o WHERE o.id IN :ids AND"
-          + " (EXISTS (SELECT h.id FROM JobOrderHandover h WHERE h.jobOrder = o)"
-          + " OR EXISTS (SELECT h.id FROM JobOrderItemHandover h WHERE h.jobOrder = o))")
-  Set<UUID> findIdsWithAnyDelivery(@Param("ids") Collection<UUID> ids);
 
   /**
    * Loads what the Lager shows of the given job orders in one read (plan §7.5 P3-5d).

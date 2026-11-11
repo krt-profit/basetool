@@ -24,5 +24,15 @@ public enum JobOrderStatus {
   OPEN,
   IN_PROGRESS,
   REJECTED,
-  COMPLETED
+  COMPLETED,
+  CANCELLED;
+
+  /**
+   * Reports whether the order remains active in the work queue.
+   *
+   * @return whether the order is open or in progress
+   */
+  public boolean isActive() {
+    return this == OPEN || this == IN_PROGRESS;
+  }
 }

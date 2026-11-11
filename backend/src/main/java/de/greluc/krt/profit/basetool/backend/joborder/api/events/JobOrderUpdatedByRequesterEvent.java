@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api.events;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -33,9 +34,8 @@ import org.jetbrains.annotations.Nullable;
  * Domain event published when a requesting owner (Auftraggeber) edits one of their own job orders
  * (REQ-ORDERS-023).
  *
- * <p>Recipients are resolved from the {@link NotificationContextRole#RESPONSIBLE} org unit; the
- * {@link NotificationContextRole#REQUESTING} org unit names the editor instead of a personal name.
- * Carries only scalars.
+ * <p>The unit contexts address current responsible and requesting writers. The requester shorthand
+ * identifies the editing unit in the notice.
  *
  * @param jobOrderId the edited job order's id (also the notification's loose entity id)
  * @param displayId the human-facing sequential display id
@@ -45,6 +45,7 @@ import org.jetbrains.annotations.Nullable;
  * @param requestingOrgUnit the requesting/customer org unit (id + kind)
  * @param requestingOrgUnitShorthand the requesting org unit's shorthand, for rendering
  * @param actorSub the editing user's sub, or {@code null} when not resolvable
+ * @param observedRevision the order revisions observed when the requester edited it
  */
 public record JobOrderUpdatedByRequesterEvent(
     UUID jobOrderId,
@@ -54,7 +55,8 @@ public record JobOrderUpdatedByRequesterEvent(
     String responsibleOrgUnitShorthand,
     @Nullable OrgUnitRef requestingOrgUnit,
     @Nullable String requestingOrgUnitShorthand,
-    @Nullable UUID actorSub)
+    @Nullable UUID actorSub,
+    @NotNull NotificationRevision observedRevision)
     implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notifications (shared with the create event). */

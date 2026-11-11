@@ -90,6 +90,8 @@ public class MaterialHandoverPlanner {
     stockCommands.prepareWrites(rows, List.of(), scopes);
     if (booked.allFulfilled()) {
       orders.lockAllJobOrders();
+    } else {
+      orders.lockForScopedEdit(orderId);
     }
     entityManager.refresh(order);
     responsibilityGuard.assertWritable(order);

@@ -13,9 +13,9 @@ handle and a material name, and has a seeded, admin-editable rule. Each can be m
 
 ## Approved target: notification audiences and causes
 
-> **Status:** Accepted/planned, implementation pending. This section and the scoped amendments
-> below supersede the narrower legacy JobOrder defaults for the target. Existing runtime paragraphs
-> and tests are baseline evidence only.
+The shared MATERIAL and ITEM policy below uses the existing channels and Inbox preferences. The
+linked-money and Bank outcomes follow their separate [aUEC](orders-auec.md) and
+[optional Bank](orders-auec-bank.md) contracts.
 
 Use existing notification channels, preferences and current access; introduce no watcher enrolment.
 The default target policy is:
@@ -48,87 +48,70 @@ when resolved or responsibility changes. Inbox cleanup never deletes the partici
 business history. Transfer from SK to Staffel is no longer a reason to delete preserved contributions
 or send a misleading withdrawal notice.
 
-**Required acceptance (not executed)**
+**Linked-money acceptance**
 
-- [ ] One change reducing several material promises produces one grouped notice per affected recipient.
-- [ ] A routine money movement sends no all-reader/all-Profit/Admin broadcast.
-- [ ] A Bank staff decision retains its legitimate applicant/approval outcome without duplicate order success or actor confusion.
-- [ ] Muting, stale-action cleanup and current-access links preserve their independent gates.
-- [ ] Accountless names receive no fabricated Inbox identity; complete business history survives notice replacement.
+- [ ] Routine money movements use the affected linked-person policy.
+- [ ] A Bank staff decision retains its legitimate applicant or approval outcome in one cause.
+- [ ] An accountless participant is coordinated through the responsible unit writers, and notice
+  replacement preserves the authorised business history.
 
 ## Requirements
 
-### REQ-ORDERS-041 — An order handed to another unit tells that unit's leadership
+### REQ-ORDERS-041 - Responsibility transfer tells the affected unit writers
 
-> **Approved planned JobOrder amendment (not implemented):** Apply [the approved shared JobOrder contract](orders-core.md) to all three kinds. Notify the actually affected unit writers, retire obsolete responsibility prompts, exclude the actor of this event and combine one logical cause per recipient. Transfer no longer deletes material contributions merely because the destination is a Staffel.
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+`JobOrderService#reassignResponsibleOrgUnit` groups `JOB_ORDER_REASSIGNED` for current writers of the
+former and new responsible units and the requesting unit. The notice names the order and both
+responsible units. Transfer retires outstanding processing and clarification prompts, including the
+earlier creation, need edit, reassignment and reopening notices. Contribution facts and their
+authorised history stay with the order.
 
-`JobOrderService#reassignResponsibleOrgUnit` publishes `JOB_ORDER_REASSIGNED`. The default rule notifies
-the officers, leads and logisticians of the **new** responsible unit (`ORG_RELATIVE_ROLE`,
-`RESPONSIBLE`), names the order, its handle and the old and the new unit, and excludes the actor. The
-event clears the order's earlier `JOB_ORDER_CREATED`, `JOB_ORDER_UPDATED_BY_REQUESTER` and
-`JOB_ORDER_REASSIGNED` notices for every recipient, so the previous unit stops being asked about an
-order that is no longer theirs.
+### REQ-ORDERS-042 - Lifecycle and clarification tell the affected parties
 
-### REQ-ORDERS-042 — A completed, rejected or deleted order tells the requesting unit's leadership
+Completion, rejection, cancellation and deletion use `JOB_ORDER_FINISHED` for current requesting and
+responsible writers and active assigned accounts. The coded `statusCode` renders the specific outcome
+(REQ-NOTIF-028). A deleted order carries the `JOB_ORDER_DELETED` entity tag and has no detail link.
+Closing clears outstanding order prompts through `JOB_ORDER_CLOSED`.
 
-> **Approved planned JobOrder amendment (not implemented):** The shared contract also covers cancellation, reopening and clarification for the concretely affected unit/personal audiences. Early manual MATERIAL/ITEM completion remains distinct from delivered quantities. Routine financial bookings do not notify every reader. See [the approved shared JobOrder contract](orders-core.md); runtime acceptance is pending.
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+Reopening uses the same functional and assigned audience through `JOB_ORDER_REOPENED`. Manual
+MATERIAL or ITEM completion may leave unmet quantities in the order's retained facts.
 
-`updateJobOrderStatus` (to `COMPLETED` or `REJECTED`), `completeJobOrderWithinTransaction` (the last
-handover) and `deleteJobOrder` publish `JOB_ORDER_FINISHED` next to `JOB_ORDER_CLOSED`. The default
-rule notifies the officers, leads and logisticians of the **requesting** unit (`REQUESTING`); the
-word „abgeschlossen / abgelehnt / gelöscht" comes from the coded parameter `statusCode`
-(REQ-NOTIF-028). No requester-user column exists, so the person who placed the order is reached only
-through that unit's leadership. A deleted order's notice carries the entity tag `JOB_ORDER_DELETED`, so
-the inbox row has no page to link; an order without a requesting unit tells nobody.
+An organisational change that makes the current responsibility invalid raises
+`JOB_ORDER_CLARIFICATION_REQUIRED` for the affected writers and active assigned accounts. Repeating
+the same eligibility state creates no new prompt. Restoration or an eligible transfer clears it.
 
-### REQ-ORDERS-043 — An assignment tells the assignee
+### REQ-ORDERS-043 - An assignment tells the assignee
 
-> **Approved planned JobOrder amendment (not implemented):** Keep personal assignee notices and narrow personal rights. Include the permitted linked-person money changes made by another actor under [the approved shared JobOrder contract](orders-core.md) and [the approved aUEC contract](orders-auec.md), without treating an original bank requester as the actor of a later staff decision.
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+`JobOrderAssigneeService#addAssignee` publishes `JOB_ORDER_ASSIGNEE_ADDED` for a newly assigned
+account other than the actor. Removal publishes `JOB_ORDER_ASSIGNEE_REMOVED`, which clears that
+member's assignment notice (REQ-NOTIF-025). Linked monetary outcomes follow the
+[aUEC contract](orders-auec.md), including the original applicant's distinct role in a staff
+decision.
 
-`JobOrderAssigneeService#addAssignee` publishes `JOB_ORDER_ASSIGNEE_ADDED` when the assignee is not the
-actor and the member was not assigned already; the default rule notifies the assignee with the order,
-its handle and the actor. `#removeAssignee` publishes `JOB_ORDER_ASSIGNEE_REMOVED`, which clears that
-member's assignment notice only (REQ-NOTIF-025).
+### REQ-ORDERS-044 - Support and promise changes tell the affected writers
 
-### REQ-ORDERS-044 — A withdrawn claim tells the member who made it
+Participation and material notices address current writers of the affected Staffel and the
+responsible unit. Explicit enrolment or withdrawal uses `JOB_ORDER_PARTICIPATION_CHANGED`. A first
+promise uses the original material-change preference. A Staffel becoming responsible is covered by
+the transfer cause and keeps its contributions.
 
-> **Approved planned JobOrder amendment (not implemented):** Replace the last-editor/per-claim withdrawal default with the affected-Staffel and responsible-coordination policy in [the approved shared JobOrder contract](orders-core.md). Changes and automatic material reductions are one grouped cause per recipient, not invented fulfilled provision. Preserve contribution history; a responsibility transfer alone is no withdrawal.
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
-
-`MaterialClaimService#withdrawOrphanedClaimsWithinTransaction` (an order edit removed the bucket)
-publishes `JOB_ORDER_CLAIM_WITHDRAWN` once per claim whose `claimedByUser` is set; the default rule
-notifies that member with the order, the material and the coded reason `ORDER_CHANGED`. A claim the
-member withdrew themselves (`withdrawClaim`) tells nobody. Responsibility transfers preserve active
-claims and do not publish withdrawal notices. Existing `DE_ESCALATED` events remain readable as
-historical notices.
+Automatic ineligibility endings and order-driven changes group affected promises in one order
+revision, including support endings with no open promise. Current covering contextual grants and
+leadership reach determine recipients. Initial reconciliation uses the same path with a system
+actor. Already ended promises and unchanged eligibility do not produce a duplicate notice.
 
 **Acceptance**
 
-- [x] Each event reaches the leadership or member its seeded rule names and never the actor.
-- [x] A reassignment clears the earlier creation notices; a removal clears the assignment notice of that
-  member only.
-- [x] An order without a requesting unit, an assignment of yourself and a repeated assignment tell nobody.
-- [x] The default rules exist, are enabled, and use the intended selector kinds.
+- [ ] Creation and need changes reach the affected current writers while excluding the event's
+  actor and unrelated global administrators.
+- [ ] Transfer reaches the affected units once and retires the earlier responsibility prompts.
+- [ ] Lifecycle changes and clarification reach current unit writers and active assigned accounts.
+- [ ] Delivery of a delayed cause cannot restore an action prompt superseded by a committed change.
+- [ ] Material reductions, support changes and their derived outcomes remain one notice per
+  recipient and order revision under the eligible original preferences.
+- [ ] Assignment removal clears the affected account's assignment prompt.
 
-**Enforced by:** `JobOrderNoticeIntegrationTest`, `JobOrderServicePriorityAndStatusTest`
-(`finishedNotice…`), `MaterialClaimServiceTest` (`withdraw…tells…`), `SeededNotificationRulesIntegrationTest`,
-`NotificationPageControllerTest` (`targetOf_…`) · **Code:** `joborder/api/events/JobOrderNotices`,
-`joborder/internal/JobOrderService`, `joborder/internal/JobOrderAssigneeService`, `joborder/internal/MaterialClaimService`,
-`V274__seed_job_order_notification_rules.sql` · **Issues:** #2414
-
-The hierarchy foundation implements the grouped policy for the new automatic ineligibility trigger:
-all ended legacy promises of one hierarchy change are grouped by order and affected Staffel,
-then one cause per order carries the union of current affected-Staffel and responsible-unit writers.
-The owning orgunit directory includes actual covering contextual grants and leadership reach, never
-unrelated global administrators or only the last recorder. Existing preferences, actor exclusion and
-recipient deduplication stay in the notification engine; historical line-level audit remains intact.
-
-Initial automatic reconciliation uses the same grouped policy before application readiness, with a
-system actor. Already-ended promises produce no new cause on a repeated start.
+**Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `MaterialContributionEffectsIntegrationTest`,
+`JobOrderNoticeIntegrationTest`, `NotificationLifecycleEventsTest`,
+`SeededNotificationRulesIntegrationTest` · **Code:** `joborder/api/events/JobOrderNotices`,
+`joborder/internal/JobOrderChangeEffects`, `joborder/internal/JobOrderActionNoticeGuard`,
+`joborder/internal/JobOrderLifecycleNotices`, `V384__seed_shared_order_notification_audiences.sql`

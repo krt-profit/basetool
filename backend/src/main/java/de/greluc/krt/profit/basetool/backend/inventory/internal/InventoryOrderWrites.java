@@ -44,6 +44,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -121,6 +122,24 @@ public class InventoryOrderWrites {
         List.of(rowId),
         List.of(),
         targetOrder == null ? List.of() : List.of(new PoolAllocationTarget(rowId, targetOrder)));
+  }
+
+  /**
+   * Stabilizes the planned order targets after stock locks.
+   *
+   * @param orderIds the complete current attachment targets
+   */
+  void lockEarmarkTargets(Collection<UUID> orderIds) {
+    if (orderIds.isEmpty()) {
+      return;
+    }
+    Set<UUID> locked = planning().earmarkTargets;
+    Set<UUID> pending = new HashSet<>(orderIds);
+    pending.removeAll(locked);
+    if (!pending.isEmpty()) {
+      observer.lockOrderEarmarkTargets(pending);
+      locked.addAll(pending);
+    }
   }
 
   /**
@@ -380,6 +399,11 @@ public class InventoryOrderWrites {
             InventoryItem.class, destination.getKey().holder());
       }
     }
+    lockEarmarkTargets(
+        Stream.concat(
+                bookings.stream().flatMap(booking -> booking.orderIds().stream()),
+                allocationTargets.stream().map(PoolAllocationTarget::orderId))
+            .toList());
   }
 
   /**
@@ -615,6 +639,7 @@ public class InventoryOrderWrites {
     private final Map<UUID, Optional<RowSnapshot>> mutationBaselines = new HashMap<>();
     private final Set<UUID> validated = new HashSet<>();
     private final Set<Long> lots = new HashSet<>();
+    private final Set<UUID> earmarkTargets = new HashSet<>();
     private final Set<UUID> restorationRows = new HashSet<>();
     private final Set<InventoryQuantityEvidenceLockRepository.Identity> restorationEvidence =
         new HashSet<>();

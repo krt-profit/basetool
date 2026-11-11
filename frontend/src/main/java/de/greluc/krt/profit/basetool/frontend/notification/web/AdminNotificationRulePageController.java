@@ -69,6 +69,7 @@ public class AdminNotificationRulePageController {
       List.of(
           "JOB_ORDER_CREATED",
           "JOB_ORDER_UPDATED_BY_REQUESTER",
+          "JOB_ORDER_UPDATED_BY_RESPONSIBLE",
           "BANK_BOOKING_REQUEST_CREATED",
           "BANK_BOOKING_REQUEST_CONFIRMED",
           "BANK_BOOKING_REQUEST_REJECTED",
@@ -105,10 +106,14 @@ public class AdminNotificationRulePageController {
           "OPERATION_COMPLETED_UNOWNED",
           "JOB_ORDER_REASSIGNED",
           "JOB_ORDER_FINISHED",
+          "JOB_ORDER_REOPENED",
           "JOB_ORDER_ASSIGNEE_ADDED",
           "JOB_ORDER_ASSIGNEE_REMOVED",
           "JOB_ORDER_CLAIM_WITHDRAWN",
           "JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED",
+          "JOB_ORDER_CLARIFICATION_REQUIRED",
+          "JOB_ORDER_PARTICIPATION_CHANGED",
+          "JOB_ORDER_CLARIFICATION_RESOLVED",
           "REFINERY_ORDER_READY",
           "REFINERY_ORDER_CHANGED_BY_OTHER",
           "REFINERY_ORDER_READY_CLEARED",
@@ -169,6 +174,7 @@ public class AdminNotificationRulePageController {
       List.of(
           "JOB_ORDER_CREATED",
           "JOB_ORDER_UPDATED_BY_REQUESTER",
+          "JOB_ORDER_UPDATED_BY_RESPONSIBLE",
           "BANK_BOOKING_REQUEST_CREATED",
           "BANK_BOOKING_REQUEST_CONFIRMED",
           "BANK_BOOKING_REQUEST_REJECTED",
@@ -199,9 +205,12 @@ public class AdminNotificationRulePageController {
           "OPERATION_COMPLETED",
           "JOB_ORDER_REASSIGNED",
           "JOB_ORDER_FINISHED",
+          "JOB_ORDER_REOPENED",
           "JOB_ORDER_ASSIGNED",
           "JOB_ORDER_CLAIM_WITHDRAWN",
           "JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED",
+          "JOB_ORDER_CLARIFICATION_REQUIRED",
+          "JOB_ORDER_PARTICIPATION_CHANGED",
           "REFINERY_ORDER_READY",
           "REFINERY_ORDER_CHANGED_BY_OTHER",
           "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE",
@@ -272,13 +281,15 @@ public class AdminNotificationRulePageController {
    * admin.notificationRules.selector.orgRelativeRole}.
    */
   static final List<String> ORG_RELATIVE_ROLES =
-      List.of("OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP");
+      List.of(
+          "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP", "UNIT_WRITER");
 
   /**
    * {@code NotificationContextRole} codes, labelled via {@code
    * admin.notificationRules.selector.contextRole}.
    */
-  static final List<String> CONTEXT_ROLES = List.of("RESPONSIBLE", "REQUESTING");
+  static final List<String> CONTEXT_ROLES =
+      List.of("RESPONSIBLE", "REQUESTING", "PREVIOUS_RESPONSIBLE");
 
   /**
    * Global role codes a {@code ROLE} selector may name, labelled via {@code

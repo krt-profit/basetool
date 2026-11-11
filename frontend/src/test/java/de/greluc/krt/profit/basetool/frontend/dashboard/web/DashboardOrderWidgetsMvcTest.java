@@ -143,7 +143,11 @@ class DashboardOrderWidgetsMvcTest {
         false,
         false,
         false,
-        false);
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   private static PageResponse<JobOrderDto> orders(long total, JobOrderDto... content) {

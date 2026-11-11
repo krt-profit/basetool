@@ -85,7 +85,11 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
             false,
             false,
             false,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     when(backendApiClient.post(
             eq(item ? "/api/v1/orders/items" : "/api/v1/orders"), any(), eq(JobOrderDto.class)))
         .thenReturn(created);

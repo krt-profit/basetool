@@ -89,7 +89,7 @@ class JobOrderBackendClientTest {
             + "\"canEdit\":false,\"canTransferResponsibility\":true}");
 
     var result =
-        client.transferResponsibility(ORDER, new ReassignResponsibleOrgUnitRequest(SQUADRON));
+        client.transferResponsibility(ORDER, new ReassignResponsibleOrgUnitRequest(SQUADRON, 6L));
 
     assertThat(result.id()).isEqualTo(ORDER);
     assertThat(result.displayId()).isEqualTo(77);
@@ -99,7 +99,7 @@ class JobOrderBackendClientTest {
     backend.expect(
         "PATCH",
         "/api/v1/orders/" + ORDER + "/responsible-org-unit",
-        "{\"responsibleOrgUnitId\":\"" + SQUADRON + "\"}");
+        "{\"responsibleOrgUnitId\":\"" + SQUADRON + "\",\"version\":6}");
   }
 
   @Test
@@ -261,9 +261,31 @@ class JobOrderBackendClientTest {
     backend.expect("GET", "/api/v1/locations/lookup");
   }
 
+  /**
+   * Preserves participation identity and the observed withdrawal version across the typed client.
+   */
+  @Test
+  void supportReadsAndWritesUseTheSameParticipation() {
+    backend.answerJson(
+        """
+        {"participations":[],"enrollmentOptions":[]}
+        """);
+    backend.answerEmpty();
+    backend.answerEmpty();
+
+    assertThat(client.support(ORDER).participations()).isEmpty();
+    client.enrollSupport(ORDER, SQUADRON);
+    client.withdrawSupport(ORDER, SQUADRON, 9L);
+
+    String supportPath = "/api/v1/orders/" + ORDER + "/participations";
+    backend.expect("GET", supportPath);
+    backend.expect("PUT", supportPath + "/" + SQUADRON, null);
+    backend.expect("DELETE", supportPath + "/" + SQUADRON + "?version=9", null);
+  }
+
   @Test
   void orderWrites() {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 9; i++) {
       backend.answerJson("{}");
     }
     backend.answerEmpty();
@@ -294,6 +316,7 @@ class JobOrderBackendClientTest {
 
     client.createItemOrder(itemOrder);
     client.updateItemOrder(ORDER, itemOrder);
+    client.updateItemOrderAsRequester(ORDER, itemOrder);
     client.createOrder(materialOrder);
     client.updateOrder(ORDER, materialOrder);
     client.updateOrderAsRequester(ORDER, materialOrder);
@@ -324,6 +347,7 @@ class JobOrderBackendClientTest {
             + "\",\"minQuality\":500,\"amount\":12.5}],\"version\":3}";
     backend.expect("POST", "/api/v1/orders/items", itemBody);
     backend.expect("PUT", "/api/v1/orders/" + ORDER + "/items", itemBody);
+    backend.expect("PUT", "/api/v1/orders/" + ORDER + "/items/requested", itemBody);
     backend.expect("POST", "/api/v1/orders", materialBody);
     backend.expect("PUT", "/api/v1/orders/" + ORDER, materialBody);
     backend.expect("PUT", "/api/v1/orders/" + ORDER + "/requested", materialBody);

@@ -67,10 +67,8 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void unlinkMaterial_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
-      throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void unlinkMaterial_WhenContextualAuthorityAccepts_RedirectsWithSuccessToast() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
 
@@ -101,9 +99,16 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
-  void unlinkMaterial_AsPlainMember_ShouldReturn403() throws Exception {
+  void unlinkMaterial_WhenBackendRefusesAuthority_Propagates403() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
+    doThrow(new BackendServiceException("Forbidden", null, 403))
+        .when(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/{id}/materials/{materialId}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(materialId));
 
     mockMvc
         .perform(

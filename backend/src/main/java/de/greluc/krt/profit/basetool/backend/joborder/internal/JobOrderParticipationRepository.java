@@ -90,6 +90,15 @@ public interface JobOrderParticipationRepository
       Pageable pageable);
 
   /**
+   * Loads the retained support relationships and their units for one readable order.
+   *
+   * @param jobOrderId the order
+   * @return current and retained participation in stable order
+   */
+  @EntityGraph(attributePaths = "claimingOrgUnit")
+  List<JobOrderParticipation> findByJobOrderIdOrderById(UUID jobOrderId);
+
+  /**
    * Loads a bounded stable batch of managed dependents for order deletion.
    *
    * @param jobOrderId the order

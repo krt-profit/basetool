@@ -36,6 +36,9 @@ public enum NotificationEventType {
    */
   JOB_ORDER_UPDATED_BY_REQUESTER,
 
+  /** The responsible side changed the order's need or editable details. */
+  JOB_ORDER_UPDATED_BY_RESPONSIBLE,
+
   /**
    * An org-unit officer/lead raised a confirm-before-post bank booking request (REQ-BANK-026). The
    * default rule notifies the bank management and the employees granted on the target account.
@@ -134,8 +137,8 @@ public enum NotificationEventType {
   DISCORD_REGISTRATION_DECIDED,
 
   /**
-   * A job order was completed, rejected or deleted (REQ-NOTIF-008). Creates no notification; it
-   * clears the open {@code JOB_ORDER_CREATED} and {@code JOB_ORDER_UPDATED_BY_REQUESTER} items.
+   * A job order ended or was deleted, so its outstanding processing and clarification prompts are
+   * obsolete (REQ-NOTIF-008, REQ-NOTIF-018).
    */
   JOB_ORDER_CLOSED,
 
@@ -250,17 +253,19 @@ public enum NotificationEventType {
   OPERATION_COMPLETED_UNOWNED,
 
   /**
-   * A job order moved to another responsible unit (REQ-ORDERS-041). The default rule notifies the
-   * officers, leads and logisticians of the new unit; the event clears the order's earlier creation
-   * notices.
+   * Responsibility moved to another unit, notifying the affected current unit writers
+   * (REQ-ORDERS-041).
    */
   JOB_ORDER_REASSIGNED,
 
   /**
-   * A job order was completed, rejected or deleted (REQ-ORDERS-042). The default rule notifies the
-   * officers, leads and logisticians of the requesting unit.
+   * A job order ended or was deleted, notifying affected writers and active assigned accounts
+   * (REQ-ORDERS-042).
    */
   JOB_ORDER_FINISHED,
+
+  /** Work on a job order has reopened. */
+  JOB_ORDER_REOPENED,
 
   /**
    * Somebody assigned a member to a job order (REQ-ORDERS-043). The default rule notifies that
@@ -282,6 +287,15 @@ public enum NotificationEventType {
 
   /** Material promises or credited contributions changed for the affected unit writers. */
   JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED,
+
+  /** The order's responsible unit lost eligibility for its recorded Profit boundary. */
+  JOB_ORDER_CLARIFICATION_REQUIRED,
+
+  /** A Staffel began or ended active support for the order. */
+  JOB_ORDER_PARTICIPATION_CHANGED,
+
+  /** The order's responsibility qualifies again and its clarification prompt is obsolete. */
+  JOB_ORDER_CLARIFICATION_RESOLVED,
 
   /**
    * A refinery order's run has ended and the output can be collected (REQ-REFINERY-023). Published

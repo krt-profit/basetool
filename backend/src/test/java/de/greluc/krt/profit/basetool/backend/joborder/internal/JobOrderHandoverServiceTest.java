@@ -103,7 +103,7 @@ class JobOrderHandoverServiceTest {
         new JobOrderHandoverService(
             jobOrderRepository,
             promises,
-            responsibilityGuard,
+            org.mockito.Mockito.mock(JobOrderAccessPolicy.class),
             MaterialHandoverPlannerFixtures.planner(
                 () -> order,
                 inventoryItemRepository,

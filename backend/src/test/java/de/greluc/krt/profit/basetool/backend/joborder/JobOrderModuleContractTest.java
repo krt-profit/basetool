@@ -140,7 +140,7 @@ class JobOrderModuleContractTest {
         .andExpect(status().is2xxSuccessful());
     assertThat(events(id)).contains("JOB_ORDER_ASSIGNEE_ADDED");
 
-    long version = version(id);
+    long version = created.path("lifecycleVersion").longValue();
     mockMvc
         .perform(
             put(ORDERS + "/" + id + "/status")
@@ -214,11 +214,6 @@ class JobOrderModuleContractTest {
             .getContentAsString();
     entityManager.flush();
     return objectMapper.readTree(response);
-  }
-
-  private long version(UUID id) {
-    entityManager.flush();
-    return jdbc.queryForObject("SELECT version FROM job_order WHERE id = ?", Long.class, id);
   }
 
   private List<String> events(UUID id) {

@@ -117,7 +117,9 @@ public class JobOrderItemReconciliation {
     CreateJobOrderItemLineDto line = prepared.payload();
     int manufactured =
         existing.getManufacturedAmount() == null ? 0 : existing.getManufacturedAmount();
-    if (manufactured <= 0) {
+    int delivered = existing.getDeliveredAmount() == null ? 0 : existing.getDeliveredAmount();
+    int booked = Math.max(manufactured, delivered);
+    if (booked <= 0) {
       return;
     }
     if (existing.getGameItem() != null
@@ -126,15 +128,15 @@ public class JobOrderItemReconciliation {
           "Item line "
               + existing.getId()
               + " already has "
-              + manufactured
+              + booked
               + " manufactured unit(s); its ordered item can no longer be changed.");
     }
-    if (line.amount() != null && line.amount() < manufactured) {
+    if (line.amount() != null && line.amount() < booked) {
       throw new BadRequestException(
           "Item line "
               + existing.getId()
               + " already has "
-              + manufactured
+              + booked
               + " manufactured unit(s); the amount cannot be lowered below that.");
     }
   }

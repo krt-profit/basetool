@@ -102,9 +102,9 @@ A scaled material requirement must be finite and representable in the existing e
 
 **Booking.** A production run is booked through
 `POST /api/v1/orders/{id}/items/{itemId}/production`
-(`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or
-hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id)` — the same
-authorisation as the item handovers. The payload is `JobOrderItemProductionCreateDto` (`amount` ≥ 1,
+(`JobOrderItemProductionService.bookProduction`). The current responsible-unit writer must be
+allowed to fulfill the order (`canFulfillJobOrder`), the same gate used by item handovers.
+The payload is `JobOrderItemProductionCreateDto` (`amount` ≥ 1,
 the line `version`, a `consumption` list of `JobOrderItemProductionConsumptionDto`, each naming an
 `inventoryItemId`, the `materialId` it holds, a positive `amount`, and the entry `version`, and an
 optional `skippedMaterialIds` — the required materials the operator marked "nicht ausbuchen" and does
@@ -249,9 +249,9 @@ registry), and the receiver's apply map.
 - [ ] A booking with a `bookIn` block creates (or merges into) the matching game-item stack,
   earmarked to the order unless deselected, audited as `INVENTORY_RECEIVED_FROM_PRODUCTION` in
   the same transaction (REQ-INV-032); a payload without `bookIn` is rejected with 400.
-- [ ] The endpoint is reachable only by a LOGISTICIAN/ADMIN with `canEditJobOrder`; the
-  success response re-renders the `items` (booking surface + inline stock) and `kpi` sections, among
-  others, in place and propagates them to a peer without a reload.
+- [ ] The endpoint uses the current order's fulfillment authority. The success response
+  re-renders the `items` (booking surface and inline stock) and `kpi` sections in place and
+  propagates them to a peer without a reload.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` (amount/coverage/slice caps, delete-on-depletion,
 mission auto-clamp, 409/422 mapping, audit, skipped/not-booked-out material),
@@ -321,12 +321,10 @@ when the order actually contains a material of that unit type (`kpi.hasScuMateri
 both; an order with no open demand still shows `0` SCU. The tile never adds SCU and pieces into one
 figure.
 
-The **claims KPI tile is shown only for SK-public orders** — the tile renders only when the order
-supports material claims (`kpi.supportsClaims`), i.e. a public Spezialkommando order that can carry
-Eintragungen ([`orders-material-claims.md`](orders-material-claims.md)); a strict-staffel order that
-cannot be claimed omits the tile entirely. The KPI grid is its own AJAX-swappable fragment
-(`kpiSection`, container `#order-kpi-results`, live-sync key `kpi`) so a production booking, a claim,
-a delivery or an assignee change refreshes the KPIs in place.
+The claims KPI tile renders when the backend provides material promise capacity. Eligible
+Profit Bereich, SK and Staffel orders use the same projection and the current caller receives
+only permitted write actions. The KPI grid refreshes in place with the `kpi` live section
+after production, contribution and handover changes.
 
 **Tabs.** The tabs are filtered by order kind, in this order:
 
@@ -361,7 +359,7 @@ tab counts (`.tab-count`) reflect each section's item count.
 The layout uses the common order-read contract and distinct per-action capabilities. Independent
 producer access and the relevant optimistic versions remain unchanged.
 
-The **production booking surface stays on the *Items* tab** for LOGISTICIAN+ editors — the
+The **production booking surface stays on the *Items* tab** for writers with current fulfillment authority — the
 *Hersteller* tab shows who can craft, it books nothing. Each item line carries a leading chevron
 that reveals the per-unit material demand (*Bedarf je Stück*) in a collapsible sub-row (hidden by
 default, mirroring the bank request table's Notiz/Begründung detail row, so a multi-material recipe
@@ -370,31 +368,17 @@ booking modal. Manufactured and delivered each render a progress bar. The machin
 per-material demand the modal consumes stays on the main row, so booking is unaffected; a booking
 re-renders the *Items* section rather than a separate production section. The chevron and the
 demand sub-row (with the line's earmarked *Item-Bestand*) are shown to every admitted viewer,
-editor or not; only the *Herstellung erfassen* button and the booking demand need the LOGISTICIAN+
-editor. Ordinary requesters can expand the same permitted demand and stock facts without a
-production action.
+including requesters. The *Herstellung erfassen* button and the booking demand require current
+fulfillment authority.
 
-**Columns of the aggregated *Materialien* pane.** The pane lists, per material+quality bucket,
-*Material*, *Qualität*, *Gesamtmenge* (the outstanding requirement), **_Vorhanden_**, and —
-for SK-public orders only — the single claim column *Eingetragen* (Σ claims), which also hosts the
-*Eintragen* action. *Vorhanden* sits **between *Gesamtmenge* and *Eingetragen*** and shows the
-linked-inventory stock earmarked to the order for that material at or above the bucket's quality
-floor (`AggregatedMaterialDto.currentStock`, the same value the order-overview list renders as
-collection progress); it is always shown (strict-staffel and SK-public orders alike). The gap
-*Gesamtmenge − Vorhanden* is the still-to-procure amount.
-
-**Implemented baseline pane:** **This pane renders no *Offen* column** — unlike the MATERIAL requirement table, which keeps its
-*Offen* (`amount − Σ claims`). The two figures do not share a base here: `AggregatedMaterialDto`'s
-`openAmount` is `MaterialClaimService.requiredByBucket() − Σ claims`, i.e. derived from the **full**
-order requirement (a supply commitment is against the whole order, see `REQ-ORDERS-025` above),
-while *Gesamtmenge* is the **outstanding** demand of the not-yet-manufactured units. Side by side in
-one row they contradicted each other: as soon as production was booked, *Offen* exceeded
-*Gesamtmenge* — observed on a live order at `Offen` 71.52 SCU against a `Gesamtmenge` of 56.2 SCU
-with zero Eintragungen, which reads as "more open than is needed at all". On a MATERIAL order no
-such gap exists (`amount` is not manufacturing-reduced), so that table is unaffected. The claimable
-remainder is **not** dropped from the contract: `openAmount` still travels in the DTO, still gates
-the write server-side (no overclaim), and is still surfaced to the user as the claim modal's
-`Maximal verfügbar:` hint, fed by the `data-open` attribute on the *Eintragen* / edit controls.
+**Columns of the aggregated *Materialien* pane.** The pane lists the material, quality,
+outstanding requirement (*Gesamtmenge*), earmarked stock (*Vorhanden*) and current promises
+(*Eingetragen*) per material and quality bucket. *Vorhanden* counts stock at or above the
+quality floor (`AggregatedMaterialDto.currentStock`), using the same value as the overview's
+collection progress. Eligible writers use *Eintragen* inside *Eingetragen*. The promise modal's
+*Maximal verfügbar* hint uses `openAmount`, the uncovered capacity of the unmanufactured need
+defined in [REQ-ORDERS-024](orders-material-claims.md). The MATERIAL need table has an
+*Offen* column.
 
 **Material tables on a phone.** Below 768px the *Bedarf* table of a material order and the
 aggregated *Materialien* table of an item order (`.od-lines-table`) stack each row as a card: the
@@ -425,18 +409,15 @@ on the *Items* tab.*
 - [ ] The *Offene Menge* tile shows the open SCU sum and the open whole-unit (*Stück*) sum as two
   separate numbers when the order mixes unit types, a single number when only one type is present,
   and never sums SCU and pieces together.
-- [ ] The claims KPI tile renders only for an SK-public order (claims supported); a strict-staffel
-  order omits it. Requesters keep the same applicable fulfillment and handover facts.
+- [ ] The claims KPI tile reflects material promise capacity on eligible orders. Requesters see the same applicable fulfillment and handover facts.
 - [ ] *Materialien* is hidden while the aggregate is empty, and *Übergaben* while there are none
   and the caller may not record one; a live swap that brings a count above zero shows the tab again.
-- [ ] The aggregated *Materialien* pane of an SK-public order renders *Eingetragen* but **no**
-  *Offen* column, and the *Eintragen* action sits inside *Eingetragen*; the claim modal still offers
-  the full-requirement remainder as its maximum in the baseline; the approved target replaces it with uncovered unmanufactured capacity. The *Bedarf* table of a material order keeps its
-  *Offen*.
-- [ ] The *Items* tab shows the chevron/demand sub-row (*Bedarf je Stück*) to every non-requester
-  viewer of an `ITEM` order and the *Herstellung erfassen* button only to a LOGISTICIAN+ editor; a
-  requester receives the same demand/stock expansion without production controls. The *Hersteller*
-  tab books nothing.
+- [ ] The aggregated *Materialien* pane renders *Eingetragen* on eligible ITEM orders.
+  The *Eintragen* action uses the uncovered unmanufactured capacity as its maximum. The *Bedarf*
+  table of a MATERIAL order renders *Offen*.
+- [ ] Every admitted reader can expand *Bedarf je Stück* on the *Items* tab. Current fulfillment
+  authority controls the *Herstellung erfassen* button. The *Hersteller* tab shows eligible
+  producers.
 - [ ] `?tab=<key>` selects that tab on load and is honoured over `#tab=`, `localStorage`, and the
   default; back/forward re-applies the tab.
 - [ ] Arrow-key navigation moves selection along the tablist; `aria-selected` tracks the active tab.
@@ -445,9 +426,8 @@ on the *Items* tab.*
 - [ ] On the *Items* tab a line's per-unit demand is hidden behind a chevron and revealed in a
   sub-row on click; both Hergestellt and Geliefert render a progress bar; booking a production run
   from that tab still works (its machine-readable demand stays on the main row).
-- [ ] The aggregated *Materialien* pane shows a *Vorhanden* column (linked stock,
-  `AggregatedMaterialDto.currentStock`) between *Gesamtmenge* and the claim columns, for both
-  strict-staffel and SK-public item orders.
+- [ ] The aggregated *Materialien* pane shows earmarked stock (*Vorhanden*) between the
+  outstanding requirement and promises for each eligible responsible unit.
 - [ ] Below 768px both material tables show each row as a card with one labelled line per value
   (label left, value right); every value cell of a row carries its column name as `data-label`.
 - [ ] The item order's *Übergaben* tab shows the "record production first" hint while the order is

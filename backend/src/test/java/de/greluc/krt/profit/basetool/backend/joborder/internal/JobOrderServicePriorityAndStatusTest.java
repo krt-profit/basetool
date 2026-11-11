@@ -74,7 +74,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Unit tests for the priority and status transitions of {@link JobOrderService} and its priority
@@ -107,7 +106,6 @@ class JobOrderServicePriorityAndStatusTest {
   @Mock private AuditService auditService;
   @Mock private QualityTierService qualityTierService;
   @Mock private AuthHelperService authHelperService;
-  @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private JobOrderChangeEffects effects;
 
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
@@ -125,6 +123,7 @@ class JobOrderServicePriorityAndStatusTest {
             profitHierarchy,
             responsibilityGuard,
             jobOrderAccessPolicy,
+            org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
             auditService,
             jobOrderStockProjectionService);
     service =
@@ -161,7 +160,6 @@ class JobOrderServicePriorityAndStatusTest {
             null,
             null,
             authHelperService,
-            eventPublisher,
             effects,
             materialClaimService,
             auditService,
@@ -169,7 +167,6 @@ class JobOrderServicePriorityAndStatusTest {
             null,
             jobOrderStockProjectionService,
             jobOrderPriorityService,
-            actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
@@ -187,7 +184,8 @@ class JobOrderServicePriorityAndStatusTest {
                         .class)),
             liveSyncPublisher,
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class));
+                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            org.mockito.Mockito.mock(JobOrderParticipationCommands.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     lenient()
         .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
@@ -217,7 +215,11 @@ class JobOrderServicePriorityAndStatusTest {
               false,
               false,
               null,
-              false);
+              false,
+              false,
+              false,
+              0L,
+              0L);
         });
 
     Squadron testSquadron = new Squadron();
@@ -255,7 +257,8 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).save(o);
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
-      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(effects)
+          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
     }
 
     @Test
@@ -271,7 +274,8 @@ class JobOrderServicePriorityAndStatusTest {
       assertNull(o.getPriority());
       assertEquals(JobOrderStatus.REJECTED, o.getStatus());
 
-      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(effects)
+          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
     }
 
     private de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent
@@ -571,7 +575,8 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository, times(2)).lockAllJobOrders();
-      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(effects)
+          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
     }
 
     @Test
@@ -583,7 +588,8 @@ class JobOrderServicePriorityAndStatusTest {
 
       verify(jobOrderRepository).delete(o);
       verify(jobOrderRepository, never()).lockAllJobOrders();
-      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(effects)
+          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
     }
   }
 
@@ -667,7 +673,8 @@ class JobOrderServicePriorityAndStatusTest {
       verify(jobOrderRepository).flush();
       verify(jobOrderRepository).lockAllJobOrders();
 
-      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(effects)
+          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
     }
 
     @Test
@@ -681,7 +688,8 @@ class JobOrderServicePriorityAndStatusTest {
       assertNull(o.getPriority());
       verify(jobOrderRepository).flush();
 
-      verify(effects).publish(new JobOrderClosedEvent(ORDER_ID, null));
+      verify(effects)
+          .publish(new JobOrderClosedEvent(ORDER_ID, null, JobOrderLifecycleNotices.revision(o)));
     }
   }
 
@@ -725,6 +733,7 @@ class JobOrderServicePriorityAndStatusTest {
     o.setStatus(status);
     o.setPriority(priority);
     o.setVersion(version);
+    o.setLifecycleVersion(version);
     o.setCreatedAt(Instant.now());
     o.setMaterials(new HashSet<>());
     o.setAssignees(new HashSet<>());

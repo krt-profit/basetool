@@ -90,7 +90,11 @@ class JobOrderPageControllerReaderTest {
         false,
         false,
         null,
-        false);
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   private static OrgUnitMembershipOptionDto option() {
@@ -207,7 +211,8 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.of(null),
                 List.of(options.getFirst()),
-                List.of()));
+                List.of(),
+                JobOrderPageReader.Part.absent()));
     Model model = new ExtendedModelMap();
 
     assertThat(controller.viewOrderDetail(ID, model, null, null))
@@ -255,7 +260,8 @@ class JobOrderPageControllerReaderTest {
                 JobOrderPageReader.Part.absent(),
                 JobOrderPageReader.Part.absent(),
                 List.of(),
-                List.of()));
+                List.of(),
+                JobOrderPageReader.Part.absent()));
 
     assertThat(controller.viewOrderDetail(ID, new ExtendedModelMap(), null, "items"))
         .isEqualTo("joborder/orders-detail :: itemsSection");

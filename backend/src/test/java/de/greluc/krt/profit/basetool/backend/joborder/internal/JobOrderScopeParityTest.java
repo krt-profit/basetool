@@ -49,8 +49,6 @@ import org.springframework.transaction.annotation.Transactional;
 class JobOrderScopeParityTest {
 
   @Autowired private JobOrderRepository jobOrderRepository;
-  @Autowired private JobOrderHandoverRepository jobOrderHandoverRepository;
-  @Autowired private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private UserRepository userRepository;
@@ -101,8 +99,6 @@ class JobOrderScopeParityTest {
                     wired.authHelper(),
                     jobOrderRepository,
                     org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class),
-                    jobOrderHandoverRepository,
-                    jobOrderItemHandoverRepository,
                     org.mockito.Mockito.mock(
                         de.greluc.krt.profit.basetool.backend.joborder.internal
                             .JobOrderUnitReadHistoryRepository.class),

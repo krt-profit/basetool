@@ -71,7 +71,7 @@ public class JobOrderItemHandoverService {
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderItemFulfillmentGuard itemFulfillment;
   private final MaterialPromiseCoordinator materialPromises;
-  private final JobOrderResponsibilityGuard responsibilityGuard;
+  private final JobOrderAccessPolicy accessPolicy;
   private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderItemHandoverMapper jobOrderItemHandoverMapper;
   private final StockCommands stockCommands;
@@ -121,7 +121,7 @@ public class JobOrderItemHandoverService {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
-    responsibilityGuard.assertWritable(jobOrder);
+    accessPolicy.assertCanFulfill(jobOrder);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException(JobOrderStockErrors.ITEM_ORDER_REQUIRED);
@@ -129,6 +129,7 @@ public class JobOrderItemHandoverService {
 
     final ItemHandoverPlanner.Booked booked =
         handoverPlanner.prepare(jobOrder, dto.entries(), scopes);
+    accessPolicy.assertCanFulfill(jobOrder);
     JobOrderItemHandover handover = new JobOrderItemHandover();
     handover.setJobOrder(jobOrder);
     handover.setHandoverTime(dto.handoverTime());

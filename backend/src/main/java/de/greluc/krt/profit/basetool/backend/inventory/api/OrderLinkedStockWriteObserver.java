@@ -43,6 +43,13 @@ public interface OrderLinkedStockWriteObserver {
   void beforeOrderLinkedMaterialWrite(@NotNull Collection<OrderMaterialScope> scopes);
 
   /**
+   * Stabilizes all planned attachment targets after material and physical stock locks.
+   *
+   * @param orderIds the order targets in the complete attachment plan
+   */
+  void lockOrderEarmarkTargets(@NotNull Collection<UUID> orderIds);
+
+  /**
    * Rejects unplanned material scopes after stock locks without acquiring another material lock.
    *
    * @param scopes the actual material scopes found under stock locks

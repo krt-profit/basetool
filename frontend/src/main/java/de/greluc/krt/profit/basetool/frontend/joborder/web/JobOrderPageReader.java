@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBluepri
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSupportDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
@@ -199,6 +200,7 @@ public class JobOrderPageReader {
    * @param orphanedInventory the stock linked to the order but needed by none of its materials
    * @param responsibleOptions the currently eligible responsible units
    * @param claimingOptions the squadrons whose claims the caller may manage on this order
+   * @param support the Staffel participation and authorized enrollment choices
    */
   public record OrderDetailPage(
       @NotNull JobOrderDto order,
@@ -214,7 +216,8 @@ public class JobOrderPageReader {
       @NotNull Part<Map<UUID, JobOrderItemStockGroupDto>> itemStockByGameItem,
       @NotNull Part<List<InventoryItemDto>> orphanedInventory,
       @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions,
-      @NotNull List<OrgUnitMembershipOptionDto> claimingOptions) {}
+      @NotNull List<OrgUnitMembershipOptionDto> claimingOptions,
+      @NotNull Part<JobOrderSupportDto> support) {}
 
   /**
    * Everything the authorized creation form renders.
@@ -232,7 +235,7 @@ public class JobOrderPageReader {
 
   /** Why the item-order edit form is, or is not, offered. */
   public enum ItemEditAccess {
-    /** The order is an item order without item handovers and can be edited. */
+    /** The item order has a permitted processing or requester edit. */
     EDITABLE,
     /** The order could not be read. */
     ORDER_UNAVAILABLE,
@@ -240,7 +243,7 @@ public class JobOrderPageReader {
     NOT_AN_ITEM_ORDER,
     /** The order has invalid responsibility and permits recovery transfer only. */
     RESPONSIBILITY_INVALID,
-    /** The order has an item handover and is locked against editing. */
+    /** The processing editor cannot change a partially handed-over order. */
     HAS_ITEM_HANDOVERS
   }
 
@@ -316,7 +319,9 @@ public class JobOrderPageReader {
     Optional<UUID> currentUserId = currentUserId(caller);
     DetailCatalogs catalogs = detailCatalogs(order.callerMayEditAsRequester(), canAssign);
     Part<UserDto> actingUser =
-        canAssign && itemOrder && fragment == null ? actingUser() : Part.absent();
+        canAssign && itemOrder && (fragment == null || "dialogs".equalsIgnoreCase(fragment))
+            ? actingUser()
+            : Part.absent();
     JobOrderSettingsDto settings = settings();
     return new OrderDetailPage(
         order,
@@ -344,7 +349,15 @@ public class JobOrderPageReader {
                     || "aggregated".equalsIgnoreCase(fragment)
                     || "dialogs".equalsIgnoreCase(fragment))
             ? claimingOptions(id)
-            : List.of());
+            : List.of(),
+        fragment == null || "participations".equalsIgnoreCase(fragment)
+            ? support(id)
+            : Part.absent());
+  }
+
+  private Part<JobOrderSupportDto> support(@NotNull UUID id) {
+    return SectionFallback.load(
+        log, "job-order-support", () -> Part.of(jobOrderClient.support(id)), Part.absent());
   }
 
   private DetailCatalogs detailCatalogs(boolean canEditAsRequester, boolean canAssign) {
@@ -435,24 +448,22 @@ public class JobOrderPageReader {
     if (order.responsibilityInvalid()) {
       return ItemEditPage.blocked(ItemEditAccess.RESPONSIBILITY_INVALID, Optional.of(order));
     }
-    if (!order.callerMayEdit()) {
+    if (!order.callerMayEdit() && !order.callerMayEditAsRequester()) {
       throw new org.springframework.security.access.AccessDeniedException(
-          "Processing edit is not permitted");
+          "Item order edit is not permitted");
     }
-    if (order.itemHandovers() != null && !order.itemHandovers().isEmpty()) {
+    boolean processing = order.callerMayUseItemProcessingEditor();
+    if (!processing && !order.callerMayEditAsRequester()) {
       return ItemEditPage.blocked(ItemEditAccess.HAS_ITEM_HANDOVERS, Optional.of(order));
     }
-    List<MaterialDto> materials = materials();
-    boolean hasOrderableItems = hasOrderableItems();
-    List<SquadronDto> squadrons = squadrons();
     return new ItemEditPage(
         ItemEditAccess.EDITABLE,
         Optional.of(order),
-        materials,
-        hasOrderableItems,
-        squadrons,
-        requestingOptions(),
-        responsibleOptions());
+        materials(),
+        hasOrderableItems(),
+        processing ? squadrons() : List.of(),
+        processing ? requestingOptions() : List.of(),
+        processing ? responsibleOptions() : List.of());
   }
 
   /**

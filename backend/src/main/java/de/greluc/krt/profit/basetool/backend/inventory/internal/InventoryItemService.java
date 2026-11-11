@@ -656,6 +656,7 @@ public class InventoryItemService {
     }
     switch (dto.field()) {
       case JOB_ORDER -> {
+        orderWrites.lockEarmarkTargets(List.of(dto.targetId()));
         if (item.getGameItem() != null) {
           assertGameItemRequiredByJobOrder(item.getGameItem(), dto.targetId());
         } else {

@@ -84,7 +84,11 @@ class JobOrderCreatePublishMvcTest extends JobOrderPageMvcTestBase {
             false,
             false,
             true,
-            true);
+            true,
+            false,
+            false,
+            0L,
+            0L);
     when(backendApiClient.post(eq("/api/v1/orders"), any(), eq(JobOrderDto.class)))
         .thenReturn(created);
     mockMvc

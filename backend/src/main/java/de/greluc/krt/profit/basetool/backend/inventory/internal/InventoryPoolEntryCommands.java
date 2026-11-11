@@ -570,6 +570,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     if (!jobOrder) {
       return earmarkLookup.mission(targetId) != null;
     }
+    orderWrites.lockEarmarkTargets(List.of(targetId));
     Set<UUID> needed =
         row.getMaterial() != null
             ? jobOrders.requiredMaterialIdsInScope(targetId)

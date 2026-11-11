@@ -19,11 +19,7 @@
 
 /* global MSG_STATUS_SUCCESS, MSG_STATUS_ERROR, MSG_CLAIM_TITLE_ADD, MSG_CLAIM_TITLE_EDIT, MSG_CLAIM_MAX_HINT, MSG_CLAIM_SUCCESS, MSG_CLAIM_WITHDRAW_SUCCESS, MSG_CLAIM_ERROR, MSG_CLAIM_VALIDATION_SQUADRON, MSG_CLAIM_VALIDATION_AMOUNT, MSG_CLAIM_VALIDATION_OVERCLAIM, MSG_BP_COUNTING_SUCCESS, MSG_BP_COUNTING_ERROR */
 
-import {
-    _refreshMaterialsSection,
-    _swapOrderSection,
-    krtOrderWrite,
-} from '/js/joborder/orders-detail-edit.js';
+import { _refreshMaterialsSection, krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
 import {
     _odControlById,
     _odEditVersionInput,
@@ -33,6 +29,7 @@ import {
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
+import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 /**
  * @typedef {object} OdClaimModalOptions
@@ -166,6 +163,8 @@ export function submitClaim() {
             krtModal.close(document.getElementById('claim-modal'));
             showFrontendSuccessToast(MSG_CLAIM_SUCCESS);
             _refreshMaterialsSection();
+            joborderHooks.refreshOrderSection?.('participations');
+            _publishOrdersQueue();
         },
     });
 }
@@ -192,119 +191,107 @@ export function withdrawClaimAction() {
     });
 }
 
-/** @type {string | null} */
-let _pendingStatus = null;
-/** @type {string | null} */
-let _previousStatus = null;
+/** @typedef {{orderId: string, status: string, version: number, previousStatus: string, select: HTMLSelectElement | null}} StatusChange */
+/** @type {StatusChange | null} */
+let pendingStatus = null;
 
 /**
- * Reads the status the select last had saved.
+ * Applies a lifecycle action using the version displayed with that control.
  *
- * @param {HTMLSelectElement} selectElement the status select
- * @returns {string} the saved status
+ * @param {HTMLSelectElement | HTMLButtonElement} control the status control
  */
-function _knownStatus(selectElement) {
-    const selectedOption = /** @type {HTMLOptionElement | null} */ (
-        selectElement.querySelector('option[selected]')
-    );
-    return (
-        selectElement.dataset.savedStatus ||
-        (selectedOption && selectedOption.value) ||
-        selectElement.options[0].value
-    );
-}
-
-/**
- * Applies a status chosen in the select, asking first for the terminal statuses.
- *
- * @param {HTMLSelectElement} selectElement the status select
- */
-export function updateStatus(selectElement) {
-    const newStatus = selectElement.value;
-    if (newStatus === 'COMPLETED' || newStatus === 'REJECTED') {
-        _pendingStatus = newStatus;
-        _previousStatus = _knownStatus(selectElement);
+export function updateStatus(control) {
+    const { orderId, version } = control.dataset;
+    const previousStatus = document.getElementById('order-head-meta')?.dataset.status;
+    if (!orderId || !version || !previousStatus) return;
+    const change = {
+        orderId,
+        status: control.value,
+        version: Number(version),
+        previousStatus,
+        select: control instanceof HTMLSelectElement ? control : null,
+    };
+    if (isTerminalStatus(change.status)) {
+        if (change.select) change.select.value = previousStatus;
+        pendingStatus = change;
         krtModal.open(document.getElementById('status-warning-modal'));
-    } else {
-        _doStatusUpdate(selectElement.dataset.orderId, newStatus, selectElement);
+        return;
     }
+    saveStatus(change);
 }
 
-/** Dismisses the terminal-status warning and restores the previous status. */
+/** Discards the pending lifecycle action. */
 export function cancelStatusChange() {
+    pendingStatus = null;
     krtModal.close(document.getElementById('status-warning-modal'));
-    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('status-select'));
-    if (sel && _previousStatus) {
-        sel.value = _previousStatus;
-    }
-    _pendingStatus = null;
-    _previousStatus = null;
 }
 
-/** Confirms the terminal-status warning and saves the pending status. */
+/** Confirms the lifecycle action with its observed version. */
 export function confirmStatusChange() {
+    const change = pendingStatus;
+    pendingStatus = null;
     krtModal.close(document.getElementById('status-warning-modal'));
-    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('status-select'));
-    if (!sel || !_pendingStatus) return;
-    _doStatusUpdate(sel.dataset.orderId, _pendingStatus, sel);
-    _pendingStatus = null;
-    _previousStatus = null;
+    if (change) saveStatus(change);
 }
 
 /**
- * Reads the order's current version from the status select, else from the edit modal.
+ * Identifies a status that releases earmarks and ends promises.
  *
- * @returns {number | null} the version, or null when neither carries one
+ * @param {string} status the order status
+ * @returns {boolean} whether the status ends active work
  */
-function _orderVersion() {
-    const sel = document.getElementById('status-select');
-    if (sel && sel.dataset.version != null && sel.dataset.version !== '') {
-        return parseInt(sel.dataset.version, 10);
-    }
-    const editVer = _odEditVersionInput();
-    return editVer && editVer.value ? parseInt(editVer.value, 10) : null;
+function isTerminalStatus(status) {
+    return status === 'COMPLETED' || status === 'REJECTED' || status === 'CANCELLED';
 }
 
 /**
- * Saves a new order status and refreshes the affected sections.
+ * Writes a lifecycle change and re-renders the affected sections from their current versions.
  *
- * @param {string | null | undefined} orderId the order
- * @param {string} status the new status
- * @param {HTMLSelectElement | null} selectElement the status select to revert on failure
+ * @param {StatusChange} change the observed control state
  */
-function _doStatusUpdate(orderId, status, selectElement) {
-    const savedStatus = selectElement ? _knownStatus(selectElement) : null;
+function saveStatus({ orderId, status, version, previousStatus, select }) {
+    const refresh =
+        isTerminalStatus(status) || isTerminalStatus(previousStatus)
+            ? [
+                  'header',
+                  'actions',
+                  'participations',
+                  'dialogs',
+                  'kpi',
+                  'materials',
+                  'aggregated',
+                  'items',
+                  'handovers',
+                  'item-handovers',
+              ]
+            : ['header'];
     krtOrderWrite({
         method: 'POST',
-        url: `/orders/${orderId}/status`,
-        payload() {
-            return { status, version: _orderVersion() };
-        },
+        url: `/orders/${encodeURIComponent(orderId)}/status`,
+        payload: { status, version },
         toast: false,
         errorMessage: MSG_STATUS_ERROR,
         sectionKey: 'header',
-        propagateVersion: true,
-        onSuccess(data) {
-            if (data && data.version != null && selectElement) {
-                const editVer = _odEditVersionInput();
-                if (editVer) editVer.value = data.version;
-            }
-            if (selectElement) selectElement.dataset.savedStatus = status;
-            _swapOrderSection(orderId, 'order-header-results', 'header');
-            if (status === 'COMPLETED' || status === 'REJECTED') {
-                document.querySelectorAll('.inventory-details-row').forEach((r) => {
-                    r.remove();
-                });
-                _refreshMaterialsSection(orderId);
-            }
+        refresh,
+        onSuccess() {
             _publishOrdersQueue();
             showFrontendSuccessToast(MSG_STATUS_SUCCESS);
         },
-    }).then((res) => {
-        if (selectElement && (!res || !res.ok)) {
-            selectElement.value = /** @type {string} */ (savedStatus);
-        }
+    }).then((result) => {
+        if (select && !result?.ok) select.value = previousStatus;
     });
+}
+
+/**
+ * Reads the order's need version for the blueprint-counting edit.
+ *
+ * @returns {number | null} the displayed need version, if present
+ */
+function _orderVersion() {
+    const version =
+        _odEditVersionInput()?.value ||
+        document.getElementById('order-head-meta')?.dataset.orderVersion;
+    return version ? Number(version) : null;
 }
 
 /**
@@ -328,14 +315,13 @@ export function _toggleBlueprintCounting(checkbox) {
         toast: false,
         errorMessage: MSG_BP_COUNTING_ERROR,
         sectionKey: 'header',
-        propagateVersion: true,
+        refresh: ['header', 'blueprint-owners'],
         onSuccess(data) {
             if (data && data.version != null) {
                 const editVer = _odEditVersionInput();
                 if (editVer) editVer.value = data.version;
             }
             showFrontendSuccessToast(MSG_BP_COUNTING_SUCCESS);
-            _swapOrderSection(orderId, 'blueprint-owners-section', 'blueprint-owners');
         },
     }).then((res) => {
         checkbox.disabled = false;

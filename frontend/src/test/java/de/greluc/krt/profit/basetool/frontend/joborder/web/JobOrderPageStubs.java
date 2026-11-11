@@ -219,7 +219,8 @@ final class JobOrderPageStubs {
           itemStock,
           orphanedInventory,
           List.of(),
-          claimingOptions);
+          claimingOptions,
+          JobOrderPageReader.Part.absent());
     }
   }
 

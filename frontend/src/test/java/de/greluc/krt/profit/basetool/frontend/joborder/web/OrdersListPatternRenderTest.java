@@ -140,7 +140,11 @@ class OrdersListPatternRenderTest {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     return new PageResponse<>(List.of(order), 0, 100, 1L, 1, List.of());
   }
 

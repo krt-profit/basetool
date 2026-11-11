@@ -209,11 +209,7 @@ public class MaterialPromiseCoordinator {
             capacities
                 .getOrDefault(scope.orderId(), Map.of())
                 .get(new Bucket(scope.materialId(), entry.getKey()));
-        boolean terminal =
-            entry.getValue().getFirst().getJobOrder().getStatus()
-                    == de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus.COMPLETED
-                || entry.getValue().getFirst().getJobOrder().getStatus()
-                    == de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus.REJECTED;
+        boolean terminal = !entry.getValue().getFirst().getJobOrder().getStatus().isActive();
         if (bucket == null || terminal) {
           for (MaterialClaim claim : entry.getValue()) {
             end(

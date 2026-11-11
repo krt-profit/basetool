@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectio
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
+import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -58,6 +59,7 @@ public class JobOrderPriorityService {
   private final ProfitHierarchyService profitHierarchy;
   private final JobOrderResponsibilityGuard responsibilityGuard;
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
+  private final EntityManager entityManager;
 
   /** Records the priority-change audit event (REQ-AUDIT-001). */
   private final AuditRecorder auditRecorder;
@@ -79,31 +81,23 @@ public class JobOrderPriorityService {
     profitHierarchy.lockForOrderWrite();
     JobOrder targetOrder =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
-    if (!jobOrderAccessPolicy.canEdit(targetOrder, JobOrderGate.EDIT)) {
-      throw new AccessDeniedException("Caller may not reorder this job order");
-    }
-    responsibilityGuard.assertWritable(targetOrder);
+    assertCanReorder(targetOrder);
+    final List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
+    entityManager.refresh(targetOrder);
+    assertCanReorder(targetOrder);
 
     Integer oldPriority = targetOrder.getPriority();
     if (oldPriority == null) {
-      throw new BadRequestException("Cannot update priority of a completed or rejected job order");
+      throw new BadRequestException("Cannot update priority without an active queue position");
     }
+    Set<UUID> validIds = responsibilityGuard.validOrderIds(allOrders);
+    List<JobOrder> ordered = orderedActive(allOrders, validIds);
     if (oldPriority.equals(newPriority)) {
-      normalizePriorities();
+      assignAvailablePriorities(ordered, allOrders, validIds);
       return jobOrderStockProjectionService.mapToDtoWithStock(targetOrder);
     }
 
-    List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
-    Set<UUID> validIds = responsibilityGuard.validOrderIds(allOrders);
-
-    List<JobOrder> activeOrders =
-        new ArrayList<>(
-            allOrders.stream()
-                .filter(o -> o.getPriority() != null && validIds.contains(o.getId()))
-                .sorted(
-                    Comparator.comparing(JobOrder::getPriority)
-                        .thenComparing(JobOrder::getCreatedAt))
-                .toList());
+    List<JobOrder> activeOrders = new ArrayList<>(ordered);
 
     activeOrders.remove(targetOrder);
 
@@ -131,15 +125,23 @@ public class JobOrderPriorityService {
    * flush it first.
    */
   public void normalizePriorities() {
-    List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
+    final List<JobOrder> allOrders = jobOrderRepository.lockAllJobOrders();
     Set<UUID> validIds = responsibilityGuard.validOrderIds(allOrders);
-    List<JobOrder> activeOrders =
-        allOrders.stream()
-            .filter(o -> o.getPriority() != null && validIds.contains(o.getId()))
-            .sorted(
-                Comparator.comparing(JobOrder::getPriority).thenComparing(JobOrder::getCreatedAt))
-            .toList();
-    assignAvailablePriorities(activeOrders, allOrders, validIds);
+    assignAvailablePriorities(orderedActive(allOrders, validIds), allOrders, validIds);
+  }
+
+  private void assertCanReorder(JobOrder order) {
+    if (!jobOrderAccessPolicy.canEdit(order, JobOrderGate.EDIT)) {
+      throw new AccessDeniedException("Caller may not reorder this job order");
+    }
+    responsibilityGuard.assertWritable(order);
+  }
+
+  private static List<JobOrder> orderedActive(List<JobOrder> orders, Set<UUID> validIds) {
+    return orders.stream()
+        .filter(order -> order.getPriority() != null && validIds.contains(order.getId()))
+        .sorted(Comparator.comparing(JobOrder::getPriority).thenComparing(JobOrder::getCreatedAt))
+        .toList();
   }
 
   private static void assignAvailablePriorities(

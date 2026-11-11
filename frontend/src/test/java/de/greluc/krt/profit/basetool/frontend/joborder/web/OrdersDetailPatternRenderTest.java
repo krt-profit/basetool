@@ -63,6 +63,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Renders the order detail page on the detail pattern (REQ-UI-027, REQ-ORDERS-026): the back-link
@@ -217,6 +219,116 @@ class OrdersDetailPatternRenderTest {
         .doesNotContain("data-modal-id=\"edit-modal\"");
   }
 
+  /** Renders the requester cancellation with its own version and without processing controls. */
+  @Test
+  void requesterCanCancelWithTheLifecycleVersion() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    JobOrderDto order =
+        JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build()
+            .readValue(
+                """
+                {
+                  "id": "%s",
+                  "displayId": 7,
+                  "type": "MATERIAL",
+                  "status": "OPEN",
+                  "version": 17,
+                  "lifecycleVersion": 8,
+                  "canCancel": true,
+                  "canEditAsRequester": true
+                }
+                """
+                    .formatted(orderId),
+                JobOrderDto.class);
+    stubOrder(order);
+
+    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+        .containsPattern("data-testid=\"order-cancel\"[^>]*data-version=\"8\"")
+        .doesNotContain("id=\"status-select\"")
+        .doesNotContain("data-testid=\"order-reopen\"");
+  }
+
+  /** A cancelled order retains its recorded handover without an active fulfillment action. */
+  @Test
+  void cancelledOrderKeepsHandoverHistoryWithoutRecordingControls() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
+    UUID orderId = UUID.randomUUID();
+    MaterialDto titanium = material("Titanium");
+    stubOrder(
+        order(
+            orderId,
+            "MATERIAL",
+            "CANCELLED",
+            List.of(materialLine(titanium, 300.0)),
+            List.of(),
+            List.of(handover(orderId, titanium, 100.0)),
+            false));
+
+    assertThat(render(orderId, "ROLE_LOGISTICIAN"))
+        .contains("data-testid=\"order-handover-row\"", "data-testid=\"order-progress\"")
+        .doesNotContain("data-testid=\"order-handover-open\"", "id=\"handover-form\"");
+  }
+
+  /** Displays permitted Staffel support actions and keeps ended participation visible. */
+  @Test
+  void supportActionsFollowTheBackendProjection() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    stubOrder(order(orderId, "MATERIAL", "OPEN", List.of(), List.of(), List.of(), true));
+    String support =
+        """
+        {
+          "participations": [
+            {
+              "id": "00000000-0000-0000-0000-000000000001",
+              "unit": {
+                "orgUnitId": "00000000-0000-0000-0000-000000000011",
+                "orgUnitName": "Own support",
+                "orgUnitShorthand": "OWN",
+                "kind": "SQUADRON"
+              },
+              "version": 9, "active": true, "canWithdraw": true
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000002",
+              "unit": {
+                "orgUnitId": "00000000-0000-0000-0000-000000000012",
+                "orgUnitName": "Past support",
+                "orgUnitShorthand": "PAST",
+                "kind": "SQUADRON"
+              },
+              "version": 17, "active": false, "canWithdraw": false
+            }
+          ],
+          "enrollmentOptions": [
+            {
+              "orgUnitId": "00000000-0000-0000-0000-000000000013",
+              "orgUnitName": "Joining Staffel",
+              "orgUnitShorthand": "JOIN",
+              "kind": "SQUADRON"
+            }
+          ]
+        }
+        """;
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/participations"),
+            org.mockito.ArgumentMatchers.<Class<Object>>any(),
+            eq(orderId)))
+        .thenAnswer(call ->
+            JsonMapper.builder().build().readValue(support, call.<Class<Object>>getArgument(1)));
+
+    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+        .contains(
+            "data-testid=\"order-support-enroll\"",
+            "Joining Staffel",
+            "Own support",
+            "Past support")
+        .containsPattern("data-testid=\"order-support-withdraw\"[^>]*data-version=\"9\"")
+        .doesNotContainPattern("data-testid=\"order-support-withdraw\"[^>]*data-version=\"17\"")
+        .doesNotContain("id=\"status-select\"");
+  }
+
   /**
    * Stubs the order read the detail page issues first.
    *
@@ -308,7 +420,11 @@ class OrdersDetailPatternRenderTest {
         false,
         false,
         !readOnly,
-        false);
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   /**

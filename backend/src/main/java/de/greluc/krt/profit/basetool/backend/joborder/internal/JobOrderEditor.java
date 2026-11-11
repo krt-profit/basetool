@@ -142,11 +142,11 @@ public class JobOrderEditor {
   }
 
   /**
-   * Runs an edit whose request carries no version and whose caller needs no projection.
+   * Runs a resource-planned edit without a client version or response projection.
    *
    * @param id the order to edit
    * @param gate the access the edit demands
-   * @param mutation the change to apply to the managed order
+   * @param planner the complete resources and managed order mutation
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the order is
    *     unknown
    * @throws AccessDeniedException when the caller fails the gate
@@ -155,8 +155,8 @@ public class JobOrderEditor {
   public void editWithoutProjection(
       @NotNull UUID id,
       @NotNull JobOrderGate gate,
-      @NotNull Function<JobOrder, JobOrderEdit> mutation) {
-    run(id, gate, false, null, _ -> JobOrderEditPlan.of(mutation));
+      @NotNull Function<JobOrder, JobOrderEditPlan> planner) {
+    run(id, gate, false, null, planner);
   }
 
   /**
@@ -216,6 +216,8 @@ public class JobOrderEditor {
     }
     if (planned.prioritySequence()) {
       jobOrderRepository.lockAllJobOrders();
+    } else {
+      jobOrderRepository.lockForScopedEdit(id);
     }
     entityManager.refresh(order);
     authorize(order, gate, versioned, expectedVersion);
@@ -254,7 +256,13 @@ public class JobOrderEditor {
       throw new AccessDeniedException("Caller may not edit job order " + order.getId());
     }
     if (versioned) {
-      OptimisticLock.check(order.getVersion(), expectedVersion, JobOrder.class, order.getId());
+      Long currentVersion =
+          switch (gate) {
+            case CANCEL, SET_OPEN, STATUS -> order.getLifecycleVersion();
+            case TRANSFER -> order.getResponsibilityVersion();
+            default -> order.getVersion();
+          };
+      OptimisticLock.check(currentVersion, expectedVersion, JobOrder.class, order.getId());
     }
   }
 }

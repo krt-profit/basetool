@@ -86,29 +86,37 @@ class MaterialTest {
   @Test
   void testCreateMaterial_Admin_Allowed() throws Exception {
     Material material = new Material();
-    material.setName("New Material");
+    material.setName("New Material " + UUID.randomUUID());
     material.setDescription("Valuable");
     material.setType(MaterialType.RAW);
     material.setQuantityType(QuantityType.SCU);
 
-    mockMvc
-        .perform(
-            post("/api/v1/materials")
-                .with(
-                    jwt()
-                        .jwt(builder -> builder.subject(adminUser.getId().toString()))
-                        .authorities(
-                            new SimpleGrantedAuthority("ROLE_ADMIN"),
-                            new SimpleGrantedAuthority("USER_MANAGE"),
-                            new SimpleGrantedAuthority("MISSION_MANAGE"),
-                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
-                            new SimpleGrantedAuthority("REFINERY_MANAGE")))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(material)))
-        .andExpect(status().isOk());
+    String response =
+        mockMvc
+            .perform(
+                post("/api/v1/materials")
+                    .with(
+                        jwt()
+                            .jwt(builder -> builder.subject(adminUser.getId().toString()))
+                            .authorities(
+                                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                                new SimpleGrantedAuthority("USER_MANAGE"),
+                                new SimpleGrantedAuthority("MISSION_MANAGE"),
+                                new SimpleGrantedAuthority("HANGAR_MANAGE"),
+                                new SimpleGrantedAuthority("REFINERY_MANAGE")))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(material)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
 
-    assertEquals(1, materialRepository.findAll().size());
-    assertEquals("New Material", materialRepository.findAll().get(0).getName());
+    UUID createdId = UUID.fromString(objectMapper.readTree(response).path("id").asString());
+    Material created = materialRepository.findById(createdId).orElseThrow();
+    assertEquals(material.getName(), created.getName());
+    assertEquals(material.getDescription(), created.getDescription());
+    assertEquals(MaterialType.RAW, created.getType());
+    assertEquals(QuantityType.SCU, created.getQuantityType());
   }
 
   @Test

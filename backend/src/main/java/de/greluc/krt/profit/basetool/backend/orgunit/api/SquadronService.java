@@ -157,10 +157,11 @@ public class SquadronService {
     }
     Squadron squadron = getSquadronById(id);
     boolean wasActive = squadron.isActive();
+    final ProfitHierarchySnapshot previousEligibility = profitHierarchy.snapshot();
     squadron.setActive(false);
     orgStructureAuditor.activeChanged(squadronRepository.save(squadron), wasActive);
     squadronRepository.flush();
-    eligibilityMaintenance.eligibilityChanged(squadron);
+    eligibilityMaintenance.eligibilityChanged(squadron, previousEligibility);
   }
 
   /**
@@ -174,9 +175,10 @@ public class SquadronService {
     profitHierarchy.lockForHierarchyChange();
     Squadron squadron = getSquadronById(id);
     boolean wasActive = squadron.isActive();
+    final ProfitHierarchySnapshot previousEligibility = profitHierarchy.snapshot();
     squadron.setActive(true);
     orgStructureAuditor.activeChanged(squadronRepository.save(squadron), wasActive);
     squadronRepository.flush();
-    eligibilityMaintenance.eligibilityChanged(squadron);
+    eligibilityMaintenance.eligibilityChanged(squadron, previousEligibility);
   }
 }

@@ -167,7 +167,7 @@ class JobOrderAssigneeGrantIntegrationTest {
     as(
             put(ORDERS + orderId + "/status")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"IN_PROGRESS\",\"version\":" + orderVersion() + "}"),
+                .content("{\"status\":\"IN_PROGRESS\",\"version\":" + lifecycleVersion() + "}"),
             assigneeId,
             "ROLE_LOGISTICIAN")
         .andExpect(status().isForbidden());
@@ -201,7 +201,7 @@ class JobOrderAssigneeGrantIntegrationTest {
     as(
             put(ORDERS + orderId + "/status")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"COMPLETED\",\"version\":" + orderVersion() + "}"),
+                .content("{\"status\":\"COMPLETED\",\"version\":" + lifecycleVersion() + "}"),
             adminId,
             "ROLE_ADMIN")
         .andExpect(status().isOk());
@@ -436,6 +436,10 @@ class JobOrderAssigneeGrantIntegrationTest {
         request
             .with(jwt().jwt(token -> token.subject(userId.toString())).authorities(authorities))
             .accept(MediaType.APPLICATION_JSON));
+  }
+
+  private long lifecycleVersion() {
+    return jobOrderRepository.findById(orderId).orElseThrow().getLifecycleVersion();
   }
 
   private long orderVersion() {
