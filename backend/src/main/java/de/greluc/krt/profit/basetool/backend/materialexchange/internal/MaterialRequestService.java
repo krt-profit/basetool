@@ -176,9 +176,9 @@ public class MaterialRequestService {
     MaterialExchangeRequest entity = new MaterialExchangeRequest();
     entity.setKind(MaterialExchangeRequestKind.ITEM);
     subject.applyTo(entity);
+    entity.setOwner(owner);
     entity.setItemQuantity(request.quantity());
     entity.setMinQuality(request.minQuality());
-    entity.setOwner(owner);
     entity.setOwningOrgUnit(requestScopeResolver.currentOrgUnit().orElse(null));
     entity.setRemark(request.remark());
     entity.setStatus(MaterialExchangeRequestStatus.ACTIVE);

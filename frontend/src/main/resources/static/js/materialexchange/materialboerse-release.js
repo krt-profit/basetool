@@ -25,6 +25,8 @@ import {
     renderItemOption,
 } from '/js/materialexchange/exchange-item-options.js';
 
+/** @import { ExchangeItemOption } from '/js/materialexchange/exchange-item-options.js' */
+
 function initMaterialboerseRelease() {
     /**
      * The seed values `open` takes from its caller; absent fields are blank.
@@ -97,7 +99,7 @@ function initMaterialboerseRelease() {
 
     /** @type {MaterialPickerItem[]} */
     let pickerItems = [];
-    /** @type {import('/js/materialexchange/exchange-item-options.js').ExchangeItemOption[]} */
+    /** @type {ExchangeItemOption[]} */
     let itemOptions = [];
     /** @type {HTMLElement | null} */
     let lastFocused = null;

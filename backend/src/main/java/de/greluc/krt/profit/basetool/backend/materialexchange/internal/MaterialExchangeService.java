@@ -257,9 +257,9 @@ public class MaterialExchangeService {
 
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setKind(MaterialExchangeOfferKind.ITEM);
+    subject.applyTo(offer);
     offer.setOwner(owner);
     offer.setOwningOrgUnit(requestScopeResolver.currentOrgUnit().orElse(null));
-    subject.applyTo(offer);
     offer.setItemQuantity(request.quantity());
     offer.setRemark(request.remark());
     offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
