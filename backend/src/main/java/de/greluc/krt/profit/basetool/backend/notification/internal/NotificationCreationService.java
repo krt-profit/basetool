@@ -60,7 +60,8 @@ public class NotificationCreationService {
   @Transactional
   public @NotNull Set<UUID> createFromEvent(@NotNull NotificationEvent event) {
     var prepared = eventPreparation.resolve(event);
-    Set<UUID> changed = new HashSet<>(eventPreparation.removeObsolete(prepared));
+    Set<UUID> changed = new HashSet<>(eventPreparation.removeCaptured(event));
+    changed.addAll(eventPreparation.removeObsolete(prepared));
     List<Notification> notices = eventPreparation.missing(prepared);
     persist(notices);
     recordCreated(counts(notices));
@@ -85,6 +86,7 @@ public class NotificationCreationService {
             .map(eventPreparation::resolve)
             .toList();
     Set<UUID> changed = new HashSet<>();
+    cause.events().forEach(event -> changed.addAll(eventPreparation.removeCaptured(event)));
     prepared.forEach(event -> changed.addAll(eventPreparation.removeObsolete(event)));
     Map<UUID, Notification> selected = new LinkedHashMap<>();
     for (var event : prepared) {

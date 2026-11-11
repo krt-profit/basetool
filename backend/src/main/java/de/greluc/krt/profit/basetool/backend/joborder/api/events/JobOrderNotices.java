@@ -45,7 +45,7 @@ public final class JobOrderNotices {
   private static final String UNKNOWN = ActorRef.UNKNOWN_NAME;
 
   /** Notice types whose action may become obsolete when the order's state changes. */
-  static final Set<NotificationType> ACTION_PROMPTS =
+  public static final Set<NotificationType> ACTION_PROMPTS =
       Set.of(
           NotificationType.JOB_ORDER_CREATED,
           NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER,

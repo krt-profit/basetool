@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationPromptCleanup;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
@@ -63,6 +64,18 @@ public class JobOrderChangeEffects {
   private final AuthHelperService auth;
   private final ApplicationEventPublisher events;
   private final LiveSyncPublisher liveSync;
+  private final NotificationPromptCleanup notificationCleanup;
+
+  /**
+   * Captures existing action prompts while the caller holds the order lock.
+   *
+   * @param orderId the closing order
+   * @return the exact prompts the closing revision supersedes
+   */
+  public @NotNull Set<UUID> captureActionPromptIds(@NotNull UUID orderId) {
+    return notificationCleanup.capture(
+        JobOrderNotices.ACTION_PROMPTS, JobOrderCreatedEvent.ENTITY_TYPE, orderId);
+  }
 
   /** Registers the collector before final material reconciliation can produce further changes. */
   public void prepare() {

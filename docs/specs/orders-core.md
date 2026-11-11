@@ -196,6 +196,8 @@ deleting physical stock, booked
 production or history. It ends open promises. A new stock earmark requires reopening a cancelled order. aUEC cancellation, residual money, corrections,
 returns and reopening follow its own spec. A completed MATERIAL/ITEM may therefore truthfully
 show unmet quantities; the UI must not imply full physical delivery.
+Lifecycle changes refresh a peer's support actions on the order page, including when the order has
+no open promises.
 
 **Acceptance**
 

@@ -837,10 +837,9 @@ registration stays pending — and clears nothing.
 **JobOrder processing prompts.** Closing, transferring or invalidating responsibility retires the
 superseded prompts for that order. Restoring eligibility clears the clarification prompt. The
 owning guard checks current responsibility and applicable scoped revisions under the hierarchy and
-order locks before grouped delivery applies each actionable event's notice or cleanup. An event
-superseded by a lifecycle or responsibility transition cannot recreate its earlier prompt or
-remove the current transition's prompt. Historical outcomes and material facts in the same cause
-retain their independent delivery policies.
+order locks before grouped delivery applies actionable events. Closure captures the existing
+obsolete notice IDs under the order lock and removes exactly those notices after commit.
+Historical outcomes and material facts in the same cause retain their independent delivery policies.
 
 **Acceptance**
 
@@ -850,7 +849,8 @@ retain their independent delivery policies.
 - [x] One admin's decision on a registration, or its deletion while pending, clears every admin's
   `DISCORD_REGISTRATION_PENDING` item for it.
 - [ ] Completing, rejecting, cancelling or deleting a job order clears its outstanding processing
-  prompts. A delayed creation cause leaves the cancelled order's informational outcome intact.
+  prompts. A delayed closure clears those prompts even after a subsequent lifecycle change and
+  preserves newer action prompts and historical outcomes.
 - [x] The affected staff are included in the pushed recipient set so their badge/dropdown refresh
   live; the removal runs even when the event resolves no new recipients (cancel).
 - [x] Adding the `BANK_BOOKING_REQUEST_CANCELLED` event type and the `resolvesNotificationTypes()`

@@ -337,11 +337,10 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Lightweight reference projection of the active orders the caller may see, for typeaheads and
-   * pickers.
+   * Returns references to active material and item orders the caller may see in stock pickers.
    *
    * @param withNeeds whether to include each order's outstanding per-material need (REQ-INV-039)
-   * @return active job orders the caller may see, as reference DTOs
+   * @return visible active material and item orders
    */
   public List<JobOrderReferenceDto> findAllActiveReference(boolean withNeeds) {
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);

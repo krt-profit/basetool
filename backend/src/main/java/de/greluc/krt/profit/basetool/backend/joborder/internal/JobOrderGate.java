@@ -49,9 +49,5 @@ public enum JobOrderGate {
   TRANSFER,
 
   /** The caller is an administrator independently of the queue-reading capability. */
-  ADMIN_DELETE;
-
-  boolean usesLifecycleVersion() {
-    return this == STATUS || this == CANCEL || this == SET_OPEN;
-  }
+  ADMIN_DELETE
 }

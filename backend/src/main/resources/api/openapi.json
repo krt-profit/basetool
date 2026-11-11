@@ -47201,7 +47201,7 @@
     },
     "/api/v1/orders/by-number" : {
       "get" : {
-        "description" : "Returns the orders whose number starts with the given digits that the caller may open: the scoped order list and the orders the caller is an assignee of.",
+        "description" : "Returns orders whose number starts with the given digits and that the caller may open through scoped access, an assignment, or a linked money holding.",
         "operationId" : "findByNumber",
         "parameters" : [ {
           "in" : "query",
@@ -47561,7 +47561,7 @@
     },
     "/api/v1/orders/lookup" : {
       "get" : {
-        "description" : "Returns a reference list of active job orders. With withNeeds=true every order also carries its outstanding need per material bucket, for the Lager allocation pickers.",
+        "description" : "Returns active material and item orders. With withNeeds=true each order also carries its outstanding need per material bucket.",
         "operationId" : "lookupJobOrders",
         "parameters" : [ {
           "in" : "query",
@@ -47679,7 +47679,7 @@
             "description" : "Internal Server Error"
           }
         },
-        "summary" : "Lookup active job orders",
+        "summary" : "Lookup active job orders for stock pickers",
         "tags" : [ "joborder" ],
         "x-domain" : "joborder"
       }

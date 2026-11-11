@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import static de.greluc.krt.profit.basetool.backend.support.JobOrderParticipationFixtures.persistedParticipation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -50,6 +51,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipa
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
@@ -88,6 +90,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -122,6 +126,7 @@ class ProfitHierarchyNoticeIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private NotificationService inbox;
   @Autowired private NotificationCreationService notificationCreation;
+  @Autowired private NotificationRepository notificationRepository;
   @Autowired private ApplicationEvents events;
 
   private MockMvc mvc;
@@ -187,11 +192,20 @@ class ProfitHierarchyNoticeIntegrationTest {
   @Test
   void cancellationAndReopeningNotifyBothSidesAndRetireTheCreationPrompt() throws Exception {
     Number version = JsonPath.read(createAffectedOrder(), "$.lifecycleVersion");
+    String supportPath = "/api/v1/orders/" + createdOrder + "/participations";
+    String claimingOption = "$.enrollmentOptions[?(@.orgUnitId == '" + fixture.claiming() + "')]";
+    as(Audience.RESPONSIBLE_WRITER, get(supportPath), fixture.responsible())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.participations").isEmpty())
+        .andExpect(jsonPath(claimingOption).isNotEmpty());
     await()
         .atMost(Duration.ofSeconds(10))
         .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED"));
 
     String cancelled = changeLifecycle(Audience.ACTOR, fixture.claiming(), "CANCELLED", version);
+    as(Audience.RESPONSIBLE_WRITER, get(supportPath), fixture.responsible())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.enrollmentOptions").isEmpty());
 
     await()
         .atMost(Duration.ofSeconds(10))
@@ -209,6 +223,9 @@ class ProfitHierarchyNoticeIntegrationTest {
 
     Number cancelledVersion = JsonPath.read(cancelled, "$.lifecycleVersion");
     changeLifecycle(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "OPEN", cancelledVersion);
+    as(Audience.RESPONSIBLE_WRITER, get(supportPath), fixture.responsible())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath(claimingOption).isNotEmpty());
 
     await()
         .atMost(Duration.ofSeconds(10))
@@ -322,6 +339,48 @@ class ProfitHierarchyNoticeIntegrationTest {
 
     deliverDelayedClosure(closure);
     assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_REOPENED");
+  }
+
+  @Test
+  void delayedClosureClearsTheOldPromptAfterAnotherTerminalStatus() throws Exception {
+    String completed = completeWithDelayedNotices();
+    changeLifecycle(
+        Audience.RESPONSIBLE_WRITER,
+        fixture.responsible(),
+        "REJECTED",
+        JsonPath.read(completed, "$.lifecycleVersion"));
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED");
+
+    deliverDelayed(originalCause(NotificationEventType.JOB_ORDER_CLOSED));
+
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER);
+    assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED");
+  }
+
+  @Test
+  void delayedClosureClearsTheOldPromptAndKeepsANewActiveNeedPrompt() throws Exception {
+    String completed = completeWithDelayedNotices();
+    String opened =
+        changeLifecycle(
+            Audience.RESPONSIBLE_WRITER,
+            fixture.responsible(),
+            "OPEN",
+            JsonPath.read(completed, "$.lifecycleVersion"));
+    changeNeed(
+        Audience.ACTOR, fixture.claiming(), "/requested", JsonPath.read(opened, "$.version"), 7);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() ->
+            assertNoticeTypes(
+                Audience.RESPONSIBLE_WRITER,
+                "JOB_ORDER_CREATED",
+                "JOB_ORDER_UPDATED_BY_REQUESTER"));
+
+    deliverDelayed(originalCause(NotificationEventType.JOB_ORDER_CLOSED));
+
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_UPDATED_BY_REQUESTER");
+    assertNoticeTypes(
+        Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_UPDATED_BY_REQUESTER");
   }
 
   @Test
@@ -792,6 +851,29 @@ class ProfitHierarchyNoticeIntegrationTest {
                     event -> event.eventType() == type && createdOrder.equals(event.entityId())))
         .findFirst()
         .orElseThrow();
+  }
+
+  private String completeWithDelayedNotices() throws Exception {
+    Number version = JsonPath.read(createAffectedOrder(), "$.lifecycleVersion");
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED"));
+
+    return transactions.execute(_ -> {
+      String completed =
+          assertDoesNotThrow(() ->
+              changeLifecycle(
+                  Audience.RESPONSIBLE_WRITER, fixture.responsible(), "COMPLETED", version));
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void beforeCommit(boolean readOnly) {
+              notificationRepository.claimCause(
+                  originalCause(NotificationEventType.JOB_ORDER_CLOSED).id());
+            }
+          });
+      return completed;
+    });
   }
 
   private void deliverDelayed(NotificationCause cause) {

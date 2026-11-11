@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.backend.joborder.api.events;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
@@ -39,12 +38,26 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param jobOrderId the closed order; the loose entity id of the cleared items
  * @param actorSub the member who closed it, or {@code null} when none is known
  * @param observedRevision the order revisions at closure
+ * @param resolvesNotificationIds the action prompt IDs observed under the order lock
  */
 public record JobOrderClosedEvent(
     @NotNull UUID jobOrderId,
     @Nullable UUID actorSub,
-    @NotNull NotificationRevision observedRevision)
+    @NotNull NotificationRevision observedRevision,
+    @NotNull @Unmodifiable Set<UUID> resolvesNotificationIds)
     implements NotificationEvent {
+
+  /**
+   * Captures the immutable cleanup scope.
+   *
+   * @param jobOrderId the closed order
+   * @param actorSub the member who closed it, if known
+   * @param observedRevision the order revisions at closure
+   * @param resolvesNotificationIds the order's observed action prompt IDs
+   */
+  public JobOrderClosedEvent {
+    resolvesNotificationIds = Set.copyOf(resolvesNotificationIds);
+  }
 
   @NotNull
   @Override
@@ -76,17 +89,5 @@ public record JobOrderClosedEvent(
   @Override
   public Map<String, String> renderParams() {
     return Map.of();
-  }
-
-  /**
-   * The order needs no more action, so its open order notices are stale.
-   *
-   * @return open processing and clarification notice types for the settled order
-   */
-  @NotNull
-  @Unmodifiable
-  @Override
-  public Set<NotificationType> resolvesNotificationTypes() {
-    return JobOrderNotices.ACTION_PROMPTS;
   }
 }

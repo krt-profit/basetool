@@ -37,6 +37,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class JobOrderMoneyEffects {
 
+  static final List<String> LIFECYCLE_SECTIONS =
+      List.of("money", "header", "actions", "dialogs", "kpi", "participations");
+
   private final LiveSyncPublisher live;
   private final ApplicationEventPublisher events;
 
@@ -49,9 +52,7 @@ class JobOrderMoneyEffects {
       boolean newLinkedHolder) {
     live.publishAfterCommit(
         LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
-        started
-            ? List.of("money", "header", "actions", "kpi", "participations")
-            : List.of("money"));
+        started ? LIFECYCLE_SECTIONS : List.of("money"));
     if (started || newLinkedHolder) {
       live.publishAfterCommit(
           LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));

@@ -75,6 +75,17 @@ public class NotificationEventPreparation {
   }
 
   @NotNull
+  Set<UUID> removeCaptured(@NotNull NotificationEvent event) {
+    Set<UUID> ids = event.resolvesNotificationIds();
+    if (ids.isEmpty() || event.entityType() == null || event.entityId() == null) {
+      return Set.of();
+    }
+    return Set.copyOf(
+        notificationRepository.deleteCapturedNoticesReturningRecipients(
+            ids, event.entityType(), event.entityId()));
+  }
+
+  @NotNull
   List<Notification> missing(@NotNull Prepared prepared) {
     if (prepared.recipients().isEmpty()) {
       return List.of();

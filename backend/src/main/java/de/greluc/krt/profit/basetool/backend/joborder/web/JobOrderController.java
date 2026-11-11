@@ -206,19 +206,17 @@ public class JobOrderController {
   }
 
   /**
-   * Returns an id-and-label projection of the non-terminal job orders for typeaheads, optionally
-   * with each order's outstanding per-material need (REQ-INV-039).
+   * Returns non-terminal material and item order references for stock pickers.
    *
    * @param withNeeds whether to include each order's outstanding per-material need
-   * @return active job orders as reference DTOs
+   * @return active material and item orders as reference DTOs
    */
   @GetMapping("/lookup")
   @Operation(
-      summary = "Lookup active job orders",
+      summary = "Lookup active job orders for stock pickers",
       description =
-          "Returns a reference list of active job orders. With withNeeds=true every order also"
-              + " carries its outstanding need per material bucket, for the Lager allocation"
-              + " pickers.")
+          "Returns active material and item orders. With withNeeds=true each order also carries"
+              + " its outstanding need per material bucket.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<JobOrderReferenceDto> lookupJobOrders(

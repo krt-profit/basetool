@@ -75,7 +75,9 @@ authorised history stay with the order.
 Completion, rejection, cancellation and deletion use `JOB_ORDER_FINISHED` for current requesting and
 responsible writers and active assigned accounts. The coded `statusCode` renders the specific outcome
 (REQ-NOTIF-028). A deleted order carries the `JOB_ORDER_DELETED` entity tag and has no detail link.
-Closing clears outstanding order prompts through `JOB_ORDER_CLOSED`.
+Closing clears the order prompts present at that transition through `JOB_ORDER_CLOSED`.
+The cleanup applies after commit even if the order has since changed status. Prompts created for
+later work and historical outcome notices remain.
 
 Reopening uses the same functional and assigned audience through `JOB_ORDER_REOPENED`. Manual
 MATERIAL or ITEM completion may leave unmet quantities in the order's retained facts.
@@ -111,6 +113,7 @@ actor. Already ended promises and unchanged eligibility do not produce a duplica
 - [ ] Transfer reaches the affected units once and retires the earlier responsibility prompts.
 - [ ] Lifecycle changes and clarification reach current unit writers and active assigned accounts.
 - [ ] Delivery of a delayed cause cannot restore an action prompt superseded by a committed change.
+- [ ] Delayed closure retires its obsolete prompts and preserves prompts for later work.
 - [ ] Material reductions, support changes and their derived outcomes remain one notice per
   recipient and order revision under the eligible original preferences.
 - [ ] Assignment removal clears the affected account's assignment prompt.

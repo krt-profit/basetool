@@ -224,6 +224,17 @@ public interface NotificationEvent {
   }
 
   /**
+   * Exact notices about this entity that the originating transaction marks obsolete.
+   *
+   * @return the captured notice identities, or an empty set if none are captured
+   */
+  @NotNull
+  @Unmodifiable
+  default Set<UUID> resolvesNotificationIds() {
+    return Set.of();
+  }
+
+  /**
    * The members whose notice about this event's entity is decided afresh, for an event that
    * reconciles an existing notice instead of raising a new one (REQ-NOTIF-023).
    *
