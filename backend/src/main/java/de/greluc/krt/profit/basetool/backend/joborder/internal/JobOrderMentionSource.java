@@ -83,6 +83,8 @@ public class JobOrderMentionSource implements PersonMentionSource {
         "job_order.type",
         "job_order_handover_item.location_name",
         "job_order_money_operation.selection_kind",
+        // Commitment change reasons are enum codes.
+        "job_order_money_commitment_change.reason",
         "job_order_money_operation.kind",
         // The database accepts only the MaterialProvisionEvidence enum codes.
         "material_provision_credit.evidence");
