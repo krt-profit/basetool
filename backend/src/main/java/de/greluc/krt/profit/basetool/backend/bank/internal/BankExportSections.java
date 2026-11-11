@@ -122,6 +122,24 @@ public class BankExportSections implements PersonalDataExportSection {
                 """)
             .scrubbing("note", "justification"),
         new Section(
+            413,
+            "bankRequestsAsCustodian",
+            ART_15,
+            "Linked booking requests that name the member as a custodian.",
+            """
+            SELECT r.type, r.amount, r.status, r.created_at, r.decided_at,
+                   (h.id = r.requested_holder_id AND
+                    r.type IN ('WITHDRAWAL', 'TRANSFER', 'HOLDER_TRANSFER'))
+                       AS member_is_source_custodian,
+                   (r.type = 'DEPOSIT' OR h.id IS NOT DISTINCT FROM r.requested_target_holder_id)
+                       AS member_is_destination_custodian,
+                   (r.type = 'AUTHORISATION') AS member_is_funding_custodian
+            FROM bank_booking_request r JOIN bank_holder h
+              ON h.id = r.requested_holder_id OR h.id = r.requested_target_holder_id
+            WHERE h.user_id = :userId
+            ORDER BY r.created_at, r.id
+            """),
+        new Section(
             415,
             "bankFundsAuthorisations",
             ART_15,

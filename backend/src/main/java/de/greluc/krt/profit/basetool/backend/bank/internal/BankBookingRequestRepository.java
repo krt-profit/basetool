@@ -60,14 +60,23 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   long countByStatus(BankBookingRequestStatus status);
 
   /**
-   * Counts one requester's requests in the given status, whichever channel raised them; the
-   * open-request cap of the exchange counts the {@code PENDING} ones (REQ-BXCH-004).
+   * Counts a requester's requests in the Exchange projection for its cap (REQ-BXCH-004).
    *
-   * @param requestedBy the requesting user's id
+   * @param requestedBy the applicant
    * @param status the lifecycle state to count
-   * @return the number of the requester's requests in that status
+   * @param excludedPurpose the purpose outside the connected-application scope
+   * @return the number of Exchange-visible requests in that state
    */
-  long countByRequestedByAndStatus(UUID requestedBy, BankBookingRequestStatus status);
+  @Query(
+      """
+      SELECT COUNT(r) FROM BankBookingRequest r
+      WHERE r.requestedBy = :requestedBy AND r.status = :status AND
+      """
+          + EXCHANGE_PURPOSE)
+  long countExchangeByRequesterAndStatus(
+      @Param("requestedBy") UUID requestedBy,
+      @Param("status") BankBookingRequestStatus status,
+      @Param("excludedPurpose") BankPurposeKind excludedPurpose);
 
   /**
    * Takes the requester's open-request-cap lock, which the transaction holds until it ends, so two

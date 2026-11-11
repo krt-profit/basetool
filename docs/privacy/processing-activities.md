@@ -87,7 +87,9 @@ requires it and duplicating it into further files spreads personal data for no g
   Linked requests record the applicant and the actual depositor or payee, including a named
   counterparty without a tool account. Authorisation records identify the deciding member and
   custodian alongside the funding account, amount and time. The member's data export shows their
-  own participation in an authorisation without identifying the other participant.
+  own participation in an authorisation. For linked requests in any state, it shows the member's
+  own roles as source, destination or funding custodian with the amount, status and dates.
+  These export sections omit other participants' identities and private notes.
 - **Legal basis:** Art. 6(1)(f) — traceability and integrity of the organisation's financial records.
 - **Where:** `bank_*`.
 - **Retention:** the link to the account is cleared on deletion; the historic handle stays in the

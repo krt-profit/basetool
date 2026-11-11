@@ -3447,8 +3447,8 @@ REQ-BANK-038, REQ-BANK-056
 > internal attempt identity. The own snapshot, change feed and staff queue cover the existing
 > connected-client request scope. They omit aUEC Order-linked requests, including feed tombstones.
 > Correction and cancellation of a linked request through a connected client answer the shared
-> `404`. The connected-client raise cap still counts pending requests across channels. Posted
-> Bank transactions follow the existing account views and redactions.
+> `404`. The connected-client raise cap counts the pending requests in its own snapshot across
+> channels. Posted Bank transactions follow the existing account views and redactions.
 
 A booking request a connected application raised through the exchange (REQ-BXCH-004) records that
 application in `bank_booking_request.client_id`, the registry client id the exchange gate admitted;

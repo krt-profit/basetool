@@ -591,6 +591,20 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "bankRequestsAsCustodian",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "type" : "AUTHORISATION",
+      "amount" : 6000000.0000,
+      "status" : "CONFIRMED",
+      "created_at" : "<instant>",
+      "decided_at" : "<instant>",
+      "member_is_source_custodian" : false,
+      "member_is_destination_custodian" : false,
+      "member_is_funding_custodian" : true
+    } ],
+    "truncated" : false
+  }, {
     "key" : "bankFundsAuthorisations",
     "legalBasis" : "ART_15",
     "rows" : [ {

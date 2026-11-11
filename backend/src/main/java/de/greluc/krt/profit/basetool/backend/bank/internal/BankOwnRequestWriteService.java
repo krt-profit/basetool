@@ -153,14 +153,14 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   }
 
   /**
-   * Refuses a request once the member holds the cap of pending requests, whichever channel raised
-   * them; the caller holds the member's open-request lock.
+   * Refuses a request at the cap of Exchange-visible pending requests under the member's lock.
    *
    * @param requester the requester's id
    * @throws BankOpenRequestCapException at or over the cap
    */
   private void requireBelowCap(@NotNull UUID requester) {
-    if (requestRepository.countByRequestedByAndStatus(requester, BankBookingRequestStatus.PENDING)
+    if (requestRepository.countExchangeByRequesterAndStatus(
+            requester, BankBookingRequestStatus.PENDING, BankPurposeKind.AUEC_ORDER)
         >= properties.openRequestCap()) {
       throw new BankOpenRequestCapException();
     }

@@ -66,6 +66,52 @@ public interface BankAccountGrantRepository
   List<BankAccountGrant> findByUserId(@Param("userId") UUID userId);
 
   /**
+   * Reads the current booking capabilities without loading managed grant entities.
+   *
+   * @param userId the grantee
+   * @return the grantee's per-account capability rows
+   */
+  @Query(
+      """
+      SELECT g.id.accountId AS accountId, g.canDeposit AS canDeposit,
+        g.canWithdraw AS canWithdraw, g.canTransfer AS canTransfer
+      FROM BankAccountGrant g WHERE g.id.userId = :userId
+      """)
+  List<ActorGrant> findActorGrants(@Param("userId") UUID userId);
+
+  /** The current flags on one account grant. */
+  interface ActorGrant {
+
+    /**
+     * Reads the granted account.
+     *
+     * @return the account id
+     */
+    UUID getAccountId();
+
+    /**
+     * Reads the deposit capability.
+     *
+     * @return whether the actor can book deposits
+     */
+    boolean getCanDeposit();
+
+    /**
+     * Reads the withdrawal capability.
+     *
+     * @return whether the actor can book withdrawals
+     */
+    boolean getCanWithdraw();
+
+    /**
+     * Reads the transfer capability.
+     *
+     * @return whether the actor can book transfers
+     */
+    boolean getCanTransfer();
+  }
+
+  /**
    * Every grant row with references pre-fetched, for the "Alle Konten" matrix view, ordered by
    * account number then grantee handle.
    *

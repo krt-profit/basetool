@@ -763,13 +763,14 @@ class DataExportEndStateTest {
         subject.getId(),
         SUBJECT);
     UUID attempt = UUID.randomUUID();
+    UUID purpose = UUID.randomUUID();
     jdbc.update(
         """
         INSERT INTO bank_linked_attempt (id, purpose_kind, purpose_ref, fee_rate, fee)
         VALUES (?, 'AUEC_ORDER', ?, 0.005, 0)
         """,
         attempt,
-        UUID.randomUUID());
+        purpose);
     jdbc.update(
         """
         INSERT INTO bank_authorisation (id, account_id, holder_id, amount, authorised_by,
@@ -780,6 +781,25 @@ class DataExportEndStateTest {
         account,
         holder,
         other.getId());
+    jdbc.update(
+        """
+        INSERT INTO bank_booking_request (id, account_id, type, amount, status, requested_by,
+                                          requester_handle, purpose_kind, purpose_ref,
+                                          linked_attempt_id, requested_holder_id, holder_id,
+                                          authorisation_id, decided_at, staff_note)
+        VALUES (?, ?, 'AUTHORISATION', 6000000, 'CONFIRMED', ?, ?, 'AUEC_ORDER', ?,
+                ?, ?, ?, ?, now(), ?)
+        """,
+        UUID.randomUUID(),
+        account,
+        other.getId(),
+        OTHER,
+        purpose,
+        attempt,
+        holder,
+        holder,
+        attempt,
+        HIDDEN);
     jdbc.update(
         "INSERT INTO bank_account_view_grant (id, account_id, grantee_kind, grantee_user_id)"
             + " VALUES (?, ?, 'USER', ?)",

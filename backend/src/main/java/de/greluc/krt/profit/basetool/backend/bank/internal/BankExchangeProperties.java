@@ -28,9 +28,8 @@ import org.springframework.validation.annotation.Validated;
 /**
  * The bank's limits on the exchange (REQ-BXCH-006).
  *
- * @param openRequestCap the most {@code PENDING} booking requests a member may hold before an
- *     exchange client's next request is refused with {@code 409 BANK_OPEN_REQUEST_CAP}; every
- *     pending request of the member counts, whichever channel raised it
+ * @param openRequestCap the number of Exchange-visible pending requests at which a client's next
+ *     raise is refused with {@code 409 BANK_OPEN_REQUEST_CAP}
  */
 @Validated
 @ConfigurationProperties("app.bank.exchange")
