@@ -41,7 +41,7 @@ function primeModal(trigger, modal) {
     if (form) {
         form.toggleAttribute(
             'data-server-request-sync',
-            Boolean(trigger.closest('[data-linked-holder-id]')),
+            Boolean(trigger.closest('[data-linked-request]')),
         );
         clearErrors(form);
         const staffNote = /** @type {HTMLInputElement | null} */ (

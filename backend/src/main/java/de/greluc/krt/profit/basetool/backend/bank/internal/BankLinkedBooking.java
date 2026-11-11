@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * @param type the Bank effect
  * @param account the principal account, absent for a holder transfer
  * @param target the destination account for an account transfer
- * @param holder the registered source or receiving custodian
+ * @param holder the registered custodian, absent when the submitted effect names no custodian
  * @param targetHolder the second custodian for a transfer
  * @param counterparty the actual depositor or payee
  * @param amount principal in whole aUEC
@@ -41,7 +41,7 @@ record BankLinkedBooking(
     @NotNull BankBookingRequestType type,
     @Nullable BankAccount account,
     @Nullable BankAccount target,
-    @NotNull BankHolder holder,
+    @Nullable BankHolder holder,
     @Nullable BankHolder targetHolder,
     @Nullable CounterpartySnapshot counterparty,
     @NotNull BigDecimal amount,

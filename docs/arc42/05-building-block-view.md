@@ -1,6 +1,6 @@
 # 5. Building block view
 
-> **JobOrder implementation scope:** Actual Profit hierarchy and shared MATERIAL/ITEM reading use the existing modules. Material contribution coordination is mapped below; its verification status belongs to [REQ-ORDERS-024](../specs/orders-material-claims.md). Shared writer and lifecycle operations run through the existing order workspace. Bank-free [money operations and corrections](../specs/orders-auec.md) are handled inside joborder. They use `admin.api.TransferFeePolicy` for exact fees. The [optional Bank adapter](../specs/orders-auec-bank.md) remains planned.
+> **JobOrder implementation scope:** Actual Profit hierarchy and shared MATERIAL/ITEM reading use the existing modules. Material contribution coordination is mapped below; its verification status belongs to [REQ-ORDERS-024](../specs/orders-material-claims.md). Shared writer and lifecycle operations run through the existing order workspace. Bank-free [money operations and corrections](../specs/orders-auec.md) are handled inside joborder. They use `admin.api.TransferFeePolicy` for exact fees. The [optional Bank adapter](../specs/orders-auec-bank.md) joins the public Bank and Order ports in the existing application composition.
 
 ## 5.1 Level 1 — the whitebox of the whole system
 

@@ -622,6 +622,7 @@ class DataExportEndStateTest {
         subject.getId(),
         recipientId);
     seedMoneyCorrection(orderId, holderId, provisionId);
+    seedLinkedMoneyAttempt(orderId, holderId);
     jdbc.update(
         """
         INSERT INTO job_order_money_target_change
@@ -651,6 +652,34 @@ class DataExportEndStateTest {
     order.addMaterial(
         JobOrderMaterial.builder().material(material).qualityTier(good).amount(10.0).build());
     return jobOrderRepository.save(order);
+  }
+
+  private void seedLinkedMoneyAttempt(UUID orderId, UUID holderId) {
+    UUID attempt = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO job_order_linked_money_attempt
+          (id, order_id, operation_id, purpose_ref, revision, active, version, kind,
+           actor_id, holder_id, selection_kind, selected_ref, amount, provision, rate,
+           actual_fee, fee_funding, source_binding, actual_payment, bank_type,
+           bank_account_id, bank_custodian_id, counterparty_name,
+           state, request_id, submitted_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, true, 0, 'PROVISION',
+                ?, ?, 'EXISTING', ?, 21, 21, 0.005,
+                0, 'DEPOSITOR', 0, true, 'DEPOSIT',
+                ?, ?, ?, 'WAITING', ?, now(), now())
+        """,
+        attempt,
+        orderId,
+        UUID.randomUUID(),
+        attempt,
+        other.getId(),
+        holderId,
+        holderId,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        OTHER,
+        UUID.randomUUID());
   }
 
   private void seedMoneyHolderLink(UUID orderId, UUID holderId) {

@@ -215,6 +215,42 @@ final class BankAccessSeeder {
         outsider.getId());
   }
 
+  /** Seeds an isolated account, applicant, custodian and audit reader. */
+  @NotNull
+  BankAccessWorld seedLinkedOrder() {
+    User applicant = user("applicant", ApprovalStatus.ACTIVE, Set.of(role("KRT Member")));
+    User manager =
+        user("manager", ApprovalStatus.ACTIVE, Set.of(role("KRT Member"), role("Bank Management")));
+    User admin = user("audit-reader", ApprovalStatus.ACTIVE, Set.of(role("Admin")));
+    Squadron requester = orgUnit(new Squadron(), "Requester", null, null);
+    seat(applicant, requester, MembershipRole.MEMBER);
+    BankAccount account = account(BankAccountType.ORG_UNIT, "Requester", requester);
+    viewGrant(account, BankAccountViewGranteeKind.ALL_MEMBERS);
+    BankHolder holder = holder(manager, "custodian");
+    persistedProfitArea(orgUnitRepository);
+    entityManager.flush();
+    return new BankAccessWorld(
+        Map.of(
+            Actor.MEMBER,
+            applicant.getId(),
+            Actor.MANAGEMENT,
+            manager.getId(),
+            Actor.ADMIN,
+            admin.getId()),
+        Map.of(
+            Actor.MEMBER,
+            applicant.getUsername(),
+            Actor.MANAGEMENT,
+            manager.getUsername(),
+            Actor.ADMIN,
+            admin.getUsername()),
+        Map.of(Account.OWN_ORG_UNIT, account.getId()),
+        Map.of(Holder.MANAGEMENT_HOLDER, holder.getId()),
+        Map.of(),
+        Map.of(Pin.OWN_STAFFEL, requester.getId()),
+        admin.getId());
+  }
+
   /**
    * Seeds one user per actor with the roles the actor holds.
    *

@@ -197,6 +197,8 @@ public class JobOrderMoneyReassignment {
 
     Parties parties = parties(source, destination, attempt.dto());
     authorize(source, destination, parties, attempt.actor());
+    ledger.requireIndependentOperation(source.getId(), operationId);
+    ledger.requireIndependentOperation(destination.getId(), operationId);
     if (operations.isRefused(source.getId(), operationId)
         || operations.isRefused(destination.getId(), operationId)) {
       return unchanged(source, destination, Optional.empty());
@@ -238,8 +240,8 @@ public class JobOrderMoneyReassignment {
     }
     var parties =
         new Parties(
-            currentHolder(source.getId(), outflow.getHolderId()),
-            currentHolder(destination.getId(), inflow.getHolderId()));
+            currentHolder(source.getId(), outflow.personalHolderId()),
+            currentHolder(destination.getId(), inflow.personalHolderId()));
     authorize(source, destination, parties, attempt.actor());
     if (attempt.amount().compareTo(outflow.getAmount()) != 0
         || attempt.amount().compareTo(inflow.getAmount()) != 0
@@ -255,9 +257,13 @@ public class JobOrderMoneyReassignment {
       ReassignJobOrderMoneyDto dto, Parties parties, JobOrderMoneyOperation inflow) {
     UUID selected = dto.destinationHolderId();
     boolean confirmed = Boolean.TRUE.equals(dto.confirmSamePerson());
-    return switch (inflow.getSelectionKind()) {
+    var selection = inflow.getSelectionKind();
+    if (selection == null) {
+      return false;
+    }
+    return switch (selection) {
       case ACCOUNTLESS -> selected == null && confirmed;
-      case EXISTING -> inflow.getHolderId().equals(selected) && confirmed;
+      case EXISTING -> inflow.personalHolderId().equals(selected) && confirmed;
       case LINKED ->
           selected == null
               ? parties.accounts().sameAccount()
@@ -410,8 +416,11 @@ public class JobOrderMoneyReassignment {
   private Balances balances(
       JobOrder source, JobOrder destination, Parties parties, BigDecimal amount) {
     return new Balances(
-        ledger.read(source.getId()).balance(parties.source().getId()).subtract(amount),
-        ledger.read(destination.getId()).balance(parties.destination().getId()).add(amount));
+        ledger.read(source.getId()).availableBalance(parties.source().getId()).subtract(amount),
+        ledger
+            .read(destination.getId())
+            .availableBalance(parties.destination().getId())
+            .add(amount));
   }
 
   private static boolean acceptsReassignment(JobOrder source, JobOrder destination) {

@@ -104,7 +104,7 @@ class BankRequestCreation {
             + " request "
             + plain(saved.getAmount())
             + " aUEC "
-            + BankBookingRequestService.shortId(saved.getId())
+            + saved.shortId()
             + (saved.isRequiresOwnerApproval() ? " (needs approval)" : ""));
     BankAccount account = saved.getAccount();
     OrgUnit orgUnit = account == null ? null : account.getOrgUnit();

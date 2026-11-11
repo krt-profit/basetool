@@ -504,7 +504,13 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    * @param orderId the aUEC order
    * @return whether a monetary submission was durably accepted
    */
-  @Query("SELECT COUNT(m) > 0 FROM JobOrderMoneyOperation m WHERE m.orderId = :orderId")
+  @Query(
+      value =
+          """
+          SELECT EXISTS (SELECT 1 FROM job_order_money_operation WHERE order_id = :orderId)
+              OR EXISTS (SELECT 1 FROM job_order_linked_money_attempt WHERE order_id = :orderId)
+          """,
+      nativeQuery = true)
   boolean hasDurableMoneySubmission(@Param("orderId") UUID orderId);
 
   /**

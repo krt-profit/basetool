@@ -94,6 +94,37 @@ public sealed interface BankLinkedPayment {
       implements BankLinkedPayment {}
 
   /**
+   * A reported deposit whose receiving Bank custodian is selected by the confirmer.
+   *
+   * @param accountId the account receiving the principal
+   * @param depositor the actual depositor
+   * @param terms the submitted amount and fee basis
+   */
+  record AccountDeposit(
+      @NotNull UUID accountId, @NotNull Counterparty depositor, @NotNull Terms terms)
+      implements BankLinkedPayment {}
+
+  /**
+   * An account ownership change with unchanged Bank custody.
+   *
+   * @param sourceAccountId the funding account
+   * @param destinationAccountId the receiving account
+   * @param terms the submitted principal and fee basis
+   */
+  record AccountTransfer(
+      @NotNull UUID sourceAccountId, @NotNull UUID destinationAccountId, @NotNull Terms terms)
+      implements BankLinkedPayment {}
+
+  /**
+   * An authorisation to use an account without a custody attribution or ledger movement.
+   *
+   * @param accountId the funding account
+   * @param terms the submitted principal and fee basis
+   */
+  record AccountAuthorisation(@NotNull UUID accountId, @NotNull Terms terms)
+      implements BankLinkedPayment {}
+
+  /**
    * A payout from Bank custody.
    *
    * @param accountId the funding account

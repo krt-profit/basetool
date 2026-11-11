@@ -32,8 +32,8 @@ public class JobOrderExportSections implements PersonalDataExportSection {
 
   private static final String MONEY_PARTICIPANTS =
       """
-      JOIN job_order_money_holder source ON source.id = p.holder_id
-      JOIN job_order_money_holder holder ON holder.id = COALESCE(source.merged_into_id, source.id)
+      LEFT JOIN job_order_money_holder source ON source.id = p.holder_id
+      LEFT JOIN job_order_money_holder holder ON holder.id = COALESCE(source.merged_into_id, source.id)
       LEFT JOIN LATERAL (
         SELECT COALESCE(
           (SELECT effective.amount FROM job_order_money_correction_entry effective
@@ -194,6 +194,37 @@ public class JobOrderExportSections implements PersonalDataExportSection {
                 + MONEY_PARTICIPANTS
                 + "WHERE correction.actor_id = :userId OR "
                 + MONEY_PERSON
-                + "ORDER BY c.id"));
+                + "ORDER BY c.id"),
+        linkedMoneyAttempts());
+  }
+
+  private static Section linkedMoneyAttempts() {
+    return new Section(
+        313,
+        "jobOrderLinkedMoneyAttempts",
+        ART_15_20,
+        "Bank-linked monetary attempts the member recorded, decided or directly participated in.",
+        """
+            SELECT o.display_id AS job_order, a.operation_id, a.revision, a.kind, a.state,
+                   a.active, CAST(a.amount AS text) AS amount, CAST(a.provision AS text) AS new_provision,
+                   CAST(a.actual_fee AS text) AS fee, a.fee_funding, a.actual_payment,
+                   a.submitted_at, a.updated_at
+            FROM job_order_linked_money_attempt a JOIN job_order o ON o.id = a.order_id
+            LEFT JOIN job_order_money_holder h ON h.id = a.holder_id
+            LEFT JOIN job_order_money_holder source ON source.id = COALESCE(h.merged_into_id, h.id)
+            LEFT JOIN job_order_money_holder d ON d.id = a.destination_holder_id
+            LEFT JOIN job_order_money_holder destination ON destination.id = COALESCE(d.merged_into_id, d.id)
+            LEFT JOIN job_order_money_recipient original_recipient ON original_recipient.id = a.recipient_id
+            LEFT JOIN job_order_money_recipient recipient
+              ON recipient.id = COALESCE(original_recipient.corrected_into_id, original_recipient.id)
+              AND a.actual_payment
+            LEFT JOIN job_order_money_holder r ON r.id = recipient.holder_id
+            LEFT JOIN job_order_money_holder payee ON payee.id = COALESCE(r.merged_into_id, r.id)
+            WHERE a.actor_id = :userId OR a.decision_actor_id = :userId OR a.counterparty_user_id = :userId
+               OR a.selected_user_id = :userId AND a.kind = 'SETTLEMENT' AND a.actual_payment
+               OR source.user_id = :userId OR destination.user_id = :userId
+               OR recipient.user_id = :userId OR payee.user_id = :userId
+            ORDER BY a.submitted_at, a.id
+        """);
   }
 }

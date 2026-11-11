@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationCauseCollector;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationPromptCleanup;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
@@ -65,6 +66,7 @@ public class JobOrderChangeEffects {
   private final ApplicationEventPublisher events;
   private final LiveSyncPublisher liveSync;
   private final NotificationPromptCleanup notificationCleanup;
+  private final NotificationCauseCollector linkedCauses;
 
   /**
    * Captures existing action prompts while the caller holds the order lock.
@@ -232,6 +234,21 @@ public class JobOrderChangeEffects {
     };
   }
 
+  void linkBankCause(UUID orderId, UUID causeId) {
+    linkedCauses.prepare(causeId);
+    batch().revisions.computeIfAbsent(orderId, _ -> new Revision()).linkedCause = causeId;
+  }
+
+  boolean hasLinkedCause(UUID orderId) {
+    for (var synchronization : TransactionSynchronizationManager.getSynchronizations()) {
+      if (synchronization instanceof Batch current) {
+        var revision = current.revisions.get(orderId);
+        return revision != null && revision.linkedCause != null;
+      }
+    }
+    return false;
+  }
+
   private Batch batch() {
     for (TransactionSynchronization synchronization :
         TransactionSynchronizationManager.getSynchronizations()) {
@@ -309,6 +326,7 @@ public class JobOrderChangeEffects {
   /** A stable cause identity and original event groups for one order revision. */
   private static final class Revision {
     private final UUID causeId = UUID.randomUUID();
+    @org.jetbrains.annotations.Nullable private UUID linkedCause;
     private final List<NotificationEvent> originals = new ArrayList<>();
     private final Map<GroupKey, UnitGroup> groups = new LinkedHashMap<>();
   }
@@ -411,9 +429,12 @@ public class JobOrderChangeEffects {
         revision.groups.forEach(
             (key, group) -> appendUnitNotices(originals, key.kind(), group, audiences));
         if (!originals.isEmpty()) {
-          events.publishEvent(
-              new NotificationCause(
-                  revision.causeId, originals.values().stream().flatMap(List::stream).toList()));
+          var batchEvents = originals.values().stream().flatMap(List::stream).toList();
+          if (revision.linkedCause == null) {
+            events.publishEvent(new NotificationCause(revision.causeId, batchEvents));
+          } else {
+            linkedCauses.append(revision.linkedCause, batchEvents);
+          }
         }
       }
     }

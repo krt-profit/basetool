@@ -508,37 +508,101 @@ public class BankLedgerService {
     if (inclusive) {
       guards.requireAmountExceedsFee(request.amount(), fee);
     }
-    guards.requireAccountCoverage(source, debit);
+    return recordTransfer(
+        source,
+        destination,
+        new TransferAmounts(debit, credit, fee, inclusive),
+        new TransferText(request.note(), request.justification(), request.staffNote()),
+        new TransferCustody(sourceHolder, destinationHolder, submittedFee == null));
+  }
 
+  /**
+   * Records a zero-fee account transfer while both account rows are held by the caller.
+   *
+   * @param source the locked debit account
+   * @param destination the locked receiving account
+   * @param amount the exact principal
+   * @param note the applicant's note
+   * @param justification the required debit reason
+   * @param staffNote the confirming employee's note
+   * @return the posted account transfer
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  BankTransactionDto bookLinkedAccountTransfer(
+      @NotNull BankAccount source,
+      @NotNull BankAccount destination,
+      @NotNull BigDecimal amount,
+      @Nullable String note,
+      @Nullable String justification,
+      @Nullable String staffNote) {
+    guards.requireActive(source);
+    guards.requireActive(destination);
+    BankBookingGuards.requireDebitJustification(source, justification);
+    return recordTransfer(
+        source,
+        destination,
+        new TransferAmounts(amount, amount, BigDecimal.ZERO, false),
+        new TransferText(note, justification, staffNote),
+        null);
+  }
+
+  private BankTransactionDto recordTransfer(
+      BankAccount source,
+      BankAccount destination,
+      TransferAmounts amounts,
+      TransferText text,
+      @Nullable TransferCustody custody) {
+    guards.requireAccountCoverage(source, amounts.debit());
     Instant now = Instant.now();
     BankTransaction tx =
         writer.persistTransaction(
             BankTransactionType.TRANSFER,
-            request.note(),
-            request.justification(),
-            request.staffNote(),
+            text.note(),
+            text.justification(),
+            text.staffNote(),
             null,
-            fee,
+            amounts.fee(),
             now,
             null);
-    writer.persistAccountPosting(tx, source, debit.negate(), now);
-    writer.persistAccountPosting(tx, destination, credit, now);
-    writer.persistHolderPosting(tx, sourceHolder, debit.negate(), now);
-    writer.persistHolderPosting(tx, destinationHolder, credit, now);
+    writer.persistAccountPosting(tx, source, amounts.debit().negate(), now);
+    writer.persistAccountPosting(tx, destination, amounts.credit(), now);
+    if (custody != null) {
+      writer.persistHolderPosting(tx, custody.source(), amounts.debit().negate(), now);
+      writer.persistHolderPosting(tx, custody.destination(), amounts.credit(), now);
+    }
+    String holders =
+        custody == null || !custody.includeAuditNames()
+            ? ""
+            : " ("
+                + custody.source().getHandle()
+                + " -> "
+                + custody.destination().getHandle()
+                + ")";
     bankAuditService.record(
         BankAuditEventType.TRANSFER_BOOKED,
         source.getId(),
         tx.getId(),
         null,
-        plain(debit)
+        plain(amounts.debit())
             + " aUEC -> "
             + destination.getAccountNo()
-            + (submittedFee == null
-                ? " (" + sourceHolder.getHandle() + " -> " + destinationHolder.getHandle() + ")"
-                : "")
-            + feeDetail(fee, inclusive));
+            + holders
+            + feeDetail(amounts.fee(), amounts.inclusive()));
     return toDto(tx);
   }
+
+  /** Reconciled debit, credit and fee for one transfer. */
+  private record TransferAmounts(
+      BigDecimal debit, BigDecimal credit, BigDecimal fee, boolean inclusive) {}
+
+  /** Submitted and confirmed text fields of a transfer. */
+  private record TransferText(
+      @Nullable String note, @Nullable String justification, @Nullable String staffNote) {}
+
+  /** Custody legs recorded when the transfer attributes a movement between holders. */
+  private record TransferCustody(
+      BankHolder source, BankHolder destination, boolean includeAuditNames) {}
 
   /**
    * Books a holder-to-holder Umbuchung (REQ-BANK-031, ADR-0039): two holder legs and no account

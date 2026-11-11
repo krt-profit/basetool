@@ -29,7 +29,13 @@ import org.jetbrains.annotations.Nullable;
  * @param userId currently linked account, if present
  * @param displayName current account label or manually entered name
  * @param amount effective booked whole aUEC
+ * @param availableAmount whole aUEC available after local Bank attempt bindings
  * @param version independent revision of this holder
  */
 public record JobOrderMoneyHolderView(
-    UUID id, @Nullable UUID userId, @Nullable String displayName, String amount, long version) {}
+    UUID id,
+    @Nullable UUID userId,
+    @Nullable String displayName,
+    String amount,
+    String availableAmount,
+    long version) {}

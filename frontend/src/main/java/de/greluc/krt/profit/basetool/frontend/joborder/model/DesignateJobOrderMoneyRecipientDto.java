@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
@@ -30,7 +31,11 @@ import org.jetbrains.annotations.Nullable;
  * @param holderId an existing order-local holder
  * @param userId an explicitly selected account
  * @param name a named recipient without a linked account
+ * @param bankAccountId an explicitly selected Kartellbank account
  */
 @DtoMirror
 public record DesignateJobOrderMoneyRecipientDto(
-    @Nullable UUID holderId, @Nullable UUID userId, @Nullable @Size(max = 200) String name) {}
+    @Nullable UUID holderId,
+    @Nullable UUID userId,
+    @Nullable @Size(max = 200) String name,
+    @Nullable @JsonInclude(JsonInclude.Include.NON_NULL) UUID bankAccountId) {}

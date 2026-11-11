@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -44,6 +45,7 @@ class JobOrderMoneyMovementBasis {
   private final JobOrderMoneyAccess access;
   private final JobOrderMoneyLedger ledger;
   private final TransferFeePolicy fees;
+  private final JobOrderLinkedPaymentTerms linkedTerms;
 
   Resolved resolve(
       JobOrder order,
@@ -76,26 +78,47 @@ class JobOrderMoneyMovementBasis {
     if (destination != null) {
       requireVersion(destination, dto.destinationVersion());
     }
-    if (recipient != null && (!recipient.isActive() || !receivingParty.usable())) {
+    UUID destinationAccount = recipient == null ? null : recipient.getBankAccountId();
+    if (recipient != null
+        && (!recipient.isActive()
+            || recipient.isSuperseded()
+            || (destinationAccount == null && !receivingParty.usable()))) {
       throw new UnavailableBasis(new BusinessConflictException("orders.money.recipient.inactive"));
     }
-    checkPurpose(source, receivingParty, terms.kind());
+    JobOrderBankSelection bank = dto.bank();
+    if (destinationAccount != null) {
+      if (bank == null
+          || bank.type() != JobOrderBankSelection.Type.TRANSFER
+          || !destinationAccount.equals(bank.targetAccountId())
+          || (terms.kind() == JobOrderMoneyKind.PURPOSE_HANDOVER)
+              == JobOrderLinkedPaymentTerms.reported(bank)) {
+        throw JobOrderLinkedPaymentTerms.invalid();
+      }
+    } else {
+      checkPurpose(source, receivingParty, terms.kind());
+    }
     var current = ledger.read(orderId);
     var target = terms.kind().delivers() ? targets.findById(orderId).orElseThrow() : null;
     if (target != null) {
       OptimisticLock.check(
           target.getVersion(), dto.targetVersion(), JobOrderMoneyTarget.class, orderId);
     }
+    RateSnapshot configured =
+        terms.kind() == JobOrderMoneyKind.PURPOSE_HANDOVER && bank == null
+            ? new RateSnapshot(BigDecimal.ZERO)
+            : fees.snapshot();
     RateSnapshot rate =
         terms.kind() == JobOrderMoneyKind.PURPOSE_HANDOVER
             ? new RateSnapshot(BigDecimal.ZERO)
-            : fees.snapshot();
+            : configured;
     if (expectedRate != null && !expectedRate.equals(rate)) {
       throw new UnavailableBasis(
           new BusinessConflictException("orders.money.movement.rateRequired"));
     }
-    BigDecimal fee = fees.feeOn(terms.amount(), rate);
-    BigDecimal held = current.balance(source.getId());
+    var linkedFee =
+        bank == null ? null : linkedTerms.feeFor(terms.kind(), bank, terms.amount(), configured);
+    BigDecimal fee = linkedFee == null ? fees.feeOn(terms.amount(), rate) : linkedFee.orderFee();
+    BigDecimal held = current.availableBalance(source.getId());
     BigDecimal principalShortfall = terms.amount().subtract(held).max(BigDecimal.ZERO);
     BigDecimal sourceAfter = held.subtract(terms.amount()).subtract(fee);
     if (terms.provision().compareTo(principalShortfall.add(fee)) > 0) {
@@ -113,7 +136,9 @@ class JobOrderMoneyMovementBasis {
         fee,
         sourceAfter.add(terms.provision()),
         delivered,
-        target == null ? null : target.getAmount());
+        target == null ? null : target.getAmount(),
+        configured,
+        linkedFee);
   }
 
   void authorize(
@@ -173,6 +198,8 @@ class JobOrderMoneyMovementBasis {
    * @param sourceAfter exact amount after top-up, principal and fee
    * @param delivered net handover after the movement
    * @param target target affected by a requester handover
+   * @param configuredRate the configured snapshot used by the Bank, including for no-fee effects
+   * @param linkedFee the calculated game fee and funding when coupled
    */
   record Resolved(
       JobOrderMoneyHolder source,
@@ -182,7 +209,9 @@ class JobOrderMoneyMovementBasis {
       BigDecimal fee,
       BigDecimal sourceAfter,
       BigDecimal delivered,
-      @Nullable BigDecimal target) {
+      @Nullable BigDecimal target,
+      RateSnapshot configuredRate,
+      @Nullable JobOrderLinkedPaymentTerms.Fee linkedFee) {
 
     boolean completes() {
       return target != null && delivered.compareTo(target) >= 0;

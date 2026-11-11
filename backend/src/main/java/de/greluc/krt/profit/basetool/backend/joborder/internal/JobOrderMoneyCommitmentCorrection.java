@@ -47,6 +47,21 @@ class JobOrderMoneyCommitmentCorrection {
       JobOrderMoneyCorrectionEntry entry,
       @Nullable JobOrderMoneyCorrectionEntry prior,
       boolean removeAttribution) {
+    reviseCredit(order, original, entry, prior, removeAttribution, true);
+  }
+
+  void attachLinkedReversalCredit(
+      JobOrder order, JobOrderMoneyOperation original, JobOrderMoneyCorrectionEntry entry) {
+    reviseCredit(order, original, entry, null, false, false);
+  }
+
+  private void reviseCredit(
+      JobOrder order,
+      JobOrderMoneyOperation original,
+      JobOrderMoneyCorrectionEntry entry,
+      @Nullable JobOrderMoneyCorrectionEntry prior,
+      boolean removeAttribution,
+      boolean checkAuthority) {
     var credit = changes.findByOrderIdAndOperationId(order.getId(), original.getOperationId());
     if (credit.isEmpty()) {
       if (removeAttribution) {
@@ -60,7 +75,7 @@ class JobOrderMoneyCommitmentCorrection {
     boolean removed = removeAttribution || (prior != null && prior.isAttributionRemoved());
     BigDecimal revised =
         removed ? BigDecimal.ZERO : entry.getProvision().min(originalCredit.creditBasis());
-    if (revised.compareTo(previouslyCredited) != 0 || removeAttribution) {
+    if (checkAuthority && (revised.compareTo(previouslyCredited) != 0 || removeAttribution)) {
       creditAuthority.assertAttributionAuthority(order, originalCredit.getCommitmentId());
     }
     entry.attachCredit(

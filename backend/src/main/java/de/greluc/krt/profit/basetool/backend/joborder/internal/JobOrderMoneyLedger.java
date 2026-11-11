@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -39,8 +41,10 @@ class JobOrderMoneyLedger {
 
   private final JobOrderMoneyOperationRepository operations;
   private final JobOrderMoneyHolderRepository holders;
+  private final JobOrderMoneyAccountHoldingRepository accountHoldings;
   private final JobOrderMoneyCorrectionEntryRepository corrections;
   private final JobOrderMoneyRecipients recipients;
+  private final JobOrderLinkedMoneyAttemptRepository attempts;
 
   Ledger read(UUID orderId) {
     var facts = facts(orderId);
@@ -49,13 +53,36 @@ class JobOrderMoneyLedger {
             .collect(
                 Collectors.toMap(
                     holder -> Objects.requireNonNull(holder.getId()), Function.identity()));
+    Map<UUID, JobOrderMoneyAccountHolding> byAccountHolding =
+        accountHoldings.findAllByOrderIdOrderById(orderId).stream()
+            .collect(
+                Collectors.toMap(
+                    account -> Objects.requireNonNull(account.getId()), Function.identity()));
     var entries = corrections.findAllByOrderIdOrderByIdAsc(orderId);
+    var recipientAliases = recipients.correctedRecipientAliases(orderId);
+    var activeAttempts = attempts.findAllByOrderIdAndActiveTrue(orderId);
+    var availability =
+        JobOrderMoneyAvailability.collect(
+            activeAttempts,
+            id -> Ledger.canonical(byId, id),
+            id -> recipientAliases.getOrDefault(id, id));
     return Ledger.fold(
         facts,
         byId,
-        recipients.correctedRecipientAliases(orderId),
+        byAccountHolding,
+        recipientAliases,
         entries,
-        revisedAmounts(Map.of(), entries));
+        revisedAmounts(Map.of(), entries),
+        availability,
+        activeAttempts.stream()
+            .collect(
+                Collectors.toMap(JobOrderLinkedMoneyAttempt::getOperationId, Function.identity())));
+  }
+
+  void requireIndependentOperation(UUID orderId, UUID operationId) {
+    if (attempts.existsByOrderIdAndOperationIdAndActiveTrue(orderId, operationId)) {
+      throw new BusinessConflictException("orders.money.operation.termsMismatch");
+    }
   }
 
   List<JobOrderMoneyOperation> facts(UUID orderId) {
@@ -100,10 +127,12 @@ class JobOrderMoneyLedger {
    *
    * @param facts accepted original and correction operations
    * @param identities original holders and retained aliases
+   * @param accountHoldings order-local positions by Bank account
    * @param recipientAliases erroneous designations and their current replacements
    * @param corrections linked effects in committed order
    * @param revisions latest effect for each corrected original fact
    * @param balances effective balances by canonical holder
+   * @param accountBalances effective balances by order-local Bank account position
    * @param requesterBalances effective net handover by requester designation
    * @param provided actual new funds recorded for this order
    * @param handedOver effective net handover to requester recipients
@@ -113,14 +142,18 @@ class JobOrderMoneyLedger {
    * @param released money released from the order's purpose
    * @param shortages real later losses
    * @param settled principal paid to a third-party beneficiary
+   * @param availability funds bound by active linked attempts
+   * @param linkedAttempts the current linked revision for each operation
    */
   record Ledger(
       List<JobOrderMoneyOperation> facts,
       Map<UUID, JobOrderMoneyHolder> identities,
+      Map<UUID, JobOrderMoneyAccountHolding> accountHoldings,
       Map<UUID, UUID> recipientAliases,
       List<JobOrderMoneyCorrectionEntry> corrections,
       Map<UUID, JobOrderMoneyAmounts> revisions,
       Map<UUID, BigDecimal> balances,
+      Map<UUID, BigDecimal> accountBalances,
       Map<UUID, BigDecimal> requesterBalances,
       BigDecimal provided,
       BigDecimal handedOver,
@@ -129,15 +162,21 @@ class JobOrderMoneyLedger {
       BigDecimal purposeOutflow,
       BigDecimal released,
       BigDecimal shortages,
-      BigDecimal settled) {
+      BigDecimal settled,
+      JobOrderMoneyAvailability availability,
+      Map<UUID, JobOrderLinkedMoneyAttempt> linkedAttempts) {
 
     static Ledger fold(
         List<JobOrderMoneyOperation> facts,
         Map<UUID, JobOrderMoneyHolder> identities,
+        Map<UUID, JobOrderMoneyAccountHolding> accountHoldings,
         Map<UUID, UUID> recipientAliases,
         List<JobOrderMoneyCorrectionEntry> corrections,
-        Map<UUID, JobOrderMoneyAmounts> revisions) {
+        Map<UUID, JobOrderMoneyAmounts> revisions,
+        JobOrderMoneyAvailability availability,
+        Map<UUID, JobOrderLinkedMoneyAttempt> linkedAttempts) {
       Map<UUID, BigDecimal> balances = new HashMap<>();
+      Map<UUID, BigDecimal> accountBalances = new HashMap<>();
       Map<UUID, BigDecimal> requesterBalances = new HashMap<>();
       BigDecimal provision = BigDecimal.ZERO;
       BigDecimal fees = BigDecimal.ZERO;
@@ -146,7 +185,12 @@ class JobOrderMoneyLedger {
         JobOrderMoneyAmounts effective = amounts(fact, revisions);
         provision = provision.add(effective.provision());
         fees = fees.add(effective.fee());
-        add(balances, identities, fact.getHolderId(), fact.holderEffect(effective));
+        UUID accountHoldingId = fact.getAccountHoldingId();
+        if (accountHoldingId == null) {
+          add(balances, identities, fact.personalHolderId(), fact.holderEffect(effective));
+        } else {
+          accountBalances.merge(accountHoldingId, fact.holderEffect(effective), BigDecimal::add);
+        }
         if (fact.getDestinationHolderId() != null) {
           add(balances, identities, fact.getDestinationHolderId(), effective.amount());
         }
@@ -161,10 +205,12 @@ class JobOrderMoneyLedger {
       return new Ledger(
           facts,
           identities,
+          accountHoldings,
           recipientAliases,
           corrections,
           revisions,
           balances,
+          accountBalances,
           requesterBalances,
           provision,
           requesterBalances.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add),
@@ -173,25 +219,68 @@ class JobOrderMoneyLedger {
           movements.getOrDefault(JobOrderMoneyKind.PURPOSE_OUTFLOW, BigDecimal.ZERO),
           movements.getOrDefault(JobOrderMoneyKind.RELEASE, BigDecimal.ZERO),
           movements.getOrDefault(JobOrderMoneyKind.SHORTAGE, BigDecimal.ZERO),
-          movements.getOrDefault(JobOrderMoneyKind.SETTLEMENT, BigDecimal.ZERO));
+          movements.getOrDefault(JobOrderMoneyKind.SETTLEMENT, BigDecimal.ZERO),
+          availability,
+          linkedAttempts);
     }
 
     Ledger revised(List<JobOrderMoneyCorrectionEntry> entries) {
       return fold(
-          facts, identities, recipientAliases, corrections, revisedAmounts(revisions, entries));
+          facts,
+          identities,
+          accountHoldings,
+          recipientAliases,
+          corrections,
+          revisedAmounts(revisions, entries),
+          availability,
+          linkedAttempts);
     }
 
     JobOrderMoneyAmounts effective(JobOrderMoneyOperation fact) {
       return amounts(fact, revisions);
     }
 
-    boolean nonnegative() {
+    boolean nonnegativeAvailable() {
       return balances.values().stream().allMatch(amount -> amount.signum() >= 0)
-          && requesterBalances.values().stream().allMatch(amount -> amount.signum() >= 0);
+          && accountBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
+          && requesterBalances.values().stream().allMatch(amount -> amount.signum() >= 0)
+          && availability.coveredBy(balances, accountBalances, requesterBalances);
+    }
+
+    boolean canCorrect(JobOrderMoneyOperation fact) {
+      if (!fact.isBankHandling()) {
+        return true;
+      }
+      JobOrderLinkedMoneyAttempt attempt = linkedAttempts.get(fact.getOperationId());
+      return attempt != null
+          && (attempt.getState() == JobOrderLinkedMoneyState.AUTHORISED
+              || attempt.getState() == JobOrderLinkedMoneyState.CLARIFICATION);
+    }
+
+    @Nullable
+    BigDecimal historicalOrderFeeRate(JobOrderMoneyOperation fact) {
+      if (!fact.isBankHandling()) {
+        return fact.getFeeRate();
+      }
+      JobOrderLinkedMoneyAttempt attempt = linkedAttempts.get(fact.getOperationId());
+      return attempt != null && attempt.getFeeFunding() == JobOrderMoneyFeeFunding.ORDER
+          ? attempt.getRate()
+          : null;
     }
 
     BigDecimal netForRecipient(UUID recipientId) {
       return requesterBalances.getOrDefault(recipientId, BigDecimal.ZERO);
+    }
+
+    BigDecimal availableForRecipient(UUID recipientId) {
+      return availableForRecipient(recipientId, null);
+    }
+
+    BigDecimal availableForRecipient(UUID recipientId, @Nullable UUID excludedAttemptId) {
+      UUID canonical = recipientAliases.getOrDefault(recipientId, recipientId);
+      return requesterBalances
+          .getOrDefault(canonical, BigDecimal.ZERO)
+          .subtract(availability.forRecipient(canonical, excludedAttemptId));
     }
 
     BigDecimal balance(@Nullable UUID holderId) {
@@ -200,8 +289,36 @@ class JobOrderMoneyLedger {
           : balances.getOrDefault(canonical(identities, holderId), BigDecimal.ZERO);
     }
 
+    BigDecimal availableBalance(@Nullable UUID holderId) {
+      return availableBalance(holderId, null);
+    }
+
+    BigDecimal availableBalance(@Nullable UUID holderId, @Nullable UUID excludedAttemptId) {
+      if (holderId == null) {
+        return BigDecimal.ZERO;
+      }
+      UUID canonical = canonical(identities, holderId);
+      return balances
+          .getOrDefault(canonical, BigDecimal.ZERO)
+          .subtract(availability.forHolder(canonical, excludedAttemptId));
+    }
+
+    BigDecimal accountBalance(UUID holdingId) {
+      return accountBalances.getOrDefault(holdingId, BigDecimal.ZERO);
+    }
+
+    BigDecimal availableAccountBalance(UUID holdingId) {
+      return availableAccountBalance(holdingId, null);
+    }
+
+    BigDecimal availableAccountBalance(UUID holdingId, @Nullable UUID excludedAttemptId) {
+      return accountBalance(holdingId)
+          .subtract(availability.forAccount(holdingId, excludedAttemptId));
+    }
+
     BigDecimal holdings() {
-      return balances.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+      return Stream.concat(balances.values().stream(), accountBalances.values().stream())
+          .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     JobOrderMoneyHolder holder(UUID id) {

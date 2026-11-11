@@ -58,7 +58,11 @@ an OS notification for each one.
    The notification owner resolves and mutes original candidates before choosing at most one
    ordinary notice for each recipient. Distinct necessary Bank approval tasks must not be
    discarded as another success notice. The domain that owns the cause declares its priority;
-   the notification engine does not import JobOrder or Bank policy.
+   the notification engine does not import JobOrder or Bank policy. A transaction collector
+   gathers original events under one effective outcome identity and publishes a single cause
+   with a namespaced receipt identity. A preferred original outcome claims its resolved
+   audience before fallback selection. Its per-type mute suppresses another success notice
+   for the same decision, while recipients outside that audience keep their own original rules.
 7. **Cause replay is independent of Inbox retention.** Notification creation first atomically
    inserts an opaque cause receipt with `ON CONFLICT DO NOTHING`, before clearing superseded
    notices or creating any rows. The receipt and all resulting Inbox changes commit together;

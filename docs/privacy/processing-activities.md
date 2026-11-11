@@ -72,6 +72,12 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Retention:** for the duration of the account; on deletion the account-owned rows are purged and
   the shared aggregates are reassigned (REQ-DATA-008).
 
+- **Bank-linked aUEC attempts:** `job_order_linked_money_attempt` records submitted monetary terms,
+  reported payment, participant links and the outcome. Accountless holder and depositor names can
+  survive account deletion. A granted Art. 17 request clears the matching names while retaining
+  amounts and outcomes. Personal exports include only the subject's directly related attempts
+  and financial facts.
+
 > [!note] Added 2026-09-15 — two free-text handles nothing had named
 > `job_order_handover.recipient_handle` and `job_order_item_handover.recipient_handle` record who
 > collected material on a job order. They are **typed in by hand**, so they can name somebody with

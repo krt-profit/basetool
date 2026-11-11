@@ -28,6 +28,8 @@ target|JOB_ORDER|job_order_assignees|note|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_handover|recipient_handle|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_handover|recipient_squadron|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_item_handover|recipient_handle|job_order_id|JOB_ORDER
+target|JOB_ORDER|job_order_linked_money_attempt|counterparty_name|order_id|JOB_ORDER
+target|JOB_ORDER|job_order_linked_money_attempt|selected_accountless_name|order_id|JOB_ORDER
 target|JOB_ORDER|job_order_money_holder_change|name|order_id|JOB_ORDER
 target|JOB_ORDER|job_order_money_holder_change|previous_name|order_id|JOB_ORDER
 target|JOB_ORDER|job_order_money_holder|accountless_name|order_id|JOB_ORDER
@@ -171,6 +173,11 @@ exempt-column|frequency_type.updated_by
 exempt-column|job_order.status
 exempt-column|job_order.type
 exempt-column|job_order_handover_item.location_name
+exempt-column|job_order_linked_money_attempt.bank_type
+exempt-column|job_order_linked_money_attempt.fee_funding
+exempt-column|job_order_linked_money_attempt.kind
+exempt-column|job_order_linked_money_attempt.selection_kind
+exempt-column|job_order_linked_money_attempt.state
 exempt-column|job_order_money_commitment_change.reason
 exempt-column|job_order_money_holder_change.kind
 exempt-column|job_order_money_operation.kind

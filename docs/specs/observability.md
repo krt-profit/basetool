@@ -2141,6 +2141,12 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - `basetool_bank_ledger_integrity_violations{category}` gauge fed by the hourly integrity sweep
   (six `category` values; **any value > 0 is CRITICAL** — the ledger broke an invariant).
 
+- Linked order money exposes the current waiting count, oldest waiting age, clarification count
+  and local financial contradiction count as `basetool_job_order_linked_money_*` gauges. The
+  technical failure counter counts infrastructure errors applying a synchronous linked outcome.
+  These metrics carry no participant, order, account or payment dimensions. Routine approval
+  waiting and clarification are visible on the operations dashboard. An alert fires for
+  persistent contradictory order effects.
 - `basetool_job_order_integrity_violations{category}` gauge fed by the hourly `JobOrderIntegrityTask`
   (REQ-ORDERS-033; one `category` today, `item_line_blueprint_drift`). `> 0` means an ordered-item
   line's blueprint no longer produces the ordered item after an SC-Wiki re-point, so that order

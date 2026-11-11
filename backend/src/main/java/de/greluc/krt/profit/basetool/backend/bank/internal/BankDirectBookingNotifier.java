@@ -20,7 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationCauseCollector;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -48,6 +50,8 @@ public class BankDirectBookingNotifier {
   private final BankPostingRepository postingRepository;
   private final BankActorResolver actors;
   private final ApplicationEventPublisher eventPublisher;
+  private final NotificationCauseCollector notificationCauses;
+  private final BankLinkedAttemptRepository linkedAttempts;
 
   /**
    * Announces a booked withdrawal: a payout to the counterparty member, if any, and the debit to
@@ -59,7 +63,7 @@ public class BankDirectBookingNotifier {
   @Transactional(propagation = Propagation.MANDATORY)
   public void withdrawalBooked(
       @NotNull BankWithdrawalRequest request, @NotNull BankTransactionDto booked) {
-    withdrawalBooked(request, booked, true);
+    withdrawalBooked(request, booked, true, null);
   }
 
   /**
@@ -68,12 +72,14 @@ public class BankDirectBookingNotifier {
    * @param request the withdrawal
    * @param booked the booked transaction
    * @param gamePayment whether the holder actually paid another player
+   * @param causeId the linked booking cause, or {@code null} for an ordinary booking
    */
   @Transactional(propagation = Propagation.MANDATORY)
   void withdrawalBooked(
       @NotNull BankWithdrawalRequest request,
       @NotNull BankTransactionDto booked,
-      boolean gamePayment) {
+      boolean gamePayment,
+      @Nullable UUID causeId) {
     BankTransaction transaction = transactionRepository.findById(booked.id()).orElse(null);
     String accountNo = accountNo(request.accountId());
     if (transaction == null || accountNo == null) {
@@ -81,7 +87,8 @@ public class BankDirectBookingNotifier {
     }
     ActorRef actor = actors.current();
     if (gamePayment && request.counterpartyUserId() != null) {
-      eventPublisher.publishEvent(
+      announce(
+          causeId,
           BankNotices.payoutBooked(
               booked.id(),
               request.counterpartyUserId(),
@@ -90,7 +97,8 @@ public class BankDirectBookingNotifier {
               accountNo,
               actor));
     }
-    eventPublisher.publishEvent(
+    announce(
+        causeId,
         BankNotices.accountDebited(
             booked.id(),
             request.accountId(),
@@ -110,18 +118,36 @@ public class BankDirectBookingNotifier {
   @Transactional(propagation = Propagation.MANDATORY)
   public void transferBooked(
       @NotNull BankTransferRequest request, @NotNull BankTransactionDto booked) {
+    transferBooked(request.sourceAccountId(), request.amount(), booked, null);
+  }
+
+  /**
+   * Announces an account debit using the linked outcome cause when present.
+   *
+   * @param sourceId the debited account
+   * @param amount the principal
+   * @param booked the booked transaction
+   * @param causeId the linked booking cause, or {@code null} for an ordinary booking
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  void transferBooked(
+      @NotNull UUID sourceId,
+      @NotNull BigDecimal amount,
+      @NotNull BankTransactionDto booked,
+      @Nullable UUID causeId) {
     BankTransaction transaction = transactionRepository.findById(booked.id()).orElse(null);
-    String accountNo = accountNo(request.sourceAccountId());
+    String accountNo = accountNo(sourceId);
     if (transaction == null || accountNo == null) {
       return;
     }
-    eventPublisher.publishEvent(
+    announce(
+        causeId,
         BankNotices.accountDebited(
             booked.id(),
-            request.sourceAccountId(),
+            sourceId,
             accountNo,
             "TRANSFER",
-            request.amount(),
+            amount,
             transaction.getTransferFee(),
             actors.current()));
   }
@@ -129,14 +155,17 @@ public class BankDirectBookingNotifier {
   /**
    * Announces a booked reversal to the responsible holders of every account it moved.
    *
+   * @param originalId the original transaction
    * @param booked the reversal transaction
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public void reversalBooked(@NotNull BankTransactionDto booked) {
+  public void reversalBooked(@NotNull UUID originalId, @NotNull BankTransactionDto booked) {
+    UUID causeId = linkedAttempts.findPostingLink(originalId).isPresent() ? booked.id() : null;
     ActorRef actor = actors.current();
     List<BankCounterLeg> legs = postingRepository.findLegsByTransactionIds(List.of(booked.id()));
     for (BankCounterLeg leg : legs) {
-      eventPublisher.publishEvent(
+      announce(
+          causeId,
           BankNotices.accountDebited(
               booked.id(),
               leg.accountId(),
@@ -158,6 +187,21 @@ public class BankDirectBookingNotifier {
   @Transactional(propagation = Propagation.MANDATORY)
   public void holderTransferBooked(
       @NotNull BankHolderTransferRequest request, @NotNull BankTransactionDto booked) {
+    holderTransferBooked(request, booked, null);
+  }
+
+  /**
+   * Announces a custody movement using the linked outcome cause when present.
+   *
+   * @param request the holder transfer
+   * @param booked the booked transaction
+   * @param causeId the linked booking cause, or {@code null} for an ordinary booking
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  void holderTransferBooked(
+      @NotNull BankHolderTransferRequest request,
+      @NotNull BankTransactionDto booked,
+      @Nullable UUID causeId) {
     UUID recipient =
         holderRepository
             .findById(request.destinationHolderId())
@@ -167,7 +211,8 @@ public class BankDirectBookingNotifier {
     if (recipient == null) {
       return;
     }
-    eventPublisher.publishEvent(
+    announce(
+        causeId,
         BankNotices.holderTransferBooked(
             booked.id(), recipient, request.amount(), actors.current()));
   }
@@ -182,9 +227,18 @@ public class BankDirectBookingNotifier {
   @Transactional(propagation = Propagation.MANDATORY)
   void fundsAuthorised(
       @NotNull UUID authorisationId, @NotNull BankAccount account, @NotNull BigDecimal amount) {
-    eventPublisher.publishEvent(
+    notificationCauses.appendPreferred(
+        authorisationId,
         BankNotices.fundsAuthorised(
             authorisationId, account.getId(), account.getAccountNo(), amount, actors.current()));
+  }
+
+  private void announce(@Nullable UUID causeId, NotificationEvent event) {
+    if (causeId == null) {
+      eventPublisher.publishEvent(event);
+    } else {
+      notificationCauses.appendPreferred(causeId, event);
+    }
   }
 
   private @Nullable String accountNo(UUID accountId) {

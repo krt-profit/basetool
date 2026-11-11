@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MoneyProvisionRefusedException;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.DesignateJobOrderMoneyRecipientDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderLinkedMoneyRepair;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyHolderCandidate;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyMovementPreview;
@@ -37,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyView
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MoveJobOrderMoneyDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.PreviewJobOrderMoneyProvisionDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.ProvideJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.ReplaceJobOrderBankAttemptDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderMoneyInformationDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.UpdateJobOrderMoneyTargetDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -68,6 +70,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobOrderMoneyController {
 
   private final JobOrderMoneyCommands commands;
+  private final JobOrderLinkedMoneyRepair repair;
   private final JobOrderMoneyQueries queries;
   private final JobOrderMoneyMovements movements;
   private final JobOrderMoneyRecipients recipients;
@@ -283,6 +286,26 @@ public class JobOrderMoneyController {
       @PathVariable UUID id, @Valid @RequestBody UpdateJobOrderMoneyInformationDto dto) {
     changes.information(id, dto);
     return queries.getMoney(id);
+  }
+
+  /**
+   * Replaces the failed linked request for an already submitted operation.
+   *
+   * @param id the order
+   * @param operation the original logical operation identity
+   * @param dto the prior attempt revision and full corrected terms
+   * @return the new authoritative outcome
+   */
+  @PostMapping("/{id}/money/operations/{operation}/bank-replacement")
+  @PreAuthorize("isAuthenticated()")
+  @Operation(
+      operationId = "replaceJobOrderBankAttempt",
+      summary = "Replace a failed linked Bank request")
+  public JobOrderMoneyOutcome replaceBankAttempt(
+      @PathVariable UUID id,
+      @PathVariable UUID operation,
+      @Valid @RequestBody ReplaceJobOrderBankAttemptDto dto) {
+    return repair.replace(id, operation, dto);
   }
 
   /**

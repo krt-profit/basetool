@@ -53,11 +53,10 @@ public class NotificationEventPreparation {
   Prepared resolve(@NotNull NotificationEvent event) {
     if (reconciling(event) && !validReconciliation(event)) {
       log.warn("Event {} reconciles without notice types or entity; ignored", event.eventType());
-      return new Prepared(event, Map.of());
+      return new Prepared(event, Map.of(), Map.of());
     }
-    return new Prepared(
-        event,
-        notificationMuteService.withoutMuted(ruleEvaluationService.resolveRecipients(event)));
+    Map<NotificationType, Set<UUID>> audience = ruleEvaluationService.resolveRecipients(event);
+    return new Prepared(event, audience, notificationMuteService.withoutMuted(audience));
   }
 
   @NotNull
@@ -184,11 +183,14 @@ public class NotificationEventPreparation {
   }
 
   /**
-   * Original event and its resolved, originally muted delivery choices.
+   * Original event and its resolved audience before and after preferences.
    *
    * @param event immutable original domain event
-   * @param recipients eligible recipients by original notification type
+   * @param audience entitled recipients by original notification type before mutes
+   * @param recipients eligible recipients by original notification type after mutes
    */
   record Prepared(
-      @NotNull NotificationEvent event, @NotNull Map<NotificationType, Set<UUID>> recipients) {}
+      @NotNull NotificationEvent event,
+      @NotNull Map<NotificationType, Set<UUID>> audience,
+      @NotNull Map<NotificationType, Set<UUID>> recipients) {}
 }

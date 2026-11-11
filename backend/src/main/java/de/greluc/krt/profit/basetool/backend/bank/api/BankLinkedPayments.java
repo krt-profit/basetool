@@ -36,10 +36,42 @@ public interface BankLinkedPayments {
   BankLinkedOutcome submit(@NotNull BankLinkedAttempt attempt, @NotNull BankLinkedPayment payment);
 
   /**
+   * Replaces a rejected or cancelled linked request under current Bank admission.
+   *
+   * @param previousRequestId the failed Bank request
+   * @param previousAttempt the exact failed attempt and purpose
+   * @param nextAttempt the fresh attempt identity for the same purpose
+   * @param payment the complete revised terms using the failed attempt's rate
+   * @return the synchronous pending, posted or authorised outcome
+   */
+  @NotNull
+  BankLinkedOutcome replace(
+      @NotNull UUID previousRequestId,
+      @NotNull BankLinkedAttempt previousAttempt,
+      @NotNull BankLinkedAttempt nextAttempt,
+      @NotNull BankLinkedPayment payment);
+
+  /**
+   * Requires the selected active custodian to belong to the expected registered member.
+   *
+   * @param custodianId the selected Bank custodian
+   * @param expectedUserId the member identified by the owning purpose
+   */
+  void requireCustodianUser(@NotNull UUID custodianId, @NotNull UUID expectedUserId);
+
+  /**
    * Cancels a pending request using the required purpose owner's authority.
    *
    * @param requestId the Bank request to cancel
    * @param attempt the exact linked attempt
    */
   void cancel(@NotNull UUID requestId, @NotNull BankLinkedAttempt attempt);
+
+  /**
+   * Cancels an unexecuted request under the purpose owner's already-held terminal guard.
+   *
+   * @param requestId the pending request
+   * @param attempt the exact linked attempt
+   */
+  void cancelUnexecuted(@NotNull UUID requestId, @NotNull BankLinkedAttempt attempt);
 }

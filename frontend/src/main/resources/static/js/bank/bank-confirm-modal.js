@@ -101,7 +101,7 @@ export function applyConfirmModalState(trigger, modal) {
 }
 
 /**
- * Shows the submitted custodians for a linked request and the editable pickers for ordinary requests.
+ * Shows the custodians relevant to the pending request and preserves its original account terms.
  *
  * @param {HTMLFormElement} form the confirmation form
  * @param {HTMLTableRowElement | null} requestRow the pending request's queue row
@@ -110,15 +110,20 @@ export function applyConfirmModalState(trigger, modal) {
 function applyCustodianState(form, requestRow, type) {
     const holderId = requestRow?.dataset.linkedHolderId ?? '';
     const destinationId = requestRow?.dataset.linkedDestinationId ?? '';
-    const linked = holderId !== '';
+    const linked = requestRow?.dataset.linkedRequest === 'true';
+    const selectDepositCustodian = linked && type === 'DEPOSIT' && holderId === '';
     toggleRequiredPicker(form.querySelector('[data-confirm-source-holder]'), !linked);
+    toggleRequiredPicker(
+        form.querySelector('[data-confirm-account-deposit-holder]'),
+        selectDepositCustodian,
+    );
     toggleRequiredPicker(
         form.querySelector('[data-confirm-destination-holder]'),
         !linked && type === 'TRANSFER',
     );
     const hint = /** @type {HTMLElement} */ (form.querySelector('[data-confirm-picker-hint]'));
     const fixed = /** @type {HTMLElement} */ (form.querySelector('[data-confirm-fixed-parties]'));
-    hint.hidden = linked;
+    hint.hidden = linked && !selectDepositCustodian;
     fixed.hidden = !linked;
     setFixedCustodian(fixed, 'holder', holderId, requestRow?.dataset.linkedHolder ?? '');
     setFixedCustodian(
@@ -127,6 +132,8 @@ function applyCustodianState(form, requestRow, type) {
         destinationId,
         requestRow?.dataset.linkedDestination ?? '',
     );
+    const holderRow = /** @type {HTMLElement} */ (fixed.querySelector('[data-fixed-holder-row]'));
+    holderRow.hidden = holderId === '';
     const destinationRow = /** @type {HTMLElement} */ (
         fixed.querySelector('[data-fixed-destination-row]')
     );

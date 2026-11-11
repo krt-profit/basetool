@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -30,7 +32,8 @@ import org.jetbrains.annotations.Nullable;
  *
  * @param operationId caller-generated identity, required to book
  * @param kind collection, handover or same-person purpose handover
- * @param sourceHolderId the debited holder
+ * @param sourceHolderId the debited personal holder
+ * @param sourceAccountHoldingId the debited order-local Bank account position
  * @param sourceVersion the observed source holder revision
  * @param targetVersion the observed target revision for a requester handover
  * @param destinationHolderId the existing collection holder, if selected
@@ -42,12 +45,14 @@ import org.jetbrains.annotations.Nullable;
  * @param provision explicitly recorded new means, if needed
  * @param commitmentId the explicitly selected unit commitment occurrence for new provision
  * @param rate the rate returned by preview, required to book
- * @param bankHandling the deliberate Bank-free selection
+ * @param bankHandling the explicit handling choice
+ * @param bank selected Bank terms when coupling is requested
  */
 public record MoveJobOrderMoneyDto(
     @Nullable UUID operationId,
     @NotNull JobOrderMoneyKind kind,
-    @NotNull UUID sourceHolderId,
+    @Nullable UUID sourceHolderId,
+    @Nullable UUID sourceAccountHoldingId,
     @Nullable Long sourceVersion,
     @Nullable Long targetVersion,
     @Nullable UUID destinationHolderId,
@@ -59,4 +64,5 @@ public record MoveJobOrderMoneyDto(
     @Nullable String provision,
     @Nullable UUID commitmentId,
     @Nullable String rate,
-    @NotNull Boolean bankHandling) {}
+    @NotNull Boolean bankHandling,
+    @Valid @Nullable JobOrderBankSelection bank) {}

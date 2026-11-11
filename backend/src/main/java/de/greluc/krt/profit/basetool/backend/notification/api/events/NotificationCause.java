@@ -28,17 +28,33 @@ import org.jetbrains.annotations.NotNull;
  * One logical revision's original notification events in descending delivery priority.
  *
  * @param id stable identity of this revision
- * @param events the original events, highest priority first
+ * @param preferredEvents original outcomes whose audiences cannot receive a fallback notice
+ * @param events the remaining original events, highest priority first
  */
-public record NotificationCause(@NotNull UUID id, @NotNull List<NotificationEvent> events) {
+public record NotificationCause(
+    @NotNull UUID id,
+    @NotNull List<NotificationEvent> preferredEvents,
+    @NotNull List<NotificationEvent> events) {
   /**
    * Captures a non-null revision identity and an immutable event list.
    *
    * @param id stable identity of this revision
-   * @param events the original events, highest priority first
+   * @param preferredEvents original outcomes whose audiences cannot receive a fallback notice
+   * @param events the remaining original events, highest priority first
    */
   public NotificationCause {
     Objects.requireNonNull(id);
+    preferredEvents = List.copyOf(preferredEvents);
     events = List.copyOf(events);
+  }
+
+  /**
+   * Captures a cause whose eligible notices follow the supplied priority order.
+   *
+   * @param id stable identity of this revision
+   * @param events the original events, highest priority first
+   */
+  public NotificationCause(@NotNull UUID id, @NotNull List<NotificationEvent> events) {
+    this(id, List.of(), events);
   }
 }

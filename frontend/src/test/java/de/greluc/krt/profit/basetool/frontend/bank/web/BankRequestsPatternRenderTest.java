@@ -201,7 +201,9 @@ class BankRequestsPatternRenderTest {
         holderTransfer
             ? new LinkedBankRequestDetails(
                 UUID.randomUUID(), "orion", new BigDecimal("20000"), null)
-            : null);
+            : "AUTHORISATION".equals(type)
+                ? new LinkedBankRequestDetails(null, null, BigDecimal.ZERO, null)
+                : null);
   }
 
   /**
@@ -408,6 +410,23 @@ class BankRequestsPatternRenderTest {
         .contains("1 warten auf dich")
         .doesNotContain("KB-0007")
         .doesNotContain("data-testid=\"bank-request-approval-pending\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void marksAnAccountOnlyAuthorisationAsLinkedWithoutAFixedCustodian() throws Exception {
+    var page =
+        new PageResponse<>(
+            List.of(request(OPEN_ID, "AUTHORISATION", false, false, null, null)),
+            0,
+            200,
+            1L,
+            1,
+            List.of());
+    assertThat(render(page, ""))
+        .contains("data-linked-request=\"true\"")
+        .doesNotContain("data-linked-holder-id=")
+        .contains("data-testid=\"bank-request-confirm-btn\"");
   }
 
   /** An empty segment renders the empty state and no table. */

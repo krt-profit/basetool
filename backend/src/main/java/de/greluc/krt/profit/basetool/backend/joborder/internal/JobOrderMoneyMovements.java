@@ -20,10 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import java.math.BigDecimal;
@@ -56,8 +53,9 @@ public class JobOrderMoneyMovements {
   private final JobOrderMoneyMovementBasis basis;
   private final JobOrderMoneyIdentityLock identityLock;
   private final JobOrderMoneyLedger ledger;
-  private final JobOrderService orders;
-  private final JobOrderMoneyEffects effects;
+  private final JobOrderMoneyMovementWriter writer;
+  private final JobOrderLinkedMoneyCommands linked;
+  private final JobOrderMoneyAccountCommands accountCommands;
   private final JobOrderMoneyCommitmentCredit commitmentCredit;
 
   /**
@@ -69,6 +67,10 @@ public class JobOrderMoneyMovements {
    */
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public JobOrderMoneyMovementPreview preview(UUID orderId, MoveJobOrderMoneyDto dto) {
+    var bank = dto.bank();
+    if (bank != null && Boolean.TRUE.equals(bank.accountOnly())) {
+      return accountCommands.preview(orderId, dto, bank);
+    }
     JobOrder order = queries.requireReadableMoneyOrder(orderId);
     if (queries.responsibilityInvalid(order) || !order.getStatus().isActive()) {
       throw new BusinessConflictException("orders.money.movement.inactive");
@@ -97,6 +99,10 @@ public class JobOrderMoneyMovements {
    * @return the accepted result or empty for a durable refusal
    */
   public Optional<JobOrderMoneyOutcome> record(UUID orderId, MoveJobOrderMoneyDto dto) {
+    var bank = dto.bank();
+    if (bank != null && Boolean.TRUE.equals(bank.accountOnly())) {
+      return accountCommands.move(orderId, dto, bank);
+    }
     UUID operationId = dto.operationId();
     if (operationId == null) {
       throw new BadRequestException("orders.money.movement.operationRequired");
@@ -118,8 +124,28 @@ public class JobOrderMoneyMovements {
     access.requireActiveActor();
     authorizeAttribution(order, attempt.terms());
     UUID id = order.getId();
+    var linkedReplay =
+        linked.replayMovement(
+            order,
+            attempt.id(),
+            attempt.dto().bank(),
+            attempt.actor(),
+            attempt.terms(),
+            attempt.rate());
+    if (linkedReplay.isPresent()) {
+      basis.authorize(
+          order,
+          attempt.terms(),
+          attempt.actor(),
+          attempt.accounts().source(),
+          attempt.accounts().destination());
+      return new JobOrderEditor.MoneyEdit<>(linkedReplay, JobOrderEdit.unchanged(order));
+    }
     var previous = operations.findByOrderIdAndOperationId(id, attempt.id());
     if (previous.isPresent()) {
+      if (attempt.dto().bank() != null) {
+        throw new BusinessConflictException("orders.money.operation.termsMismatch");
+      }
       return replay(order, attempt, previous.orElseThrow());
     }
     if (operations.isRefused(id, attempt.id())) {
@@ -155,67 +181,36 @@ public class JobOrderMoneyMovements {
         return refuse(order, attempt.id());
       }
     }
+    if (attempt.dto().bank() != null) {
+      var outcome =
+          linked.submitMovement(
+              order,
+              attempt.id(),
+              attempt.actor(),
+              attempt.terms(),
+              resolved,
+              attempt.dto().bank());
+      return new JobOrderEditor.MoneyEdit<>(Optional.of(outcome), JobOrderEdit.unchanged(order));
+    }
     return post(order, attempt, resolved);
   }
 
   private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> post(
       JobOrder order, Attempt attempt, JobOrderMoneyMovementBasis.Resolved resolved) {
-    JobOrderMoneyMovementTerms terms = attempt.terms();
-    var source = resolved.source();
-    source.recordChange();
-    var destination = resolved.destination();
-    UUID destinationId = null;
-    boolean newLinkedHolder = false;
-    if (destination != null) {
-      newLinkedHolder = destination.getId() == null && destination.getUserId() != null;
-      destination.recordChange();
-      destinationId = Objects.requireNonNull(holders.save(destination).getId());
-    }
-    var fact =
-        operations.saveAndFlush(
-            new JobOrderMoneyOperation(
-                order.getId(),
-                attempt.id(),
-                terms.sourceId(),
-                attempt.actor(),
-                terms.selection(),
-                terms.commitmentId(),
-                false,
-                terms.amount(),
-                terms.kind(),
-                destinationId,
-                terms.recipientId(),
-                terms.provision(),
-                resolved.rate().rate(),
-                resolved.fee()));
-    if (terms.commitmentId() != null) {
-      commitmentCredit.recordFreshProvision(
-          order, attempt.id(), terms.commitmentId(), terms.provision());
-    }
-    boolean started = order.getStatus() == JobOrderStatus.OPEN;
-    if (resolved.completes()) {
-      orders.completeJobOrderWithinTransaction(order);
-    } else if (started) {
-      JobOrderService.changeLifecycle(order, JobOrderStatus.IN_PROGRESS);
-    }
-    effects.movementRecorded(
-        order,
-        fact,
-        source.getUserId(),
-        resolved.recipient().accountId(),
-        attempt.actor(),
-        started || resolved.completes(),
-        newLinkedHolder);
-    JobOrderEdit audit =
-        JobOrderEdit.audited(
-            order,
-            AuditEventType.JOB_ORDER_MONEY_MOVED,
-            AuditDetails.of("operationId", attempt.id())
-                .with("kind", terms.kind())
-                .with("amount", terms.amount())
-                .with("fee", resolved.fee())
-                .with("provision", terms.provision()));
-    return new JobOrderEditor.MoneyEdit<>(Optional.of(queries.projectOutcome(fact, source)), audit);
+    var terms =
+        new JobOrderMoneyMovementWriter.Terms(
+            attempt.id(),
+            attempt.actor(),
+            attempt.actor(),
+            attempt.terms(),
+            resolved.recipient().accountId(),
+            resolved.rate().rate(),
+            resolved.fee(),
+            resolved.completes(),
+            null);
+    var posted = writer.post(order, resolved.source(), resolved.destination(), terms);
+    return new JobOrderEditor.MoneyEdit<>(
+        Optional.of(queries.projectOutcome(posted.fact(), resolved.source())), posted.edit());
   }
 
   /**
@@ -302,7 +297,7 @@ public class JobOrderMoneyMovements {
       throw new BusinessConflictException("orders.money.operation.termsMismatch");
     }
     var identities = ledger.read(order.getId());
-    var holder = identities.holder(previous.getHolderId());
+    var holder = identities.holder(previous.personalHolderId());
     UUID destinationId = previous.getDestinationHolderId();
     UUID recipientId = previous.getRecipientId();
     UUID destinationAccount =

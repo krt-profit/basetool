@@ -335,7 +335,26 @@ public class JobOrderEditor {
     return new PreparedEdit(order, planned);
   }
 
-  private void recordOutcome(@NotNull JobOrderEdit edit) {
+  @Transactional(propagation = Propagation.MANDATORY)
+  JobOrder prepareLinkedBankEffect(UUID id, Predicate<JobOrder> needsQueue) {
+    profitHierarchy.lockForOrderWrite();
+    JobOrder order =
+        Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+    boolean queueLocked = needsQueue.test(order);
+    if (queueLocked) {
+      jobOrderRepository.lockPriorityQueueRows();
+    }
+    Entities.require(jobOrderRepository.lockForScopedEdit(id), () -> "JobOrder not found: " + id);
+    entityManager.refresh(order);
+    JobOrderMoneyQueries.requireMoneyKind(order);
+    responsibilityGuard.assertWritable(order);
+    if (!queueLocked && needsQueue.test(order)) {
+      throw JobOrderLinkedMoneyAttempt.conflict();
+    }
+    return order;
+  }
+
+  void recordOutcome(@NotNull JobOrderEdit edit) {
     if (edit.type() != null) {
       JobOrder affected = edit.order();
       auditRecorder.record(

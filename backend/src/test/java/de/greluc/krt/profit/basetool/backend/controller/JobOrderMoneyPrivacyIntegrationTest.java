@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -113,6 +114,81 @@ class JobOrderMoneyPrivacyIntegrationTest {
       unitless = account(unitlessName).getId();
       survivor = account("money-survivor-" + tag).getId();
     });
+  }
+
+  @Test
+  void registeredDepositorExportsOnlyTheirOwnPendingAttempt() throws Exception {
+    UUID order = createOrder();
+    UUID holder = UUID.fromString(provisionFor(order, UUID.randomUUID(), "10", survivor));
+    UUID ownOperation = UUID.randomUUID();
+    UUID otherOperation = UUID.randomUUID();
+    UUID bankAccount = UUID.randomUUID();
+    seedWaitingLinkedDeposit(order, ownOperation, holder, bankAccount, unitless, null);
+    seedWaitingLinkedDeposit(order, otherOperation, holder, bankAccount, null, "Another depositor");
+
+    JsonNode export = exportFor(unitless);
+    JsonNode ownAttempt = singleExportRow(export, "jobOrderLinkedMoneyAttempts");
+    assertThat(ownAttempt.path("operation_id").asString()).isEqualTo(ownOperation.toString());
+    assertThat(ownAttempt.path("state").asString()).isEqualTo("WAITING");
+    assertThat(ownAttempt.path("amount").asString()).isEqualTo("400000");
+    assertThat(export.toString()).doesNotContain(otherOperation.toString(), "Another depositor");
+    assertThat(ownAttempt.toString()).doesNotContain(bankAccount.toString(), holder.toString());
+  }
+
+  @Test
+  void grantedErasureClearsAnAccountlessDepositorMentionFromAWaitingAttempt() throws Exception {
+    UUID order = createOrder();
+    UUID holder = UUID.fromString(provisionFor(order, UUID.randomUUID(), "10", survivor));
+    UUID operation = UUID.randomUUID();
+    seedWaitingLinkedDeposit(order, operation, holder, UUID.randomUUID(), null, unitlessName);
+
+    personSearch(unitlessName)
+        .andExpect(jsonPath("$.hits[*].column", hasItem("counterparty_name")));
+    anonymisation.anonymise(unitless, List.of(unitlessName));
+    personSearch(unitlessName)
+        .andExpect(jsonPath("$.hits[?(@.table == 'job_order_linked_money_attempt')]").isEmpty());
+    mvc.perform(
+            get("/api/v1/orders/{id}/money/operations/{operation}", order, operation)
+                .with(writer()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"))
+        .andExpect(jsonPath("$.amount").value("400000"))
+        .andExpect(jsonPath("$.counterpartyName").doesNotExist());
+  }
+
+  private void seedWaitingLinkedDeposit(
+      UUID order,
+      UUID operation,
+      UUID holder,
+      UUID bankAccount,
+      @Nullable UUID depositor,
+      @Nullable String name) {
+    UUID attempt = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO job_order_linked_money_attempt
+          (id, order_id, operation_id, purpose_ref, revision, active, version, kind,
+           actor_id, holder_id, selection_kind, selected_ref, amount, provision, rate,
+           actual_fee, fee_funding, source_binding, actual_payment, bank_type,
+           bank_account_id, bank_custodian_id, counterparty_user_id, counterparty_name,
+           state, request_id, submitted_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, true, 0, 'PROVISION',
+                ?, ?, 'EXISTING', ?, 400000, 400000, 0.005,
+                2000, 'DEPOSITOR', 0, true, 'DEPOSIT',
+                ?, ?, ?, ?, 'WAITING', ?, now(), now())
+        """,
+        attempt,
+        order,
+        operation,
+        attempt,
+        writer,
+        holder,
+        holder,
+        bankAccount,
+        UUID.randomUUID(),
+        depositor,
+        name,
+        UUID.randomUUID());
   }
 
   @AfterEach

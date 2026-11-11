@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * Recorded result of one accepted money operation.
  *
  * @param operationId submitted logical identity
- * @param holderId credited provision holder or debited movement holder
+ * @param holderId credited provision holder or debited movement holder, when person-held
  * @param amount exact net whole aUEC
  * @param bankHandling the submitted choice
  * @param recordedAt the booking time
@@ -46,11 +46,20 @@ import org.jetbrains.annotations.Nullable;
  * @param peerOrderId paired order when the caller may read it
  * @param corrections connected corrections accepted in this operation
  * @param correctionBasis current editable basis for this original in the order history
+ * @param state the authoritative outcome
+ * @param linkedRevision the submitted revision for a linked operation
+ * @param actualPayment whether the linked attempt reports a player payment
+ * @param actualFee the full linked game fee
+ * @param feeFunding the source of the linked fee
+ * @param counterpartyName the depositor when independently reported
+ * @param activeLinkedRevision whether this revision is the current linked attempt
+ * @param clarificationResolved whether a targeted correction resolved clarification
+ * @param accountHoldingId the credited or debited order-local Bank account holding
  */
 @DtoMirror
 public record JobOrderMoneyOutcome(
     UUID operationId,
-    UUID holderId,
+    @Nullable UUID holderId,
     String amount,
     boolean bankHandling,
     Instant recordedAt,
@@ -65,4 +74,13 @@ public record JobOrderMoneyOutcome(
     String provision,
     @Nullable UUID peerOrderId,
     List<JobOrderMoneyCorrectionView> corrections,
-    @Nullable JobOrderMoneyCorrectionBasisView correctionBasis) {}
+    @Nullable JobOrderMoneyCorrectionBasisView correctionBasis,
+    @BackendEnumAsString String state,
+    @Nullable Long linkedRevision,
+    @Nullable Boolean actualPayment,
+    @Nullable String actualFee,
+    @Nullable @BackendEnumAsString String feeFunding,
+    @Nullable String counterpartyName,
+    @Nullable Boolean activeLinkedRevision,
+    @Nullable Boolean clarificationResolved,
+    @Nullable UUID accountHoldingId) {}

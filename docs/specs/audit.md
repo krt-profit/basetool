@@ -144,7 +144,11 @@ web, naming its client (REQ-AUDIT-005):
   Active Staffel support starts with `JOB_ORDER_PARTICIPATION_ENROLLED` and ends with
   `JOB_ORDER_PARTICIPATION_ENDED`, with safe participation and unit ids and a bounded reason.
   An accepted money provision records `JOB_ORDER_MONEY_PROVIDED` in the same transaction as the
-  durable operation, with its logical operation ID and exact amount. A Bank-free movement records
+  durable operation, with its logical operation ID and exact amount. Linked provision and
+  movement also correlate the decision to the exact attempt. The deciding employee is the actor
+  when the Bank decision comes later. `JOB_ORDER_MONEY_BANK_DECIDED` records pending, refused,
+  withdrawn and reversed linked outcomes using the order operation ID, attempt ID and state.
+  A Bank-free movement records
   `JOB_ORDER_MONEY_MOVED` with its logical operation ID, purpose, net amount, exact fee and explicit
   new funds. A requester return, release, shortage or beneficiary payment uses the same event with
   its own purpose. `JOB_ORDER_MONEY_REASSIGNED` records each order's purpose leg in the same

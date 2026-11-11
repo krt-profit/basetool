@@ -68,7 +68,10 @@ final class BankBookingRequestDtos {
     BankAccount account = request.getAccount();
     OrgUnit orgUnit = account == null ? null : account.getOrgUnit();
     boolean linked = request.getPurposeKind() == BankPurposeKind.AUEC_ORDER;
-    BankHolder holder = linked ? request.getRequestedHolder() : request.getHolder();
+    BankHolder holder = request.getHolder();
+    if (holder == null && linked) {
+      holder = request.getRequestedHolder();
+    }
     BankTransaction transaction = request.getResultingTransaction();
     BankAccount target = request.getTargetAccount();
     return new BankBookingRequestDto(

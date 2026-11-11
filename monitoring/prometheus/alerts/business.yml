@@ -46,6 +46,15 @@ groups:
           summary: "Job orders require valid responsibility: {{ $value }} order(s)"
           description: "Current responsibility lies outside the active designated Profit hierarchy or verified original boundary. Authorised readers retain the order; a current responsible-unit writer must explicitly transfer it to an eligible unit before processing resumes. No stock or money is moved automatically."
 
+      - alert: JobOrderLinkedMoneyContradiction
+        expr: basetool_job_order_linked_money_contradictions > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Linked order money has {{ $value }} contradictory effect(s)"
+          description: "Inspect the coupled decision history and owning-domain audit before making a financial correction."
+
       - alert: JobOrderItemBlueprintDrift
         expr: basetool_job_order_integrity_violations > 0
         for: 15m

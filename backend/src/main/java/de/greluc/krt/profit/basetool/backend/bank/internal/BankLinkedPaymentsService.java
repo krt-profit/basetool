@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
+import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActors;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
@@ -65,6 +66,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   private final BankActors actors;
   private final BankAccessRules policy;
   private final BankPostingWriter writer;
+  private final BankHolderRepository holders;
   private final BankBookingGuards guards;
   private final BankLedgerService ledger;
   private final TransferFeePolicy feePolicy;
@@ -75,11 +77,59 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   @NotNull
   public BankLinkedOutcome submit(
       @NotNull BankLinkedAttempt attempt, @NotNull BankLinkedPayment payment) {
+    BankLinkedDecisions.Prepared prepared = prepareSubmission(attempt, payment);
+    return admit(prepared, payment, feePolicy.snapshot());
+  }
+
+  @Override
+  @NotNull
+  public BankLinkedOutcome replace(
+      @NotNull UUID previousRequestId,
+      @NotNull BankLinkedAttempt previousAttempt,
+      @NotNull BankLinkedAttempt nextAttempt,
+      @NotNull BankLinkedPayment payment) {
+    if (previousAttempt.id().equals(nextAttempt.id())
+        || !previousAttempt.purpose().equals(nextAttempt.purpose())) {
+      throw new BadRequestException("Replacement requires a fresh attempt for the same purpose");
+    }
+    BankLinkedDecisions.Prepared prepared = prepareSubmission(nextAttempt, payment);
+    RateSnapshot previousRate = requests.replacementRate(previousRequestId, previousAttempt);
+    return admit(prepared, payment, previousRate);
+  }
+
+  /**
+   * Validates the submission and prepares its owner before Bank locks any resources.
+   *
+   * @param attempt the new attempt
+   * @param payment its submitted terms
+   * @return the prepared owner
+   */
+  @NotNull
+  private BankLinkedDecisions.Prepared prepareSubmission(
+      @NotNull BankLinkedAttempt attempt, @NotNull BankLinkedPayment payment) {
     if (attempt.purpose().kind() != BankPurposeKind.AUEC_ORDER) {
       throw new BadRequestException("This purpose does not use the linked Bank contract");
     }
     requireValidTerms(payment.terms());
-    BankLinkedDecisions.Prepared prepared = decisions.prepare(attempt, Action.SUBMIT);
+    return decisions.prepare(attempt, Action.SUBMIT);
+  }
+
+  /**
+   * Runs current Bank admission with the authoritative new or historical fee basis.
+   *
+   * @param prepared the prepared owner and attempt
+   * @param payment the immutable submitted terms
+   * @param rate the authoritative rate for this payment
+   * @return the Bank outcome
+   */
+  @NotNull
+  private BankLinkedOutcome admit(
+      @NotNull BankLinkedDecisions.Prepared prepared,
+      @NotNull BankLinkedPayment payment,
+      @NotNull RateSnapshot rate) {
+    if (!rate.equals(payment.terms().rate())) {
+      throw new BadRequestException("The submitted fee rate does not match the payment fee basis");
+    }
     BankActor actor = actors.of(prepared.actor());
     requirePreliminaryAdmission(actor, payment);
     BankLinkedBooking booking = normalize(payment);
@@ -92,6 +142,9 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
           case BankLinkedPayment.Transfer transfer ->
               Objects.requireNonNull(transfer.gamePayment()) == GamePayment.SAME_PLAYER;
           case BankLinkedPayment.Deposit _,
+              BankLinkedPayment.AccountDeposit _,
+              BankLinkedPayment.AccountTransfer _,
+              BankLinkedPayment.AccountAuthorisation _,
               BankLinkedPayment.HolderTransfer _,
               BankLinkedPayment.Authorisation _ ->
               false;
@@ -101,12 +154,12 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
         switch (booking.type()) {
           case AUTHORISATION, DEPOSIT -> BigDecimal.ZERO;
           case WITHDRAWAL, TRANSFER, HOLDER_TRANSFER ->
-              samePlayer
+              samePlayer || payment instanceof BankLinkedPayment.AccountTransfer
                   ? BigDecimal.ZERO
-                  : feePolicy.feeOn(booking.amount(), payment.terms().rate());
+                  : feePolicy.feeOn(booking.amount(), rate);
         };
     BankLinkedAttemptRecord record =
-        new BankLinkedAttemptRecord(attempt, payment.terms().rate().rate(), fee, samePlayer);
+        new BankLinkedAttemptRecord(prepared.attempt(), rate.rate(), fee, samePlayer);
     BankAdmission.Admitted routing = pendingRouting(actor, staff, booking);
     if (routing == null && booking.type() == BankBookingRequestType.HOLDER_TRANSFER) {
       ledger.lockHolderTransferFeeAccount(fee);
@@ -160,8 +213,20 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   }
 
   @Override
+  public void requireCustodianUser(@NotNull UUID custodianId, @NotNull UUID expectedUserId) {
+    if (!holders.existsByIdAndUserIdAndActiveTrue(custodianId, expectedUserId)) {
+      throw new NotFoundException("The selected Bank custodian is unavailable for this member");
+    }
+  }
+
+  @Override
   public void cancel(@NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
-    requests.cancelLinked(requestId, attempt);
+    requests.cancelLinked(requestId, attempt, Action.CANCEL);
+  }
+
+  @Override
+  public void cancelUnexecuted(@NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
+    requests.cancelLinked(requestId, attempt, Action.CANCEL_UNEXECUTED);
   }
 
   /**
@@ -184,6 +249,16 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
                   transfer.sourceAccountId(),
                   transfer.destinationAccountId());
           case BankLinkedPayment.Authorisation authorisation ->
+              new AccountSelection(
+                  BankBookingRequestType.AUTHORISATION, authorisation.accountId(), null);
+          case BankLinkedPayment.AccountDeposit deposit ->
+              new AccountSelection(BankBookingRequestType.DEPOSIT, deposit.accountId(), null);
+          case BankLinkedPayment.AccountTransfer transfer ->
+              new AccountSelection(
+                  BankBookingRequestType.TRANSFER,
+                  transfer.sourceAccountId(),
+                  transfer.destinationAccountId());
+          case BankLinkedPayment.AccountAuthorisation authorisation ->
               new AccountSelection(
                   BankBookingRequestType.AUTHORISATION, authorisation.accountId(), null);
           case BankLinkedPayment.HolderTransfer _ -> null;
@@ -230,6 +305,9 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
     BankAccount account = booking.account();
     if (account == null) {
       return staff.staff() ? null : BankAdmission.Admitted.UNROUTED;
+    }
+    if (booking.type() == BankBookingRequestType.DEPOSIT && booking.holder() == null) {
+      return BankAdmission.Admitted.UNROUTED;
     }
     boolean direct = staff.canBook(booking.type(), account.getId());
     if (direct) {
@@ -286,7 +364,38 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
               null,
               resolve(withdrawal.payee()),
               terms);
-      case BankLinkedPayment.Transfer transfer -> normalizeTransfer(transfer);
+      case BankLinkedPayment.Transfer transfer ->
+          normalizeTransfer(
+              transfer.sourceAccountId(),
+              transfer.destinationAccountId(),
+              transfer.sourceHolderId(),
+              transfer.destinationHolderId(),
+              transfer.terms());
+      case BankLinkedPayment.AccountTransfer transfer ->
+          normalizeTransfer(
+              transfer.sourceAccountId(),
+              transfer.destinationAccountId(),
+              null,
+              null,
+              transfer.terms());
+      case BankLinkedPayment.AccountDeposit deposit ->
+          booking(
+              BankBookingRequestType.DEPOSIT,
+              lockActive(deposit.accountId()),
+              null,
+              null,
+              null,
+              resolve(deposit.depositor()),
+              terms);
+      case BankLinkedPayment.AccountAuthorisation authorisation ->
+          booking(
+              BankBookingRequestType.AUTHORISATION,
+              lockActive(authorisation.accountId()),
+              null,
+              null,
+              null,
+              null,
+              terms);
       case BankLinkedPayment.HolderTransfer transfer ->
           booking(
               BankBookingRequestType.HOLDER_TRANSFER,
@@ -311,13 +420,20 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   /**
    * Locks both account transfer accounts in the shared Bank order.
    *
-   * @param transfer the typed transfer
+   * @param sourceId the funding account
+   * @param targetId the receiving account
+   * @param sourceHolder the selected source custodian, when applicable
+   * @param targetHolder the selected receiving custodian, when applicable
+   * @param terms the submitted payment terms
    * @return the normalized transfer
    */
   @NotNull
-  private BankLinkedBooking normalizeTransfer(@NotNull BankLinkedPayment.Transfer transfer) {
-    UUID sourceId = transfer.sourceAccountId();
-    UUID targetId = transfer.destinationAccountId();
+  private BankLinkedBooking normalizeTransfer(
+      @NotNull UUID sourceId,
+      @NotNull UUID targetId,
+      @Nullable UUID sourceHolder,
+      @Nullable UUID targetHolder,
+      @NotNull BankLinkedPayment.Terms terms) {
     if (sourceId.equals(targetId)) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_SELF_TRANSFER, "Bank transfer accounts must differ");
@@ -332,13 +448,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
       source = lockActive(sourceId);
     }
     return booking(
-        BankBookingRequestType.TRANSFER,
-        source,
-        target,
-        transfer.sourceHolderId(),
-        transfer.destinationHolderId(),
-        null,
-        transfer.terms());
+        BankBookingRequestType.TRANSFER, source, target, sourceHolder, targetHolder, null, terms);
   }
 
   /**
@@ -358,7 +468,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
       @NotNull BankBookingRequestType type,
       @Nullable BankAccount account,
       @Nullable BankAccount target,
-      @NotNull UUID holderId,
+      @Nullable UUID holderId,
       @Nullable UUID targetHolderId,
       @Nullable CounterpartySnapshot counterparty,
       @NotNull BankLinkedPayment.Terms terms) {
@@ -369,7 +479,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
         type,
         account,
         target,
-        writer.requireHolder(holderId),
+        holderId == null ? null : writer.requireHolder(holderId),
         targetHolderId == null ? null : writer.requireHolder(targetHolderId),
         counterparty,
         terms.amount(),

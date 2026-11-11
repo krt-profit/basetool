@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
@@ -34,6 +35,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +52,7 @@ public class JobOrderMoneyRecipients {
   private final JobOrderMoneyHolders holderChoices;
   private final JobOrderMoneyIdentityLock identityLock;
   private final JobOrderMoneyEffects effects;
+  private final ObjectProvider<JobOrderBankPort> bankPort;
 
   /**
    * Designates an eligible account, existing holder or accountless recipient.
@@ -62,6 +65,14 @@ public class JobOrderMoneyRecipients {
       UUID orderId, DesignateJobOrderMoneyRecipientDto dto) {
     JobOrderMoneySelection selection = dto.selection();
     UUID actor = access.actorId();
+    UUID bankAccountId = dto.bankAccountId();
+    if (bankAccountId != null) {
+      if (selection.kind() != JobOrderMoneySelection.Kind.SELF) {
+        throw JobOrderLinkedPaymentTerms.invalid();
+      }
+      identityLock.lockAccounts(actor);
+      return editor.editMoney(orderId, order -> designateBank(order, bankAccountId));
+    }
     UUID account =
         switch (selection.kind()) {
           case EXISTING ->
@@ -74,6 +85,31 @@ public class JobOrderMoneyRecipients {
         };
     identityLock.lockAccounts(actor, account);
     return editor.editMoney(orderId, order -> designateLocked(order, selection, account));
+  }
+
+  private JobOrderEditor.MoneyEdit<JobOrderMoneyRecipientView> designateBank(
+      JobOrder order, UUID accountId) {
+    authorizeChange(order);
+    if (!bankAccountVisible(accountId)) {
+      throw new BadRequestException("orders.money.bank.accountUnavailable");
+    }
+    var existing =
+        recipients.findAllByOrderIdOrderById(order.getId()).stream()
+            .filter(row -> row.isActive() && accountId.equals(row.getBankAccountId()))
+            .findFirst();
+    if (existing.isPresent()) {
+      return new JobOrderEditor.MoneyEdit<>(
+          view(existing.orElseThrow()), JobOrderEdit.unchanged(order));
+    }
+    JobOrderMoneyRecipient saved =
+        recipients.save(new JobOrderMoneyRecipient(order.getId(), accountId));
+    effects.designationChanged(order, false);
+    return new JobOrderEditor.MoneyEdit<>(view(saved), designationAudit(order, saved));
+  }
+
+  private boolean bankAccountVisible(UUID accountId) {
+    JobOrderBankPort port = bankPort.getIfUnique();
+    return port != null && port.canSeeAccount(accountId);
   }
 
   private JobOrderEditor.MoneyEdit<JobOrderMoneyRecipientView> designateLocked(
@@ -230,7 +266,11 @@ public class JobOrderMoneyRecipients {
         previousId == null ? null : recordedName(find.apply(previousId), names),
         previousId == null ? null : recordedName(recipient, names),
         recipient.getCorrectedAt(),
-        actor == null ? null : names.apply(actor));
+        actor == null ? null : names.apply(actor),
+        recipient.getBankAccountId() != null,
+        recipient.getBankAccountId() != null && bankAccountVisible(recipient.getBankAccountId())
+            ? recipient.getBankAccountId()
+            : null);
   }
 
   private static JobOrderMoneyRecipient currentRecipient(

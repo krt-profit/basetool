@@ -69,10 +69,16 @@ class JobOrderMoneyEffects {
     if (recipient == null || recipient.equals(actor)) {
       return;
     }
-    boolean grouped = attempt.getCommitmentId() != null;
+    boolean grouped =
+        attempt.getCommitmentId() != null || orderEffects.hasLinkedCause(order.getId());
     var notice =
         new JobOrderMoneyProvisionedEvent(
-            order.getId(), attempt.getHolderId(), recipient, actor, grouped, order.getDisplayId());
+            order.getId(),
+            attempt.personalHolderId(),
+            recipient,
+            actor,
+            grouped,
+            order.getDisplayId());
     if (grouped) {
       orderEffects.publish(notice);
     } else {
@@ -93,6 +99,14 @@ class JobOrderMoneyEffects {
     publishMoney(destination, destinationStarted, newLinkedHolder);
   }
 
+  void accountMoneyChanged(JobOrder order, boolean lifecycleChanged) {
+    publishMoney(order, lifecycleChanged, false);
+  }
+
+  void linkedAttemptChanged(JobOrder order, boolean participantAdded) {
+    publishMoney(order, false, participantAdded);
+  }
+
   void designationChanged(JobOrder order, boolean linked) {
     publishMoney(order, false, linked);
   }
@@ -107,7 +121,8 @@ class JobOrderMoneyEffects {
       boolean newLinkedHolder) {
     publishMoney(order, lifecycleChanged, newLinkedHolder);
     boolean grouped =
-        order.getStatus() == JobOrderStatus.COMPLETED
+        orderEffects.hasLinkedCause(order.getId())
+            || order.getStatus() == JobOrderStatus.COMPLETED
             || fact.getCommitmentId() != null
             || (lifecycleChanged && fact.getKind() == JobOrderMoneyKind.REQUESTER_RETURN);
     List<NotificationEvent> notices = new ArrayList<>();
@@ -153,7 +168,8 @@ class JobOrderMoneyEffects {
       boolean affectsRecipients,
       boolean affectsCredit) {
     publishMoney(order, lifecycleChanged, affectsRecipients);
-    boolean grouped = lifecycleChanged || affectsCredit;
+    boolean grouped =
+        lifecycleChanged || affectsCredit || orderEffects.hasLinkedCause(order.getId());
     var affected = new HashSet<UUID>();
     List<NotificationEvent> notices = new ArrayList<>();
     for (var party : parties) {

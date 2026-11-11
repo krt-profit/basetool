@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -42,6 +44,7 @@ import org.jetbrains.annotations.Nullable;
  * @param rate previewed applicable fee rate
  * @param provision explicit additional funds
  * @param bankHandling per-operation Bank choice
+ * @param bank explicit Bank coordinates when coupling is selected
  */
 public record SettleJobOrderMoneyDto(
     @Nullable UUID operationId,
@@ -57,4 +60,5 @@ public record SettleJobOrderMoneyDto(
     @NotBlank String amount,
     @Nullable String rate,
     @Nullable String provision,
-    @NotNull Boolean bankHandling) {}
+    @NotNull Boolean bankHandling,
+    @Nullable @Valid JobOrderBankSelection bank) {}

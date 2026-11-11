@@ -71,7 +71,19 @@ class JobOrderMoneyCommitmentCredit {
     if (amount.signum() <= 0) {
       throw new IllegalArgumentException("Provision credit requires a positive amount.");
     }
-    JobOrderMoneyCommitment commitment = current(order, commitmentId);
+    record(current(order, commitmentId), operationId, amount);
+  }
+
+  @Transactional(propagation = Propagation.MANDATORY)
+  void recordDelayedProvision(
+      JobOrder order, UUID operationId, UUID commitmentId, BigDecimal amount) {
+    var commitment = requireOccurrence(order, commitmentId);
+    if (eligible(order, commitment) && amount.signum() > 0) {
+      record(commitment, operationId, amount);
+    }
+  }
+
+  private void record(JobOrderMoneyCommitment commitment, UUID operationId, BigDecimal amount) {
     BigDecimal before = commitment.getOutstanding();
     BigDecimal remaining = before.subtract(amount.min(before));
     Reason reason = Reason.CREDITED;
@@ -92,14 +104,18 @@ class JobOrderMoneyCommitmentCredit {
 
   private JobOrderMoneyCommitment current(JobOrder order, UUID commitmentId) {
     JobOrderMoneyCommitment commitment = requireOccurrence(order, commitmentId);
-    UUID unitId = commitment.getUnit().getId();
-    boolean responsible = unitId.equals(OrgUnit.idOf(order.getResponsibleOrgUnit()));
-    if (!order.getStatus().isActive()
-        || commitment.getEndedAt() != null
-        || (!responsible && !isSupporting(order, unitId))) {
+    if (!eligible(order, commitment)) {
       throw new BusinessConflictException("orders.money.commitment.changed");
     }
     return commitment;
+  }
+
+  private boolean eligible(JobOrder order, JobOrderMoneyCommitment commitment) {
+    UUID unitId = commitment.getUnit().getId();
+    return order.getStatus().isActive()
+        && commitment.getEndedAt() == null
+        && (unitId.equals(OrgUnit.idOf(order.getResponsibleOrgUnit()))
+            || isSupporting(order, unitId));
   }
 
   private boolean isSupporting(JobOrder order, UUID unitId) {

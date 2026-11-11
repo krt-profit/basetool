@@ -1,6 +1,6 @@
 # ADR-0357 - Optional aUEC Bank effects use a thin composition adapter
 
-- **Status:** Accepted — Bank capabilities implemented, Order composition pending
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Deciders:** Repository owner (@greluc)
 - **Amends:** ADR-0021 (authorisation-only outcome), ADR-0254 (optional purpose command/outcome coverage)
@@ -66,10 +66,21 @@ expanded by this integration.
 
 ## Implementation
 
-The Bank API, request and ledger effects, single synchronous handler and pre-effect preparation
-are implemented. V401 retains attempt identity and no-ledger evidence. The existing Bank staff
-workflow presents the new request types. The application adapter and acceptance through public
-Order actions remain pending.
+The application composition translates the public JobOrder and Bank ports. V401 retains Bank
+attempt identity and no-ledger evidence. V402 retains order-side revisions, decision references,
+the reported fee source, local bindings and the designated Bank destination. V403 identifies
+a first-provision withdrawal fee paid by the funding Bank account. V404 enables account-only
+authorisation and transfer and allows Bank to select the actual receiving custodian when
+confirming a deposit. V405 adds the order's collection-account position. The effective order
+ledger folds both personal and account positions, while Bank retains the independent custody
+dimension.
+
+Order action entry points take the sorted identity guards, the shared Profit hierarchy guard,
+the priority sequence when a decision affects it, and the order row before Bank request and
+account locks. The Bank resolves linked identifiers before acquiring those locks and invokes
+the order preparation under the authenticated decision actor. The synchronous effect consumes
+that preparation in the same transaction. Bank account UUID order follows PostgreSQL order.
+The terminal cleanup cancels unexecuted sibling requests under the held order guard.
 
 ## Consequences
 

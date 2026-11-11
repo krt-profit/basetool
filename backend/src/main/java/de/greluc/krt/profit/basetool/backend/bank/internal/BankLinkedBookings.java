@@ -62,23 +62,22 @@ class BankLinkedBookings {
    * Executes the submitted terms with the custodians displayed on the request.
    *
    * @param request the locked request
-   * @param holderId the echoed source holder
+   * @param holderId the selected or echoed custodian, when required
    * @param destinationHolderId the echoed destination holder
    * @param staffNote the private staff note
    * @param actor the authenticated confirming employee
-   * @return the confirmed linked effect
+   * @return the confirmed linked effect and its recorded custodian
    */
   @NotNull
-  BankLinkedOutcome confirm(
+  Confirmed confirm(
       @NotNull BankBookingRequest request,
-      @NotNull UUID holderId,
+      @Nullable UUID holderId,
       @Nullable UUID destinationHolderId,
       @Nullable String staffNote,
       @NotNull UUID actor) {
-    BankHolder holder = Objects.requireNonNull(request.getRequestedHolder());
+    BankHolder holder = confirmationHolder(request, holderId);
     BankHolder destination = request.getRequestedTargetHolder();
-    if (!holder.getId().equals(holderId)
-        || !Objects.equals(destination == null ? null : destination.getId(), destinationHolderId)) {
+    if (!Objects.equals(destination == null ? null : destination.getId(), destinationHolderId)) {
       throw new BadRequestException("Confirmation must use the submitted Bank custodians");
     }
     CounterpartySnapshot counterparty = linkedCounterparty(request);
@@ -93,9 +92,34 @@ class BankLinkedBookings {
             request.getAmount(),
             request.getNote(),
             request.getJustification());
-    return execute(
-        Objects.requireNonNull(request.getLinkedAttempt()), terms, actor, staffNote, false);
+    var outcome =
+        execute(Objects.requireNonNull(request.getLinkedAttempt()), terms, actor, staffNote, false);
+    return new Confirmed(outcome, holder);
   }
+
+  private @Nullable BankHolder confirmationHolder(
+      BankBookingRequest request, @Nullable UUID selected) {
+    BankHolder fixed = request.getRequestedHolder();
+    if (fixed != null) {
+      if (!fixed.getId().equals(selected)) {
+        throw new BadRequestException("Confirmation must use the submitted Bank custodian");
+      }
+      return fixed;
+    }
+    if (request.getType() == BankBookingRequestType.DEPOSIT) {
+      if (selected == null) {
+        throw new BadRequestException("The receiving Bank custodian is required");
+      }
+      return writer.requireHolder(selected);
+    }
+    if (selected != null) {
+      throw new BadRequestException("This account-only request does not select a Bank custodian");
+    }
+    return null;
+  }
+
+  /** A confirmed effect and the Bank custodian recorded by that decision, when applicable. */
+  record Confirmed(@NotNull BankLinkedOutcome outcome, @Nullable BankHolder holder) {}
 
   /**
    * Revalidates the frozen counterparty without substituting the applicant or another unit.
@@ -140,8 +164,13 @@ class BankLinkedBookings {
     if (terms.type() == BankBookingRequestType.AUTHORISATION) {
       UUID accountId = Objects.requireNonNull(terms.account()).getId();
       ledger.authorise(accountId, terms.amount(), terms.justification());
+      BankHolder holder = terms.holder();
       attempts.recordAuthorisation(
-          attempt.getId(), accountId, terms.holder().getId(), terms.amount(), actor);
+          attempt.getId(),
+          accountId,
+          holder == null ? null : holder.getId(),
+          terms.amount(),
+          actor);
       audit.record(
           BankAuditEventType.FUNDS_AUTHORISED,
           accountId,
@@ -166,7 +195,11 @@ class BankLinkedBookings {
    * @param samePlayer whether the payment is a same-player purpose change
    */
   void validateParties(@NotNull BankLinkedBooking terms, boolean samePlayer) {
-    UUID holderUserId = registeredUserId(terms.holder());
+    BankHolder holder = terms.holder();
+    if (holder == null) {
+      return;
+    }
+    UUID holderUserId = registeredUserId(holder);
     if (terms.targetHolder() != null) {
       UUID targetUserId = registeredUserId(terms.targetHolder());
       if (samePlayer != holderUserId.equals(targetUserId)) {
@@ -209,13 +242,12 @@ class BankLinkedBookings {
       @NotNull BankLinkedBooking terms,
       @Nullable String staffNote,
       boolean direct) {
-    UUID holderId = terms.holder().getId();
     return switch (terms.type()) {
       case DEPOSIT ->
           ledger.bookLinkedDeposit(
               new BankDepositRequest(
                   Objects.requireNonNull(terms.account()).getId(),
-                  holderId,
+                  Objects.requireNonNull(terms.holder()).getId(),
                   terms.amount(),
                   terms.note(),
                   staffNote,
@@ -230,7 +262,7 @@ class BankLinkedBookings {
         BankWithdrawalRequest request =
             new BankWithdrawalRequest(
                 Objects.requireNonNull(terms.account()).getId(),
-                holderId,
+                Objects.requireNonNull(terms.holder()).getId(),
                 terms.amount(),
                 terms.note(),
                 terms.justification(),
@@ -241,15 +273,30 @@ class BankLinkedBookings {
                 null);
         BankTransactionDto booked = ledger.bookLinkedWithdrawal(request, party, attempt.getFee());
         if (direct) {
-          notifier.withdrawalBooked(request, booked, !attempt.isSamePlayer());
+          notifier.withdrawalBooked(request, booked, !attempt.isSamePlayer(), booked.id());
         }
         yield booked;
       }
       case TRANSFER -> {
+        if (terms.holder() == null) {
+          BankAccount source = Objects.requireNonNull(terms.account());
+          BankTransactionDto booked =
+              ledger.bookLinkedAccountTransfer(
+                  source,
+                  Objects.requireNonNull(terms.target()),
+                  terms.amount(),
+                  terms.note(),
+                  terms.justification(),
+                  staffNote);
+          if (direct) {
+            notifier.transferBooked(source.getId(), terms.amount(), booked, booked.id());
+          }
+          yield booked;
+        }
         BankTransferRequest request =
             new BankTransferRequest(
                 Objects.requireNonNull(terms.account()).getId(),
-                holderId,
+                Objects.requireNonNull(terms.holder()).getId(),
                 Objects.requireNonNull(terms.target()).getId(),
                 Objects.requireNonNull(terms.targetHolder()).getId(),
                 terms.amount(),
@@ -259,21 +306,21 @@ class BankLinkedBookings {
                 false);
         BankTransactionDto booked = ledger.bookLinkedTransfer(request, attempt.getFee());
         if (direct) {
-          notifier.transferBooked(request, booked);
+          notifier.transferBooked(request.sourceAccountId(), request.amount(), booked, booked.id());
         }
         yield booked;
       }
       case HOLDER_TRANSFER -> {
         BankHolderTransferRequest request =
             new BankHolderTransferRequest(
-                holderId,
+                Objects.requireNonNull(terms.holder()).getId(),
                 Objects.requireNonNull(terms.targetHolder()).getId(),
                 terms.amount(),
                 terms.note());
         BankTransactionDto booked =
             ledger.bookLinkedHolderTransfer(request, attempt.getFee(), staffNote);
         if (direct) {
-          notifier.holderTransferBooked(request, booked);
+          notifier.holderTransferBooked(request, booked, booked.id());
         }
         yield booked;
       }

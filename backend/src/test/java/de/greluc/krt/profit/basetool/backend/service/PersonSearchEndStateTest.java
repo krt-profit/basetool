@@ -107,6 +107,17 @@ class PersonSearchEndStateTest {
     VALID.put("job_order.type", "MATERIAL");
     VALID.put("job_order.status", "OPEN");
     VALID.put("job_order_money_operation.selection_kind", "ACCOUNTLESS");
+    UUID linkedAttempt = UUID.randomUUID();
+    VALID.put("job_order_linked_money_attempt.id", linkedAttempt);
+    VALID.put("job_order_linked_money_attempt.purpose_ref", linkedAttempt);
+    VALID.put("job_order_linked_money_attempt.active", true);
+    VALID.put("job_order_linked_money_attempt.kind", "PROVISION");
+    VALID.put("job_order_linked_money_attempt.selection_kind", "ACCOUNTLESS");
+    VALID.put("job_order_linked_money_attempt.rate", 0.005);
+    VALID.put("job_order_linked_money_attempt.fee_funding", "DEPOSITOR");
+    VALID.put("job_order_linked_money_attempt.bank_type", "DEPOSIT");
+    VALID.put("job_order_linked_money_attempt.bank_account_id", UUID.randomUUID());
+    VALID.put("job_order_linked_money_attempt.state", "SUBMITTING");
     VALID.put("job_order_money_holder_change.kind", "NAME");
     VALID.put("purchasing_partner.kind", "ORG");
     VALID.put("purchasing_partner.channel", "OTHER");

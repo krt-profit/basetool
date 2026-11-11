@@ -73,7 +73,10 @@ public interface HandleAnonymisationParticipant {
     ORDER_MONEY_RECIPIENTS,
 
     /** Rows rewritten in {@code job_order_money_holder_change}. */
-    ORDER_MONEY_HOLDER_CHANGES
+    ORDER_MONEY_HOLDER_CHANGES,
+
+    /** Rows rewritten in {@code job_order_linked_money_attempt}. */
+    ORDER_LINKED_MONEY_ATTEMPTS
   }
 
   /**

@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="action">
-    <button th:if="${entry.correctionBasis != null and currentUserId != null}" type="button"
+    <button th:if="${entry.correctionBasis != null and entry.correctionBasis.accountHoldingId == null and currentUserId != null}" type="button"
             class="btn btn-ghost" data-trigger="od-money-correct" data-testid="order-money-correct"
             th:data-original-operation="${entry.operationId}" th:data-original-kind="${entry.kind}"
             th:data-original-peer="${entry.peerOrderId}"

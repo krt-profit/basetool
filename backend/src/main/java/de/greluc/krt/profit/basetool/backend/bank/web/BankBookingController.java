@@ -203,7 +203,7 @@ public class BankBookingController {
       @RequestBody(required = false) @Valid ReverseBankTransactionRequest request) {
     BankTransactionDto reversal =
         bankLedgerService.reverseTransaction(id, request == null ? null : request.note());
-    bankDirectBookingNotifier.reversalBooked(reversal);
+    bankDirectBookingNotifier.reversalBooked(id, reversal);
     return reversal;
   }
 }

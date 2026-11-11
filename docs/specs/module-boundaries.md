@@ -91,7 +91,11 @@ derives schema names from them, and the module baseline names classes by simple 
 
 ### REQ-MOD-003 — A module depends only on lower ranks and on its allow rows
 
-> **Approved planned JobOrder amendment (not implemented):** Keep JobOrder below Bank and implement the approved narrow coordination adapter in the existing application composition through joborder.api/bank.api only. Neither module imports the other aggregates/internals or an upper composition implementation. Synchronous effect-bearing commands/observers join one transaction; audit is synchronous and delivery is post-commit. Shared fee snapshots/calculation belong to the lower configuration-owning admin API, not Bank internals or kernel/platform policy. See [the approved aUEC contract](orders-auec.md) and [the approved optional-bank contract](orders-auec-bank.md).
+> **JobOrder and Bank composition:** The application adapter uses `joborder.api` and `bank.api` at
+> their existing ranks. Each domain owns its aggregates and repositories. The commands, required
+> Bank observer and audit share a transaction. Notices and live invalidations follow commit. The
+> configuration-owning admin API provides the fee snapshot and calculation. See the
+> [aUEC contract](orders-auec.md) and the [optional Bank contract](orders-auec-bank.md).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 

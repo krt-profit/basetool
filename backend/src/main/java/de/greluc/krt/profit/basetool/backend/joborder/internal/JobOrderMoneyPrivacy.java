@@ -54,14 +54,22 @@ public class JobOrderMoneyPrivacy {
     int retiredHolderRecipients = recipients.retireErasedHolderRecipients(userId, names, orderIds);
     int holderRows = holders.anonymiseNames(userId, names, orderIds, HandleAnonymisation.SENTINEL);
     int operationRows = operations.anonymiseSubmittedNames(userId, names, orderIds);
+    int linkedAttemptRows = holders.anonymiseLinkedAttemptNames(userId, names, orderIds);
     int changeRows =
         holderChanges.anonymiseNames(userId, names, orderIds, HandleAnonymisation.SENTINEL);
     int recipientRows = recipients.anonymiseNames(names, orderIds, HandleAnonymisation.SENTINEL);
     report.accept(Rewritten.ORDER_MONEY_RECIPIENTS, recipientRows + retiredHolderRecipients);
     report.accept(Rewritten.ORDER_MONEY_HOLDERS, holderRows);
     report.accept(Rewritten.ORDER_MONEY_OPERATIONS, operationRows);
+    report.accept(Rewritten.ORDER_LINKED_MONEY_ATTEMPTS, linkedAttemptRows);
     report.accept(Rewritten.ORDER_MONEY_HOLDER_CHANGES, changeRows);
-    if (holderRows + operationRows + recipientRows + retiredHolderRecipients + changeRows > 0) {
+    if (holderRows
+            + operationRows
+            + recipientRows
+            + retiredHolderRecipients
+            + changeRows
+            + linkedAttemptRows
+        > 0) {
       publishChanges(orderIds);
     }
   }

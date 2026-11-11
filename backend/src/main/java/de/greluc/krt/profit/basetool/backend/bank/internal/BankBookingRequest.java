@@ -401,6 +401,16 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   }
 
   /**
+   * Shortens the request id for audit details.
+   *
+   * @return the first id segment
+   */
+  String shortId() {
+    String text = id.toString();
+    return text.substring(0, text.indexOf('-'));
+  }
+
+  /**
    * Reads the source account id, if this request concerns an account.
    *
    * @return the account id, or {@code null} for a custody-only request

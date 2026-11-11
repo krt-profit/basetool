@@ -71,6 +71,7 @@ public class HandleAnonymisationService {
    * @param orderMoneyOperations rows rewritten in {@code job_order_money_operation}
    * @param orderMoneyRecipients rows rewritten in {@code job_order_money_recipient}
    * @param orderMoneyHolderChanges rows rewritten in {@code job_order_money_holder_change}
+   * @param orderLinkedMoneyAttempts rows rewritten in {@code job_order_linked_money_attempt}
    */
   public record AnonymisationResult(
       int activityAudit,
@@ -84,7 +85,8 @@ public class HandleAnonymisationService {
       int orderMoneyHolders,
       int orderMoneyOperations,
       int orderMoneyRecipients,
-      int orderMoneyHolderChanges) {
+      int orderMoneyHolderChanges,
+      int orderLinkedMoneyAttempts) {
 
     /**
      * The total number of rows rewritten across every column.
@@ -103,7 +105,8 @@ public class HandleAnonymisationService {
           + orderMoneyHolders
           + orderMoneyOperations
           + orderMoneyRecipients
-          + orderMoneyHolderChanges;
+          + orderMoneyHolderChanges
+          + orderLinkedMoneyAttempts;
     }
   }
 
@@ -145,7 +148,8 @@ public class HandleAnonymisationService {
             rewritten.getOrDefault(Rewritten.ORDER_MONEY_HOLDERS, 0),
             rewritten.getOrDefault(Rewritten.ORDER_MONEY_OPERATIONS, 0),
             rewritten.getOrDefault(Rewritten.ORDER_MONEY_RECIPIENTS, 0),
-            rewritten.getOrDefault(Rewritten.ORDER_MONEY_HOLDER_CHANGES, 0));
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_HOLDER_CHANGES, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_LINKED_MONEY_ATTEMPTS, 0));
 
     auditRecorder.record(
         AuditEventType.HANDLE_SNAPSHOTS_ANONYMISED,
@@ -164,6 +168,7 @@ public class HandleAnonymisationService {
             .with("orderMoneyOperations", result.orderMoneyOperations())
             .with("orderMoneyRecipients", result.orderMoneyRecipients())
             .with("orderMoneyHolderChanges", result.orderMoneyHolderChanges())
+            .with("orderLinkedMoneyAttempts", result.orderLinkedMoneyAttempts())
             .with("spellings", names.size()));
 
     for (HandleAnonymisationParticipant participant : ordered) {

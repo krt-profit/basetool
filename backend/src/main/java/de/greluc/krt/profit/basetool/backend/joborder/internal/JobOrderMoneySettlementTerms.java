@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -45,9 +46,7 @@ record JobOrderMoneySettlementTerms(
     BigDecimal provision) {
 
   static JobOrderMoneySettlementTerms from(SettleJobOrderMoneyDto dto) {
-    if (Boolean.TRUE.equals(dto.bankHandling())) {
-      throw new BadRequestException("orders.money.bankHandling.unavailable");
-    }
+    validateBank(dto);
     var destination =
         JobOrderMoneySelection.parse(
             dto.destinationHolderId(), dto.destinationUserId(), dto.destinationName());
@@ -92,6 +91,41 @@ record JobOrderMoneySettlementTerms(
     };
   }
 
+  private static void validateBank(SettleJobOrderMoneyDto dto) {
+    JobOrderBankSelection bank = dto.bank();
+    if (Boolean.TRUE.equals(dto.bankHandling()) != (bank != null)) {
+      throw JobOrderLinkedPaymentTerms.invalid();
+    }
+    if (bank == null) {
+      return;
+    }
+    JobOrderLinkedPaymentTerms.validate(bank);
+    if (bank.counterpartyName() != null || bank.counterpartyUserId() != null) {
+      throw JobOrderLinkedPaymentTerms.invalid();
+    }
+    boolean supported =
+        switch (dto.kind()) {
+          case SETTLEMENT ->
+              JobOrderLinkedPaymentTerms.reported(bank)
+                  && (bank.type() == JobOrderBankSelection.Type.WITHDRAWAL
+                      || bank.type() == JobOrderBankSelection.Type.TRANSFER);
+          case REQUESTER_RETURN -> bank.type() != JobOrderBankSelection.Type.AUTHORISATION;
+          case PROVISION,
+              COLLECTION,
+              HANDOVER,
+              PURPOSE_HANDOVER,
+              RELEASE,
+              SHORTAGE,
+              PURPOSE_INFLOW,
+              PURPOSE_OUTFLOW,
+              CORRECTION ->
+              false;
+        };
+    if (!supported) {
+      throw JobOrderLinkedPaymentTerms.invalid();
+    }
+  }
+
   private static JobOrderMoneySettlementTerms terms(
       SettleJobOrderMoneyDto dto, JobOrderMoneySelection destination, BigDecimal provision) {
     return new JobOrderMoneySettlementTerms(
@@ -126,13 +160,30 @@ record JobOrderMoneySettlementTerms(
       return false;
     }
     UUID recordedSource =
-        requesterReturn() && fact.getHolderId().equals(fact.getDestinationHolderId())
+        requesterReturn() && Objects.equals(fact.getHolderId(), fact.getDestinationHolderId())
             ? null
             : fact.getHolderId();
     return Objects.equals(sourceId, recordedSource)
         && (hasFee()
             ? rate.rate().compareTo(Objects.requireNonNull(fact.getFeeRate())) == 0
             : rate.rate().signum() == 0);
+  }
+
+  boolean matches(JobOrderLinkedMoneyAttempt attempt, RateSnapshot rate) {
+    if (kind != attempt.getKind() || attempt.getAccountHoldingId() != null) {
+      return false;
+    }
+    UUID holderId = attempt.personalHolderId();
+    boolean sameHolding = requesterReturn() && holderId.equals(attempt.getDestinationHolderId());
+    boolean sourceMatches =
+        Objects.equals(sourceId, holderId)
+            || (sourceId == null && sameHolding && attempt.getSourceBinding().signum() == 0);
+    return sourceMatches
+        && Objects.equals(requesterRecipientId, attempt.getRecipientId())
+        && recordedSelection().equals(attempt.selection())
+        && amount.compareTo(attempt.getAmount()) == 0
+        && provision.compareTo(attempt.getProvision()) == 0
+        && rate.equals(attempt.rateSnapshot());
   }
 
   static BadRequestException invalidSelection() {

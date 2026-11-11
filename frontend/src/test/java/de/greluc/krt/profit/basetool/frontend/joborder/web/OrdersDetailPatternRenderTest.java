@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyView;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
@@ -248,6 +249,74 @@ class OrdersDetailPatternRenderTest {
         .containsPattern("data-testid=\"order-cancel\"[^>]*data-version=\"8\"")
         .doesNotContain("id=\"status-select\"")
         .doesNotContain("data-testid=\"order-reopen\"");
+  }
+
+  @Test
+  void moneyFragmentShowsTheWaitingPaymentAndTheAvailableBalanceSeparately() throws Exception {
+    UUID order = UUID.randomUUID();
+    UUID holder = UUID.randomUUID();
+    UUID accountHolding = UUID.randomUUID();
+    UUID bankAccount = UUID.randomUUID();
+    stubOrder(order(order, "AUEC", "IN_PROGRESS", List.of(), List.of(), List.of(), true));
+    JobOrderMoneyView money =
+        JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build()
+            .readValue(
+                """
+                {
+                  "target":"500000","targetVersion":0,"provided":"800000","holdings":"800000",
+                  "netHandedOver":"0","remaining":"500000","fees":"0","overpaid":"0",
+                  "responsibilityValid":true,"history":[],"targetChanges":[],"recipients":[],
+                  "holderIdentityHistory":[],"returnableRecipientIds":[],
+                  "holders":[{"id":"%s","displayName":"Alex","amount":"600000",
+                              "availableAmount":"97500","version":2}],
+                  "accountHoldings":[{"id":"%s","bankAccountId":"%s","amount":"200000",
+                                      "availableAmount":"175000","version":3}],
+                  "linkedAttempts":[{"operationId":"%s","holderId":"%s","amount":"500000",
+                     "bankHandling":true,"recordedAt":"2026-11-11T11:00:00Z","holderName":"Alex",
+                     "actorName":"Sam","recipientName":"Mika & Jo","kind":"HANDOVER",
+                     "fee":"2500","provision":"0","corrections":[],"state":"WAITING",
+                     "linkedRevision":1,"actualPayment":true,"actualFee":"2500","feeFunding":"ORDER"},
+                    {"operationId":"%s","accountHoldingId":"%s","amount":"25000",
+                     "bankHandling":true,"recordedAt":"2026-11-11T11:00:00Z","actorName":"Kim",
+                     "kind":"PURPOSE_HANDOVER","fee":"0","provision":"0","corrections":[],
+                     "state":"WAITING","linkedRevision":1,"actualPayment":false}]
+                }
+                """
+                    .formatted(
+                        holder,
+                        accountHolding,
+                        bankAccount,
+                        UUID.randomUUID(),
+                        holder,
+                        UUID.randomUUID(),
+                        accountHolding),
+                JobOrderMoneyView.class);
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/money"), eq(JobOrderMoneyView.class), eq(order)))
+        .thenReturn(money);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/{id}", order)
+                    .param("fragment", "money")
+                    .header("Accept-Language", "de")
+                    .with(authentication(token("ROLE_KRT_MEMBER"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .contains("data-testid=\"order-money-linked-attempt\"", "Wartet auf Bankbestätigung")
+        .contains("Spielzahlung gemeldet", "Mika &amp; Jo")
+        .contains("Gebucht: 600.000 aUEC", "Verfügbar: 97.500 aUEC")
+        .contains("data-testid=\"order-money-account-holding\"", "Erfasst von: Kim")
+        .contains("Übergabe an ein Empfängerkonto")
+        .contains("Gebucht: 200.000 aUEC", "Verfügbar: 175.000 aUEC")
+        .contains("Gebühr aus Auftragsmitteln: 2.500 aUEC")
+        .doesNotContain(bankAccount.toString(), "data-testid=\"order-money-history-entry\"");
   }
 
   /** A cancelled order retains its recorded handover without an active fulfillment action. */

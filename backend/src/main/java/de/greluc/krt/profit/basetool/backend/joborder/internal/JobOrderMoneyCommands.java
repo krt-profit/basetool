@@ -19,17 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,7 +57,9 @@ public class JobOrderMoneyCommands {
   private final JobOrderMoneyHolders holderChoices;
   private final JobOrderMoneyQueries queries;
   private final JobOrderMoneyIdentityLock identityLock;
-  private final JobOrderMoneyEffects effects;
+  private final JobOrderMoneyProvisionWriter provisions;
+  private final JobOrderLinkedMoneyCommands linked;
+  private final JobOrderMoneyAccountCommands accountCommands;
   private final JobOrderMoneyCommitmentCredit commitmentCredit;
 
   /**
@@ -83,12 +83,21 @@ public class JobOrderMoneyCommands {
    * @return the recorded result, or empty for a durable refusal with no monetary effect
    */
   public Optional<JobOrderMoneyOutcome> provide(UUID orderId, ProvideJobOrderMoneyDto dto) {
+    var bank = dto.bank();
+    if (bank != null && Boolean.TRUE.equals(bank.accountOnly())) {
+      return accountCommands.provide(orderId, dto, bank);
+    }
     BigDecimal amount = WholeAuec.positive(dto.amount());
     JobOrderMoneySelection selection = dto.selection();
     UUID actor =
         auth.currentUserId()
             .orElseThrow(() -> new AccessDeniedException("An active member account is required."));
-    identityLock.lockAccounts(actor, dto.holderUserId());
+    UUID holderAccount =
+        dto.holderId() == null
+            ? dto.holderUserId()
+            : holders.accountFor(orderId, dto.holderId()).orElse(null);
+    UUID depositor = dto.bank() == null ? null : dto.bank().counterpartyUserId();
+    identityLock.lockAffectedAccounts(actor, Arrays.asList(holderAccount, depositor));
     return editor.editMoney(orderId, order -> provideChecked(order, dto, actor, amount, selection));
   }
 
@@ -146,6 +155,10 @@ public class JobOrderMoneyCommands {
     if (dto.commitmentId() != null) {
       commitmentCredit.assertAttributionAuthority(order, dto.commitmentId());
     }
+    var linkedReplay = linked.replayProvision(order, dto, actor, amount, selection);
+    if (linkedReplay.isPresent()) {
+      return new JobOrderEditor.MoneyEdit<>(linkedReplay, JobOrderEdit.unchanged(order));
+    }
     var existing = operations.findByOrderIdAndOperationId(order.getId(), dto.operationId());
     if (existing.isPresent()) {
       return replay(
@@ -160,7 +173,11 @@ public class JobOrderMoneyCommands {
     if (operations.isRefused(order.getId(), dto.operationId())) {
       return refused(order);
     }
-    requireBankFree(dto.bankHandling());
+    if (dto.bank() == null) {
+      requireBankFree(dto.bankHandling());
+    } else if (!dto.bankHandling()) {
+      throw JobOrderLinkedPaymentTerms.invalid();
+    }
     if (!order.getStatus().isActive()) {
       return reserveRefusal(order, dto.operationId());
     }
@@ -176,35 +193,25 @@ public class JobOrderMoneyCommands {
         | BusinessConflictException unavailableBasis) {
       return reserveRefusal(order, dto.operationId());
     }
-    final boolean newLinkedHolder = holder.getId() == null && holder.getUserId() != null;
-    holder.recordChange();
-    UUID holderId = Objects.requireNonNull(holders.save(holder).getId());
-    JobOrderMoneyOperation operation =
-        operations.saveAndFlush(
-            new JobOrderMoneyOperation(
-                order.getId(),
-                dto.operationId(),
-                holderId,
-                actor,
-                selection,
-                dto.commitmentId(),
-                dto.bankHandling(),
-                amount));
-    if (dto.commitmentId() != null) {
-      commitmentCredit.recordFreshProvision(order, dto.operationId(), dto.commitmentId(), amount);
+    if (dto.bank() != null) {
+      var outcome =
+          linked.submitProvision(order, dto, actor, amount, selection, holder, dto.bank());
+      return new JobOrderEditor.MoneyEdit<>(Optional.of(outcome), JobOrderEdit.unchanged(order));
     }
-    boolean started = order.getStatus() == JobOrderStatus.OPEN;
-    if (started) {
-      JobOrderService.changeLifecycle(order, JobOrderStatus.IN_PROGRESS);
-    }
-    effects.provisionRecorded(order, holder, operation, actor, started, newLinkedHolder);
-    JobOrderEdit audit =
-        JobOrderEdit.audited(
-            order,
-            AuditEventType.JOB_ORDER_MONEY_PROVIDED,
-            AuditDetails.of("operationId", operation.getOperationId()).with("amount", amount));
+    var terms =
+        new JobOrderMoneyProvisionWriter.Terms(
+            dto.operationId(),
+            actor,
+            actor,
+            selection,
+            dto.commitmentId(),
+            false,
+            amount,
+            false,
+            null);
+    var posted = provisions.post(order, holder, terms);
     return new JobOrderEditor.MoneyEdit<>(
-        Optional.of(queries.projectOutcome(operation, holder)), audit);
+        Optional.of(queries.projectOutcome(posted.operation(), holder)), posted.edit());
   }
 
   private static JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> refused(JobOrder order) {
@@ -260,7 +267,7 @@ public class JobOrderMoneyCommands {
         || !operation.matchesSelection(selection)) {
       throw new BusinessConflictException("orders.money.operation.termsMismatch");
     }
-    JobOrderMoneyHolder holder = holders.findById(operation.getHolderId()).orElseThrow();
+    JobOrderMoneyHolder holder = holders.findById(operation.personalHolderId()).orElseThrow();
     return new JobOrderEditor.MoneyEdit<>(
         Optional.of(queries.projectOutcome(operation, holder)), JobOrderEdit.unchanged(order));
   }

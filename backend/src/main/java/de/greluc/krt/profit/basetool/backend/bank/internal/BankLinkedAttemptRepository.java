@@ -66,7 +66,7 @@ interface BankLinkedAttemptRepository extends Repository<BankLinkedAttemptRecord
    *
    * @param id the Bank attempt's authorisation identity
    * @param accountId the funding account
-   * @param holderId the registered custodian
+   * @param holderId the registered custodian, absent for account-only authority
    * @param amount the authorised principal
    * @param actor the current Bank staff actor
    */
@@ -81,7 +81,7 @@ interface BankLinkedAttemptRepository extends Repository<BankLinkedAttemptRecord
   void recordAuthorisation(
       @Param("id") UUID id,
       @Param("accountId") UUID accountId,
-      @Param("holderId") UUID holderId,
+      @Param("holderId") @Nullable UUID holderId,
       @Param("amount") BigDecimal amount,
       @Param("actor") UUID actor);
 

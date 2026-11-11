@@ -479,6 +479,25 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "jobOrderLinkedMoneyAttempts",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "job_order" : <n>,
+      "operation_id" : "<uuid>",
+      "revision" : 1,
+      "kind" : "PROVISION",
+      "state" : "WAITING",
+      "active" : true,
+      "amount" : "21",
+      "new_provision" : "21",
+      "fee" : "0",
+      "fee_funding" : "DEPOSITOR",
+      "actual_payment" : true,
+      "submitted_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "marketRequests",
     "legalBasis" : "ART_15_20",
     "rows" : [ {

@@ -22,15 +22,17 @@ package de.greluc.krt.profit.basetool.frontend.joborder.model;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Current visible basis for revising one original fact.
  *
  * @param amount effective principal or provision
  * @param provision effective additional funds
- * @param holderIds canonical affected holders
+ * @param holderIds canonical affected money positions
  * @param affectsTarget whether the correction changes the fulfilment basis
  * @param attributed whether an original commitment attribution may be removed
+ * @param accountHoldingId the affected order-local account holding, if applicable
  */
 @DtoMirror
 public record JobOrderMoneyCorrectionBasisView(
@@ -38,4 +40,5 @@ public record JobOrderMoneyCorrectionBasisView(
     String provision,
     List<UUID> holderIds,
     boolean affectsTarget,
-    boolean attributed) {}
+    boolean attributed,
+    @Nullable UUID accountHoldingId) {}

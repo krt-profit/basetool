@@ -162,6 +162,23 @@ class DatabaseIndexMigrationTest {
         "idx_job_order_money_recipient_corrects",
         "create unique index",
         "(order_id, corrects_id)");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_linked_money_attempt",
+        "idx_order_linked_money_active",
+        "create unique index",
+        "(order_id, operation_id)",
+        "where active");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_linked_money_attempt",
+        "idx_order_attempt_account_holding",
+        "(order_id, account_holding_id, bank_account_id)");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_money_operation",
+        "idx_order_operation_account_holding",
+        "(order_id, account_holding_id)");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {

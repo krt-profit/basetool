@@ -23,9 +23,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationCauseCollector;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationDto;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
@@ -36,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
 import de.greluc.krt.profit.basetool.backend.refinery.api.events.RefineryNotices;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +58,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** Observes logical-cause delivery through committed events and the recipient's public Inbox. */
@@ -65,6 +70,7 @@ class NotificationCauseIntegrationTest {
   @Autowired private NotificationService notificationService;
   @Autowired private NotificationMuteService notificationMuteService;
   @Autowired private NotificationCreationService notificationCreationService;
+  @Autowired private NotificationCauseCollector causeCollector;
   @Autowired private UserRepository userRepository;
   @Autowired private JdbcTemplate jdbc;
 
@@ -72,20 +78,29 @@ class NotificationCauseIntegrationTest {
 
   @BeforeEach
   void seedRecipient() {
-    recipient = UUID.randomUUID();
-    User user = new User();
-    user.setId(recipient);
-    user.setUsername("cause-recipient-" + recipient);
-    user.setApprovalStatus(ApprovalStatus.ACTIVE);
-    user.setInKeycloak(true);
-    userRepository.saveAndFlush(user);
+    recipient = createRecipient();
   }
 
   @AfterEach
   void removeRecipient() {
-    notificationService.markAllRead(recipient);
-    notificationService.deleteAllRead(recipient);
-    userRepository.deleteById(recipient);
+    removeRecipient(recipient);
+  }
+
+  private UUID createRecipient() {
+    UUID id = UUID.randomUUID();
+    User user = new User();
+    user.setId(id);
+    user.setUsername("cause-recipient-" + id);
+    user.setApprovalStatus(ApprovalStatus.ACTIVE);
+    user.setInKeycloak(true);
+    userRepository.saveAndFlush(user);
+    return id;
+  }
+
+  private void removeRecipient(UUID id) {
+    notificationService.markAllRead(id);
+    notificationService.deleteAllRead(id);
+    userRepository.deleteById(id);
   }
 
   @Test
@@ -252,6 +267,84 @@ class NotificationCauseIntegrationTest {
   }
 
   @Test
+  void aPreferredBankOutcomesMuteSuppressesItsFallbackSuccess() {
+    UUID entity = UUID.randomUUID();
+    var bank = payout(entity, recipient);
+    var other = RefineryNotices.ready(entity, recipient, "Synthetic Hub", "1 SCU Test Ore");
+    notificationMuteService.setMuted(recipient, NotificationType.BANK_PAYOUT_RECEIVED, true);
+
+    assertThat(
+            notificationCreationService.createFromCause(
+                new NotificationCause(UUID.randomUUID(), List.of(bank), List.of(other))))
+        .isEmpty();
+    assertThat(inbox()).isEmpty();
+
+    notificationMuteService.setMuted(recipient, NotificationType.BANK_PAYOUT_RECEIVED, false);
+    assertThat(
+            notificationCreationService.createFromCause(
+                new NotificationCause(UUID.randomUUID(), List.of(bank), List.of(other))))
+        .containsExactly(recipient);
+    assertThat(inbox())
+        .singleElement()
+        .satisfies(notice ->
+            assertThat(notice.type()).isEqualTo(NotificationType.BANK_PAYOUT_RECEIVED.name()));
+  }
+
+  @Test
+  void aCollectedCauseIncludesBeforeCommitNoticesForAdditionalRecipients() {
+    UUID secondRecipient = createRecipient();
+    UUID entity = UUID.randomUUID();
+    UUID causeId = UUID.randomUUID();
+    try {
+      new TransactionTemplate(transactionManager)
+          .executeWithoutResult(_ -> {
+            causeCollector.prepare(causeId);
+            causeCollector.appendPreferred(causeId, payout(entity, recipient));
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                  @Override
+                  public int getOrder() {
+                    return 200;
+                  }
+
+                  @Override
+                  public void beforeCommit(boolean ignored) {
+                    causeCollector.append(
+                        causeId,
+                        List.of(
+                            RefineryNotices.ready(entity, recipient, "Synthetic Hub", "Test Ore"),
+                            RefineryNotices.ready(
+                                entity, secondRecipient, "Synthetic Hub", "Test Ore")));
+                  }
+                });
+            assertThat(inbox()).isEmpty();
+          });
+
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(() ->
+              assertThat(inbox(secondRecipient))
+                  .extracting(NotificationDto::type)
+                  .containsExactly(NotificationType.REFINERY_ORDER_READY.name()));
+      assertThat(inbox())
+          .extracting(NotificationDto::type)
+          .containsExactly(NotificationType.BANK_PAYOUT_RECEIVED.name());
+    } finally {
+      removeRecipient(secondRecipient);
+    }
+  }
+
+  private static NoticeEvent payout(UUID entity, UUID recipient) {
+    return BankNotices.payoutBooked(
+        entity,
+        recipient,
+        new BigDecimal("10000"),
+        new BigDecimal("50"),
+        "KB-0003",
+        new ActorRef(UUID.randomUUID(), "Synthetic actor"));
+  }
+
+  @Test
   void reconciliationReplacesAnEntitledNoticeRemovedByAnotherChildsCleanup() {
     UUID entity = UUID.randomUUID();
     assertThat(
@@ -396,6 +489,10 @@ class NotificationCauseIntegrationTest {
   }
 
   private List<NotificationDto> inbox() {
-    return notificationService.listOwn(recipient, PageRequest.of(0, 10)).getContent();
+    return inbox(recipient);
+  }
+
+  private List<NotificationDto> inbox(UUID id) {
+    return notificationService.listOwn(id, PageRequest.of(0, 10)).getContent();
   }
 }

@@ -48,12 +48,20 @@ record JobOrderMoneyMovementTerms(
 
   static JobOrderMoneyMovementTerms from(MoveJobOrderMoneyDto dto) {
     if (Boolean.TRUE.equals(dto.bankHandling())) {
-      throw new BadRequestException("orders.money.bankHandling.unavailable");
+      if (dto.bank() == null) {
+        throw new BadRequestException("orders.money.bankHandling.unavailable");
+      }
+      JobOrderLinkedPaymentTerms.validate(dto.bank());
+    } else if (dto.bank() != null) {
+      throw JobOrderLinkedPaymentTerms.invalid();
     }
     JobOrderMoneySelection destination =
         JobOrderMoneySelection.parse(
             dto.destinationHolderId(), dto.destinationUserId(), dto.destinationName());
     UUID sourceId = dto.sourceHolderId();
+    if (sourceId == null || dto.sourceAccountHoldingId() != null) {
+      throw invalidSelection();
+    }
     UUID recipientId = dto.recipientId();
     JobOrderMoneySelection selected =
         switch (dto.kind()) {
@@ -114,7 +122,7 @@ record JobOrderMoneyMovementTerms(
 
   boolean matches(JobOrderMoneyOperation operation, RateSnapshot rate) {
     return operation.getKind() == kind
-        && operation.getHolderId().equals(sourceId)
+        && sourceId.equals(operation.getHolderId())
         && Objects.equals(operation.getRecipientId(), recipientId)
         && Objects.equals(operation.getCommitmentId(), commitmentId)
         && operation.matchesSelection(selection)

@@ -47,6 +47,7 @@ class JobOrderMoneySettlementBasis {
   private final JobOrderMoneyTargetRepository targets;
   private final JobOrderMoneyLedger ledger;
   private final TransferFeePolicy feePolicy;
+  private final JobOrderLinkedPaymentTerms paymentTerms;
 
   Resolved resolve(
       JobOrder order,
@@ -74,12 +75,17 @@ class JobOrderMoneySettlementBasis {
     JobOrderMoneyHolder destination =
         terms.requesterReturn() ? holders.resolve(orderId, actor, terms.destination()) : null;
     var beneficiary = destination == null ? beneficiary(terms.destination()) : party(destination);
+    UUID payerBankAccount = designation == null ? null : designation.getBankAccountId();
+    var bank = dto.bank();
     if (designation != null && designation.isSuperseded()) {
       throw new UnavailableSettlement("orders.money.recipient.identity.changed");
     }
-    if ((designation != null && !payer.usable())
-        || (terms.hasFee() && payer.sameKnownPerson(beneficiary))
-        || (terms.requesterReturn() && source != null && !payer.sameKnownPerson(party(source)))) {
+    boolean personReturn = terms.requesterReturn() && payerBankAccount == null;
+    boolean gamePayment = bank == null || JobOrderLinkedPaymentTerms.reported(bank);
+    if ((payerBankAccount != null && bank == null)
+        || (personReturn && !payer.usable())
+        || (terms.hasFee() && gamePayment && payer.sameKnownPerson(beneficiary))
+        || (personReturn && source != null && !payer.sameKnownPerson(party(source)))) {
       throw JobOrderMoneySettlementTerms.invalidSelection();
     }
     if (source != null) {
@@ -97,7 +103,7 @@ class JobOrderMoneySettlementBasis {
       OptimisticLock.check(
           target.getVersion(), dto.targetVersion(), JobOrderMoneyTarget.class, orderId);
       if (current
-              .netForRecipient(Objects.requireNonNull(designation.getId()))
+              .availableForRecipient(Objects.requireNonNull(designation.getId()))
               .compareTo(terms.amount())
           < 0) {
         throw new UnavailableSettlement("orders.money.settlement.return.excess");
@@ -112,25 +118,32 @@ class JobOrderMoneySettlementBasis {
     if (expectedRate != null && !expectedRate.equals(rate)) {
       throw new UnavailableSettlement("orders.money.movement.rateRequired");
     }
-    BigDecimal fee = feePolicy.feeOn(terms.amount(), rate);
+    var linkedFee =
+        bank == null ? null : paymentTerms.feeFor(terms.kind(), bank, terms.amount(), rate);
+    BigDecimal fee =
+        linkedFee == null ? feePolicy.feeOn(terms.amount(), rate) : linkedFee.orderFee();
     if (terms.provision().compareTo(fee) > 0) {
       throw new BadRequestException("orders.money.settlement.feeProvision.excess");
     }
-    BigDecimal held = current.balance(source == null ? null : source.getId());
+    BigDecimal held = current.availableBalance(source == null ? null : source.getId());
     BigDecimal chargedPrincipal = terms.requesterReturn() ? BigDecimal.ZERO : terms.amount();
     if (held.compareTo(chargedPrincipal) < 0) {
       throw new UnavailableSettlement("orders.money.settlement.insufficient");
     }
     BigDecimal sourceAfter = held.subtract(chargedPrincipal).subtract(fee).add(terms.provision());
     BigDecimal destinationAfter =
-        destination == null ? null : current.balance(destination.getId()).add(terms.amount());
+        destination == null
+            ? null
+            : current.availableBalance(destination.getId()).add(terms.amount());
     return new Resolved(
         source,
         destination,
         payer,
         beneficiary,
+        payerBankAccount,
         rate,
         fee,
+        linkedFee,
         sourceAfter,
         overpayment,
         destinationAfter,
@@ -181,8 +194,10 @@ class JobOrderMoneySettlementBasis {
    * @param destination receiving order holder for a return
    * @param payer the actual sending player
    * @param beneficiary the actual recipient
+   * @param payerBankAccount the exact Bank account designated for the original handover
    * @param rate the current fee policy snapshot
    * @param fee order-funded fee
+   * @param linkedFee actual game fee and funding for a linked settlement
    * @param sourceAfter remaining funds after the movement
    * @param overpayment amount remaining above target after a return
    * @param destinationAfter resulting receiving holding for a return
@@ -193,8 +208,10 @@ class JobOrderMoneySettlementBasis {
       @Nullable JobOrderMoneyHolder destination,
       JobOrderMoneyRecipients.Party payer,
       JobOrderMoneyRecipients.Party beneficiary,
+      @Nullable UUID payerBankAccount,
       RateSnapshot rate,
       BigDecimal fee,
+      @Nullable JobOrderLinkedPaymentTerms.Fee linkedFee,
       BigDecimal sourceAfter,
       BigDecimal overpayment,
       @Nullable BigDecimal destinationAfter,

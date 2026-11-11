@@ -52,6 +52,10 @@ class JobOrderMoneyRecipient {
 
   @Nullable private UUID userId;
 
+  @Nullable
+  @Column(updatable = false)
+  private UUID bankAccountId;
+
   @Column(updatable = false)
   @Nullable
   private UUID holderId;
@@ -83,6 +87,11 @@ class JobOrderMoneyRecipient {
       case ACCOUNTLESS -> accountlessName = selection.name();
       default -> throw new IllegalArgumentException("A requester designation requires a party.");
     }
+  }
+
+  JobOrderMoneyRecipient(UUID orderId, UUID bankAccountId) {
+    this.orderId = orderId;
+    this.bankAccountId = bankAccountId;
   }
 
   void recordCorrectionOf(JobOrderMoneyRecipient prior, UUID actor, boolean available) {

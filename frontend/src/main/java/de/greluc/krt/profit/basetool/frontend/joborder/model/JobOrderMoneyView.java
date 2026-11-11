@@ -60,6 +60,8 @@ import java.util.UUID;
  * @param canRecordSettlement whether the caller currently owns a permitted settlement action
  * @param canCorrectRecipient whether the caller can correct a false recipient designation
  * @param returnableRecipientIds designations with a positive retained net receipt
+ * @param linkedAttempts the submitted Bank-linked revisions and their outcomes
+ * @param accountHoldings the balances attributed to Bank accounts within this order
  */
 @DtoMirror
 public record JobOrderMoneyView(
@@ -96,4 +98,6 @@ public record JobOrderMoneyView(
     List<JobOrderMoneyHolderChangeView> holderIdentityHistory,
     boolean canRecordSettlement,
     boolean canCorrectRecipient,
-    List<UUID> returnableRecipientIds) {}
+    List<UUID> returnableRecipientIds,
+    List<JobOrderMoneyOutcome> linkedAttempts,
+    List<JobOrderMoneyAccountHoldingView> accountHoldings) {}

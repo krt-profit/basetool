@@ -55,6 +55,15 @@ public interface BankHolderRepository extends JpaRepository<BankHolder, UUID> {
   boolean existsByUserId(UUID userId);
 
   /**
+   * Proves that the selected active custodian belongs to the expected registered member.
+   *
+   * @param id the selected Bank custodian
+   * @param userId the expected member
+   * @return whether the current registration matches
+   */
+  boolean existsByIdAndUserIdAndActiveTrue(UUID id, UUID userId);
+
+  /**
    * Returns the full holder registry with each linked {@code user} fetch-joined ({@code null} for a
    * deleted user), so the live display name resolves without an N+1 (REQ-BANK-003).
    *

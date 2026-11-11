@@ -168,6 +168,8 @@ public enum AuditEventType {
   /** Actual aUEC reported as purpose-bound to one order. */
   JOB_ORDER_MONEY_PROVIDED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_MOVED(AuditDomain.JOB_ORDER),
+  /** The authoritative Bank decision changed a linked order attempt. */
+  JOB_ORDER_MONEY_BANK_DECIDED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_CORRECTED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_REASSIGNED(AuditDomain.JOB_ORDER),
   JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED(AuditDomain.JOB_ORDER),

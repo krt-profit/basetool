@@ -77,6 +77,11 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
             WHERE p.actor_id = :userId OR p.selected_user_id = :userId
                   OR lower(p.selected_accountless_name) IN (SELECT name FROM spellings)
             UNION
+            SELECT a.order_id FROM job_order_linked_money_attempt a
+            WHERE :userId IN (a.actor_id, a.decision_actor_id, a.selected_user_id, a.counterparty_user_id)
+               OR lower(a.selected_accountless_name) IN (SELECT name FROM spellings)
+               OR lower(a.counterparty_name) IN (SELECT name FROM spellings)
+            UNION
             SELECT r.order_id FROM job_order_money_recipient r
             WHERE r.user_id = :userId OR r.correction_actor_id = :userId
                   OR lower(r.accountless_name) IN (SELECT name FROM spellings)
@@ -99,6 +104,36 @@ interface JobOrderMoneyHolderRepository extends JpaRepository<JobOrderMoneyHolde
           """,
       nativeQuery = true)
   List<UUID> lockPrivacyOrders(UUID userId, String[] spellings);
+
+  @Modifying
+  @Query(
+      value =
+          """
+          WITH spellings AS (
+            SELECT lower(name) AS name FROM unnest(CAST(:spellings AS text[])) AS names(name)
+          ), redactions AS (
+            SELECT a.id,
+              a.selected_accountless_name IS NOT NULL AND (
+                lower(a.selected_accountless_name) IN (SELECT name FROM spellings) OR EXISTS (
+                  SELECT 1 FROM job_order_money_holder original
+                  JOIN job_order_money_holder linked ON linked.id = COALESCE(original.merged_into_id, original.id)
+                  WHERE linked.user_id = :userId
+                    AND original.id = CASE
+                      WHEN a.kind = 'PROVISION' THEN a.holder_id
+                      WHEN a.kind IN ('COLLECTION', 'REQUESTER_RETURN') THEN a.destination_holder_id
+                    END
+                )) AS redact_selection,
+              lower(a.counterparty_name) IN (SELECT name FROM spellings) AS redact_counterparty
+            FROM job_order_linked_money_attempt a WHERE a.order_id IN (:orderIds)
+          )
+          UPDATE job_order_linked_money_attempt a
+          SET selected_accountless_name = CASE WHEN r.redact_selection THEN NULL ELSE a.selected_accountless_name END,
+              counterparty_name = CASE WHEN r.redact_counterparty THEN NULL ELSE a.counterparty_name END
+          FROM redactions r
+          WHERE a.id = r.id AND (r.redact_selection OR r.redact_counterparty)
+          """,
+      nativeQuery = true)
+  int anonymiseLinkedAttemptNames(UUID userId, String[] spellings, List<UUID> orderIds);
 
   @Modifying
   @Query(

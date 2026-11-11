@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -70,7 +71,7 @@ public class NotificationCreationService {
   }
 
   /**
-   * Delivers a logical revision once, selecting its first eligible original notice per recipient.
+   * Delivers a logical revision once under its original priorities and preferences.
    *
    * @param cause immutable revision identity and original events in descending priority
    * @return recipients whose Inbox changed, or none for an already processed cause
@@ -80,25 +81,44 @@ public class NotificationCreationService {
     if (notificationRepository.claimCause(cause.id()) == 0) {
       return Set.of();
     }
-    List<NotificationEventPreparation.Prepared> prepared =
-        cause.events().stream()
-            .filter(event -> causeGuards.stream().allMatch(guard -> guard.isCurrent(event)))
-            .map(eventPreparation::resolve)
-            .toList();
+    List<NotificationEventPreparation.Prepared> preferred = prepare(cause.preferredEvents());
+    List<NotificationEventPreparation.Prepared> additional = prepare(cause.events());
     Set<UUID> changed = new HashSet<>();
-    cause.events().forEach(event -> changed.addAll(eventPreparation.removeCaptured(event)));
-    prepared.forEach(event -> changed.addAll(eventPreparation.removeObsolete(event)));
+    Stream.concat(cause.preferredEvents().stream(), cause.events().stream())
+        .forEach(event -> changed.addAll(eventPreparation.removeCaptured(event)));
+    Stream.concat(preferred.stream(), additional.stream())
+        .forEach(event -> changed.addAll(eventPreparation.removeObsolete(event)));
     Map<UUID, Notification> selected = new LinkedHashMap<>();
-    for (var event : prepared) {
-      for (Notification notice : eventPreparation.missing(event)) {
-        selected.putIfAbsent(notice.getRecipientUserId(), notice);
-      }
+    Set<UUID> preferredAudience = new HashSet<>();
+    for (var event : preferred) {
+      select(event, preferredAudience, selected);
+      event.audience().values().forEach(preferredAudience::addAll);
     }
+    additional.forEach(event -> select(event, preferredAudience, selected));
     List<Notification> notices = List.copyOf(selected.values());
     persist(notices);
     recordAfterCommit(counts(notices));
     changed.addAll(selected.keySet());
     return Set.copyOf(changed);
+  }
+
+  private List<NotificationEventPreparation.Prepared> prepare(List<NotificationEvent> events) {
+    return events.stream()
+        .filter(event -> causeGuards.stream().allMatch(guard -> guard.isCurrent(event)))
+        .map(eventPreparation::resolve)
+        .toList();
+  }
+
+  private void select(
+      NotificationEventPreparation.Prepared event,
+      Set<UUID> preferredAudience,
+      Map<UUID, Notification> selected) {
+    for (Notification notice : eventPreparation.missing(event)) {
+      UUID recipient = notice.getRecipientUserId();
+      if (!preferredAudience.contains(recipient)) {
+        selected.putIfAbsent(recipient, notice);
+      }
+    }
   }
 
   private void persist(@NotNull List<Notification> notices) {

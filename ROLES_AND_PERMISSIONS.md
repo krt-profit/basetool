@@ -1,6 +1,6 @@
 # Role and Permission Matrix (Profit Basetool)
 
-> **Approved JobOrder contract and implementation scope:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Section 3.3 describes the internal Bank-free checkpoint. Bank authority for linked payments is covered in section 3.11. Order composition and public acceptance remain pending.
+> **Approved JobOrder contract and implementation scope:** The target matrix in section 3.3 is governed by [orders-core.md](docs/specs/orders-core.md), [orders-auec.md](docs/specs/orders-auec.md) and [orders-auec-bank.md](docs/specs/orders-auec-bank.md). Section 3.3 describes the internal Bank-free checkpoint. Bank authority for linked payments is covered in section 3.11. The coupled order actions use the same current Order and Bank authority. The default Bank journey in the order forms remains pending.
 
 > **Last reviewed: 2026-09-22** — re-verified against every `@PreAuthorize` of the 88 backend
 > `@RestController`s and the frontend page/proxy controllers, after the members-only cut
@@ -507,7 +507,13 @@ another person's holding needs a responsible writer. A requester-side writer or 
 can record a genuine requester return. Ordinary procurement and target/contact edits on a cancelled
 order require reopening. Permitted settlement and corrections preserve the cancellation. A correctly
 linked participant can recover accepted outcomes under the current order read scope. An accepted
-monetary submission closes the administrator's hard-delete path.
+monetary submission closes the administrator's hard-delete path. Either current unit writer can
+designate an active Bank account they are authorised to view. A current responsible writer
+may attribute approved existing Bank funds to the order's collection account. Bank staff
+confirm an actual deposit with its registered custodian. Account-only handover retains existing
+order and Bank rights and changes the two account balances. A Bank decision uses current Bank
+authority and can affect only its linked order attempt under valid responsibility. Order staff
+may recover or replace a failed request under the applicable money-action grants.
 Current responsible-unit writers coordinate aUEC commitments. Supporting Staffel writers
 manage their own commitment and may explicitly credit a provision they are authorised to record.
 The first commitment of an eligible Staffel starts its shared participation. An individual

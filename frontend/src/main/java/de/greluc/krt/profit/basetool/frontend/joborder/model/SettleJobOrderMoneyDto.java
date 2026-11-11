@@ -19,8 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -44,6 +46,7 @@ import org.jetbrains.annotations.Nullable;
  * @param rate the previewed applicable fee rate
  * @param provision the fee money explicitly added by the source
  * @param bankHandling the per-operation choice of Bank handling
+ * @param bank the selected Bank effect and its parties
  */
 @DtoMirror
 public record SettleJobOrderMoneyDto(
@@ -60,4 +63,5 @@ public record SettleJobOrderMoneyDto(
     @NotBlank String amount,
     @Nullable String rate,
     @Nullable String provision,
-    @NotNull Boolean bankHandling) {}
+    @NotNull Boolean bankHandling,
+    @Nullable @Valid @JsonInclude(JsonInclude.Include.NON_NULL) JobOrderBankSelection bank) {}

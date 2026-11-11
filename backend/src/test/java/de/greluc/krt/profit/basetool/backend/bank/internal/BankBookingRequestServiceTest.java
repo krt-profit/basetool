@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationCauseCollector;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
@@ -122,18 +123,20 @@ class BankBookingRequestServiceTest {
             approvalLimitRepository,
             bereichRepository,
             orgUnitRepository);
+    var creation =
+        new BankRequestCreation(
+            requestRepository,
+            bankAuditService,
+            userRepository,
+            eventPublisher,
+            mock(BankLinkedRequestLiveSync.class));
     service =
         new BankBookingRequestService(
             requestRepository,
             accountRepository,
             holderRepository,
             transactionRepository,
-            new BankRequestCreation(
-                requestRepository,
-                bankAuditService,
-                userRepository,
-                eventPublisher,
-                mock(BankLinkedRequestLiveSync.class)),
+            creation,
             new BankRequestPostings(bankLedgerService, orgUnitMembershipQueryService),
             bankCaller,
             policy,
@@ -146,7 +149,9 @@ class BankBookingRequestServiceTest {
             new BankRequestClientNames(clientDirectory),
             mock(BankLinkedDecisions.class),
             mock(BankLinkedBookings.class),
-            mock(BankLinkedRequestLiveSync.class));
+            mock(BankLinkedRequestLiveSync.class),
+            mock(NotificationCauseCollector.class),
+            new BankRequestConfirmation(creation, bankAuditService));
   }
 
   @Test

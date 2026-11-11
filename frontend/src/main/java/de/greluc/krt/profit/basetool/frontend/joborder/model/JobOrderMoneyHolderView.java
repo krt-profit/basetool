@@ -30,8 +30,14 @@ import org.jetbrains.annotations.Nullable;
  * @param userId the explicitly linked account, if any
  * @param displayName the current visible name
  * @param amount the holding in whole aUEC
+ * @param availableAmount the portion usable for other order operations
  * @param version the holder's independent version
  */
 @DtoMirror
 public record JobOrderMoneyHolderView(
-    UUID id, @Nullable UUID userId, @Nullable String displayName, String amount, long version) {}
+    UUID id,
+    @Nullable UUID userId,
+    @Nullable String displayName,
+    String amount,
+    String availableAmount,
+    long version) {}

@@ -35,6 +35,9 @@ import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSna
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedAttempt;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedEffectHandler;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedOutcome;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedPayment.AccountAuthorisation;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedPayment.AccountDeposit;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedPayment.AccountTransfer;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedPayment.Authorisation;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedPayment.Counterparty;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedPayment.Deposit;
@@ -52,6 +55,7 @@ import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Actor;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Holder;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.privacy.api.DataExportService;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -68,6 +72,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpMethod;
@@ -92,7 +97,6 @@ import tools.jackson.databind.json.JsonMapper;
 class BankLinkedPaymentsIntegrationTest {
   private static final String REQUESTS = "/api/v1/bank/requests";
   private static final String FEE_SETTING = "operation.transfer_fee_rate";
-  private static final RateSnapshot FROZEN_RATE = new RateSnapshot(new BigDecimal("0.0075"));
 
   @Autowired private ConfigurableWebApplicationContext context;
   @Autowired private CustomJwtGrantedAuthoritiesConverter authorities;
@@ -103,9 +107,11 @@ class BankLinkedPaymentsIntegrationTest {
   @Autowired private TransactionTemplate transactions;
   @Autowired private SystemSettings settings;
   @Autowired private TransferFeePolicy feePolicy;
+  @Autowired private DataExportService exports;
 
   private final JsonMapper json = JsonMapper.builder().build();
   private final List<String> registeredHandlers = new ArrayList<>();
+  private final List<BeanDefinition> excludedHandlers = new ArrayList<>();
   private BankAccessWorld world;
   private MockMvc mvc;
 
@@ -115,14 +121,23 @@ class BankLinkedPaymentsIntegrationTest {
     if (TransactionSynchronizationManager.isActualTransactionActive()) {
       world = new BankAccessSeeder(context).seed();
     }
+    var factory = context.getBeanFactory();
+    for (String name : factory.getBeanNamesForType(BankLinkedEffectHandler.class)) {
+      BeanDefinition definition = factory.getMergedBeanDefinition(name);
+      if (definition.isAutowireCandidate()) {
+        definition.setAutowireCandidate(false);
+        excludedHandlers.add(definition);
+      }
+    }
     mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  /** Removes the fixture adapters from the shared test application context. */
+  /** Restores the shared application context's production purpose handlers. */
   @AfterEach
   void removeHandlers() {
     DefaultListableBeanFactory factory = (DefaultListableBeanFactory) context.getBeanFactory();
     registeredHandlers.forEach(factory::destroySingleton);
+    excludedHandlers.forEach(definition -> definition.setAutowireCandidate(true));
   }
 
   @Test
@@ -254,6 +269,24 @@ class BankLinkedPaymentsIntegrationTest {
   }
 
   @Test
+  void aNewLinkedPaymentCannotOverrideTheConfiguredFee() {
+    addHandler();
+    settings.putSettingValue(FEE_SETTING, "0.005");
+    UUID source = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
+    UUID target = world.holder(Holder.MANAGEMENT_HOLDER);
+    Terms mismatched =
+        new Terms(
+            new BigDecimal("4000000"), new RateSnapshot(new BigDecimal("0.0075")), null, null);
+
+    assertThatThrownBy(() ->
+            as(
+                Actor.MEMBER,
+                () -> payments.submit(attempt(), new HolderTransfer(source, target, mismatched))))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("fee rate");
+  }
+
+  @Test
   void holderTransferUsesTheStoredKrtFeeAndNeedsNoAccountGrant() throws Exception {
     addHandler();
     UUID source = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
@@ -283,6 +316,221 @@ class BankLinkedPaymentsIntegrationTest {
     assertThat(balance("bank_posting", "account_id", cartel))
         .isEqualByComparingTo(original.subtract(new BigDecimal("20000")));
     assertThat(balance("bank_holder_posting", "holder_id", target)).isEqualByComparingTo("4000000");
+  }
+
+  @Test
+  void replacementUsesTheFailedAttemptRateAndOnlyTheRevisedWholeAmount() throws Exception {
+    addHandler();
+    UUID source = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
+    UUID target = world.holder(Holder.MANAGEMENT_HOLDER);
+    UUID cartel = world.account(Account.CARTEL);
+    BigDecimal original = balance("bank_posting", "account_id", cartel);
+    settings.putSettingValue(FEE_SETTING, "0.005");
+    RateSnapshot originalRate = feePolicy.snapshot();
+    BankLinkedAttempt first = attempt();
+    UUID failed =
+        ((BankLinkedOutcome.Pending)
+                as(
+                    Actor.MEMBER,
+                    () ->
+                        payments.submit(
+                            first,
+                            new HolderTransfer(
+                                source,
+                                target,
+                                new Terms(new BigDecimal("4000000"), originalRate, null, null)))))
+            .requestId();
+    as(
+        Actor.MEMBER,
+        () -> {
+          payments.cancel(failed, first);
+          return null;
+        });
+    settings.putSettingValue(FEE_SETTING, "0.01");
+    BankLinkedAttempt next = new BankLinkedAttempt(UUID.randomUUID(), first.purpose());
+    UUID replacement =
+        ((BankLinkedOutcome.Pending)
+                as(
+                    Actor.MEMBER,
+                    () ->
+                        payments.replace(
+                            failed,
+                            first,
+                            next,
+                            new HolderTransfer(
+                                source,
+                                target,
+                                new Terms(new BigDecimal("3000000"), originalRate, null, null)))))
+            .requestId();
+
+    confirm(failed, Actor.EMPLOYEE, source, target, false)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("BANK_REQUEST_NOT_PENDING"));
+    confirm(replacement, Actor.EMPLOYEE, source, target, false).andExpect(status().isOk());
+    entityManager.flush();
+    assertThat(balance("bank_posting", "account_id", cartel))
+        .isEqualByComparingTo(original.subtract(new BigDecimal("15000")));
+    assertThat(balance("bank_holder_posting", "holder_id", target)).isEqualByComparingTo("3000000");
+  }
+
+  @Test
+  void guardedTerminalCancellationPreventsLaterBankConfirmation() throws Exception {
+    FixtureHandler handler = addHandler();
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    UUID holder = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
+    BankLinkedAttempt attempt = attempt();
+    UUID request =
+        ((BankLinkedOutcome.Pending)
+                as(
+                    Actor.MEMBER,
+                    () ->
+                        payments.submit(attempt, new Authorisation(account, holder, terms("100")))))
+            .requestId();
+    handler.preparation =
+        action -> {
+          if (action == BankLinkedEffectHandler.Action.CANCEL) {
+            throw new IllegalStateException("The order guard is already held");
+          }
+        };
+    as(
+        Actor.EMPLOYEE_WITHDRAW,
+        () -> {
+          payments.cancelUnexecuted(request, attempt);
+          return null;
+        });
+
+    confirm(request, Actor.EMPLOYEE_WITHDRAW, holder, null, false)
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("BANK_REQUEST_NOT_PENDING"));
+    assertThat(authorisationCount(attempt)).isZero();
+  }
+
+  @Test
+  void selectedCustodianRequiresTheExpectedRegisteredMember() {
+    UUID holder = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
+    UUID otherUser = world.user(Actor.MEMBER);
+    payments.requireCustodianUser(holder, world.user(Actor.EMPLOYEE_DEPOSIT));
+
+    assertThatThrownBy(() -> payments.requireCustodianUser(holder, otherUser))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void accountTransferConfirmsWithoutCustodianAndPostsOnlyBalancedAccountLegs() throws Exception {
+    addHandler();
+    UUID source = world.account(Account.OWN_ORG_UNIT);
+    UUID destination = world.account(Account.AREA);
+    UUID request =
+        ((BankLinkedOutcome.Pending)
+                as(
+                    Actor.MEMBER,
+                    () ->
+                        payments.submit(
+                            attempt(), new AccountTransfer(source, destination, terms("400000")))))
+            .requestId();
+
+    var result =
+        confirm(request, Actor.ADMIN, null, null, true)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.holderId").doesNotExist())
+            .andExpect(jsonPath("$.linked.fee").value(0))
+            .andReturn();
+    UUID transaction =
+        UUID.fromString(
+            json.readTree(result.getResponse().getContentAsByteArray())
+                .path("resultingTransactionId")
+                .asString());
+    entityManager.flush();
+    assertThat(balance("bank_posting", "account_id", source)).isEqualByComparingTo("600000");
+    assertThat(balance("bank_posting", "account_id", destination)).isEqualByComparingTo("1400000");
+    assertThat(holderPostingCount(transaction)).isZero();
+
+    var reversed =
+        mvc.perform(
+                post("/api/v1/bank/transactions/{id}/reversal", transaction)
+                    .with(jwt().jwt(token(Actor.ADMIN)).authorities(authorities::convert))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}"))
+            .andExpect(status().isCreated())
+            .andReturn();
+    UUID reversal =
+        UUID.fromString(
+            json.readTree(reversed.getResponse().getContentAsByteArray()).path("id").asString());
+    entityManager.flush();
+    assertThat(balance("bank_posting", "account_id", source)).isEqualByComparingTo("1000000");
+    assertThat(balance("bank_posting", "account_id", destination)).isEqualByComparingTo("1000000");
+    assertThat(holderPostingCount(reversal)).isZero();
+  }
+
+  @Test
+  void accountAuthorisationRequiresCoverageWithoutRecordingCustody() {
+    addHandler();
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    BankLinkedAttempt attempt = attempt();
+    assertThat(
+            as(
+                Actor.ADMIN,
+                () ->
+                    payments.submit(attempt, new AccountAuthorisation(account, terms("1000000")))))
+        .isEqualTo(new BankLinkedOutcome.Authorised(attempt.id()));
+    assertThat(
+            jdbc.sql("SELECT count(*) FROM bank_authorisation WHERE id = :id AND holder_id IS NULL")
+                .param("id", attempt.id())
+                .query(Integer.class)
+                .single())
+        .isOne();
+    assertThat(balance("bank_posting", "account_id", account)).isEqualByComparingTo("1000000");
+    var decisionMaker = as(Actor.ADMIN, () -> exports.export(world.user(Actor.ADMIN)));
+    var custodyHolder =
+        as(Actor.EMPLOYEE_DEPOSIT, () -> exports.export(world.user(Actor.EMPLOYEE_DEPOSIT)));
+    assertThat(ownAuthorisations(decisionMaker))
+        .singleElement()
+        .satisfies(row -> {
+          assertThat(row).containsEntry("member_authorised", true);
+          assertThat(row).containsEntry("member_is_custodian", false);
+        });
+    assertThat(ownAuthorisations(custodyHolder)).isEmpty();
+  }
+
+  private static List<Map<String, Object>> ownAuthorisations(DataExportService.DataExport export) {
+    return export.sections().stream()
+        .filter(section -> section.key().equals("bankFundsAuthorisations"))
+        .flatMap(section -> section.rows().stream())
+        .toList();
+  }
+
+  private int holderPostingCount(UUID transaction) {
+    return jdbc.sql("SELECT count(*) FROM bank_holder_posting WHERE transaction_id = :id")
+        .param("id", transaction)
+        .query(Integer.class)
+        .single();
+  }
+
+  @Test
+  void accountDepositWaitsForStaffToSelectARegisteredReceivingCustodian() throws Exception {
+    addHandler();
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    UUID custodian = world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER);
+    UUID request =
+        ((BankLinkedOutcome.Pending)
+                as(
+                    Actor.MANAGEMENT,
+                    () ->
+                        payments.submit(
+                            attempt(),
+                            new AccountDeposit(
+                                account,
+                                new Counterparty.Accountless("Actual account depositor", null),
+                                terms("400")))))
+            .requestId();
+
+    confirm(request, Actor.ADMIN, custodian, null, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.holderId").value(custodian.toString()))
+        .andExpect(jsonPath("$.counterpartyHandle").value("Actual account depositor"))
+        .andExpect(jsonPath("$.resultingTransactionId").isNotEmpty());
+    entityManager.flush();
+    assertThat(balance("bank_posting", "account_id", account)).isEqualByComparingTo("1000400");
   }
 
   @Test
@@ -569,7 +817,11 @@ class BankLinkedPaymentsIntegrationTest {
   }
 
   private ResultActions confirm(
-      UUID request, Actor staff, UUID holder, @Nullable UUID destination, boolean attestation)
+      UUID request,
+      Actor staff,
+      @Nullable UUID holder,
+      @Nullable UUID destination,
+      boolean attestation)
       throws Exception {
     entityManager.flush();
     Long version =
@@ -578,10 +830,10 @@ class BankLinkedPaymentsIntegrationTest {
             .query(Long.class)
             .single();
     var body =
-        json.createObjectNode()
-            .put("holderId", holder.toString())
-            .put("version", version)
-            .put("ownerApprovalConfirmed", attestation);
+        json.createObjectNode().put("version", version).put("ownerApprovalConfirmed", attestation);
+    if (holder != null) {
+      body.put("holderId", holder.toString());
+    }
     if (destination != null) {
       body.put("destinationHolderId", destination.toString());
     }
@@ -620,8 +872,8 @@ class BankLinkedPaymentsIntegrationTest {
         UUID.randomUUID(), new BankPurpose(BankPurposeKind.AUEC_ORDER, UUID.randomUUID()));
   }
 
-  private static Terms terms(String amount) {
-    return new Terms(new BigDecimal(amount), FROZEN_RATE, null, "Linked effect evidence");
+  private Terms terms(String amount) {
+    return new Terms(new BigDecimal(amount), feePolicy.snapshot(), null, "Linked effect evidence");
   }
 
   private static final class FixtureHandler implements BankLinkedEffectHandler {

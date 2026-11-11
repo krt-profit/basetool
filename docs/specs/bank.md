@@ -3096,12 +3096,12 @@ real UI) · **Code:** `bank/internal/BankBookingRequest`, `bank/internal/CreateB
 
 ### REQ-BANK-056 — Editing an own still-pending booking request
 
-> **Approved aUEC target - not implemented:** linked attempts preserve normalised economics,
-> parties/accounts, operation/attempt identity and submitted fee basis. Ordinary replay cannot
-> change them. Deliberate correction/replacement keeps old/new facts, rechecks needed authority/
-> approvals and prevents the superseded attempt from booking. It never repeats an actual game
-> payment. Generic Bank editing cannot bypass its owning operation; note/reason edits retain the
-> pending/unapproved gates.
+Linked attempts preserve normalised economics, parties, accounts, attempt identity and the submitted
+fee basis. Generic Bank editing cannot change these terms. A replacement uses a fresh attempt
+identity for the same opaque purpose. It requires the exact rejected or cancelled predecessor
+request, retains its stored fee basis and runs current admission and approval routing against the
+complete revised terms. The failed request keeps its own terms and cannot be confirmed.
+The owning Order command checks the active attempt and continuity of the actual payment.
 
 A requester may **correct** their own booking request while it is still `PENDING` **and** the
 responsible holder has **not yet granted** the over-limit approval. Until now the only move was to
@@ -3255,7 +3255,17 @@ existing staff queue and detail show the frozen terms, with the actual counterpa
 the applicant. A custody-only request uses its two registered custodians for the movement and Bank
 staff authority for the decision. A successful authorisation stores its principal, account,
 custodian and deciding actor in `bank_authorisation`. Staff see **Authorised** in the existing
-confirmed request set.
+confirmed request set. A new Bank attempt must use the current configured rate. A replacement
+checks its basis against the exact failed Bank attempt so a setting change cannot reprice the same
+payment. The owning operation can verify that a selected active custodian matches its known
+registered member without obtaining Bank custody data.
+
+A linked deposit into an Order account holding enters the ordinary staff queue. The request
+retains the actual depositor and leaves the receiving custodian for staff to select. Confirmation
+requires an active registered custodian and records the usual account and custody legs.
+A linked account-only transfer checks source coverage and records a zero-fee debit and credit
+between active accounts. Custody totals remain unchanged. Account-only authorisation applies
+the same debit controls and records the authorising actor and account.
 
 **Target acceptance**
 
@@ -3304,8 +3314,12 @@ staff queue shows a chip for the kind. The booked transaction is reached through
 
 `BankLinkedEffectHandler` prepares each decision before Bank locks, then receives the synchronous
 typed outcome inside the Bank transaction. A reversal resolves its original attempt from the
-posting and prepares the owner before locking the original and affected accounts. All Bank paths
-acquire shared account locks in PostgreSQL UUID order.
+posting and prepares the owner before locking the original and affected accounts. The Bank
+checks for a prior reversal while holding the original posting lock. Replacing a failed request
+locks that request before acquiring accounts. Bank paths acquire shared account locks in
+PostgreSQL UUID order. The purpose owner can cancel an exact unexecuted request during terminal
+cleanup after proving its Order guard is already held. The Bank then records and announces the
+ordinary cancelled outcome in the same transaction.
 
 For a purchasing request, the Bank calls the purpose's `BookingRequestPurposeObserver` when it
 confirms, rejects or cancels the request. The observer runs inside the Bank's

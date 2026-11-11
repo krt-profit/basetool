@@ -257,7 +257,11 @@ go stale). This is **in-app only** — OS / browser push notifications are out o
 
 ### REQ-NOTIF-007 — Data-driven recipient rule engine
 
-> **Approved planned JobOrder amendment (not implemented):** JobOrder causes carry stable cause/revision identity for idempotent, per-recipient grouping across relevant roles and bank/order outcomes. The current per-type, single-event recipient union is not that guarantee. Preserve necessary bank tasks and current mute/priority rules; add no durable messaging subsystem. See [the approved shared JobOrder contract](orders-core.md) and [the approved optional-bank contract](orders-auec-bank.md).
+JobOrder causes carry a stable revision identity for once-only, per-recipient grouping across
+relevant roles and Bank/Order outcomes. The shared transaction collector groups the original
+outcomes of a linked decision before post-commit delivery. Required Bank approval tasks retain
+their existing independent delivery. See the [shared JobOrder contract](orders-core.md) and
+[optional Bank contract](orders-auec-bank.md).
 >
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
@@ -326,8 +330,11 @@ frontend `notification/web/AdminNotificationRulePageController`,
 **Logical revision grouping (S04 implementation under verification).** A domain cause carries a
 stable opaque revision identity and its original notification events in explicit priority order.
 Resolve rules, actor exclusions and type mutes for those original events before choosing at most
-one resulting notice per recipient. A wrapper cannot change an original actor or recreate a
-muted Bank outcome; distinct necessary approval tasks retain their own cause. Material changes
+one resulting notice per recipient. For a linked decision, the original Bank outcome takes
+precedence for the audience its rule and current access resolve. Muting that Bank outcome also
+suppresses an alternative success notice for the same recipient and decision. Other recipients
+retain the original Order priority and preferences. Separate approval tasks retain their own
+cause. Material changes
 collect affected Staffel and current responsible-unit writers through the owning writer directory,
 without broadening the audience to all readers or administrators.
 
@@ -1117,9 +1124,9 @@ ready, a mission that was never ended. They come from **one scheduled producer**
 
 ### REQ-NOTIF-027 — Members mute notification types
 
-> **Approved planned JobOrder amendment (not implemented):** Combining JobOrder causes must respect existing per-type muting and priority. A wrapper or another order-success type must not recreate a muted bank outcome. Already stored Inbox rows and durable business history remain separate. See [the approved shared JobOrder contract](orders-core.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+A linked Bank decision honours the original Bank outcome preference for its overlapping audience.
+Muting it suppresses an alternative success notice for that decision. Already stored Inbox rows
+and durable business history are separate. See the logical revision grouping rules in REQ-NOTIF-007.
 
 A member MUST be able to choose which notification types they receive. Muting a type is the
 member's own decision; it changes nothing for anybody else and nothing about what the rules resolve.

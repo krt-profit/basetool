@@ -29,9 +29,13 @@ import org.jetbrains.annotations.Nullable;
  * @param holderId an existing order holder
  * @param userId an explicitly selected active account
  * @param name a new accountless recipient's name
+ * @param bankAccountId an existing Bank account deliberately selected for executed credit
  */
 public record DesignateJobOrderMoneyRecipientDto(
-    @Nullable UUID holderId, @Nullable UUID userId, @Nullable @Size(max = 200) String name) {
+    @Nullable UUID holderId,
+    @Nullable UUID userId,
+    @Nullable @Size(max = 200) String name,
+    @Nullable UUID bankAccountId) {
 
   JobOrderMoneySelection selection() {
     return JobOrderMoneySelection.parse(holderId, userId, name);

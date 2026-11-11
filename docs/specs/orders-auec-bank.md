@@ -1,7 +1,8 @@
 > **Doc type:** Living spec - approved target. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS / BANK
-> **Status:** The [Bank-owned capabilities](bank.md#req-bank-061--purpose-reference) are implemented.
-> Order composition, the public default journey and their acceptance remain pending.
+> **Status:** The [Bank-owned capabilities](bank.md#req-bank-061--purpose-reference) and the
+> synchronous order integration are implemented through the order action API. The default Bank
+> journey in the order forms and its browser acceptance remain separate.
 > **Related ADRs:** [ADR-0357](../adr/0357-optional-auec-bank-effects-use-a-thin-composition-adapter.md),
 > [ADR-0358](../adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md),
 > ADR-0232, ADR-0251, ADR-0254, ADR-0352, ADR-0353.
@@ -43,12 +44,20 @@ The actual economic boundary selects the representation:
 
 | Economic change | Optional Bank representation | Order effect |
 | --- | --- | --- |
-| Money first enters Bank custody | DEPOSIT to the selected account and receiving registered custodian | Provision only on first attribution to this order |
+| Money first enters the collection account | DEPOSIT to the selected account, with the registered receiving custodian confirmed in Bank | Provision in the order's collection-account position on first attribution |
 | Money leaves Bank custody | WITHDRAWAL from the selected account and paying custodian to the actual counterparty | The provision, movement, handover or return the operation represents |
-| Organisational account ownership changes | TRANSFER between the selected accounts with actual custodians | Reallocation or designated requester handover/return; no repeat procurement |
+| Account ownership changes without a game payment | Account-only TRANSFER between the collection account and the designated requester account | Debit the order's collection-account position and record net handover |
+| Account ownership changes with a game payment | TRANSFER between the selected accounts with actual custodians | Reallocation or designated requester handover/return, with the actual payment terms |
 | Custody changes between Bank custodians, principal account ownership unchanged | HOLDER_TRANSFER under REQ-BANK-031 | Collection/holder change; no repeat provision or fulfilment |
-| Existing Bank funds are authorised for this order without an account/custody movement | Successful authorisation under REQ-BANK-022/-023/-024, without a ledger transaction | First authorised order provision once |
+| Existing Bank funds are authorised for this order without an account/custody movement | Successful authorisation under REQ-BANK-022/-023/-024, without a ledger transaction | First authorised order provision once, to the selected account position or explicitly selected player holding |
 | Both sides remain outside Bank custody | No Bank posting; explicitly select Bank-free handling | The independent order action under that explicit choice |
+
+An order can use the collection account throughout. A deposit credits the order's position in
+that account after Bank confirmation. A subsequent account-only transfer delivers to the
+designated requester account. The order records both effects without a personal money holder.
+Bank staff select or confirm the actual registered receiving custodian for the deposit.
+The account transfer changes account balances and leaves custody and game fees unchanged.
+The same collection-account position can receive successfully authorised existing Bank funds.
 
 Entering or leaving the Bank does not repeat an already recorded provision or unit contribution.
 Four million newly contributed and six million first provided from existing Bank funds is ten
@@ -77,9 +86,10 @@ An order may use existing active accounts. Suggest the affected unit's account, 
 Profit unit for an early deposit or the requesting unit for delivery. Explicit alternatives must
 pass the Bank's rules. Do not create an account for each order.
 
-Existing funds may remain on the same account and with the same registered custodian. Record the
-funding account and actual custodian as provenance, not a per-account custodian balance. Bank
-custody remains the independent global dimension of REQ-BANK-003/-006.
+Existing funds may remain in the selected Bank account. Account-only authorisation records the
+order's position in that account. An explicitly selected player holding retains the actual
+registered custodian as provenance. Bank custody remains the independent global dimension of
+REQ-BANK-003/-006.
 
 The Bank's authorisation-only contract in REQ-BANK-022/-023/-024 applies before provision becomes
 available. Account selection or order write rights do not authorise spending. A pending account-owner
@@ -118,7 +128,8 @@ be procurement holdings. An arbitrary deposit on another account does not fulfil
 **Acceptance**
 
 - [ ] Recording an accountless member's deposit through another account retains both the real depositor and authenticated requester.
-- [ ] Same-custodian transfer of ten million from the Profit account to the designated requester account can deliver ten million without a game transfer or later player payout.
+- [ ] Multiple actual deposits using different registered Bank custodians credit the same order collection-account position without creating a personal order holder.
+- [ ] An account-only transfer of ten million from the collection account to the designated requester account delivers ten million with two account postings and zero custody change.
 - [ ] A request or account-owner approval alone does not credit delivery.
 - [ ] A matching name neither creates a Bank custodian nor proves a no-transfer purpose change.
 
@@ -139,6 +150,12 @@ requires another order fee provision nor counts as procurement nor consumes orde
 For four million at an illustrative 0.5%, order holdings move A=4/C=0 to A=0/C=4; the Bank charges
 20,000 to CARTEL and A's global custody. This is one game cost represented in both views.
 
+When an actual Bank withdrawal first provides funds to a player, the receiving principal is the
+new order provision and the Bank funding account bears the separate fee. At 0.5%, a 4,000,000
+aUEC payment requires 4,020,000 aUEC of Bank coverage. The order credits 4,000,000 aUEC as
+available provision and eligible unit credit. Its history shows the 20,000 aUEC Bank-funded fee
+separately. The Bank applies its established withdrawal authority and approval limits.
+
 A true purpose change at the same actual player without a game transfer is fee-free in the order
 and its Bank representation, including the scoped withdrawal exemption and a same-custodian
 account transfer. Account permissions and approvals remain required. This classification is not
@@ -149,6 +166,7 @@ an editable fee override.
 - [ ] A later configured rate does not reprice a submitted coupled attempt or its ordinary retry.
 - [ ] A KRT-funded holder-transfer fee changes neither principal provision nor order holdings beyond principal.
 - [ ] Source-order-funded and KRT-funded expenses reconcile separately.
+- [ ] A first-provision Bank withdrawal credits 4,000,000 aUEC and displays its separate 20,000 aUEC Bank-account-funded fee after successful debit coverage of 4,020,000 aUEC.
 - [ ] A proven same-player purpose change charges zero while retaining debit-equivalent authority.
 
 ### REQ-ORDERS-073 - Bank waiting protects local availability without fabricating financial effects
@@ -248,6 +266,12 @@ or settlement workflow.
 - [ ] Pure Bank-only handover reversal restores the same holder and reopens only when appropriate; cancellation is never automatically undone.
 - [ ] Real-payment Bank reversal flags clarification while retaining posted order amounts until explicit correction.
 - [ ] Cleanup of a cancelled order respects both its limited scope and the strict invalid-responsibility gate.
+
+The order retains each submitted attempt and its decision. The same operation identity can
+recover the active result. A replacement uses the previous request's retained fee basis and
+keeps the old revision visible in the order's linked attempt history. Booked holdings and usable
+holdings are separate figures. A Bank account designation carries its account identifier only
+for an actor who can currently view that account in the Bank.
 
 ### REQ-ORDERS-076 - Integration preserves access, evidence and external boundaries
 

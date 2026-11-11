@@ -55,13 +55,19 @@ class JobOrderMoneyOperation {
   @Column(nullable = false, updatable = false)
   private UUID operationId;
 
-  @Column(nullable = false, updatable = false)
+  @Nullable
+  @Column(updatable = false)
   private UUID holderId;
+
+  @Nullable
+  @Column(updatable = false)
+  private UUID accountHoldingId;
 
   @Nullable private UUID actorId;
 
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false, updatable = false)
+  @Nullable
+  @Column(updatable = false)
   private JobOrderMoneySelection.Kind selectionKind;
 
   @Nullable
@@ -117,7 +123,7 @@ class JobOrderMoneyOperation {
       UUID orderId,
       UUID operationId,
       UUID holderId,
-      UUID actorId,
+      @Nullable UUID actorId,
       JobOrderMoneySelection selection,
       @Nullable UUID commitmentId,
       boolean bankHandling,
@@ -142,9 +148,9 @@ class JobOrderMoneyOperation {
   JobOrderMoneyOperation(
       UUID orderId,
       UUID operationId,
-      UUID holderId,
-      UUID actorId,
-      JobOrderMoneySelection selection,
+      @Nullable UUID holderId,
+      @Nullable UUID actorId,
+      @Nullable JobOrderMoneySelection selection,
       @Nullable UUID commitmentId,
       boolean bankHandling,
       BigDecimal amount,
@@ -164,15 +170,54 @@ class JobOrderMoneyOperation {
     this.operationId = operationId;
     this.holderId = holderId;
     this.actorId = actorId;
-    this.selectionKind = selection.kind();
+    this.selectionKind = selection == null ? null : selection.kind();
     this.selectedUserId =
-        selectionKind == JobOrderMoneySelection.Kind.LINKED ? selection.reference() : null;
+        selection != null && selection.kind() == JobOrderMoneySelection.Kind.LINKED
+            ? selection.reference()
+            : null;
     this.selectedAccountlessName =
-        selectionKind == JobOrderMoneySelection.Kind.ACCOUNTLESS ? selection.name() : null;
+        selection != null && selection.kind() == JobOrderMoneySelection.Kind.ACCOUNTLESS
+            ? selection.name()
+            : null;
     this.commitmentId = commitmentId;
     this.bankHandling = bankHandling;
     this.amount = amount;
     this.recordedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+  }
+
+  static JobOrderMoneyOperation accountOperation(
+      UUID orderId,
+      UUID operationId,
+      UUID accountHoldingId,
+      @Nullable UUID actorId,
+      @Nullable UUID commitmentId,
+      JobOrderMoneyKind kind,
+      @Nullable UUID recipientId,
+      BigDecimal amount) {
+    boolean delivers = kind == JobOrderMoneyKind.PURPOSE_HANDOVER;
+    BigDecimal noGameCost = delivers ? BigDecimal.ZERO : null;
+    var fact =
+        new JobOrderMoneyOperation(
+            orderId,
+            operationId,
+            null,
+            actorId,
+            null,
+            commitmentId,
+            kind != JobOrderMoneyKind.CORRECTION,
+            amount,
+            kind,
+            null,
+            recipientId,
+            noGameCost,
+            noGameCost,
+            noGameCost);
+    fact.accountHoldingId = accountHoldingId;
+    return fact;
+  }
+
+  UUID personalHolderId() {
+    return Objects.requireNonNull(holderId);
   }
 
   static JobOrderMoneyOperation reassignment(
@@ -180,7 +225,7 @@ class JobOrderMoneyOperation {
       UUID peerOrderId,
       UUID operationId,
       UUID holderId,
-      UUID actorId,
+      @Nullable UUID actorId,
       BigDecimal amount,
       JobOrderMoneyKind kind,
       JobOrderMoneySelection.Kind selectionKind) {
@@ -203,7 +248,7 @@ class JobOrderMoneyOperation {
       UUID orderId,
       UUID operationId,
       UUID holderId,
-      UUID actorId,
+      @Nullable UUID actorId,
       BigDecimal amount,
       JobOrderMoneyKind kind) {
     return new JobOrderMoneyOperation(
@@ -224,7 +269,7 @@ class JobOrderMoneyOperation {
   }
 
   boolean matchesSelection(JobOrderMoneySelection selection) {
-    if (selection.kind() != selectionKind) {
+    if (selectionKind == null || selection.kind() != selectionKind) {
       return false;
     }
     return switch (selectionKind) {

@@ -38,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
  * @param correctionName recorded replacement label
  * @param correctedAt time of the correction
  * @param correctionActorName visible label of the original recorder
+ * @param bankDestination whether the designation requires executed Bank credit
+ * @param bankAccountId the designated account when independently visible in the Bank
  */
 @DtoMirror
 public record JobOrderMoneyRecipientView(
@@ -51,4 +53,6 @@ public record JobOrderMoneyRecipientView(
     @Nullable String previousName,
     @Nullable String correctionName,
     @Nullable Instant correctedAt,
-    @Nullable String correctionActorName) {}
+    @Nullable String correctionActorName,
+    boolean bankDestination,
+    @Nullable UUID bankAccountId) {}

@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
  * Recorded result of one accepted money operation.
  *
  * @param operationId submitted logical identity
- * @param holderId credited provision holder or debited movement holder
+ * @param holderId credited provision holder or debited movement holder, when person-held
  * @param amount exact net whole aUEC
  * @param bankHandling the submitted choice
  * @param recordedAt the booking time
@@ -44,10 +44,19 @@ import org.jetbrains.annotations.Nullable;
  * @param peerOrderId paired order when the caller may read it
  * @param corrections connected corrections accepted in this operation
  * @param correctionBasis current editable basis for this original in the order history
+ * @param state the authoritative operation outcome
+ * @param linkedRevision the submitted revision for a linked operation
+ * @param actualPayment whether an actual player payment was recorded for a linked attempt
+ * @param actualFee the linked game's fee, including any part not funded by the order
+ * @param feeFunding the linked fee's source
+ * @param counterpartyName the reported actual counterparty when distinct from the order holder
+ * @param activeLinkedRevision whether this revision is the current linked attempt
+ * @param clarificationResolved whether a targeted correction resolved a real-payment reversal
+ * @param accountHoldingId the credited or debited order-local Bank account holding
  */
 public record JobOrderMoneyOutcome(
     UUID operationId,
-    UUID holderId,
+    @Nullable UUID holderId,
     String amount,
     boolean bankHandling,
     Instant recordedAt,
@@ -62,7 +71,16 @@ public record JobOrderMoneyOutcome(
     String provision,
     @Nullable UUID peerOrderId,
     List<JobOrderMoneyCorrectionView> corrections,
-    @Nullable JobOrderMoneyCorrectionBasisView correctionBasis) {
+    @Nullable JobOrderMoneyCorrectionBasisView correctionBasis,
+    JobOrderLinkedMoneyState state,
+    @Nullable Long linkedRevision,
+    @Nullable Boolean actualPayment,
+    @Nullable String actualFee,
+    @Nullable JobOrderMoneyFeeFunding feeFunding,
+    @Nullable String counterpartyName,
+    @Nullable Boolean activeLinkedRevision,
+    @Nullable Boolean clarificationResolved,
+    @Nullable UUID accountHoldingId) {
 
   static JobOrderMoneyOutcome of(
       JobOrderMoneyOperation operation,
@@ -89,6 +107,15 @@ public record JobOrderMoneyOutcome(
         operation.providedAmount().toPlainString(),
         peerOrderId,
         corrections,
-        correctionBasis);
+        correctionBasis,
+        JobOrderLinkedMoneyState.POSTED,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        operation.getAccountHoldingId());
   }
 }

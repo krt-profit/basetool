@@ -106,7 +106,7 @@ public class JobOrderService {
   private final LiveSyncPublisher liveSyncPublisher;
   private final JobOrderUnitHistory unitHistory;
   private final JobOrderParticipationCommands participationCommands;
-  private final JobOrderMoneyCommitments moneyCommitments;
+  private final JobOrderMoneyLifecycle moneyLifecycle;
 
   /**
    * Persists a new job order in the next free priority slot (1 is highest), taking each material's
@@ -382,7 +382,7 @@ public class JobOrderService {
 
     List<Object> notices = new ArrayList<>();
     if (isTerminal && !wasTerminal) {
-      moneyCommitments.endOpenForOrder(jobOrder);
+      moneyLifecycle.close(jobOrder);
       stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
       notices.add(closedEvent(jobOrder));
       notices.add(finishedNotice(jobOrder, status.name()));
@@ -1029,7 +1029,7 @@ public class JobOrderService {
     changeLifecycle(jobOrder, JobOrderStatus.COMPLETED);
 
     if (!wasTerminal) {
-      moneyCommitments.endOpenForOrder(jobOrder);
+      moneyLifecycle.close(jobOrder);
       jobOrderRepository.flush();
       jobOrderPriorityService.normalizePriorities();
       stockCommands.releaseJobOrderEarmarks(jobOrder.getId());
@@ -1086,7 +1086,7 @@ public class JobOrderService {
     jobOrder.setResponsibleOrgUnit(target);
     jobOrder.setResponsibilityVersion(Math.incrementExact(jobOrder.getResponsibilityVersion()));
     participationCommands.becomeResponsible(jobOrder, target);
-    moneyCommitments.endForLostResponsibility(jobOrder, OrgUnit.idOf(previous));
+    moneyLifecycle.responsibilityLost(jobOrder, OrgUnit.idOf(previous));
     liveSyncPublisher.publishAfterCommit(
         LiveSyncTopic.of(LiveSyncTopicClass.ORDER, jobOrder.getId()),
         List.of(

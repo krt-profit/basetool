@@ -150,6 +150,12 @@ public final class HandleErasureCoverage {
               "job_order_money_operation.selected_accountless_name",
               "Clears the submitted name by exact spelling or canonical holder account"
                   + " without changing the monetary effect."),
+          anonymised(
+              "job_order_linked_money_attempt.selected_accountless_name",
+              "Clears the submitted name by whole spelling or canonical holder account."),
+          anonymised(
+              "job_order_linked_money_attempt.counterparty_name",
+              "Clears the reported depositor name by whole spelling while retaining the payment."),
           removed("app_user.username", "The account row itself is deleted."),
           removed("app_user.display_name", "The account row itself is deleted."),
           removed("app_user.email", "The account row itself is deleted."),

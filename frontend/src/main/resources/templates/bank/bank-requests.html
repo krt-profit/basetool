@@ -55,7 +55,7 @@
                                requestLabel=${r.holderTransfer() ? #messages.msg('bank.request.type.HOLDER_TRANSFER') : r.accountNo()}">
             <tr data-testid="bank-request-row" class="bank-booking-row bank-req-row" th:data-focus-id="${r.id()}"
                 th:classappend="${(hasDetail ? ' is-expandable' : '') + (pending and !approvalOpen and mayConfirm ? ' bank-req-row--ready' : '')}"
-                th:attr="data-linked-holder-id=${linked != null ? r.holderId() : null},data-linked-holder=${linkedHolder},data-linked-destination-id=${linked != null ? linked.destinationHolderId() : null},data-linked-destination=${linkedDestination}">
+                th:attr="data-linked-request=${linked != null ? 'true' : null},data-linked-holder-id=${linked != null ? r.holderId() : null},data-linked-holder=${linkedHolder},data-linked-destination-id=${linked != null ? linked.destinationHolderId() : null},data-linked-destination=${linkedDestination}">
                 <td>
                     <div class="bank-req-head">
                         <span class="chip"
@@ -224,8 +224,18 @@
                             <option th:each="h : ${holders}" th:value="${h.id()}"
                                     th:text="${h.active()} ? ${@handles.display(h.handle())} : (${@handles.display(h.handle())} + ' ' + #{bank.holder.inactive})">greluc</option>
                         </select>
-                        <span class="bank-field-error" data-error-for="holderId"></span>
                     </div>
+
+                    <div class="bank-form-row" data-confirm-account-deposit-holder hidden>
+                        <label for="bank-confirm-account-deposit-holder" th:text="#{bank.field.holder}">Halter</label>
+                        <select id="bank-confirm-account-deposit-holder" name="holderId" disabled
+                                data-krt-combobox data-testid="bank-confirm-account-deposit-holder">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="h : ${activeHolders}" th:if="${h.userId() != null}"
+                                    th:value="${h.id()}" th:text="${@handles.display(h.handle())}">greluc</option>
+                        </select>
+                    </div>
+                    <span class="bank-field-error" data-error-for="holderId"></span>
 
                     <div class="bank-form-row" data-confirm-destination-holder hidden>
                         <label for="bank-confirm-destination-holder" th:text="#{bank.field.holder.target}">Ziel-Halter</label>
@@ -247,7 +257,7 @@
                             <span class="bank-detail-value" data-fixed-amount></span>
                             <span class="bank-field-hint" data-fixed-fee hidden></span>
                         </div>
-                        <div class="bank-detail-item">
+                        <div class="bank-detail-item" data-fixed-holder-row hidden>
                             <span class="bank-detail-label" th:text="#{bank.field.holder}">Halter</span>
                             <span class="bank-detail-value" data-fixed-holder></span>
                         </div>

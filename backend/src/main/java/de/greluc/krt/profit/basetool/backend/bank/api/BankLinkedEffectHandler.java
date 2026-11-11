@@ -67,6 +67,8 @@ public interface BankLinkedEffectHandler {
     REJECT,
     /** Pending request cancellation. */
     CANCEL,
+    /** Terminal cancellation of an unexecuted request with the owner guard already held. */
+    CANCEL_UNEXECUTED,
     /** Reversal of the original ledger transaction. */
     REVERSE
   }

@@ -89,11 +89,25 @@ class JobOrderMoneyCorrectionPlans {
       boolean checkHolderVersions) {
     var current = ledger.read(order.getId());
     var originals = originalFacts(current, terms, peerId);
-    var affected = affectedHolders(order, current, originals, actor);
+    var affected = affectedPositions(order, current, originals, actor);
+    ledger.requireIndependentOperation(order.getId(), dto.operationId());
     if (checkHolderVersions) {
-      affected.forEach((id, holder) ->
-          OptimisticLock.check(
-              holder.getRevision(), dto.holderVersions().get(id), JobOrderMoneyHolder.class, id));
+      affected
+          .people()
+          .forEach((id, holder) ->
+              OptimisticLock.check(
+                  holder.getRevision(),
+                  dto.holderVersions().get(id),
+                  JobOrderMoneyHolder.class,
+                  id));
+      affected
+          .accounts()
+          .forEach((id, holding) ->
+              OptimisticLock.check(
+                  holding.getRevision(),
+                  dto.holderVersions().get(id),
+                  JobOrderMoneyAccountHolding.class,
+                  id));
     }
     var entries = new ArrayList<JobOrderMoneyCorrectionEntry>();
     boolean changesFact = false;
@@ -106,7 +120,7 @@ class JobOrderMoneyCorrectionPlans {
               dto.operationId(),
               fact.getOperationId(),
               current.effective(fact),
-              revisedAmounts(fact, change));
+              revisedAmounts(current, fact, change));
       var prior =
           current.corrections().reversed().stream()
               .filter(previous -> previous.getOriginalOperationId().equals(fact.getOperationId()))
@@ -123,7 +137,7 @@ class JobOrderMoneyCorrectionPlans {
       throw new BadRequestException("orders.money.correction.noChange");
     }
     var revised = current.revised(entries);
-    if (!revised.nonnegative()) {
+    if (!revised.nonnegativeAvailable()) {
       throw new UnavailableCorrection();
     }
     boolean touchesHandover =
@@ -137,7 +151,7 @@ class JobOrderMoneyCorrectionPlans {
           changesLifecycle(order.getStatus(), target.getAmount(), revised.handedOver());
     }
     var noticeParties = new ArrayList<JobOrderMoneyEffects.CorrectionParty>();
-    for (var holder : affected.values()) {
+    for (var holder : affected.people().values()) {
       UUID account = holder.getUserId();
       if (account != null) {
         noticeParties.add(new JobOrderMoneyEffects.CorrectionParty(holder.getId(), null, account));
@@ -163,16 +177,25 @@ class JobOrderMoneyCorrectionPlans {
     return (status.isActive() && met) || (status == JobOrderStatus.COMPLETED && !met);
   }
 
-  private Map<UUID, JobOrderMoneyHolder> affectedHolders(
+  private AffectedPositions affectedPositions(
       JobOrder order,
       JobOrderMoneyLedger.Ledger current,
       Map<UUID, JobOrderMoneyOperation> originals,
       UUID actor) {
     var affected = new LinkedHashMap<UUID, JobOrderMoneyHolder>();
+    var accounts = new LinkedHashMap<UUID, JobOrderMoneyAccountHolding>();
     boolean responsible = access.responsible(order);
     for (var fact : originals.values()) {
-      var source = current.holder(fact.getHolderId());
-      addAffected(affected, source, actor, responsible);
+      UUID positionId = fact.getAccountHoldingId();
+      if (positionId != null) {
+        if (!responsible) {
+          throw new AccessDeniedException(
+              "Only the current responsible writer may correct a Bank account position.");
+        }
+        accounts.put(positionId, Objects.requireNonNull(current.accountHoldings().get(positionId)));
+      } else {
+        addAffected(affected, current.holder(fact.personalHolderId()), actor, responsible);
+      }
       if (fact.getDestinationHolderId() != null) {
         addAffected(affected, current.holder(fact.getDestinationHolderId()), actor, responsible);
       }
@@ -183,7 +206,7 @@ class JobOrderMoneyCorrectionPlans {
         throw new AccessDeniedException("The correction changes a foreign requester payment.");
       }
     }
-    return affected;
+    return new AffectedPositions(affected, accounts);
   }
 
   private static void addAffected(
@@ -206,7 +229,7 @@ class JobOrderMoneyCorrectionPlans {
     if (matches.size() != terms.size()
         || matches.values().stream()
             .anyMatch(fact ->
-                fact.isBankHandling()
+                !current.canCorrect(fact)
                     || fact.getKind() == JobOrderMoneyKind.CORRECTION
                     || (fact.getPeerOrderId() != null && !fact.getPeerOrderId().equals(peerId)))) {
       throw new BadRequestException("orders.money.correction.originalRequired");
@@ -214,28 +237,30 @@ class JobOrderMoneyCorrectionPlans {
     return matches;
   }
 
-  private JobOrderMoneyAmounts revisedAmounts(JobOrderMoneyOperation fact, Terms terms) {
+  private JobOrderMoneyAmounts revisedAmounts(
+      JobOrderMoneyLedger.Ledger current, JobOrderMoneyOperation fact, Terms terms) {
     BigDecimal amount = terms.amount();
     BigDecimal provision = terms.provision();
+    BigDecimal rate = current.historicalOrderFeeRate(fact);
+    BigDecimal fee = rate == null ? BigDecimal.ZERO : fees.feeOn(amount, new RateSnapshot(rate));
     if (fact.getKind() == JobOrderMoneyKind.PROVISION) {
       if (provision != null) {
         throw new BadRequestException("orders.money.correction.provision");
       }
-      return new JobOrderMoneyAmounts(amount, amount, BigDecimal.ZERO);
+      return new JobOrderMoneyAmounts(amount, amount, fee);
     }
-    BigDecimal rate = fact.getFeeRate();
     BigDecimal newFunds = Objects.requireNonNullElse(provision, BigDecimal.ZERO);
     JobOrderMoneyKind kind = fact.getKind();
-    if ((rate == null || kind == JobOrderMoneyKind.PURPOSE_HANDOVER) && newFunds.signum() != 0) {
+    if ((fact.getFeeRate() == null || kind == JobOrderMoneyKind.PURPOSE_HANDOVER)
+        && newFunds.signum() != 0) {
       throw new BadRequestException("orders.money.correction.provision");
     }
-    BigDecimal fee = rate == null ? BigDecimal.ZERO : fees.feeOn(amount, new RateSnapshot(rate));
     if ((kind == JobOrderMoneyKind.REQUESTER_RETURN || kind == JobOrderMoneyKind.SETTLEMENT)
         && newFunds.compareTo(fee) > 0) {
       throw new BadRequestException("orders.money.settlement.feeProvision.excess");
     }
     if (kind == JobOrderMoneyKind.REQUESTER_RETURN
-        && fact.getHolderId().equals(fact.getDestinationHolderId())
+        && fact.personalHolderId().equals(fact.getDestinationHolderId())
         && newFunds.compareTo(fee) != 0) {
       throw new BadRequestException("orders.money.correction.provision");
     }
@@ -254,14 +279,26 @@ class JobOrderMoneyCorrectionPlans {
       Plan plan,
       @Nullable UUID peerId,
       Set<UUID> noticedAccounts) {
-    var holder = plan.holders().values().iterator().next();
-    final var fact =
-        operations.saveAndFlush(
-            JobOrderMoneyOperation.correction(
-                order.getId(), operationId, Objects.requireNonNull(holder.getId()), actor, peerId));
+    var positions = plan.positions();
+    var holder = positions.people().values().stream().findFirst().orElse(null);
+    var marker =
+        holder == null
+            ? JobOrderMoneyOperation.accountOperation(
+                order.getId(),
+                operationId,
+                positions.accounts().keySet().iterator().next(),
+                actor,
+                null,
+                JobOrderMoneyKind.CORRECTION,
+                null,
+                BigDecimal.ZERO)
+            : JobOrderMoneyOperation.correction(
+                order.getId(), operationId, Objects.requireNonNull(holder.getId()), actor, peerId);
+    final var fact = operations.saveAndFlush(marker);
     history.saveAll(plan.entries());
     creditCorrection.apply(order, operationId, plan.entries());
-    plan.holders().values().forEach(JobOrderMoneyHolder::recordChange);
+    positions.people().values().forEach(JobOrderMoneyHolder::recordChange);
+    positions.accounts().values().forEach(JobOrderMoneyAccountHolding::recordChange);
     if (plan.lifecycleChanged()) {
       if (order.getStatus() == JobOrderStatus.COMPLETED) {
         lifecycle.reopenUnderfulfilledMoneyOrder(order);
@@ -291,7 +328,7 @@ class JobOrderMoneyCorrectionPlans {
                     plan.entries().stream()
                         .map(JobOrderMoneyCorrectionEntry::getOriginalOperationId)
                         .toList()));
-    return new JobOrderEditor.MoneyEdit<>(Optional.of(queries.projectOutcome(fact, holder)), audit);
+    return new JobOrderEditor.MoneyEdit<>(Optional.of(queries.projectOutcome(fact)), audit);
   }
 
   JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> replay(
@@ -321,18 +358,19 @@ class JobOrderMoneyCorrectionPlans {
         || stored.stream()
             .anyMatch(entry ->
                 !matchesStored(
+                    current,
                     entry,
                     originals.get(entry.getOriginalOperationId()),
                     terms.get(entry.getOriginalOperationId())))) {
       throw new BusinessConflictException("orders.money.operation.termsMismatch");
     }
-    affectedHolders(order, current, originals, actor);
+    affectedPositions(order, current, originals, actor);
     creditCorrection.authorizeReplay(order, stored);
-    return result(
-        order, Optional.of(queries.projectOutcome(fact, current.holder(fact.getHolderId()))));
+    return result(order, Optional.of(queries.projectOutcome(fact)));
   }
 
   private boolean matchesStored(
+      JobOrderMoneyLedger.Ledger current,
       JobOrderMoneyCorrectionEntry entry,
       @Nullable JobOrderMoneyOperation original,
       @Nullable Terms change) {
@@ -342,7 +380,7 @@ class JobOrderMoneyCorrectionPlans {
       return false;
     }
     try {
-      return sameAmounts(entry.revised(), revisedAmounts(original, change));
+      return sameAmounts(entry.revised(), revisedAmounts(current, original, change));
     } catch (BadRequestException invalid) {
       return false;
     }
@@ -377,8 +415,12 @@ class JobOrderMoneyCorrectionPlans {
 
   record Terms(BigDecimal amount, @Nullable BigDecimal provision, boolean removeAttribution) {}
 
+  /** The personal and account positions whose local revision the correction changes. */
+  private record AffectedPositions(
+      Map<UUID, JobOrderMoneyHolder> people, Map<UUID, JobOrderMoneyAccountHolding> accounts) {}
+
   record Plan(
-      Map<UUID, JobOrderMoneyHolder> holders,
+      AffectedPositions positions,
       List<JobOrderMoneyCorrectionEntry> entries,
       JobOrderMoneyLedger.Ledger revised,
       boolean lifecycleChanged,
@@ -404,10 +446,10 @@ class JobOrderMoneyCorrectionPlans {
     }
 
     Map<UUID, Long> holderVersions() {
-      return holders.entrySet().stream()
-          .collect(
-              Collectors.toUnmodifiableMap(
-                  Map.Entry::getKey, item -> item.getValue().getRevision()));
+      var versions = new LinkedHashMap<UUID, Long>();
+      positions.people().forEach((id, holder) -> versions.put(id, holder.getRevision()));
+      positions.accounts().forEach((id, holding) -> versions.put(id, holding.getRevision()));
+      return Map.copyOf(versions);
     }
   }
 

@@ -46,5 +46,24 @@ public final class JobOrderMetricNames {
   public static final String JOB_ORDER_INVALID_RESPONSIBILITY =
       "basetool.job.order.invalid.responsibility";
 
+  /** Count of active linked attempts waiting for a Bank decision. */
+  public static final String LINKED_MONEY_WAITING = "basetool.job.order.linked.money.waiting.count";
+
+  /** Age of the oldest undecided linked Bank request. */
+  public static final String LINKED_MONEY_WAITING_AGE =
+      "basetool.job.order.linked.money.waiting.age";
+
+  /** Count of effective real payments whose ledger reversal needs clarification. */
+  public static final String LINKED_MONEY_CLARIFICATION =
+      "basetool.job.order.linked.money.clarification";
+
+  /** Count of linked attempts with a contradictory order effect. */
+  public static final String LINKED_MONEY_CONTRADICTIONS =
+      "basetool.job.order.linked.money.contradictions";
+
+  /** Technical failures applying a linked Bank outcome in the order transaction. */
+  public static final String LINKED_MONEY_TECHNICAL_FAILURES =
+      "basetool.job.order.linked.money.technical.failures";
+
   private JobOrderMetricNames() {}
 }

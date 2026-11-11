@@ -20,8 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
-import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -57,8 +55,8 @@ public class JobOrderMoneySettlements {
   private final JobOrderMoneyRecipients recipients;
   private final JobOrderMoneyQueries queries;
   private final JobOrderMoneySettlementBasis basis;
-  private final JobOrderService lifecycle;
-  private final JobOrderMoneyEffects effects;
+  private final JobOrderMoneySettlementWriter writer;
+  private final JobOrderLinkedMoneySettlements linked;
 
   /**
    * Calculates a settlement at its observed basis without creating a fact.
@@ -72,7 +70,11 @@ public class JobOrderMoneySettlements {
     JobOrder order = readableSettlement(orderId);
     var terms = JobOrderMoneySettlementTerms.from(dto);
     try {
-      return basis.resolve(order, dto, terms, access.requireActiveActor(), null).preview(terms);
+      var resolved = basis.resolve(order, dto, terms, access.requireActiveActor(), null);
+      if (dto.bank() != null) {
+        linked.validateParties(resolved, dto.bank());
+      }
+      return resolved.preview(terms);
     } catch (JobOrderMoneySettlementBasis.UnavailableSettlement unavailable) {
       throw unavailable.previewProblem();
     } catch (JobOrderMoneyHolders.UnavailableHolderException unavailable) {
@@ -187,6 +189,7 @@ public class JobOrderMoneySettlements {
     if (!attempt.terms().requesterReturn()
         || order.getStatus() != JobOrderStatus.COMPLETED
         || operations.existsByOrderIdAndOperationId(orderId, attempt.id())
+        || linked.hasAttempt(orderId, attempt.id())
         || operations.isRefused(orderId, attempt.id())) {
       return false;
     }
@@ -200,6 +203,15 @@ public class JobOrderMoneySettlements {
       JobOrder order, Attempt attempt, boolean queueLocked) {
     access.requireActiveActor();
     UUID orderId = order.getId();
+    var bank = attempt.dto().bank();
+    if (bank != null) {
+      var previous =
+          linked.replay(
+              order, attempt.id(), attempt.actor(), attempt.terms(), attempt.rate(), bank);
+      if (previous.isPresent()) {
+        return unchanged(order, previous);
+      }
+    }
     var accepted = operations.findByOrderIdAndOperationId(orderId, attempt.id());
     if (accepted.isPresent()) {
       return replay(order, attempt, accepted.orElseThrow());
@@ -213,6 +225,7 @@ public class JobOrderMoneySettlements {
         attempt.terms().kind(),
         attempt.actor(),
         attempt.terms().requesterReturn() ? current.requester() : current.source());
+    ledger.requireIndependentOperation(orderId, attempt.id());
     if (!current.equals(attempt.accounts())) {
       return refuse(order, attempt.id());
     }
@@ -228,64 +241,32 @@ public class JobOrderMoneySettlements {
     if (settled.sourceAfter().signum() < 0 || (settled.reopens() && !queueLocked)) {
       return refuse(order, attempt.id());
     }
-    return post(order, attempt, settled);
+    if (bank != null) {
+      return unchanged(
+          order,
+          Optional.of(
+              linked.submit(order, attempt.id(), attempt.actor(), attempt.terms(), settled, bank)));
+    }
+    return writer.post(order, settled.source(), settled.destination(), effect(attempt, settled));
   }
 
-  private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> post(
-      JobOrder order, Attempt attempt, JobOrderMoneySettlementBasis.Resolved settled) {
+  private static JobOrderMoneySettlementWriter.Effect effect(
+      Attempt attempt, JobOrderMoneySettlementBasis.Resolved settled) {
     var terms = attempt.terms();
-    var destination = settled.destination();
-    final boolean createsLink =
-        destination != null && destination.getId() == null && destination.getUserId() != null;
-    UUID destinationId = null;
-    if (destination != null) {
-      destination.recordChange();
-      destinationId = Objects.requireNonNull(holders.save(destination).getId());
-    }
-    var source = settled.source();
-    if (source != null) {
-      source.recordChange();
-    }
-    var holding = source == null ? Objects.requireNonNull(destination) : source;
-    var fact =
-        operations.saveAndFlush(
-            new JobOrderMoneyOperation(
-                order.getId(),
-                attempt.id(),
-                Objects.requireNonNull(holding.getId()),
-                attempt.actor(),
-                terms.recordedSelection(),
-                null,
-                false,
-                terms.amount(),
-                terms.kind(),
-                destinationId,
-                terms.requesterRecipientId(),
-                terms.hasFee() ? terms.provision() : null,
-                terms.hasFee() ? settled.rate().rate() : null,
-                terms.hasFee() ? settled.fee() : null));
-    if (settled.reopens()) {
-      lifecycle.reopenUnderfulfilledMoneyOrder(order);
-    }
-    effects.movementRecorded(
-        order,
-        fact,
-        settled.payer().accountId(),
-        destination == null ? null : destination.getUserId(),
+    return new JobOrderMoneySettlementWriter.Effect(
+        attempt.id(),
         attempt.actor(),
-        settled.reopens(),
-        createsLink);
-    var audit =
-        JobOrderEdit.audited(
-            order,
-            AuditEventType.JOB_ORDER_MONEY_MOVED,
-            AuditDetails.of("operationId", attempt.id())
-                .with("kind", terms.kind())
-                .with("amount", terms.amount())
-                .with("fee", settled.fee())
-                .with("provision", terms.provision()));
-    return new JobOrderEditor.MoneyEdit<>(
-        Optional.of(queries.projectOutcome(fact, holding)), audit);
+        attempt.actor(),
+        terms.kind(),
+        terms.recordedSelection(),
+        terms.requesterRecipientId(),
+        settled.payer().accountId(),
+        terms.amount(),
+        terms.provision(),
+        terms.hasFee() ? settled.rate() : null,
+        settled.fee(),
+        null,
+        settled.reopens());
   }
 
   private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> replay(
@@ -293,11 +274,13 @@ public class JobOrderMoneySettlements {
     if (!attempt.actor().equals(fact.getActorId())) {
       throw new AccessDeniedException("Caller may not replay this operation.");
     }
-    if (!attempt.terms().matches(fact, attempt.rate())) {
+    if (attempt.dto().bank() != null
+        || fact.isBankHandling()
+        || !attempt.terms().matches(fact, attempt.rate())) {
       throw new BusinessConflictException("orders.money.operation.termsMismatch");
     }
     var current = ledger.read(order.getId());
-    var holding = current.holder(fact.getHolderId());
+    var holding = current.holder(fact.personalHolderId());
     UUID designation = fact.getRecipientId();
     UUID payer =
         designation == null
