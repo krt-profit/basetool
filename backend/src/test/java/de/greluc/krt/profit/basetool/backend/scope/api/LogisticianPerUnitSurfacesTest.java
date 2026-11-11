@@ -29,8 +29,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderResponsibilityGuard;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -229,8 +227,6 @@ class LogisticianPerUnitSurfacesTest {
             chain.authHelper,
             orders,
             responsibilityGuard,
-            mock(JobOrderHandoverRepository.class),
-            mock(JobOrderItemHandoverRepository.class),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal
                     .JobOrderUnitReadHistoryRepository.class),

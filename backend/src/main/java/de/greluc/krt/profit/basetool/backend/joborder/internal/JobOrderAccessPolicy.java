@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthorityFlags;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -40,6 +41,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,8 +62,6 @@ public class JobOrderAccessPolicy
   private final AuthHelperService authHelper;
   private final JobOrderRepository jobOrderRepository;
   private final JobOrderResponsibilityGuard responsibilityGuard;
-  private final JobOrderHandoverRepository jobOrderHandoverRepository;
-  private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   private final JobOrderUnitReadHistoryRepository unitReadHistory;
   private final JobOrderParticipationRepository participations;
 
@@ -141,6 +141,44 @@ public class JobOrderAccessPolicy
   }
 
   /**
+   * Checks the caller's current responsible-unit grant for an earmark release.
+   *
+   * @param orderId the order whose earmark is released
+   * @return whether the caller holds the current responsible-unit grant
+   */
+  public boolean canReleaseJobOrderEarmarks(@NotNull UUID orderId) {
+    return jobOrderRepository.findById(orderId).map(this::canTransferResponsibility).orElse(false);
+  }
+
+  /**
+   * Checks current permission to record fulfillment for the concrete order.
+   *
+   * @param orderId the order to process
+   * @return whether the responsible-unit writer may record fulfillment
+   */
+  public boolean canFulfillJobOrder(@NotNull UUID orderId) {
+    return jobOrderRepository
+        .findById(orderId)
+        .filter(order -> order.getStatus() != JobOrderStatus.CANCELLED)
+        .map(this::canEditJobOrderRow)
+        .orElse(false);
+  }
+
+  /**
+   * Rechecks current processing authority on the managed order before recording fulfillment.
+   *
+   * @param order the order with current status and responsibility
+   * @throws AccessDeniedException when fulfillment is cancelled or the actor lacks the unit grant
+   */
+  public void assertCanFulfill(@NotNull JobOrder order) {
+    responsibilityGuard.assertWritable(order);
+    if (order.getStatus() == JobOrderStatus.CANCELLED || !canTransferResponsibility(order)) {
+      throw new AccessDeniedException(
+          "Caller may not record fulfillment for order " + order.getId());
+    }
+  }
+
+  /**
    * Decides whether the caller passes {@code gate} on the already-loaded order.
    *
    * @param order the loaded order the edit targets
@@ -157,14 +195,20 @@ public class JobOrderAccessPolicy
     return switch (gate) {
       case TRANSFER -> canTransferResponsibility(order);
       case ADMIN_DELETE -> authHelper.isAdmin();
-      case EDIT -> canEditJobOrderRow(order);
-      case REQUESTER -> isRequesterWriter(order) && !orderHasAnyDelivery(order.getId());
+      case EDIT, STATUS -> canEditJobOrderRow(order);
+      case SUPPORT ->
+          canTransferResponsibility(order)
+              || accessGateService.canActAsLogisticianInActiveContext();
+      case CANCEL -> canTransferResponsibility(order) || isRequesterWriter(order);
+      case SET_OPEN ->
+          canTransferResponsibility(order)
+              || (order.getStatus() == JobOrderStatus.CANCELLED && isRequesterWriter(order));
+      case REQUESTER -> isRequesterWriter(order);
     };
   }
 
   /**
-   * Checks the current requesting-unit writer while the delivery restriction permits an edit
-   * (REQ-ORDERS-023).
+   * Checks current requesting-unit authority to edit remaining need (REQ-ORDERS-023).
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the order as its requester
@@ -211,27 +255,21 @@ public class JobOrderAccessPolicy
       return Map.of();
     }
     Set<UUID> validIds = responsibilityGuard.validOrderIds(orders);
-    Set<UUID> requesterWriters = new java.util.LinkedHashSet<>();
-    for (JobOrder order : orders) {
-      if (validIds.contains(order.getId()) && isRequesterWriter(order)) {
-        requesterWriters.add(order.getId());
-      }
-    }
-    Set<UUID> delivered =
-        requesterWriters.isEmpty()
-            ? Set.of()
-            : jobOrderRepository.findIdsWithAnyDelivery(requesterWriters);
     Map<UUID, JobOrderAuthorityFlags> flags = new LinkedHashMap<>();
     for (JobOrder order : orders) {
       boolean mayTransfer = canTransferResponsibility(order);
       boolean valid = validIds.contains(order.getId());
+      boolean requesterWriter = valid && isRequesterWriter(order);
+      boolean mayManageCancellation = valid && (mayTransfer || requesterWriter);
       flags.put(
           order.getId(),
           new JobOrderAuthorityFlags(
               !valid,
               valid && mayTransfer,
               mayTransfer,
-              requesterWriters.contains(order.getId()) && !delivered.contains(order.getId())));
+              requesterWriter,
+              mayManageCancellation && order.getStatus().isActive(),
+              mayManageCancellation && order.getStatus() == JobOrderStatus.CANCELLED));
     }
     return Collections.unmodifiableMap(flags);
   }
@@ -300,10 +338,5 @@ public class JobOrderAccessPolicy
   private boolean isRequesterWriter(@NotNull JobOrder order) {
     OrgUnit requesting = order.getRequestingOrgUnit();
     return requesting != null && accessGateService.canActAsLogisticianIn(requesting.getId());
-  }
-
-  private boolean orderHasAnyDelivery(@NotNull UUID jobOrderId) {
-    return jobOrderHandoverRepository.existsByJobOrderId(jobOrderId)
-        || jobOrderItemHandoverRepository.existsByJobOrderId(jobOrderId);
   }
 }

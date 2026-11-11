@@ -24,6 +24,7 @@ import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -42,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -74,7 +76,7 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Observes independent public terminal writes under database-controlled queue contention. */
+/** Observes public order writes under database-controlled queue contention. */
 @SpringBootTest
 class JobOrderStatusQueueRaceIntegrationTest {
   private static final String ORDERS = "/api/v1/orders";
@@ -121,8 +123,9 @@ class JobOrderStatusQueueRaceIntegrationTest {
                       .param("priority", Integer.toString(Integer.MAX_VALUE)),
                   fixture))
           .andExpect(status().isOk());
-      long firstVersion = readOrder(fixture, fixture.first()).path("version").longValue();
-      long secondVersion = readOrder(fixture, fixture.second()).path("version").longValue();
+      long firstVersion = readOrder(fixture, fixture.first()).path("lifecycleVersion").longValue();
+      long secondVersion =
+          readOrder(fixture, fixture.second()).path("lifecycleVersion").longValue();
       createGates(gate, firstTable, secondTable, fixture);
       AtomicInteger firstPid = new AtomicInteger();
       AtomicInteger secondPid = new AtomicInteger();
@@ -162,23 +165,63 @@ class JobOrderStatusQueueRaceIntegrationTest {
         jdbc.execute("DROP FUNCTION IF EXISTS " + gate + "()");
         jdbc.execute("DROP TABLE IF EXISTS " + firstTable + ", " + secondTable);
       } finally {
-        transactions.executeWithoutResult(_ -> {
-          jdbc.update(
-              "DELETE FROM notification WHERE entity_id IN (?, ?)",
-              fixture.first(),
-              fixture.second());
-          jdbc.update(
-              "DELETE FROM audit_event WHERE subject_id IN (?, ?)",
-              fixture.first(),
-              fixture.second());
-          orders.deleteAllById(List.of(fixture.first(), fixture.second()));
-          orders.flush();
-          units.deleteById(fixture.unit());
-          units.flush();
-          materials.deleteById(fixture.material());
-          users.deleteById(fixture.actor());
-        });
+        clean(fixture);
       }
+    }
+  }
+
+  @Test
+  @Timeout(60)
+  void waitingPriorityWriteChecksCurrentResponsibilityAfterTransfer() throws Exception {
+    Fixture fixture = Objects.requireNonNull(transactions.execute(_ -> seed()));
+    AtomicInteger waiterPid = new AtomicInteger();
+    try (var worker = Executors.newSingleThreadExecutor()) {
+      var pending =
+          Objects.requireNonNull(
+              transactions.execute(_ -> {
+                UUID destination = ProfitHierarchyFixtures.persistedProfitArea(units).getId();
+                var transfer =
+                    perform(
+                        authenticated(
+                            patch(ORDERS + "/{id}/responsible-org-unit", fixture.first())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                    json.writeValueAsString(
+                                        Map.of("responsibleOrgUnitId", destination, "version", 0))),
+                            fixture));
+                assertThat(transfer.getResponse().getStatus()).isEqualTo(200);
+                int transferPid = currentPid();
+                var waiting =
+                    worker.submit(() ->
+                        transactions.execute(waitingTransaction -> {
+                          waiterPid.set(currentPid());
+                          var response =
+                              perform(
+                                  put(ORDERS + "/{id}/priority", fixture.first())
+                                      .param("priority", Integer.toString(Integer.MAX_VALUE))
+                                      .with(
+                                          jwt()
+                                              .jwt(token ->
+                                                  token.subject(fixture.actor().toString()))
+                                              .authorities(
+                                                  new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                                                  new OrgUnitContextualAuthority(
+                                                      Roles.LOGISTICIAN, fixture.unit()))));
+                          if (response.getResponse().getStatus() == 403) {
+                            waitingTransaction.setRollbackOnly();
+                          }
+                          return response;
+                        }));
+                await()
+                    .atMost(Duration.ofSeconds(10))
+                    .until(() -> blockedByEither(waiterPid.get(), transferPid, transferPid));
+                return waiting;
+              }));
+      assertThat(
+              Objects.requireNonNull(pending.get(15, TimeUnit.SECONDS)).getResponse().getStatus())
+          .isEqualTo(403);
+    } finally {
+      clean(fixture);
     }
   }
 
@@ -218,19 +261,25 @@ class JobOrderStatusQueueRaceIntegrationTest {
       @NotNull Fixture fixture, UUID order, long version, @NotNull AtomicInteger pid) {
     return Objects.requireNonNull(
         transactions.execute(_ -> {
-          pid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
-          try {
-            return mvc.perform(
-                    authenticated(put(ORDERS + "/{id}/status", order), fixture)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                            json.writeValueAsString(
-                                Map.of("status", "COMPLETED", "version", version))))
-                .andReturn();
-          } catch (Exception failure) {
-            throw new IllegalStateException("Public status request failed", failure);
-          }
+          pid.set(currentPid());
+          return perform(
+              authenticated(put(ORDERS + "/{id}/status", order), fixture)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      json.writeValueAsString(Map.of("status", "COMPLETED", "version", version))));
         }));
+  }
+
+  private int currentPid() {
+    return Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+  }
+
+  private MvcResult perform(MockHttpServletRequestBuilder request) {
+    try {
+      return mvc.perform(request).andReturn();
+    } catch (Exception failure) {
+      throw new IllegalStateException("Public order request failed", failure);
+    }
   }
 
   private boolean blockedByEither(int waiter, int first, int second) {
@@ -261,6 +310,21 @@ class JobOrderStatusQueueRaceIntegrationTest {
             .authorities(
                 new SimpleGrantedAuthority("ROLE_ADMIN"),
                 new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+  }
+
+  private void clean(Fixture fixture) {
+    transactions.executeWithoutResult(_ -> {
+      jdbc.update(
+          "DELETE FROM notification WHERE entity_id IN (?, ?)", fixture.first(), fixture.second());
+      jdbc.update(
+          "DELETE FROM audit_event WHERE subject_id IN (?, ?)", fixture.first(), fixture.second());
+      orders.deleteAllById(List.of(fixture.first(), fixture.second()));
+      orders.flush();
+      units.deleteById(fixture.unit());
+      units.flush();
+      materials.deleteById(fixture.material());
+      users.deleteById(fixture.actor());
+    });
   }
 
   private @NotNull Fixture seed() {

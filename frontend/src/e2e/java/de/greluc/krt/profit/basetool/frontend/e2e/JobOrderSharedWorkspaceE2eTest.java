@@ -48,6 +48,8 @@ class JobOrderSharedWorkspaceE2eTest {
   private static final String ADMIN_PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
   private static final String READER = "test-member";
   private static final String READER_PASSWORD = "test-member-pw";
+  private static final String REQUESTER_WRITER = "test-officer";
+  private static final String REQUESTER_WRITER_PASSWORD = "test-officer-pw";
   private static final String IRIDIUM = "00000000-0000-0000-0000-000000000001";
   private static final String NOTE = "Shared workspace draft survives a peer status change";
 
@@ -57,6 +59,8 @@ class JobOrderSharedWorkspaceE2eTest {
   private static String orderId;
   private static String unrelatedOrderId;
   private static String readerId;
+  private static String requesterUnitId;
+  private static String materialId;
 
   /** Seeds a non-Profit requester and proves its concrete read before adding a personal entry. */
   @BeforeAll
@@ -72,17 +76,23 @@ class JobOrderSharedWorkspaceE2eTest {
     assertNotEquals(seeder.getUserId(ADMIN, ADMIN_PASSWORD), readerId);
     seeder.grantStoredRoles(READER, READER_PASSWORD, List.of("KRT_MEMBER"));
     String tag = UUID.randomUUID().toString().substring(0, 8);
-    String requester =
+    requesterUnitId =
         seeder.createSquadron(ADMIN, ADMIN_PASSWORD, "Workspace requester " + tag, "WR" + tag);
-    seeder.assignStaffelMembership(ADMIN, ADMIN_PASSWORD, readerId, requester, false, false);
-    String material =
-        seeder.ensureJobOrderMaterial(ADMIN, ADMIN_PASSWORD, "Workspace material " + tag);
+    seeder.assignStaffelMembership(ADMIN, ADMIN_PASSWORD, readerId, requesterUnitId, false, false);
+    materialId = seeder.ensureJobOrderMaterial(ADMIN, ADMIN_PASSWORD, "Workspace material " + tag);
     orderId =
         seeder.createJobOrder(
-            ADMIN, ADMIN_PASSWORD, IRIDIUM, requester, "Workspace " + tag, material, 650, 10);
+            ADMIN,
+            ADMIN_PASSWORD,
+            IRIDIUM,
+            requesterUnitId,
+            "Workspace " + tag,
+            materialId,
+            650,
+            10);
     unrelatedOrderId =
         seeder.createJobOrder(
-            ADMIN, ADMIN_PASSWORD, IRIDIUM, "Unrelated " + tag, material, 650, 10);
+            ADMIN, ADMIN_PASSWORD, IRIDIUM, "Unrelated " + tag, materialId, 650, 10);
     JsonObject readable = order(READER, READER_PASSWORD);
     assertEquals(0, readable.getAsJsonArray("assignees").size());
     assertEquals(false, readable.get("canEdit").getAsBoolean());
@@ -179,6 +189,99 @@ class JobOrderSharedWorkspaceE2eTest {
         throw failure;
       }
     }
+  }
+
+  /** A requester can cancel and reopen while a peer keeps an independent note draft. */
+  @Test
+  void requesterCancellationAndReopeningRefreshTheWorkspaceInPlace() {
+    assumeTrue(STACK.managesStack(), "requires the isolated requester fixture");
+    String writerId = seeder.getUserId(REQUESTER_WRITER, REQUESTER_WRITER_PASSWORD);
+    seeder.assignStaffelleiterSeat(ADMIN, ADMIN_PASSWORD, writerId, requesterUnitId, false);
+    String id =
+        seeder.createJobOrder(
+            ADMIN,
+            ADMIN_PASSWORD,
+            IRIDIUM,
+            requesterUnitId,
+            "Workspace lifecycle",
+            materialId,
+            650,
+            10);
+    seeder.postBody(ADMIN, ADMIN_PASSWORD, "/api/v1/orders/" + id + "/assignees/" + readerId, "");
+    String base = STACK.baseUrl();
+    try (BrowserContext reader = authenticated(READER, READER_PASSWORD);
+        BrowserContext writer = authenticated(REQUESTER_WRITER, REQUESTER_WRITER_PASSWORD);
+        BrowserContext processor = authenticated(ADMIN, ADMIN_PASSWORD)) {
+      Page queue = reader.newPage();
+      Page detail = reader.newPage();
+      Page editor = writer.newPage();
+      Page fulfillment = processor.newPage();
+      try {
+        E2eSupport.navigate(queue, base + "/orders");
+        E2eSupport.navigate(detail, base + "/orders/" + id + "?tab=assignees");
+        E2eSupport.navigate(editor, base + "/orders/" + id);
+        for (Page page : List.of(queue, detail, editor)) {
+          page.evaluate("window.__workspaceNoReload = true");
+          waitForRoom(page, page == queue ? "orders" : "order:" + id);
+        }
+        assertThat(queue.locator(row(id))).isVisible();
+        assertThat(detail.getByTestId("order-cancel")).hasCount(0);
+        assertThat(editor.getByTestId("order-cancel")).isVisible();
+        assertThat(editor.locator("#status-select")).hasCount(0);
+
+        detail.locator("[data-trigger='oa-edit-note']").click();
+        detail.locator("#assignee-note-text").fill(NOTE);
+        String noteVersion = detail.locator("#assignee-note-version").inputValue();
+
+        editor.getByTestId("order-cancel").click();
+        assertThat(editor.locator("#status-warning-modal")).isVisible();
+        expectLifecycleWrite(
+            editor, () -> editor.locator("[data-trigger='od-confirm-status']").click());
+        assertThat(editor.locator("#order-head-meta")).hasAttribute("data-status", "CANCELLED");
+        assertThat(queue.locator(row(id))).hasCount(0);
+        assertThat(detail.locator("#krt-livesync-pill")).isVisible();
+        assertThat(detail.locator("#assignee-note-text")).hasValue(NOTE);
+        assertThat(detail.locator("#assignee-note-version")).hasValue(noteVersion);
+
+        E2eSupport.navigate(fulfillment, base + "/orders/" + id);
+        fulfillment.evaluate("window.__workspaceNoReload = true");
+        waitForRoom(fulfillment, "order:" + id);
+        assertThat(fulfillment.locator("#tab-handovers")).isHidden();
+
+        expectLifecycleWrite(editor, () -> editor.getByTestId("order-reopen").click());
+        assertThat(editor.locator("#order-head-meta")).hasAttribute("data-status", "OPEN");
+        assertThat(fulfillment.locator("#tab-handovers")).isVisible();
+        fulfillment.locator("#tab-handovers").click();
+        assertThat(fulfillment.getByTestId("order-handover-open")).isVisible();
+        assertThat(queue.locator(row(id) + " .status-open")).isVisible();
+        assertThat(detail.locator("#assignee-note-text")).hasValue(NOTE);
+        assertThat(detail.locator("#assignee-note-version")).hasValue(noteVersion);
+        var noteResponse =
+            detail.waitForResponse(
+                response ->
+                    response.url().endsWith("/note") && "PUT".equals(response.request().method()),
+                () -> detail.locator("[data-trigger='oa-save-note']").click());
+        assertEquals(200, noteResponse.status());
+        assertThat(detail.locator("#assignees-section").getByText(NOTE)).isVisible();
+        for (Page page : List.of(queue, detail, editor, fulfillment)) {
+          assertEquals(Boolean.TRUE, page.evaluate("window.__workspaceNoReload === true"));
+        }
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(queue, "shared-lifecycle-queue");
+        E2eSupport.dump(detail, "shared-lifecycle-reader");
+        E2eSupport.dump(editor, "shared-lifecycle-requester");
+        E2eSupport.dump(fulfillment, "shared-lifecycle-fulfillment");
+        throw failure;
+      }
+    }
+  }
+
+  private static void expectLifecycleWrite(Page page, Runnable action) {
+    var response =
+        page.waitForResponse(
+            result -> result.url().endsWith("/status") && "POST".equals(result.request().method()),
+            action);
+    assertEquals(200, response.status());
   }
 
   private static BrowserContext authenticated(String username, String password) {

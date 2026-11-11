@@ -57,6 +57,16 @@ public interface NotificationEvent {
   UUID actorSub();
 
   /**
+   * The originating revision used to check whether an action prompt is current.
+   *
+   * @return the observed revisions, or {@code null} when the event carries none
+   */
+  @Nullable
+  default NotificationRevision observedRevision() {
+    return null;
+  }
+
+  /**
    * The org units this event exposes by role, for {@code ORG_RELATIVE_ROLE} selector resolution.
    *
    * @return the context org units keyed by role; never {@code null}

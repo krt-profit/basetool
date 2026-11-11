@@ -129,7 +129,14 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.ORG_RELATIVE_ROLE,
             SelectorKind.ORG_RELATIVE_ROLE,
-            SelectorKind.ORG_RELATIVE_ROLE),
+            SelectorKind.EVENT_RECIPIENTS),
+        rule(
+            NotificationEventType.JOB_ORDER_REOPENED,
+            NotificationType.JOB_ORDER_REOPENED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.EVENT_RECIPIENTS),
         rule(
             NotificationEventType.JOB_ORDER_ASSIGNEE_ADDED,
             NotificationType.JOB_ORDER_ASSIGNED,

@@ -27,6 +27,7 @@ import java.util.UUID;
  * Target of a responsibility transfer within the current Profit hierarchy.
  *
  * @param responsibleOrgUnitId the valid target unit
+ * @param version the observed responsibility version
  */
 @DtoMirror
-public record ReassignResponsibleOrgUnitRequest(@NotNull UUID responsibleOrgUnitId) {}
+public record ReassignResponsibleOrgUnitRequest(@NotNull UUID responsibleOrgUnitId, Long version) {}

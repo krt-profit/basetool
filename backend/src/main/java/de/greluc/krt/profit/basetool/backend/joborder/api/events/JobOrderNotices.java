@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventT
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,6 +43,16 @@ public final class JobOrderNotices {
   public static final String ENTITY_TYPE_DELETED = "JOB_ORDER_DELETED";
 
   private static final String UNKNOWN = ActorRef.UNKNOWN_NAME;
+
+  /** Notice types whose action may become obsolete when the order's state changes. */
+  static final Set<NotificationType> ACTION_PROMPTS =
+      Set.of(
+          NotificationType.JOB_ORDER_CREATED,
+          NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER,
+          NotificationType.JOB_ORDER_UPDATED_BY_RESPONSIBLE,
+          NotificationType.JOB_ORDER_REASSIGNED,
+          NotificationType.JOB_ORDER_REOPENED,
+          NotificationType.JOB_ORDER_CLARIFICATION_REQUIRED);
 
   /** Bounded reasons for automatic support or promise endings. */
   public enum AutomaticEndingReason {
@@ -65,82 +76,190 @@ public final class JobOrderNotices {
   }
 
   /**
-   * An order moved to another responsible unit; the earlier creation notices go.
+   * Tells affected unit writers that responsibility has transferred.
    *
    * @param jobOrderId the order
-   * @param displayId its display id
+   * @param displayId its display number
    * @param handle its contact handle
-   * @param from the previous unit's shorthand
-   * @param to the new unit
-   * @param toShorthand the new unit's shorthand
-   * @param actor who moved it
-   * @return the event
+   * @param from the former responsible unit's shorthand
+   * @param to the new responsible unit's shorthand
+   * @param units the order's current and former unit contexts
+   * @param revision the resulting order revisions
+   * @param actor the actor moving the order, if known
+   * @return the transfer notice and cleanup of obsolete prompts
    */
-  @NotNull
-  public static NoticeEvent reassigned(
+  public static @NotNull NoticeEvent reassigned(
       @NotNull UUID jobOrderId,
       @Nullable Integer displayId,
       @Nullable String handle,
       @Nullable String from,
-      @NotNull OrgUnitRef to,
-      @Nullable String toShorthand,
-      @NotNull ActorRef actor) {
+      @Nullable String to,
+      @NotNull Map<NotificationContextRole, OrgUnitRef> units,
+      @NotNull NotificationRevision revision,
+      @Nullable UUID actor) {
     Map<String, String> params = params(displayId, handle);
     params.put("from", text(from));
-    params.put("to", text(toShorthand));
+    params.put("to", text(to));
     return NoticeEvent.builder()
         .eventType(NotificationEventType.JOB_ORDER_REASSIGNED)
-        .actorSub(actor.id())
+        .actorSub(actor)
         .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
         .entityId(jobOrderId)
-        .contextOrgUnits(Map.of(NotificationContextRole.RESPONSIBLE, to))
+        .contextOrgUnits(units)
+        .observedRevision(revision)
         .renderParams(params)
-        .resolvesNotificationTypes(
-            Set.of(
-                NotificationType.JOB_ORDER_CREATED,
-                NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER,
-                NotificationType.JOB_ORDER_REASSIGNED))
+        .resolvesNotificationTypes(ACTION_PROMPTS)
         .build();
   }
 
   /**
-   * An order was completed, rejected or deleted; its requesting unit's leadership is told.
+   * Reports the terminal outcome to affected unit writers and active assigned accounts.
    *
-   * @param jobOrderId the order
-   * @param displayId its display id
+   * @param jobOrderId the affected order
+   * @param displayId its display number
    * @param handle its contact handle
-   * @param requesting the requesting unit, or {@code null}
-   * @param requestingShorthand the requesting unit's shorthand
-   * @param statusCode {@code COMPLETED}, {@code REJECTED} or {@code DELETED}
-   * @param actor who closed it
-   * @return the event
+   * @param units its affected requesting and responsible units
+   * @param unitShorthand the unit named in the notice
+   * @param statusCode the coded terminal outcome
+   * @param assignees active accounts assigned to the order
+   * @param actor the actor who ended the order, if known
+   * @return the terminal outcome notice
    */
-  @NotNull
-  public static NoticeEvent finished(
+  public static @NotNull NoticeEvent finished(
       @NotNull UUID jobOrderId,
       @Nullable Integer displayId,
       @Nullable String handle,
-      @Nullable OrgUnitRef requesting,
-      @Nullable String requestingShorthand,
+      @NotNull Map<NotificationContextRole, OrgUnitRef> units,
+      @Nullable String unitShorthand,
       @NotNull String statusCode,
-      @NotNull ActorRef actor) {
+      @NotNull Set<UUID> assignees,
+      @Nullable UUID actor) {
     Map<String, String> params = params(displayId, handle);
-    params.put("unit", text(requestingShorthand));
+    params.put("unit", text(unitShorthand));
     params.put("statusCode", statusCode);
-    NoticeEvent.NoticeEventBuilder builder =
-        NoticeEvent.builder()
-            .eventType(NotificationEventType.JOB_ORDER_FINISHED)
-            .actorSub(actor.id())
-            .entityType(
-                "DELETED".equals(statusCode)
-                    ? ENTITY_TYPE_DELETED
-                    : JobOrderCreatedEvent.ENTITY_TYPE)
-            .entityId(jobOrderId)
-            .renderParams(params);
-    if (requesting != null) {
-      builder.contextOrgUnits(Map.of(NotificationContextRole.REQUESTING, requesting));
-    }
-    return builder.build();
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_FINISHED)
+        .actorSub(actor)
+        .entityType(
+            "DELETED".equals(statusCode) ? ENTITY_TYPE_DELETED : JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(jobOrderId)
+        .contextOrgUnits(units)
+        .contextRecipientUserIds(assignees)
+        .renderParams(params)
+        .build();
+  }
+
+  /**
+   * Tells affected unit writers about a meaningful edit by the responsible side.
+   *
+   * @param orderId the affected order
+   * @param displayId its display number
+   * @param handle its contact handle
+   * @param units its responsible and requesting unit contexts
+   * @param revision the order revisions observed by the editor
+   * @param actor the actor editing the order, if known
+   * @return the responsible-side update notice
+   */
+  public static @NotNull NoticeEvent needChanged(
+      @NotNull UUID orderId,
+      @Nullable Integer displayId,
+      @Nullable String handle,
+      @NotNull Map<NotificationContextRole, OrgUnitRef> units,
+      @NotNull NotificationRevision revision,
+      @Nullable UUID actor) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_UPDATED_BY_RESPONSIBLE)
+        .actorSub(actor)
+        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(orderId)
+        .contextOrgUnits(units)
+        .observedRevision(revision)
+        .renderParams(params(displayId, handle))
+        .build();
+  }
+
+  /**
+   * Tells affected writers and assignees that work on an order has reopened.
+   *
+   * @param orderId the reopened order
+   * @param displayId its display number
+   * @param handle its contact handle
+   * @param units its responsible and requesting unit contexts
+   * @param assignees active accounts assigned to the order
+   * @param revision the resulting order revisions
+   * @param actor the actor reopening the order, if known
+   * @return the reopening notice
+   */
+  public static @NotNull NoticeEvent reopened(
+      @NotNull UUID orderId,
+      @Nullable Integer displayId,
+      @Nullable String handle,
+      @NotNull Map<NotificationContextRole, OrgUnitRef> units,
+      @NotNull Set<UUID> assignees,
+      @NotNull NotificationRevision revision,
+      @Nullable UUID actor) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_REOPENED)
+        .actorSub(actor)
+        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(orderId)
+        .contextOrgUnits(units)
+        .contextRecipientUserIds(assignees)
+        .observedRevision(revision)
+        .renderParams(params(displayId, handle))
+        .resolvesNotificationTypes(ACTION_PROMPTS)
+        .build();
+  }
+
+  /**
+   * Prompts affected writers and assignees when the order's responsibility needs clarification.
+   *
+   * @param orderId the affected order
+   * @param displayId its display number
+   * @param handle its contact handle
+   * @param units its responsible and requesting unit contexts
+   * @param assignees accounts assigned to the order
+   * @param revision the order revisions observed when eligibility changed
+   * @param actor the actor of the hierarchy change, if known
+   * @return the notice with obsolete processing prompts to clear
+   */
+  public static @NotNull NoticeEvent clarificationRequired(
+      @NotNull UUID orderId,
+      @Nullable Integer displayId,
+      @Nullable String handle,
+      @NotNull Map<NotificationContextRole, OrgUnitRef> units,
+      @NotNull Set<UUID> assignees,
+      @NotNull NotificationRevision revision,
+      @Nullable UUID actor) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_CLARIFICATION_REQUIRED)
+        .actorSub(actor)
+        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(orderId)
+        .contextOrgUnits(units)
+        .contextRecipientUserIds(assignees)
+        .observedRevision(revision)
+        .renderParams(params(displayId, handle))
+        .resolvesNotificationTypes(ACTION_PROMPTS)
+        .build();
+  }
+
+  /**
+   * Retires the prompt when the order's responsibility qualifies again.
+   *
+   * @param orderId the affected order
+   * @param actor the actor of the hierarchy change, if known
+   * @return the cleanup event
+   */
+  public static @NotNull NoticeEvent clarificationResolved(
+      @NotNull UUID orderId, @Nullable UUID actor) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_CLARIFICATION_RESOLVED)
+        .actorSub(actor)
+        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(orderId)
+        .resolvesNotificationTypes(Set.of(NotificationType.JOB_ORDER_CLARIFICATION_REQUIRED))
+        .build();
   }
 
   /**
@@ -224,6 +343,36 @@ public final class JobOrderNotices {
         .actorSub(actor.id())
         .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
         .entityId(jobOrderId)
+        .contextRecipientUserIds(recipients)
+        .renderParams(params)
+        .build();
+  }
+
+  /**
+   * Tells affected current writers that a Staffel began or ended support.
+   *
+   * @param orderId the affected order
+   * @param displayId its display number
+   * @param handle its contact handle
+   * @param recipients affected Staffel and responsible coordination writers
+   * @param active whether the Staffel began support
+   * @param actor the actor of the participation change
+   * @return the participation notice
+   */
+  public static @NotNull NoticeEvent participationChanged(
+      @NotNull UUID orderId,
+      @Nullable Integer displayId,
+      @Nullable String handle,
+      @NotNull Set<UUID> recipients,
+      boolean active,
+      @NotNull ActorRef actor) {
+    Map<String, String> params = params(displayId, handle);
+    params.put("supportCode", active ? "ENROLLED" : "WITHDRAWN");
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.JOB_ORDER_PARTICIPATION_CHANGED)
+        .actorSub(actor.id())
+        .entityType(JobOrderCreatedEvent.ENTITY_TYPE)
+        .entityId(orderId)
         .contextRecipientUserIds(recipients)
         .renderParams(params)
         .build();

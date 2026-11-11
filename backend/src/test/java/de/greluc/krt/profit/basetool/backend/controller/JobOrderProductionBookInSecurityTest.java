@@ -81,7 +81,7 @@ class JobOrderProductionBookInSecurityTest {
     UUID orderId = UUID.randomUUID();
     UUID callerId = UUID.randomUUID();
     UUID foreignOwnerId = UUID.randomUUID();
-    when(jobOrderAccessPolicy.canEditJobOrder(any())).thenReturn(true);
+    when(jobOrderAccessPolicy.canFulfillJobOrder(any())).thenReturn(true);
     when(inventoryAccessPolicy.mayBookInFor(foreignOwnerId)).thenReturn(false);
 
     mockMvc

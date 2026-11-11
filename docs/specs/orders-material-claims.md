@@ -255,23 +255,24 @@ implementation. Actual inventory ownership and ordinary stock permissions stay w
 ## Open questions
 
 None for the approved quantity and original-quality contracts. Complete runtime acceptance remains
-pending; explicit support and responsibility writes follow the shared workflow.
+pending; support and responsibility writes use the shared workflow.
 
 The existing explicit administrator hard-delete of a MATERIAL/ITEM order (REQ-ORDERS-042) removes
 its dependent active and ended claim rows in the same transaction after the responsibility guard.
 The normal `JOB_ORDER_DELETED` audit survives. Automatic eligibility ending remains distinct: it
 retains every promise fact and never deletes its history.
 
-The current SK-only claim workflow exposes writable Staffel options through
-`GET /api/v1/orders/{jobOrderId}/claims/claiming-options`. The read requires access to the concrete
-order; empty options confer no write authority. Options and existing claim writes share the same
-claim-management predicate. A contextual Staffel writer can maintain its own existing claim
-without receiving responsible-side processing authority. The existing responsible-SK grant
-exception remains part of this workflow: `hasRoleInOrgUnit(SK, LOGISTICIAN)` differs from the
-active-context check `canActAsLogisticianIn(Staffel)`. The complete shared writer conversion must
-resolve that distinction against REQ-ORDERS-053 and the canonical leadership/context rules.
-`JobOrderHierarchyAuthorityIntegrationTest` and the frontend `JobOrderClaimControlsMvcTest` cover
-the current options, positive own-Staffel writes and foreign/ordinary/invalid denials.
+`GET /api/v1/orders/{jobOrderId}/claims/claiming-options` returns eligible Staffeln whose promises
+the caller can write on the readable order. The current responsible unit and the selected
+Staffel each use their contextual writer grant. The responsible Staffel is absent from new
+support and promise options. An open contribution retained when a Staffel becomes responsible
+can still receive explicit suitable provision. Inventory continues to check the stock action.
+
+Explicit participation uses `GET /api/v1/orders/{id}/participations` and `PUT` or `DELETE`
+on the same collection with the selected unit id. The first promise uses that same participation.
+Withdrawing support requires the observed participation version and ends its open promises in the
+same transaction. `JobOrderHierarchyAuthorityIntegrationTest`, `MaterialClaimConcurrencyTest` and
+`MaterialProvisionAuthorityIntegrationTest` cover current actor and participation behavior.
 
 ## Material implementation foundation
 

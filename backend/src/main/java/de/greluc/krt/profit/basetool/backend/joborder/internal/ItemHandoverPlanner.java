@@ -101,6 +101,8 @@ public class ItemHandoverPlanner {
     commands.prepareWrites(rows, List.of(), scopes);
     if (booked.allDelivered()) {
       orders.lockAllJobOrders();
+    } else {
+      orders.lockForScopedEdit(orderId);
     }
     entityManager.refresh(order);
     responsibility.assertWritable(order);

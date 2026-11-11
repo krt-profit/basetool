@@ -36,21 +36,27 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrgUnitEligibilityMaintenance {
 
   private final OrgUnitRepository units;
+  private final ProfitHierarchyService profitHierarchy;
   private final ObjectProvider<OrgUnitEligibilityObserver> observers;
 
   /**
    * Joins dependent maintenance for the changed unit's eligibility subtree.
    *
    * @param changed the managed unit after its organisational change
+   * @param previous the eligibility snapshot from before the organisational change
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public void eligibilityChanged(@NotNull OrgUnit changed) {
+  public void eligibilityChanged(
+      @NotNull OrgUnit changed, @NotNull ProfitHierarchySnapshot previous) {
     Set<UUID> affected = new LinkedHashSet<>();
     affected.add(changed.getId());
     if (changed.getKind() == OrgUnitKind.BEREICH) {
       affected.addAll(units.findChildOrgUnitIds(changed.getId()));
     }
     Set<UUID> affectedIds = Set.copyOf(affected);
-    observers.orderedStream().forEach(observer -> observer.onEligibilityChanged(affectedIds));
+    ProfitHierarchySnapshot current = profitHierarchy.snapshot();
+    observers
+        .orderedStream()
+        .forEach(observer -> observer.onEligibilityChanged(affectedIds, previous, current));
   }
 }

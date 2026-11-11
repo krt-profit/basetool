@@ -53,7 +53,11 @@ import {
     openHandoverModal,
     updateHandoverIndexes,
 } from '/js/joborder/orders-detail.js';
-import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
+import {
+    showFrontendErrorToast,
+    showFrontendSuccessToast,
+    showKrtConfirm,
+} from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
@@ -61,6 +65,9 @@ import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
 krtEvents.on('change', 'od-update-status', (el) => {
     updateStatus(/** @type {HTMLSelectElement} */ (el));
+});
+krtEvents.on('click', 'od-change-status', (el) => {
+    updateStatus(/** @type {HTMLButtonElement} */ (el));
 });
 krtEvents.on('change', 'od-toggle-bp-counting', (el) => {
     _toggleBlueprintCounting(/** @type {HTMLInputElement} */ (el));
@@ -314,16 +321,17 @@ krtEvents.on('submit', 'od-transfer-responsibility', async (el, event) => {
     const target = /** @type {HTMLSelectElement | null} */ (
         form.querySelector('[name="responsibleOrgUnitId"]')
     );
-    const id = form.dataset.orderId;
-    if (!id || !target || !target.value || !joborderHooks.writeOrder) return;
+    const { orderId, version } = form.dataset;
+    if (!orderId || !version || !target?.value || !joborderHooks.writeOrder) return;
     await joborderHooks.writeOrder({
         method: 'PATCH',
-        url: `/orders/${encodeURIComponent(id)}/responsible-org-unit`,
-        payload: { responsibleOrgUnitId: target.value },
+        url: `/orders/${encodeURIComponent(orderId)}/responsible-org-unit`,
+        payload: { responsibleOrgUnitId: target.value, version: Number(version) },
         sectionKey: 'header',
         refresh: [
             'header',
             'actions',
+            'participations',
             'dialogs',
             'kpi',
             'materials',
@@ -339,5 +347,49 @@ krtEvents.on('submit', 'od-transfer-responsibility', async (el, event) => {
         onSuccess() {
             _publishOrdersQueue();
         },
+    });
+});
+
+/**
+ * Builds the shared route for a Staffel's participation in an order.
+ *
+ * @param {string} orderId the order
+ * @param {string} unitId the Staffel
+ * @returns {string} the route for enrollment and withdrawal
+ */
+function supportUrl(orderId, unitId) {
+    return `/orders/${encodeURIComponent(orderId)}/participations/${encodeURIComponent(unitId)}`;
+}
+
+krtEvents.on('submit', 'od-enroll-support', (element, event) => {
+    event.preventDefault();
+    if (!(element instanceof HTMLFormElement)) return;
+    const { orderId, error } = element.dataset;
+    const unit = element.elements.namedItem('unitId');
+    if (!orderId || !(unit instanceof HTMLSelectElement) || !unit.value) return;
+    const url = supportUrl(orderId, unit.value);
+    joborderHooks.writeOrder?.({
+        method: 'PUT',
+        url,
+        sectionKey: 'participations',
+        refresh: ['participations'],
+        errorMessage: error,
+        onSuccess: _publishOrdersQueue,
+    });
+});
+
+krtEvents.on('click', 'od-withdraw-support', async (element) => {
+    if (!(element instanceof HTMLButtonElement)) return;
+    const { orderId, unitId, version, error, confirmTitle, confirmMessage } = element.dataset;
+    if (!orderId || !unitId || !version) return;
+    if (!(await showKrtConfirm(confirmTitle || '', confirmMessage || ''))) return;
+    const url = `${supportUrl(orderId, unitId)}?version=${encodeURIComponent(version)}`;
+    await joborderHooks.writeOrder?.({
+        method: 'DELETE',
+        url,
+        sectionKey: 'participations',
+        refresh: ['participations', 'materials', 'aggregated', 'kpi'],
+        errorMessage: error,
+        onSuccess: _publishOrdersQueue,
     });
 });

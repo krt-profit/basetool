@@ -99,6 +99,15 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
       UUID jobOrderId, UUID materialId, UUID qualityTierId);
 
   /**
+   * Loads the open promises tied to the Staffel participation.
+   *
+   * @param participationId the durable participation
+   * @return open promise rows in stable order
+   */
+  @EntityGraph(attributePaths = {"material", "qualityTier", "claimingOrgUnit", "participation"})
+  List<MaterialClaim> findByParticipationIdOrderById(UUID participationId);
+
+  /**
    * Loads one bounded page of active promises of the affected ineligible units.
    *
    * @param unitIds the ineligible claiming units

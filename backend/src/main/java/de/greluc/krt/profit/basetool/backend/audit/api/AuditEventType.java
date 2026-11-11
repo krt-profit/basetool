@@ -217,7 +217,9 @@ public enum AuditEventType {
   JOB_ORDER_CLAIM_UPSERTED(AuditDomain.JOB_ORDER),
   /** A squadron claim was withdrawn. */
   JOB_ORDER_CLAIM_WITHDRAWN(AuditDomain.JOB_ORDER),
-  /** An active supporting participation ended when its Staffel became ineligible. */
+  /** A Staffel began active support for a job order. */
+  JOB_ORDER_PARTICIPATION_ENROLLED(AuditDomain.JOB_ORDER),
+  /** An active supporting participation ended. */
   JOB_ORDER_PARTICIPATION_ENDED(AuditDomain.JOB_ORDER),
   /** A quality tier was added to the catalogue (REQ-ORDERS-036). */
   QUALITY_TIER_CREATED(AuditDomain.JOB_ORDER),

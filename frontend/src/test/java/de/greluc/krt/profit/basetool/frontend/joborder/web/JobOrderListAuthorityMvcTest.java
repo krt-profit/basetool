@@ -137,6 +137,10 @@ class JobOrderListAuthorityMvcTest extends JobOrderPageMvcTestBase {
         invalid,
         false,
         false,
-        false);
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 }

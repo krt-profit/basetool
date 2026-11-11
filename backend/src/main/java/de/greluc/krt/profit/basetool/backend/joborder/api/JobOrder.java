@@ -44,7 +44,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.Generated;
+import org.hibernate.annotations.OptimisticLock;
 import org.jetbrains.annotations.Nullable;
 
 /** Job Order JPA entity. */
@@ -57,6 +59,7 @@ import org.jetbrains.annotations.Nullable;
 @Builder
 @Table(name = "job_order")
 @BatchSize(size = 100)
+@DynamicUpdate
 public class JobOrder extends AbstractEntity<UUID> {
 
   /**
@@ -78,7 +81,14 @@ public class JobOrder extends AbstractEntity<UUID> {
   /** The current Profit-hierarchy processing unit, changed through the responsibility endpoint. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "responsible_org_unit_id", nullable = false)
+  @OptimisticLock(excluded = true)
   private OrgUnit responsibleOrgUnit;
+
+  /** The independently observed revision of the responsible unit. */
+  @Column(name = "responsibility_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  @Builder.Default
+  private Long responsibilityVersion = 0L;
 
   /**
    * The customer unit granting complete order read and its current writer's requester capability.
@@ -94,7 +104,10 @@ public class JobOrder extends AbstractEntity<UUID> {
 
   @Column private String handle;
 
-  @Column @Nullable private Integer priority;
+  @Column
+  @Nullable
+  @OptimisticLock(excluded = true)
+  private Integer priority;
 
   /**
    * Optional, untrusted free-text comment from the order creator, at most {@value
@@ -108,7 +121,14 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   @Builder.Default
+  @OptimisticLock(excluded = true)
   private JobOrderStatus status = JobOrderStatus.OPEN;
+
+  /** The independently observed revision of the order's lifecycle. */
+  @Column(name = "lifecycle_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  @Builder.Default
+  private Long lifecycleVersion = 0L;
 
   /**
    * Order kind. {@link JobOrderType#MATERIAL} (the default, and the value backfilled onto every

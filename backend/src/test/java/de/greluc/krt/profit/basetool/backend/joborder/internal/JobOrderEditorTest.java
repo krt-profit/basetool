@@ -193,7 +193,7 @@ class JobOrderEditorTest {
     when(jobOrderRepository.findById(id)).thenReturn(Optional.of(order));
     when(jobOrderAccessPolicy.canEdit(order, JobOrderGate.EDIT)).thenReturn(true);
 
-    editor.editWithoutProjection(id, JobOrderGate.EDIT, statusChanged());
+    editor.editWithoutProjection(id, JobOrderGate.EDIT, _ -> JobOrderEditPlan.of(statusChanged()));
 
     assertThat(mutations).hasValue(1);
     verify(auditRecorder)

@@ -33,23 +33,20 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialProvisionTarge
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Resolves provision and correction choices through current domain authority. */
-@Service
+@Service("materialProvisionOptions")
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MaterialProvisionOptions {
   private final MaterialProvisionCreditRepository provisions;
   private final MaterialClaimRepository contributions;
-  private final MaterialClaimService claims;
   private final MaterialProvisionCredits credits;
   private final JobOrderRepository orders;
   private final MaterialContributionHistory history;
@@ -67,18 +64,12 @@ public class MaterialProvisionOptions {
    */
   public List<MaterialProvisionTargetDto> provisionTargets(
       UUID orderId, UUID materialId, int quality) {
-    var writable =
-        claims.claimingOptions(orderId).stream()
-            .map(OrgUnitMembershipOptionDto::orgUnitId)
-            .collect(Collectors.toSet());
-    if (writable.isEmpty()) {
-      return List.of();
-    }
+
     return contributions.findByJobOrderIdOrderByCreatedAtDesc(orderId).stream()
         .filter(claim -> claim.getEndedAt() == null && claim.getAmount() > 0.0)
         .filter(claim -> claim.getMaterial().getId().equals(materialId))
         .filter(claim -> claim.getQualityTier().getMinQuality() <= quality)
-        .filter(claim -> writable.contains(claim.getClaimingOrgUnit().getId()))
+        .filter(authority::canRecordProvision)
         .map(claim -> {
           var unit = claim.getClaimingOrgUnit();
           return new MaterialProvisionTargetDto(
@@ -90,6 +81,23 @@ public class MaterialProvisionOptions {
               claim.getMaterial().getQuantityType() == QuantityType.PIECE);
         })
         .toList();
+  }
+
+  /**
+   * Checks current write authority on the receipt and its concrete historical contribution.
+   *
+   * @param orderId the order addressed by the correction
+   * @param provisionId the retained receipt
+   * @return whether the actor may submit a correction for that receipt
+   */
+  public boolean mayCorrectProvision(UUID orderId, UUID provisionId) {
+    return provisions
+        .findById(provisionId)
+        .filter(credit -> orderId.equals(credit.getOrderId()))
+        .flatMap(credit -> contributions.findHistoricalById(credit.getClaimId()))
+        .filter(claim -> orderId.equals(claim.getJobOrder().getId()))
+        .map(authority::mayCorrectReceiptFor)
+        .orElse(false);
   }
 
   /**

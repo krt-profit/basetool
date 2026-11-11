@@ -174,7 +174,8 @@ public enum LiveSyncTopicClass {
               "item-handovers",
               "item-handover-lines",
               "blueprint-owners",
-              "assignees");
+              "assignees",
+              "participations");
       case ORDERS_QUEUE -> Set.of("queue", "demand");
       case SUPPLY_NEEDS -> Set.of("needs", "mine", "stats");
       case SUPPLY_DONATIONS -> Set.of("donations");

@@ -19,11 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitEligibilityObserver;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchySnapshot;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -47,16 +50,24 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
   private final JobOrderParticipationEligibility participationEligibility;
   private final JobOrderRepository orders;
   private final LiveSyncPublisher liveSyncPublisher;
+  private final JobOrderChangeEffects effects;
+  private final AuthHelperService auth;
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
-  public void onEligibilityChanged(@NotNull Set<UUID> affectedUnitIds) {
+  public void onEligibilityChanged(
+      @NotNull Set<UUID> affectedUnitIds,
+      @NotNull ProfitHierarchySnapshot previous,
+      @NotNull ProfitHierarchySnapshot current) {
     int page = 0;
     boolean affected = false;
     List<UUID> batch;
     do {
       batch =
           orders.findIdsAffectedByUnits(affectedUnitIds, PageRequest.of(page++, ORDER_BATCH_SIZE));
+      if (!batch.isEmpty() && !previous.equals(current)) {
+        publishClarificationChanges(batch, previous, current);
+      }
       for (UUID orderId : batch) {
         affected = true;
         publishOrderChanged(orderId);
@@ -84,10 +95,32 @@ public class JobOrderEligibilityMaintenance implements OrgUnitEligibilityObserve
     }
   }
 
+  private void publishClarificationChanges(
+      List<UUID> batch, ProfitHierarchySnapshot previous, ProfitHierarchySnapshot current) {
+    UUID actor = auth.currentUserId().orElse(null);
+    for (JobOrder order : orders.findNotificationContextByIdIn(batch)) {
+      boolean wasValid = JobOrderResponsibilityGuard.isValid(order, previous);
+      boolean isValid = JobOrderResponsibilityGuard.isValid(order, current);
+      if (wasValid && !isValid) {
+        effects.publish(JobOrderLifecycleNotices.clarificationRequired(order, actor));
+      } else if (!wasValid && isValid) {
+        effects.publish(JobOrderLifecycleNotices.clarificationResolved(order, actor));
+      }
+    }
+  }
+
   private void publishOrderChanged(UUID orderId) {
     liveSyncPublisher.publishAfterCommit(
         LiveSyncTopic.of(LiveSyncTopicClass.ORDER, orderId),
-        List.of("header", "actions", "dialogs", "materials", "aggregated", "items", "assignees"));
+        List.of(
+            "header",
+            "actions",
+            "dialogs",
+            "materials",
+            "aggregated",
+            "items",
+            "assignees",
+            "participations"));
   }
 
   private void publishQueueChanged() {

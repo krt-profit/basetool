@@ -138,7 +138,11 @@ class JobOrderPageReaderTest {
         false,
         false,
         canEdit,
-        canEditAsRequester);
+        canEditAsRequester,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   private static JobOrderPageReader.OrderCaller logistician() {
@@ -600,11 +604,14 @@ class JobOrderPageReaderTest {
   }
 
   @Test
-  void requesterPermissionDoesNotOpenTheItemProcessingEditor() {
+  void requesterPermissionOpensItemNeedWithoutProcessingOptions() {
     when(client.order(ID)).thenReturn(order("ITEM", false, List.of(), false, true));
 
-    assertThatThrownBy(() -> reader.readItemEdit(ID))
-        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    JobOrderPageReader.ItemEditPage edit = reader.readItemEdit(ID);
+
+    assertThat(edit.access()).isEqualTo(JobOrderPageReader.ItemEditAccess.EDITABLE);
+    assertThat(edit.requestingOptions()).isEmpty();
+    assertThat(edit.responsibleOptions()).isEmpty();
   }
 
   @Test

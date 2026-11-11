@@ -123,8 +123,10 @@
         <div id="mode-item" th:hidden="${!itemMode}">
             <form class="orders-create__form" th:action="${editOrderId != null} ? @{/orders/{id}/items/update(id=${editOrderId})} : @{/orders/items}" method="post" th:object="${jobOrderItemForm}">
                 <input type="hidden" th:field="*{source}" />
+                <input th:if="${editOrderId != null}" type="hidden" th:field="*{version}" />
+                <input th:if="${requesterItemEdit == true}" type="hidden" name="requesterEdit" value="true" />
 
-                <fieldset class="form-section">
+                <fieldset class="form-section" th:unless="${requesterItemEdit == true}">
                     <legend class="form-section__head" th:text="|1 · #{orders.create.section.order}|">1 · Auftrag</legend>
                     <div th:if="${#lists.isEmpty(responsibleOptions)}" class="alert alert-danger" role="alert"
                          th:text="#{orders.create.responsible.none}">Keine bearbeitende Einheit freigeschaltet.</div>
@@ -139,7 +141,7 @@
                 </fieldset>
 
                 <fieldset class="form-section">
-                    <legend class="form-section__head" th:text="|2 · #{orders.create.items.title}|">2 · Items</legend>
+                    <legend class="form-section__head" th:text="${requesterItemEdit == true} ? #{orders.create.items.title} : |2 · #{orders.create.items.title}|">2 · Items</legend>
                     <div th:if="${!hasOrderableItems}" class="alert alert-danger" role="alert"
                          th:text="#{orders.create.item.noItems}">Keine bestellbaren Items verfügbar.</div>
                     <div id="item-lines"></div>
@@ -148,7 +150,7 @@
 
                 <fieldset class="form-section">
                     <legend class="form-section__head">
-                        <label for="item-comment"><span aria-hidden="true">3 · </span><span th:text="#{orders.create.comment}">Kommentar</span></label>
+                        <label for="item-comment"><span th:unless="${requesterItemEdit == true}" aria-hidden="true">3 · </span><span th:text="#{orders.create.comment}">Kommentar</span></label>
                         <span class="opt" th:text="|· #{form.optional}|">· optional</span>
                     </legend>
                     <div class="form-group">

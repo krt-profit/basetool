@@ -4283,9 +4283,12 @@ The JobOrder hierarchy foundation adds the unlabelled gauge
 `basetool_job_order_invalid_responsibility`, counting every lifecycle status whose current
 responsibility fails active Profit hierarchy or a verified original boundary. Unknown legacy
 origin alone is not a violation. `JobOrderInvalidResponsibility` warns after 15 minutes and the
-operations dashboard shows the count. Existing HTTP, audit and live-sync observations cover the
-current target picker, recovery transfer and automatic promise endings; no identity or amount is
-a metric label and no public external gateway surface is added.
+operations dashboard shows the count. Cancelled orders still contribute when their responsibility
+is invalid. The active queue gauges continue to count only `OPEN` and `IN_PROGRESS`, and the oldest
+age continues to track `OPEN`. Deliberate reopening returns the order to the `OPEN` queue.
+Existing HTTP, audit and live-sync observations cover the target picker, recovery transfer and
+automatic promise endings. Notification creation counters use the bounded notification types for
+participation and clarification. No identity or amount is a metric label.
 
 Initial promise reconciliation runs before application readiness and uses the same audited state
 transition and live notifications. A failed reconciliation rolls back and prevents readiness; the

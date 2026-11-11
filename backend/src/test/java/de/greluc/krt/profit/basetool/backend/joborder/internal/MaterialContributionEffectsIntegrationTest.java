@@ -22,6 +22,10 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
@@ -51,7 +55,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -95,8 +101,8 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
         fixture.orderId(), claim(fixture.materialId(), fixture.squadronAId(), 4.0));
     materialClaimService.upsertClaim(
         fixture.orderId(), claim(fixture.materialId(), fixture.squadronBId(), 6.0));
-    UUID muted = sharedWriter(fixture);
-    UUID receiving = sharedWriter(fixture);
+    UUID muted = writerForUnits(List.of(fixture.squadronBId()));
+    UUID receiving = writerForUnits(List.of(fixture.squadronBId()));
     mutes.setMuted(muted, NotificationType.JOB_ORDER_CLAIM_WITHDRAWN, true);
 
     replaceDemand(fixture, List.of());
@@ -199,6 +205,58 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
   }
 
   @Test
+  void cancellationReleasesAnEarmarkAndPreservesStockAndProvisionHistory() throws Exception {
+    Fixture fixture = seed();
+    var promise =
+        materialClaimService.upsertClaim(
+            fixture.orderId(), claim(fixture.materialId(), fixture.squadronAId(), 6.0));
+    StockFixture physical = stock(fixture, 4.0);
+    provide(fixture, promise, physical, 3.0);
+    var before = contributionHistory(fixture.orderId(), promise.id());
+    assertThat(before.openAmount()).isEqualTo(3.0);
+    assertThat(before.provisions()).hasSize(1);
+    assertThat(stockReads.earmarkedMaterialRowIds(fixture.orderId(), List.of(fixture.materialId())))
+        .containsExactly(physical.rowId());
+    var order = jobOrderQueryService.getJobOrderById(fixture.orderId());
+
+    changeLifecycle(
+        fixture,
+        JobOrderStatus.CANCELLED,
+        order.lifecycleVersion(),
+        asWriter(fixture, responsibleWriter(fixture)));
+
+    assertThat(stockReads.earmarkedMaterialRowIds(fixture.orderId(), List.of(fixture.materialId())))
+        .isEmpty();
+    assertThat(stockReads.findRow(physical.rowId()).orElseThrow().getAmount()).isEqualTo(4.0);
+    var after = contributionHistory(fixture.orderId(), promise.id());
+    assertThat(after.openAmount()).isZero();
+    assertThat(after.endedAt()).isNotNull();
+    assertThat(after.creditedAmount()).isEqualTo(3.0);
+    assertThat(after.provisions()).containsExactlyElementsOf(before.provisions());
+  }
+
+  @Test
+  void cancelledOrderRequiresReopeningBeforeTheInventoryCanAttachNewEarmarks() throws Exception {
+    Fixture fixture = seed();
+    StockFixture physical = stock(fixture, 4.0);
+    var writer = asWriter(fixture, responsibleWriter(fixture));
+
+    attachEarmark(fixture, physical).andExpect(status().isOk());
+    var open = jobOrderQueryService.getJobOrderById(fixture.orderId());
+    changeLifecycle(fixture, JobOrderStatus.CANCELLED, open.lifecycleVersion(), writer);
+
+    attachEarmark(fixture, physical).andExpect(status().isBadRequest());
+    assertThat(stockReads.earmarkedMaterialRowIds(fixture.orderId(), List.of(fixture.materialId())))
+        .isEmpty();
+
+    var cancelled = jobOrderQueryService.getJobOrderById(fixture.orderId());
+    changeLifecycle(fixture, JobOrderStatus.OPEN, cancelled.lifecycleVersion(), writer);
+    attachEarmark(fixture, physical).andExpect(status().isOk());
+    assertThat(stockReads.earmarkedMaterialRowIds(fixture.orderId(), List.of(fixture.materialId())))
+        .containsExactly(physical.rowId());
+  }
+
+  @Test
   void aFinishedRevisionKeepsOriginalMutesAndClearsResolvedCoordinationWork() throws Exception {
     Fixture fixture = seed();
     var original =
@@ -232,17 +290,7 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
     }
     var order = jobOrderQueryService.getJobOrderById(fixture.orderId());
 
-    mvc()
-        .perform(
-            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
-                    "/api/v1/orders/{order}/status", fixture.orderId())
-                .with(asAdmin(actor))
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content(
-                    json.writeValueAsString(
-                        new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, order.version()))))
-        .andExpect(
-            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+    changeLifecycle(fixture, JobOrderStatus.COMPLETED, order.lifecycleVersion(), asAdmin(actor));
 
     await()
         .atMost(Duration.ofSeconds(5))
@@ -251,6 +299,7 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
           assertOnlyNotice(finishedMuted, NotificationType.JOB_ORDER_CLAIM_WITHDRAWN);
           assertOnlyNotice(endingMuted, NotificationType.JOB_ORDER_FINISHED);
           assertOnlyNotice(affectedOnly, NotificationType.JOB_ORDER_CLAIM_WITHDRAWN);
+          assertOnlyNotice(coordination, NotificationType.JOB_ORDER_FINISHED);
         });
     await()
         .during(Duration.ofMillis(400))
@@ -258,7 +307,6 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
         .untilAsserted(() -> {
           assertThat(inbox.listOwn(actor, PageRequest.of(0, 20)).getContent()).isEmpty();
           assertThat(inbox.listOwn(bothMuted, PageRequest.of(0, 20)).getContent()).isEmpty();
-          assertThat(inbox.listOwn(coordination, PageRequest.of(0, 20)).getContent()).isEmpty();
         });
     var ended = contributionHistory(fixture.orderId(), original.id());
     assertThat(ended.openAmount()).isZero();
@@ -569,6 +617,36 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
             .orElseThrow()
             .getResponsibleOrgUnit()
             .getId());
+  }
+
+  private ResultActions attachEarmark(Fixture fixture, StockFixture physical) throws Exception {
+    return mvc()
+        .perform(
+            post("/api/v1/inventory/{id}/allocation", physical.rowId())
+                .with(asAdmin(physical.holderId()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(
+                        new InventoryAllocationWriteDto(
+                            InventoryAllocationDimension.JOB_ORDER,
+                            fixture.orderId(),
+                            3.0,
+                            stockReads.findRow(physical.rowId()).orElseThrow().getVersion(),
+                            null))));
+  }
+
+  private void changeLifecycle(
+      Fixture fixture, JobOrderStatus target, long observedVersion, RequestPostProcessor actor)
+      throws Exception {
+    mvc()
+        .perform(
+            put("/api/v1/orders/{order}/status", fixture.orderId())
+                .with(actor)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    json.writeValueAsString(new UpdateJobOrderStatusDto(target, observedVersion))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(target.name()));
   }
 
   private RequestPostProcessor asWriter(@NotNull Fixture fixture, @NotNull UUID actor) {

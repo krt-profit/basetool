@@ -91,7 +91,7 @@ public class JobOrderPageController {
   private final JobOrderItemLines jobOrderItemLines;
 
   private static final List<String> VALID_STATUSES =
-      List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED");
+      List.of("OPEN", "IN_PROGRESS", "REJECTED", "COMPLETED", "CANCELLED");
 
   /**
    * Selectable page sizes for the order list, large enough that the default active queue fits on
@@ -294,6 +294,7 @@ public class JobOrderPageController {
         case "materials" -> "joborder/orders-detail :: materialsSection";
         case "aggregated" -> "joborder/orders-detail :: aggregatedSection";
         case "header" -> "joborder/orders-detail :: orderHeader";
+        case "participations" -> "joborder/orders-detail :: participationsSection";
         case "actions" -> "joborder/orders-detail :: orderActions";
         case "dialogs" -> "joborder/orders-detail :: orderDialogs";
         case "kpi" -> "joborder/orders-detail :: kpiSection";
@@ -331,12 +332,14 @@ public class JobOrderPageController {
 
     boolean canAssign = !order.responsibilityInvalid() && detail.canAssign();
     model.addAttribute("isLogistician", canAssign);
+    model.addAttribute("canFulfill", canAssign && !"CANCELLED".equals(order.status()));
     boolean canEditAsRequester = order.callerMayEditAsRequester();
     model.addAttribute("canEditAsRequester", canEditAsRequester);
     model.addAttribute("requesterEditMode", canEditAsRequester && !canAssign);
     model.addAttribute(
         "canTransferResponsibility", Boolean.TRUE.equals(order.canTransferResponsibility()));
     model.addAttribute("responsibleOptions", detail.responsibleOptions());
+    addPart(model, "support", detail.support());
     model.addAttribute("claimingOptions", detail.claimingOptions());
     model.addAttribute(
         "claimingOrgUnitIds",
@@ -415,7 +418,7 @@ public class JobOrderPageController {
    * Renders the item-order edit page: the create form in edit mode, with the stored responsible and
    * requesting org units preselected and the existing lines injected as {@code window.EDIT_ITEMS}.
    *
-   * <p>Non-item orders and orders with an item handover redirect to the detail page.
+   * <p>Only an authorised requester can edit need after an item handover.
    *
    * @param id the item-order id
    * @param model Thymeleaf model
@@ -424,7 +427,6 @@ public class JobOrderPageController {
    */
   @NotNull
   @GetMapping("/{id}/items/edit")
-  @PreAuthorize("@logisticianGate.isGranted()")
   public String viewEditItemForm(
       @PathVariable UUID id, Model model, RedirectAttributes redirectAttributes) {
     JobOrderPageReader.ItemEditPage edit = pageReader.readItemEdit(id);
@@ -469,6 +471,9 @@ public class JobOrderPageController {
       model.addAttribute("jobOrderItemForm", itemForm);
     }
     model.addAttribute("editOrderId", id);
+    model.addAttribute(
+        "requesterItemEdit",
+        order.callerMayEditAsRequester() && !order.callerMayUseItemProcessingEditor());
     model.addAttribute(
         "editItems",
         jobOrderItemLines.editPrefill(order.items() != null ? order.items() : List.of()));

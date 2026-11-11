@@ -93,7 +93,11 @@ class JobOrderAssigneeControllerTest {
         false,
         false,
         null,
-        false);
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   @Test

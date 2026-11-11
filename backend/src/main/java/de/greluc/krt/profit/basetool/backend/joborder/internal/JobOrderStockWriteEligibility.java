@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
+import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -46,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObserver {
 
   private final JobOrderRepository orders;
+  private final EntityManager entityManager;
   private final MaterialPromiseCoordinator materialPromises;
   private final LiveSyncPublisher live;
   private final MaterialProvisionCredits provisionCredits;
@@ -74,6 +76,13 @@ public class JobOrderStockWriteEligibility implements OrderLinkedStockWriteObser
   public void beforeOrderLinkedMaterialWrite(
       Collection<de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope> scopes) {
     materialPromises.lock(scopes);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void lockOrderEarmarkTargets(@NotNull Collection<UUID> orderIds) {
+    var locked = orders.lockForOrderEarmarks(orderIds);
+    orders.findAllById(locked).forEach(entityManager::refresh);
   }
 
   @Override

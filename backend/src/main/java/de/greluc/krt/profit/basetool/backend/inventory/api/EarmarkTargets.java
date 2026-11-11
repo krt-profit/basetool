@@ -75,7 +75,7 @@ public final class EarmarkTargets {
     Map<UUID, JobOrderEarmark> jobOrders(@NotNull Collection<UUID> ids);
 
     /**
-     * Returns required materials under common order readership (REQ-ORDERS-018, REQ-ORDERS-052).
+     * Returns material requirements for a new earmark under common order readership.
      *
      * @param jobOrderId the job order
      * @return the required materials, or {@code null} when the order does not exist or lies outside
@@ -85,8 +85,8 @@ public final class EarmarkTargets {
     Set<UUID> requiredMaterialIds(@NotNull UUID jobOrderId);
 
     /**
-     * Returns requested game items under common order readership (REQ-INV-031, REQ-ORDERS-052); a
-     * material order requests none.
+     * Returns game-item requirements for a new earmark under common order readership. A material
+     * order requests none.
      *
      * @param jobOrderId the job order
      * @return the requested game items, or {@code null} when the order does not exist or lies

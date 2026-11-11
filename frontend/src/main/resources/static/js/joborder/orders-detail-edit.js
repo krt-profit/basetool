@@ -83,6 +83,11 @@ function initHandoverForms() {
                     _swapOrderSection(orderId, 'order-handovers-results', 'handovers');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
+                        joborderHooks.refreshOrderSection?.([
+                            'participations',
+                            'actions',
+                            'dialogs',
+                        ]);
                         _publishOrdersQueue();
                     }
                 },
@@ -126,6 +131,11 @@ function initHandoverForms() {
                     _swapOrderSection(orderId, 'order-kpi-results', 'kpi');
                     krtPageSections.publish('inventory', ['stock']);
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
+                        joborderHooks.refreshOrderSection?.([
+                            'participations',
+                            'actions',
+                            'dialogs',
+                        ]);
                         _publishOrdersQueue();
                     }
                 },
@@ -497,7 +507,7 @@ export async function unlinkInventoryItem(btn) {
         toast: false,
         errorMessage: MSG_INVENTORY_UNLINK_ERROR,
         sectionKey: 'header',
-        propagateVersion: true,
+        refresh: ['header'],
         onSuccess(data) {
             if (data && data.version != null) {
                 const editVer = _odEditVersionInput();

@@ -51,8 +51,7 @@ public class JobOrderResponsibilityGuard {
     return isValid(order, profitHierarchy.snapshot());
   }
 
-  private static boolean isValid(
-      @NotNull JobOrder order, @NotNull ProfitHierarchySnapshot snapshot) {
+  static boolean isValid(@NotNull JobOrder order, @NotNull ProfitHierarchySnapshot snapshot) {
     return order.getResponsibleOrgUnit() != null
         && snapshot.eligibleUnitIds().contains(order.getResponsibleOrgUnit().getId())
         && (order.getOriginalProfitOrgUnitId() == null

@@ -48,6 +48,8 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssignee;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandoverItem;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverEntry;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
@@ -55,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -87,9 +90,11 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.ObjectMapper;
 
 /** Verifies current creation authority and recovery through the public order HTTP API. */
 @SpringBootTest
@@ -97,6 +102,7 @@ import org.springframework.web.context.WebApplicationContext;
 class JobOrderHierarchyAuthorityIntegrationTest {
 
   @Autowired private WebApplicationContext context;
+  @Autowired private ObjectMapper json;
   @Autowired private OrgHierarchyService hierarchy;
   @Autowired private OrgUnitRepository units;
   @Autowired private SquadronRepository squadrons;
@@ -107,6 +113,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   @Autowired private JobOrderParticipationRepository participations;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private JobOrderHandoverRepository handovers;
+  @Autowired private JobOrderItemHandoverRepository itemHandovers;
   @Autowired private QualityTierRepository tiers;
   @Autowired private MaterialRepository materials;
   @Autowired private GameItemRepository gameItems;
@@ -473,7 +480,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     as(
             patch("/api/v1/orders/" + order.getId() + "/responsible-org-unit")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"responsibleOrgUnitId\":\"" + target.getId() + "\"}"),
+                .content("{\"responsibleOrgUnitId\":\"" + target.getId() + "\",\"version\":0}"),
             responsible.getId())
         .andExpect(status().isOk());
     hierarchy.setParent(responsible.getId(), null, responsible.getVersion());
@@ -708,7 +715,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     as(
             patch(path + "/responsible-org-unit")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"responsibleOrgUnitId\":\"" + profit.getId() + "\"}"),
+                .content("{\"responsibleOrgUnitId\":\"" + profit.getId() + "\",\"version\":0}"),
             responsible.getId())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.responsibilityInvalid").value(false))
@@ -718,7 +725,334 @@ class JobOrderHierarchyAuthorityIntegrationTest {
   }
 
   @Test
-  void requesterEditCapabilityRequiresItsCurrentWriterAndNeverGrantsProcessing() throws Exception {
+  void transferToSupporterPreservesThePromiseAndEndsActiveSupport() throws Exception {
+    var quality = tiers.findByCode("GOOD").orElseThrow();
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(profit)
+            .requestingOrgUnit(requester)
+            .handle("Staffel role conversion")
+            .build();
+    order.addMaterial(
+        JobOrderMaterial.builder()
+            .material(materials.getReferenceById(material))
+            .qualityTier(quality)
+            .amount(10.0)
+            .build());
+    order = orders.saveAndFlush(order);
+    Long needVersion = order.getVersion();
+    var promise =
+        claims.saveAndFlush(
+            MaterialClaim.builder()
+                .jobOrder(order)
+                .material(materials.getReferenceById(material))
+                .qualityTier(quality)
+                .claimingOrgUnit(responsible)
+                .participation(participation(order, responsible))
+                .amount(4.0)
+                .build());
+    String path = "/api/v1/orders/" + order.getId();
+    String transferBody =
+        "{\"responsibleOrgUnitId\":\"" + responsible.getId() + "\",\"version\":0}";
+
+    as(
+            patch(path + "/responsible-org-unit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(transferBody),
+            profit.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.responsibleOrgUnit.id").value(responsible.getId().toString()))
+        .andExpect(jsonPath("$.requestingOrgUnit.id").value(requester.getId().toString()))
+        .andExpect(jsonPath("$.responsibilityVersion").value(1))
+        .andExpect(jsonPath("$.version").value(needVersion.intValue()))
+        .andExpect(jsonPath("$.materials[0].claims[0].id").value(promise.getId().toString()))
+        .andExpect(jsonPath("$.materials[0].claims[0].amount").value(4.0));
+
+    as(get(path + "/participations"), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.participations.length()").value(1))
+        .andExpect(jsonPath("$.participations[0].active").value(false))
+        .andExpect(jsonPath("$.participations[0].canWithdraw").value(false));
+    as(
+            patch(path + "/responsible-org-unit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(transferBody),
+            responsible.getId())
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void ownStaffelWriterCanEnrollWithoutCreatingAMaterialPromise() throws Exception {
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(profit)
+                .requestingOrgUnit(requester)
+                .handle("Staffel support")
+                .build());
+    String path = "/api/v1/orders/" + order.getId();
+    String participationsPath = path + "/participations";
+    var staffelAuthority =
+        jwt()
+            .jwt(token -> token.subject(caller.toString()))
+            .authorities(
+                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                new OrgUnitContextualAuthority(Roles.LOGISTICIAN, responsible.getId()));
+
+    mvc.perform(put(participationsPath + "/" + responsible.getId()).with(staffelAuthority))
+        .andExpect(status().isNoContent());
+    mvc.perform(put(participationsPath + "/" + responsible.getId()).with(staffelAuthority))
+        .andExpect(status().isNoContent());
+
+    mvc.perform(get(participationsPath).with(staffelAuthority))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.participations.length()").value(1))
+        .andExpect(
+            jsonPath("$.participations[0].unit.orgUnitId").value(responsible.getId().toString()))
+        .andExpect(jsonPath("$.participations[0].active").value(true))
+        .andExpect(jsonPath("$.participations[0].canWithdraw").value(true))
+        .andExpect(jsonPath("$.enrollmentOptions").isEmpty());
+    mvc.perform(get(path + "/claims").with(staffelAuthority))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isEmpty());
+  }
+
+  @Test
+  void withdrawingStaffelSupportEndsThePromiseButRetainsItsHistory() throws Exception {
+    var quality = tiers.findByCode("GOOD").orElseThrow();
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(profit)
+            .requestingOrgUnit(requester)
+            .handle("Withdrawing support")
+            .build();
+    order.addMaterial(
+        JobOrderMaterial.builder()
+            .material(materials.getReferenceById(material))
+            .qualityTier(quality)
+            .amount(10.0)
+            .build());
+    order = orders.saveAndFlush(order);
+    var support = participation(order, responsible);
+    var promise =
+        claims.saveAndFlush(
+            MaterialClaim.builder()
+                .jobOrder(order)
+                .material(materials.getReferenceById(material))
+                .qualityTier(quality)
+                .claimingOrgUnit(responsible)
+                .participation(support)
+                .amount(4.0)
+                .build());
+    String path = "/api/v1/orders/" + order.getId();
+
+    as(
+            delete(path + "/participations/" + responsible.getId())
+                .param("version", support.getVersion().toString()),
+            responsible.getId())
+        .andExpect(status().isNoContent());
+    as(get(path + "/participations"), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.participations[0].id").value(support.getId().toString()))
+        .andExpect(jsonPath("$.participations[0].active").value(false));
+    as(get(path + "/claims/history"), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(promise.getId().toString()))
+        .andExpect(jsonPath("$[0].openAmount").value(0.0))
+        .andExpect(jsonPath("$[0].endedAt").isNotEmpty());
+  }
+
+  @Test
+  void currentRequesterWriterCanCancelAndReopenWithoutProcessingAuthority() throws Exception {
+    var quality = tiers.findByCode("GOOD").orElseThrow();
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requester)
+            .handle("Requester lifecycle")
+            .build();
+    order.addMaterial(
+        JobOrderMaterial.builder()
+            .material(materials.getReferenceById(material))
+            .qualityTier(quality)
+            .amount(10.0)
+            .build());
+    order = orders.saveAndFlush(order);
+    Squadron supporter = squadron("Lifecycle supporter " + UUID.randomUUID(), profit);
+    var promise =
+        claims.saveAndFlush(
+            MaterialClaim.builder()
+                .jobOrder(order)
+                .material(materials.getReferenceById(material))
+                .qualityTier(quality)
+                .claimingOrgUnit(supporter)
+                .participation(participation(order, supporter))
+                .amount(4.0)
+                .build());
+    String endpoint = "/api/v1/orders/" + order.getId();
+    var requesterAuthority =
+        jwt()
+            .jwt(token -> token.subject(caller.toString()))
+            .authorities(
+                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                new OrgUnitContextualAuthority(Roles.LOGISTICIAN, requester.getId()));
+
+    mvc.perform(
+            put(endpoint + "/status")
+                .with(requesterAuthority)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CANCELLED\",\"version\":0}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.lifecycleVersion").value(1))
+        .andExpect(jsonPath("$.canReopen").value(true))
+        .andExpect(jsonPath("$.canEdit").value(false));
+
+    mvc.perform(
+            put(endpoint + "/status")
+                .with(requesterAuthority)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"OPEN\",\"version\":1}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("OPEN"))
+        .andExpect(jsonPath("$.lifecycleVersion").value(2))
+        .andExpect(jsonPath("$.canCancel").value(true))
+        .andExpect(jsonPath("$.materials[0].claims").isEmpty());
+    mvc.perform(get(endpoint + "/claims/history").with(requesterAuthority))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(promise.getId().toString()))
+        .andExpect(jsonPath("$[0].openAmount").value(0.0))
+        .andExpect(jsonPath("$[0].endedAt").isNotEmpty())
+        .andExpect(jsonPath("$[0].supporting").value(true));
+  }
+
+  @Test
+  void currentResponsibleContextCanEditOrderAndPriorityWithoutAFlatRole() throws Exception {
+    JobOrder order =
+        orders.saveAndFlush(
+            JobOrder.builder()
+                .responsibleOrgUnit(responsible)
+                .requestingOrgUnit(requester)
+                .handle("Scoped processor")
+                .priority(2)
+                .build());
+    String endpoint = "/api/v1/orders/" + order.getId();
+    var writer = contextualWriter(responsible.getId());
+    String reordered =
+        mvc.perform(put(endpoint + "/priority").with(writer).param("priority", "1"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    long needVersion = json.readTree(reordered).path("version").asLong();
+    String body = createBody();
+    body = body.substring(0, body.length() - 1) + ",\"version\":" + needVersion + "}";
+    mvc.perform(put(endpoint).with(writer).contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.handle").value("Hierarchy test"));
+    mvc.perform(delete(endpoint + "/materials/" + material).with(writer))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void requesterEditsCancelledItemNeedWithoutChangingBookedWork() throws Exception {
+    JobOrderItem line = cancelledItemWithBookedWork();
+    JobOrder order = line.getJobOrder();
+    String endpoint = "/api/v1/orders/" + order.getId();
+    String body =
+        "{\"version\":"
+            + order.getVersion()
+            + ",\"comment\":\"Remaining items\",\"items\":[{\"id\":\""
+            + line.getId()
+            + "\",\"gameItemId\":\""
+            + gameItemId
+            + "\",\"blueprintId\":\""
+            + blueprintId
+            + "\",\"amount\":3,\"materials\":[]}]}";
+
+    as(
+            put(endpoint + "/items/requested")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+            requester.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.items[0].id").value(line.getId().toString()))
+        .andExpect(jsonPath("$.items[0].amount").value(3))
+        .andExpect(jsonPath("$.items[0].manufacturedAmount").value(2))
+        .andExpect(jsonPath("$.items[0].deliveredAmount").value(1))
+        .andExpect(jsonPath("$.itemHandovers[0].entries[0].amount").value(1));
+  }
+
+  @Test
+  void cancelledItemOrderRequiresReopeningBeforeAnotherHandover() throws Exception {
+    JobOrderItem line = cancelledItemWithBookedWork();
+    String endpoint = "/api/v1/orders/" + line.getJobOrder().getId();
+    String body =
+        "{\"handoverTime\":\"2026-11-10T20:00:00Z\",\"recipientHandle\":\"Recipient\","
+            + "\"entries\":[{\"jobOrderItemId\":\""
+            + line.getId()
+            + "\",\"amount\":1}]}";
+
+    as(
+            post(endpoint + "/item-handovers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+            responsible.getId())
+        .andExpect(status().isForbidden());
+    as(get(endpoint), responsible.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.items[0].deliveredAmount").value(1));
+
+    var writer = contextualWriter(responsible.getId());
+    mvc.perform(
+            put(endpoint + "/status")
+                .with(writer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"OPEN\",\"version\":0}"))
+        .andExpect(status().isOk());
+    mvc.perform(
+            post(endpoint + "/item-handovers")
+                .with(writer)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isCreated());
+  }
+
+  private JobOrderItem cancelledItemWithBookedWork() {
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requester)
+            .type(JobOrderType.ITEM)
+            .status(JobOrderStatus.CANCELLED)
+            .handle("Partial item order")
+            .build();
+    JobOrderItem line =
+        JobOrderItem.builder()
+            .gameItem(gameItems.getReferenceById(gameItemId))
+            .blueprint(blueprints.getReferenceById(blueprintId))
+            .amount(4)
+            .manufacturedAmount(2)
+            .deliveredAmount(1)
+            .build();
+    order.addItem(line);
+    orders.saveAndFlush(order);
+    JobOrderItemHandover delivery =
+        JobOrderItemHandover.builder()
+            .jobOrder(order)
+            .handoverTime(Instant.now())
+            .recipientHandle("Partial delivery")
+            .build();
+    delivery.addEntry(JobOrderItemHandoverEntry.builder().jobOrderItem(line).amount(1).build());
+    itemHandovers.saveAndFlush(delivery);
+    return line;
+  }
+
+  @Test
+  void requesterEditsRemainingMaterialNeedAfterPartialDeliveryAndPreservesTheHandover()
+      throws Exception {
     memberships.deleteById(new OrgUnitMembershipId(caller, responsible.getId()));
     memberships.flush();
     var quality = tiers.findByCode("GOOD").orElseThrow();
@@ -761,10 +1095,40 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             .build());
     handovers.saveAndFlush(delivery);
 
-    as(get(endpoint), requester.getId())
+    Squadron supporter = squadron("Requester edit supporter " + UUID.randomUUID(), profit);
+    var promise =
+        claims.saveAndFlush(
+            MaterialClaim.builder()
+                .jobOrder(order)
+                .material(materials.getReferenceById(material))
+                .qualityTier(quality)
+                .claimingOrgUnit(supporter)
+                .participation(participation(order, supporter))
+                .amount(6.0)
+                .build());
+    String updatedNeed =
+        "{\"version\":"
+            + order.getVersion()
+            + ",\"materials\":[{\"materialId\":\""
+            + material
+            + "\",\"minQuality\":"
+            + quality.getMinQuality()
+            + ",\"amount\":3.0}],\"comment\":\"Remaining need\"}";
+
+    as(
+            put(endpoint + "/requested")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updatedNeed),
+            requester.getId())
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.canEdit").value(false))
-        .andExpect(jsonPath("$.canEditAsRequester").value(false));
+        .andExpect(jsonPath("$.canEditAsRequester").value(true))
+        .andExpect(jsonPath("$.comment").value("Remaining need"))
+        .andExpect(jsonPath("$.materials[0].amount").value(3.0))
+        .andExpect(jsonPath("$.materials[0].claims[0].id").value(promise.getId().toString()))
+        .andExpect(jsonPath("$.materials[0].claims[0].amount").value(3.0))
+        .andExpect(jsonPath("$.handovers[0].id").value(delivery.getId().toString()))
+        .andExpect(jsonPath("$.handovers[0].items[0].amount").value(1.0));
   }
 
   @Test
@@ -840,6 +1204,9 @@ class JobOrderHierarchyAuthorityIntegrationTest {
 
     as(get(options).header("X-Active-Org-Unit-Id", requester.getId()), processing.getId())
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$").isEmpty());
+    as(get(options), processing.getId())
+        .andExpect(status().isOk())
         .andExpect(jsonPath("$[?(@.orgUnitId == '" + responsible.getId() + "')]").isNotEmpty())
         .andExpect(jsonPath("$[?(@.orgUnitId == '" + foreign.getId() + "')]").isNotEmpty());
     JobOrder privateOrder =
@@ -853,11 +1220,16 @@ class JobOrderHierarchyAuthorityIntegrationTest {
             get("/api/v1/orders/" + privateOrder.getId() + "/claims/claiming-options"),
             responsible.getId())
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$").isEmpty());
+        .andExpect(jsonPath("$.length()").value(1))
+        .andExpect(jsonPath("$[0].orgUnitId").value(responsible.getId().toString()));
+    as(get("/api/v1/orders/" + privateOrder.getId() + "/claims/claiming-options"), foreign.getId())
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.orgUnitId == '" + foreign.getId() + "')]").isEmpty())
+        .andExpect(jsonPath("$[?(@.orgUnitId == '" + responsible.getId() + "')]").isNotEmpty());
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"COMPLETED", "REJECTED", "NON_SK", "INVALID"})
+  @ValueSource(strings = {"COMPLETED", "REJECTED", "CANCELLED", "INVALID"})
   void claimingOptionsNeverOfferWritesForFrozenOrInvalidOrders(String block) throws Exception {
     SpecialCommand processing = processingUnit();
     JobOrder order =
@@ -868,8 +1240,7 @@ class JobOrderHierarchyAuthorityIntegrationTest {
                 .handle("Blocked options")
                 .build());
     switch (block) {
-      case "COMPLETED", "REJECTED" -> order.setStatus(JobOrderStatus.valueOf(block));
-      case "NON_SK" -> order.setResponsibleOrgUnit(responsible);
+      case "COMPLETED", "REJECTED", "CANCELLED" -> order.setStatus(JobOrderStatus.valueOf(block));
       case "INVALID" -> hierarchy.setParent(processing.getId(), null, processing.getVersion());
       default -> throw new IllegalArgumentException(block);
     }
@@ -1075,6 +1446,14 @@ class JobOrderHierarchyAuthorityIntegrationTest {
         + "\",\"handle\":\"Hierarchy test\",\"materials\":[{\"materialId\":\""
         + material
         + "\",\"amount\":1.0}]}";
+  }
+
+  private RequestPostProcessor contextualWriter(UUID unit) {
+    return jwt()
+        .jwt(token -> token.subject(caller.toString()))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+            new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unit));
   }
 
   private ResultActions as(MockHttpServletRequestBuilder request, UUID grant) throws Exception {

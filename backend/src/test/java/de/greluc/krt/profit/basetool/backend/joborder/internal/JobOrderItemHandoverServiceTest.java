@@ -149,7 +149,7 @@ class JobOrderItemHandoverServiceTest {
             jobOrderRepository,
             itemFulfillment,
             promises,
-            responsibilityGuard,
+            org.mockito.Mockito.mock(JobOrderAccessPolicy.class),
             jobOrderItemHandoverRepository,
             jobOrderItemHandoverMapper,
             commands,

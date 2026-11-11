@@ -52,6 +52,80 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
   @Autowired private OrgUnitMembershipRepository memberships;
 
   @Test
+  void contextualStaffelWriterCanPromiseMaterialWithoutAFlatRole() throws Exception {
+    Fixture fixture = seed();
+    var initial = jobOrderQueryService.getJobOrderById(fixture.orderId());
+    UUID profit = orgUnitRepository.findActiveProfitRootIds().getFirst();
+    UUID actor = writer(fixture.squadronAId());
+    var currentStaffelWriter =
+        jwt()
+            .jwt(token -> token.subject(actor.toString()))
+            .authorities(
+                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                new OrgUnitContextualAuthority(Roles.LOGISTICIAN, fixture.squadronAId()));
+    try {
+      jobOrderService.reassignResponsibleOrgUnit(
+          fixture.orderId(), profit, initial.responsibilityVersion());
+
+      mvc()
+          .perform(
+              post("/api/v1/orders/{order}/claims", fixture.orderId())
+                  .with(currentStaffelWriter)
+                  .header("X-Active-Org-Unit-Id", fixture.squadronAId())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      json.writeValueAsString(
+                          claim(fixture.materialId(), fixture.squadronBId(), 4.0))))
+          .andExpect(status().isForbidden());
+
+      String response =
+          mvc()
+              .perform(
+                  post("/api/v1/orders/{order}/claims", fixture.orderId())
+                      .with(currentStaffelWriter)
+                      .header("X-Active-Org-Unit-Id", fixture.squadronAId())
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(
+                          json.writeValueAsString(
+                              claim(fixture.materialId(), fixture.squadronAId(), 4.0))))
+              .andExpect(status().isCreated())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      ClaimDto promised = json.readValue(response, ClaimDto.class);
+
+      String order =
+          mvc()
+              .perform(
+                  get("/api/v1/orders/{order}", fixture.orderId())
+                      .with(currentStaffelWriter)
+                      .header("X-Active-Org-Unit-Id", fixture.squadronAId()))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      var materialLine = json.readTree(order).get("materials").get(0);
+      assertThat(materialLine.get("claims").get(0).get("id").asString())
+          .isEqualTo(promised.id().toString());
+      assertThat(materialLine.get("openAmount").asDouble()).isEqualTo(6.0);
+    } finally {
+      mvc()
+          .perform(
+              delete("/api/v1/orders/{order}", fixture.orderId())
+                  .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+          .andExpect(status().isNoContent());
+      transactionTemplate.executeWithoutResult(_ -> {
+        memberships.deleteById(new OrgUnitMembershipId(actor, fixture.squadronAId()));
+        users.deleteById(actor);
+        squadronRepository.deleteById(fixture.squadronAId());
+        squadronRepository.deleteById(fixture.squadronBId());
+        specialCommandRepository.deleteById(initial.responsibleOrgUnit().id());
+        materialRepository.deleteById(fixture.materialId());
+      });
+    }
+  }
+
+  @Test
   void onlyTargetStaffelWriterCannotRelabelAnotherStaffelsHistoricalCredit() throws Exception {
     Fixture fixture = seed();
     ClaimDto original =
@@ -142,6 +216,12 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
     var before = contributionHistory(fixture.orderId(), original.id());
     var receipt = before.provisions().getFirst();
     UUID actor = writer(fixture.squadronAId());
+    var writer =
+        jwt()
+            .jwt(token -> token.subject(actor.toString()))
+            .authorities(
+                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                new OrgUnitContextualAuthority(Roles.LOGISTICIAN, fixture.squadronAId()));
 
     var denied =
         mvc()
@@ -150,7 +230,7 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
                         "/api/v1/orders/{order}/claims/provisions/{receipt}/correction-options",
                         fixture.orderId(),
                         receipt.id())
-                    .with(asWriter(actor, fixture.squadronAId()))
+                    .with(writer)
                     .header("X-Active-Org-Unit-Id", fixture.squadronAId()))
             .andExpect(status().isForbidden())
             .andReturn()
@@ -176,7 +256,7 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
                         "/api/v1/orders/{order}/claims/provisions/{receipt}/correction",
                         fixture.orderId(),
                         receipt.id())
-                    .with(asWriter(actor, fixture.squadronAId()))
+                    .with(writer)
                     .header("X-Active-Org-Unit-Id", fixture.squadronAId())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(json.writeValueAsString(forbiddenQuantity)))
@@ -204,7 +284,7 @@ class MaterialProvisionAuthorityIntegrationTest extends MaterialContributionTest
                     "/api/v1/orders/{order}/claims/provisions/{receipt}/correction",
                     fixture.orderId(),
                     receipt.id())
-                .with(asWriter(actor, fixture.squadronAId()))
+                .with(writer)
                 .header("X-Active-Org-Unit-Id", fixture.squadronAId())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(correction)))

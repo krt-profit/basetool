@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -119,10 +118,7 @@ public class JobOrderMaterialDemandService {
         jobOrderStockProjectionService.loadOrderLinkedStockIndex(
             orders.stream().map(JobOrder::getId).toList());
     Map<UUID, List<ClaimBucketDto>> claimsByOrder =
-        materialClaimService.getClaimBucketsForOrders(
-            orders.stream()
-                .filter(JobOrderMaterialDemandService::isSpecialCommandResponsible)
-                .toList());
+        materialClaimService.getClaimBucketsForOrders(orders);
 
     Map<UUID, GroupAccumulator> groups = new LinkedHashMap<>();
     for (JobOrder order : orders) {
@@ -246,18 +242,6 @@ public class JobOrderMaterialDemandService {
   @Nullable
   private SquadronReferenceDto referenceOf(@Nullable OrgUnit orgUnit) {
     return orgUnit == null ? null : squadronMapper.orgUnitToReferenceDto(orgUnit);
-  }
-
-  /**
-   * {@code true} iff the order is responsible to a Spezialkommando — the only orders that carry
-   * material claims, so only those are handed to the batched claim lookup.
-   *
-   * @param jobOrder the order.
-   * @return whether the order is a public SK order.
-   */
-  private static boolean isSpecialCommandResponsible(@NotNull JobOrder jobOrder) {
-    return jobOrder.getResponsibleOrgUnit() != null
-        && jobOrder.getResponsibleOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND;
   }
 
   /**

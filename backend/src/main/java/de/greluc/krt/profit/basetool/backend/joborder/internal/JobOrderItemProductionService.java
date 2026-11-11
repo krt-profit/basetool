@@ -97,7 +97,7 @@ public class JobOrderItemProductionService {
 
   private final JobOrderRepository jobOrderRepository;
   private final MaterialPromiseCoordinator materialPromises;
-  private final JobOrderResponsibilityGuard responsibilityGuard;
+  private final JobOrderAccessPolicy accessPolicy;
   private final StockCommands stockCommands;
   private final JobOrderItemService jobOrderItemService;
   private final AuditRecorder auditRecorder;
@@ -178,7 +178,7 @@ public class JobOrderItemProductionService {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
-    responsibilityGuard.assertWritable(jobOrder);
+    accessPolicy.assertCanFulfill(jobOrder);
 
     if (jobOrder.getType() != JobOrderType.ITEM) {
       throw new BadRequestException("Job order " + jobOrderId + " is not an item order");
@@ -386,7 +386,7 @@ public class JobOrderItemProductionService {
       List<OrderMaterialScope> materialScopes,
       ProductionDestination destination) {
     UUID jobOrderId = jobOrder.getId();
-    UUID jobOrderItemId = line.getId();
+    final UUID jobOrderItemId = line.getId();
     final ProductionSnapshot planned = snapshot(jobOrder, line);
     stockCommands.prepareWrites(
         dto.consumption().stream()
@@ -401,6 +401,7 @@ public class JobOrderItemProductionService {
                 destination.owningOrgUnit() == null ? null : destination.owningOrgUnit().getId(),
                 true)),
         materialScopes);
+    jobOrderRepository.lockForScopedEdit(jobOrderId);
     entityManager.refresh(jobOrder);
     line =
         Entities.require(
@@ -418,7 +419,7 @@ public class JobOrderItemProductionService {
             .equals(new HashSet<>(materialPromises.materialScopesOfOrder(jobOrderId)))) {
       throw new ObjectOptimisticLockingFailureException(JobOrderItem.class, jobOrderItemId);
     }
-    responsibilityGuard.assertWritable(jobOrder);
+    accessPolicy.assertCanFulfill(jobOrder);
     assertMayBookInFor(dto.bookIn());
 
     return line;

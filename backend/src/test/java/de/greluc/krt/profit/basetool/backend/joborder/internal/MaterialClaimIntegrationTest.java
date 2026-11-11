@@ -734,7 +734,7 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    long orderVersion = json.readTree(orderBody).path("version").asLong();
+    long lifecycleVersion = json.readTree(orderBody).path("lifecycleVersion").asLong();
     mvc()
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
@@ -746,7 +746,7 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
                             new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                 "ROLE_ADMIN")))
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"COMPLETED\",\"version\":" + orderVersion + "}"))
+                .content("{\"status\":\"COMPLETED\",\"version\":" + lifecycleVersion + "}"))
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
     var original = contributionHistory(f.orderId(), a.id());
@@ -935,8 +935,8 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
     UUID originalResponsible =
         jobOrderQueryService.getJobOrderById(f.orderId()).responsibleOrgUnit().id();
 
-    jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId());
-    jobOrderService.reassignResponsibleOrgUnit(f.orderId(), originalResponsible);
+    jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId(), 0L);
+    jobOrderService.reassignResponsibleOrgUnit(f.orderId(), originalResponsible, 1L);
 
     assertThat(materialClaimService.getClaimBuckets(f.orderId()))
         .singleElement()
@@ -965,14 +965,14 @@ class MaterialClaimIntegrationTest extends MaterialContributionTestSupport {
   }
 
   @Test
-  void getJobOrderById_privateOrder_leavesClaimFieldsEmpty() {
+  void getJobOrderById_staffelOrderProjectsRemainingDemand() {
     Fixture f = seed();
-    jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId());
+    jobOrderService.reassignResponsibleOrgUnit(f.orderId(), f.squadronAId(), 0L);
 
     JobOrderDto dto = jobOrderQueryService.getJobOrderById(f.orderId());
 
     assertThat(dto.materials()).hasSize(1);
-    assertThat(dto.materials().get(0).openAmount()).isNull();
+    assertThat(dto.materials().get(0).openAmount()).isEqualTo(10.0);
     assertThat(dto.materials().get(0).claims()).isEmpty();
   }
 

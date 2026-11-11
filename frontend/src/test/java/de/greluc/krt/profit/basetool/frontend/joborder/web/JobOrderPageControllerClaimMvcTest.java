@@ -23,7 +23,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -85,9 +84,8 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void upsertClaim_AsLogistician_RelaysAndReturnsCreated() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void upsertClaim_WhenContextualAuthorityAccepts_RelaysAndReturnsCreated() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
@@ -208,11 +206,18 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER"})
-  void upsertClaim_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
+  @WithMockUser(roles = "KRT_MEMBER")
+  void upsertClaim_WhenBackendRefusesAuthority_Propagates403() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
+    doThrow(new BackendServiceException("forbidden", null, 403))
+        .when(backendApiClient)
+        .post(
+            eq("/api/v1/orders/{id}/claims"),
+            any(CreateClaimDto.class),
+            eq(ClaimDto.class),
+            eq(orderId));
 
     mockMvc
         .perform(
@@ -221,15 +226,11 @@ class JobOrderPageControllerClaimMvcTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(claimBody(materialId, squadronId, 6.0)))
         .andExpect(status().isForbidden());
-
-    verify(backendApiClient, never())
-        .post(any(String.class), any(CreateClaimDto.class), eq(ClaimDto.class));
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void withdrawClaim_AsLogistician_RelaysAndReturnsNoContent() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void withdrawClaim_WhenContextualAuthorityAccepts_RelaysAndReturnsNoContent() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID claimId = UUID.randomUUID();
     doReturn(null)
@@ -281,10 +282,18 @@ class JobOrderPageControllerClaimMvcTest {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER"})
-  void withdrawClaim_AsPlainMember_Returns403() throws Exception {
+  @WithMockUser(roles = "KRT_MEMBER")
+  void withdrawClaim_WhenBackendRefusesAuthority_Propagates403() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID claimId = UUID.randomUUID();
+    doThrow(new BackendServiceException("forbidden", null, 403))
+        .when(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/{id}/claims/{claimId}?version={version}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(claimId),
+            eq(7L));
 
     mockMvc
         .perform(
@@ -292,7 +301,5 @@ class JobOrderPageControllerClaimMvcTest {
                 .param("version", "7")
                 .with(csrf()))
         .andExpect(status().isForbidden());
-
-    verify(backendApiClient, never()).delete(any(String.class), eq(Void.class));
   }
 }

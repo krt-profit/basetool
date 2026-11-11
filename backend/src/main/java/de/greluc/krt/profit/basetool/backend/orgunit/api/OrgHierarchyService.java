@@ -176,6 +176,7 @@ public class OrgHierarchyService {
     OrgUnit child = Entities.require(orgUnitRepository.findById(orgUnitId), "Org unit not found");
     OptimisticLock.check(child.getVersion(), version, OrgUnit.class, orgUnitId);
     OrgUnit previousParent = child.getParent();
+    ProfitHierarchySnapshot previousEligibility = profitHierarchy.snapshot();
     if (parentOrgUnitId == null) {
       child.setParent(null);
     } else {
@@ -187,7 +188,7 @@ public class OrgHierarchyService {
     }
     OrgUnit saved = orgUnitRepository.saveAndFlush(child);
     orgStructureAuditor.parentChanged(saved, previousParent);
-    eligibilityMaintenance.eligibilityChanged(saved);
+    eligibilityMaintenance.eligibilityChanged(saved, previousEligibility);
     return saved;
   }
 

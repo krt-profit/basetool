@@ -105,6 +105,8 @@ public abstract class JobOrderMapper {
   @Mapping(
       target = "canEditAsRequester",
       expression = "java(authority.get(jobOrder.getId()).canEditAsRequester())")
+  @Mapping(target = "canCancel", expression = "java(authority.get(jobOrder.getId()).canCancel())")
+  @Mapping(target = "canReopen", expression = "java(authority.get(jobOrder.getId()).canReopen())")
   @Mapping(target = "withAssignees", ignore = true)
   @Mapping(
       target = "canManageAssignees",

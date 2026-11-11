@@ -513,8 +513,8 @@
 /orders/{id}/assignees/{userId} DELETE -> JobOrderWriteController#removeAssignee gate=class:isAuthenticated() layout=yes
 /orders/{id}/assignees/{userId}/note DELETE -> JobOrderWriteController#deleteAssigneeNote gate=class:isAuthenticated() layout=yes
 /orders/{id}/assignees/{userId}/note PUT -> JobOrderWriteController#setAssigneeNote gate=class:isAuthenticated() layout=yes
-/orders/{id}/blueprint-variant-counting POST -> JobOrderWriteController#updateBlueprintVariantCounting gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/claims POST -> JobOrderWriteController#upsertClaim gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/blueprint-variant-counting POST -> JobOrderWriteController#updateBlueprintVariantCounting gate=class:isAuthenticated() layout=yes
+/orders/{id}/claims POST -> JobOrderWriteController#upsertClaim gate=class:isAuthenticated() layout=yes
 /orders/{id}/claims/history GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#history gate=class:isAuthenticated() layout=yes
 /orders/{id}/claims/provision-options GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#provisionOptions gate=class:isAuthenticated() layout=yes
 /orders/{id}/claims/provisions/{creditId}/attribution-options GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#attributionOptions gate=class:isAuthenticated() layout=yes
@@ -522,29 +522,31 @@
 /orders/{id}/claims/provisions/{creditId}/editor GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#editor gate=class:isAuthenticated() layout=yes
 /orders/{id}/claims/provisions/{creditId}/quality-options GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#qualityOptions gate=class:isAuthenticated() layout=yes
 /orders/{id}/claims/provisions/{creditId}/quantity-options GET headers=[X-Requested-With=XMLHttpRequest] -> MaterialContributionController#quantityOptions gate=class:isAuthenticated() layout=yes
-/orders/{id}/claims/{claimId}/withdraw POST -> JobOrderWriteController#withdrawClaim gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/claims/{claimId}/withdraw POST -> JobOrderWriteController#withdrawClaim gate=class:isAuthenticated() layout=yes
 /orders/{id}/delete POST -> JobOrderWriteController#deleteOrder gate=class:isAuthenticated() layout=yes
-/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/items/edit GET -> JobOrderPageController#viewEditItemForm gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/items/update POST -> JobOrderWriteController#updateItemOrder gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/handovers POST -> JobOrderWriteController#createHandover gate=class:isAuthenticated() layout=yes
+/orders/{id}/handovers POST consumes=[application/json] -> JobOrderWriteController#createHandoverAjax gate=class:isAuthenticated() layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink POST -> JobOrderWriteController#unlinkInventoryItem gate=class:isAuthenticated() layout=yes
+/orders/{id}/inventory/{inventoryItemId}/unlink/ajax DELETE -> JobOrderWriteController#unlinkInventoryItemAjax gate=class:isAuthenticated() layout=yes
+/orders/{id}/item-handovers POST -> JobOrderWriteController#createItemHandover gate=class:isAuthenticated() layout=yes
+/orders/{id}/item-handovers POST consumes=[application/json] -> JobOrderWriteController#createItemHandoverAjax gate=class:isAuthenticated() layout=yes
+/orders/{id}/items/edit GET -> JobOrderPageController#viewEditItemForm gate=class:isAuthenticated() layout=yes
+/orders/{id}/items/update POST -> JobOrderWriteController#updateItemOrder gate=class:isAuthenticated() layout=yes
+/orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=class:isAuthenticated() layout=yes
+/orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=class:isAuthenticated() layout=yes
+/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
+/orders/{id}/participations/{unitId} DELETE -> JobOrderResponsibilityProxyController#withdrawSupport gate=class:isAuthenticated() layout=no
+/orders/{id}/participations/{unitId} PUT -> JobOrderResponsibilityProxyController#enrollSupport gate=class:isAuthenticated() layout=no
 /orders/{id}/priority POST -> JobOrderWriteController#updatePriority gate=class:isAuthenticated() layout=yes
-/orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/priority/ajax PUT -> JobOrderWriteController#updatePriorityAjax gate=class:isAuthenticated() layout=yes
 /orders/{id}/requested-update POST -> JobOrderWriteController#updateOrderAsRequester gate=class:isAuthenticated() layout=yes
 /orders/{id}/requested-update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAsRequesterAjax gate=class:isAuthenticated() layout=yes
 /orders/{id}/responsible-org-unit PATCH -> JobOrderResponsibilityProxyController#transferResponsibility gate=class:isAuthenticated() layout=no
 /orders/{id}/status POST -> JobOrderWriteController#updateStatus gate=class:isAuthenticated() layout=yes
-/orders/{id}/update POST -> JobOrderWriteController#updateOrder gate=method:@logisticianGate.isGranted() layout=yes
-/orders/{id}/update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAjax gate=method:@logisticianGate.isGranted() layout=yes
+/orders/{id}/update POST -> JobOrderWriteController#updateOrder gate=class:isAuthenticated() layout=yes
+/orders/{id}/update POST consumes=[application/json] -> JobOrderWriteController#updateOrderAjax gate=class:isAuthenticated() layout=yes
 /orders/{jobOrderId}/item-collection GET -> ItemCollectionPageController#viewItemCollection gate=method:isAuthenticated() layout=yes
 /orders/{jobOrderId}/material-collection GET -> MaterialCollectionPageController#viewMaterialCollection gate=method:isAuthenticated() layout=yes
 /org-unit-bank GET -> OrgUnitBankPageController#orgUnitBank gate=method:hasAnyRole('ADMIN','LOGISTICIAN','MISSION_MANAGER','KRT_MEMBER') layout=yes

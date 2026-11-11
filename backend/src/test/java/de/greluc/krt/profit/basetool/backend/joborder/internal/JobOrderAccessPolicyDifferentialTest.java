@@ -216,10 +216,7 @@ class JobOrderAccessPolicyDifferentialTest {
           .thenReturn(caller.profitEligible() ? 1L : 0L);
 
       JobOrderRepository repository = mock(JobOrderRepository.class);
-      JobOrderHandoverRepository handovers = mock(JobOrderHandoverRepository.class);
-      JobOrderItemHandoverRepository itemHandovers = mock(JobOrderItemHandoverRepository.class);
       when(repository.findById(any())).thenReturn(Optional.empty());
-      int n = 0;
       for (String responsible : List.of("A", "B", "child C", "SK", "none")) {
         for (String requesting : List.of("A", "B")) {
           for (boolean delivered : List.of(false, true)) {
@@ -229,8 +226,6 @@ class JobOrderAccessPolicyDifferentialTest {
             order.setResponsibleOrgUnit(unit(responsible));
             order.setRequestingOrgUnit(unit(requesting));
             when(repository.findById(id)).thenReturn(Optional.of(order));
-            when(handovers.existsByJobOrderId(id)).thenReturn(delivered && n % 2 == 0);
-            when(itemHandovers.existsByJobOrderId(id)).thenReturn(delivered && n % 2 == 1);
             orders.put(
                 "order of "
                     + responsible
@@ -238,7 +233,6 @@ class JobOrderAccessPolicyDifferentialTest {
                     + requesting
                     + (delivered ? " delivered" : ""),
                 id);
-            n++;
           }
         }
       }
@@ -257,9 +251,7 @@ class JobOrderAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
-      scopeHub =
-          new ScopeHubJobOrderGates(
-              accessGateService, resolver, repository, handovers, itemHandovers);
+      scopeHub = new ScopeHubJobOrderGates(accessGateService, resolver, repository);
       policy =
           new JobOrderAccessPolicy(
               resolver,
@@ -267,8 +259,6 @@ class JobOrderAccessPolicyDifferentialTest {
               authHelper,
               repository,
               org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class),
-              handovers,
-              itemHandovers,
               org.mockito.Mockito.mock(
                   de.greluc.krt.profit.basetool.backend.joborder.internal
                       .JobOrderUnitReadHistoryRepository.class),
@@ -304,15 +294,11 @@ class JobOrderAccessPolicyDifferentialTest {
    * @param accessGateService the scope hub, for its org-unit gates
    * @param resolver the request scope, for the queue capability and the caller's memberships
    * @param orders the job orders
-   * @param handovers the material handovers
-   * @param itemHandovers the item handovers
    */
   private record ScopeHubJobOrderGates(
       AccessGateService accessGateService,
       RequestScopeResolver resolver,
-      JobOrderRepository orders,
-      JobOrderHandoverRepository handovers,
-      JobOrderItemHandoverRepository itemHandovers) {
+      JobOrderRepository orders) {
 
     boolean canSeeJobOrder(UUID id) {
       return orders.findById(id).map(this::row).orElse(false);
@@ -320,16 +306,6 @@ class JobOrderAccessPolicyDifferentialTest {
 
     boolean canSeeJobOrderBlueprintOwners(UUID id) {
       return responsibleVisible(id);
-    }
-
-    boolean canEditJobOrderAsRequester(UUID id) {
-      return orders
-          .findById(id)
-          .map(o ->
-              requester(o)
-                  && !(handovers.existsByJobOrderId(o.getId())
-                      || itemHandovers.existsByJobOrderId(o.getId())))
-          .orElse(false);
     }
 
     private boolean row(JobOrder order) {
@@ -349,11 +325,6 @@ class JobOrderAccessPolicyDifferentialTest {
           .map(JobOrder::getResponsibleOrgUnit)
           .map(responsible -> accessGateService.canSeeSquadron(responsible.getId()))
           .orElse(false);
-    }
-
-    private boolean requester(JobOrder order) {
-      var requesting = order.getRequestingOrgUnit();
-      return requesting != null && resolver.currentUserIsMemberOfOrgUnit(requesting.getId());
     }
   }
 }

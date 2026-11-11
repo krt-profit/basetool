@@ -179,7 +179,11 @@ function initOrdersDetailProduction() {
             if (badge) {
                 badge.textContent = String(count);
             }
-            if (count > 0 && tab.hidden) {
+            const hasAction = meta.getAttribute('data-od-tab-action');
+            if (hasAction !== null) {
+                tab.toggleAttribute('data-od-hide-empty', hasAction !== 'true');
+            }
+            if ((count > 0 || hasAction === 'true') && tab.hidden) {
                 tab.hidden = false;
             } else if (count === 0 && !tab.hidden && tab.hasAttribute('data-od-hide-empty')) {
                 const wasActive = tab.classList.contains('active');

@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -47,19 +46,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over material claims ("Eintragungen") nested under a job order, letting profit
- * squadrons sign up for partial quantities of a material bucket on a Spezialkommando order.
+ * Material promises of eligible Staffeln on active Profit orders.
  *
- * <p>Reads require {@code canSeeJobOrder}; writes require LOGISTICIAN or above and {@code
- * canViewJobOrders}. The fine-grained permissions and claim invariants are enforced in {@link
- * MaterialClaimService}.
+ * <p>Writes require current authority on the selected Staffel or responsible unit.
  */
 @RestController
 @RequestMapping("/api/v1/orders/{jobOrderId}/claims")
 @RequiredArgsConstructor
-@Tag(
-    name = "Material Claims",
-    description = "Squadron claims on a Spezialkommando order's materials")
+@Tag(name = "Material Claims", description = "Staffel material promises on a Profit order")
 public class MaterialClaimController {
 
   private final MaterialClaimService materialClaimService;
@@ -94,7 +88,7 @@ public class MaterialClaimController {
       summary = "List writable claiming squadrons for an order",
       description =
           "Returns eligible squadrons allowed by the current claim-write authority."
-              + " Terminal, invalid or non-SK orders return an empty list.")
+              + " Terminal or invalid orders return an empty list.")
   @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> claimingOptions(@PathVariable UUID jobOrderId) {
@@ -115,7 +109,7 @@ public class MaterialClaimController {
       summary = "Create or update a material claim",
       description =
           "Creates or updates a partial material promise of an active squadron in the actual Profit"
-              + " hierarchy on a nonterminal SK order. Current responsibility and claiming-unit"
+              + " hierarchy on a nonterminal order. Current responsibility and claiming-unit"
               + " eligibility are required for every write. Bucket, overclaim and contextual writer"
               + " checks apply.")
   @ApiResponses({
@@ -123,12 +117,14 @@ public class MaterialClaimController {
     @ApiResponse(
         responseCode = "400",
         description =
-            "Invalid responsibility or claiming unit, terminal/non-SK order, unknown bucket, or"
+            "Invalid responsibility or claiming unit, terminal order, unknown bucket, or"
                 + " overclaim"),
     @ApiResponse(responseCode = "403", description = "Forbidden – may not act for this squadron"),
     @ApiResponse(responseCode = "404", description = "Order not found")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @requestScopeResolver.canViewJobOrders()")
+  @PreAuthorize(
+      "isAuthenticated() and @materialClaimAuthority.canWritePromise(#jobOrderId,"
+          + " #dto.claimingOrgUnitId)")
   public ClaimDto upsertClaim(
       @PathVariable UUID jobOrderId, @RequestBody @Valid CreateClaimDto dto) {
     return materialClaimService.upsertClaim(jobOrderId, dto);
@@ -154,7 +150,8 @@ public class MaterialClaimController {
     @ApiResponse(responseCode = "404", description = "Order or claim not found"),
     @ApiResponse(responseCode = "409", description = "Missing or stale contribution version")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "') and @requestScopeResolver.canViewJobOrders()")
+  @PreAuthorize(
+      "isAuthenticated() and @materialClaimAuthority.canWithdrawPromise(#jobOrderId, #claimId)")
   public void withdrawClaim(
       @PathVariable UUID jobOrderId,
       @PathVariable UUID claimId,

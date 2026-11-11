@@ -23,38 +23,42 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
+import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/**
- * The Logistician controls of the inventory, job-order and refinery pages follow the backend's
- * pin-aware capability flag, never the flat role: a caller holding {@code ROLE_LOGISTICIAN} whom
- * the backend reports without a grant in the active context (pinned to a unit without the grant)
- * gets none of them, and the same caller with the grant gets all.
- */
+/** Verifies that inventory, job-order and refinery surfaces honor the active-context grant. */
 @SpringBootTest
 class LogisticianPinAwareSurfacesMvcTest {
 
@@ -131,23 +135,72 @@ class LogisticianPinAwareSurfacesMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void jobOrderItemEditPage_pinnedWithoutTheGrant_isForbidden() throws Exception {
     backendReports(CapabilitiesResponse.NONE);
+    UUID orderId = UUID.randomUUID();
+    JobOrderDto order =
+        new JobOrderDto(
+            orderId,
+            7,
+            new SquadronReferenceDto(UUID.randomUUID(), "Responsible", "RESP"),
+            new SquadronReferenceDto(UUID.randomUUID(), "Requester", "REQ"),
+            "Handle",
+            null,
+            1,
+            "OPEN",
+            "ITEM",
+            true,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            Instant.now(),
+            1L,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            0L,
+            0L);
+    when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
+        .thenReturn(order);
 
-    mockMvc
-        .perform(get("/orders/" + UUID.randomUUID() + "/items/edit"))
-        .andExpect(status().isForbidden());
+    mockMvc.perform(get("/orders/" + orderId + "/items/edit")).andExpect(status().isForbidden());
+    verify(backendApiClient).get("/api/v1/orders/{id}", JobOrderDto.class, orderId);
   }
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void jobOrderWriteProxy_pinnedWithoutTheGrant_isForbidden() throws Exception {
     backendReports(CapabilitiesResponse.NONE);
+    UUID orderId = UUID.randomUUID();
+    String detail = "Current unit has no write authority for this order.";
+    when(backendApiClient.post(
+            eq("/api/v1/orders/{id}/handovers"), any(), eq(JobOrderHandoverDto.class), eq(orderId)))
+        .thenThrow(
+            new BackendServiceException(
+                "Forbidden", null, 403, "ACCESS_DENIED", null, List.of(), detail));
 
     mockMvc
         .perform(
-            post("/orders/" + UUID.randomUUID() + "/handovers")
+            post("/orders/" + orderId + "/handovers")
                 .with(csrf())
-                .param("recipientHandle", "Recipient"))
-        .andExpect(status().isForbidden());
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"handoverTime":"2026-04-29T18:00:00.000Z","recipientHandle":"Recipient",
+                     "items":[{"inventoryItemId":"%s","amount":1.5}]}
+                    """
+                        .formatted(UUID.randomUUID())))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(403))
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+        .andExpect(jsonPath("$.detail").value(detail));
   }
 
   @Test

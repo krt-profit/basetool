@@ -246,20 +246,20 @@ public class JobOrderController {
   }
 
   /**
-   * Updates the status; a transition to a terminal state (COMPLETED, REJECTED) also atomically
-   * unlinks every inventory item pointing at the order.
+   * Updates the status; a transition to a terminal state (COMPLETED, REJECTED, CANCELLED) also
+   * atomically unlinks every inventory item pointing at the order.
    *
    * @param id job-order id
-   * @param dto status payload (carries the expected version)
+   * @param dto target status and the observed lifecycle version
    * @return the persisted DTO
    */
   @PutMapping("/{id}/status")
   @Operation(
       summary = "Update job order status",
       description =
-          "Updates the status of a job order. For terminal statuses (COMPLETED, REJECTED), all"
-              + " linked inventory items are unlinked atomically. Requires the current version for"
-              + " optimistic locking.")
+          "Updates the status of a job order. For terminal statuses (COMPLETED, REJECTED,"
+              + " CANCELLED), all linked inventory items are unlinked atomically. Requires the"
+              + " current version for optimistic locking.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Status updated successfully"),
     @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
@@ -268,7 +268,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("isAuthenticated()")
   public JobOrderDto updateJobOrderStatus(
       @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderStatusDto dto) {
     return jobOrderService.updateJobOrderStatus(id, dto);
@@ -287,8 +287,7 @@ public class JobOrderController {
   @Operation(
       summary = "Update job order priority",
       description = "Updates priority and shifts others.")
-  @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrderPriority(@PathVariable UUID id, @RequestParam Integer priority) {
     return jobOrderService.updateJobOrderPriority(id, priority);
   }
@@ -302,7 +301,7 @@ public class JobOrderController {
    */
   @PutMapping("/{id}")
   @Operation(summary = "Update job order", description = "Updates job order details and materials.")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.updateJobOrder(id, dto);
@@ -334,16 +333,14 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateItemJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.updateItemJobOrder(id, dto);
   }
 
   /**
-   * Requester-side edit of a MATERIAL order's lines and comment by a member of the requesting org
-   * unit, allowed only while nothing is delivered (REQ-ORDERS-023). Notifies the processing unit's
-   * leads.
+   * Edits remaining MATERIAL need and the requester comment without changing recorded handovers.
    *
    * @param id job-order id
    * @param dto the new material lines + comment (carries the expected version)
@@ -354,17 +351,16 @@ public class JobOrderController {
   @Operation(
       summary = "Requester edit of a material order",
       description =
-          "Lets a member of the order's requesting org unit change quantities, add/remove"
-              + " not-yet-delivered materials and edit the comment. Only while the order has no"
-              + " delivery yet.")
+          "Lets a current requesting-unit writer update the remaining material need and comment."
+              + " Retains booked deliveries and their history.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Order updated"),
     @ApiResponse(
         responseCode = "400",
-        description = "Not a material order, or already has a delivery"),
+        description = "The order kind or remaining material need is invalid"),
     @ApiResponse(
         responseCode = "403",
-        description = "Caller is not a member of the order's requesting org unit"),
+        description = "Caller lacks current requesting-unit write authority"),
     @ApiResponse(responseCode = "404", description = "Order or material not found"),
     @ApiResponse(
         responseCode = "409",
@@ -389,16 +385,16 @@ public class JobOrderController {
   @Operation(
       summary = "Requester edit of an item order",
       description =
-          "Lets a member of the order's requesting org unit replace the ordered items and edit the"
-              + " comment. Only while the order has no delivery yet.")
+          "Lets a current requesting-unit writer edit item quantities and the comment."
+              + " Preserves item identity and booked production and delivery.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Order updated"),
     @ApiResponse(
         responseCode = "400",
-        description = "Not an item order, already has a delivery, or an invalid blueprint choice"),
+        description = "The order kind, requested item changes or blueprint choice is invalid"),
     @ApiResponse(
         responseCode = "403",
-        description = "Caller is not a member of the order's requesting org unit"),
+        description = "Caller lacks current requesting-unit write authority"),
     @ApiResponse(responseCode = "404", description = "Order, item or blueprint not found"),
     @ApiResponse(
         responseCode = "409",
@@ -434,7 +430,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateBlueprintVariantCounting(
       @PathVariable UUID id, @NotNull @RequestBody @Valid UpdateJobOrderBlueprintCountingDto dto) {
     return jobOrderService.updateBlueprintVariantCounting(
@@ -457,16 +453,18 @@ public class JobOrderController {
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto reassignResponsibleOrgUnit(
       @PathVariable UUID id, @NotNull @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
-    return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
+    return jobOrderService.reassignResponsibleOrgUnit(
+        id, body.responsibleOrgUnitId(), body.version());
   }
 
   /**
    * Request body for the responsible-org-unit reassignment endpoint.
    *
-   * @param responsibleOrgUnitId the target active Profit-hierarchy org unit id (required)
+   * @param responsibleOrgUnitId the target active Profit-hierarchy org unit id
+   * @param version the observed responsibility revision
    */
   public record ReassignResponsibleOrgUnitRequest(
-      @jakarta.validation.constraints.NotNull UUID responsibleOrgUnitId) {}
+      @jakarta.validation.constraints.NotNull UUID responsibleOrgUnitId, Long version) {}
 
   /**
    * ADMIN-only delete. Surviving orders' priorities shift up to keep the queue contiguous.

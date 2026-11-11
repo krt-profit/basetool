@@ -88,8 +88,6 @@ class JobOrderAccessPolicyTest {
             authHelper,
             jobOrderRepository,
             responsibilityGuard,
-            mock(JobOrderHandoverRepository.class),
-            mock(JobOrderItemHandoverRepository.class),
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal
                     .JobOrderUnitReadHistoryRepository.class),

@@ -49,7 +49,10 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
+import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -79,6 +82,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -88,6 +93,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /** Exercises committed hierarchy maintenance and its current-writer notification audience. */
 @SpringBootTest
+@RecordApplicationEvents
 class ProfitHierarchyNoticeIntegrationTest {
 
   private static final String NOTICE_TYPE = "JOB_ORDER_CLAIM_WITHDRAWN";
@@ -115,9 +121,12 @@ class ProfitHierarchyNoticeIntegrationTest {
   @Autowired private DataExportService exports;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private NotificationService inbox;
+  @Autowired private NotificationCreationService notificationCreation;
+  @Autowired private ApplicationEvents events;
 
   private MockMvc mvc;
   private Fixture fixture;
+  private UUID createdOrder;
 
   @BeforeEach
   void seed() {
@@ -131,6 +140,10 @@ class ProfitHierarchyNoticeIntegrationTest {
       return;
     }
     transactions.executeWithoutResult(_ -> {
+      if (createdOrder != null) {
+        jdbc.update("DELETE FROM notification WHERE entity_id = ?", createdOrder);
+        orders.deleteById(createdOrder);
+      }
       jdbc.update("DELETE FROM notification WHERE entity_id = ?", fixture.order());
       jdbc.update("DELETE FROM material_claim WHERE job_order_id = ?", fixture.order());
       orders.deleteById(fixture.order());
@@ -146,6 +159,272 @@ class ProfitHierarchyNoticeIntegrationTest {
       units.deleteById(fixture.outside());
       materials.deleteAllById(fixture.materials());
     });
+  }
+
+  @Test
+  void newWorkNotifiesCurrentAffectedWritersAndExcludesTheActorAndUnrelatedAdmin()
+      throws Exception {
+    createAffectedOrder();
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          for (Audience recipient :
+              List.of(
+                  Audience.AFFECTED_WRITER,
+                  Audience.RESPONSIBLE_WRITER,
+                  Audience.AFFECTED_LEADER)) {
+            assertThat(orderNotices(recipient, createdOrder))
+                .as("creation notice for %s", recipient)
+                .extracting(notice -> notice.get("type"))
+                .containsExactly("JOB_ORDER_CREATED");
+          }
+        });
+    assertThat(orderNotices(Audience.ACTOR, createdOrder)).isEmpty();
+    assertThat(orderNotices(Audience.ADMIN, createdOrder)).isEmpty();
+  }
+
+  @Test
+  void cancellationAndReopeningNotifyBothSidesAndRetireTheCreationPrompt() throws Exception {
+    Number version = JsonPath.read(createAffectedOrder(), "$.lifecycleVersion");
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED"));
+
+    String cancelled = changeLifecycle(Audience.ACTOR, fixture.claiming(), "CANCELLED", version);
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_FINISHED");
+          assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED");
+          assertThat(orderNotices(Audience.AFFECTED_WRITER, createdOrder))
+              .singleElement()
+              .satisfies(notice ->
+                  assertThat(((Map<?, ?>) notice.get("params")).get("statusCode"))
+                      .isEqualTo("CANCELLED"));
+        });
+    assertNoticeTypes(Audience.ACTOR);
+    assertNoticeTypes(Audience.ADMIN);
+
+    Number cancelledVersion = JsonPath.read(cancelled, "$.lifecycleVersion");
+    changeLifecycle(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "OPEN", cancelledVersion);
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_REOPENED");
+          assertNoticeTypes(Audience.ACTOR, "JOB_ORDER_REOPENED");
+        });
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_FINISHED");
+    assertNoticeTypes(Audience.ADMIN);
+  }
+
+  @Test
+  void aLateCreationCauseCannotRestoreTheActionPromptAfterCancellationOrReopening()
+      throws Exception {
+    String created = createAffectedOrder();
+    NotificationCause creation = originalCause(NotificationEventType.JOB_ORDER_CREATED);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED"));
+
+    Number version = JsonPath.read(created, "$.lifecycleVersion");
+    String cancelled = changeLifecycle(Audience.ACTOR, fixture.claiming(), "CANCELLED", version);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_FINISHED"));
+
+    deliverDelayed(creation);
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_FINISHED");
+    assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED");
+
+    Number cancelledVersion = JsonPath.read(cancelled, "$.lifecycleVersion");
+    changeLifecycle(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "OPEN", cancelledVersion);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() ->
+            assertNoticeTypes(
+                Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_REOPENED"));
+
+    deliverDelayed(creation);
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_FINISHED");
+    assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_REOPENED");
+  }
+
+  @Test
+  void aLateActiveTransferCannotRestoreTheActionPromptAfterCancellation() throws Exception {
+    String created = createAffectedOrder();
+    String transferred =
+        transfer(
+            Audience.AFFECTED_WRITER,
+            fixture.responsible(),
+            fixture.claiming(),
+            JsonPath.read(created, "$.responsibilityVersion"));
+    NotificationCause transfer = originalCause(NotificationEventType.JOB_ORDER_REASSIGNED);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(
+            () -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_REASSIGNED"));
+
+    Number lifecycleVersion = JsonPath.read(transferred, "$.lifecycleVersion");
+    changeLifecycle(Audience.ACTOR, fixture.claiming(), "CANCELLED", lifecycleVersion);
+    NotificationCause closure = originalCause(NotificationEventType.JOB_ORDER_CLOSED);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED"));
+
+    deliverDelayed(transfer);
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER);
+    assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED");
+
+    transfer(
+        Audience.ACTOR,
+        fixture.claiming(),
+        fixture.responsible(),
+        JsonPath.read(transferred, "$.responsibilityVersion"));
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_REASSIGNED");
+          assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_REASSIGNED");
+        });
+
+    deliverDelayedClosure(closure);
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_REASSIGNED");
+    assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_REASSIGNED");
+  }
+
+  @Test
+  void reopeningClearsOldActionPromptsEvenWhenClosureCleanupArrivesLate() throws Exception {
+    String created = createAffectedOrder();
+    NotificationCause creation = originalCause(NotificationEventType.JOB_ORDER_CREATED);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_CREATED"));
+
+    Number version = JsonPath.read(created, "$.lifecycleVersion");
+    String cancelled = changeLifecycle(Audience.ACTOR, fixture.claiming(), "CANCELLED", version);
+    NotificationCause closure = originalCause(NotificationEventType.JOB_ORDER_CLOSED);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED"));
+    notificationCreation.createFromEvent(creation.events().getFirst());
+    assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_CREATED");
+
+    Number cancelledVersion = JsonPath.read(cancelled, "$.lifecycleVersion");
+    changeLifecycle(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "OPEN", cancelledVersion);
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() ->
+            assertNoticeTypes(
+                Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_REOPENED"));
+
+    deliverDelayedClosure(closure);
+    assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_FINISHED", "JOB_ORDER_REOPENED");
+  }
+
+  @Test
+  void transferNotifiesFormerAndNewUnitWritersAndReplacesTheCreationPrompt() throws Exception {
+    String created = createAffectedOrder();
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED"));
+
+    transfer(
+        Audience.AFFECTED_WRITER,
+        fixture.responsible(),
+        fixture.claiming(),
+        JsonPath.read(created, "$.responsibilityVersion"));
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_REASSIGNED");
+          assertNoticeTypes(Audience.ACTOR, "JOB_ORDER_REASSIGNED");
+        });
+    assertNoticeTypes(Audience.AFFECTED_WRITER);
+    assertNoticeTypes(Audience.ADMIN);
+  }
+
+  @Test
+  void requesterNeedChangesNotifyCurrentWritersOfBothAffectedUnits() throws Exception {
+    Number version = JsonPath.read(createAffectedOrder(), "$.version");
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED"));
+
+    changeNeed(Audience.ACTOR, fixture.claiming(), "/requested", version, 7);
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          assertNoticeTypes(
+              Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER");
+          assertNoticeTypes(
+              Audience.PREFERENCE_WRITER, "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_REQUESTER");
+        });
+    assertNoticeTypes(Audience.ACTOR);
+    assertNoticeTypes(Audience.ADMIN);
+  }
+
+  @Test
+  void onlyMeaningfulResponsibleNeedEditsNotifyAffectedWriters() throws Exception {
+    Number version = JsonPath.read(createAffectedOrder(), "$.version");
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertNoticeTypes(Audience.AFFECTED_WRITER, "JOB_ORDER_CREATED"));
+
+    String changed = changeNeed(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "", version, 7);
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> {
+          assertNoticeTypes(
+              Audience.AFFECTED_WRITER, "JOB_ORDER_CREATED", "JOB_ORDER_UPDATED_BY_RESPONSIBLE");
+          assertNoticeTypes(Audience.ACTOR, "JOB_ORDER_UPDATED_BY_RESPONSIBLE");
+        });
+    assertNoticeTypes(Audience.RESPONSIBLE_WRITER, "JOB_ORDER_CREATED");
+    assertNoticeTypes(Audience.ADMIN);
+
+    Number changedVersion = JsonPath.read(changed, "$.version");
+    changeNeed(Audience.RESPONSIBLE_WRITER, fixture.responsible(), "", changedVersion, 7);
+
+    await()
+        .during(Duration.ofMillis(250))
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() -> assertNoticeTypes(Audience.ACTOR, "JOB_ORDER_UPDATED_BY_RESPONSIBLE"));
+  }
+
+  @Test
+  void invalidResponsibilityPromptsCurrentWritersOnceAndRestorationClearsThePrompt()
+      throws Exception {
+    moveUnit(fixture.responsible(), fixture.outside());
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() ->
+            assertThat(orderNotices(Audience.RESPONSIBLE_WRITER))
+                .extracting(notice -> notice.get("type"))
+                .containsExactly("JOB_ORDER_CLARIFICATION_REQUIRED"));
+    assertThat(orderNotices(Audience.ADMIN)).isEmpty();
+    Object promptId = orderNotices(Audience.RESPONSIBLE_WRITER).getFirst().get("id");
+
+    moveUnit(fixture.responsible(), fixture.outside());
+
+    await()
+        .during(Duration.ofMillis(250))
+        .atMost(Duration.ofSeconds(2))
+        .untilAsserted(() ->
+            assertThat(orderNotices(Audience.RESPONSIBLE_WRITER))
+                .extracting(notice -> notice.get("id"))
+                .containsExactly(promptId));
+
+    moveUnit(fixture.responsible(), fixture.profit());
+
+    await()
+        .atMost(Duration.ofSeconds(10))
+        .untilAsserted(() -> assertThat(orderNotices(Audience.RESPONSIBLE_WRITER)).isEmpty());
   }
 
   @Test
@@ -505,10 +784,129 @@ class ProfitHierarchyNoticeIntegrationTest {
         .rows();
   }
 
+  private NotificationCause originalCause(NotificationEventType type) {
+    return events.stream(NotificationCause.class)
+        .filter(cause ->
+            cause.events().stream()
+                .anyMatch(
+                    event -> event.eventType() == type && createdOrder.equals(event.entityId())))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private void deliverDelayed(NotificationCause cause) {
+    notificationCreation.createFromCause(new NotificationCause(UUID.randomUUID(), cause.events()));
+  }
+
+  private void deliverDelayedClosure(NotificationCause closure) {
+    notificationCreation.createFromCause(
+        new NotificationCause(
+            UUID.randomUUID(),
+            closure.events().stream()
+                .filter(event -> event.eventType() == NotificationEventType.JOB_ORDER_CLOSED)
+                .toList()));
+  }
+
+  private String transfer(Audience actor, UUID previous, UUID target, Number version)
+      throws Exception {
+    String request =
+        """
+        {"responsibleOrgUnitId": "%s", "version": %s}
+        """
+            .formatted(target, version);
+    return as(
+            actor,
+            patch("/api/v1/orders/" + createdOrder + "/responsible-org-unit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request),
+            previous)
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  private String createAffectedOrder() throws Exception {
+    String request =
+        """
+        {
+          "responsibleOrgUnitId": "%s",
+          "requestingOrgUnitId": "%s",
+          "handle": "New work for the unit",
+          "materials": [{"materialId": "%s", "minQuality": 650, "amount": 5}]
+        }
+        """
+            .formatted(fixture.responsible(), fixture.claiming(), fixture.materials().getFirst());
+    String response =
+        as(
+                Audience.ACTOR,
+                post("/api/v1/orders").contentType(MediaType.APPLICATION_JSON).content(request),
+                fixture.claiming())
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    createdOrder = UUID.fromString(JsonPath.read(response, "$.id"));
+    return response;
+  }
+
+  private String changeLifecycle(Audience actor, UUID unit, String statusCode, Number version)
+      throws Exception {
+    String request =
+        """
+        {"status": "%s", "version": %s}
+        """
+            .formatted(statusCode, version);
+    return as(
+            actor,
+            put("/api/v1/orders/" + createdOrder + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request),
+            unit)
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  private String changeNeed(Audience actor, UUID unit, String path, Number version, int amount)
+      throws Exception {
+    String request =
+        """
+        {
+          "handle": "New work for the unit",
+          "materials": [{"materialId": "%s", "minQuality": 650, "amount": %s}],
+          "version": %s
+        }
+        """
+            .formatted(fixture.materials().getFirst(), amount, version);
+    return as(
+            actor,
+            put("/api/v1/orders/" + createdOrder + path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request),
+            unit)
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  private void assertNoticeTypes(Audience recipient, String... types) throws Exception {
+    assertThat(orderNotices(recipient, createdOrder))
+        .as("order notices for %s", recipient)
+        .extracting(notice -> (String) notice.get("type"))
+        .containsExactlyInAnyOrder(types);
+  }
+
   private void moveClaimingUnit(UUID parent) throws Exception {
-    Long version = units.findById(fixture.claiming()).orElseThrow().getVersion();
+    moveUnit(fixture.claiming(), parent);
+  }
+
+  private void moveUnit(UUID unit, UUID parent) throws Exception {
+    Long version = units.findById(unit).orElseThrow().getVersion();
     mvc.perform(
-            patch("/api/v1/org-units/" + fixture.claiming() + "/parent")
+            patch("/api/v1/org-units/" + unit + "/parent")
                 .with(
                     jwt()
                         .jwt(
@@ -537,13 +935,18 @@ class ProfitHierarchyNoticeIntegrationTest {
   }
 
   private List<Map<String, Object>> orderNotices(Audience recipient) throws Exception {
+    return orderNotices(recipient, fixture.order());
+  }
+
+  private List<Map<String, Object>> orderNotices(Audience recipient, UUID orderId)
+      throws Exception {
     String json =
         as(recipient, get("/api/v1/notifications").param("size", "100"), null)
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
             .getContentAsString();
-    return JsonPath.read(json, "$.content[?(@.entityId == '" + fixture.order() + "')]");
+    return JsonPath.read(json, "$.content[?(@.entityId == '" + orderId + "')]");
   }
 
   private ResultActions as(Audience caller, MockHttpServletRequestBuilder request, UUID grant)

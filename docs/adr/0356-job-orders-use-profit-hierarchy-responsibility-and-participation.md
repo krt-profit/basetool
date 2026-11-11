@@ -1,6 +1,6 @@
 # ADR-0356 — Job orders use Profit hierarchy responsibility and participation
 
-- **Status:** Accepted — planned, not implemented
+- **Status:** Accepted. MATERIAL and ITEM use the shared model.
 - **Date:** 2026-11-09
 - **Deciders:** Repository owner (@greluc)
 - **Related:** [REQ-ORDERS-049–056](../specs/orders-core.md) · REQ-ORDERS-023/-024 · REQ-ORG-003/-004/-014/-016 · amendments to ADR-0091 · issues #3193, #3197, #3200, #3203

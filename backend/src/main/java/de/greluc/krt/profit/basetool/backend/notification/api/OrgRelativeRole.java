@@ -23,8 +23,8 @@ package de.greluc.krt.profit.basetool.backend.notification.api;
  * A role evaluated relative to an org unit carried by an event (used by {@link
  * SelectorKind#ORG_RELATIVE_ROLE}).
  *
- * <p>{@link #OFFICER} and {@link #UNIT_LEADERSHIP} resolve to the seat holders directly in the
- * context org unit; the others read the corresponding per-membership flag of that unit.
+ * <p>{@link #OFFICER} and {@link #UNIT_LEADERSHIP} resolve direct seat holders. {@link
+ * #UNIT_WRITER} uses current functional authority, including leadership and Logistician reach.
  */
 public enum OrgRelativeRole {
 
@@ -44,5 +44,8 @@ public enum OrgRelativeRole {
    * Members whose rank confers a leadership seat in the context org unit (Staffelleiter,
    * Bereichsleiter, …); a higher unit's seat holders are not included.
    */
-  UNIT_LEADERSHIP
+  UNIT_LEADERSHIP,
+
+  /** Current leadership and contextual logisticians whose authority covers the unit. */
+  UNIT_WRITER
 }

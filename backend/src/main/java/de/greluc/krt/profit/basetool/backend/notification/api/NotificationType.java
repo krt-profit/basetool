@@ -40,6 +40,9 @@ public enum NotificationType {
    */
   JOB_ORDER_UPDATED_BY_REQUESTER,
 
+  /** The responsible side changed the order's need or editable details. */
+  JOB_ORDER_UPDATED_BY_RESPONSIBLE,
+
   /**
    * An org-unit officer/lead raised a confirm-before-post bank booking request (REQ-BANK-026). The
    * default rule notifies the bank management and every employee granted on the target account,
@@ -209,16 +212,19 @@ public enum NotificationType {
   OPERATION_COMPLETED,
 
   /**
-   * A job order moved to the recipient's unit (REQ-ORDERS-041), rendered with {@code displayId},
+   * Responsibility changed for a job order (REQ-ORDERS-041), rendered with {@code displayId},
    * {@code handle}, {@code from} and {@code to}.
    */
   JOB_ORDER_REASSIGNED,
 
   /**
-   * A job order of the recipient's unit was completed, rejected or deleted (REQ-ORDERS-042),
-   * rendered with {@code displayId}, {@code handle}, {@code unit} and the {@code status} word.
+   * A job order was completed, rejected, cancelled or deleted (REQ-ORDERS-042), rendered with
+   * {@code displayId}, {@code handle}, {@code unit} and the {@code status} word.
    */
   JOB_ORDER_FINISHED,
+
+  /** Work on a job order has reopened. */
+  JOB_ORDER_REOPENED,
 
   /**
    * The recipient was assigned to a job order (REQ-ORDERS-043), rendered with {@code displayId},
@@ -234,6 +240,12 @@ public enum NotificationType {
 
   /** Material promises or credited contributions changed for the affected unit writers. */
   JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED,
+
+  /** The order requires a valid responsibility before processing can continue. */
+  JOB_ORDER_CLARIFICATION_REQUIRED,
+
+  /** A Staffel began or ended active support for the order. */
+  JOB_ORDER_PARTICIPATION_CHANGED,
 
   /**
    * A refinery order is ready to collect (REQ-REFINERY-023), rendered with {@code order}, {@code
@@ -516,6 +528,7 @@ public enum NotificationType {
           false;
       case JOB_ORDER_CREATED,
           JOB_ORDER_UPDATED_BY_REQUESTER,
+          JOB_ORDER_UPDATED_BY_RESPONSIBLE,
           BANK_BOOKING_REQUEST_CREATED,
           BANK_BOOKING_REQUEST_CONFIRMED,
           BANK_BOOKING_REQUEST_REJECTED,
@@ -543,9 +556,12 @@ public enum NotificationType {
           OPERATION_COMPLETED,
           JOB_ORDER_REASSIGNED,
           JOB_ORDER_FINISHED,
+          JOB_ORDER_REOPENED,
           JOB_ORDER_ASSIGNED,
           JOB_ORDER_CLAIM_WITHDRAWN,
           JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED,
+          JOB_ORDER_CLARIFICATION_REQUIRED,
+          JOB_ORDER_PARTICIPATION_CHANGED,
           REFINERY_ORDER_READY,
           REFINERY_ORDER_CHANGED_BY_OTHER,
           MATERIAL_EXCHANGE_OFFER_UNAVAILABLE,

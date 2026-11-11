@@ -109,7 +109,11 @@ class JobOrderResponsibilityRecoveryMvcTest {
             true,
             true,
             true,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            6L);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
     List<OrgUnitMembershipOptionDto> options =
@@ -148,6 +152,7 @@ class JobOrderResponsibilityRecoveryMvcTest {
     var transfer =
         Pattern.compile("id=\"responsibility-transfer-form\"[^>]*>(.*?)</form>", Pattern.DOTALL)
             .matcher(html);
+    assertThat(html).containsPattern("id=\"responsibility-transfer-form\"[^>]*data-version=\"6\"");
     assertThat(transfer.find()).isTrue();
     assertThat(transfer.group(1))
         .contains("Current Profit Bereich", "Current Profit Staffel", "Current Profit SK");
@@ -194,7 +199,11 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             true,
             false,
-            mayEdit);
+            mayEdit,
+            false,
+            false,
+            0L,
+            0L);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
 
@@ -245,10 +254,14 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             true,
             true,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     when(backendApiClient.patch(
             eq("/api/v1/orders/{id}/responsible-org-unit"),
-            eq(new ReassignResponsibleOrgUnitRequest(target)),
+            eq(new ReassignResponsibleOrgUnitRequest(target, 6L)),
             eq(JobOrderDto.class),
             eq(id)))
         .thenReturn(recovered);
@@ -258,7 +271,7 @@ class JobOrderResponsibilityRecoveryMvcTest {
             patch("/orders/{id}/responsible-org-unit", id)
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"responsibleOrgUnitId\":\"" + target + "\"}"))
+                .content("{\"responsibleOrgUnitId\":\"" + target + "\",\"version\":6}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.id").value(id.toString()))
         .andExpect(jsonPath("$.displayId").value(51))
@@ -298,7 +311,11 @@ class JobOrderResponsibilityRecoveryMvcTest {
             false,
             false,
             true,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id)))
         .thenReturn(order);
     when(backendApiClient.getCached(

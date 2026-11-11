@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEditor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderGate;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialProvisionCredit;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderController;
 import de.greluc.krt.profit.basetool.backend.joborder.web.JobOrderMaterialController;
@@ -120,6 +121,7 @@ class TenancyGuardTest {
           OperationAccessPolicy.class,
           RefineryAccessPolicy.class,
           JobOrderAccessPolicy.class,
+          MaterialClaimAuthority.class,
           MissionAccessPolicy.class,
           InventoryAccessPolicy.class,
           StockLevelAccessPolicy.class,

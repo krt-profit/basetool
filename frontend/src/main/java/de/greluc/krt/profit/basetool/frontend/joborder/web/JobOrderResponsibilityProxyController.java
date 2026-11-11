@@ -30,15 +30,19 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Relays current-authority responsibility transfers and queue invalidations. */
+/** Relays changes to the order's responsible and supporting units. */
 @RestController
 @RequestMapping("/orders")
 @PreAuthorize("isAuthenticated()")
@@ -68,6 +72,46 @@ public class JobOrderResponsibilityProxyController {
           JobOrderDto order = jobOrderClient.transferResponsibility(id, request);
           liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
           return ResponseEntity.ok(order);
+        });
+  }
+
+  /**
+   * Relays enrollment under the backend's current supporting or responsible writer authority.
+   *
+   * @param id the order
+   * @param unitId the supporting Staffel
+   * @return 204 on success or the backend refusal
+   */
+  @PutMapping("/{id}/participations/{unitId}")
+  public ResponseEntity<Object> enrollSupport(@PathVariable UUID id, @PathVariable UUID unitId) {
+    return relay(
+        log,
+        "enroll order support",
+        () -> {
+          jobOrderClient.enrollSupport(id, unitId);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Relays withdrawal of Staffel support and its open promises.
+   *
+   * @param id the order
+   * @param unitId the supporting Staffel
+   * @param version the observed participation version
+   * @return 204 on success or the backend refusal
+   */
+  @DeleteMapping("/{id}/participations/{unitId}")
+  public ResponseEntity<Object> withdrawSupport(
+      @PathVariable UUID id,
+      @PathVariable UUID unitId,
+      @RequestParam(required = false) @Nullable Long version) {
+    return relay(
+        log,
+        "withdraw order support",
+        () -> {
+          jobOrderClient.withdrawSupport(id, unitId, version);
+          return ResponseEntity.noContent().build();
         });
   }
 }

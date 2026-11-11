@@ -231,7 +231,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
 
     stubDetail(orderId, userId, order);
 
@@ -350,7 +354,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -437,7 +445,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -523,7 +535,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -625,7 +641,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
 
     stubDetail(orderId, userId, order);
 
@@ -718,7 +738,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -778,7 +802,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -847,7 +875,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -930,7 +962,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         false,
         false,
         null,
-        false);
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   @Test
@@ -1424,7 +1460,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -1497,7 +1537,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     when(reader.readOrderDetail(eq(orderId), any(), any()))
         .thenReturn(
             logisticianDetail(order, userId)
@@ -1583,7 +1627,11 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =

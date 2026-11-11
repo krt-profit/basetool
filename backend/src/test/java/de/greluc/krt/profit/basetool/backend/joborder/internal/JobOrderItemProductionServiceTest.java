@@ -92,8 +92,6 @@ import org.springframework.security.access.AccessDeniedException;
 })
 class JobOrderItemProductionServiceTest {
 
-  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
-
   private static final long LINE_VERSION = 3L;
   private static final long INVENTORY_VERSION = 7L;
   private static final UUID BOOK_IN_LOCATION_ID = UUID.randomUUID();
@@ -127,7 +125,7 @@ class JobOrderItemProductionServiceTest {
         new JobOrderItemProductionService(
             jobOrderRepository,
             org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
-            responsibilityGuard,
+            org.mockito.Mockito.mock(JobOrderAccessPolicy.class),
             new InventoryStockCommands(
                 new InventoryOrderWrites(
                     inventoryItemRepository,

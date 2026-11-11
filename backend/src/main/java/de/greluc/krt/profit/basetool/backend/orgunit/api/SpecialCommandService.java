@@ -155,10 +155,11 @@ public class SpecialCommandService {
     profitHierarchy.lockForHierarchyChange();
     SpecialCommand sc = getSpecialCommandById(id);
     boolean wasActive = sc.isActive();
+    final ProfitHierarchySnapshot previousEligibility = profitHierarchy.snapshot();
     sc.setActive(false);
     orgStructureAuditor.activeChanged(specialCommandRepository.save(sc), wasActive);
     specialCommandRepository.flush();
-    eligibilityMaintenance.eligibilityChanged(sc);
+    eligibilityMaintenance.eligibilityChanged(sc, previousEligibility);
   }
 
   /**
@@ -172,9 +173,10 @@ public class SpecialCommandService {
     profitHierarchy.lockForHierarchyChange();
     SpecialCommand sc = getSpecialCommandById(id);
     boolean wasActive = sc.isActive();
+    final ProfitHierarchySnapshot previousEligibility = profitHierarchy.snapshot();
     sc.setActive(true);
     orgStructureAuditor.activeChanged(specialCommandRepository.save(sc), wasActive);
     specialCommandRepository.flush();
-    eligibilityMaintenance.eligibilityChanged(sc);
+    eligibilityMaintenance.eligibilityChanged(sc, previousEligibility);
   }
 }

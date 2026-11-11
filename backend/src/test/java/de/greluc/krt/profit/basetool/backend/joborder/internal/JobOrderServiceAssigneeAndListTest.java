@@ -182,7 +182,6 @@ class JobOrderServiceAssigneeAndListTest {
             null,
             null,
             null,
-            null,
             effects,
             materialClaimService,
             auditService,
@@ -190,7 +189,6 @@ class JobOrderServiceAssigneeAndListTest {
             new JobOrderItemReconciliation(jobOrderItemService),
             jobOrderStockProjectionService,
             null,
-            actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
@@ -208,7 +206,8 @@ class JobOrderServiceAssigneeAndListTest {
                         .class)),
             liveSyncPublisher,
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class));
+                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            org.mockito.Mockito.mock(JobOrderParticipationCommands.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     queryService =
         new JobOrderQueryService(
@@ -260,7 +259,11 @@ class JobOrderServiceAssigneeAndListTest {
               false,
               false,
               null,
-              false);
+              false,
+              false,
+              false,
+              0L,
+              0L);
         });
     lenient().when(orderLinkedStockRows.materialStockOfOrders(any())).thenReturn(List.of());
     lenient().when(materialClaimService.getClaimBucketsForOrders(any())).thenReturn(Map.of());
@@ -1202,7 +1205,11 @@ class JobOrderServiceAssigneeAndListTest {
         false,
         false,
         null,
-        false);
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   private Squadron processingUnit() {

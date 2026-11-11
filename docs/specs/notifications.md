@@ -40,8 +40,9 @@ is the notification-engine view of it; the linked requirement is canonical.
 
 | Event (`NotificationEventType`) | Notification type(s) raised | Seed | Recipients (selectors) | Requirement |
 |---|---|---|---|---|
-| `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` + `ROLE` ADMIN | REQ-NOTIF-008 |
-| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 | `ORG_RELATIVE_ROLE` OFFICER / LEAD on `RESPONSIBLE` | REQ-NOTIF-017 |
+| `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 + V384 | `ORG_RELATIVE_ROLE` `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-008 |
+| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 + V384 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-017 |
+| `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | V384 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` after a meaningful edit | REQ-NOTIF-017 |
 | `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 · V360 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; the approval notice outranks the generic one | REQ-NOTIF-011/-033, [REQ-BANK-026](bank.md) |
 | `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
 | `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
@@ -51,7 +52,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `BANK_BOOKING_REQUEST_CREATED` (reconcile, `BankBookingRequestNoticesReconciledEvent`) | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 | the rules of `…_CREATED`, applied only to the members who became or stopped being responsible holders of the request's account | REQ-NOTIF-023/-033, [REQ-BANK-034](bank.md) |
 | `DISCORD_REGISTRATION_PENDING` | `DISCORD_REGISTRATION_PENDING` | V174 | `ROLE` ADMIN (`exclude_actor = false`) | REQ-NOTIF-012 ([discord-integration.md](discord-integration.md)) |
 | `DISCORD_REGISTRATION_DECIDED` | none (no rule) | — | supersedes `DISCORD_REGISTRATION_PENDING` only (approve, reject, deletion while pending) | REQ-NOTIF-012, REQ-NOTIF-018 |
-| `JOB_ORDER_CLOSED` | none (no rule) | — | supersedes `JOB_ORDER_CREATED` and `JOB_ORDER_UPDATED_BY_REQUESTER` only (completed, rejected, deleted) | REQ-NOTIF-008, REQ-NOTIF-018 |
+| `JOB_ORDER_CLOSED` | none (no rule) | — | Retires outstanding processing and clarification prompts after completion, rejection, cancellation or deletion | REQ-NOTIF-008, REQ-NOTIF-018 |
 | `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | `MATERIAL_EXCHANGE_INTEREST_REGISTERED` | V211 | `EVENT_RECIPIENT` (offer owner) | REQ-NOTIF-016, [REQ-MARKET-011](materialboerse.md) |
 | `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | `MATERIAL_REQUEST_FULFILLMENT_SIGNALLED` | V225 | `EVENT_RECIPIENT` (requester) | [REQ-MARKET-020](materialboerse.md) |
 | `ACCOUNT_DELETION_REQUESTED` | `ACCOUNT_DELETION_REQUESTED` | V243 | `ROLE` ADMIN (`exclude_actor = false`) | [REQ-SEC-061](security-and-access.md) |
@@ -77,11 +78,16 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `OPERATION_PAYOUT_UNMARKED` | none (no rule) | — | supersedes that participant's `OPERATION_PAYOUT_PAID_OUT` | REQ-MISSION-028 |
 | `OPERATION_COMPLETED` | `OPERATION_COMPLETED` | V273 | `ORG_RELATIVE_ROLE` `MISSION_MANAGER` and `OFFICER` on `RESPONSIBLE` | REQ-MISSION-029 |
 | `OPERATION_COMPLETED_UNOWNED` | `OPERATION_COMPLETED` | V273 | `ROLE` `OFFICER` (an operation without an owning unit) | REQ-MISSION-029 |
-| `JOB_ORDER_REASSIGNED` | `JOB_ORDER_REASSIGNED` | V274 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` (the new unit); supersedes `JOB_ORDER_CREATED`, `…_UPDATED_BY_REQUESTER` and itself | REQ-ORDERS-041 |
-| `JOB_ORDER_FINISHED` | `JOB_ORDER_FINISHED` | V274 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `REQUESTING`; the status word is the coded parameter `statusCode` | REQ-ORDERS-042 |
+| `JOB_ORDER_REASSIGNED` | `JOB_ORDER_REASSIGNED` | V274 + V384 | `UNIT_WRITER` for the former and new responsible units and the requesting unit; retires obsolete processing and clarification prompts | REQ-ORDERS-041 |
+| `JOB_ORDER_FINISHED` | `JOB_ORDER_FINISHED` | V274 + V384 | Current requesting/responsible unit writers and active assigned accounts; coded `statusCode` includes cancellation | REQ-ORDERS-042 |
+| `JOB_ORDER_REOPENED` | `JOB_ORDER_REOPENED` | V384 | Current requesting/responsible unit writers and active assigned accounts | REQ-ORDERS-042 |
+| `JOB_ORDER_CLARIFICATION_REQUIRED` | `JOB_ORDER_CLARIFICATION_REQUIRED` | V384 | Current requesting/responsible unit writers and assigned accounts when the existing responsibility loses eligibility | REQ-ORDERS-042, REQ-ORDERS-055 |
+| `JOB_ORDER_CLARIFICATION_RESOLVED` | none (no rule) | — | Retires the outstanding clarification prompt when eligibility is restored | REQ-ORDERS-042 |
+| `JOB_ORDER_PARTICIPATION_CHANGED` | `JOB_ORDER_PARTICIPATION_CHANGED` | V384 | `EVENT_RECIPIENTS` for the affected Staffel and responsible unit writers; coded `supportCode` | REQ-ORDERS-044 |
 | `JOB_ORDER_ASSIGNEE_ADDED` | `JOB_ORDER_ASSIGNED` | V274 | `EVENT_RECIPIENT` (the assignee); clears a removal | REQ-ORDERS-043 |
 | `JOB_ORDER_ASSIGNEE_REMOVED` | none (no rule) | — | supersedes that member's `JOB_ORDER_ASSIGNED` (REQ-NOTIF-025) | REQ-ORDERS-043 |
-| `JOB_ORDER_CLAIM_WITHDRAWN` | `JOB_ORDER_CLAIM_WITHDRAWN` | V274 | `EVENT_RECIPIENT` (the member who made the claim); coded reason `reasonCode` | REQ-ORDERS-044 |
+| `JOB_ORDER_CLAIM_WITHDRAWN` | `JOB_ORDER_CLAIM_WITHDRAWN` | V274 + V376 | `EVENT_RECIPIENTS` for current affected Staffel and responsible writers; coded `reasonCode` | REQ-ORDERS-044 |
+| `JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED` | `JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED` | V381 | `EVENT_RECIPIENTS` for current affected Staffel and responsible writers in one order revision | REQ-ORDERS-044 |
 | `REFINERY_ORDER_READY` | `REFINERY_ORDER_READY` | V276 | `EVENT_RECIPIENT` (the owner); raised once by the `refinery_ready` timed producer | REQ-REFINERY-023 |
 | `REFINERY_ORDER_READY_CLEARED` | none (no rule) | — | supersedes the order's `REFINERY_ORDER_READY` | REQ-REFINERY-023 |
 | `REFINERY_ORDER_CHANGED_BY_OTHER` | `REFINERY_ORDER_CHANGED_BY_OTHER` | V276 | `EVENT_RECIPIENT` (the owner, or the member the yield was booked onto); coded `changeCode` | REQ-REFINERY-024 |
@@ -333,37 +339,33 @@ its nonidentifying once-only evidence is independent of Inbox retention. Notific
 and fan-out remain asynchronous after the business commit, without a new durable messaging
 workflow. A genuine later business revision has a different cause identity. ADR-0245 owns this
 technical contract; the full Bank/order journey remains subject to its separate implementation.
-### REQ-NOTIF-008 — UC1: notify on job-order creation
+### REQ-NOTIF-008 - UC1: notify on job-order creation
 
-> **Approved planned JobOrder amendment (not implemented):** Replace the global-Admin creation default with actually affected responsible/requesting unit writers under [the approved shared JobOrder contract](orders-core.md). A global Admin role alone is not an order-notice audience; an affected functional role may still qualify. This is an approved future change to the seeded default, not current runtime behavior.
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+The seeded creation rule addresses current functional writers of the responsible and requesting
+units under [the shared JobOrder contract](orders-core.md). The `UNIT_WRITER` selector resolves
+current leadership reach and contextual Logistician grants through the org-unit directory. A
+global Admin receives the default notice only through an affected functional relationship.
+The rule excludes the creating actor and stays admin-editable and deletable.
 
-When a job order is created, the seeded default rule resolves recipients from the **responsible
-org unit**: officers (the seat holders directly in that unit, `OrgRelativeRole.OFFICER`), leads
-(`org_unit_membership.role = SK_LEAD`), logisticians (`org_unit_membership.is_logistician`), plus the
-global admins (`ROLE` `ADMIN`). The creating actor is excluded. The seeded rule is
-admin-editable and -deletable. Officer-ness is the membership rank, read live from
-`org_unit_membership`; a newly appointed seat holder is a recipient at once.
+V384 upgrades the original selector set in place. Custom audiences, descriptions and enabled
+settings are retained. One creation cause can reach a writer of both sides once.
 
-The notice leaves the inbox when the order closes: completing it (status change or the last
-handover), rejecting it or deleting it publishes `JOB_ORDER_CLOSED`, which supersedes the order's
-`JOB_ORDER_CREATED` and `JOB_ORDER_UPDATED_BY_REQUESTER` notices (REQ-NOTIF-018).
+The notice leaves the Inbox when the order closes or responsibility moves. The cleanup runs with
+the resulting order cause and preserves business history (REQ-NOTIF-018).
 
 **Acceptance**
 
-- [x] Creating a job order publishes `JobOrderCreatedEvent` after commit.
-- [x] The seeded rule (V156, id `62200000-0000-0000-0000-000000000001`) has the four UC1
-  selectors and `exclude_actor = true`.
-- [x] Completing, rejecting or deleting the order publishes `JobOrderClosedEvent`; reopening it or
-  moving it between two closed states does not.
+- [ ] The order creation notice reaches each affected current writer once, including an overlapping
+  writer, and excludes the creating actor and unrelated global administrators.
+- [ ] A closure or transfer retires the outstanding creation prompt.
+- [ ] The stock seed uses both unit contexts under `UNIT_WRITER` and retains its actor exclusion.
 
-**Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`,
-`JobOrderServiceTest`, `JobOrderServicePriorityAndStatusTest` · **Code:**
+**Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `NotificationRuleEngineIntegrationTest`,
+`JobOrderNoticeIntegrationTest`, `JobOrderServicePriorityAndStatusTest` · **Code:**
 `joborder/internal/JobOrderService#publishJobOrderCreated`,
-`joborder/internal/JobOrderService#publishJobOrderClosed`,
-`joborder/api/events/JobOrderCreatedEvent`, `joborder/api/events/JobOrderClosedEvent`,
-`notification/internal/RecipientResolutionService`
+`joborder/api/events/JobOrderCreatedEvent`, `joborder/internal/JobOrderChangeEffects`,
+`notification/internal/RecipientResolutionService`,
+`V384__seed_shared_order_notification_audiences.sql`
 
 ### REQ-NOTIF-009 — Retention
 
@@ -756,43 +758,37 @@ records the notification-engine consumer.
 `notification/api/NotificationType`,
 `db/migration/V211__seed_material_exchange_interest_notification_rule.sql` · **Issues:** #1187
 
-### REQ-NOTIF-017 — UC5: notify the processing unit on a requester edit
+### REQ-NOTIF-017 - Current unit writers hear about need changes
 
-> **Approved planned JobOrder amendment (not implemented):** Apply the agreed actual-effect audiences and grouping to requester need changes across all order kinds, including derived material-promise reductions. Do not retain a narrower legacy selector or notify all Profit readers. See [the approved shared JobOrder contract](orders-core.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+When the requesting side edits its order under REQ-ORDERS-023, `JOB_ORDER_UPDATED_BY_REQUESTER`
+identifies the affected responsible and requesting units. V384 upgrades the stock V214 default
+to current `UNIT_WRITER` audiences on both contexts. A meaningful responsible-side edit uses
+`JOB_ORDER_UPDATED_BY_RESPONSIBLE` with the same contextual audiences and its own preference.
+Both defaults exclude the editor. The message identifies the order and its unit context using
+bounded rendering facts.
 
-When the requesting owner (Auftraggeber) edits one of their own job orders (REQ-ORDERS-023 — change
-quantities, add/remove not-yet-delivered items or materials, edit the comment), the processing
-(responsible) org unit's **officers and leads** are notified through the engine (#1186). A
-`JOB_ORDER_UPDATED_BY_REQUESTER` event carries the responsible org unit as its `RESPONSIBLE` context
-and is mapped by a seeded default rule (V214) to a same-named notification with two `ORG_RELATIVE_ROLE`
-selectors (`OFFICER` + `LEAD`, both against `RESPONSIBLE`). Unlike the job-order-created rule (UC1,
-V156) it deliberately omits the LOGISTICIAN and global-ADMIN recipients — the issue scopes it to
-officers and leads — but stays admin-editable at runtime. The editing member is excluded
-(`exclude_actor = TRUE`; moot because recipients resolve from the responsible unit while the actor is
-in the requesting unit). The message names the requesting org unit (`{requester}` = its shorthand),
-never the editing member's personal name (no PII in params).
+An edit and its derived material effects share one cause. Current writers of an affected Staffel
+receive the eligible specific material outcome first. A writer reached through responsible
+coordination alone receives the eligible requester-edit notice first. For a responsible-side
+revision, the eligible material notice takes precedence. Rule evaluation and muting apply to each
+original type before the cause chooses one notice per recipient.
 
 **Acceptance**
 
-- [x] A requester edit (after commit) notifies the responsible unit's officers + leads, excluding the
-  actor (`JobOrderServiceTest`, `RuleEvaluationServiceTest`).
-- [x] The new event/notification types need no schema migration (open enums; the seed rule is V214
-  data).
-- [x] The notification renders via `notifications.type.JOB_ORDER_UPDATED_BY_REQUESTER` (DE + EN + base
-  bundles, named placeholders `{displayId}`/`{orgUnit}`/`{requester}`).
+- [ ] Requester and meaningful responsible-side need changes reach both affected current unit
+  audiences once and exclude the editor.
+- [ ] An identical responsible-side save raises no update notice.
+- [ ] Derived material changes preserve original preferences and receive one grouped delivery.
 
-**Enforced by:** `JobOrderServiceTest`, `MessageBundleConsistencyTest` · **Code:**
-`joborder/api/events/JobOrderUpdatedByRequesterEvent`, `joborder/internal/JobOrderService#updatedByRequesterEvent` (published by `JobOrderEditor`),
-`notification/api/NotificationEventType`, `notification/api/NotificationType`,
-`db/migration/V214__seed_job_order_requester_update_notification_rule.sql` · **Issues:** #1186
+**Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `MaterialContributionEffectsIntegrationTest`,
+`MessageBundleConsistencyTest` · **Code:** `joborder/api/events/JobOrderUpdatedByRequesterEvent`,
+`joborder/internal/JobOrderLifecycleNotices`, `joborder/internal/JobOrderChangeEffects`,
+`V384__seed_shared_order_notification_audiences.sql`
 
 ### REQ-NOTIF-018 — Superseding: clear stale "action needed" notifications on lifecycle close
 
-> **Approved planned JobOrder amendment (not implemented):** Retire or replace obsolete JobOrder action hints after decisions and responsibility changes while preserving the separate business history. A bank decision must not duplicate an order-success notice for the same recipient/cause; distinct required bank tasks remain. See [the approved shared JobOrder contract](orders-core.md) and [the approved optional-bank contract](orders-auec-bank.md).
->
-> The existing paragraphs and verification references below describe the current implementation baseline.
+Linked Bank decisions follow the [optional Bank contract](orders-auec-bank.md), including one
+outcome per recipient and cause and separate required approval tasks.
 
 An event may declare, via `NotificationEvent.resolvesNotificationTypes()`, notification **types it
 marks obsolete for its own entity**. When such an event is processed, the creation pipeline
@@ -838,10 +834,13 @@ registration is deleted (`UserDeletionService#deleteUser`, which also covers lin
 existing account). Merging an older account into a pending registration decides nothing — the
 registration stays pending — and clears nothing.
 
-**Fourth wired use case:** the job order (REQ-NOTIF-008, REQ-NOTIF-017). The notify-nobody
-`JOB_ORDER_CLOSED` resolves `JOB_ORDER_CREATED` and `JOB_ORDER_UPDATED_BY_REQUESTER`; it is published
-when an order becomes `COMPLETED` or `REJECTED` (by status change or by the last handover) and when it
-is deleted, so no inbox keeps an order that is settled or a link that leads nowhere.
+**JobOrder processing prompts.** Closing, transferring or invalidating responsibility retires the
+superseded prompts for that order. Restoring eligibility clears the clarification prompt. The
+owning guard checks current responsibility and applicable scoped revisions under the hierarchy and
+order locks before grouped delivery applies each actionable event's notice or cleanup. An event
+superseded by a lifecycle or responsibility transition cannot recreate its earlier prompt or
+remove the current transition's prompt. Historical outcomes and material facts in the same cause
+retain their independent delivery policies.
 
 **Acceptance**
 
@@ -850,9 +849,8 @@ is deleted, so no inbox keeps an order that is settled or a link that leads nowh
   across all recipients, and only those (other types and other entities are untouched).
 - [x] One admin's decision on a registration, or its deletion while pending, clears every admin's
   `DISCORD_REGISTRATION_PENDING` item for it.
-- [x] Completing, rejecting or deleting a job order clears its `JOB_ORDER_CREATED` and
-  `JOB_ORDER_UPDATED_BY_REQUESTER` items; a move between two closed states or back to open clears
-  nothing.
+- [ ] Completing, rejecting, cancelling or deleting a job order clears its outstanding processing
+  prompts. A delayed creation cause leaves the cancelled order's informational outcome intact.
 - [x] The affected staff are included in the pushed recipient set so their badge/dropdown refresh
   live; the removal runs even when the event resolves no new recipients (cancel).
 - [x] Adding the `BANK_BOOKING_REQUEST_CANCELLED` event type and the `resolvesNotificationTypes()`
@@ -861,7 +859,8 @@ is deleted, so no inbox keeps an order that is settled or a link that leads nowh
 **Enforced by:** `NotificationCreationServiceTest`, `NotificationRepositoryIntegrationTest`,
 `BankBookingRequestServiceTest` · **Code:** `notification/api/events/NotificationEvent#resolvesNotificationTypes`,
 `bank/api/events/BankBookingRequest{Confirmed,Rejected,Cancelled}Event`,
-`notification/internal/NotificationCreationService#removeSupersededNotifications`,
+`notification/internal/NotificationEventPreparation#removeObsolete`,
+`joborder/internal/JobOrderActionNoticeGuard`,
 `notification/api/NotificationRepository#{findRecipientUserIdsByTypeInAndEntity,deleteByTypeInAndEntity}`,
 `bank/internal/BankBookingRequestService#cancelOwn`, `privacy/api/events/AccountDeletionRequest{Declined,Resolved}Event`,
 `identity/api/events/DiscordRegistrationDecidedEvent`, `joborder/api/events/JobOrderClosedEvent`,

@@ -56,7 +56,11 @@ public record JobOrderDto(
     boolean responsibilityInvalid,
     boolean originalProfitBoundaryUnknown,
     Boolean canTransferResponsibility,
-    Boolean canEditAsRequester) {
+    Boolean canEditAsRequester,
+    Boolean canCancel,
+    Boolean canReopen,
+    Long lifecycleVersion,
+    Long responsibilityVersion) {
 
   /**
    * Whether the backend lets the caller edit this order: its {@code canEdit} row flag, which is
@@ -66,6 +70,15 @@ public record JobOrderDto(
    */
   public boolean callerMayEdit() {
     return !responsibilityInvalid && Boolean.TRUE.equals(canEdit);
+  }
+
+  /**
+   * Whether the caller can use the processing editor before the first item handover.
+   *
+   * @return true when processing authority and the handover bound both allow the edit
+   */
+  public boolean callerMayUseItemProcessingEditor() {
+    return callerMayEdit() && (itemHandovers == null || itemHandovers.isEmpty());
   }
 
   /**

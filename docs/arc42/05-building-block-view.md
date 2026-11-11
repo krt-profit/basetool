@@ -1,6 +1,6 @@
 # 5. Building block view
 
-> **JobOrder implementation scope:** Actual Profit hierarchy and shared MATERIAL/ITEM reading use the existing modules. Material contribution coordination is mapped below; its verification status belongs to [REQ-ORDERS-024](../specs/orders-material-claims.md). The remaining [shared writer/lifecycle contract](../specs/orders-core.md), [money operations](../specs/orders-auec.md) and [optional bank adapter](../specs/orders-auec-bank.md) remain planned. The implemented configuration-owned fee policy (`admin.api.TransferFeePolicy`, ADR-0358) is their prerequisite; no new service or module cycle is introduced.
+> **JobOrder implementation scope:** Actual Profit hierarchy and shared MATERIAL/ITEM reading use the existing modules. Material contribution coordination is mapped below; its verification status belongs to [REQ-ORDERS-024](../specs/orders-material-claims.md). Shared writer and lifecycle operations run through the existing order workspace. [Money operations](../specs/orders-auec.md) and the [optional bank adapter](../specs/orders-auec-bank.md) remain planned. The implemented configuration-owned fee policy (`admin.api.TransferFeePolicy`, ADR-0358) is their prerequisite; no new service or module cycle is introduced.
 
 ## 5.1 Level 1 — the whitebox of the whole system
 
@@ -155,7 +155,7 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | `purchasing` | the deal, tranche, delivery, partner, risk-class and pause vocabulary, `PurchasingProblemCode` and its exception, and the notices | the settings, delegate, partner, pause, deal, tranche, delivery, settlement, state and report services, `PurchasingAccessPolicy`, `PurchasingDealAssembler`, the nine entities and their repositories, the bank and need observers, `SettlementOverdueNoticeProducer`, `PurchasingBusinessGauges` and the export, merge and person-search participants | the deal, partner, delegate, report, state and admin controllers under `/api/v1/purchasing` |
 | `materialexchange` | the two after-commit events | the offer and request entities, repositories and DTOs, the board services, `MaterialExchangeOfferRatchet` (the Lager's `StockChangeObserver`) and `MaterialExchangeStockOfferLookup` (its `StockOfferLookup`) | `MaterialExchangeController`, `MaterialRequestController` |
 | `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (create, update and cancel), `RefineryOrderQueryService` (the reads, also the blueprint craftability's `CraftabilityYieldSource`), `RefineryOrderStoreService` (completion), `RefineryImportService`, `RefineryAccessPolicy`, the import settings and the store requests, `RefineryMissionFinance` (the mission's `MissionFinanceContributor`), `MissionRefineryOrderRelease` (the mission's `MissionDeletionObserver`) and `RefineryOrderMissionCache` (the per-transaction memo behind `mapper.RefineryOrderMissionLookup`) | `RefineryOrderController`, `RefineryImportController` |
-| `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderEditor` (common order edits, ADR-0287), material promise/provision coordination and authorized provision-choice projection ([REQ-ORDERS-024](../specs/orders-material-claims.md)), `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the integrity task, its own repositories and the request DTOs | `JobOrderController`, `JobOrderHandoverController`, `JobOrderMaterialController`, `MaterialClaimController`, `MaterialContributionController`, `MaterialCollectionController`, `JobOrderItemStockController` |
+| `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderEditor` (common order edits, ADR-0287), material promise/provision coordination and authorized provision-choice projection ([REQ-ORDERS-024](../specs/orders-material-claims.md)), `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the integrity task, its own repositories and the request DTOs | `JobOrderController`, `JobOrderHandoverController`, `JobOrderMaterialController`, `JobOrderSupportController`, `MaterialClaimController`, `MaterialContributionController`, `MaterialCollectionController`, `JobOrderItemStockController` |
 | `mission` | `MissionCommands` (`detachFromOperation`), the read SPI `OperationSummaryProvider` (the operation module implements it), `MissionFinanceContributor` and `MissionDeletionObserver` (the refinery module implements them), `MissionReferences` (the refinery reads a mission's reference through it) | the mission, structure, participant, timeline and finance services, `MissionEditor` (the edit module every timeline, roster and structure edit runs through, ADR-0287), `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, `MissionOperationSummaryCache` (the per-transaction memo behind `mapper.MissionOperationLookup`), its own repositories and the request DTOs | `MissionController` (calls the mission, timeline, participant and structure services for their sections, ADR-0286), `MissionFinanceEntryController` |
 | `leadership` | — (publishes nothing) | `LeitungViewService` and the Leitung DTOs (ADR-0331) | `LeitungController` (`/api/v1/leadership`) |
 
@@ -314,7 +314,8 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `audit.api.ActorHandleResolver` | the actor handle an audit row snapshots | identity (`UserActorHandleResolver`) |
 | `audit.api.RetentionParticipant` | the audit trails outside the audit module that the retention run also purges, after the activity domains | bank (`BankAuditService`) |
 | `notification.api.RoleRecipientDirectory` | global-role holders, role holders within an org unit, the catalogue spelling of a role code | identity (`UserRoleRecipientDirectory`) |
-| `notification.api.OrgUnitRecipientDirectory` | the Lead, Logistician and Mission Manager flags of an org unit | orgunit (`OrgUnitMembershipRecipientDirectory`) |
+| `notification.api.OrgUnitRecipientDirectory` | org-unit appointments, leadership and current functional writers | orgunit (`OrgUnitMembershipRecipientDirectory`) |
+| `notification.api.NotificationCauseGuard` | whether an actionable event and its cleanup still apply before grouped Inbox delivery ([ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)) | joborder (`JobOrderActionNoticeGuard`) |
 | `notification.api.AccountRecipientDirectory` | grant holders and responsible holders of a bank account | bank, org-unit side (`OrgUnitBankRecipientDirectory`) |
 | `platform.api.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
 | `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
@@ -543,12 +544,13 @@ editing rights. [REQ-ORDERS-050/-053/-055](../specs/orders-core.md) and
 
 `joborder.internal.JobOrderEligibilityStartup` performs the initial pre-readiness reconciliation in
 bounded order-ID/claim pages through the same audited maintenance. Order projections expose distinct
-processing, requester-edit and recovery decisions through `JobOrderAuthority`; requester delivery
-restrictions are loaded in a batch.
+processing, requester-edit, fulfillment and recovery decisions through `JobOrderAuthority`. The
+editor checks the current action authority under the order's write locks. Lifecycle and
+responsibility have separate observed versions.
 
-The claim service separately projects writable claiming-Staffel options through a concrete-order
-read. This keeps existing own-Staffel claim authority distinct from responsible-side processing;
-the frontend renders its claim controls from those options and reuses the ordinary claim writes.
+The participation service and claim commands share the same order/Staffel enrollment. The workspace
+projects the eligible participation and claim choices for each action. Remaining-need edits retain
+line identities and booked delivery or manufacture.
 
 Material contribution coordination keeps the domain direction unchanged. Inventory owns physical
 quantity provenance, `StockQuantityCorrections` and `OrderLinkedStockWriteObserver`; JobOrder

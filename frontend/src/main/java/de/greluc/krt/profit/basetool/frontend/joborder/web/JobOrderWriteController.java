@@ -46,7 +46,6 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBluep
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
@@ -103,9 +102,6 @@ public class JobOrderWriteController {
 
   /** Sends every job-order mutation and its follow-up reads to the backend. */
   private final JobOrderBackendClient jobOrderClient;
-
-  /** Answers the pin-aware Logistician capability of the active context. */
-  private final LogisticianGate logisticianGate;
 
   /**
    * Shared redirect/flash-toast helper backing the classic (non-AJAX) priority and delete
@@ -231,8 +227,7 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Persists an edit to an item order's lines and metadata via {@code PUT
-   * /api/v1/orders/{id}/items}.
+   * Persists the item lines and metadata permitted by the caller's selected edit mode.
    *
    * @param id the item-order id
    * @param form the bound item-order form (lines rebuilt client-side)
@@ -241,7 +236,6 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/items/update")
-  @PreAuthorize("@logisticianGate.isGranted()")
   public String updateItemOrder(
       @PathVariable UUID id,
       @ModelAttribute("jobOrderItemForm") JobOrderItemForm form,
@@ -254,15 +248,7 @@ public class JobOrderWriteController {
         return "redirect:/orders/" + id + "/items/edit";
       }
 
-      CreateJobOrderItemRequestDto dto =
-          new CreateJobOrderItemRequestDto(
-              null,
-              form.getRequestingOrgUnitId(),
-              form.getHandle(),
-              form.getComment(),
-              lines,
-              form.getVersion());
-      jobOrderClient.updateItemOrder(id, dto);
+      persistItemEdit(id, form, lines);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
     } catch (Exception e) {
@@ -281,7 +267,6 @@ public class JobOrderWriteController {
    * @return {@code {targetUrl}} on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/items/update", headers = "X-Requested-With=XMLHttpRequest")
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updateItemOrderAjax(
       @PathVariable UUID id, @ModelAttribute("jobOrderItemForm") JobOrderItemForm form) {
@@ -293,17 +278,41 @@ public class JobOrderWriteController {
         log,
         "update item order " + id + " (ajax)",
         () -> {
-          CreateJobOrderItemRequestDto dto =
-              new CreateJobOrderItemRequestDto(
-                  null,
-                  form.getRequestingOrgUnitId(),
-                  form.getHandle(),
-                  form.getComment(),
-                  lines,
-                  form.getVersion());
-          jobOrderClient.updateItemOrder(id, dto);
+          persistItemEdit(id, form, lines);
           return ResponseEntity.ok(Map.of("targetUrl", "/orders/" + id));
         });
+  }
+
+  private void persistItemEdit(
+      @NotNull UUID id,
+      @NotNull JobOrderItemForm form,
+      @NotNull List<CreateJobOrderItemLineDto> lines) {
+    boolean requester = form.isRequesterEdit();
+    CreateJobOrderItemRequestDto dto =
+        new CreateJobOrderItemRequestDto(
+            null,
+            requester ? null : form.getRequestingOrgUnitId(),
+            requester ? null : form.getHandle(),
+            form.getComment(),
+            lines,
+            form.getVersion());
+    if (requester) {
+      jobOrderClient.updateItemOrderAsRequester(id, dto);
+    } else {
+      jobOrderClient.updateItemOrder(id, dto);
+    }
+    liveSyncLocalBus.publish("orders", List.of("queue", "demand"));
+    liveSyncLocalBus.publish(
+        "order:" + id,
+        List.of(
+            "header",
+            "actions",
+            "items",
+            "aggregated",
+            "kpi",
+            "blueprint-owners",
+            "dialogs",
+            "item-handover-lines"));
   }
 
   /**
@@ -445,7 +454,6 @@ public class JobOrderWriteController {
    * @return the updated order on success, or the propagated RFC 7807 backend error
    */
   @PutMapping("/{id}/priority/ajax")
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updatePriorityAjax(
       @PathVariable UUID id, @RequestParam Integer priority) {
@@ -459,11 +467,11 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX status transition endpoint. Updates the job order's status (OPEN → IN_PROGRESS →
-   * COMPLETED, REJECTED). Backend enforces the state machine and rejects illegal transitions with a
-   * 400.
+   * Relays a status transition with its observed lifecycle version.
    *
-   * @return updated order on success, propagated backend status code on failure
+   * @param id the order
+   * @param dto the requested status and lifecycle version
+   * @return the updated order or the backend refusal
    */
   @PostMapping("/{id}/status")
   @ResponseBody
@@ -487,7 +495,6 @@ public class JobOrderWriteController {
    * @return the updated order on success, or the propagated backend error status
    */
   @PostMapping("/{id}/blueprint-variant-counting")
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updateBlueprintVariantCounting(
       @PathVariable UUID id, @RequestBody UpdateJobOrderBlueprintCountingDto dto) {
@@ -510,7 +517,6 @@ public class JobOrderWriteController {
    *     a surviving claim race)
    */
   @PostMapping("/{id}/claims")
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> upsertClaim(
       @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
@@ -532,7 +538,6 @@ public class JobOrderWriteController {
    * @return 204 on success, or the propagated backend error status
    */
   @PostMapping("/{id}/claims/{claimId}/withdraw")
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> withdrawClaim(
       @PathVariable UUID id,
@@ -548,15 +553,12 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Persists an edit to the order's metadata (note, target inventory location, materials list).
-   * Restricted to logisticians at the controller boundary; backend additionally enforces a
-   * fine-grained role check on the {@code @PreAuthorize}-annotated service method.
+   * Relays a material order's metadata and demand under current responsible-unit authority.
    *
    * @return redirect to the order detail page
    */
   @NotNull
   @PostMapping("/{id}/update")
-  @PreAuthorize("@logisticianGate.isGranted()")
   public String updateOrder(
       @PathVariable UUID id,
       @ModelAttribute("jobOrderForm") JobOrderForm form,
@@ -604,7 +606,6 @@ public class JobOrderWriteController {
    * @return the updated order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/update", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> updateOrderAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderForm form) {
@@ -772,7 +773,6 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/handovers")
-  @PreAuthorize("@logisticianGate.isGranted()")
   public String createHandover(
       @PathVariable UUID id,
       @ModelAttribute("handoverForm") JobOrderHandoverForm form,
@@ -848,7 +848,6 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/item-handovers")
-  @PreAuthorize("@logisticianGate.isGranted()")
   public String createItemHandover(
       @PathVariable UUID id,
       @ModelAttribute("itemHandoverForm") JobOrderItemHandoverForm form,
@@ -938,7 +937,6 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/handovers", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> createHandoverAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderHandoverForm form) {
@@ -983,7 +981,6 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @PostMapping(value = "/{id}/item-handovers", consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> createItemHandoverAjax(
       @PathVariable UUID id, @NotNull @RequestBody JobOrderItemHandoverForm form) {
@@ -1021,7 +1018,6 @@ public class JobOrderWriteController {
   @PostMapping(
       value = "/{id}/items/{itemId}/production",
       consumes = MediaType.APPLICATION_JSON_VALUE)
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> bookProductionAjax(
       @PathVariable UUID id,
@@ -1046,13 +1042,15 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/materials/unlink")
-  @PreAuthorize("@logisticianGate.isGranted()")
   public String unlinkMaterial(
       @PathVariable UUID id, @RequestParam UUID materialId, RedirectAttributes redirectAttributes) {
     try {
       jobOrderClient.unlinkMaterial(id, materialId);
       redirectAttributes.addFlashAttribute("successToast", "orders.detail.material.unlink.success");
     } catch (BackendServiceException bse) {
+      if (isBackendRefusal(bse)) {
+        throw bse;
+      }
       BackendErrorLogging.warn(log, "DELETE /api/v1/orders/{id}/materials/{materialId}", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.material.unlink.error");
     } catch (Exception e) {
@@ -1070,7 +1068,6 @@ public class JobOrderWriteController {
    */
   @NotNull
   @PostMapping("/{id}/inventory/{inventoryItemId}/unlink")
-  @PreAuthorize("@logisticianGate.isGranted()")
   public String unlinkInventoryItem(
       @PathVariable UUID id,
       @PathVariable UUID inventoryItemId,
@@ -1080,6 +1077,9 @@ public class JobOrderWriteController {
       redirectAttributes.addFlashAttribute(
           "successToast", "orders.detail.inventory.unlink.success");
     } catch (BackendServiceException bse) {
+      if (isBackendRefusal(bse)) {
+        throw bse;
+      }
       BackendErrorLogging.warn(
           log, "DELETE /api/v1/orders/{id}/allocations/{inventoryItemId}", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
@@ -1088,6 +1088,11 @@ public class JobOrderWriteController {
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
     }
     return "redirect:/orders/" + id;
+  }
+
+  private static boolean isBackendRefusal(@NotNull BackendServiceException failure) {
+    HttpStatus status = HttpStatus.resolve(failure.getStatusCode());
+    return status != null && status.is4xxClientError();
   }
 
   /**
@@ -1099,7 +1104,6 @@ public class JobOrderWriteController {
    * @return the refreshed order on success, or the propagated RFC 7807 backend error
    */
   @DeleteMapping("/{id}/inventory/{inventoryItemId}/unlink/ajax")
-  @PreAuthorize("@logisticianGate.isGranted()")
   @ResponseBody
   public ResponseEntity<Object> unlinkInventoryItemAjax(
       @PathVariable UUID id, @PathVariable UUID inventoryItemId) {
@@ -1221,7 +1225,7 @@ public class JobOrderWriteController {
       @NotNull Model model, OidcUser principal, JobOrderDto order) {
     model.addAttribute("order", order);
     model.addAttribute("currentUserId", getCurrentUserId(principal));
-    model.addAttribute("isLogistician", logisticianGate.isGranted() && order.callerMayEdit());
+    model.addAttribute("isLogistician", order.callerMayEdit());
     model.addAttribute("canManageAssignees", order.callerMayManageAssignees());
   }
 

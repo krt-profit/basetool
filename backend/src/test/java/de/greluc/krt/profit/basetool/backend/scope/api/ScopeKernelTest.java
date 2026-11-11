@@ -43,8 +43,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderResponsibilityGuard;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
@@ -104,8 +102,6 @@ class ScopeKernelTest {
   @Mock private SquadronRepository squadronRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
-  @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
@@ -229,8 +225,6 @@ class ScopeKernelTest {
             authHelper,
             jobOrderRepository,
             responsibilityGuard,
-            jobOrderHandoverRepository,
-            jobOrderItemHandoverRepository,
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.joborder.internal
                     .JobOrderUnitReadHistoryRepository.class),
@@ -950,7 +944,7 @@ class ScopeKernelTest {
     }
 
     @Test
-    void nonProfitRequesterWriter_canEditOwnUndeliveredOrder() {
+    void nonProfitRequesterWriter_canEditOwnOrder() {
       when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
@@ -961,20 +955,6 @@ class ScopeKernelTest {
 
       assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
       assertTrue(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
-    }
-
-    @Test
-    void requester_cannotEditOwnOrder_onceDelivered() {
-      when(responsibilityGuard.isValid(any())).thenReturn(true);
-      UUID orderId = UUID.randomUUID();
-      var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
-      order.setRequestingOrgUnit(squadronA);
-      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-      stubNonProfitMember();
-      stubLogisticianGrantIn(SQUADRON_A_ID);
-      when(jobOrderHandoverRepository.existsByJobOrderId(orderId)).thenReturn(true);
-
-      assertFalse(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
     }
 
     @Test

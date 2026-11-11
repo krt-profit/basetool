@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — hierarchy and MATERIAL/ITEM workspace implemented; remaining workflows accepted/planned. Last reviewed: 2026-11-09.
+> **Doc type:** Living spec — MATERIAL/ITEM shared workflow implemented. Last reviewed: 2026-11-09.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0356, ADR-0359, ADR-0360
 
 # Shared JobOrder model
@@ -10,7 +10,7 @@ organisation, participation, access and lifecycle contract. Accepted Wayfinder d
 [responsibility](https://github.com/krt-profit/basetool/issues/3193),
 [access](https://github.com/krt-profit/basetool/issues/3197) and
 [shared scope](https://github.com/krt-profit/basetool/issues/3200) replace conflicting legacy
-rules. The implemented hierarchy foundation is identified below; other shared workflows remain planned.
+rules. The material and item workflow is described below. Money operations follow the aUEC specs.
 
 Kind-specific homes remain [production](orders-item-production.md),
 [material promises](orders-material-claims.md), [money](orders-auec.md) and
@@ -33,20 +33,11 @@ navigation and invalid-hierarchy handling apply to all three kinds.
 
 ### REQ-ORDERS-050 — Responsibility follows the actual Profit hierarchy
 
-**Implemented foundation:** MATERIAL and ITEM resolve responsibility from the active designated
-Profit area and its active Staffel/SK children. Current writers of either proposed side may create;
-current responsible-unit writers may transfer directly, including recovery after hierarchy changes.
-Unknown legacy original boundaries remain unknown and do not alone invalidate current eligibility.
-Before application readiness, automatic maintenance ends existing ineligible active promises with
-retained quantities, attribution and history, normal audit records and grouped current-writer notices.
-It also runs atomically on later hierarchy changes; restarting does not repeat ended promises.
-The complete participation, common-view and aUEC workflows below remain separate implementation work.
-`JobOrderDto.canEdit` remains responsible-side processing authority in every projection;
-`canEditAsRequester` separately exposes the current requesting-unit writer and existing delivery
-freeze. The existing MATERIAL requester editor uses that explicit capability independently of
-redaction. The ITEM processing editor retains its responsible-side gate; completion of the shared
-requester write workflows belongs to the subsequent requester/lifecycle implementation. List
-projections resolve the requester delivery restriction in one bounded ID query.
+MATERIAL and ITEM use the designated Profit hierarchy for current responsibility. Current writers
+of either proposed unit can create an order. A valid transfer takes effect immediately and preserves
+observed unit relationships, booked work and the original Profit boundary when it is known.
+Responsibility, lifecycle, need, participation and personal note versions belong to their respective
+edits.
 
 The Kartell has exactly one Profit Bereich, identified by the organisational domain identity
 Department.PROFIT, not a display name or an independent eligibility flag. Enforce that there
@@ -71,7 +62,7 @@ not belong to Profit.
 `JobOrderHierarchyAuthorityIntegrationTest`, `ProfitHierarchyIntegrationTest`,
 `ProfitHierarchyWriteRaceIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
 `ProfitHierarchyNoticeIntegrationTest` and `V376ProfitHierarchyMigrationTest`.
-The complete shared participation and aUEC workflows remain pending.
+The aUEC workflow follows its own implementation slice.
 **Issues:** #3193, #3197, #3200
 
 ### REQ-ORDERS-051 — One Staffel participation carries support and promises
@@ -83,7 +74,8 @@ also enrolls it. There is no parallel helper registration. Multiple Staffeln may
 
 Responsible-unit writers may enroll/remove supporting Staffeln; writers of a supporting Staffel
 may enroll/remove their own Staffel and maintain its own promises. A responsible Staffel cannot
-also support itself. Making a supporter responsible removes it from the active support list while
+also support itself. Eligible Staffeln can enroll while the order is active. Withdrawal uses the
+observed participation version. Making a supporter responsible removes it from active support while
 preserving its contribution lines and history under its responsibility. This role transition is
 not a withdrawal of its contributions. The former responsible Staffel is not automatically enrolled
 as a supporter. Withdrawing support ends its open promises, preserving past contributions. REJECTED, COMPLETED and
@@ -95,7 +87,9 @@ CANCELLED end open promises; reopening does not revive them. Empty promises do n
 - [ ] A helper becoming responsible retains history without duplicate active roles.
 - [ ] Reopening or replenishing a former need does not revive ended promises.
 
-**Enforced by:** Pending implementation · **Issues:** #3193, #3200, #3207
+**Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest` and `MaterialClaimConcurrencyTest`
+cover MATERIAL/ITEM participation and role conversion. The aUEC promise workflow follows its
+own implementation slice. **Issues:** #3193, #3200, #3207
 
 ### REQ-ORDERS-052 — Permitted readers see the complete order
 
@@ -177,7 +171,8 @@ within existing booked-production/delivery lower bounds; recorded facts are not 
 
 **Enforced by:** `JobOrderCreateOptionsIntegrationTest`, `JobOrderCreationWorkspaceMvcTest` and
 `JobOrderAssigneeGrantIntegrationTest` cover current creation and personal-entry capabilities.
-Post-partial requester and money workflows remain pending. **Issues:** #3197, #3200
+`JobOrderHierarchyAuthorityIntegrationTest` covers safe MATERIAL and ITEM requester edits
+after booked work. The money workflow follows its own implementation slice. **Issues:** #3197, #3200
 
 ### REQ-ORDERS-054 — Lifecycle distinguishes kind-specific fulfillment
 
@@ -185,11 +180,13 @@ Orders start OPEN. aUEC acceptance or first posted money causes IN_PROGRESS; com
 the strict money fulfillment contract. MATERIAL and ITEM retain automatic completion on their
 complete final handover and permit responsible-unit manual early completion. Their other
 ordinary status changes remain responsible-unit writes. Both requesting and responsible writers
-may cancel and reopen a cancellation. For MATERIAL/ITEM, need edits do not automatically reopen
-an order manually completed or cancelled. aUEC target-change effects follow its money spec.
+may cancel an active order and explicitly reopen a cancellation to OPEN. Each status write uses
+the observed lifecycle version. MATERIAL and ITEM need edits preserve the current lifecycle,
+including manual completion and cancellation. aUEC target-change effects follow its money spec.
 
-Cancelling MATERIAL/ITEM releases order stock earmarks without deleting physical stock, booked
-production or history. It ends open promises. aUEC cancellation, residual money, corrections,
+Cancelling MATERIAL/ITEM stops ordinary fulfillment and releases order stock earmarks without
+deleting physical stock, booked
+production or history. It ends open promises. A new stock earmark requires reopening a cancelled order. aUEC cancellation, residual money, corrections,
 returns and reopening follow its own spec. A completed MATERIAL/ITEM may therefore truthfully
 show unmet quantities; the UI must not imply full physical delivery.
 
@@ -199,7 +196,10 @@ show unmet quantities; the UI must not imply full physical delivery.
 - [ ] Cancellation releases MATERIAL/ITEM earmarks and open promises without deleting history.
 - [ ] Need edits do not silently reopen manual completion or cancellation.
 
-**Enforced by:** Pending implementation · **Issues:** #3195, #3200, #3201
+**Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest` covers MATERIAL and ITEM lifecycle
+rights, cancellation and the preservation of historical promises and booked work.
+`JobOrderStatusQueueRaceIntegrationTest` covers terminal queue changes. The strict money
+completion contract follows its own implementation slice. **Issues:** #3195, #3200, #3201
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 

@@ -68,6 +68,14 @@ an OS notification for each one.
    message, render parameters or link back to a personal fact. They preserve processed-once
    evidence independently of normal Inbox retention and erasure. This adds no outbox, durable
    delivery workflow or user action; the existing after-commit asynchronous delivery remains.
+
+8. **The owning domain checks whether a delayed action prompt is current.** The notification
+   delivery transaction consults `NotificationCauseGuard` before evaluating an original event's
+   selectors or cleanup. JobOrder checks current eligibility, status and observed revisions under
+   its shared hierarchy and scoped order locks. The remaining original events in a cause retain
+   their own delivery policies. When the relevant lifecycle or responsibility revision advances,
+   the superseded event neither recreates its prompt nor removes the current transition's prompt.
+
 ## Consequences
 
 - A rule written for the new kinds on an event that carries no mission, client or user set resolves

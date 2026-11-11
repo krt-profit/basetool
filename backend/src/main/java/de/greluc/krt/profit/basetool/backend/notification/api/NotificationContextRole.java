@@ -30,5 +30,8 @@ public enum NotificationContextRole {
   RESPONSIBLE,
 
   /** The org unit that requested / placed the originating aggregate. */
-  REQUESTING
+  REQUESTING,
+
+  /** The unit that held responsibility before the transfer. */
+  PREVIOUS_RESPONSIBLE
 }

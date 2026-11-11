@@ -137,7 +137,6 @@ class JobOrderServiceTest {
   private de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandoverMapper
       jobOrderItemHandoverMapper;
 
-  @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
   @Mock private JobOrderChangeEffects effects;
 
   @Mock private AuditService auditService;
@@ -171,6 +170,7 @@ class JobOrderServiceTest {
             profitHierarchy,
             responsibilityGuard,
             jobOrderAccessPolicy,
+            org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
             auditService,
             jobOrderStockProjectionService);
     jobOrderService =
@@ -207,7 +207,6 @@ class JobOrderServiceTest {
             orgUnitRepository,
             jobOrderOrgUnitResolver,
             authHelperService,
-            eventPublisher,
             effects,
             materialClaimService,
             auditService,
@@ -215,7 +214,6 @@ class JobOrderServiceTest {
             new JobOrderItemReconciliation(jobOrderItemService),
             jobOrderStockProjectionService,
             jobOrderPriorityService,
-            actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
                 profitHierarchy,
@@ -233,7 +231,8 @@ class JobOrderServiceTest {
                         .class)),
             liveSyncPublisher,
             org.mockito.Mockito.mock(
-                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class));
+                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            org.mockito.Mockito.mock(JobOrderParticipationCommands.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     jobOrderQueryService =
         new JobOrderQueryService(
@@ -352,7 +351,11 @@ class JobOrderServiceTest {
             false,
             false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     lenient()
         .when(jobOrderItemService.prepareItemLines(any(), any()))
         .thenAnswer(inv -> preparedItemLines(inv.getArgument(0)));
@@ -739,7 +742,8 @@ class JobOrderServiceTest {
 
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
-            orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
+            orderId,
+            new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, jobOrder.getLifecycleVersion()));
 
     assertNull(jobOrder.getPriority());
     assertEquals(JobOrderStatus.COMPLETED, jobOrder.getStatus());
@@ -761,7 +765,8 @@ class JobOrderServiceTest {
 
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
-            orderId, new UpdateJobOrderStatusDto(JobOrderStatus.REJECTED, 1L));
+            orderId,
+            new UpdateJobOrderStatusDto(JobOrderStatus.REJECTED, jobOrder.getLifecycleVersion()));
 
     assertNull(jobOrder.getPriority());
     assertEquals(JobOrderStatus.REJECTED, jobOrder.getStatus());
@@ -781,7 +786,9 @@ class JobOrderServiceTest {
 
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
-            orderId, new UpdateJobOrderStatusDto(JobOrderStatus.IN_PROGRESS, 1L));
+            orderId,
+            new UpdateJobOrderStatusDto(
+                JobOrderStatus.IN_PROGRESS, jobOrder.getLifecycleVersion()));
 
     assertEquals(JobOrderStatus.IN_PROGRESS, jobOrder.getStatus());
     assertNotNull(result);
@@ -804,7 +811,8 @@ class JobOrderServiceTest {
 
     JobOrderDto result =
         jobOrderService.updateJobOrderStatus(
-            orderId, new UpdateJobOrderStatusDto(JobOrderStatus.OPEN, 2L));
+            orderId,
+            new UpdateJobOrderStatusDto(JobOrderStatus.OPEN, jobOrder.getLifecycleVersion()));
 
     assertEquals(1, jobOrder.getPriority());
     assertEquals(JobOrderStatus.OPEN, jobOrder.getStatus());
@@ -910,7 +918,7 @@ class JobOrderServiceTest {
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
         .thenReturn(java.util.List.of());
 
-    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
+    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId, 0L);
 
     assertSame(target, jobOrder.getResponsibleOrgUnit());
   }
@@ -998,22 +1006,6 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void updateJobOrderAsRequester_frozenOnceDelivered_throws400() {
-    jobOrder
-        .getHandovers()
-        .add(new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderHandover());
-    CreateJobOrderMaterialDto updateMat = new CreateJobOrderMaterialDto(materialId, 650, 50.0);
-    CreateJobOrderDto updateDto =
-        new CreateJobOrderDto(null, null, null, "note", List.of(updateMat), null);
-    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-
-    assertThrows(
-        BadRequestException.class,
-        () -> jobOrderService.updateJobOrderAsRequester(orderId, updateDto));
-    verify(effects, never()).publish(any());
-  }
-
-  @Test
   void getRequestedJobOrders_emptyMembership_returnsEmptyPageWithoutHittingRepo() {
     when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, Set.of()));
@@ -1066,28 +1058,6 @@ class JobOrderServiceTest {
     de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto dto =
         new de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto(
             null, null, "note", null, List.of(), null);
-
-    assertThrows(
-        BadRequestException.class,
-        () -> jobOrderService.updateItemJobOrderAsRequester(orderId, dto));
-    verify(effects, never()).publish(any());
-    verify(jobOrderRepository, never()).saveAndFlush(any(JobOrder.class));
-  }
-
-  @Test
-  void updateItemJobOrderAsRequester_frozenOnceItemDelivered_throws400() {
-    JobOrder itemOrder = new JobOrder();
-    itemOrder.setId(orderId);
-    itemOrder.setType(JobOrderType.ITEM);
-    itemOrder.setVersion(1L);
-    itemOrder
-        .getItemHandovers()
-        .add(new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemHandover());
-    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(itemOrder));
-
-    de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto dto =
-        new de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto(
-            null, null, "note", null, List.of(), 1L);
 
     assertThrows(
         BadRequestException.class,
@@ -1354,7 +1324,7 @@ class JobOrderServiceTest {
         item.getJobOrderAllocations().stream().noneMatch(a -> orderId.equals(a.getJobOrderId())),
         "the order's allocation slice should be removed after unlinking");
     verify(jobOrderRepository).findById(orderId);
-    verify(inventoryItemRepository).findById(inventoryItemId);
+    verify(inventoryItemRepository, times(2)).findById(inventoryItemId);
   }
 
   @Test
@@ -1659,7 +1629,8 @@ class JobOrderServiceTest {
     stubLinkedStock(700, 10.0);
 
     jobOrderService.updateJobOrderStatus(
-        orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
+        orderId,
+        new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, jobOrder.getLifecycleVersion()));
 
     verify(auditService)
         .record(
@@ -1680,19 +1651,20 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void updateJobOrderStatus_completedToCompleted_recordsStatusChangedOnly() {
+  void updateJobOrderStatus_completedToCompletedLeavesLifecycleAndAuditUnchanged() {
     jobOrder.setPriority(null);
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
-    jobOrder.setVersion(1L);
+    jobOrder.setLifecycleVersion(1L);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     stubLinkedStock(700, 10.0);
 
     jobOrderService.updateJobOrderStatus(
-        orderId, new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, 1L));
+        orderId,
+        new UpdateJobOrderStatusDto(JobOrderStatus.COMPLETED, jobOrder.getLifecycleVersion()));
 
-    verify(auditService)
+    assertEquals(1L, jobOrder.getLifecycleVersion());
+    verify(auditService, never())
         .record(
             eq(
                 de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType
@@ -1700,7 +1672,7 @@ class JobOrderServiceTest {
             eq(orderId),
             any(),
             any(),
-            argThat(d -> d != null && d.toString().equals("from=COMPLETED to=COMPLETED")));
+            any());
     verify(auditService, never())
         .record(
             eq(de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType.JOB_ORDER_COMPLETED),
@@ -1733,7 +1705,7 @@ class JobOrderServiceTest {
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class)))
         .thenReturn(java.util.List.of());
 
-    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
+    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId, 0L);
 
     assertSame(target, jobOrder.getResponsibleOrgUnit());
     verify(jobOrderRepository).save(jobOrder);
@@ -1759,7 +1731,7 @@ class JobOrderServiceTest {
     when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
 
-    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
+    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId, 0L);
 
     assertSame(target, jobOrder.getResponsibleOrgUnit());
   }
@@ -1785,7 +1757,7 @@ class JobOrderServiceTest {
     when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(baseJobOrderDto);
     when(materialClaimService.getClaimBucketsForOrder(any(JobOrder.class))).thenReturn(List.of());
 
-    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId);
+    jobOrderService.reassignResponsibleOrgUnit(orderId, targetId, 0L);
 
     assertSame(target, jobOrder.getResponsibleOrgUnit());
   }
@@ -1805,7 +1777,7 @@ class JobOrderServiceTest {
 
     assertThrows(
         org.springframework.security.access.AccessDeniedException.class,
-        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId));
+        () -> jobOrderService.reassignResponsibleOrgUnit(orderId, targetId, 0L));
     verify(jobOrderRepository, never()).save(any(JobOrder.class));
   }
 
@@ -1898,15 +1870,25 @@ class JobOrderServiceTest {
       assertEquals("edited", order.getHandle());
     }
 
+    private static JobOrderItem existingItemLine(int amount, int manufactured) {
+      GameItem item = new GameItem();
+      item.setId(UUID.randomUUID());
+      Blueprint blueprint = new Blueprint();
+      blueprint.setId(UUID.randomUUID());
+      JobOrderItem line = new JobOrderItem();
+      line.setId(UUID.randomUUID());
+      line.setGameItem(item);
+      line.setBlueprint(blueprint);
+      line.setAmount(amount);
+      line.setManufacturedAmount(manufactured);
+      return line;
+    }
+
     @Test
     void matchedLine_isReDerivedInPlace_soBookedProductionSurvives() {
       JobOrder order = itemOrder();
-      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem existing =
-          new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem();
-      java.util.UUID lineId = UUID.randomUUID();
-      existing.setId(lineId);
-      existing.setAmount(10);
-      existing.setManufacturedAmount(6);
+      JobOrderItem existing = existingItemLine(10, 6);
+      UUID lineId = existing.getId();
       order.addItem(existing);
 
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
@@ -1924,7 +1906,13 @@ class JobOrderServiceTest {
               null,
               List.of(
                   new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
-                      lineId, UUID.randomUUID(), UUID.randomUUID(), 12, List.of(), 1, null)),
+                      lineId,
+                      existing.getGameItem().getId(),
+                      existing.getBlueprint().getId(),
+                      12,
+                      List.of(),
+                      1,
+                      null)),
               1L);
 
       jobOrderService.updateItemJobOrder(orderId, dto);
@@ -1938,11 +1926,7 @@ class JobOrderServiceTest {
     @Test
     void droppingALineWithBookedProduction_throwsBadRequest() {
       JobOrder order = itemOrder();
-      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem produced =
-          new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem();
-      produced.setId(UUID.randomUUID());
-      produced.setAmount(4);
-      produced.setManufacturedAmount(4);
+      JobOrderItem produced = existingItemLine(4, 4);
       order.addItem(produced);
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
 
@@ -1955,11 +1939,8 @@ class JobOrderServiceTest {
     @Test
     void twoPayloadLinesClaimingTheSameExistingLine_throwsBadRequest() {
       JobOrder order = itemOrder();
-      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem existing =
-          new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem();
-      java.util.UUID lineId = UUID.randomUUID();
-      existing.setId(lineId);
-      existing.setAmount(5);
+      JobOrderItem existing = existingItemLine(5, 0);
+      UUID lineId = existing.getId();
       order.addItem(existing);
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
 
@@ -1971,9 +1952,21 @@ class JobOrderServiceTest {
               null,
               List.of(
                   new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
-                      lineId, UUID.randomUUID(), UUID.randomUUID(), 5, List.of(), 1, null),
+                      lineId,
+                      existing.getGameItem().getId(),
+                      existing.getBlueprint().getId(),
+                      5,
+                      List.of(),
+                      1,
+                      null),
                   new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
-                      lineId, UUID.randomUUID(), UUID.randomUUID(), 7, List.of(), 2, null)),
+                      lineId,
+                      existing.getGameItem().getId(),
+                      existing.getBlueprint().getId(),
+                      7,
+                      List.of(),
+                      2,
+                      null)),
               1L);
 
       assertThrows(
@@ -1985,12 +1978,8 @@ class JobOrderServiceTest {
     @Test
     void loweringAmountBelowManufactured_throwsBadRequest() {
       JobOrder order = itemOrder();
-      de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem existing =
-          new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem();
-      java.util.UUID lineId = UUID.randomUUID();
-      existing.setId(lineId);
-      existing.setAmount(10);
-      existing.setManufacturedAmount(6);
+      JobOrderItem existing = existingItemLine(10, 6);
+      UUID lineId = existing.getId();
       order.addItem(existing);
       when(jobOrderRepository.findById(orderId)).thenReturn(java.util.Optional.of(order));
 
@@ -2002,7 +1991,13 @@ class JobOrderServiceTest {
               null,
               List.of(
                   new de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto(
-                      lineId, UUID.randomUUID(), UUID.randomUUID(), 3, List.of(), 1, null)),
+                      lineId,
+                      existing.getGameItem().getId(),
+                      existing.getBlueprint().getId(),
+                      3,
+                      List.of(),
+                      1,
+                      null)),
               1L);
 
       assertThrows(
@@ -2041,7 +2036,11 @@ class JobOrderServiceTest {
               false,
               false,
               null,
-              false);
+              false,
+              false,
+              false,
+              0L,
+              0L);
       when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any())).thenReturn(itemBase);
       when(jobOrderItemService.toItemDtos(any())).thenReturn(List.of());
       when(jobOrderItemService.aggregateMaterials(any()))
@@ -2115,7 +2114,11 @@ class JobOrderServiceTest {
                 false,
                 false,
                 null,
-                false);
+                false,
+                false,
+                false,
+                0L,
+                0L);
           });
     }
 
