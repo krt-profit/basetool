@@ -126,4 +126,4 @@ actor. Already ended promises and unchanged eligibility do not produce a duplica
 `JobOrderNoticeIntegrationTest`, `NotificationLifecycleEventsTest`,
 `SeededNotificationRulesIntegrationTest` · **Code:** `joborder/api/events/JobOrderNotices`,
 `joborder/internal/JobOrderChangeEffects`, `joborder/internal/JobOrderActionNoticeGuard`,
-`joborder/internal/JobOrderLifecycleNotices`, `V384__seed_shared_order_notification_audiences.sql`
+`joborder/internal/JobOrderLifecycleNotices`, `V387__seed_shared_order_notification_audiences.sql`

@@ -25,11 +25,13 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
+import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,7 +56,8 @@ public interface InventoryItemRepository
         InventoryOrderAllocationQueries,
         InventoryQuantityQueries,
         InventoryQuantityEvidenceLockRepository,
-        InventoryRestoreQueries {
+        InventoryRestoreQueries,
+        InventoryRowLockRepository {
 
   /**
    * Returns one snapshot page of a member's lots, ordered by their lowest row id.
@@ -768,27 +771,6 @@ public interface InventoryItemRepository
   List<InventoryItem> findAllForJobOrderAllocationRelease(@Param("rowIds") Collection<UUID> rowIds);
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code IdForUpdate}. Acquires a
-   * pessimistic write lock for the duration of the surrounding transaction.
-   */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @EntityGraph(attributePaths = {"material", "user", "location", "owningOrgUnit"})
-  @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
-  Optional<InventoryItem> findByIdForUpdate(@Param("id") UUID id);
-
-  /**
-   * Loads one row of a bulk rebooking (REQ-INV-036) under a pessimistic write lock, with material
-   * and game item fetched.
-   *
-   * @param id the inventory row id.
-   * @return the locked row, or empty when unknown.
-   */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @EntityGraph(attributePaths = {"material", "gameItem", "user", "location", "owningOrgUnit"})
-  @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
-  Optional<InventoryItem> findByIdForRebook(@Param("id") UUID id);
-
-  /**
    * Loads the rows sharing a stock's physical identity (user, catalog reference, location, quality,
    * personal, stolen, owning org unit), oldest first and pessimistically locked, as merge
    * candidates (REQ-INV-026).
@@ -895,23 +877,6 @@ public interface InventoryItemRepository
       @Param("personal") Boolean personal,
       @Param("stolen") Boolean stolen,
       @Param("owningOrgUnitId") @Nullable UUID owningOrgUnitId);
-
-  /**
-   * Bulk-deletes the non-personal inventory within the given org-unit scope; personal rows are
-   * never touched. Callers must enforce access first.
-   *
-   * @param isAdminAllScope {@code true} for an admin without an active org unit; wipes every
-   *     non-personal item
-   * @param activeOrgUnitId the single org unit to scope the wipe to, or {@code null}
-   * @param memberOrgUnitIds the caller's org units (non-admin path); empty for admins
-   * @return number of deleted rows
-   */
-  @Modifying
-  @Query("DELETE FROM InventoryItem i WHERE i.personal = false AND " + InventoryScope.TRIPLE)
-  int deleteAllNonPersonal(
-      @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
    * Deletes every inventory row of the given user, personal and shared, as part of the hard account
@@ -1045,10 +1010,22 @@ public interface InventoryItemRepository
    * @param ids the complete named row set
    * @return the existing row ids locked for the transaction
    */
+  default List<UUID> lockRowIdsOrderById(@NotNull Collection<UUID> ids) {
+    return lockRowIdsByArray(UuidArrayLiteral.of(ids));
+  }
+
+  /**
+   * Locks the named stock rows using one UUID array parameter.
+   *
+   * @param ids the complete named row set as a PostgreSQL UUID array literal
+   * @return the existing row ids locked for the transaction
+   */
   @Query(
-      value = "SELECT id FROM inventory_item WHERE id IN (:ids) ORDER BY id FOR UPDATE",
+      value =
+          "SELECT id FROM inventory_item WHERE id = ANY(CAST(:ids AS UUID[])) ORDER BY id FOR"
+              + " UPDATE",
       nativeQuery = true)
-  List<UUID> lockRowIdsOrderById(@Param("ids") Collection<UUID> ids);
+  List<UUID> lockRowIdsByArray(@Param("ids") String ids);
 
   /**
    * Counts the shared entries of one org unit's pool.

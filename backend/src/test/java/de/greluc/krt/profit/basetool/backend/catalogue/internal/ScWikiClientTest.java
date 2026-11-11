@@ -386,7 +386,6 @@ class ScWikiClientTest {
   @Test
   void distinctRowsFallingShortOfMetaTotal_isIncomplete_andWarns() {
     server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 205, rows(1))));
-    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 205, rows(1))));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
@@ -395,22 +394,6 @@ class ScWikiClientTest {
         result.complete(), "a distinct-row count below meta.total is not a complete census");
     assertEquals(1, result.data().size(), "the fetched rows are still returned");
     assertEquals(1.0, fetchErrorCount(), "a total mismatch must count as a fetch error");
-    assertEquals(2, server.getRequestCount(), "a shortfall is walked once more, not twice");
-  }
-
-  @Test
-  void aWalkTheFeedReshuffledUnderIsRepeatedOnceAndTheStableRepeatDecides() {
-    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
-    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 3))));
-    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
-    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 4))));
-
-    ScWikiClient.FetchResult<ScWikiCommodityDto> result =
-        client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
-
-    assertTrue(result.complete(), "the repeated walk enumerated every announced row once");
-    assertEquals(4, result.data().size(), "only the repeat's rows are returned");
-    assertEquals(4, server.getRequestCount());
   }
 
   @Test
@@ -453,10 +436,8 @@ class ScWikiClientTest {
 
   @Test
   void rowServedOnTwoPages_isIncomplete_evenWhenTheRowCountMatchesMetaTotal() {
-    for (int walk = 0; walk < 2; walk++) {
-      server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
-      server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 3))));
-    }
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(3))));
+    server.enqueue(jsonOk(pageBodyWithTotal(2, 2, 4, rows(1, 3))));
 
     List<ScWikiClient.FetchResult<ScWikiCommodityDto>> captured = new ArrayList<>();
     List<ILoggingEvent> events =
@@ -482,10 +463,8 @@ class ScWikiClientTest {
 
   @Test
   void feedAnnouncingMorePagesByTheEndOfTheWalk_isIncomplete() {
-    for (int walk = 0; walk < 2; walk++) {
-      server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(2))));
-      server.enqueue(jsonOk(pageBodyWithTotal(2, 3, 6, rows(2, 3))));
-    }
+    server.enqueue(jsonOk(pageBodyWithTotal(1, 2, 4, rows(2))));
+    server.enqueue(jsonOk(pageBodyWithTotal(2, 3, 6, rows(2, 3))));
 
     ScWikiClient.FetchResult<ScWikiCommodityDto> result =
         client.fetchAllPagesResult("/api/commodities", commodityTypeRef(), "commodities");
@@ -811,6 +790,22 @@ class ScWikiClientTest {
   }
 
   @Test
+  void itemFeedsAreWalkedInClassNameOrderAndOtherFeedsKeepTheSourceOrder() throws Exception {
+    server.enqueue(jsonOk(pageBody(1, 1, rows(1))));
+    server.enqueue(jsonOk(pageBody(1, 1, rows(1))));
+
+    client.fetchAllPagesResult("/api/vehicle-items", commodityTypeRef(), "vehicle items");
+    client.fetchAllPagesResult("/api/blueprints", commodityTypeRef(), "blueprints");
+
+    RecordedRequest items = server.takeRequest(1, TimeUnit.SECONDS);
+    RecordedRequest blueprints = server.takeRequest(1, TimeUnit.SECONDS);
+    assertNotNull(items);
+    assertNotNull(blueprints);
+    assertEquals("class_name", items.getRequestUrl().queryParameter("sort"));
+    assertNull(blueprints.getRequestUrl().queryParameter("sort"));
+  }
+
+  @Test
   void aBlueprintDetailWithEmptyArraysForAbsentRangesDecodes() throws Exception {
     String captured;
     try (InputStream input =
@@ -833,6 +828,42 @@ class ScWikiClientTest {
             "blueprint");
 
     assertEquals(ScWikiClient.DetailOutcome.FOUND, result.outcome());
+    assertEquals(0.0, fetchErrorCount());
+  }
+
+  @Test
+  void aBlueprintAspectWithAGroupReferenceKeepsTheGroupKey() throws Exception {
+    String captured;
+    try (InputStream input =
+        getClass().getResourceAsStream("/catalogue/scwiki-blueprint-detail.json")) {
+      assertNotNull(input);
+      captured = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    }
+    String withGroupReference =
+        captured
+            .replaceFirst(
+                "\"selection_group\": null",
+                "\"selection_group\": {\"key\": \"ASPECTS\", \"name\": \"A S P E C T S\","
+                    + " \"required_count\": 2, \"option_count\": 3}")
+            .replaceFirst("\"selection_group\": null", "\"selection_group\": \"LINERS\"");
+    assertNotEquals(captured, withGroupReference, "the fixture must carry a selection group");
+    server.enqueue(jsonOk(withGroupReference));
+
+    var result =
+        client.fetchOneResult(
+            "/api/blueprints",
+            UUID.fromString("280f47b7-8434-410c-b854-380768fdccec"),
+            ScWikiBlueprintDto.class,
+            "blueprint");
+
+    assertEquals(ScWikiClient.DetailOutcome.FOUND, result.outcome());
+    ScWikiBlueprintDto detail = result.data();
+    assertNotNull(detail);
+    assertNotNull(detail.aspects());
+    var aspects = detail.aspects().aspects();
+    assertEquals("ASPECTS", aspects.getFirst().selectionGroup());
+    assertEquals("LINERS", aspects.get(1).selectionGroup());
+    assertNull(aspects.get(2).selectionGroup());
     assertEquals(0.0, fetchErrorCount());
   }
 
@@ -960,7 +991,6 @@ class ScWikiClientTest {
   @Test
   void existenceCensusCannotVouchForMissingOrDuplicatedAssetIdentities() {
     server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 1, idlessRows(1))));
-    server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 2, rows(1) + "," + rows(1))));
     server.enqueue(jsonOk(pageBodyWithTotal(1, 1, 2, rows(1) + "," + rows(1))));
 
     ScWikiClient.ExistenceCensus missing = client.fetchExistenceCensus("/api/items", "items", 200);

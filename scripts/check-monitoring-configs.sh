@@ -106,10 +106,10 @@ check_alloy_fmt() {
 }
 
 check_alloy_validate() {
-  local image out
+  local image out status=0
   image="$(image_of alloy)" || return 1
-  out="$(docker run --rm -v "${MONITORING_DIR}/alloy:/cfg:ro" "$image" validate /cfg/config.alloy 2>&1 || true)"
-  if [[ -n "$out" ]]; then
+  out="$(docker run --rm -v "${MONITORING_DIR}/alloy:/cfg:ro" "$image" validate /cfg/config.alloy 2>&1)" || status=$?
+  if (( status != 0 )) || [[ -n "$out" ]]; then
     printf '%s\n' "$out" >&2
     return 1
   fi

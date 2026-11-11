@@ -402,46 +402,6 @@ interface InventoryOrderAllocationQueries extends Repository<InventoryItem, UUID
       @Param("holder") UUID holder, @Param("lotKeys") Collection<String> lotKeys);
 
   /**
-   * Resolves material scopes removed by a scoped nonpersonal wipe before any stock row lock.
-   *
-   * @param adminAll whether all shared rows are in scope
-   * @param activeUnit the pinned unit
-   * @param memberUnits the caller's scoped units
-   * @return the affected cross-quality scopes
-   */
-  @Query(
-      """
-      SELECT DISTINCT new de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope(
-          a.jobOrderId, i.material.id)
-      FROM InventoryJobOrderAllocation a JOIN a.inventoryItem i
-      WHERE i.material IS NOT NULL AND i.personal = false
-        AND (:adminAll = true OR (:activeUnit IS NOT NULL AND i.owningOrgUnit.id = :activeUnit)
-          OR (:activeUnit IS NULL AND i.owningOrgUnit.id IN :memberUnits))
-      """)
-  List<OrderMaterialScope> findAllocatedMaterialScopesInWipeScope(
-      @Param("adminAll") boolean adminAll,
-      @Param("activeUnit") @Nullable UUID activeUnit,
-      @Param("memberUnits") Collection<UUID> memberUnits);
-
-  /**
-   * Resolves the order slices removed by a scoped nonpersonal wipe.
-   *
-   * @param adminAll whether all rows are in scope
-   * @param activeUnit the pinned unit
-   * @param memberUnits the scoped units
-   * @return distinct affected order ids
-   */
-  @Query(
-      "SELECT DISTINCT a.jobOrderId FROM InventoryJobOrderAllocation a JOIN a.inventoryItem i WHERE"
-          + " i.personal = false AND (:adminAll = true OR (:activeUnit IS NOT NULL AND"
-          + " i.owningOrgUnit.id = :activeUnit) OR (:activeUnit IS NULL AND i.owningOrgUnit.id IN"
-          + " :memberUnits))")
-  List<UUID> findAllocatedOrdersInWipeScope(
-      @Param("adminAll") boolean adminAll,
-      @Param("activeUnit") @Nullable UUID activeUnit,
-      @Param("memberUnits") Collection<UUID> memberUnits);
-
-  /**
    * Returns every material allocation of the given job orders as one row each (row, material,
    * quality, amount), in a single query (REQ-DATA-003).
    *

@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
@@ -50,6 +51,9 @@ final class MaterialHandoverPlannerFixtures {
       @NotNull MaterialPromiseCoordinator promises) {
     JobOrderMaterialRepository demands = mock(JobOrderMaterialRepository.class);
     StockReads stock = mock(StockReads.class);
+    lenient()
+        .when(rows.lockRowIdsOrderById(anyCollection()))
+        .thenAnswer(invocation -> List.copyOf(invocation.<Collection<UUID>>getArgument(0)));
     lenient()
         .when(demands.handoverRequirements(any()))
         .thenAnswer(_ ->
@@ -71,7 +75,7 @@ final class MaterialHandoverPlannerFixtures {
           UUID orderId = invocation.getArgument(0);
           Collection<UUID> ids = invocation.getArgument(1);
           return ids.stream()
-              .map(rows::findByIdForUpdate)
+              .map(rows::lockById)
               .flatMap(java.util.Optional::stream)
               .map(row ->
                   new MaterialHandoverFact(

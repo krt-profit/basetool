@@ -19,17 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
-
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.BackendDownloads;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,45 +57,42 @@ public class BankReportProxyController {
    * @param from period start; bound as an instant so the relayed value cannot carry URI syntax
    * @param to period end; bound as an instant so the relayed value cannot carry URI syntax
    * @param userTimeZone the caller's IANA time zone; optional
-   * @return the PDF with attachment headers
+   * @param response the browser download response
+   * @throws IOException when the response stream cannot be opened
    */
   @GetMapping("/accounts/{id}/statement")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<byte[]> downloadStatement(
+  public void downloadStatement(
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    byte[] pdf = withBackendStatus(() -> bankClient.accountStatement(id, from, to, userTimeZone));
-    return pdfResponse(pdf, "kontoauszug-" + id + ".pdf");
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone,
+      @NotNull HttpServletResponse response)
+      throws IOException {
+    BackendDownloads.send(
+        response,
+        bankClient.accountStatement(id, from, to, userTimeZone),
+        "kontoauszug-" + id + ".pdf",
+        MediaType.APPLICATION_PDF);
   }
 
   /**
    * Proxies the management three-month report download.
    *
    * @param userTimeZone the caller's IANA time zone; optional
-   * @return the PDF with attachment headers
+   * @param response the browser download response
+   * @throws IOException when the response stream cannot be opened
    */
   @GetMapping("/export/three-month-report")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<byte[]> downloadThreeMonthReport(
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    byte[] pdf = withBackendStatus(() -> bankClient.threeMonthReport(userTimeZone));
-    return pdfResponse(pdf, "bank-3-monats-report.pdf");
-  }
-
-  /**
-   * Wraps a fetched backend PDF with attachment headers; backend errors have already propagated
-   * with their original status so bank.js can surface 403/400 distinctly.
-   *
-   * @param pdf the PDF bytes, or {@code null} when the backend sent no body
-   * @param filename the download filename
-   * @return the proxied PDF response
-   */
-  private static ResponseEntity<byte[]> pdfResponse(byte[] pdf, @NotNull String filename) {
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", filename);
-    return ResponseEntity.ok().headers(headers).body(pdf);
+  public void downloadThreeMonthReport(
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone,
+      @NotNull HttpServletResponse response)
+      throws IOException {
+    BackendDownloads.send(
+        response,
+        bankClient.threeMonthReport(userTimeZone),
+        "bank-3-monats-report.pdf",
+        MediaType.APPLICATION_PDF);
   }
 }

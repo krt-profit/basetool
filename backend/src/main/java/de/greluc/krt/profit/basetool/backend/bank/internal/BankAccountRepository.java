@@ -187,6 +187,14 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   List<BankAccount> findAllByOrderByAccountNoAsc();
 
   /**
+   * Pages report accounts in their existing account-number order.
+   *
+   * @param pageable bounded report page
+   * @return one ordered account page without a total-count query
+   */
+  List<BankAccount> findAllByOrderByAccountNoAsc(Pageable pageable);
+
+  /**
    * Loads every account of one type and status with its org unit fetched, for the split deposit's
    * squadron-account enumeration (REQ-BANK-043). The rows are not locked.
    *

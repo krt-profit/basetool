@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -72,6 +73,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -104,6 +106,7 @@ class SupplyDonationServiceTest {
   @Mock private AuditRecorder auditRecorder;
   @Mock private AuthHelperService authHelperService;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private ObjectProvider<SupplyDonationService> self;
 
   private SupplyDonationService service;
   private Material material;
@@ -133,7 +136,9 @@ class SupplyDonationServiceTest {
             auditRecorder,
             authHelperService,
             eventPublisher,
-            new SimpleMeterRegistry());
+            new SimpleMeterRegistry(),
+            self);
+    org.mockito.Mockito.lenient().when(self.getObject()).thenReturn(service);
     material = new Material();
     material.setId(UUID.randomUUID());
     material.setName("Quantainium");
@@ -498,6 +503,7 @@ class SupplyDonationServiceTest {
     when(carrier.getMaterial()).thenReturn(material);
     when(carrier.getQuality()).thenReturn(donation.getQuality());
     when(stockReads.findRow(rowId)).thenReturn(Optional.of(carrier));
+    when(stockCommands.lockRow(rowId)).thenReturn(Optional.of(carrier));
     when(donationRepository.saveAndFlush(donation)).thenReturn(donation);
 
     service.receive(donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L));
@@ -512,6 +518,61 @@ class SupplyDonationServiceTest {
             eq(location),
             eq(StockBookingReason.DONATION));
     verify(stockCommands, never()).bookIntoPool(any(), any(), any(), anyDouble(), any());
+  }
+
+  @Test
+  void aReceiptWhoseEarmarkedRowWasDeletedWhileItsLockWaitedBooksIntoThePool() {
+    SupplyDonation donation = pledged(4.0);
+    UUID rowId = UUID.randomUUID();
+    donation.setSourceInventoryItemId(rowId);
+    StockRow row = org.mockito.Mockito.mock(StockRow.class);
+    when(row.getMaterial()).thenReturn(material);
+    when(row.getQuality()).thenReturn(475);
+    when(row.getStolen()).thenReturn(false);
+    callerIs(HOLDER);
+    when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
+    when(accessPolicy.canManageUnit(unit.getId())).thenReturn(true);
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+    when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
+    when(stockReads.findRow(rowId)).thenReturn(Optional.of(row)).thenReturn(Optional.empty());
+    when(stockReads.donationEarmarkedRowIds(donation.getId()))
+        .thenReturn(List.of(rowId))
+        .thenReturn(List.of());
+    when(stockCommands.lockRow(rowId)).thenReturn(Optional.empty());
+    when(donationRepository.saveAndFlush(donation)).thenReturn(donation);
+
+    service.receive(donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L));
+
+    verify(stockCommands)
+        .bookIntoPool(
+            eq(HOLDER),
+            eq(unit),
+            eq(new StockLot(material, null, location, 500, false)),
+            eq(4.0),
+            eq(StockBookingReason.DONATION));
+    verify(stockCommands, never()).releaseDonationEarmark(any());
+    verify(stockCommands, never()).transferToPool(any(), anyDouble(), any(), any(), any(), any());
+    assertThat(donation.getStatus()).isEqualTo(DonationStatus.RECEIVED);
+  }
+
+  @Test
+  void aReceiptWhoseOriginalRowIsAlreadyGoneBooksIntoThePool() {
+    SupplyDonation donation = pledged(4.0);
+    UUID sourceId = UUID.randomUUID();
+    donation.setSourceInventoryItemId(sourceId);
+    callerIs(HOLDER);
+    when(donationRepository.findByIdForUpdate(donation.getId())).thenReturn(Optional.of(donation));
+    when(accessPolicy.canManageUnit(unit.getId())).thenReturn(true);
+    when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
+    when(orgUnitRepository.findById(unit.getId())).thenReturn(Optional.of(unit));
+    when(donationRepository.saveAndFlush(donation)).thenReturn(donation);
+
+    service.receive(donation.getId(), new ReceiveDonationRequest(4.0, location.getId(), 2L));
+
+    verify(stockReads, org.mockito.Mockito.times(2)).findRow(sourceId);
+    verify(stockCommands)
+        .bookIntoPool(eq(HOLDER), eq(unit), any(), eq(4.0), eq(StockBookingReason.DONATION));
+    verify(stockCommands, never()).transferToPool(any(), anyDouble(), any(), any(), any(), any());
   }
 
   @Test

@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MutationResponseHelper;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -154,6 +155,7 @@ public class JobOrderWriteController {
 
       return "redirect:" + postCreateTarget(created);
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to create item order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
       redirectAttributes.addFlashAttribute("jobOrderItemForm", form);
@@ -252,6 +254,7 @@ public class JobOrderWriteController {
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to update item order {}", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
       return "redirect:/orders/" + id + "/items/edit";
@@ -355,6 +358,7 @@ public class JobOrderWriteController {
 
       return "redirect:" + postCreateTarget(created);
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to create order", e);
       log.error("Failed to create job order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.create.failed");
@@ -590,6 +594,7 @@ public class JobOrderWriteController {
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to update order", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
       redirectAttributes.addFlashAttribute("jobOrderForm", form);
@@ -669,6 +674,7 @@ public class JobOrderWriteController {
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.update");
       return "redirect:/orders/" + id;
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to update order {} as requester", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.update.failed");
       redirectAttributes.addFlashAttribute("jobOrderForm", form);
@@ -825,6 +831,7 @@ public class JobOrderWriteController {
       BackendErrorLogging.warn(log, "POST /api/v1/orders/{id}/handovers", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error(
           "Failed to create handover for jobOrder={} via POST /api/v1/orders/{}/handovers",
           id,
@@ -893,6 +900,7 @@ public class JobOrderWriteController {
       BackendErrorLogging.warn(log, "POST /api/v1/orders/{id}/item-handovers", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error(
           "Failed to create item handover for jobOrder={} via POST"
               + " /api/v1/orders/{}/item-handovers",
@@ -1054,6 +1062,7 @@ public class JobOrderWriteController {
       BackendErrorLogging.warn(log, "DELETE /api/v1/orders/{id}/materials/{materialId}", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.material.unlink.error");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to unlink material {} from jobOrder={}", materialId, id, e);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.material.unlink.error");
     }
@@ -1084,6 +1093,7 @@ public class JobOrderWriteController {
           log, "DELETE /api/v1/orders/{id}/allocations/{inventoryItemId}", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to unlink inventory item {} from jobOrder={}", inventoryItemId, id, e);
       redirectAttributes.addFlashAttribute("errorToast", "orders.detail.inventory.unlink.error");
     }
@@ -1207,6 +1217,7 @@ public class JobOrderWriteController {
       log.warn("Failed to {} (status {})", action, bse.getStatusCode());
       throw new ResponseStatusException(HttpStatus.valueOf(bse.getStatusCode()));
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to {}", action, e);
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -1250,6 +1261,7 @@ public class JobOrderWriteController {
       UserDto me = jobOrderClient.currentUser();
       return me != null ? me.id() : null;
     } catch (Exception ex) {
+      SectionFallback.rethrowIfReauthenticationRequired(ex);
       log.warn("Failed to get current user ID from backend: {}", ex.getMessage());
       return null;
     }

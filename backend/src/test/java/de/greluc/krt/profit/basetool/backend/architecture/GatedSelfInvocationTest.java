@@ -28,7 +28,6 @@ import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -55,10 +54,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 class GatedSelfInvocationTest {
 
   /** The backend's main classes. */
-  private static final JavaClasses CLASSES =
-      new ClassFileImporter()
-          .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-          .importPackages("de.greluc.krt.profit.basetool.backend");
+  private static final JavaClasses CLASSES = ModuleSubjects.importBackendMainClasses();
 
   /** Gated methods on 2026-10-02; fewer means the rule lost its subject. */
   private static final int GATED_METHOD_FLOOR = 593;

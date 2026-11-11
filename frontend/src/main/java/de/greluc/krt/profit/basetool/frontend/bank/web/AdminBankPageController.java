@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankWipeResetResultDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -92,6 +93,7 @@ public class AdminBankPageController {
         redirectAttributes.addFlashAttribute("wipeResult", result);
       }
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Bank wipe reset failed", e);
       redirectAttributes.addFlashAttribute("error", "admin.bank.wipe.error.failed");
     }

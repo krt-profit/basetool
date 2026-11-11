@@ -47,9 +47,14 @@ import org.springframework.util.StringUtils;
  * manufacturer} rows by stamping the Wiki cross-reference columns.
  *
  * <p>Enrichment only: never inserts a row and never overwrites UEX-owned columns. A row already
- * linked to a different Wiki UUID is left alone and logged as {@link
- * SyncEventType#MANUFACTURER_MISMATCH}. Gated behind {@code krt.scwiki.manufacturer-sync-enabled}
- * (default {@code false}).
+ * linked to a different Wiki UUID stays with that link: when the link names another row of the same
+ * census, or the Wiki row is already a known alias, it is stored as an alias in {@link
+ * ManufacturerScwikiIdentity} ({@link SyncEventType#MANUFACTURER_DUPLICATE} on first sight); when a
+ * complete census no longer carries the link and the Wiki row is a known alias or repeats the row's
+ * name and stored Wiki code, the row moves to the new UUID ({@link
+ * SyncEventType#MANUFACTURER_RELINKED}); otherwise it is a conflict ({@link
+ * SyncEventType#MANUFACTURER_MISMATCH}, REQ-DATA-033, ADR-0361). Gated behind {@code
+ * krt.scwiki.manufacturer-sync-enabled} (default {@code false}).
  */
 @Slf4j
 @Service
@@ -59,6 +64,7 @@ public class ScWikiManufacturerSyncService {
   private final ScWikiClient scWikiClient;
   private final ScWikiProperties properties;
   private final ManufacturerRepository manufacturerRepository;
+  private final ManufacturerScwikiIdentityRepository identityRepository;
   private final SyncReportService syncReportService;
   private final SyncChunkWriter chunkWriter;
 
@@ -108,10 +114,12 @@ public class ScWikiManufacturerSyncService {
             .filter(StringUtils::hasText)
             .map(ScWikiManufacturerSyncService::sourceKey)
             .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+    boolean censusComplete =
+        result.complete() && valid.size() == rows.size() && seen.size() == rows.size();
     if (valid.size() != rows.size() || seen.size() != rows.size()) {
       syncReportService.recordIncomplete();
     }
-    SourceKeys keys = new SourceKeys(names, codes, seen);
+    SourceKeys keys = new SourceKeys(names, codes, seen, censusComplete);
     var outcome =
         chunkWriter.write(
             valid,
@@ -123,16 +131,13 @@ public class ScWikiManufacturerSyncService {
                     .toList(),
             "Wiki manufacturer",
             dto -> dto.uuid().toString());
-    boolean complete =
-        result.complete()
-            && valid.size() == rows.size()
-            && seen.size() == rows.size()
-            && outcome.failedRows() == 0
-            && conflicts.isEmpty();
+    boolean complete = censusComplete && outcome.failedRows() == 0 && conflicts.isEmpty();
     if (complete && !seen.isEmpty() && !outcome.results().isEmpty()) {
       int marked =
-          chunkWriter.inNewTransaction(
-              () -> manufacturerRepository.markScwikiDeletedExcept(seen, now));
+          chunkWriter.inNewTransaction(() -> {
+            identityRepository.deleteAbsentFrom(seen);
+            return manufacturerRepository.markScwikiDeletedExcept(seen, now);
+          });
       syncReportService.recordApplied(marked);
       syncReportService.recordSweep(true);
     } else {
@@ -163,16 +168,40 @@ public class ScWikiManufacturerSyncService {
     }
     UUID link = manufacturer.getScwikiUuid();
     if (link != null && !link.equals(dto.uuid())) {
+      boolean knownAlias = identityRepository.existsById(dto.uuid());
+      boolean primaryPresent = !keys.complete() || keys.census().contains(link);
+      if ((knownAlias || keys.heldBySibling(manufacturer, dto.uuid())) && primaryPresent) {
+        recordIdentity(manufacturer, dto, now);
+        if (!knownAlias) {
+          syncReportService.logScwikiEvent(
+              runId,
+              SyncEventType.MANUFACTURER_DUPLICATE,
+              "manufacturer",
+              dto.uuid(),
+              dto.name(),
+              "Kept as an alias of a manufacturer another Wiki row of this census links.");
+        }
+        return dto.uuid();
+      }
+      if (!knownAlias && !keys.relinkable(manufacturer, dto)) {
+        syncReportService.logScwikiEvent(
+            runId,
+            SyncEventType.MANUFACTURER_MISMATCH,
+            "manufacturer",
+            dto.uuid(),
+            dto.name(),
+            "Matched manufacturer is linked to another Wiki UUID.");
+        syncReportService.recordIncomplete();
+        conflicts.add(dto.uuid());
+        return null;
+      }
       syncReportService.logScwikiEvent(
           runId,
-          SyncEventType.MANUFACTURER_MISMATCH,
+          SyncEventType.MANUFACTURER_RELINKED,
           "manufacturer",
           dto.uuid(),
-          dto.name(),
-          "Matched manufacturer is linked to another Wiki UUID.");
-      syncReportService.recordIncomplete();
-      conflicts.add(dto.uuid());
-      return null;
+          manufacturer.getName(),
+          "Moved the Wiki link from a UUID the complete census no longer carries.");
     }
     UUID p4kUuid = manufacturer.getP4kUuid();
     if (p4kUuid != null) {
@@ -200,6 +229,7 @@ public class ScWikiManufacturerSyncService {
     manufacturer.setScwikiSyncedAt(now);
     manufacturer.setScwikiDeletedAt(null);
     manufacturerRepository.save(manufacturer);
+    recordIdentity(manufacturer, dto, now);
     if (link == null) {
       syncReportService.logScwikiEvent(
           runId,
@@ -213,8 +243,27 @@ public class ScWikiManufacturerSyncService {
   }
 
   /**
-   * Resolves a Wiki manufacturer to a local row by {@code p4k_uuid}, {@code scwiki_uuid}, then
-   * case-insensitive name, then case-insensitive {@code abbreviation == code}.
+   * Stores or refreshes the Wiki row as one identity of the manufacturer it resolved to.
+   *
+   * @param manufacturer the local manufacturer
+   * @param dto the Wiki manufacturer payload
+   * @param now the run's timestamp
+   */
+  private void recordIdentity(Manufacturer manufacturer, ScWikiManufacturerDto dto, Instant now) {
+    ManufacturerScwikiIdentity identity =
+        identityRepository.findById(dto.uuid()).orElseGet(ManufacturerScwikiIdentity::new);
+    identity.setScwikiUuid(dto.uuid());
+    identity.setManufacturer(manufacturer);
+    identity.setWikiName(
+        StringUtils.hasText(dto.name()) ? dto.name().strip() : manufacturer.getName());
+    identity.setWikiCode(StringUtils.hasText(dto.code()) ? dto.code().strip() : null);
+    identity.setSyncedAt(now);
+    identityRepository.save(identity);
+  }
+
+  /**
+   * Resolves a Wiki manufacturer to a local row by {@code p4k_uuid}, {@code scwiki_uuid}, a known
+   * Wiki identity, then case-insensitive name, then case-insensitive {@code abbreviation == code}.
    *
    * <p>A name or code that several census rows share is ambiguous only while a local row carrying
    * it is still unclaimed; a local row linked to another manufacturer of this census belongs to
@@ -228,7 +277,8 @@ public class ScWikiManufacturerSyncService {
     Optional<Manufacturer> byUuid =
         manufacturerRepository
             .findByP4kUuid(dto.uuid())
-            .or(() -> manufacturerRepository.findByScwikiUuid(dto.uuid()));
+            .or(() -> manufacturerRepository.findByScwikiUuid(dto.uuid()))
+            .or(() -> identityRepository.findManufacturerByScwikiUuid(dto.uuid()));
     if (byUuid.isPresent()) {
       return new ManufacturerMatch(byUuid.get(), false);
     }
@@ -267,8 +317,36 @@ public class ScWikiManufacturerSyncService {
    * @param names census rows per normalized exact name
    * @param codes census rows per normalized engine code
    * @param census Wiki UUIDs of every valid census row
+   * @param complete whether every page arrived and every row carried a distinct UUID
    */
-  private record SourceKeys(Map<String, Long> names, Map<String, Long> codes, Set<UUID> census) {
+  private record SourceKeys(
+      Map<String, Long> names, Map<String, Long> codes, Set<UUID> census, boolean complete) {
+
+    /**
+     * Tells whether a row linked to a vanished Wiki UUID may move to this Wiki row.
+     *
+     * <p>Requires a complete census without the old link, and a Wiki row whose name and code are
+     * each unique in the census and equal the row's name and stored Wiki code.
+     *
+     * @param row local manufacturer linked to another Wiki UUID
+     * @param dto Wiki manufacturer being resolved
+     * @return {@code true} when the Wiki changed only the UUID of the row's manufacturer
+     */
+    boolean relinkable(Manufacturer row, ScWikiManufacturerDto dto) {
+      return complete
+          && row.getScwikiUuid() != null
+          && !census.contains(row.getScwikiUuid())
+          && uniqueMatch(names, dto.name(), row.getName())
+          && uniqueMatch(codes, dto.code(), row.getScwikiCode());
+    }
+
+    private static boolean uniqueMatch(
+        Map<String, Long> counts, @Nullable String source, @Nullable String stored) {
+      return StringUtils.hasText(source)
+          && StringUtils.hasText(stored)
+          && sourceKey(source).equals(sourceKey(stored))
+          && counts.getOrDefault(sourceKey(source), 0L) == 1;
+    }
 
     /**
      * Tells whether a local row is already linked to another manufacturer of this census.

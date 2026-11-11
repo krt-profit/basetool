@@ -163,8 +163,8 @@ display-and-expand only; it carries no aggregate mutation. Optimistic locking an
 The two **bulk** actions — bulk check-out and bulk rebooking (REQ-INV-034 / REQ-INV-036) — are the
 deliberate exception: they act on a list of the caller's own entry ids, which the bulk bar and the
 server-resolved select-all set hold without versions, so each listed row is loaded under a
-pessimistic write lock (`InventoryItemRepository#findByIdForUpdate` / `#findByIdForRebook`) instead
-of an optimistic `version` check. They are still per-entry: each listed row is checked out or moved
+pessimistic write lock (`InventoryRowLockRepository#lockById`, REQ-INV-071) instead of an
+optimistic `version` check. They are still per-entry: each listed row is checked out or moved
 on its own, never a stack aggregate.
 
 **Acceptance**
@@ -451,7 +451,9 @@ silently degenerate to a permanent no-op.
 [`materialboerse.md`](materialboerse.md)). A row that backs *any* `MaterialExchangeOffer` (any status)
 is excluded from the merge — it is never a survivor whose amount changes and never folded away: the
 `inventory_item` FK is `ON DELETE CASCADE` (V210), so deleting such a row would silently destroy the
-offer. The offered quantity is therefore never increased by a merge.
+offer. The offered quantity is therefore never increased by a merge. The locking read excludes the
+offer-backed rows it sees, and the merge asks again once the group is locked, since a release locks
+its row (ADR-0362) and an offer released while the merge waited is not seen by the locking read.
 
 **Concurrency.** The merge group is loaded `FOR UPDATE` (pessimistic write lock) so two racing
 same-stack writers serialise instead of double-counting or losing stock — this re-introduces, **only
@@ -491,7 +493,8 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 **Code:** `InventoryCheckoutService#mergeStockIfRequested`,
 `InventoryItemRepository#findMergeGroupForUpdate`, `InventoryItemService#hasMergeCandidates`,
 `InventoryItemRepository#countMergeCandidates`,
-`MaterialExchangeOfferRepository#existsByInventoryItemId`, `InventoryItemService`,
+`MaterialExchangeOfferRepository#existsByInventoryItemId` / `#findOfferedInventoryItemIds`,
+`InventoryItemService`,
 `V216__merge_piece_inventory_rows.sql`, `inventory/inventory-input.html` / `inventory-input.js`,
 `inventory/inventory-my.html` / `inventory-my.js`, `inventory/inventory-admin.html` / `inventory-admin.js`
 · **Issues:** #1182 · **ADR:** ADR-0097
@@ -1022,7 +1025,7 @@ something is marked.*
 `InventoryPageControllerMvcTest`
 (`viewMyInventory_rendersBulkRebookButtonAndModalWithAllThreeModes`) · **Code:**
 `InventoryCheckoutService#bulkRebook`, `InventoryItemService#bulkRebook`,
-`InventoryItemController#bulkRebook`, `InventoryItemRepository#findByIdForRebook`,
+`InventoryItemController#bulkRebook`, `InventoryRowLockRepository#lockById` (REQ-INV-071),
 `BulkRebookRequest` / `BulkRebookResultDto` / `BulkRebookMode`,
 `InventoryWriteController#bulkRebook`, `templates/inventory/inventory-my.html`,
 `static/js/inventory/inventory-my.js` · **Issues:** — · **ADR:** ADR-0124
@@ -1341,8 +1344,12 @@ REQ-INV-037)
 The shared "Globales Lager" page (`/inventory/all`) offers an admin a **"Globales Lager leeren"**
 entry in the page head's „⋯" menu (since 2026-10-03, website overhaul phase 3; it was a button in
 the action bar above the table) behind a danger confirmation modal. It deletes every **non-personal** Lager row inside the
-caller's current org-unit scope in one statement; personal rows (`personal = true`) are never
-touched. The scope is the standard predicate triple
+caller's current org-unit scope; personal rows (`personal = true`) are never touched. The wipe
+captures the matching row ids, plans their order, material and stock resources, and locks the
+captured rows with `PESSIMISTIC_WRITE` in ascending id order. It rechecks scope under those locks and
+audits the Materialbörse offers (REQ-MARKET-013) on the same subset it deletes by id in one
+statement. Rows that enter the scope after selection survive (ADR-0362).
+The scope is the standard predicate triple
 ([`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-003): an admin in all-scope wipes the shared
 stock of every org unit, an admin pinned to one org unit wipes only that unit's. The rows' job-order
 / mission allocations and any Materialbörse offer they back go with them through the
@@ -1365,15 +1372,19 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
   the backend, and sees no button.
 - [ ] The wipe records exactly one `INVENTORY_WIPED` audit event with the scope and the removed-row
   count.
+- [ ] The rows the wipe audits and deletes are the rows it locked; an offer released on one of them
+  while the wipe waits for its lock is audited as removed.
 
 **Enforced by:** `InventoryItemServiceTest` (`deleteAllGlobalInventory_*`),
-`InventoryCheckoutServiceAuditTest#deleteAllGlobalInventory_recordsWipedAuditWithScopeAndCount`,
+`InventoryCheckoutServiceAuditTest#deleteAllGlobalInventory_locksAuditsAndDeletesTheSameRowsAndRecordsWipedAudit`,
+`MaterialExchangeOfferDeleteRaceIntegrationTest`,
 `InventoryItemControllerTest#deleteAllGlobalInventory_returns204_andDelegatesToService`,
 `InventoryDeleteAllProxyControllerTest` (backend 403 propagated) — the two `hasRole('ADMIN')` gates
 themselves are not yet pinned by a test · **Code:**
 `InventoryItemController#deleteAllGlobalInventory`, `InventoryCheckoutService#deleteAllGlobalInventory`,
-`InventoryItemRepository#deleteAllNonPersonal`, `InventoryDeleteAllProxyController`,
-`templates/inventory/inventory-admin.html`, `static/js/inventory/inventory-admin.js` · **Issues:** — · **ADR:** —
+`InventoryRowLockRepository#findNonPersonalIdsInScope` / `#deleteAllByIdIn`,
+`InventoryOrderWrites#prepareWrites`, `InventoryDeleteAllProxyController`,
+`templates/inventory/inventory-admin.html`, `static/js/inventory/inventory-admin.js` · **Issues:** #3261 · **ADR:** ADR-0362
 
 ### REQ-INV-052 — A member can change the org unit of their own personal row afterwards
 
@@ -1582,7 +1593,9 @@ that lowers or moves the row:
 - the three slice sums are each checked against the row's amount (`InventoryAllocations.fits`) on
   every amount-lowering write, so book-out, sale, transfer, rebooking and the stolen split refuse a
   write that would leave a pledge uncovered (422);
-- a row that still carries a donation slice is neither depleted nor moved in full;
+- a row that still carries a donation slice is neither depleted nor moved in full: a depleting
+  book-out, the bulk check-out (REQ-INV-044) and the bulk rebooking (REQ-INV-036) refuse it (422)
+  and change nothing;
 - the exchange counts the donation slice in its free-stock calculation;
 - a stock merge unions the slices of the folded row into the survivor;
 - the row's DTO lists the slices as `donationAllocations` (the donation, the receiving unit's name,
@@ -1593,8 +1606,9 @@ that lowers or moves the row:
 Concurrent pledge and sale of the same row cannot both succeed: both take the row's lot lock first and
 the row's `@Version` guards the write.
 
-**Enforced by:** `InventoryPoolCommandsTest`, `InventoryItemMapperTest`, `SupplyDonationEarmarksTest`,
-`InventorySupplyRenderTest` · **Code:** `inventory/internal/InventoryAllocations`,
+**Enforced by:** `InventoryPoolCommandsTest`, `InventoryItemServiceBulkCheckoutTest`,
+`InventoryItemMapperTest`, `SupplyDonationEarmarksTest`, `InventorySupplyRenderTest` · **Code:**
+`inventory/internal/InventoryAllocations`, `inventory/internal/InventoryDonationGuards`,
 `inventory/internal/InventoryCheckoutService`, `inventory/internal/InventoryDonationAllocation`,
 `exchange/internal/ExchangeStockWriteService`
 
@@ -1903,6 +1917,47 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 `inventory/web/StockLevelPageController`, `StockLevelProxyController`,
 `templates/inventory/stock-levels.html`, `static/js/inventory/stock-levels.js` · **Related:** REQ-INV-067, REQ-NOTIF-030, REQ-SUP-003, REQ-UI-026, REQ-UI-034, REQ-AUDIT-001,
 REQ-OBS-011 · **Decision:** ADR-0302
+
+### REQ-INV-071 — A single-row Lager lock is one statement without a join
+
+Every Lager write that locks one row by its id takes the lock through
+`InventoryRowLockRepository#lockById`: one `SELECT … FOR NO KEY UPDATE` on `inventory_item` alone.
+That covers the bulk check-out and the bulk rebooking (REQ-INV-034, REQ-INV-036), the stolen
+marking (REQ-INV-053), the org-unit and pool changes, the org-stock entry commands of the exchange,
+and `StockCommands.lockRow` for the material handover, the production consumption (REQ-INV-032) and
+the donation pledge and receipt (REQ-SUP-008, REQ-SUP-009). The row's associations load on first
+use.
+
+- **A row deleted while the lock waited reads as absent.** The write answers its not-found for an
+  unknown row: `404 Inventory item not found`, `Stock row not found` for a pledge, the refusal
+  `NOT_PERMITTED` for an org-stock entry command. A receipt books the received amount into the pool,
+  as it does for a source row gone before it started.
+- **A row the transaction already read is locked too.** When another transaction committed a newer
+  version of it meanwhile, the lock raises the optimistic-lock conflict (`409`).
+- **No pessimistic lock of a repository needs follow-on locking.** A `@Lock(PESSIMISTIC_*)` query
+  carries no `@EntityGraph`, no outer join, no `DISTINCT`, `GROUP BY`, `HAVING` or aggregate, and
+  reads a single-table entity, so Hibernate locks in the query's own statement (ADR-0363).
+
+**Acceptance**
+
+- [x] The bulk check-out, the bulk rebooking, the single and bulk stolen marking, the single and
+  bulk org-unit change, the pool change, the handover, the production consumption and the pledge
+  answer their not-found when another transaction deletes their row while their lock waits.
+  *`InventoryRowLockRaceIntegrationTest`, `JobOrderStockLockRaceIntegrationTest`,
+  `SupplyDonationStockLockRaceIntegrationTest`.*
+- [x] A receipt whose source row is deleted while its lock waits books into the pool.
+  *`SupplyDonationStockLockRaceIntegrationTest`, `SupplyDonationServiceTest`.*
+- [x] `lockRow` answers empty for a row deleted while it waited, reads what a concurrent writer
+  committed, holds the lock on a row its transaction already read and raises the conflict for one
+  read at an older version. *`InventoryRowLockRaceIntegrationTest`.*
+- [x] No repository's pessimistic lock carries a follow-on shape. *`PessimisticLockShapeTest`.*
+
+**Enforced by:** `InventoryRowLockRaceIntegrationTest`, `JobOrderStockLockRaceIntegrationTest`,
+`SupplyDonationStockLockRaceIntegrationTest`, `PessimisticLockShapeTest` · **Code:**
+`inventory/internal/InventoryRowLockRepository#lockById`, `InventoryStockCommands#lockRow`,
+`InventoryCheckoutService`, `InventoryStolenMarkService`, `InventoryOrgUnitChangeService`,
+`InventoryPoolChangeService`, `InventoryPoolEntryCommands`, `supply/internal/SupplyDonationService#receive`
+· **Related:** REQ-MARKET-013, REQ-INV-044 · **Decision:** ADR-0363
 
 ## Out of scope
 

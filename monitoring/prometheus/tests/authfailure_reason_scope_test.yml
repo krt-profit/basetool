@@ -69,7 +69,7 @@ tests:
               reason: no_credentials
             exp_annotations:
               summary: "Sustained flood of credential-less requests on backend"
-              description: "The backend is refusing more than 60 requests/minute that carry no Authorization header at all, for 15 minutes. That is an order of magnitude above the blackbox-probe floor, so it is scanning or a misconfigured client looping - not credential guessing, which would show on BackendAuthFailureSpike. Check basetool_ratelimit_rejections_total for whether the rate limiter is already absorbing it."
+              description: "The backend is refusing more than 18 requests/minute that carry no Authorization header at all, for 15 minutes. Its floor is 2/minute from the internal TLS probe, and the backend is reachable only from the frontend and ingest, so this is an internal caller looping without a token - not credential guessing, which would show on BackendAuthFailureSpike. Check basetool_api_client_requests_total for the calling client and basetool_ratelimit_rejections_total for whether the rate limiter is already absorbing it."
 
   - name: silent - ingest probe traffic is not a brute force
     interval: 1m

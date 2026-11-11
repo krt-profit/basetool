@@ -35,7 +35,9 @@ DEPLOY_USER_TASKS = "ansible/roles/basetool_host/tasks/22-deploy-user.yml"
 LIB_GLOB = "scripts/lib/*.sh"
 
 TWO_WORD = {"container", "image", "network", "system", "volume"}
-RT_CLI_CALL = re.compile(r"\$\{?RT_CLI\}?\s+([a-z][a-z-]*)(?:\s+([a-z][a-z-]*))?")
+RT_CLI_CALL = re.compile(
+    r'(?:\$\{?RT_CLI\}?|"\$\{RT_CLI_ARGV\[@\]\}")\s+([a-z][a-z-]*)(?:\s+([a-z][a-z-]*))?'
+)
 SUDO_PODMAN_CALL = re.compile(
     r"sudo\s+-n\s+-u\s+(?:\{\{[^}]*\}\}|\S+)\s+podman\s+([a-z][a-z-]*)(?:\s+([a-z][a-z-]*))?"
 )
@@ -101,9 +103,10 @@ def selftest() -> int:
         'sudo -n -u "${u}" podman ps --format x\n'
         "sudo -n -u {{ basetool_host_service_user }}\n    podman info --format x\n"
         "$RT_CLI exec db sh\n"
+        '"${RT_CLI_ARGV[@]}" container prune --force\n'
     )
     cases = [
-        ("extraction", subcommands(script) == {"create", "image prune", "system df", "ps", "exec", "info"}),
+        ("extraction", subcommands(script) == {"create", "image prune", "system df", "ps", "exec", "info", "container prune"}),
         ("agreement passes", compare(["ps", "exec"], {"ps", "exec"}) == []),
         ("a used sub-command missing from the allowlist fails", len(compare(["ps"], {"ps", "exec"})) == 1),
         ("an unused allowlist entry fails", len(compare(["ps", "run"], {"ps"})) == 1),

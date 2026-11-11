@@ -49,6 +49,10 @@ ships as Flyway migrations, not here.
 
 ### REQ-DATA-003 — No N+1
 
+The leadership overview resolves visible unit identifiers before batch-loading their rosters
+and command groups. These reads have a fixed query count as the number of visible units grows;
+they do not fetch multiple sibling collections in a cartesian join.
+
 Prefer `JOIN FETCH`, `@EntityGraph`, or Spring Data projections over lazy-load fan-out. Replace a
 `findById`-in-a-loop with one `findAllById` keyed into a map (e.g.
 `MissionService.resolveMembershipOrgUnits`, `BankLedgerService` wipe-reset / reversal holders), and
@@ -253,6 +257,13 @@ batch; the abbreviation fallback still adopts a legacy short-named row; the `V16
 child FKs and carries cross-source links onto the surviving canonical row.
 
 ### REQ-DATA-005 — the UEX syncs isolate each row (or chunk) in its own transaction
+
+Each universe-catalogue chunk batch-reads existing UEX identities and name fallbacks once.
+City and space-station chunks additionally batch-read their linked storage places and source
+or fallback name collisions once, keeping a transaction-local reservation index as rows change.
+Lookup count scales with chunks rather than DTOs. Terminal name fallback still adopts only an
+unclaimed row in stable local-id order. A failed chunk rebuilds every index in each isolated
+row-recovery transaction; no managed entity crosses transaction boundaries.
 
 UEX assigns the **same in-game `uuid`** to several distinct item ids (a base item and its
 skins/variants — e.g. ids `879`/`5457`/`5458` all carry the MaxLift tractor-beam uuid). `game_item`
@@ -528,9 +539,14 @@ Concrete handling, in order:
   `inventory_item` (`inventory_job_order_allocation`, `inventory_mission_allocation`,
   `material_exchange_offer`) declare `ON DELETE CASCADE`, so the job-order and mission links and any
   open Materialbörse offer go with the row; `job_order_handover_item.inventory_item_id` is
-  `ON DELETE SET NULL` (V58) so the handover history survives with its snapshot, and
-  `mission_unit.ship_id` is likewise `ON DELETE SET NULL` (V51) so mission units survive without
-  their ship. **Consequence, accepted deliberately:** `inventory_item.personal = false` is the shared
+  `ON DELETE SET NULL` (V58) so the handover history survives with its snapshot. Mission units
+  survive without their ship: before the ships go, `HangarUserErasure` calls
+  `ShipDeletionObserver#beforeOwnerShipsDelete`, and the mission module clears `mission_unit.ship_id`
+  on every unit that carries one of them in one statement that bumps the unit's `version`, records
+  `MISSION_UNIT_UPDATED` per unit and tells an unfinished mission's leadership (REQ-HANGAR-006). It
+  reads the units as a projection and loads no ship or unit, because a managed entity that references
+  the member aborts the deletion's flush. The column's `ON DELETE SET NULL` (V51) stays as the
+  database's own guarantee. **Consequence, accepted deliberately:** `inventory_item.personal = false` is the shared
   squadron pool, in which `user_id` marks only the contributor — so this removes stock the org unit
   may still physically hold. That is the intended semantics as of this release; a member's
   contribution is not inherited by the squadron.
@@ -653,7 +669,12 @@ and the claim survives with a null stamp. The same class additionally deletes a 
 an org-unit membership and asserts the flush raises no `TransientPropertyValueException` and that the
 DB cascade removed the membership row. `UserDeletionEndStateTest` (real Postgres) deletes a member
 who owns rows in every store next to a second member whose rows must stay, and pins the end state
-of every table and the audit rows with their order and exact details; `UserErasureOrderTest` pins
+of every table and the audit rows with their order and exact details;
+`UserDeletionShipReleaseIntegrationTest` (real Postgres) deletes a member who owns a mission and
+whose ships sit in units of an open and a completed mission, and asserts the flush succeeds, every
+such unit loses its ship with a `version` bump and a `MISSION_UNIT_UPDATED` row, another member's
+unit is untouched, and only the open mission's units are announced, never to the member;
+`UserErasureOrderTest` pins
 the participants' run order and the uniqueness of the positions; `UserDeletionServiceTest` runs
 fake participants through the orchestrator (phase and position order, summed counts, audit
 details, refusals run none); each participant has a unit test.
@@ -663,6 +684,8 @@ the `UserErasureParticipant` implementations (`platform.api`),
 `MissionOwnershipRepository.updateOwner`, `MaterialClaimRepository.unlinkClaimedByUser`,
 `db/migration/V63` (companion table without auto-cascade on `owner_id`),
 `OrgUnitMembershipRepository.findOrgUnitIdsByUserId` (projection-only snapshot seam),
+`ShipDeletionObserver#beforeOwnerShipsDelete` with `MissionUnitRepository.findShipReleasesByShipOwnerId`
+(projection) and `#releaseShipsOfOwner` (set-based release of the member's ships),
 `GdprParticipantCoverageTest` (every non-cascading foreign key to `app_user` is a step the
 deletion is checked to call, REQ-DATA-021).
 
@@ -795,6 +818,36 @@ cache, and a write evicts both); `TerminalServiceCachingTest` / `PoiServiceCachi
 `ScWikiScheduler.runAllSyncSteps`, `P4kImportJobRunner.run` (APPLY-committed evict), `P4kCatalogueChange` (APPLY and review resolution),
 `MaterialService` / `TerminalService` / `PoiService` / `OutpostService` (`@Cacheable` reads + `@CacheEvict`
 mutators).
+
+
+**Cache admission follows retained value shape, rather than one entry count for every shape.**
+`CacheConfig` keeps the TTLs, write/sync invalidation and statistics above, and assigns each cache a
+Caffeine `maximumWeight` budget. `CacheValueWeight` traverses immutable DTO records, pages,
+collections, indexes, strings and scalar values iteratively with identity tracking. It counts shared
+references once per entry, rejects unsupported/inaccessible value shapes and refuses oversized
+entries without failing the underlying read. Admission arithmetic saturates and a cyclic/deep graph
+cannot overflow the Java stack. Known catalogue, role and squadron DTO families have admission
+coverage.
+
+| Cache group | Conservative estimated-value budget per cache |
+| --- | --- |
+| `terminals`, `blueprintFamilyIndex` | 16 MiB |
+| `materials`, `shipTypes`, `pois` | 8 MiB |
+| `cities`, `locations`, `outposts`, `manufacturers`, `materialById` | 4 MiB |
+| `frequencyTypes`, `jobTypes`, `materialCategories`, `refiningMethods`, `starSystems`, `squadrons`, `roles` | 2 MiB |
+
+The 17 budgets total 90 MiB of admission weights. These are conservative model estimates, not a JVM
+retained-heap limit: cache bookkeeping, collector layout and cross-entry sharing differ. Large pages
+and complete indexes consume proportionally more budget and a load-all value above its cache's
+budget is returned without being retained. Existing hit/miss/eviction metrics keep their names and
+label vocabulary; no new public surface or metric family is introduced.
+
+`CacheValueWeightTest` covers all cached DTO families, large-page rejection, eviction statistics,
+unknown shapes and cyclic/deep graphs. `:backend:characterizeCacheBudgets` records synthetic real
+`TerminalDto` shapes, approximate retained-heap deltas and the same fixed mixed-locality request
+trace for entry-count and weighted policies. The method and evidence limits live in
+[`audit-3267-cache-budgets.md`](../research/audit-3267-cache-budgets.md). No production heap or latency
+improvement is inferred from a synthetic result.
 
 ### REQ-DATA-012 — Operation-detail + job-order read-shape hardening (operation-side ADR-0078, #1109)
 
@@ -960,19 +1013,19 @@ ingests the other categories but runs no sweep; a run in which a category answer
 zero rows still sweeps. (`StalePriceSweepTest`): the same rows are cleared as the `NOT IN` form
 cleared, no statement is issued when nothing is stale, and the ids arrive in bounded batches.
 
-**A feed that shifts under the walk is walked once more.** The Wiki re-paginates a large feed while
-it is read, so one walk can see a row twice and miss another. A walk that read every page but saw a
-repeated row, a shortfall against `meta.total` or a growing page count is repeated once, and the
-repeat alone decides the census; a repeat that shifts again stays `INCOMPLETE`. A walk without
-pagination metadata or with a failed page is not repeated. Both walks count as fetched deliveries
-(REQ-DATA-038) and share one fetch-error count.
+**Item and vehicle feeds are walked in `class_name` order.** The Wiki's default order has ties, so
+on `/api/items` and `/api/vehicle-items` the same rows land on both sides of a page boundary and as
+many never arrive, identically on every walk. Every endpoint in
+`ScWikiProperties.classNameSortedEndpoints()` (items, vehicles, the item-kind endpoints) is walked
+with `sort=class_name`, a key unique and non-null in those feeds. Blueprints, commodities and
+manufacturers carry no `class_name` and keep the source order, which enumerates them completely.
 
 **Acceptance** (`ScWikiClientTest`): a walk whose distinct rows exceed `meta.total` stays
 `complete`, does not `WARN` and does not count; a walk in which one row arrives on two pages is
 `INCOMPLETE` **even when the merged size matches `meta.total` exactly**; a distinct-row shortfall is
-`INCOMPLETE`; a second page announcing a third page is `INCOMPLETE`; each of these is walked exactly
-twice, and a stable repeat is `complete`; id-less rows do not read as duplicates; and a walk
-exhibiting two symptoms of one break still increments the fetch-error counter once.
+`INCOMPLETE`; a second page announcing a third page is `INCOMPLETE`; id-less rows do not read as
+duplicates; a walk exhibiting two symptoms of one break still increments the fetch-error counter
+once; and an item feed is requested with `sort=class_name` while a blueprint feed is not.
 
 **Acceptance** (`ScWikiItemSyncServiceBackfillTest`): a run in which one kind pass is INCOMPLETE but
 the residual `/api/items` pass returns a complete census containing every row that pass saw **does**
@@ -1129,7 +1182,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 52 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
+| `catalogue` | 53 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_scwiki_identity`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
@@ -1266,8 +1319,9 @@ services switched on 2026-10-12: a cached method maps the entity to its existing
 (`CityDto`, `LocationDto`, `MaterialDto`, …) in its own read-only transaction and caches that
 immutable record; cache names, keys, TTLs and evict triggers are unchanged and so is the JSON, and
 a mutator loads the entity through a private `require…` method, never through its cached getter.
-The three methods that still return an entity (`RoleService`, `SquadronService`) are listed with
-their reason, and the list may only shrink.
+Role and squadron reads also cache detached scalar records; role permissions are copied into
+unmodifiable sets. No entity-cache exception remains. Their existing wire representations, cache
+keys, TTLs and write invalidation remain compatible.
 
 **Acceptance**
 
@@ -1628,8 +1682,23 @@ Original UEX and Wiki names are retained separately from the canonical item name
 
 A Wiki manufacturer name or code that several census rows share is ambiguous only while an
 unclaimed local row carries it. A local row whose P4K or Wiki UUID names another row of the same
-census belongs to that sibling, and a key no local row carries leaves the Wiki row unmatched; neither
-case blocks the manufacturer census (`ScWikiManufacturerSyncServiceTest`).
+census belongs to that sibling, whichever key matched it: the Wiki row becomes an alias of the
+local row (`MANUFACTURER_DUPLICATE` on first sight). A key no local row carries leaves the Wiki row
+unmatched; neither case blocks the manufacturer census. Every Wiki row that resolves to a
+manufacturer is kept in `manufacturer_scwiki_identity`; the one named by `scwiki_uuid` is the
+primary link, the others are aliases, and the Wiki item sync resolves an item's manufacturer
+through all of them. An admin chooses the primary link on `/admin/sync-reports/scwiki`; the choice
+is versioned by the manufacturer's `@Version`, audited and kept by later runs. A row linked to a
+Wiki UUID that a complete census no longer carries moves to a known alias, or to the Wiki row whose
+name equals its name and whose code equals its stored `scwiki_code`, both unique in the census
+(`MANUFACTURER_RELINKED`); any other differing link stays a `MANUFACTURER_MISMATCH` and blocks the
+census. A complete census deletes the identities it no longer carries
+([ADR-0361](../adr/0361-a-wiki-manufacturer-follows-its-uuid-change-and-a-wiki-duplicate-becomes-an-alias.md),
+`ScWikiManufacturerSyncServiceTest`, `ManufacturerWikiIdentityServiceTest`,
+`AdminSyncReportsPageControllerMvcTest`).
+
+A Wiki blueprint aspect's `selection_group` is a group key or a reference object to its
+`aspect_groups` entry; both store the key (`ScWikiClientTest`).
 
 UEX gives an item and a commodity terminal of one location the same name. The terminal sync adopts
 a row by name only while no UEX terminal claims it, so each UEX terminal keeps a row of its own and
@@ -1718,3 +1787,23 @@ The run view displays outcomes, counters and the last fully successful source sw
 from the most recent attempt. Existing anomalies stay queryable. Metrics, alerts and dashboards
 follow the same bounded source/aggregate/status vocabulary. A clean run without events and a
 failed run before the first event both appear in history.
+
+### REQ-DATA-039 — Announcement reads do not create state
+
+The announcement table enforces at most one current row through a unique partial index on its
+current-row discriminator. Migration selects the latest nonblank banner, otherwise the latest
+row, and retains every non-current row. Public and administrator GETs perform no writes; an
+absent administrator view has version zero. Only the write path initializes the row and its
+conflict-safe insertion serializes concurrent first writes before checking the expected version.
+Deleting the current banner lets the next banner obtain a fresh UUID, so a previous dismissal
+cannot suppress it. Content, blank-banner visibility and optimistic conflicts retain their
+existing contracts.
+
+### REQ-DATA-040 — Transaction resources follow suspension and resumption
+
+Live-sync flushes and transaction-local mission, inventory and refinery memos unbind when their
+own transaction is suspended and rebind when it resumes. A `REQUIRES_NEW` transaction cannot
+read or append to the suspended transaction's resources. Inner notifications follow the inner
+commit independently of the outer outcome, and every completion releases its own resources.
+These are infrastructure guarantees; the regression tests do not establish a production user
+flow that previously exercised a conflicting nested resource.

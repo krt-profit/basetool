@@ -44,7 +44,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
@@ -223,19 +222,8 @@ public class BankBookingRequestService {
       throw new BadRequestException(
           "Only a withdrawal request records a counterparty (Empfaenger)");
     }
-    User user = Entities.require(userRepository.findById(userId), "Counterparty user not found");
-    if (orgUnitId == null) {
-      return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
-    }
-    OrgUnitMembershipOptionDto membership =
-        orgUnitMembershipQueryService.listDirectMembershipOptions(userId).stream()
-            .filter(option -> option.orgUnitId().equals(orgUnitId))
-            .findFirst()
-            .orElseThrow(() ->
-                new BadRequestException(
-                    "The selected org unit is not one of the counterparty's memberships"));
-    return new CounterpartySnapshot(
-        user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
+    return RegisteredCounterpartyResolver.resolve(
+        userRepository, orgUnitMembershipQueryService, userId, orgUnitId);
   }
 
   /**

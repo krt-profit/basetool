@@ -75,3 +75,10 @@ password stops the run before the first check.
 **Consequences.** A conformance run asks once per run, not once per ten minutes. Each privileged
 command is a fresh sudo authentication in the auth log. A session of the admin account no longer
 inherits root from another one.
+
+## Amendment 2 — The read grant accepts no operator-controlled environment
+
+The password-free Podman read alias uses `NOSETENV`. Command-scoped sudo defaults reset the
+environment, set the service user's home and retain only `TERM`; `SETENV` and inherited runtime,
+loader or container configuration variables cannot alter the permitted read operation. The command
+allowlist, target service identity, audit attribution and password-protected full grant are unchanged.

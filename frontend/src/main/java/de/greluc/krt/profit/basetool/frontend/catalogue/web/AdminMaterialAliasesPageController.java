@@ -146,6 +146,7 @@ public class AdminMaterialAliasesPageController {
       BackendErrorLogging.warn(log, "POST /api/v1/material-external-aliases", e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Create alias failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     }
@@ -197,6 +198,7 @@ public class AdminMaterialAliasesPageController {
       BackendErrorLogging.warn(log, "PUT /api/v1/material-external-aliases", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update alias {} failed", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.save");
     }
@@ -220,6 +222,7 @@ public class AdminMaterialAliasesPageController {
       BackendErrorLogging.warn(log, "DELETE /api/v1/material-external-aliases", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Delete alias {} failed", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "notification.error.delete");
     }

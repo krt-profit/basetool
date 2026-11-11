@@ -22,13 +22,13 @@ groups:
           description: "The backend is rejecting presented tokens at an elevated rate - possible credential/JWT guessing. This series is normally zero: a caller with no token at all counts as reason=no_credentials, not here. Split the whole picture with sum by (reason) (rate(basetool_auth_failures_total{application=\"basetool-backend\"}[5m])): invalid_token is a rejected token (expired, wrong issuer/audience, bad signature), invalid_request a malformed Authorization header, insufficient_scope a valid token missing a scope, no_credentials a request that presented nothing (the ordinary background - probes, scanners, pre-login navigation), other an unenumerated failure worth reading the DEBUG line for."
 
       - alert: BackendUnauthenticatedFlood
-        expr: rate(basetool_auth_failures_total{application="basetool-backend",reason="no_credentials"}[5m]) > 1
+        expr: rate(basetool_auth_failures_total{application="basetool-backend",reason="no_credentials"}[5m]) > 0.3
         for: 15m
         labels:
           severity: warning
         annotations:
           summary: "Sustained flood of credential-less requests on backend"
-          description: "The backend is refusing more than 60 requests/minute that carry no Authorization header at all, for 15 minutes. That is an order of magnitude above the blackbox-probe floor, so it is scanning or a misconfigured client looping - not credential guessing, which would show on BackendAuthFailureSpike. Check basetool_ratelimit_rejections_total for whether the rate limiter is already absorbing it."
+          description: "The backend is refusing more than 18 requests/minute that carry no Authorization header at all, for 15 minutes. Its floor is 2/minute from the internal TLS probe, and the backend is reachable only from the frontend and ingest, so this is an internal caller looping without a token - not credential guessing, which would show on BackendAuthFailureSpike. Check basetool_api_client_requests_total for the calling client and basetool_ratelimit_rejections_total for whether the rate limiter is already absorbing it."
 
       - alert: IngestAuthFailureSpike
         expr: rate(basetool_ingest_auth_failures_total{application="basetool-ingest",reason="invalid_token"}[5m]) > 0.05

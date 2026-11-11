@@ -66,7 +66,7 @@ not belong to Profit.
 **Enforced by:** The MATERIAL/ITEM foundation is covered by
 `JobOrderHierarchyAuthorityIntegrationTest`, `ProfitHierarchyIntegrationTest`,
 `ProfitHierarchyWriteRaceIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
-`ProfitHierarchyNoticeIntegrationTest` and `V376ProfitHierarchyMigrationTest`.
+`ProfitHierarchyNoticeIntegrationTest` and `V379ProfitHierarchyMigrationTest`.
 The aUEC workflow follows its own implementation slice.
 **Issues:** #3193, #3197, #3200
 
@@ -105,7 +105,7 @@ material demand and persisted handover reports use the same complete permitted a
 Requester reduction and its DTO flag are removed; processing and requester capabilities remain
 separate. Current contextual writers receive the concrete workspace capability even without a
 direct membership. Independent producer, mission, unrelated Inventory, Bank and reduced Exchange
-gates remain. V378 retains only observed order/unit relationships: current parties and retained
+gates remain. V381 retains only observed order/unit relationships: current parties and retained
 claim facts migrate; authorised creates and edits retain their observed before/after parties.
 Current unit reach is required, and a former individual's lost membership grants nothing.
 Current and ended participations provide observed supporting-unit readership; only active support
@@ -135,7 +135,7 @@ reduced, capability-based surface.
 - [ ] Common read does not expose an independently private blueprint, mission or Bank account.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
-`JobOrderSupportReadIntegrationTest`, `V378JobOrderUnitReadingMigrationTest`, `JobOrderAssigneeGrantIntegrationTest`,
+`JobOrderSupportReadIntegrationTest`, `V381JobOrderUnitReadingMigrationTest`, `JobOrderAssigneeGrantIntegrationTest`,
 `JobOrderScopeQueryIntegrationTest`, `JobOrderLinkedStockReadNoNPlusOneTest` and the frontend
 order render tests cover the implemented workspace. `JobOrderMoneyIntegrationTest` covers the
 currently linked holder through workspace capability, detail, list count and number lookup;
@@ -248,7 +248,7 @@ where authorized; historical names alone do not create access.
 `ProfitHierarchyWriteRaceIntegrationTest`, `InventoryJobOrderScopeIntegrationTest`,
 `StockRowViewCharacterisationTest`, `JobOrderModuleContractTest`,
 `JobOrderAssigneeGrantIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
-`ProfitHierarchyNoticeIntegrationTest` and `V376ProfitHierarchyMigrationTest` cover current
+`ProfitHierarchyNoticeIntegrationTest` and `V379ProfitHierarchyMigrationTest` cover current
 MATERIAL/ITEM mutations, linked stock, recovery and retained legacy history. Future participation
 and money mutations must apply the same prerequisite.
 **Issues:** #3193, #3197, #3200

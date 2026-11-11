@@ -39,13 +39,14 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,12 +72,9 @@ import org.springframework.context.ApplicationEventPublisher;
 class InventoryStockMergeTest {
 
   @BeforeEach
-  void wireOrderWriteFixture() {
+  void wireCheckoutGraph() {
     service =
-        new InventoryCheckoutService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -88,7 +86,6 @@ class InventoryStockMergeTest {
             null,
             null,
             auditService,
-            new InventoryCheckoutAudits(auditService),
             eventPublisher);
   }
 
@@ -241,6 +238,31 @@ class InventoryStockMergeTest {
     verify(inventoryItemRepository, never())
         .findMergeGroupForUpdate(any(), any(), any(), any(), any(), eq(false), any());
     verifyNoInteractions(auditService);
+  }
+
+  /**
+   * A sibling an offer was released on while the group lock waited passes the locking read, which
+   * saw no offer yet; the check after the lock keeps it out of the fold, so its offer survives.
+   */
+  @Test
+  void siblingOfferedWhileTheGroupLockWaited_isNotFolded() {
+    UUID survivorId = UUID.randomUUID();
+    InventoryItem survivor = row(survivorId, QuantityType.PIECE, 5.0, null);
+    InventoryItem plain = row(UUID.randomUUID(), QuantityType.PIECE, 3.0, null);
+    InventoryItem offered = row(UUID.randomUUID(), QuantityType.PIECE, 2.0, null);
+
+    when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
+    when(inventoryItemRepository.findMergeGroupForUpdate(
+            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null))
+        .thenReturn(List.of(survivor, plain, offered));
+    when(stockOfferLookup.offeredRows(List.of(plain.getId(), offered.getId())))
+        .thenReturn(Set.of(offered.getId()));
+    when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
+
+    service.mergeStockIfRequested(survivor, false);
+
+    assertEquals(8.0, survivor.getAmount(), 1e-9, "only the unoffered sibling is folded in");
+    verify(inventoryItemRepository).deleteAll(List.of(plain));
   }
 
   @Test

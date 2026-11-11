@@ -1,0 +1,32 @@
+rule_files:
+  - ../alerts/apps.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: silent - the internal TLS probe's floor of 2 per minute, and three times that
+    interval: 1m
+    input_series:
+      - series: 'basetool_auth_failures_total{application="basetool-backend",reason="no_credentials"}'
+        values: "0+2x120 240+6x60"
+    alert_rule_test:
+      - eval_time: 180m
+        alertname: BackendUnauthenticatedFlood
+        exp_alerts: []
+
+  - name: fires - an internal caller looping without a token at 30 per minute
+    interval: 1m
+    input_series:
+      - series: 'basetool_auth_failures_total{application="basetool-backend",reason="no_credentials"}'
+        values: "0+2x60 120+30x40"
+    alert_rule_test:
+      - eval_time: 95m
+        alertname: BackendUnauthenticatedFlood
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: basetool-backend
+              reason: no_credentials
+            exp_annotations:
+              summary: "Sustained flood of credential-less requests on backend"
+              description: "The backend is refusing more than 18 requests/minute that carry no Authorization header at all, for 15 minutes. Its floor is 2/minute from the internal TLS probe, and the backend is reachable only from the frontend and ingest, so this is an internal caller looping without a token - not credential guessing, which would show on BackendAuthFailureSpike. Check basetool_api_client_requests_total for the calling client and basetool_ratelimit_rejections_total for whether the rate limiter is already absorbing it."

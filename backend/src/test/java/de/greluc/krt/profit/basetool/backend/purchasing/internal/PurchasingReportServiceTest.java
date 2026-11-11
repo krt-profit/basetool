@@ -223,6 +223,34 @@ class PurchasingReportServiceTest {
     assertThat(csv).doesNotContain(PARTNER.toString());
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(
+      strings = {
+        "name;variant",
+        "name\"variant",
+        "name\r\nvariant",
+        "Größe",
+        "=1+1",
+        "+SUM(A1)",
+        "-1",
+        "@name",
+        "\t=1"
+      })
+  void csvCellsPreserveTheirText(String value) {
+    String encoded = PurchasingReportService.csvCell(value);
+    String decoded =
+        encoded.startsWith("\"")
+            ? encoded.substring(1, encoded.length() - 1).replace("\"\"", "\"")
+            : encoded;
+    assertThat(decoded).isEqualTo(value);
+    if (value.contains(";")
+        || value.contains("\"")
+        || value.contains("\r")
+        || value.contains("\n")) {
+      assertThat(encoded).startsWith("\"").endsWith("\"");
+    }
+  }
+
   @Test
   void theForumTextSummarisesThePeriodLineByLine() {
     stubFixture();

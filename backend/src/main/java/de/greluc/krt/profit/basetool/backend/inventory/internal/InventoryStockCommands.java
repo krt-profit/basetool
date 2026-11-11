@@ -133,12 +133,26 @@ public class InventoryStockCommands implements StockCommands {
 
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
+  public void prepareWritesRequiringSources(
+      @NotNull Collection<UUID> selected,
+      @NotNull Collection<UUID> additional,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes) {
+    orderWrites.prepareWritesRequiringSources(selected, additional, bookings, requiredScopes);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void prepareDonationReceipt(
+      @NotNull UUID sourceRowId, @NotNull StockBookInScope destination) {
+    orderWrites.prepareSingleRowWrite(sourceRowId, List.of(destination), false);
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull Optional<StockRow> lockRow(@NotNull UUID rowId) {
-    orderWrites.lockEligibility();
-    orderWrites.prepareWrites(List.of(rowId), List.of(), List.of());
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(rowId);
-    locked.ifPresent(_ -> orderWrites.validateRows(List.of(rowId)));
-    return locked.map(StockRow.class::cast);
+    orderWrites.prepareSingleRowWrite(rowId, List.of(), true);
+    return inventoryRepository.lockById(rowId).map(StockRow.class::cast);
   }
 
   @Override
@@ -369,7 +383,7 @@ public class InventoryStockCommands implements StockCommands {
     for (var planned : selected.takes()) {
       InventoryItem row =
           inventoryRepository
-              .findByIdForUpdate(planned.rowId())
+              .lockById(planned.rowId())
               .orElseThrow(() ->
                   new ObjectOptimisticLockingFailureException(
                       InventoryItem.class, planned.rowId()));

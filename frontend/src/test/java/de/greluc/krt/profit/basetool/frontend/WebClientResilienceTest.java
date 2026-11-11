@@ -70,6 +70,9 @@ class WebClientResilienceTest {
 
   @Autowired private WebClient termsDocumentClient;
 
+  @Autowired
+  private de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicy callPolicy;
+
   @Autowired private CircuitBreakerRegistry circuitBreakerRegistry;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
@@ -120,7 +123,7 @@ class WebClientResilienceTest {
   void retry_ShouldPerformMultipleAttempts_On5xx() {
     int before = server.getRequestCount();
     try {
-      termsDocumentClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
+      bodiless("GET", "/api/v1/ping").block();
       fail("Expected exception due to 5xx");
     } catch (Exception ignored) {
     }
@@ -132,14 +135,14 @@ class WebClientResilienceTest {
   void circuitBreaker_ShouldOpenAndShortCircuit_SubsequentCalls() {
     for (int i = 0; i < 2; i++) {
       try {
-        termsDocumentClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
+        bodiless("GET", "/api/v1/ping").block();
         fail("Expected exception");
       } catch (Exception ignored) {
       }
     }
     int before = server.getRequestCount();
     try {
-      termsDocumentClient.get().uri("/api/v1/ping").retrieve().toBodilessEntity().block();
+      bodiless("GET", "/api/v1/ping").block();
       fail("Expected CallNotPermittedException");
     } catch (Exception e) {
       assertTrue(
@@ -161,7 +164,7 @@ class WebClientResilienceTest {
 
     int beforeSingle = server.getRequestCount();
     try {
-      termsDocumentClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+      bodiless("GET", "/api/v1/throttled").block();
       fail("Expected 429 TooManyRequests");
     } catch (Exception ignored) {
     }
@@ -172,13 +175,13 @@ class WebClientResilienceTest {
 
     for (int i = 0; i < 8; i++) {
       try {
-        termsDocumentClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+        bodiless("GET", "/api/v1/throttled").block();
       } catch (Exception ignored) {
       }
     }
     int beforeFinal = server.getRequestCount();
     try {
-      termsDocumentClient.get().uri("/api/v1/throttled").retrieve().toBodilessEntity().block();
+      bodiless("GET", "/api/v1/throttled").block();
       fail("Expected 429 TooManyRequests, not a circuit-breaker short-circuit");
     } catch (Exception e) {
       assertFalse(
@@ -200,29 +203,20 @@ class WebClientResilienceTest {
   void timeLimiter_ShouldTimeoutSlowResponses() {
     circuitBreakerRegistry.circuitBreaker("backendApi").reset();
 
-    assertTimesOutOnVirtualTime(
-        () -> termsDocumentClient.get().uri("/api/v1/slow").retrieve().bodyToMono(String.class),
-        "GET");
+    assertTimesOutOnVirtualTime(() -> text("GET", "/api/v1/slow"), "GET");
   }
 
   /**
    * Verifies that the time limiter in {@link
-   * de.greluc.krt.profit.basetool.frontend.kernel.backend.WebClientConfig#resilienceFilter} also
-   * times out state-changing HTTP verbs.
+   * de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicy#protect} also times out
+   * state-changing HTTP verbs.
    */
   @ParameterizedTest
   @ValueSource(strings = {"POST", "PUT", "DELETE", "PATCH"})
   void timeLimiter_ShouldTimeoutSlowResponses_OnWriteVerbs(String method) {
     circuitBreakerRegistry.circuitBreaker("backendApi").reset();
 
-    assertTimesOutOnVirtualTime(
-        () ->
-            termsDocumentClient
-                .method(HttpMethod.valueOf(method))
-                .uri("/api/v1/slow")
-                .retrieve()
-                .bodyToMono(String.class),
-        method);
+    assertTimesOutOnVirtualTime(() -> text(method, "/api/v1/slow"), method);
   }
 
   /**
@@ -260,7 +254,7 @@ class WebClientResilienceTest {
 
   /**
    * Verifies that {@link
-   * de.greluc.krt.profit.basetool.frontend.kernel.backend.WebClientConfig#resilienceFilter} sends a
+   * de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendCallPolicy#protect} sends a
    * state-changing request that receives a 5xx exactly once, since retries apply only to idempotent
    * verbs.
    */
@@ -270,12 +264,7 @@ class WebClientResilienceTest {
     circuitBreakerRegistry.circuitBreaker("backendApi").reset();
     int before = server.getRequestCount();
     try {
-      termsDocumentClient
-          .method(HttpMethod.valueOf(method))
-          .uri("/api/v1/ping")
-          .retrieve()
-          .toBodilessEntity()
-          .block();
+      bodiless(method, "/api/v1/ping").block();
       fail("Expected 5xx for " + method);
     } catch (Exception ignored) {
     }
@@ -283,5 +272,24 @@ class WebClientResilienceTest {
         before + 1,
         server.getRequestCount(),
         method + " must be attempted exactly once on a 5xx (writes are never retried)");
+  }
+
+  private Mono<org.springframework.http.ResponseEntity<Void>> bodiless(String method, String uri) {
+    HttpMethod verb = HttpMethod.valueOf(method);
+    return callPolicy.protect(
+        verb,
+        Mono.defer(() -> termsDocumentClient.method(verb).uri(uri).retrieve().toBodilessEntity()),
+        null,
+        true);
+  }
+
+  private Mono<String> text(String method, String uri) {
+    HttpMethod verb = HttpMethod.valueOf(method);
+    return callPolicy.protect(
+        verb,
+        Mono.defer(
+            () -> termsDocumentClient.method(verb).uri(uri).retrieve().bodyToMono(String.class)),
+        null,
+        true);
   }
 }

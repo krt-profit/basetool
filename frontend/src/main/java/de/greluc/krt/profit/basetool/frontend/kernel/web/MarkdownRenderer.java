@@ -26,9 +26,9 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Renders user-supplied Markdown to HTML safe for {@code th:utext}: embedded raw HTML is escaped
- * and dangerous link and image URLs are stripped. Exposed to templates as the {@code @markdown}
- * bean; thread-safe.
+ * Renders user-supplied Markdown to HTML safe for {@code th:utext}: embedded raw HTML is escaped,
+ * dangerous link URLs are stripped and an image becomes a link to it ({@link
+ * MarkdownImageLinkRenderer}). Exposed to templates as the {@code @markdown} bean; thread-safe.
  */
 @Component("markdown")
 public class MarkdownRenderer {
@@ -36,7 +36,12 @@ public class MarkdownRenderer {
   private final Parser parser = Parser.builder().build();
 
   private final HtmlRenderer renderer =
-      HtmlRenderer.builder().escapeHtml(true).sanitizeUrls(true).softbreak("<br />\n").build();
+      HtmlRenderer.builder()
+          .escapeHtml(true)
+          .sanitizeUrls(true)
+          .softbreak("<br />\n")
+          .nodeRendererFactory(MarkdownImageLinkRenderer::new)
+          .build();
 
   /**
    * Converts Markdown text into sanitized HTML for {@code th:utext} consumption.

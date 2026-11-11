@@ -37,6 +37,7 @@ dependencies {
   implementation(libs.semver4j.core)
   implementation(libs.logstash.logback.encoder)
   implementation(project(":logging-support"))
+  implementation(project(":technical-support"))
 
   implementation(libs.mapstruct.core)
   annotationProcessor(libs.mapstruct.processor)
@@ -246,4 +247,14 @@ tasks.named<Test>("test") {
       listOf("-Ddashboard.catalogue.update=" + dashboardCatalogueUpdate.get())
     },
   )
+}
+
+tasks.register<JavaExec>("characterizeCacheBudgets") {
+  group = "verification"
+  description = "Measures synthetic cache value shapes and a fixed mixed-locality request trace."
+  dependsOn(tasks.named("testClasses"))
+  classpath = sourceSets["test"].runtimeClasspath
+  mainClass.set("de.greluc.krt.profit.basetool.backend.platform.internal.CacheBudgetMeasurement")
+  maxHeapSize = "512m"
+  jvmArgs("-XX:+UseCompactObjectHeaders")
 }

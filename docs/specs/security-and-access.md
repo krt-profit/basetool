@@ -794,6 +794,20 @@ DOS-1 collapse re-introduced on a code path the request-scoped filters do not re
 
 ### REQ-SEC-012 — Re-authentication on lost frontend OAuth2 token
 
+The approval/role refresh and consent filters preserve direct and wrapped session-loss signals
+before MVC. They share the login handoff: HTML navigation receives the context-relative login
+redirect, AJAX/JSON/fetch receives `401` with `X-Reauthenticate` and the mirrored JSON contract, and
+SSE receives one `reauth` event. A failed refresh writes no successful-sync timestamp. Authentication,
+logout, legal/error and other gate-exempt paths remain reachable; WebSocket upgrades retain their
+separate subscription authorization and reconnect policy.
+
+The frontend's login and consent navigation both use the strict shared same-origin path validator.
+Scheme-relative, slash/backslash and whitespace targets are rejected; invalid login targets use the
+fixed Keycloak login path, and invalid consent targets do not navigate. OAuth client freshness entries
+expire automatically at token freshness expiry or five minutes, whichever is earlier, and a destroyed
+Spring Session invalidates its entries. Capacity eviction removes individual entries; per-session
+single-flight refresh remains mandatory (`SingleFlightAuthorizedClientManagerTest`, ADR-0369).
+
 When a frontend &rarr; backend call fails with Spring Security's `ClientAuthorizationException`
 (`client_authorization_required`, or a refresh-grant `invalid_grant` after a revoked/rotated refresh
 token) the user MUST be bounced through a fresh Keycloak login rather than shown an empty page / 500
@@ -4739,6 +4753,10 @@ one event type.
 
 ### REQ-SEC-058 — Art. 15 / Art. 20 data export
 
+Preparing third-party name scrubbing reads only user identifiers and the four supported
+`HandleSpellings` name columns through an identity projection. It does not load complete user
+entities; the subject's protected spellings and all third-party redaction remain identical.
+
 The aUEC export includes the subject's holder links, directly related money operations,
 requester designations and recorded target amendments. It excludes unrelated people and
 private Bank data. The [aUEC contract](orders-auec.md) owns participant-visible history.
@@ -5623,6 +5641,11 @@ set is shaped by what the module serves.
   includeSubDomains; preload` with `always` (`$hsts_header` in `docker/edge/conf.d/00-maps.conf`),
   so an error page the edge produces itself carries it too.
 
+`img-src` stays `'self' data:`, so a page never makes a reader's browser contact a third-party
+image host. User-supplied Markdown (`MarkdownRenderer`, the `@markdown` bean) therefore renders an
+image as a link to it (`<a href="…" rel="noopener noreferrer nofollow">alt text</a>`,
+`MarkdownImageLinkRenderer`) instead of an `<img>` the policy would block and show broken.
+
 A new inline script or style in a template MUST carry the request nonce rather than widening the
 policy; `'unsafe-inline'` and `'unsafe-eval'` are never added. Widening any directive is a change to
 this requirement first. An inline script is only ever a data bootstrap (REQ-FE-023,
@@ -5630,7 +5653,7 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
 
 > [!note] Amended 2026-10-04 — Trusted Types (ADR-0239)
 > The frontend sends the Trusted Types directives, report-only by default; the enforced mode is a
-> configuration switch. The only step left is the owner-approved switch of production to `enforce`.
+> configuration switch. Production runs `enforce` since 2026-11-10 (#2568).
 
 **Acceptance**
 
@@ -5638,8 +5661,9 @@ this requirement first. An inline script is only ever a data bootstrap (REQ-FE-0
   `form-action` origin, and every static header above.
 - [x] A frontend page carries the Trusted Types directives: report-only by default, in the enforced
   policy with `app.security.trusted-types=enforce`.
-- [ ] Production runs `enforce`. _(Pending the owner's approval after a quiet period with no
-  `csp_violation` report; see `deployment.md`.)_
+- [x] A Markdown image renders as a link, never as an `<img>`, with its URL sanitised like a link
+  (`MarkdownRendererTest`).
+- [x] Production runs `enforce` (since 2026-11-10, #2568; see `deployment.md`).
 - [x] An API response carries the `default-src 'none'` policy and the static headers.
 - [x] The public edge sends HSTS on its first response; its absence raises `EdgeHstsHeaderMissing`.
 
@@ -6164,6 +6188,12 @@ stays an explicit loop, not an annotation.
 
 ---
 
+**The image artifact carries the same constructor selection.** The shared application Dockerfile
+copies root `lombok.config`; that file is a shared image-reuse input. The backend image build runs
+`VerifyExternalClientArtifact.java` against its actual boot jar and refuses either external client
+without the `externalRestClientBuilder` constructor qualifier. Internal-client routing, origin,
+TLS and timeouts retain their existing contracts.
+
 ### REQ-SEC-082 — Admin accounts need a second factor, and the realm's session windows are one reviewed file
 
 Three realm-wide hardening steps of [`KEYCLOAK_HARDENING_RUNBOOK.md`](../archive/KEYCLOAK_HARDENING_RUNBOOK.md)
@@ -6234,6 +6264,9 @@ dry run by default, with a rollback file, never deleting.
 [`OWNER_STEPS_2026-10.md`](../archive/OWNER_STEPS_2026-10.md)
 
 ---
+
+The OTP setup QR image gets its meaningful alternative text from the theme's DE/EN message bundles;
+assistive technology receives the selected language without changing the setup flow.
 
 ### REQ-SEC-083 — The generic settings key store is read by ADMIN only
 
@@ -6315,6 +6348,12 @@ surface.
 ---
 
 ### REQ-SEC-088 — The four application roles are assigned in the Basetool
+
+Administrator edits of role permissions and descriptions submit versioned request records.
+`permissionsVersion` and `descriptionVersion` are independent counters returned by the role DTO;
+the corresponding write echoes its counter as `version`. Each write locks the role, checks the
+expected section version through `OptimisticLock`, and increments only that section. A stale
+same-section save is HTTP 409; a completed edit of the other section does not invalidate it.
 
 The roles Admin, KRT Member, Bank Employee and Bank Management live in `user_roles` alone and are
 written by the Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)).

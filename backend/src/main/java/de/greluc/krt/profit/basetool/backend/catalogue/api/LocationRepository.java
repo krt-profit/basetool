@@ -41,6 +41,22 @@ import org.springframework.stereotype.Repository;
 public interface LocationRepository extends LookupTableRepository<Location, UUID> {
 
   /**
+   * Reads the links and potential name collisions used by one UEX storage-place chunk.
+   *
+   * @param cityIds local cities in the chunk
+   * @param stationIds local stations in the chunk
+   * @param names incoming names and deterministic fallback names
+   * @return matching locations, including reference-only rows
+   */
+  @Query(
+      "SELECT l FROM Location l LEFT JOIN l.city c LEFT JOIN l.spaceStation s "
+          + "WHERE c.id IN :cityIds OR s.id IN :stationIds OR l.name IN :names")
+  List<Location> findForUexChunk(
+      @Param("cityIds") Collection<UUID> cityIds,
+      @Param("stationIds") Collection<UUID> stationIds,
+      @Param("names") Collection<String> names);
+
+  /**
    * A native SQL scalar subquery for the P4K starmap GUID of the {@code location} row aliased
    * {@code l}: its own starmap object's, else its city's, else its space station's, else {@code
    * NULL}; an object the sweep stamped or an admin hid carries none (REQ-P4K-037, REQ-XCH-018).

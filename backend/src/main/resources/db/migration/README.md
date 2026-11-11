@@ -405,14 +405,14 @@ every existing database.
 
 ## Profit hierarchy authority
 
-V376 retires the runtime `is_profit_eligible` field but preserves its ordinary column and values
+V379 retires the runtime `is_profit_eligible` field but preserves its ordinary column and values
 for the phase-one rollback soak. It adds nullable verified original Profit provenance without
 backfilling a guess, and preserves ended legacy promise rows. A unique Profit designation index
 refuses contradictory roots; missing roots and invalid units require explicit organisational
 resolution or authorised order transfer, never automatic reparenting. Dropping the obsolete flag
 column belongs to a later release after the soak.
 
-V376 preserves legacy promise facts when adding `ended_at`. Before the first application readiness,
+V379 preserves legacy promise facts when adding `ended_at`. Before the first application readiness,
 `JobOrderEligibilityStartup` reconciles unchanged legacy units through the owning service under the
 exclusive hierarchy lock. Ineligible active promises gain an end timestamp and normal audit events;
 valid promises and unknown original Profit provenance stay intact. Repeated starts are idempotent.

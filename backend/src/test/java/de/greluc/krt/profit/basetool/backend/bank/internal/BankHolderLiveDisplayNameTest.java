@@ -103,11 +103,12 @@ class BankHolderLiveDisplayNameTest {
 
     String text =
         extractText(
-            statementService.generateStatement(
-                account.getId(),
-                Instant.now().minus(1, ChronoUnit.HOURS),
-                Instant.now().plus(1, ChronoUnit.HOURS),
-                null));
+            BankExportTestSupport.read(
+                statementService.generateStatement(
+                    account.getId(),
+                    Instant.now().minus(1, ChronoUnit.HOURS),
+                    Instant.now().plus(1, ChronoUnit.HOURS),
+                    null)));
 
     assertTrue(
         text.contains(carolDisplay), "the statement names the holder by their live display name");
@@ -143,7 +144,9 @@ class BankHolderLiveDisplayNameTest {
     bankLedgerService.bookDeposit(
         new BankDepositRequest(account.getId(), holder.getId(), new BigDecimal("500"), null));
 
-    String text = extractText(managementReportService.generateThreeMonthReport(null));
+    String text =
+        extractText(
+            BankExportTestSupport.read(managementReportService.generateThreeMonthReport(null)));
 
     assertTrue(
         text.contains(display), "the management report holder section shows the live display name");

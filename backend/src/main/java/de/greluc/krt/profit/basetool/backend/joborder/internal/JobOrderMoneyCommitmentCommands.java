@@ -74,7 +74,7 @@ public class JobOrderMoneyCommitmentCommands {
       throw new BadRequestException("orders.money.commitment.inactive");
     }
     boolean responsible = unitId.equals(OrgUnit.idOf(order.getResponsibleOrgUnit()));
-    OrgUnit unit =
+    final OrgUnit unit =
         responsible
             ? order.getResponsibleOrgUnit()
             : units

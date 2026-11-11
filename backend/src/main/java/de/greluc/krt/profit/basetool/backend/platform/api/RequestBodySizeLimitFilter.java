@@ -269,7 +269,7 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
 
     CachedBodyRequest(@NotNull HttpServletRequest request, byte @NotNull [] body) {
       super(request);
-      this.body = body.clone();
+      this.body = body;
     }
 
     @NotNull

@@ -113,7 +113,7 @@ public class JobOrderMoneyCommands {
     if (!order.getStatus().isActive()) {
       throw new BusinessConflictException("orders.money.provision.inactive");
     }
-    BigDecimal amount = WholeAuec.positive(dto.amount());
+    final BigDecimal amount = WholeAuec.positive(dto.amount());
     JobOrderMoneyHolder holder;
     try {
       holder = holderChoices.resolve(orderId, actor, selection);
@@ -176,7 +176,7 @@ public class JobOrderMoneyCommands {
         | BusinessConflictException unavailableBasis) {
       return reserveRefusal(order, dto.operationId());
     }
-    boolean newLinkedHolder = holder.getId() == null && holder.getUserId() != null;
+    final boolean newLinkedHolder = holder.getId() == null && holder.getUserId() != null;
     holder.recordChange();
     UUID holderId = Objects.requireNonNull(holders.save(holder).getId());
     JobOrderMoneyOperation operation =

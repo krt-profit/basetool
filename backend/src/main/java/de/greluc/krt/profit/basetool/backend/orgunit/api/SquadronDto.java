@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Wire shape of a squadron.
@@ -32,4 +33,9 @@ import java.util.UUID;
  * @param version optimistic-lock counter
  */
 public record SquadronDto(
-    UUID id, String name, String shorthand, String description, Boolean active, Long version) {}
+    UUID id,
+    String name,
+    String shorthand,
+    @Nullable String description,
+    Boolean active,
+    Long version) {}

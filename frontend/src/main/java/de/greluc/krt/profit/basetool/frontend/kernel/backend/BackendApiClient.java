@@ -22,8 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.kernel.backend;
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsDocumentDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.io.OutputStream;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
@@ -33,10 +37,14 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * WebClient wrapper for the backend REST API: exposes typed overloads for every HTTP verb, each
@@ -45,10 +53,8 @@ import reactor.core.publisher.Mono;
  * getCached(CachedCatalog, ...)} adds Spring Cache, routing each {@link CachedCatalog} to its
  * domain cache via {@link CatalogCacheResolver}.
  *
- * <p>Resilience comes solely from the {@link
- * de.greluc.krt.profit.basetool.frontend.kernel.backend.WebClientConfig#resilienceFilter WebClient
- * filter chain}: bulkhead, time limiter, retry (idempotent verbs only) and circuit breaker, for
- * every verb.
+ * <p>{@link BackendCallPolicy} holds concurrency permits and observes timeouts and failures through
+ * response-body completion and decoding; only safe reads are eligible for retries.
  *
  * <p>Page controllers let {@link
  * de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler} surface failures rather
@@ -76,6 +82,8 @@ public class BackendApiClient {
   /** Maps every failed call; writes to this class's logger. */
   private final BackendErrorMapper errorMapper;
 
+  private final BackendCallPolicy callPolicy;
+
   /**
    * Creates the client.
    *
@@ -83,16 +91,19 @@ public class BackendApiClient {
    * @param termsDocumentClient the bearer-less client for the Terms-of-Use wording
    * @param meterRegistry receives {@code basetool_backend_client_errors_total}
    * @param cacheManager holds the catalogue caches
+   * @param callPolicy protects requests through body completion and decoding
    */
   public BackendApiClient(
       WebClient webClient,
       WebClient termsDocumentClient,
       MeterRegistry meterRegistry,
-      CacheManager cacheManager) {
+      CacheManager cacheManager,
+      BackendCallPolicy callPolicy) {
     this.webClient = webClient;
     this.termsDocumentClient = termsDocumentClient;
     this.cacheManager = cacheManager;
     this.errorMapper = new BackendErrorMapper(meterRegistry, log);
+    this.callPolicy = callPolicy;
   }
 
   /**
@@ -508,7 +519,23 @@ public class BackendApiClient {
       @NotNull Supplier<WebClient.RequestHeadersSpec<?>> request,
       @NotNull Function<WebClient.ResponseSpec, Mono<R>> decode) {
     try {
-      return decode.apply(request.get().retrieve()).block();
+      WebClient.RequestHeadersSpec<?> spec = request.get();
+      BackendResponseStatus responseStatus = new BackendResponseStatus();
+      spec.attribute(BackendResponseStatus.ATTRIBUTE, responseStatus);
+      AtomicReference<Duration> budget = new AtomicReference<>();
+      spec.attributes(attributes -> {
+        if (attributes.get(BackendCallPolicy.RESPONSE_BUDGET) instanceof Duration duration) {
+          budget.set(duration);
+        }
+      });
+      return callPolicy
+          .protect(
+              method,
+              Mono.defer(() -> decode.apply(spec.retrieve())),
+              budget.get(),
+              true,
+              responseStatus)
+          .block();
     } catch (Exception e) {
       throw errorMapper.map(e, method.name(), uri);
     }
@@ -538,6 +565,52 @@ public class BackendApiClient {
       @NotNull Function<WebClient, WebClient.RequestHeadersSpec<?>> request,
       @NotNull Function<WebClient.ResponseSpec, Mono<R>> decode) {
     return exchange(method, uri, () -> request.apply(webClient), decode);
+  }
+
+  /**
+   * Creates a bounded binary transfer whose status is checked before any output is exposed.
+   *
+   * @param uri the backend path or URI template
+   * @param request builds the authenticated request
+   * @return the bounded streaming transfer
+   */
+  public @NotNull BackendBinaryTransfer download(
+      @NotNull String uri, @NotNull Function<WebClient, WebClient.RequestHeadersSpec<?>> request) {
+    return (output, ready) -> transfer(uri, request, output, ready);
+  }
+
+  private void transfer(
+      @NotNull String uri,
+      @NotNull Function<WebClient, WebClient.RequestHeadersSpec<?>> request,
+      @NotNull OutputStream output,
+      @NotNull Consumer<HttpHeaders> ready) {
+    try {
+      BackendResponseStatus responseStatus = new BackendResponseStatus();
+      Mono<Void> operation =
+          Mono.defer(() ->
+              request
+                  .apply(webClient)
+                  .exchangeToMono(response -> {
+                    responseStatus.observe(response);
+                    if (response.statusCode().isError()) {
+                      return response.createException().flatMap(Mono::error);
+                    }
+                    ready.accept(response.headers().asHttpHeaders());
+                    return DataBufferUtils.write(
+                            response
+                                .bodyToFlux(DataBuffer.class)
+                                .publishOn(Schedulers.boundedElastic(), 1),
+                            output)
+                        .doOnNext(DataBufferUtils.releaseConsumer())
+                        .doOnDiscard(DataBuffer.class, DataBufferUtils::release)
+                        .then();
+                  }));
+      callPolicy
+          .protect(HttpMethod.GET, operation, callPolicy.transferBudget(), false, responseStatus)
+          .block();
+    } catch (Exception failure) {
+      throw errorMapper.map(failure, HttpMethod.GET.name(), uri);
+    }
   }
 
   /**

@@ -44,19 +44,22 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Verifies against PostgreSQL that the Lager's own book-outs audit the Materialbörse offers they
- * lower or remove, and that the wipe and account-erasure reads find the offers their bulk deletes
- * cascade away (REQ-MARKET-013, REQ-AUDIT-001).
+ * Verifies against PostgreSQL that the Lager's own book-outs and its wipe audit the Materialbörse
+ * offers they lower or remove, and that the account-erasure read finds the offers its bulk delete
+ * cascades away (REQ-MARKET-013, REQ-AUDIT-001).
  */
 @SpringBootTest
 @Transactional
@@ -75,6 +78,16 @@ class MaterialExchangeOfferRatchetDataTest {
   @Autowired private JdbcTemplate jdbc;
 
   @PersistenceContext private EntityManager entityManager;
+
+  private Squadron fixtureUnit;
+
+  @BeforeEach
+  void createFixtureUnit() {
+    fixtureUnit = new Squadron();
+    fixtureUnit.setName("Offer scope " + UUID.randomUUID());
+    fixtureUnit.setShorthand("OF" + UUID.randomUUID().toString().substring(0, 6));
+    fixtureUnit = squadronRepository.save(fixtureUnit);
+  }
 
   @Test
   void aPartialDiscardLowersTheOfferAndAuditsItAsReduced() {
@@ -128,21 +141,39 @@ class MaterialExchangeOfferRatchetDataTest {
   }
 
   @Test
-  void theWipeReadFindsOffersOnSharedRowsOnlyAndTheErasureReadFindsTheMembersOffers() {
+  void theWipeAuditsTheOfferOnASharedRowItDeletesAndLeavesAPersonalRowsOffer() {
     MaterialExchangeOffer shared = offer(20.0, 5.0, false);
+    MaterialExchangeOffer personal = offer(20.0, 5.0, true);
+    detach(shared);
+
+    var previousRequest = RequestContextHolder.getRequestAttributes();
+    var request = new MockHttpServletRequest();
+    request.addHeader("X-Active-Org-Unit-Id", fixtureUnit.getId());
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    try {
+      checkoutService.deleteAllGlobalInventory();
+    } finally {
+      RequestContextHolder.setRequestAttributes(previousRequest);
+    }
+    entityManager.flush();
+
+    assertThat(details("MARKET_OFFER_REMOVED", shared.getId()))
+        .containsExactly("kind=MATERIAL reason=wipe");
+    assertThat(offerRepository.existsById(shared.getId())).isFalse();
+    assertThat(details("MARKET_OFFER_REMOVED", personal.getId())).isEmpty();
+    assertThat(offerRepository.existsById(personal.getId())).isTrue();
+  }
+
+  @Test
+  void theErasureReadFindsTheMembersOffers() {
     MaterialExchangeOffer personal = offer(20.0, 5.0, true);
     entityManager.flush();
 
-    List<UUID> wiped =
-        offerRepository.findActiveStockOnNonPersonalRows(true, null, Set.of()).stream()
-            .map(MaterialExchangeOfferRepository.OfferStock::getId)
-            .toList();
     List<UUID> erased =
         offerRepository.findActiveStockByRowOwner(personal.getOwner().getId()).stream()
             .map(MaterialExchangeOfferRepository.OfferStock::getId)
             .toList();
 
-    assertThat(wiped).contains(shared.getId()).doesNotContain(personal.getId());
     assertThat(erased).containsExactly(personal.getId());
   }
 
@@ -202,7 +233,7 @@ class MaterialExchangeOfferRatchetDataTest {
     user.setUsername("u-" + UUID.randomUUID());
     userRepository.save(user);
 
-    OrgUnit orgUnit = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
+    OrgUnit orgUnit = fixtureUnit;
 
     Location location = new Location();
     location.setName("Hub-" + UUID.randomUUID());

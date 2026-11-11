@@ -345,9 +345,9 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
   `meta.last_page`, when a page fails mid-walk, when the walk was served the same row twice, when
   the **distinct** row count falls short of `meta.total`, or when the feed announces more pages by
   the end of the walk than page 1 did; each also bumps the fetch-error counter and marks the walk
-  **incomplete**. The last three mean the feed shifted under a fully read walk: an `INFO` announces
-  one repeat walk, whose own verdict stands, and the counter moves at most once for both walks. A
-  genuinely short single page stays `complete` and silent, which is what keeps the
+  **incomplete**. Item and vehicle feeds are walked with `sort=class_name`, because the source
+  order has ties that repeat boundary rows on every walk (REQ-DATA-014). A genuinely short single
+  page stays `complete` and silent, which is what keeps the
   WARN off healthy runs. A **surplus** — more distinct rows than `meta.total` claims — is `INFO`,
   not `WARN`, and stays `complete`: it cannot hide a row from a sweep, and `/api/items` produces one
   on every run (12 331 distinct rows against a stated 12 283). Reading it as a census failure kept
@@ -573,6 +573,12 @@ id's SHA-256, stable per session and useless for resuming it. Until 2026-09-22 (
 silent-SSO entry point logged the raw id at `INFO` in every profile, and `SessionDebugFilter` did at
 `DEBUG` in dev/test. **Enforced by:** `SessionIdFingerprintTest`, `SsoReAuthenticationEntryPointTest`
 and `SessionDebugFilterTest` (the raw id appears in no captured line).
+
+**Structured masking happens before JSON serialization.** The logging encoder uses the library's
+masking generator for complete credential fields and decoded string values, so quotes, backslashes,
+control escapes and Unicode cannot break the emitted JSON or leave an escaped credential suffix.
+Credential assignments in structured text redact the remaining value; plain-text sinks keep their
+existing text-masking contract. Encoder regressions parse the resulting JSON.
 
 ### REQ-OBS-005 — Prometheus metrics endpoint, fail-closed
 
@@ -2321,6 +2327,11 @@ transport fault and is classified with the connection failures (`timeout`, HTTP 
 `BACKEND_TIMEOUT`) — the same bucket as the sibling failure that dies *before* the response, which
 Spring reports as `WebClientRequestException`. Both halves of one lost connection count alike.
 
+`BackendCallPolicy` retains the `backendApi` resilience instances through body consumption and
+decoding (REQ-FE-029, ADR-0369). The binary transfer funnel uses the same bounded method/reason
+labels and ends on completion, cancellation or failure. Failed browser callbacks reach the existing
+`script_error` client-error counter with a fixed message; no callback data or stack enters labels.
+
 > [!warning] Corrected 2026-09-20
 > Until this date the classifier read the status line, so a connection lost mid-body was reported
 > as `Backend returned 200 [UNKNOWN]` and — because 200 is below 500 — counted under
@@ -2641,9 +2652,14 @@ Two frontend meters were added by the 2026-08 logging audit:
   directive (in `message`) and the blocked **origin** (in `source`) — the browser half reduces
   `blockedURI` to `scheme://host[:port]` or to the bare keyword (`inline`, `eval`, `data`, …), and
   `ClientErrorReportController.originOnly` repeats the reduction server-side, so a path, query or
-  user info never reaches the `DEBUG` line even from a crafted beacon. It rides the same panel 43
-  and the same `ClientErrorSpike` rule; browser extensions that inject inline code are part of its
-  permanent background, which is exactly what the step-change shape tolerates. Since 2026-10-04 it
+  user info never reaches the `DEBUG` line even from a crafted beacon. It rides the same panel 43,
+  but `ClientErrorSpike` counts it only when the page's own code caused it: the recording rules
+  `basetool:client_error_own_code:increase1h` / `:increase24h` take every other `kind` from
+  `basetool_client_error_total` and `csp_violation` from
+  `basetool_client_csp_violation_total{code_origin=~"self|inline"}`. Extension and browser-translation
+  code (`code_origin` `extension` or `other`) injects stylesheets and Trusted Types policies on every
+  busy hour (196 `style-src-elem` reports in three days of 2026-11, none from our code), so counting
+  it fired the alert on traffic alone; it stays visible on panel 85. Since 2026-10-04 it
   also carries the **Trusted Types** violations of the report-only policy (ADR-0239): `message` is
   `require-trusted-types-for` followed by the sink the browser names (`Element innerHTML`, never the
   sample's markup), or `trusted-types` followed by the policy name the CSP does not list (at most 40
@@ -2669,8 +2685,8 @@ Two frontend meters were added by the 2026-08 logging audit:
   counted as `other` otherwise, so the label set is bounded whatever a caller sends (REQ-OBS-006).
   Panel 85 on dashboard `07` plots it per hour beside panel 43. `require-trusted-types-for` and
   `trusted-types` are the report-only Trusted Types policy, `script-src-*` / `style-src-*` /
-  `img-src` / `connect-src` the enforced one. No alert of its own: `ClientErrorSpike` already
-  fires on the `csp_violation` kind and its text points here.
+  `img-src` / `connect-src` the enforced one. No alert of its own: `ClientErrorSpike` fires on
+  its `self` and `inline` series and its text points here.
 
 The auth surfaces (#1041 item 18) add `basetool_login_total{outcome,reason}` (`SecurityConfig`'s
 OAuth2 success/failure handlers: `outcome` = `success` / `failure`; on failure `reason` =
@@ -3910,16 +3926,20 @@ stricter `http_401` module (`blackbox-http-401`, REQ-XCH-028): a `200` there wou
 exchange answers without a token. It adds about 0.03/s of `no_credentials` in the `exchange`
 scope and of `unauthenticated` with `client_id="none"` to the exchange refusals, far below
 `IngestUnauthenticatedFlood`'s 1/s. Of 601 401s sampled at the edge in one hour, **600 carried `Blackbox-Exporter/0.28.0`** and
-one was an outside scanner. The floor this puts under the backend's 401 rate is **~0.1/s**, and it
-rises with every probe target added.
+one was an outside scanner. With the API host probes the floor under the backend's 401 rate was
+**~0.1/s**. Re-measured without them (#2675), over the 21 days to 2026-11-10, the backend's
+`no_credentials` rate is a flat **0.0333/s** (maximum 0.035, p99 0.0333): exactly the internal TLS
+probe of `https://backend:11261` at its 30 s interval, the only probe the backend answers with a
+`401`. The floor rises with every probe target added.
 
 That floor is why `BackendAuthFailureSpike` no longer watches 401 volume. It watches
 `reason="invalid_token"` — a token that *was* presented and rejected, which a probe, a scanner and a
 pre-login navigation can never produce — so the series is a true zero and a `> 0.05/s` threshold is
 meaningful rather than a fraction of the monitoring plane's own traffic. `IngestAuthFailureSpike`
 does the same on `basetool_ingest_auth_failures_total`. The volume half lives on separately as
-`BackendUnauthenticatedFlood` (`reason="no_credentials"`, `> 1/s for 15m`), an order of magnitude
-above the floor, with `IngestUnauthenticatedFlood` its twin on the gateway. **Adding a blackbox target changes that floor and the number above must be
+`BackendUnauthenticatedFlood` (`reason="no_credentials"`, `> 0.3/s for 15m`, nine times the
+backend's floor), with `IngestUnauthenticatedFlood` (`> 1/s for 15m`) its twin on the gateway, each
+about an order of magnitude above its own floor (`backend_unauthenticated_flood_floor_test.yml`). **Adding a blackbox target changes that floor and the number above must be
 re-measured in the same PR** (ADR-0173).
 
 > [!note] `uri="UNKNOWN"` on a rejected request is a known, open gap

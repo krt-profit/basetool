@@ -102,6 +102,16 @@ public class LiveSyncPublisher {
     private final Map<LiveSyncTopic, Set<String>> pending = new LinkedHashMap<>();
 
     @Override
+    public void suspend() {
+      TransactionSynchronizationManager.unbindResource(LiveSyncPublisher.this);
+    }
+
+    @Override
+    public void resume() {
+      TransactionSynchronizationManager.bindResource(LiveSyncPublisher.this, this);
+    }
+
+    @Override
     public void afterCommit() {
       pending.forEach((topic, sections) -> publish(topic, new ArrayList<>(sections)));
     }

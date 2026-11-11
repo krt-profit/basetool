@@ -15,6 +15,10 @@ it conflicts with something else, this rule wins.
   host), Prometheus, Loki and Grafana queries, `SELECT`-only queries (open the session
   with `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY` first), and `cat`-style reads of
   files that carry no credentials.
+- **Prometheus and Loki from the workstation** go through a Grafana service account with the
+  role Viewer that @greluc creates and hands over as a token file, never through a Prometheus
+  user. How to create, use and remove it: [`monitoring/README.md`](../../monitoring/README.md),
+  "Read-only API access through a Grafana service account".
 - **Read-only means read-only in effect, not just in intent.** If a command *can* mutate, it is a
   write and needs the gate below — regardless of which flags are passed. Always prefer the variant
   that cannot mutate.

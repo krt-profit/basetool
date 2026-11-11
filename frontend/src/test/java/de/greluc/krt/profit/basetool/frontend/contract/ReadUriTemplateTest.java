@@ -99,6 +99,16 @@ class ReadUriTemplateTest {
               webClient -> webClient.get().uri(BASE + "/" + id + "/report"),
               spec -> spec.bodyToMono(byte[].class));
         }
+
+        void downloadTemplated(UUID id) {
+          backendApiClient.download(BASE + "/{id}/report",
+              webClient -> webClient.get().uri(BASE + "/{id}/report", id));
+        }
+
+        void downloadConcatenated(UUID id) {
+          backendApiClient.download(BASE + "/" + id + "/report",
+              webClient -> webClient.get().uri(BASE + "/" + id + "/report"));
+        }
       }
       """;
 
@@ -138,8 +148,9 @@ class ReadUriTemplateTest {
     assertThat(scan.readSites()).isEqualTo(8);
     assertThat(scan.concatenatedReads())
         .containsExactlyInAnyOrder("Fixture#concatenated", "Fixture#query", "Fixture#conditional");
-    assertThat(scan.executeSites()).isEqualTo(2);
-    assertThat(scan.concatenatedExecutes()).containsExactly("Fixture#report");
+    assertThat(scan.executeSites()).isEqualTo(4);
+    assertThat(scan.concatenatedExecutes())
+        .containsExactly("Fixture#downloadConcatenated", "Fixture#report");
     assertThat(scan.calls())
         .extracting(c -> c.verb() + " " + BackendCallScanner.display(c.template()))
         .contains("GET /api/v1/missions/{}/steps");

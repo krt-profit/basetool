@@ -342,4 +342,39 @@ public final class InventoryAllocations {
         .findFirst()
         .orElse(null);
   }
+
+  /**
+   * Copies the reduced earmarks of a transfer onto the moved row as same-size earmarks, inheriting
+   * each job-order slice's delivered flag (REQ-INV-027). Must run before the reductions are
+   * applied.
+   *
+   * @param source the source row whose slices are read; never {@code null}
+   * @param target the freshly built moved row to earmark; never {@code null}
+   * @param orderReductions the job-order plan (orderId to SCU)
+   * @param missionReductions the mission plan (missionId to SCU)
+   */
+  public static void applyTransferInherit(
+      InventoryItem source,
+      InventoryItem target,
+      Map<UUID, Double> orderReductions,
+      Map<UUID, Double> missionReductions) {
+    for (Map.Entry<UUID, Double> reduction : orderReductions.entrySet()) {
+      InventoryJobOrderAllocation slice =
+          InventoryAllocations.jobOrderSlice(source, reduction.getKey());
+      if (slice != null && slice.getJobOrderId() != null) {
+        InventoryAllocations.addJobOrder(
+            target,
+            slice.getJobOrderId(),
+            reduction.getValue(),
+            Boolean.TRUE.equals(slice.getDelivered()));
+      }
+    }
+    for (Map.Entry<UUID, Double> reduction : missionReductions.entrySet()) {
+      InventoryMissionAllocation slice =
+          InventoryAllocations.missionSlice(source, reduction.getKey());
+      if (slice != null && slice.getMissionId() != null) {
+        InventoryAllocations.addMission(target, slice.getMissionId(), reduction.getValue());
+      }
+    }
+  }
 }

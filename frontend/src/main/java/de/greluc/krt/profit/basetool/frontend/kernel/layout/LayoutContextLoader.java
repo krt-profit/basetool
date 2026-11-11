@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
@@ -154,6 +155,7 @@ public class LayoutContextLoader {
           response.capabilities() != null ? response.capabilities() : CapabilitiesResponse.NONE,
           response.unreadNotifications());
     } catch (Exception ex) {
+      SectionFallback.rethrowIfReauthenticationRequired(ex);
       log.debug("Failed to resolve the layout context", ex);
       return LayoutContext.NONE;
     }

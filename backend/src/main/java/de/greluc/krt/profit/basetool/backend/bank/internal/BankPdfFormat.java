@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.platform.api.KrtPdfSupport;
 import java.awt.Color;
 import java.math.BigDecimal;
@@ -26,6 +27,8 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.UnaryOperator;
 import org.jetbrains.annotations.NotNull;
 import org.openpdf.text.pdf.PdfPTable;
@@ -39,6 +42,41 @@ import org.openpdf.text.pdf.PdfPTable;
 public final class BankPdfFormat {
 
   private BankPdfFormat() {}
+
+  /**
+   * Renders the "Quell-/Zielkonto" cell of a statement row (REQ-BANK-044): the counterparty with
+   * org unit for a {@code DEPOSIT}/{@code WITHDRAWAL}, the counter account's number for a {@code
+   * TRANSFER}, empty otherwise.
+   *
+   * @param row the statement row
+   * @param accountLegsByTx the page's account legs grouped by transaction
+   * @param anonymisedLabel the localized name for erased users
+   * @return the cell text, never {@code null}
+   */
+  public static @NotNull String counterpartyCell(
+      @NotNull BankBookingRow row,
+      @NotNull Map<UUID, List<BankCounterLeg>> accountLegsByTx,
+      @NotNull String anonymisedLabel) {
+    return switch (row.type()) {
+      case DEPOSIT, WITHDRAWAL -> {
+        if (row.counterpartyHandle() == null) {
+          yield "";
+        }
+        String handle =
+            HandleAnonymisation.humaniseRequired(row.counterpartyHandle(), anonymisedLabel);
+        yield row.counterpartyOrgUnitName() == null
+            ? handle
+            : handle + " (" + row.counterpartyOrgUnitName() + ")";
+      }
+      case TRANSFER ->
+          accountLegsByTx.getOrDefault(row.transactionId(), List.of()).stream()
+              .filter(leg -> !leg.postingId().equals(row.postingId()))
+              .map(BankCounterLeg::accountNo)
+              .findFirst()
+              .orElse("");
+      default -> "";
+    };
+  }
 
   /**
    * Formats a balance as German-grouped whole aUEC, e.g. {@code 1.850.000 aUEC}.

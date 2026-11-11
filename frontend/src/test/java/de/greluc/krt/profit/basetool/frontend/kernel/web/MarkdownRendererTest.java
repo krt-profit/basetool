@@ -67,6 +67,32 @@ class MarkdownRendererTest {
   }
 
   @Test
+  void shouldRenderAnImageAsALinkToItSoTheCspNeverBlocksIt() {
+    String markdown =
+        "![Hangar-Plan](https://cdn.example.org/plan.png \"Plan\") und"
+            + " ![](https://x.example/a.png)";
+
+    String html = renderer.render(markdown);
+
+    assertFalse(html.contains("<img"), "no image may be embedded from a third-party host");
+    assertTrue(
+        html.contains(
+            "<a href=\"https://cdn.example.org/plan.png\" rel=\"noopener noreferrer nofollow\""
+                + " title=\"Plan\">Hangar-Plan</a>"),
+        "the alt text becomes the link text: " + html);
+    assertTrue(
+        html.contains(">https://x.example/a.png</a>"),
+        "an image without alt text shows its URL: " + html);
+  }
+
+  @Test
+  void shouldStripDangerousImageProtocols() {
+    String html = renderer.render("![x](javascript:alert(1))");
+
+    assertFalse(html.contains("javascript:"), "javascript: image URLs must be stripped: " + html);
+  }
+
+  @Test
   void shouldRenderSoftBreaksAsLineBreaks() {
     String markdown = "Zeile eins\nZeile zwei";
 

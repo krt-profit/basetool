@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.mission.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -34,7 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
-import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
@@ -44,10 +45,10 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.ParticipantForm;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.MessageSource;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
@@ -125,15 +126,13 @@ class MissionPageControllerTest {
   void addParticipant_ShouldCallWebClient() {
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
+    MissionParticipantWriteController controller =
+        new MissionParticipantWriteController(
             new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
             new MissionPageController(
                 new MissionBackendClient(backendApiClient),
                 mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+                PARALLEL));
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenReturn(null);
@@ -156,15 +155,13 @@ class MissionPageControllerTest {
   void addParticipant_AmbiguousName_ShouldExposeLocalizedToast() {
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
+    MissionParticipantWriteController controller =
+        new MissionParticipantWriteController(
             new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
             new MissionPageController(
                 new MissionBackendClient(backendApiClient),
                 mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+                PARALLEL));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
@@ -194,15 +191,13 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
+    MissionParticipantWriteController controller =
+        new MissionParticipantWriteController(
             new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
             new MissionPageController(
                 new MissionBackendClient(backendApiClient),
                 mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+                PARALLEL));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.post(anyString(), any(), eq(Void.class), any(Object[].class)))
@@ -227,15 +222,8 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
-            new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
-            new MissionPageController(
-                new MissionBackendClient(backendApiClient),
-                mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+    MissionLeadershipWriteController controller =
+        new MissionLeadershipWriteController(new MissionBackendClient(backendApiClient));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
@@ -253,15 +241,8 @@ class MissionPageControllerTest {
   void setPartyLead_Conflict_ShouldExposeLocalizedToast() {
     UUID id = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
-            new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
-            new MissionPageController(
-                new MissionBackendClient(backendApiClient),
-                mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+    MissionLeadershipWriteController controller =
+        new MissionLeadershipWriteController(new MissionBackendClient(backendApiClient));
     RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
@@ -282,15 +263,13 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
+    MissionParticipantWriteController controller =
+        new MissionParticipantWriteController(
             new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
             new MissionPageController(
                 new MissionBackendClient(backendApiClient),
                 mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+                PARALLEL));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.delete(anyString(), eq(Void.class), any(Object[].class)))
@@ -313,15 +292,13 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
+    MissionParticipantWriteController controller =
+        new MissionParticipantWriteController(
             new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
             new MissionPageController(
                 new MissionBackendClient(backendApiClient),
                 mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+                PARALLEL));
 
     when(backendApiClient.delete(anyString(), eq(Void.class), any(Object[].class)))
         .thenReturn(null);
@@ -343,15 +320,13 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
+    MissionParticipantWriteController controller =
+        new MissionParticipantWriteController(
             new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
             new MissionPageController(
                 new MissionBackendClient(backendApiClient),
                 mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+                PARALLEL));
     OidcUser user = mock(OidcUser.class);
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
@@ -383,15 +358,13 @@ class MissionPageControllerTest {
     UUID id = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
-    MissionWriteController controller =
-        new MissionWriteController(
+    MissionParticipantWriteController controller =
+        new MissionParticipantWriteController(
             new MissionBackendClient(backendApiClient),
-            mock(MessageSource.class),
             new MissionPageController(
                 new MissionBackendClient(backendApiClient),
                 mock(FrontendAuthHelperService.class),
-                PARALLEL),
-            mock(LiveSyncLocalBus.class));
+                PARALLEL));
 
     when(backendApiClient.put(anyString(), any(), eq(Void.class), any(Object[].class)))
         .thenReturn(null);
@@ -771,6 +744,24 @@ class MissionPageControllerTest {
     assertTrue(model.containsAttribute("crewJobTypes"));
     assertTrue(model.containsAttribute("frequencyTypes"));
     assertTrue(model.containsAttribute("orgUnits"));
+  }
+
+  @Test
+  void missionDetail_NestedSessionLossInAnOptionListPropagates() {
+    UUID id = UUID.randomUUID();
+    BackendApiClient backendApiClient = optionListBackend(id);
+    ReauthenticationRequiredException failure =
+        new ReauthenticationRequiredException("expired", null);
+    when(backendApiClient.getCached(eq(CachedCatalog.SHIP_TYPES), anyTypeRef()))
+        .thenThrow(new IllegalStateException(new CompletionException(failure)));
+    MissionPageController controller =
+        new MissionPageController(
+            new MissionBackendClient(backendApiClient),
+            mock(FrontendAuthHelperService.class),
+            PARALLEL);
+
+    assertThatThrownBy(() -> controller.missionDetail(id, new ConcurrentModel(), null, null))
+        .isSameAs(failure);
   }
 
   /**

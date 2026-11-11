@@ -19,18 +19,30 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonValue;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Constraint;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+import jakarta.validation.Payload;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -43,38 +55,80 @@ import org.jetbrains.annotations.Nullable;
 public record ExchangeOrgStockChangeSet(
     @NotNull @Size(min = 1, max = 500) List<@NotNull @Valid Op> ops, boolean dryRun) {
 
-  /** The op that books stock into a pool. */
-  public static final String BOOK_IN = "book-in";
+  /** The supported org-stock wire operations. */
+  @RequiredArgsConstructor
+  @Schema(name = "OrgStockOperation")
+  public enum Operation {
+    BOOK_IN("book-in"),
+    BOOK_OUT("book-out"),
+    SELL("sell"),
+    MOVE_LOCATION("move-location"),
+    MOVE_HOLDER("move-holder"),
+    MOVE_POOL("move-pool"),
+    NOTE("note"),
+    STOLEN("stolen"),
+    ALLOCATION_ADD("allocation-add"),
+    ALLOCATION_CHANGE("allocation-change"),
+    ALLOCATION_REMOVE("allocation-remove");
 
-  /** The op that books stock out of an entry. */
-  public static final String BOOK_OUT = "book-out";
+    private final String wireName;
 
-  /** The op that sells stock of an entry. */
-  public static final String SELL = "sell";
+    /**
+     * Returns the operation's stable wire spelling.
+     *
+     * @return the wire spelling
+     */
+    @JsonValue
+    public String wireName() {
+      return wireName;
+    }
 
-  /** The op that moves stock of an entry to another location. */
-  public static final String MOVE_LOCATION = "move-location";
+    /**
+     * Decodes the validated wire discriminator.
+     *
+     * @param name the operation name
+     * @return its typed discriminator
+     * @throws BadRequestException when the operation is unsupported
+     */
+    public static Operation decode(String name) {
+      return Arrays.stream(values())
+          .filter(op -> op.wireName.equals(name))
+          .findFirst()
+          .orElseThrow(() -> new BadRequestException("Unknown org-stock op"));
+    }
+  }
 
-  /** The op that moves stock of an entry to another holder. */
-  public static final String MOVE_HOLDER = "move-holder";
+  /** Validates the operation spelling before the adapter creates a typed plan. */
+  @Constraint(validatedBy = OperationValidator.class)
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
+  public @interface SupportedOperation {
+    /** Returns the localized validation message key. */
+    String message() default "{exchange.orgStock.unsupportedOperation}";
 
-  /** The op that moves stock of an entry into another pool of its holder. */
-  public static final String MOVE_POOL = "move-pool";
+    /** Returns the validation groups. */
+    Class<?>[] groups() default {};
 
-  /** The op that sets or clears an entry's note. */
-  public static final String NOTE = "note";
+    /** Returns constraint metadata. */
+    Class<? extends Payload>[] payload() default {};
+  }
 
-  /** The op that sets or removes the stolen marker of an entry or a part of it. */
-  public static final String STOLEN = "stolen";
-
-  /** The op that earmarks part of an entry to a job order or mission. */
-  public static final String ALLOCATION_ADD = "allocation-add";
-
-  /** The op that sets the amount of an entry's earmark. */
-  public static final String ALLOCATION_CHANGE = "allocation-change";
-
-  /** The op that removes an entry's earmark. */
-  public static final String ALLOCATION_REMOVE = "allocation-remove";
+  /** Checks wire names against the authoritative operation enum. */
+  public static final class OperationValidator
+      implements ConstraintValidator<SupportedOperation, String> {
+    /**
+     * Accepts supported names, leaving required-value checks to NotNull.
+     *
+     * @param value the wire discriminator
+     * @param context validation context
+     * @return whether the discriminator is supported or absent
+     */
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+      return value == null
+          || Arrays.stream(Operation.values()).anyMatch(op -> op.wireName.equals(value));
+    }
+  }
 
   /**
    * One write on a pool; the gateway's schema decides which fields each op carries.
@@ -111,12 +165,7 @@ public record ExchangeOrgStockChangeSet(
   @Schema(name = "OrgStockOp")
   public record Op(
       @Nullable @Size(min = 1, max = 64) String opId,
-      @NotNull
-          @Pattern(
-              regexp =
-                  "^(book-in|book-out|sell|move-location|move-holder|move-pool|note|stolen"
-                      + "|allocation-add|allocation-change|allocation-remove)$")
-          String op,
+      @NotNull @SupportedOperation @Schema(implementation = Operation.class) String op,
       @NotNull UUID unit,
       @Nullable @Size(min = 1, max = 128) String holder,
       @Nullable @Valid ExchangeItemRef material,
@@ -136,7 +185,19 @@ public record ExchangeOrgStockChangeSet(
       @Nullable @DecimalMin("0") @DecimalMax("999999999999999") BigDecimal proceeds,
       @Nullable UUID toUnit,
       @Nullable UUID jobOrder,
-      @Nullable UUID mission) {}
+      @Nullable UUID mission) {
+    /**
+     * Decodes the operation at the adapter boundary.
+     *
+     * @return the typed operation
+     * @throws BadRequestException if a direct caller bypassed wire validation
+     */
+    @JsonIgnore
+    @Schema(hidden = true)
+    public Operation operation() {
+      return Operation.decode(op);
+    }
+  }
 
   /**
    * An amount for one job order.

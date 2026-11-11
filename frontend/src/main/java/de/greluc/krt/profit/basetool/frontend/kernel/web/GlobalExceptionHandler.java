@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -482,6 +483,29 @@ public class GlobalExceptionHandler {
         request.getMethod(),
         request.getRequestURI(),
         ex.getClass().getSimpleName());
+  }
+
+  /**
+   * Maps a joined parallel read's session loss through the central reauthentication response.
+   *
+   * @param failure the joined read's failure
+   * @param model the fallback error model
+   * @param request the current request
+   * @return the reauthentication response or the ordinary error page
+   */
+  @NotNull
+  @ExceptionHandler(CompletionException.class)
+  public Object handleCompletionException(
+      @NotNull CompletionException failure,
+      @NotNull Model model,
+      @NotNull HttpServletRequest request) {
+    try {
+      SectionFallback.rethrowIfReauthenticationRequired(failure);
+    } catch (ReauthenticationRequiredException _) {
+      return handleReauthenticationRequired(request);
+    }
+    return new ModelAndView(
+        handleException(failure, model, request), model.asMap(), HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   /**

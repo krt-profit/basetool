@@ -191,6 +191,16 @@ application emptying a lot, and the purge of a deleted member's rows. The `reaso
 `checkout`, `bulk-checkout`, `transfer`, `rebook`, `wipe`, `handover`, `production`, `stock`,
 `user-deletion`. The stock-merge fold never deletes an offer-backed row, so it needs neither.
 
+**The row lock serializes the read and the offer writes** (ADR-0362). Every delete path holds the
+rows' `PESSIMISTIC_WRITE` locks before it reads their offers: the single-row paths, the bulk
+checkout and the bulk rebooking lock each row first, the wipe locks every shared row in its scope
+and deletes exactly those, and the account deletion locks the member's rows. A release, and a
+deactivation of a stock-backed offer, lock the Lager row before they read it. So an offer released
+on a row a delete holds waits for the delete and is then refused as not found, an offer released
+first is read and audited as removed, and an offer deactivated first is not reported as removed.
+The stock merge checks the offers of its locked group again after the lock, so it does not fold a
+row an offer was released on while it waited.
+
 **Acceptance**
 - [ ] Reducing a backing row below its active offer's `offeredAmount` persists `offeredAmount` down to
 the new stock (book-out, transfer, rebooking, handover / item delivery, production booking).
@@ -199,11 +209,15 @@ the new stock (book-out, transfer, rebooking, handover / item delivery, producti
 - [ ] A fully booked-out row's offer is cascade-removed (unchanged from REQ-MARKET-002).
 - [ ] Each lowered offer records one `MARKET_OFFER_REDUCED` and each cascade-removed active offer one
 `MARKET_OFFER_REMOVED`, on every path above, with the path's `reason`.
+- [ ] With a release and a delete of the same row in two concurrent transactions, the offer either
+records its `MARKET_OFFER_REMOVED` or the release is refused as not found; an offer deactivated
+while the delete waits records no `MARKET_OFFER_REMOVED`.
 
 **Enforced by:** `MaterialExchangeOfferClampDataTest`, `MaterialExchangeOfferRatchetTest`,
 `MaterialExchangeOfferRatchetDataTest`, `MaterialExchangeStockLinksDataTest`,
+`MaterialExchangeOfferDeleteRaceIntegrationTest`, `InventoryStockMergeTest`,
 `InventoryItemServiceBookOutTest`, `LotRowsTest` · **Code:** `StockChangeObserver`, `LotRows`,
-`StockOfferLookup`,
+`StockOfferLookup`, `StockRowLocks`, `MaterialExchangeService`,
 `MaterialExchangeOfferRatchet`, `MaterialExchangeOfferRepository#clampOfferedAmountToStock` /
 `#clampItemQuantityToStock`, `InventoryCheckoutService#bookOutInventoryItem` / `#rebookPersonal` /
 `#bulkCheckout` / `#bulkRebook` / `#deleteAllGlobalInventory` / transfer path,

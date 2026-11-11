@@ -1,0 +1,128 @@
+[
+  {
+    "source": "scripts/basetool-deploy.service",
+    "target": "/etc/systemd/system/basetool-deploy.service",
+    "mode": "0644",
+    "kind": "unit"
+  },
+  {
+    "source": "scripts/basetool-deploy.timer",
+    "target": "/etc/systemd/system/basetool-deploy.timer",
+    "mode": "0644",
+    "kind": "unit"
+  },
+  {
+    "source": "scripts/basetool-deploy-account-sandbox.conf",
+    "target": "/etc/systemd/system/basetool-deploy.service.d/10-deploy-account-sandbox.conf",
+    "mode": "0644",
+    "kind": "sandbox"
+  },
+  {
+    "source": "ansible/roles/basetool_host/templates/basetool-deploy-account-order.conf.j2",
+    "target": "/etc/systemd/system/basetool-deploy.service.d/20-service-user.conf",
+    "mode": "0644",
+    "kind": "ordering"
+  },
+  {
+    "source": "scripts/basetool-deploy.logrotate",
+    "target": "/etc/logrotate.d/basetool-deploy",
+    "mode": "0644",
+    "kind": "logrotate"
+  },
+  {
+    "source": "scripts/basetool-backup.service",
+    "target": "/etc/systemd/system/basetool-backup.service",
+    "mode": "0644",
+    "kind": "unit"
+  },
+  {
+    "source": "scripts/basetool-backup.timer",
+    "target": "/etc/systemd/system/basetool-backup.timer",
+    "mode": "0644",
+    "kind": "unit"
+  },
+  {
+    "source": "scripts/basetool-deploy-account-sandbox.conf",
+    "target": "/etc/systemd/system/basetool-backup.service.d/10-deploy-account-sandbox.conf",
+    "mode": "0644",
+    "kind": "sandbox"
+  },
+  {
+    "source": "ansible/roles/basetool_host/templates/basetool-deploy-account-order.conf.j2",
+    "target": "/etc/systemd/system/basetool-backup.service.d/20-service-user.conf",
+    "mode": "0644",
+    "kind": "ordering"
+  },
+  {
+    "source": "scripts/basetool-backup.logrotate",
+    "target": "/etc/logrotate.d/basetool-backup",
+    "mode": "0644",
+    "kind": "logrotate"
+  },
+  {
+    "source": "scripts/basetool-restore-drill.service",
+    "target": "/etc/systemd/system/basetool-restore-drill.service",
+    "mode": "0644",
+    "kind": "unit"
+  },
+  {
+    "source": "scripts/basetool-restore-drill.timer",
+    "target": "/etc/systemd/system/basetool-restore-drill.timer",
+    "mode": "0644",
+    "kind": "unit"
+  },
+  {
+    "source": "scripts/basetool-deploy-account-sandbox.conf",
+    "target": "/etc/systemd/system/basetool-restore-drill.service.d/10-deploy-account-sandbox.conf",
+    "mode": "0644",
+    "kind": "sandbox"
+  },
+  {
+    "source": "ansible/roles/basetool_host/templates/basetool-deploy-account-order.conf.j2",
+    "target": "/etc/systemd/system/basetool-restore-drill.service.d/20-service-user.conf",
+    "mode": "0644",
+    "kind": "ordering"
+  },
+  {
+    "source": "scripts/basetool-restore-drill.logrotate",
+    "target": "/etc/logrotate.d/basetool-restore-drill",
+    "mode": "0644",
+    "kind": "logrotate"
+  },
+  {
+    "source": "scripts/basetool-container-cleanup.service",
+    "target": "/etc/systemd/system/basetool-container-cleanup.service",
+    "mode": "0644",
+    "kind": "unit"
+  },
+  {
+    "source": "scripts/basetool-container-cleanup.timer",
+    "target": "/etc/systemd/system/basetool-container-cleanup.timer",
+    "mode": "0644",
+    "kind": "unit"
+  },
+  {
+    "source": "scripts/basetool-deploy-account-sandbox.conf",
+    "target": "/etc/systemd/system/basetool-container-cleanup.service.d/10-deploy-account-sandbox.conf",
+    "mode": "0644",
+    "kind": "sandbox"
+  },
+  {
+    "source": "ansible/roles/basetool_host/templates/basetool-deploy-account-order.conf.j2",
+    "target": "/etc/systemd/system/basetool-container-cleanup.service.d/20-service-user.conf",
+    "mode": "0644",
+    "kind": "ordering"
+  },
+  {
+    "source": "scripts/basetool-container-cleanup.logrotate",
+    "target": "/etc/logrotate.d/basetool-container-cleanup",
+    "mode": "0644",
+    "kind": "logrotate"
+  },
+  {
+    "source": "scripts/basetool-locks.tmpfiles",
+    "target": "/etc/tmpfiles.d/basetool-locks.conf",
+    "mode": "0644",
+    "kind": "tmpfiles"
+  }
+]

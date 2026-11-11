@@ -84,8 +84,7 @@ public class InventoryOrgUnitChangeService {
     orderWrites.lockTransformRows(List.of(itemId), List.of());
     InventoryItem item =
         Entities.require(
-            inventoryItemRepository.findByIdForRebook(itemId),
-            () -> "Inventory item not found: " + itemId);
+            inventoryItemRepository.lockById(itemId), () -> "Inventory item not found: " + itemId);
     orderWrites.validateRows(List.of(itemId));
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
@@ -135,7 +134,7 @@ public class InventoryOrgUnitChangeService {
     for (UUID itemId : orderedIds) {
       InventoryItem item =
           Entities.require(
-              inventoryItemRepository.findByIdForRebook(itemId),
+              inventoryItemRepository.lockById(itemId),
               () -> "Inventory item not found: " + itemId);
       orderWrites.validateRows(List.of(itemId));
       requireOwnPersonalRow(item, callerId);

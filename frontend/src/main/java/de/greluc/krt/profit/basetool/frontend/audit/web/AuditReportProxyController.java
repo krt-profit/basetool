@@ -23,6 +23,9 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.audit.client.AuditBackendClient;
 import de.greluc.krt.profit.basetool.frontend.audit.model.AuditDomains;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.BackendDownloads;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -85,20 +88,23 @@ public class AuditReportProxyController {
    * @param from period start; bound as an instant so the relayed value cannot carry URI syntax
    * @param to period end; bound as an instant so the relayed value cannot carry URI syntax
    * @param userTimeZone the caller's IANA time zone; optional
-   * @return the PDF with attachment headers
+   * @param response the browser download response
+   * @throws IOException when the response stream cannot be opened
    */
   @GetMapping("/{domain}/export")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<byte[]> downloadAuditLog(
+  public void downloadAuditLog(
       @PathVariable @NotNull String domain,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone,
+      @NotNull HttpServletResponse response)
+      throws IOException {
     requireKnownDomain(domain);
-    String filename = "audit-" + domain.toLowerCase(Locale.ROOT) + ".pdf";
-    return attachment(
-        withBackendStatus(() -> auditClient.exportPdf(domain, from, to, userTimeZone)),
-        filename,
+    BackendDownloads.send(
+        response,
+        auditClient.exportPdf(domain, from, to, userTimeZone),
+        "audit-" + domain.toLowerCase(Locale.ROOT) + ".pdf",
         MediaType.APPLICATION_PDF);
   }
 
@@ -109,19 +115,22 @@ public class AuditReportProxyController {
    * @param domain the area tab ({@code BANK} or a generic {@code AuditDomain} name)
    * @param from period start; bound as an instant so the relayed value cannot carry URI syntax
    * @param to period end; bound as an instant so the relayed value cannot carry URI syntax
-   * @return the JSON with attachment headers
+   * @param response the browser download response
+   * @throws IOException when the response stream cannot be opened
    */
   @GetMapping("/{domain}/export.json")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<byte[]> downloadAuditLogJson(
+  public void downloadAuditLogJson(
       @PathVariable @NotNull String domain,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+      @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+      @NotNull HttpServletResponse response)
+      throws IOException {
     requireKnownDomain(domain);
-    String filename = "audit-" + domain.toLowerCase(Locale.ROOT) + ".json";
-    return attachment(
-        withBackendStatus(() -> auditClient.exportJson(domain, from, to)),
-        filename,
+    BackendDownloads.send(
+        response,
+        auditClient.exportJson(domain, from, to),
+        "audit-" + domain.toLowerCase(Locale.ROOT) + ".json",
         MediaType.APPLICATION_JSON);
   }
 
@@ -143,22 +152,5 @@ public class AuditReportProxyController {
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     return ResponseEntity.ok().headers(headers).body(body);
-  }
-
-  /**
-   * Re-wraps one backend export document with attachment headers; backend errors have already
-   * propagated with their original status so the page can surface 400/403 distinctly.
-   *
-   * @param pdf the exported document
-   * @param filename the download filename
-   * @param mediaType the response content type (PDF or JSON)
-   * @return the proxied attachment response
-   */
-  private static ResponseEntity<byte[]> attachment(
-      byte[] pdf, @NotNull String filename, @NotNull MediaType mediaType) {
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(mediaType);
-    headers.setContentDispositionFormData("attachment", filename);
-    return ResponseEntity.ok().headers(headers).body(pdf);
   }
 }

@@ -19,15 +19,16 @@
 
 package de.greluc.krt.profit.basetool.frontend.bank.web;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
-
 import de.greluc.krt.profit.basetool.frontend.bank.client.BankBackendClient;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CancelBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.CreateBankBookingRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.OrgUnitBalanceTargetRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.SetBankApprovalLimitRequest;
 import de.greluc.krt.profit.basetool.frontend.bank.model.UpdateBankBookingRequest;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.BackendDownloads;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.RelayParams;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -35,10 +36,8 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -131,16 +130,13 @@ public class OrgUnitBankProxyController {
    *
    * @param id the account
    * @param roleCode the role bucket to grant
-   * @param body unused (path-only); accepted so the AJAX form may post an empty body
    * @return the refreshed settings
    */
   @PostMapping("/accounts/{id}/visibility/role/{roleCode}")
   @PreAuthorize("isAuthenticated()")
   public Object addRoleVisibility(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull String roleCode,
-      @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return orEmpty(bankClient.addRoleVisibility(id, requireRoleCode(roleCode), emptyIfNull(body)));
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull String roleCode) {
+    return orEmpty(bankClient.addRoleVisibility(id, requireRoleCode(roleCode)));
   }
 
   /**
@@ -162,16 +158,13 @@ public class OrgUnitBankProxyController {
    *
    * @param id the account
    * @param enabled whether all members may view the account
-   * @param body unused (path-only)
    * @return the refreshed settings
    */
   @PutMapping("/accounts/{id}/visibility/all-members/{enabled}")
   @PreAuthorize("isAuthenticated()")
   public Object setAllMembersVisibility(
-      @PathVariable @NotNull UUID id,
-      @PathVariable boolean enabled,
-      @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return orEmpty(bankClient.setAllMembersVisibility(id, enabled, emptyIfNull(body)));
+      @PathVariable @NotNull UUID id, @PathVariable boolean enabled) {
+    return orEmpty(bankClient.setAllMembersVisibility(id, enabled));
   }
 
   /**
@@ -180,16 +173,13 @@ public class OrgUnitBankProxyController {
    *
    * @param id the account
    * @param enabled whether the whole area cascade may view the account
-   * @param body unused (path-only)
    * @return the refreshed settings
    */
   @PutMapping("/accounts/{id}/visibility/area-members/{enabled}")
   @PreAuthorize("isAuthenticated()")
   public Object setAreaMembersVisibility(
-      @PathVariable @NotNull UUID id,
-      @PathVariable boolean enabled,
-      @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return orEmpty(bankClient.setAreaMembersVisibility(id, enabled, emptyIfNull(body)));
+      @PathVariable @NotNull UUID id, @PathVariable boolean enabled) {
+    return orEmpty(bankClient.setAreaMembersVisibility(id, enabled));
   }
 
   /**
@@ -197,16 +187,13 @@ public class OrgUnitBankProxyController {
    *
    * @param id the account
    * @param userId the user to grant
-   * @param body unused (path-only)
    * @return the refreshed settings
    */
   @PostMapping("/accounts/{id}/visibility/user/{userId}")
   @PreAuthorize("isAuthenticated()")
   public Object addUserVisibility(
-      @PathVariable @NotNull UUID id,
-      @PathVariable @NotNull UUID userId,
-      @RequestBody(required = false) @Nullable Map<String, Object> body) {
-    return orEmpty(bankClient.addUserVisibility(id, userId, emptyIfNull(body)));
+      @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
+    return orEmpty(bankClient.addUserVisibility(id, userId));
   }
 
   /**
@@ -374,21 +361,23 @@ public class OrgUnitBankProxyController {
    * @param from period start; bound as an instant so the relayed value cannot carry URI syntax
    * @param to period end; bound as an instant so the relayed value cannot carry URI syntax
    * @param userTimeZone the caller's IANA time zone; optional
-   * @return the PDF with attachment headers
+   * @param response the browser download response
+   * @throws IOException when the response stream cannot be opened
    */
   @GetMapping("/accounts/{id}/statement")
   @PreAuthorize("isAuthenticated()")
-  public ResponseEntity<byte[]> downloadStatement(
+  public void downloadStatement(
       @PathVariable @NotNull UUID id,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
       @RequestParam @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone) {
-    byte[] pdf =
-        withBackendStatus(() -> bankClient.orgUnitAccountStatement(id, from, to, userTimeZone));
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_PDF);
-    headers.setContentDispositionFormData("attachment", "kontoauszug-" + id + ".pdf");
-    return ResponseEntity.ok().headers(headers).body(pdf);
+      @RequestHeader(value = "X-User-Time-Zone", required = false) String userTimeZone,
+      @NotNull HttpServletResponse response)
+      throws IOException {
+    BackendDownloads.send(
+        response,
+        bankClient.orgUnitAccountStatement(id, from, to, userTimeZone),
+        "kontoauszug-" + id + ".pdf",
+        MediaType.APPLICATION_PDF);
   }
 
   /**

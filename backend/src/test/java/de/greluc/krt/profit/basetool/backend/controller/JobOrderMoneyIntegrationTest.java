@@ -505,15 +505,32 @@ class JobOrderMoneyIntegrationTest {
           String source = providedHolder(order, writer(), "4000000");
           String commitment = openResponsibleCommitment(order, "9000000");
           String recipient = designateRecipient(order, writer(), Map.of("name", "Requester"));
-          var payment = movementTerms(
-              "HANDOVER", source, 1, "10000000", "0",
-              Map.of("recipientId", recipient, "targetVersion", 0,
-                  "provision", "6000000", "commitmentId", commitment));
-          var revision = put("/api/v1/orders/{id}/participations/{unitId}/money-commitment", order, responsible)
-              .with(writer())
-              .contentType(MediaType.APPLICATION_JSON)
-              .content(json.writeValueAsString(
-                  Map.of("amount", "8000000", "commitmentId", commitment, "version", 0)));
+          var payment =
+              movementTerms(
+                  "HANDOVER",
+                  source,
+                  1,
+                  "10000000",
+                  "0",
+                  Map.of(
+                      "recipientId",
+                      recipient,
+                      "targetVersion",
+                      0,
+                      "provision",
+                      "6000000",
+                      "commitmentId",
+                      commitment));
+          var revision =
+              put(
+                      "/api/v1/orders/{id}/participations/{unitId}/money-commitment",
+                      order,
+                      responsible)
+                  .with(writer())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      json.writeValueAsString(
+                          Map.of("amount", "8000000", "commitmentId", commitment, "version", 0)));
 
           try (var workers = Executors.newFixedThreadPool(2)) {
             var waiterPid = new AtomicInteger();
@@ -521,21 +538,37 @@ class JobOrderMoneyIntegrationTest {
                 Objects.requireNonNull(
                     transactions.execute(_ -> {
                       jdbc.queryForObject(
-                          "SELECT id FROM job_order WHERE id = ? FOR NO KEY UPDATE", UUID.class, blockedRow);
+                          "SELECT id FROM job_order WHERE id = ? FOR NO KEY UPDATE",
+                          UUID.class,
+                          blockedRow);
                       int blocker = currentPid();
                       Future<MvcResult> request =
-                          workers.submit(() -> transactions.execute(_ -> {
-                            waiterPid.set(currentPid());
-                            return perform(movementRequest(order, writer(), payment, false));
-                          }));
-                      await().atMost(Duration.ofSeconds(10)).until(() ->
-                          waiterPid.get() != 0 && Boolean.TRUE.equals(jdbc.queryForObject(
-                              "SELECT ? = ANY(pg_blocking_pids(?))", Boolean.class, blocker, waiterPid.get())));
+                          workers.submit(() ->
+                              transactions.execute(_ -> {
+                                waiterPid.set(currentPid());
+                                return perform(movementRequest(order, writer(), payment, false));
+                              }));
+                      await()
+                          .atMost(Duration.ofSeconds(10))
+                          .until(() ->
+                              waiterPid.get() != 0
+                                  && Boolean.TRUE.equals(
+                                      jdbc.queryForObject(
+                                          "SELECT ? = ANY(pg_blocking_pids(?))",
+                                          Boolean.class,
+                                          blocker,
+                                          waiterPid.get())));
                       try {
-                        assertThat(workers.submit(() -> perform(revision)).get(8, TimeUnit.SECONDS)
-                            .getResponse().getStatus()).isEqualTo(204);
+                        assertThat(
+                                workers
+                                    .submit(() -> perform(revision))
+                                    .get(8, TimeUnit.SECONDS)
+                                    .getResponse()
+                                    .getStatus())
+                            .isEqualTo(204);
                       } catch (Exception failure) {
-                        throw new IllegalStateException("Commitment revision failed while handover waited.", failure);
+                        throw new IllegalStateException(
+                            "Commitment revision failed while handover waited.", failure);
                       }
                       return request;
                     }));

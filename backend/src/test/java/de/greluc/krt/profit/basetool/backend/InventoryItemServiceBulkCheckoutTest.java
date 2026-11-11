@@ -29,17 +29,15 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkCheckoutRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
-import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutAudits;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
-import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -47,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -72,12 +71,9 @@ import org.springframework.security.access.AccessDeniedException;
 class InventoryItemServiceBulkCheckoutTest {
 
   @BeforeEach
-  void wireOrderWriteFixture() {
+  void wireCheckoutGraph() {
     inventoryItemService =
-        new InventoryCheckoutService(
-            new InventoryOrderWrites(
-                inventoryItemRepository,
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+        InventoryCheckoutFixtures.create(
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -89,7 +85,6 @@ class InventoryItemServiceBulkCheckoutTest {
             null,
             null,
             auditService,
-            new InventoryCheckoutAudits(auditService),
             eventPublisher);
   }
 
@@ -131,8 +126,8 @@ class InventoryItemServiceBulkCheckoutTest {
     InventoryItem item1 = itemOwnedBy(itemId1, userId);
     InventoryItem item2 = itemOwnedBy(itemId2, userId);
 
-    when(inventoryItemRepository.findByIdForUpdate(itemId1)).thenReturn(Optional.of(item1));
-    when(inventoryItemRepository.findByIdForUpdate(itemId2)).thenReturn(Optional.of(item2));
+    when(inventoryItemRepository.lockById(itemId1)).thenReturn(Optional.of(item1));
+    when(inventoryItemRepository.lockById(itemId2)).thenReturn(Optional.of(item2));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
 
@@ -151,9 +146,9 @@ class InventoryItemServiceBulkCheckoutTest {
     UUID itemId1 = UUID.randomUUID();
     UUID itemId2 = UUID.randomUUID();
 
-    when(inventoryItemRepository.findByIdForUpdate(itemId1))
+    when(inventoryItemRepository.lockById(itemId1))
         .thenReturn(Optional.of(itemOwnedBy(itemId1, userId)));
-    when(inventoryItemRepository.findByIdForUpdate(itemId2))
+    when(inventoryItemRepository.lockById(itemId2))
         .thenReturn(Optional.of(itemOwnedBy(itemId2, userId)));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
@@ -187,7 +182,7 @@ class InventoryItemServiceBulkCheckoutTest {
     InventoryAllocations.addJobOrder(item, jobOrder.getId(), item.getAmount(), false);
     InventoryAllocations.addMission(item, mission.getId(), item.getAmount());
 
-    when(inventoryItemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.lockById(itemId)).thenReturn(Optional.of(item));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId));
 
@@ -197,13 +192,37 @@ class InventoryItemServiceBulkCheckoutTest {
   }
 
   @Test
+  void bulkCheckout_refusesARowWithAPledgedDonation_andRemovesNothing() {
+    UUID userId = UUID.randomUUID();
+    UUID freeItemId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID pledgedItemId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+    InventoryItem freeItem = itemOwnedBy(freeItemId, userId);
+    InventoryItem pledgedItem = itemOwnedBy(pledgedItemId, userId);
+    pledgedItem.setAmount(10.0);
+    InventoryAllocations.addDonation(pledgedItem, UUID.randomUUID(), 2.0);
+
+    when(inventoryItemRepository.lockById(freeItemId)).thenReturn(Optional.of(freeItem));
+    when(inventoryItemRepository.lockById(pledgedItemId)).thenReturn(Optional.of(pledgedItem));
+
+    BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(freeItemId, pledgedItemId));
+
+    assertThrows(
+        OverAllocationException.class, () -> inventoryItemService.bulkCheckout(request, userId));
+
+    verify(offerRatchet, never()).beforeDelete(any(), any());
+    verify(inventoryItemRepository, never()).deleteAllById(any());
+    verifyNoInteractions(auditService);
+  }
+
+  @Test
   void bulkCheckout_throwsAccessDenied_whenItemBelongsToAnotherUser() {
     UUID currentUserId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
 
     InventoryItem item = itemOwnedBy(itemId, otherUserId);
-    when(inventoryItemRepository.findByIdForUpdate(itemId)).thenReturn(Optional.of(item));
+    when(inventoryItemRepository.lockById(itemId)).thenReturn(Optional.of(item));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId));
 
@@ -219,7 +238,7 @@ class InventoryItemServiceBulkCheckoutTest {
     UUID userId = UUID.randomUUID();
     UUID missingItemId = UUID.randomUUID();
 
-    when(inventoryItemRepository.findByIdForUpdate(missingItemId)).thenReturn(Optional.empty());
+    when(inventoryItemRepository.lockById(missingItemId)).thenReturn(Optional.empty());
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(missingItemId));
 
@@ -256,7 +275,7 @@ class InventoryItemServiceBulkCheckoutTest {
     UUID itemId2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     InventoryItem foreignItem = itemOwnedBy(itemId1, otherUserId);
-    when(inventoryItemRepository.findByIdForUpdate(itemId1)).thenReturn(Optional.of(foreignItem));
+    when(inventoryItemRepository.lockById(itemId1)).thenReturn(Optional.of(foreignItem));
 
     BulkCheckoutRequest request = new BulkCheckoutRequest(List.of(itemId1, itemId2));
 
@@ -264,7 +283,7 @@ class InventoryItemServiceBulkCheckoutTest {
         AccessDeniedException.class,
         () -> inventoryItemService.bulkCheckout(request, currentUserId));
 
-    verify(inventoryItemRepository, never()).findByIdForUpdate(itemId2);
+    verify(inventoryItemRepository, never()).lockById(itemId2);
     verify(inventoryItemRepository, never()).deleteAllById(any());
   }
 }

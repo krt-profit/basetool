@@ -116,8 +116,7 @@ public class InventoryPoolChangeService {
     orderWrites.lockTransformRows(List.of(itemId), List.of());
     InventoryItem item =
         Entities.require(
-            inventoryItemRepository.findByIdForRebook(itemId),
-            () -> "Inventory item not found: " + itemId);
+            inventoryItemRepository.lockById(itemId), () -> "Inventory item not found: " + itemId);
     orderWrites.validateRows(List.of(itemId));
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);

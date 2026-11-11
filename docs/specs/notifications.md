@@ -40,9 +40,9 @@ is the notification-engine view of it; the linked requirement is canonical.
 
 | Event (`NotificationEventType`) | Notification type(s) raised | Seed | Recipients (selectors) | Requirement |
 |---|---|---|---|---|
-| `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 + V384 | `ORG_RELATIVE_ROLE` `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-008 |
-| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 + V384 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-017 |
-| `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | V384 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` after a meaningful edit | REQ-NOTIF-017 |
+| `JOB_ORDER_CREATED` | `JOB_ORDER_CREATED` | V156 + V387 | `ORG_RELATIVE_ROLE` `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-008 |
+| `JOB_ORDER_UPDATED_BY_REQUESTER` | `JOB_ORDER_UPDATED_BY_REQUESTER` | V214 + V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` | REQ-NOTIF-017 |
+| `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | `JOB_ORDER_UPDATED_BY_RESPONSIBLE` | V387 | `UNIT_WRITER` on `RESPONSIBLE` and `REQUESTING` after a meaningful edit | REQ-NOTIF-017 |
 | `BANK_BOOKING_REQUEST_CREATED` | `BANK_BOOKING_REQUEST_CREATED` · `BANK_BOOKING_REQUEST_APPROVAL_NEEDED` | V160 + V194 + V360 · V360 | `ROLE` BANK_MANAGEMENT, `ACCOUNT_GRANT`, `REQUEST_RESPONSIBLE` · `REQUIRED_APPROVER`; the approval notice outranks the generic one | REQ-NOTIF-011/-033, [REQ-BANK-026](bank.md) |
 | `BANK_BOOKING_REQUEST_CONFIRMED` | `BANK_BOOKING_REQUEST_CONFIRMED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
 | `BANK_BOOKING_REQUEST_REJECTED` | `BANK_BOOKING_REQUEST_REJECTED` · `BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED` | V161 · V194 | `EVENT_RECIPIENT` (requester) · `ACCOUNT_RESPONSIBLE`; supersedes `…_CREATED`, `…_UPDATED` and `…_APPROVAL_NEEDED` | REQ-NOTIF-011/-018, REQ-BANK-026 |
@@ -78,16 +78,16 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `OPERATION_PAYOUT_UNMARKED` | none (no rule) | — | supersedes that participant's `OPERATION_PAYOUT_PAID_OUT` | REQ-MISSION-028 |
 | `OPERATION_COMPLETED` | `OPERATION_COMPLETED` | V273 | `ORG_RELATIVE_ROLE` `MISSION_MANAGER` and `OFFICER` on `RESPONSIBLE` | REQ-MISSION-029 |
 | `OPERATION_COMPLETED_UNOWNED` | `OPERATION_COMPLETED` | V273 | `ROLE` `OFFICER` (an operation without an owning unit) | REQ-MISSION-029 |
-| `JOB_ORDER_REASSIGNED` | `JOB_ORDER_REASSIGNED` | V274 + V384 | `UNIT_WRITER` for the former and new responsible units and the requesting unit; retires obsolete processing and clarification prompts | REQ-ORDERS-041 |
-| `JOB_ORDER_FINISHED` | `JOB_ORDER_FINISHED` | V274 + V384 | Current requesting/responsible unit writers and active assigned accounts; coded `statusCode` includes cancellation | REQ-ORDERS-042 |
-| `JOB_ORDER_REOPENED` | `JOB_ORDER_REOPENED` | V384 | Current requesting/responsible unit writers and active assigned accounts | REQ-ORDERS-042 |
-| `JOB_ORDER_CLARIFICATION_REQUIRED` | `JOB_ORDER_CLARIFICATION_REQUIRED` | V384 | Current requesting/responsible unit writers and assigned accounts when the existing responsibility loses eligibility | REQ-ORDERS-042, REQ-ORDERS-055 |
+| `JOB_ORDER_REASSIGNED` | `JOB_ORDER_REASSIGNED` | V274 + V387 | `UNIT_WRITER` for the former and new responsible units and the requesting unit; retires obsolete processing and clarification prompts | REQ-ORDERS-041 |
+| `JOB_ORDER_FINISHED` | `JOB_ORDER_FINISHED` | V274 + V387 | Current requesting/responsible unit writers and active assigned accounts; coded `statusCode` includes cancellation | REQ-ORDERS-042 |
+| `JOB_ORDER_REOPENED` | `JOB_ORDER_REOPENED` | V387 | Current requesting/responsible unit writers and active assigned accounts | REQ-ORDERS-042 |
+| `JOB_ORDER_CLARIFICATION_REQUIRED` | `JOB_ORDER_CLARIFICATION_REQUIRED` | V387 | Current requesting/responsible unit writers and assigned accounts when the existing responsibility loses eligibility | REQ-ORDERS-042, REQ-ORDERS-055 |
 | `JOB_ORDER_CLARIFICATION_RESOLVED` | none (no rule) | — | Retires the outstanding clarification prompt when eligibility is restored | REQ-ORDERS-042 |
-| `JOB_ORDER_PARTICIPATION_CHANGED` | `JOB_ORDER_PARTICIPATION_CHANGED` | V384 | `EVENT_RECIPIENTS` for the affected Staffel and responsible unit writers; coded `supportCode` | REQ-ORDERS-044 |
+| `JOB_ORDER_PARTICIPATION_CHANGED` | `JOB_ORDER_PARTICIPATION_CHANGED` | V387 | `EVENT_RECIPIENTS` for the affected Staffel and responsible unit writers; coded `supportCode` | REQ-ORDERS-044 |
 | `JOB_ORDER_ASSIGNEE_ADDED` | `JOB_ORDER_ASSIGNED` | V274 | `EVENT_RECIPIENT` (the assignee); clears a removal | REQ-ORDERS-043 |
 | `JOB_ORDER_ASSIGNEE_REMOVED` | none (no rule) | — | supersedes that member's `JOB_ORDER_ASSIGNED` (REQ-NOTIF-025) | REQ-ORDERS-043 |
-| `JOB_ORDER_CLAIM_WITHDRAWN` | `JOB_ORDER_CLAIM_WITHDRAWN` | V274 + V376 | `EVENT_RECIPIENTS` for current affected Staffel and responsible writers; coded `reasonCode` | REQ-ORDERS-044 |
-| `JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED` | `JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED` | V381 | `EVENT_RECIPIENTS` for current affected Staffel and responsible writers in one order revision | REQ-ORDERS-044 |
+| `JOB_ORDER_CLAIM_WITHDRAWN` | `JOB_ORDER_CLAIM_WITHDRAWN` | V274 + V379 | `EVENT_RECIPIENTS` for current affected Staffel and responsible writers; coded `reasonCode` | REQ-ORDERS-044 |
+| `JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED` | `JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED` | V384 | `EVENT_RECIPIENTS` for current affected Staffel and responsible writers in one order revision | REQ-ORDERS-044 |
 | `REFINERY_ORDER_READY` | `REFINERY_ORDER_READY` | V276 | `EVENT_RECIPIENT` (the owner); raised once by the `refinery_ready` timed producer | REQ-REFINERY-023 |
 | `REFINERY_ORDER_READY_CLEARED` | none (no rule) | — | supersedes the order's `REFINERY_ORDER_READY` | REQ-REFINERY-023 |
 | `REFINERY_ORDER_CHANGED_BY_OTHER` | `REFINERY_ORDER_CHANGED_BY_OTHER` | V276 | `EVENT_RECIPIENT` (the owner, or the member the yield was booked onto); coded `changeCode` | REQ-REFINERY-024 |
@@ -347,7 +347,7 @@ current leadership reach and contextual Logistician grants through the org-unit 
 global Admin receives the default notice only through an affected functional relationship.
 The rule excludes the creating actor and stays admin-editable and deletable.
 
-V384 upgrades the original selector set in place. Custom audiences, descriptions and enabled
+V387 upgrades the original selector set in place. Custom audiences, descriptions and enabled
 settings are retained. One creation cause can reach a writer of both sides once.
 
 The notice leaves the Inbox when the order closes or responsibility moves. The cleanup runs with
@@ -365,7 +365,7 @@ the resulting order cause and preserves business history (REQ-NOTIF-018).
 `joborder/internal/JobOrderService#publishJobOrderCreated`,
 `joborder/api/events/JobOrderCreatedEvent`, `joborder/internal/JobOrderChangeEffects`,
 `notification/internal/RecipientResolutionService`,
-`V384__seed_shared_order_notification_audiences.sql`
+`V387__seed_shared_order_notification_audiences.sql`
 
 ### REQ-NOTIF-009 — Retention
 
@@ -761,7 +761,7 @@ records the notification-engine consumer.
 ### REQ-NOTIF-017 - Current unit writers hear about need changes
 
 When the requesting side edits its order under REQ-ORDERS-023, `JOB_ORDER_UPDATED_BY_REQUESTER`
-identifies the affected responsible and requesting units. V384 upgrades the stock V214 default
+identifies the affected responsible and requesting units. V387 upgrades the stock V214 default
 to current `UNIT_WRITER` audiences on both contexts. A meaningful responsible-side edit uses
 `JOB_ORDER_UPDATED_BY_RESPONSIBLE` with the same contextual audiences and its own preference.
 Both defaults exclude the editor. The message identifies the order and its unit context using
@@ -783,7 +783,7 @@ original type before the cause chooses one notice per recipient.
 **Enforced by:** `ProfitHierarchyNoticeIntegrationTest`, `MaterialContributionEffectsIntegrationTest`,
 `MessageBundleConsistencyTest` · **Code:** `joborder/api/events/JobOrderUpdatedByRequesterEvent`,
 `joborder/internal/JobOrderLifecycleNotices`, `joborder/internal/JobOrderChangeEffects`,
-`V384__seed_shared_order_notification_audiences.sql`
+`V387__seed_shared_order_notification_audiences.sql`
 
 ### REQ-NOTIF-018 — Superseding: clear stale "action needed" notifications on lifecycle close
 

@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.SyncReportPurgeRes
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -131,6 +132,7 @@ public class AdminSyncReportsPageController {
       SyncReportPurgeResultDto result = syncReportClient.purgeSyncReports(canonicalSource, days);
       redirectAttributes.addFlashAttribute("deletedCount", result == null ? 0 : result.deleted());
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Failed to delete old sync reports (source={}, days={})", source, days, e);
       redirectAttributes.addFlashAttribute("error", "error.admin.syncReports.delete");
     }
@@ -229,6 +231,11 @@ public class AdminSyncReportsPageController {
     model.addAttribute("attemptsAvailable", data.attemptsAvailable());
     model.addAttribute("activeTab", activeTab);
     model.addAttribute("basePath", basePath);
+    if ("SCWIKI".equals(source)) {
+      SyncReportPageReader.WikiDuplicates duplicates = pageReader.readWikiDuplicates();
+      model.addAttribute("wikiDuplicates", duplicates.manufacturers());
+      model.addAttribute("wikiDuplicatesAvailable", duplicates.available());
+    }
     return "results".equals(fragment)
         ? "catalogue/admin/sync-reports :: results"
         : "catalogue/admin/sync-reports";

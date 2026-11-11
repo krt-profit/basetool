@@ -22,6 +22,8 @@ interface KrtWriteResult {
      * a whole-document answer instead of a fragment.
      */
     redirected?: boolean;
+    /** The write completed but its success callback could not refresh the display. */
+    refreshFailed?: boolean;
 }
 
 /**
@@ -151,6 +153,8 @@ interface KrtSendOpts {
     toast?: boolean;
     /** Already-localized generic error text. */
     errorMessage?: string;
+    /** Already-localized notice that the write completed but its display refresh failed. */
+    refreshFailedMessage?: string;
     /** Localized strings for the optimistic-lock conflict dialog. */
     conflict?: KrtConflictStrings;
     /** The submit button disabled for the in-flight request (double-submit guard). */

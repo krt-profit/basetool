@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
+import de.greluc.krt.profit.basetool.backend.architecture.ModuleSubjects;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil.PageCeiling;
 import java.util.Set;
@@ -110,10 +110,7 @@ class PageCeilingTest {
   @Test
   @DisplayName("exactly the reviewed handlers opt out of the default ceiling")
   void onlyTheReviewedHandlersOptOut() {
-    JavaClasses classes =
-        new ClassFileImporter()
-            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("de.greluc.krt.profit.basetool.backend");
+    JavaClasses classes = ModuleSubjects.importBackendMainClasses();
 
     assertThat(optOuts(classes))
         .as("an opt-out is a reviewed decision: name the caller that needs the larger page")

@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeRules;
+import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderCountsDto;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryYieldBonusDto;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
@@ -71,6 +72,27 @@ public class RefineryOrderQueryService implements CraftabilityYieldSource {
   private final RefineryYieldRepository refineryYieldRepository;
   private final RequestScopeResolver requestScopeResolver;
   private final AccessGateService accessGateService;
+
+  /**
+   * Counts the list's four segments without loading orders or goods.
+   *
+   * @param userId the caller's identifier
+   * @param onlyMine whether only the caller's own orders are counted
+   * @return the scoped segment counts
+   */
+  public RefineryOrderCountsDto countSegments(@NotNull UUID userId, boolean onlyMine) {
+    ScopePredicate scope =
+        onlyMine ? null : requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    return refineryOrderRepository.countSegments(
+        onlyMine,
+        userId,
+        List.of(RefineryOrderStatus.OPEN, RefineryOrderStatus.IN_PROGRESS),
+        RefineryOrderStatus.COMPLETED,
+        Instant.now(),
+        scope != null && scope.adminAllScope(),
+        scope == null ? null : scope.activeOrgUnitId(),
+        scope == null ? Set.of() : scope.memberOrgUnitIds());
+  }
 
   /**
    * Owner-scoped paged list under the list filters (REQ-REFINERY-019).

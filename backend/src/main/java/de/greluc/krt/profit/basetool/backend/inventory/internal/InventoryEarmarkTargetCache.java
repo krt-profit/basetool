@@ -164,6 +164,16 @@ public class InventoryEarmarkTargetCache implements InventoryEarmarkLookup {
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
           @Override
+          public void suspend() {
+            TransactionSynchronizationManager.unbindResource(InventoryEarmarkTargetCache.this);
+          }
+
+          @Override
+          public void resume() {
+            TransactionSynchronizationManager.bindResource(InventoryEarmarkTargetCache.this, memo);
+          }
+
+          @Override
           public void afterCompletion(int status) {
             TransactionSynchronizationManager.unbindResourceIfPossible(
                 InventoryEarmarkTargetCache.this);

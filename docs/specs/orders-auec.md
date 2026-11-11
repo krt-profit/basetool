@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-10.
 > **Owner area:** ORDERS · **Related ADRs:** [ADR-0359](../adr/0359-orders-record-money-operations-and-replay-their-outcomes.md), [ADR-0358](../adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)
-> **Status:** The internal Bank-free checkpoint covers creation, provision, collection, requester handover and target-based completion. Commitments, settlement and Bank handling remain part of the owner-approved target. The checklists cover the complete workflow.
+> **Status:** The internal Bank-free checkpoint covers creation, provision, unit commitments and their attribution, collection, requester handover and target-based completion. Settlement and Bank handling remain part of the owner-approved target. The checklists cover the complete workflow.
 
 # aUEC procurement orders
 
@@ -130,7 +130,11 @@ possible. Material's uncovered-capacity/proportional-cut policy
 - [ ] Terminal ending is historical; reopening requires a new conscious commitment.
 - [ ] Transfer preserves an incoming Staffel's commitment and ends the outgoing remainder when it has no active support. Later participation leaves the ended occurrence historical.
 
-**Enforced by:** Required future commitment, attribution, correction and lifecycle checks.
+**Enforced by:** Job-order support and money integration tests exercise unit authority,
+explicit credit and replay, parallel credit, reassignment, completion and cancellation in
+PostgreSQL. Job-order browser tests verify the live commitment, retained peer input and the
+history link to the money operation. Connected correction and Bank confirmation retain their
+own acceptance checks.
 
 ### REQ-ORDERS-060 — A completed transfer books both sides and its fixed fee once
 

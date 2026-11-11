@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -34,7 +36,26 @@ public interface SquadronMapper {
    * @param entity the squadron to project; {@code null} maps to {@code null}
    * @return the squadron DTO
    */
-  SquadronDto toDto(Squadron entity);
+  @Contract("null -> null; !null -> !null")
+  default @Nullable SquadronDto toDto(@Nullable Squadron entity) {
+    return entity == null ? null : snapshot(entity);
+  }
+
+  /**
+   * Copies a squadron into a detached cache-safe read model.
+   *
+   * @param entity the managed squadron
+   * @return its immutable scalar snapshot
+   */
+  static @NotNull SquadronDto snapshot(@NotNull Squadron entity) {
+    return new SquadronDto(
+        entity.getId(),
+        entity.getName(),
+        entity.getShorthand(),
+        entity.getDescription(),
+        entity.isActive(),
+        entity.getVersion());
+  }
 
   /**
    * Projects a squadron into the slim reference (id, name, shorthand) embedded in aggregate DTOs.

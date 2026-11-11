@@ -645,7 +645,10 @@ public class InventoryItemController {
     @ApiResponse(
         responseCode = "403",
         description = "Access denied – item belongs to another user"),
-    @ApiResponse(responseCode = "404", description = "One or more items not found")
+    @ApiResponse(responseCode = "404", description = "One or more items not found"),
+    @ApiResponse(
+        responseCode = "422",
+        description = "An item still carries a pledged donation; nothing is removed")
   })
   @PostMapping("/bulk-checkout")
   @ResponseStatus(HttpStatus.NO_CONTENT)

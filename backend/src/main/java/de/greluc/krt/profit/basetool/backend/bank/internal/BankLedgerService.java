@@ -23,7 +23,6 @@ import static de.greluc.krt.profit.basetool.backend.bank.api.BankAmounts.plain;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -690,19 +689,8 @@ public class BankLedgerService {
       return null;
     }
     if (userId != null) {
-      User user = Entities.require(userRepository.findById(userId), "Counterparty user not found");
-      if (orgUnitId == null) {
-        return new CounterpartySnapshot(user.getId(), user.getEffectiveName(), null, null);
-      }
-      OrgUnitMembershipOptionDto membership =
-          orgUnitMembershipQueryService.listDirectMembershipOptions(userId).stream()
-              .filter(option -> option.orgUnitId().equals(orgUnitId))
-              .findFirst()
-              .orElseThrow(() ->
-                  new BadRequestException(
-                      "The selected org unit is not one of the counterparty's memberships"));
-      return new CounterpartySnapshot(
-          user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
+      return RegisteredCounterpartyResolver.resolve(
+          userRepository, orgUnitMembershipQueryService, userId, orgUnitId);
     }
     String externalHandle = Objects.requireNonNull(external);
     if (orgUnitId == null) {

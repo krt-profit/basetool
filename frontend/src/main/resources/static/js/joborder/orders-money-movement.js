@@ -28,7 +28,10 @@ import {
     setMoneyOptions,
 } from '/js/joborder/orders-money-holders.js';
 import { bindMoneyPreview, showPreviewAmounts } from '/js/joborder/orders-money-preview.js';
-import { readAttributionChoice, refreshAttributionChoices } from '/js/joborder/orders-money-commitments.js';
+import {
+    readAttributionChoice,
+    refreshAttributionChoices,
+} from '/js/joborder/orders-money-commitments.js';
 
 /** @typedef {Omit<ApiDto<'MoveJobOrderMoneyDto'>, 'operationId'>} MovementDraft */
 /** @typedef {ApiDto<'JobOrderMoneyMovementPreview'>} MovementPreview */
@@ -332,7 +335,11 @@ export function bindMoneyMovement(root, recovery) {
         if (section === 'order-participations-results') {
             const observed = commitment.selectedOptions.item(0)?.dataset.version;
             refreshAttributionChoices(commitment, commitment.value);
-            if (topUp.checked && commitment.value && observed !== commitment.selectedOptions.item(0)?.dataset.version) {
+            if (
+                topUp.checked &&
+                commitment.value &&
+                observed !== commitment.selectedOptions.item(0)?.dataset.version
+            ) {
                 changed.hidden = false;
                 preview.reset();
             }

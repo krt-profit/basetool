@@ -54,6 +54,7 @@ STATIC_SHARED = (
 
 MODULE_OWN = {
     "frontend/oss-bundled-components.json": "frontend",
+    "backend/src/main/resources/api/openapi.json": "frontend",
 }
 
 LEGACY_OWN = {m: [f"{m}/Dockerfile"] for m in MODULES}
@@ -416,6 +417,7 @@ def selftest() -> int:
         "COPY frontend/build.gradle.kts frontend/\n"
         "COPY ${MODULE}/src/main/ ${MODULE}/src/main/\n"
         "COPY logging-support/src/main/ \\\n    logging-support/src/main/\n"
+        "COPY technical-support/src/main/ technical-support/src/main/\n"
         "COPY frontend/oss-bundled-components.json frontend/oss-bundled-components.json\n"
         "FROM y AS runtime\n"
         "COPY --from=build --chown=1:1 /app/extracted/application/ ./\n"
@@ -423,6 +425,7 @@ def selftest() -> int:
     own, shared = input_sets(dockerfile)
     check("COPY flags are dropped, the wrapper is shared", "gradlew" in shared)
     check("a continued COPY line is joined, logging-support is shared", "logging-support/src/main" in shared)
+    check("technical-support is a shared source input", "technical-support/src/main" in shared)
     check("${MODULE} sources become each module's own input",
           all(own[m] == [f"{m}/src/main"] + (["frontend/oss-bundled-components.json"] if m == "frontend" else [])
               for m in MODULES))
@@ -484,7 +487,7 @@ def selftest() -> int:
     check("the OSS component list rebuilds the frontend only", r["rebuild"] == ["frontend"])
     r = d(["backend/src/main/A.java", "ingest/src/main/B.java"])
     check("backend and ingest sources rebuild those two", r["rebuild"] == ["backend", "ingest"] and r["reuse"] == ["frontend"])
-    for path in ("logging-support/src/main/L.java", "gradle/verification-metadata.xml", "gradle/libs.versions.toml",
+    for path in ("logging-support/src/main/L.java", "technical-support/src/main/T.java", "gradle/verification-metadata.xml", "gradle/libs.versions.toml",
                  "backend/build.gradle.kts", APP_DOCKERFILE, ".dockerignore",
                  ".github/actions/setup-buildx/Dockerfile", ".github/scripts/app_version.py"):
         r = d([path, "frontend/src/main/C.java"])
@@ -523,14 +526,25 @@ def selftest() -> int:
     check("base: an empty chain offers nothing", base_candidates([], True, 20) == [])
     check("base: a non-sha line is dropped", base_candidates(["x", chain[0]], True, 20) == [chain[0]])
 
-    real = show("HEAD", APP_DOCKERFILE) or (REPO / APP_DOCKERFILE).read_text(encoding="utf-8")
+    real = (REPO / APP_DOCKERFILE).read_text(encoding="utf-8")
     real_own, real_shared = input_sets(real)
     for m in MODULES:
         check(f"the real Dockerfile yields {m}/src/main as {m}'s own input", f"{m}/src/main" in real_own[m])
-    for must in ("gradle", "build-logic", "logging-support/src/main", "build.gradle.kts",
-                 "backend/build.gradle.kts"):
+    for must in ("gradle", "build-logic", "logging-support/src/main", "technical-support/src/main", "build.gradle.kts",
+                 "backend/build.gradle.kts", "lombok.config"):
         check(f"the real Dockerfile yields shared input {must}", must in real_shared)
     real_sources = copy_sources(real)
+    check("the real Dockerfile copies the shared Lombok configuration", "lombok.config" in real_sources)
+    configuration_change = decide(base, head, real, ["lombok.config"], old, old, True)
+    check("a Lombok configuration change rebuilds every application image",
+          configuration_change["rebuild"] == list(MODULES) and configuration_change["reuse"] == [])
+    generated_change = decide(base, head, real, ["backend/src/main/resources/api/openapi.json"], old, old, True)
+    check("the wire record OpenAPI input rebuilds the frontend", "frontend" in generated_change["rebuild"])
+    generator_change = decide(base, head, real,
+                              ["build-logic/src/main/kotlin/de/greluc/krt/profit/basetool/conventions/GenerateWireRecords.kt"],
+                              old, old, True)
+    check("the wire record JVM task rebuilds application images through shared build-logic",
+          generator_change["rebuild"] == list(MODULES) and generator_change["reuse"] == [])
     for path in MODULE_OWN:
         check(f"MODULE_OWN entry {path} is still a COPY source", path in real_sources)
 

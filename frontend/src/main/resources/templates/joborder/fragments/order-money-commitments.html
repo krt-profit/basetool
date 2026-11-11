@@ -9,8 +9,8 @@
         <option th:each="commitment : ${support.moneyCommitments}" th:if="${commitment.canEdit}"
                 th:value="${commitment.unit.orgUnitId}" th:text="${commitment.unit.orgUnitName}"
                 th:data-commitment-id="${commitment.id}" th:data-version="${commitment.version}"
-                th:data-outstanding="${commitment.outstanding}"
-                th:data-current="#{orders.money.commitment.current(${@moneyFormat.exactWhole(commitment.outstanding, #locale)})}"></option>
+                th:with="current=${#messages.msg('orders.money.commitment.current', @moneyFormat.exactWhole(commitment.outstanding, #locale))}"
+                th:data-outstanding="${commitment.outstanding}" th:data-current="${current}"></option>
     </template>
     <template id="order-money-provision-commitments">
         <option value="" th:text="#{orders.money.commitment.unattributed}"></option>

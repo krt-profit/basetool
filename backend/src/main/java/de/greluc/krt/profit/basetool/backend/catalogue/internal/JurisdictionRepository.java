@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,4 +32,14 @@ public interface JurisdictionRepository extends JpaRepository<Jurisdiction, UUID
 
   /** Derived Spring-Data query - returns entities matching {@code Name}. */
   Optional<Jurisdiction> findByName(String name);
+
+  /**
+   * Reads the identities and name fallbacks needed by one UEX synchronization chunk.
+   *
+   * @param ids incoming UEX identifiers
+   * @param names incoming display names
+   * @return matching rows in stable local-id order
+   */
+  List<Jurisdiction> findByIdJurisdictionInOrNameInOrderByIdAsc(
+      Collection<Integer> ids, Collection<String> names);
 }

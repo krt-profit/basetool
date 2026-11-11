@@ -38,7 +38,9 @@ MATRIX = re.compile(
     r"'(?P<pr>\[[^\]]*\])'\s*\|\|\s*'(?P<full>\[[^\]]*\])'\s*\)\s*\}\}\s*$",
     re.MULTILINE,
 )
-CLASSES = re.compile(r"new int\[\]\s*\{\s*(?P<w>\d+)\s*,\s*(?P<h>\d+)\s*\}")
+DEVICE_DECLARATION = re.compile(r"\bDEVICE_CLASSES\s*=\s*List\.of\((?P<entries>[^;]*)\)\s*;")
+VIEWPORT = r"new\s+Viewport\(\s*([1-9][0-9]*)\s*,\s*([1-9][0-9]*)\s*\)"
+VIEWPORT_LIST = re.compile(rf"\s*{VIEWPORT}(?:\s*,\s*{VIEWPORT})*\s*")
 
 
 def workflow_axes(text: str) -> tuple[list[str], list[str]]:
@@ -70,11 +72,13 @@ def subset_problems(in_pr: list[str], in_full: list[str]) -> list[str]:
 
 def sweep_devices(text: str) -> list[str]:
     """Return ``DEVICE_CLASSES`` as WxH strings in declaration order, read from that declaration only."""
-    start = text.find("DEVICE_CLASSES =")
-    if start == -1:
-        raise SystemExit("FAIL: no DEVICE_CLASSES declaration in TouchClassLayoutE2eTest.java")
-    end = text.find(";", start)
-    return [f"{w}x{h}" for w, h in CLASSES.findall(text[start:end])]
+    declaration = DEVICE_DECLARATION.search(text)
+    if not declaration:
+        raise SystemExit("FAIL: no DEVICE_CLASSES List.of declaration in TouchClassLayoutE2eTest.java")
+    entries = declaration.group("entries")
+    if not VIEWPORT_LIST.fullmatch(entries):
+        raise SystemExit("FAIL: DEVICE_CLASSES must contain only literal Viewport(width, height) entries")
+    return [f"{width}x{height}" for width, height in re.findall(VIEWPORT, entries)]
 
 
 def compare(in_workflow: list[str], in_sweep: list[str]) -> list[str]:
@@ -129,8 +133,25 @@ def selftest() -> int:
     if not in_pr or not in_full:
         print("SELFTEST FAIL: a workflow device axis parsed to an empty list")
         return 1
-    if not sweep_devices(SWEEP.read_text(encoding="utf-8")):
-        print("SELFTEST FAIL: DEVICE_CLASSES parsed to an empty list")
+    declaration = "DEVICE_CLASSES = List.of(new Viewport(375, 812),\nnew Viewport(1180, 820));"
+    sample = "OTHER = new Viewport(100, 100);\n" + declaration + "\nOTHER = new Viewport(200, 200);"
+    if sweep_devices(sample) != ["375x812", "1180x820"]:
+        print("SELFTEST FAIL: typed viewport declaration parsed incorrectly")
+        return 1
+    for invalid in (
+        "DEVICE_CLASSES = List.of();",
+        "DEVICE_CLASSES = List.of(new Viewport(375, 812), desktop());",
+        "DEVICE_CLASSES = List.of(new Viewport(375, 812) new Viewport(1180, 820),);",
+        "OTHER = List.of(new Viewport(375, 812));",
+    ):
+        try:
+            sweep_devices(invalid)
+        except SystemExit:
+            continue
+        print(f"SELFTEST FAIL: invalid declaration passed: {invalid}")
+        return 1
+    if compare(in_full, sweep_devices(SWEEP.read_text(encoding="utf-8"))):
+        print("SELFTEST FAIL: the checked-in workflow and typed viewport declarations differ")
         return 1
     print("selftest: ok")
     return 0

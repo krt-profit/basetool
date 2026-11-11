@@ -64,6 +64,18 @@ public enum SyncEventType {
    */
   MANUFACTURER_LINKED,
 
+  /**
+   * Wiki manufacturer reconciliation: the matched local row is linked to another manufacturer of
+   * the same census, so this Wiki row became one of its aliases without blocking the census.
+   */
+  MANUFACTURER_DUPLICATE,
+
+  /**
+   * Wiki manufacturer reconciliation: a complete census no longer carries the row's Wiki UUID and a
+   * Wiki row with the same unique name and code took its place, so {@code scwiki_uuid} moved to it.
+   */
+  MANUFACTURER_RELINKED,
+
   /** Wiki item sync (R4): a UUID present in UEX is absent on the Wiki. */
   WIKI_MISSING,
 

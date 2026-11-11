@@ -2569,6 +2569,9 @@ that has no entry at all, before it is used.
   resolution, detached ones included, so a plugin probe that resolves without the Boot BOM reports
   versions nothing uses. PIT's `addJUnitPlatformLauncher` probe is switched off for that reason; the
   launcher reaches PIT through the test runtime classpath ([`dependency-pins.md`](../dependency-pins.md)).
+- **The Gradle Wrapper pins Gradle 9.9.1.** Its `distributionSha256Sum` verifies the binary
+  distribution against Gradle's published SHA-256 before extraction; wrapper upgrades regenerate
+  the wrapper JAR and launch scripts with the pinned release.
 - **Checksums only.** PGP signatures are not verified (ADR-0208 says why and when to revisit).
 - **The CI tools outside Gradle are pinned the same way** (CI-SEC-12): pip installs read
   `--require-hashes` requirement files under `.github/requirements/`, markdownlint-cli is installed
@@ -3122,6 +3125,21 @@ after the apps, and the promotion failed.
 **Runbook:** `docs/deployment.md` → *Before a promotion: the host scripts* · **Related:** REQ-OPS-001,
 REQ-OPS-007, REQ-OPS-036, REQ-OBS-014
 
+**Installed operational companions participate in the same drift result.**
+`scripts/host-companions.json` owns the source, installed path, mode and kind for the operational
+units/timers, sandbox and ordering drop-ins, logrotate files and lock-file tmpfiles rule. The role's
+static installation loops consume that inventory, and the release manifest appends their hashes
+under `host/etc/...`. Comparison reads the installed paths; it writes no host configuration.
+The generated ordering drop-in is compared after removing non-semantic comments and normalizing
+only the detected service user's uid. A different numeric uid remains literal and reports drift.
+Other contents remain byte-exact. Existing drift metrics and alerts
+cover missing and changed companions; no automatic reconciliation is introduced.
+
+The deploy orchestrator retains state transitions and rollback order. Configuration/runtime apply,
+release verification, drift comparison and monitoring functions have focused owners under
+`scripts/lib/deploy-*.sh`, all installed, hashed and included in the apply-path gate. The shared
+literal environment parser is also part of that gate (ADR-0364).
+
 ### REQ-OPS-046 — The shared build conventions are precompiled plugins of an included build
 
 Every build convention the modules share lives in `build-logic/`, an included build
@@ -3185,6 +3203,24 @@ isolated projects have nothing to reject and a module added later inherits no de
 [ADR-0248](../adr/0248-the-shared-build-conventions-are-precompiled-plugins-of-an-included-build.md),
 [ADR-0275](../adr/0275-the-plugin-classpath-resolves-from-the-portal-with-maven-central-behind-it.md) ·
 **Related:** REQ-OPS-034, REQ-OPS-037, REQ-OPS-038
+
+Node script tests register through `registerNodeScriptTest` in `build-logic`, retaining their task
+names, setup dependencies, script inputs, precise extra files/directories, nonzero-exit failures and
+always-run verification behavior. The included build resolves the Node plugin marker using the
+catalog; the frontend applies that already-versioned plugin by id. Configuration-cache reuse and
+the affected task graph are checked through the wrapper.
+
+The three application dev images watch `technical-support/` in the local Compose build setup, so
+changes to its main sources or module build metadata rebuild every image that carries the library.
+
+Operational subprocesses have explicit configurable budgets (`Kcadm.timeout`, default 60 seconds;
+GraphQL commit request, default 60 seconds; sandbox HTTP calls, default 120 seconds). A kcadm timeout
+kills/waits for the local child; an uncertain write is not retried automatically and names the need
+to read server state first. The commit helper similarly requires checking the branch head before a
+retry. No diagnostic includes a credential or response payload. Script HTTP reads use a connection/I/O
+wait of at most five seconds and check their total deadline after each transport chunk, so an
+in-flight chunk may add at most one such I/O wait to the total budget; a slow trickle cannot keep
+the operation alive indefinitely.
 
 ### REQ-OPS-047 — A library module of an application is named `<app>-<name>`, and the build reads the name
 
@@ -3508,6 +3544,36 @@ Coding agents of every vendor read the same instructions (ADR-0327).
 `.github/workflows/repo-lint.yml`) · **Decision:**
 [ADR-0327](../adr/0327-agents-md-is-the-vendor-neutral-agent-instructions.md) ·
 **Related:** REQ-OPS-051
+
+### REQ-OPS-056 — The E2E harness stops the processes it started before it retries or fails
+
+A timed-out or interrupted step of the E2E stack bring-up never leaves a writer behind that
+competes with the next attempt for the Docker VM or its log.
+
+- **The owned tree is stopped first.** When a subprocess of `E2eStackExtension` times out or the
+  bring-up thread is interrupted, `OwnedProcessTree.run` forcibly stops the root and every
+  descendant seen while one of its members was alive, re-reading descendants each round, within a
+  bounded stop budget (30 s), before the failure is thrown.
+- **Only owned processes.** Nothing is stopped by name, and no Docker or Gradle daemon is touched;
+  a `ProcessHandle` carries its start time, so a reused PID is never taken for an owned one.
+- **The original failure stays.** The timeout or `InterruptedException` is what propagates;
+  processes that outlive the budget are attached to it as a suppressed
+  `UnstoppedProcessesException`, and the harness then starts no further attempt.
+- **An interrupt is not retried.** `composeUp` and `prePullImages` rethrow an
+  `InterruptedException` at once.
+- **Every attempt has its own logs.** `compose-up`, `compose-pull`, `compose-logs` and the
+  between-attempt teardown logs carry `-attempt-<n>` under `frontend/build/e2e/`.
+
+**Acceptance**
+
+- [x] `OwnedProcessTreeTest` starts a root, child and grandchild JVM, lets the root time out and
+  checks that all three are gone when `run` returns, while an unrelated sentinel JVM still runs.
+- [x] The same test interrupts the waiting thread and checks the tree is gone and the
+  `InterruptedException` propagates; a survivor marker is found through a wrapping failure.
+- [x] The test runs in `:test-support:test` on Windows and on the Linux CI runners.
+
+**Enforced by:** `OwnedProcessTreeTest` (`:test-support:test`) · **Runbook:**
+[`docs/e2e-test/README.md`](../e2e-test/README.md) · **Related:** REQ-OPS-041
 
 ## Open questions
 

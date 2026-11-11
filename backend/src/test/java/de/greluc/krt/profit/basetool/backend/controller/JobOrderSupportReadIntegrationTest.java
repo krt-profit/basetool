@@ -430,11 +430,19 @@ class JobOrderSupportReadIntegrationTest {
     String path = "/api/v1/orders/" + createMoneyOrder();
     String supportPath = path + "/participations";
     String commitmentPath = supportPath + "/" + support.getId() + "/money-commitment";
-    as(put(commitmentPath).contentType(MediaType.APPLICATION_JSON)
-            .content("{\"amount\":\"6000000\"}"), false, true)
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            false,
+            true)
         .andExpect(status().isNoContent());
-    as(put(path + "/status").contentType(MediaType.APPLICATION_JSON)
-            .content("{\"status\":\"CANCELLED\",\"version\":0}"), true, false)
+    as(
+            put(path + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CANCELLED\",\"version\":0}"),
+            true,
+            false)
         .andExpect(status().isOk());
     as(get(supportPath), false, true)
         .andExpect(status().isOk())
@@ -442,15 +450,23 @@ class JobOrderSupportReadIntegrationTest {
         .andExpect(jsonPath("$.moneyCommitments[0].changes[1].reason").value("ORDER_ENDED"))
         .andExpect(jsonPath("$.moneyCommitments[0].changes[1].before").value("6000000"));
 
-    as(put(path + "/status").contentType(MediaType.APPLICATION_JSON)
-            .content("{\"status\":\"OPEN\",\"version\":1}"), true, false)
+    as(
+            put(path + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"OPEN\",\"version\":1}"),
+            true,
+            false)
         .andExpect(status().isOk());
     as(get(supportPath), false, true)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.moneyCommitments.length()").value(1))
         .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists());
-    as(put(commitmentPath).contentType(MediaType.APPLICATION_JSON)
-            .content("{\"amount\":\"7000000\"}"), false, true)
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"7000000\"}"),
+            false,
+            true)
         .andExpect(status().isNoContent());
     as(get(supportPath), false, true)
         .andExpect(status().isOk())

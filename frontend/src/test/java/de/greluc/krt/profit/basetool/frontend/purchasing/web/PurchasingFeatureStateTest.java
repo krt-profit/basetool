@@ -43,7 +43,7 @@ class PurchasingFeatureStateTest {
 
   @BeforeEach
   void setUp() {
-    featureState = new PurchasingFeatureState(purchasingClient);
+    featureState = new PurchasingFeatureState(new PurchasingRequestState(purchasingClient));
   }
 
   private static PurchasingStateDto state(boolean enabled) {

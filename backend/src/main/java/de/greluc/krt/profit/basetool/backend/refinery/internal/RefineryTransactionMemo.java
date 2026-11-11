@@ -63,6 +63,16 @@ final class RefineryTransactionMemo {
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
           @Override
+          public void suspend() {
+            TransactionSynchronizationManager.unbindResource(owner);
+          }
+
+          @Override
+          public void resume() {
+            TransactionSynchronizationManager.bindResource(owner, memo);
+          }
+
+          @Override
           public void afterCompletion(int status) {
             TransactionSynchronizationManager.unbindResourceIfPossible(owner);
           }

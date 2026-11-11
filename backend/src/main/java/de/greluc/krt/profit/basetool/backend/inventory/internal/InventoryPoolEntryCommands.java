@@ -173,7 +173,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
       @Nullable String terminal,
       @Nullable BigDecimal proceeds) {
     orderWrites.prepareWrites(List.of(take.entryId()), List.of(), List.of());
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(take.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(take.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -227,7 +227,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
                 move.targetHolder(),
                 move.targetLocation() == null ? null : move.targetLocation().getId(),
                 null)));
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(take.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(take.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -298,7 +298,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   public @NotNull PoolOutcome movePool(@NotNull PoolChange move, boolean dryRun) {
     orderWrites.lockEligibility();
     orderWrites.lockTransformRows(List.of(move.entryId()), List.of());
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(move.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(move.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -356,7 +356,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   public @NotNull PoolOutcome setNote(@NotNull PoolNote note, boolean dryRun) {
     orderWrites.lockEligibility();
     orderWrites.lockRows(List.of(note.entryId()));
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(note.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(note.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -394,7 +394,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     orderWrites.lockTransformRows(
         List.of(stolen.entryId()),
         List.of(new PoolRelocation(stolen.entryId(), null, null, stolen.stolen())));
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(stolen.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(stolen.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }
@@ -453,7 +453,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
     orderWrites.lockAllocation(
         allocation.entryId(),
         allocation.dimension() == EarmarkDimension.JOB_ORDER ? allocation.targetId() : null);
-    Optional<InventoryItem> locked = inventoryRepository.findByIdForUpdate(allocation.entryId());
+    Optional<InventoryItem> locked = inventoryRepository.lockById(allocation.entryId());
     if (locked.isEmpty()) {
       return PoolOutcome.refused(PoolRefusal.NOT_PERMITTED);
     }

@@ -497,9 +497,9 @@ final class BackendCallScanner {
     }
 
     /**
-     * Whether this is a {@code backendApiClient.execute(…)}.
+     * Whether this is an {@code execute} or {@code download} request callback.
      *
-     * @return {@code true} for an {@code execute(…)} site
+     * @return {@code true} for a request callback site
      */
     boolean isExecute() {
       return execute != null;
@@ -519,12 +519,15 @@ final class BackendCallScanner {
     List<Call> resolve(List<String> inconsistencies) {
       Set<String> templates = templates(uri, scope);
       if (execute != null) {
+        boolean download = execute.getArguments().size() == 2;
         ExpressionTree declaredVerb = execute.getArguments().get(0);
-        Set<String> declared = templates(execute.getArguments().get(1), scope);
+        Set<String> declared = templates(execute.getArguments().get(download ? 0 : 1), scope);
         String declaredName =
-            declaredVerb instanceof MemberSelectTree select
-                ? select.getIdentifier().toString()
-                : declaredVerb.toString();
+            download
+                ? "GET"
+                : declaredVerb instanceof MemberSelectTree select
+                    ? select.getIdentifier().toString()
+                    : declaredVerb.toString();
         if (!declaredName.equals(verb) || !declared.equals(templates)) {
           inconsistencies.add(
               key
@@ -574,7 +577,8 @@ final class BackendCallScanner {
         ExpressionTree uri = node.getArguments().get(0);
         return new Site(verb, uri, scope, location(unit, node), key(type, method, verb, uri), null);
       }
-      if ("execute".equals(name) && node.getArguments().size() == 4) {
+      if (("execute".equals(name) && node.getArguments().size() == 4)
+          || ("download".equals(name) && node.getArguments().size() == 2)) {
         return executeSite(unit, node, type, method, scope);
       }
       return null;
@@ -597,9 +601,11 @@ final class BackendCallScanner {
       TypeInfo type,
       @Nullable MethodTree method,
       Scope scope) {
-    ExpressionTree request = node.getArguments().get(2);
+    boolean download = node.getArguments().size() == 2;
+    int uriIndex = download ? 0 : 1;
+    ExpressionTree request = node.getArguments().get(download ? 1 : 2);
     String verb = "?";
-    ExpressionTree uri = node.getArguments().get(1);
+    ExpressionTree uri = node.getArguments().get(uriIndex);
     Scope lambdaScope = scope;
     if (request instanceof LambdaExpressionTree lambda && lambda.getParameters().size() == 1) {
       String client = lambda.getParameters().get(0).getName().toString();
@@ -624,7 +630,7 @@ final class BackendCallScanner {
         uri,
         lambdaScope,
         location(unit, node),
-        key(type, method, verb, node.getArguments().get(1)),
+        key(type, method, verb, node.getArguments().get(uriIndex)),
         node);
   }
 

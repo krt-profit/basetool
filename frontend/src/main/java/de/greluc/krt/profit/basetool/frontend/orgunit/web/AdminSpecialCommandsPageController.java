@@ -189,6 +189,7 @@ public class AdminSpecialCommandsPageController {
       }
       return "redirect:/admin/special-commands?error=CreateSpecialCommandFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Create SpecialCommand failed", e);
       return "redirect:/admin/special-commands?error=CreateSpecialCommandFailed";
     }
@@ -237,6 +238,7 @@ public class AdminSpecialCommandsPageController {
       }
       return "redirect:/admin/special-commands?error=UpdateSpecialCommandFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Update SpecialCommand failed", e);
       return "redirect:/admin/special-commands?error=UpdateSpecialCommandFailed";
     }
@@ -266,6 +268,7 @@ public class AdminSpecialCommandsPageController {
       }
       return "redirect:/admin/special-commands?error=DeleteSpecialCommandFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Delete SpecialCommand failed", e);
       return "redirect:/admin/special-commands?error=DeleteSpecialCommandFailed";
     }
@@ -288,6 +291,7 @@ public class AdminSpecialCommandsPageController {
       evictOrgUnitCatalogueCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Activate SpecialCommand failed", e);
       return "redirect:/admin/special-commands?error=ActivateSpecialCommandFailed";
     }
@@ -343,6 +347,7 @@ public class AdminSpecialCommandsPageController {
       }
       return "redirect:" + MEMBER_PAGE_BASE + id + "?error=ToggleLeadFailed";
     } catch (Exception e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
       log.error("Toggle SpecialCommand member lead failed", e);
       return "redirect:" + MEMBER_PAGE_BASE + id + "?error=ToggleLeadFailed";
     }

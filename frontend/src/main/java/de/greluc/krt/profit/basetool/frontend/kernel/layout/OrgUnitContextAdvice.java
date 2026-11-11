@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import jakarta.servlet.http.HttpServletRequest;
@@ -134,6 +135,7 @@ public class OrgUnitContextAdvice {
           backendApiClient.getCached(CachedCatalog.SQUADRONS, SQUADRON_PAGE);
       return page != null && page.content() != null ? page.content() : List.of();
     } catch (Exception ex) {
+      SectionFallback.rethrowIfReauthenticationRequired(ex);
       log.debug("Failed to load squadron list for sidebar dropdown", ex);
       return List.of();
     }

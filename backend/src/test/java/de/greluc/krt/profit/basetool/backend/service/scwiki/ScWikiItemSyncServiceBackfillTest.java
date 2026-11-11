@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemStatWrit
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemClassResolver;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerScwikiIdentityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemFieldWriter;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemStatFollowUp;
@@ -101,6 +102,7 @@ class ScWikiItemSyncServiceBackfillTest {
   @Mock private GameItemRepository gameItemRepository;
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private ManufacturerRepository manufacturerRepository;
+  @Mock private ManufacturerScwikiIdentityRepository manufacturerIdentityRepository;
   @Mock private SyncReportService syncReportService;
   @Mock private ItemReconciliationService itemReconciliationService;
   @Mock private GameItemStatRepository gameItemStatRepository;
@@ -143,6 +145,7 @@ class ScWikiItemSyncServiceBackfillTest {
             gameItemRepository,
             blueprintRepository,
             manufacturerRepository,
+            manufacturerIdentityRepository,
             syncReportService,
             new GameItemStatWriter(gameItemStatRepository, syncReportService),
             new ScWikiItemStatFollowUp(
@@ -424,6 +427,37 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     assertSame(aegis, captureSaves().get(uuid).getManufacturer());
+  }
+
+  @Test
+  void backfill_resolvesManufacturerThroughAWikiAliasOfItsManufacturer() {
+    UUID uuid = UUID.randomUUID();
+    UUID aliasUuid = UUID.randomUUID();
+    Manufacturer banu = manufacturer("Banu");
+    banu.setId(UUID.randomUUID());
+    banu.setScwikiUuid(UUID.randomUUID());
+    when(manufacturerRepository.findAll()).thenReturn(List.of(banu));
+    ManufacturerScwikiIdentityRepository.IdentityRef alias =
+        new ManufacturerScwikiIdentityRepository.IdentityRef() {
+          @Override
+          public UUID getScwikiUuid() {
+            return aliasUuid;
+          }
+
+          @Override
+          public UUID getManufacturerId() {
+            return banu.getId();
+          }
+        };
+    when(manufacturerIdentityRepository.findIdentityRefs()).thenReturn(List.of(alias));
+    ScWikiItemManufacturerDto mfrRef =
+        new ScWikiItemManufacturerDto(aliasUuid, "Banu Souli", "BANU");
+    stubPass(WEAPONS, itemDto(uuid, "Defender Rifle", "Cargo", mfrRef));
+    when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.empty());
+
+    service.syncItems();
+
+    assertSame(banu, captureSaves().get(uuid).getManufacturer());
   }
 
   @Test
