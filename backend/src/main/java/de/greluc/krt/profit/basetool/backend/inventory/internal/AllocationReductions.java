@@ -263,10 +263,13 @@ public final class AllocationReductions {
         Comparator.comparingLong(WholeQuota::remainder)
             .reversed()
             .thenComparing(WholeQuota::target));
-    final long residual =
-        Math.subtractExact(
-            forced,
-            deductions.values().stream().mapToLong(Long::longValue).reduce(0L, Math::addExact));
+    final int residual =
+        Math.toIntExact(
+            Math.subtractExact(
+                forced,
+                deductions.values().stream()
+                    .mapToLong(Long::longValue)
+                    .reduce(0L, Math::addExact)));
     for (int index = 0; index < residual; index++) {
       deductions.merge(quotas.get(index).target(), 1L, Math::addExact);
     }

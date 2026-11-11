@@ -63,6 +63,7 @@ class NotificationCenterE2eTest {
   private static Playwright playwright;
   private static Browser browser;
   private static Path storageState;
+  private static ContextualOrderCreator.RestoreStaffeln notificationRecipient;
 
   /** The seeded order's display id — the unique discriminator in the notification text. */
   private static String orderDisplayId;
@@ -73,18 +74,14 @@ class NotificationCenterE2eTest {
   /** The display id of the order whose notification is opened from the bell dropdown. */
   private static String openedOrderDisplayId;
 
-  /**
-   * Launches the browser, seeds two job orders as {@code test-member} so {@code test-admin}
-   * receives a {@code JOB_ORDER_CREATED} notification for each (mirroring the admin's role into the
-   * backend first), and captures one authenticated admin session reused across the tests.
-   */
+  /** Seeds two orders whose responsible Staffel writer receives the creation notices. */
   @BeforeAll
   static void setUp() {
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
-      seeder.getUserId(ADMIN_USER, ADMIN_PASSWORD);
+      notificationRecipient = seeder.grantIridiumWriter(ADMIN_USER, ADMIN_PASSWORD);
       String materialId =
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Notif Material");
       orderDisplayId = displayIdOf(seeder, seedOrder(seeder, materialId, "E2E Notif Order"));
@@ -95,14 +92,16 @@ class NotificationCenterE2eTest {
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), ADMIN_USER, ADMIN_PASSWORD);
   }
 
-  /** Releases the browser and the Playwright driver process. */
+  /** Releases browser resources and restores the recipient's Staffel memberships. */
   @AfterAll
   static void tearDown() {
-    if (browser != null) {
-      browser.close();
-    }
-    if (playwright != null) {
-      playwright.close();
+    try (var _ = notificationRecipient) {
+      if (browser != null) {
+        browser.close();
+      }
+      if (playwright != null) {
+        playwright.close();
+      }
     }
   }
 
