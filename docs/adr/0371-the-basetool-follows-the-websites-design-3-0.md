@@ -8,7 +8,8 @@
   [ADR-0292](0292-the-app-wears-the-website-palette-and-a-4px-radius.md) ·
   [ADR-0294](0294-the-app-wears-the-measured-website-palette.md) ·
   [ADR-0259](0259-the-design-system-submodule-follows-its-main.md) · design system
-  `krt-profit/design-system` (design-system#22, design-system#23, design-system#24)
+  `krt-profit/design-system` (design-system#22, design-system#23, design-system#24,
+  design-system#25)
 
 ## Context
 
@@ -70,9 +71,10 @@ visible frame, its labels tint every hue, its navigation is a menu bar.
 - A page's own tile inside a box takes `--surface-card` and `--radius-tile`; the bar colour is the
   sunken level (detail rows, progress tracks, a table inside a padded card).
 - Small orange text on a control fill still takes `--color-accent-light` (4.3 : 1 on `#2F3640`).
-- Tree tables and other rounded containers whose first or last child paints its own background
-  show square corners at the rounded frame, since a rounded container never sets
-  `overflow: hidden`; the flush-card table rule is the pattern for rounding them.
+- A rounded container never sets `overflow: hidden`, so the child that fills one of its corners
+  takes the inner radius instead (REQ-UI-007): a flush card hands it to its table or scroll wrapper
+  through `--flush-corner-top` / `--flush-corner-bottom`, and a master list to its first and last
+  visible row (design-system#25).
 
 ## Alternatives considered
 

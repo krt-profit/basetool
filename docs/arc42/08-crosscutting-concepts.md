@@ -337,7 +337,8 @@ Two binding rules shape every UI change:
   `CustomPropertyExistenceTest`).
 - **Surfaces and radii follow the website's Design 3.0** (2026-11-11). A box, a lighter tile
   inside it and a sunken third level, each with the `#2A3038` frame; zebra and row hover follow the
-  surface a table sits on; boxes, tiles, controls and inner elements take 10, 8, 6 and 4 px. Where
+  surface a table sits on; boxes, tiles, controls and inner elements take 10, 8, 6 and 4 px, and a
+  child that fills a box corner takes the box's inner radius instead of being clipped. Where
   the website would fail WCAG, the app departs from it: controls keep their 3:1 border and
   department tags stay filled (REQ-UI-003, REQ-UI-007, ADR-0371).
 
