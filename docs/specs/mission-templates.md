@@ -56,3 +56,26 @@ refused with 403 on list and create.
   with a foreign template ID. Failed, stale and unauthorized writes leave no audit event.
 - [ ] A planning-row edit advances the revision. An authorized peer sees the list change while
   their open editor retains its unsaved inputs and its previous revision.
+
+
+### REQ-MISSION-036 - Start a template from a readable mission
+
+**Save as template** opens the common template editor from the details of a standalone mission or
+a mission linked to an operation. The draft starts with the mission name, ordered classified goals,
+ordered procedure titles and hints, and each visible unit's display name, catalogue ship type,
+note, HVU flag and unit frequency. It uses the standard mission detail read and its field
+visibility. Assignments, progress and other mission state stay with the source mission.
+
+The destination picker lists the active units the caller can currently manage as specified in
+REQ-MISSION-035. The source owner and the source's edit permission do not constrain the
+destination. The planner can edit the name and plan before saving through the same create path
+as a blank template. Opening or cancelling the editor performs no write.
+
+**Acceptance**
+
+- [ ] The planner opens the prefilled editor from the mission detail, edits the name and plan,
+  and saves in a permitted unit other than the readable mission's owner.
+- [ ] A direct request for an inaccessible source or a write to a destination outside management
+  scope is refused. Cancelling leaves the destination list unchanged.
+- [ ] Goal classifications and order, step hints, HVU and unit frequency round-trip. The saved
+  template contains reusable planning fields only.

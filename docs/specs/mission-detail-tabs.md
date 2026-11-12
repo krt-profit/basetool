@@ -4,6 +4,10 @@
 
 # Mission detail page — tab layout (Variante B)
 
+The detail header offers **Save as template** to planners with template management reach in the
+active context. It opens the common editor with the mission's reusable plan
+([REQ-MISSION-036](mission-templates.md#req-mission-036---start-a-template-from-a-readable-mission)).
+
 ## Context & goal
 
 The mission detail page (`/missions/{id}`) uses the **tab layout (Variante B)** approved in the

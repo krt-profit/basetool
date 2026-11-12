@@ -155,6 +155,16 @@ function setup(workspace, panel, scope, createButton, listError) {
         );
     }
 
+    if (messages.templateDraft) {
+        const draft = /** @type {ApiDto<'CreateMissionTemplateRequest'>} */ (
+            JSON.parse(messages.templateDraft)
+        );
+        editor.open(scope.value, draft);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('sourceMissionId');
+        window.history.replaceState(window.history.state, '', url);
+    }
+
     scope.addEventListener('change', () => refreshList(true));
     createButton.addEventListener('click', async () => {
         if (pending) return;
