@@ -2775,7 +2775,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 serves the **org stock**: the shared (`personal = false`) Lager rows whose owning org unit is a unit
 the member is a **direct** member of, of any of the four kinds. A unit the member only oversees —
 a Bereich rank's child units, the Organisationsleitung's reach — is not served, although the web's
-Globales Lager shows it (ADR-0257). Personal rows of any member, ownerless shared rows and rows of
+Einheitslager shows it (ADR-0257). Personal rows of any member, ownerless shared rows and rows of
 other units never appear; the admin all-scope and pin never apply.
 
 - **Pool and lot.** Each unit is a **pool**. A lot is unit + material or game item + location +

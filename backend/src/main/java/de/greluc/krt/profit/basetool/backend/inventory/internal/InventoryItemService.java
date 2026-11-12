@@ -1243,7 +1243,7 @@ public class InventoryItemService {
   }
 
   /**
-   * Deletes every non-personal inventory item ("globales Lager leeren"); delegates to {@link
+   * Deletes every non-personal inventory item ("Einheitslager leeren"); delegates to {@link
    * InventoryCheckoutService#deleteAllGlobalInventory}.
    *
    * @return number of rows deleted
