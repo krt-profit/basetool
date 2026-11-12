@@ -28,6 +28,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Response;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -37,8 +38,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * The P4K admin page on the isolated stack (REQ-P4K-015, REQ-P4K-016): a seeded run is listed, its
- * report is filtered by kind and change type and paged, and two review cases are kept and hidden;
- * every list swaps in place without a page reload.
+ * report is filtered and paged, and the review workspace supports single, grouped and link actions.
+ * Lists and previews update in place.
  */
 @Tag("e2e")
 class P4kImportReportE2eTest {
@@ -56,6 +57,10 @@ class P4kImportReportE2eTest {
   private static final String KEEP_CASE = "0e2e0000-0000-4000-8000-000000009431";
 
   private static final String HIDE_CASE = "0e2e0000-0000-4000-8000-000000009432";
+
+  private static final String BATCH_CASE = "0e2e0000-0000-4000-8000-000000009433";
+  private static final String OTHER_CASE = "0e2e0000-0000-4000-8000-000000009434";
+  private static final String LINK_CASE = "0e2e0000-0000-4000-8000-000000009435";
 
   private static Playwright playwright;
   private static Browser browser;
@@ -85,9 +90,9 @@ class P4kImportReportE2eTest {
     }
   }
 
-  /** Lists the run, filters and pages its report, and resolves both cases in place. */
+  /** Exercises report paging, review grouping and confirmed actions in place. */
   @Test
-  void theRunsReportFiltersAndPages_andTheReviewCasesResolveInPlace() {
+  void theReportAndReviewWorkspaceUpdateInPlace() {
     try (BrowserContext context =
         browser.newContext(
             new Browser.NewContextOptions()
@@ -96,7 +101,7 @@ class P4kImportReportE2eTest {
                 .setStorageStatePath(adminSession))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, STACK.baseUrl() + "/admin/p4k-import?lang=en");
+        navigateWithRunList(page);
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         Locator runButton = page.locator("button[data-run-id='" + RUN_ID + "']");
@@ -124,8 +129,12 @@ class P4kImportReportE2eTest {
         hide.locator("button[data-resolution='HIDE']").click();
         assertThat(hide).hasCount(0);
 
+        reviewGroupAndCandidate(page);
+
         assertEquals(Boolean.TRUE, page.evaluate("() => window.__krtNoReload === true"));
-        E2eSupport.navigate(page, STACK.baseUrl() + "/admin/p4k-import?lang=en");
+        navigateWithRunList(page);
+        assertThat(page.locator("#krt-p4k-review-kind")).hasValue("SHIP");
+        assertThat(page.locator("#krt-p4k-review-reason")).hasValue("GUID_CONFLICT");
         assertThat(page.locator("button[data-run-id='" + RUN_ID + "']")).isVisible();
         assertThat(page.locator("tr[data-case-id='" + KEEP_CASE + "']")).hasCount(0);
         assertThat(page.locator("tr[data-case-id='" + HIDE_CASE + "']")).hasCount(0);
@@ -133,5 +142,56 @@ class P4kImportReportE2eTest {
         page.close();
       }
     }
+  }
+
+  private static void navigateWithRunList(Page page) {
+    Response response =
+        page.waitForResponse(
+            candidate ->
+                candidate.request().method().equals("GET")
+                    && candidate.url().endsWith("/admin/p4k-import/runs?page=0"),
+            () -> E2eSupport.navigate(page, STACK.baseUrl() + "/admin/p4k-import?lang=en"));
+    assertEquals(200, response.status());
+  }
+
+  private static void reviewGroupAndCandidate(Page page) {
+    Locator reason = page.locator("#krt-p4k-review-reason");
+    Locator kind = page.locator("#krt-p4k-review-kind");
+    reason.selectOption("GUID_CONFLICT");
+    kind.selectOption("ITEM");
+    Locator group =
+        page.getByTestId("p4k-review-group").filter(new Locator.FilterOptions().setHasText("Door"));
+    assertThat(group).containsText("2 open cases");
+    group.locator("button[data-review-group]").click();
+
+    Locator selected = page.locator("tr[data-case-id='" + BATCH_CASE + "']");
+    Locator unselected = page.locator("tr[data-case-id='" + OTHER_CASE + "']");
+    selected.locator("input[data-review-select]").check();
+    page.locator("button[data-review-batch-action='KEEP']").click();
+    Locator preview = page.getByTestId("p4k-review-batch-preview");
+    assertThat(preview).isVisible();
+    assertThat(selected).isVisible();
+    assertThat(unselected).isVisible();
+    preview.locator("button[data-review-batch-confirm]").click();
+    assertThat(selected).hasCount(0);
+    assertThat(unselected).isVisible();
+
+    kind.selectOption("SHIP");
+    page.setViewportSize(390, 844);
+    Locator link = page.locator("tr[data-case-id='" + LINK_CASE + "']");
+    link.locator("button[data-review-detail]").click();
+    Locator candidate = page.getByTestId("p4k-review-candidate");
+    assertThat(candidate).containsText("Same SC Wiki UUID");
+    assertThat(candidate).containsText("E2E_WIKI_LINK_SHIP");
+    assertEquals(
+        Boolean.TRUE,
+        page.locator("#krt-p4k-review-detail")
+            .evaluate("(section) => section.scrollWidth <= section.clientWidth"));
+    candidate.locator("button[data-review-preview]").click();
+    Locator comparison = page.getByTestId("p4k-review-preview");
+    assertThat(comparison).containsText("Link P4K record");
+    assertThat(link).isVisible();
+    comparison.locator("button[data-review-confirm]").click();
+    assertThat(link).hasCount(0);
   }
 }

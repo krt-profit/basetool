@@ -58,10 +58,17 @@ class CatalogueAdminLiveSyncTest {
   }
 
   @Test
-  void aShopLinkChange_announcesTheShopsSectionAfterCommit() {
+  void aPlaceLinkChange_announcesTheStarmapAndReviewSectionsAfterCommit() {
+    liveSync.starmapLinksChanged();
+
+    verify(publisher).publishAfterCommit(ROOM, List.of("starmap", "review"));
+  }
+
+  @Test
+  void aShopLinkChange_announcesTheShopsAndReviewSectionsAfterCommit() {
     liveSync.shopsChanged();
 
-    verify(publisher).publishAfterCommit(ROOM, List.of("shops"));
+    verify(publisher).publishAfterCommit(ROOM, List.of("shops", "review"));
   }
 
   @Test

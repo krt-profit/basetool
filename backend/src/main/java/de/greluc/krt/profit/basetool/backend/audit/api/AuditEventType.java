@@ -720,6 +720,15 @@ public enum AuditEventType {
   CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED(AuditDomain.CATALOGUE),
   /** An admin assigned the material of a resource that joins no single commodity (REQ-P4K-024). */
   CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED(AuditDomain.CATALOGUE),
+
+  /** An admin confirmed a verified P4K catalogue proposal. */
+  CATALOGUE_P4K_REVIEW_APPLIED(AuditDomain.CATALOGUE),
+
+  /** An admin queued a ship identity repair for a compatible P4K import. */
+  CATALOGUE_P4K_REVIEW_REPAIR_QUEUED(AuditDomain.CATALOGUE),
+
+  /** An admin withdrew a queued ship identity repair. */
+  CATALOGUE_P4K_REVIEW_REPAIR_CANCELLED(AuditDomain.CATALOGUE),
   /** An admin linked a UEX location to a starmap object by hand (REQ-P4K-035). */
   CATALOGUE_STARMAP_LINK_SET(AuditDomain.CATALOGUE),
   /** An admin unlinked a UEX location from the starmap by hand (REQ-P4K-035). */

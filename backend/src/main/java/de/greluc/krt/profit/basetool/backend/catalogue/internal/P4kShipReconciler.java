@@ -30,12 +30,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kShipPlayability;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kVehicleKind;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
-import jakarta.persistence.EntityManager;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -58,30 +58,48 @@ public class P4kShipReconciler {
   /** The catalogue field holding a ship's vehicle kind. */
   private static final String VEHICLE_KIND = "vehicleKind";
 
-  /** Reads the UEX alias table, a few curated rows. */
-  private static final String ALIASES = "SELECT a FROM ShipTypeUexAlias a";
-
   private final ShipTypeRepository shipTypeRepository;
   private final P4kShipBaseData baseData;
   private final P4kShipVariants variants;
+  private final P4kShipBaseRepairs baseRepairs;
   private final P4kShipStoreSlugCheck storeSlugCheck;
   private final P4kManufacturerReconciler manufacturerReconciler;
-  private final EntityManager entityManager;
+  private final P4kShipClassAliases classAliases;
 
   /**
    * Reconciles every ship, then the variant groups and the store slugs; the manufacturers must be
    * reconciled first.
    *
    * @param catalogue the catalogue
+   * @param loadouts the repeatable loadout stream
    * @param context the run
+   * @return the repairs that can finish after paint and loadout reconciliation
    */
-  public void reconcile(@NotNull P4kCatalogue catalogue, @NotNull P4kImportContext context) {
-    List<ShipType> stored = shipTypeRepository.findAll();
+  List<P4kShipBaseRepairs.Repair> reconcile(
+      @NotNull P4kCatalogue catalogue,
+      @NotNull P4kLoadoutReconciler.LoadoutStream loadouts,
+      @NotNull P4kImportContext context) {
+    List<ShipType> all = shipTypeRepository.findAll();
+    Map<String, List<ShipType>> aliased = classAliases.byClassName(all);
+    List<P4kShipBaseRepairs.Repair> repairs =
+        baseRepairs.eligible(catalogue, loadouts, all, aliased, context);
+    Set<UUID> repairRows =
+        repairs.stream()
+            .map(repair -> Objects.requireNonNull(repair.row().getId()))
+            .collect(Collectors.toUnmodifiableSet());
+    List<ShipType> stored =
+        repairs.isEmpty()
+            ? all
+            : all.stream().filter(row -> !repairRows.contains(row.getId())).toList();
     P4kRowIndex<ShipType> rows =
         new P4kRowIndex<>(
             stored, ShipType::getExternalUuid, ShipType::getClassName, ShipType::getName);
     context.indexShipRows(rows);
-    Map<String, List<ShipType>> aliased = aliasedByClassName(stored);
+    repairs.forEach(repair -> repair(repair, context));
+    if (!repairRows.isEmpty()) {
+      aliased.replaceAll((_, matches) ->
+          matches.stream().filter(row -> !repairRows.contains(row.getId())).toList());
+    }
     P4kRowMatcher<ShipType> matcher =
         new P4kRowMatcher<>(
             P4kKind.SHIP,
@@ -89,10 +107,18 @@ public class P4kShipReconciler {
             rows::byWikiUuid,
             ShipType::getExternalUuid,
             "external_uuid",
-            className -> byClassNameOrUexAlias(rows, aliased, className),
+            className -> P4kShipClassAliases.classMatches(rows, aliased, className),
             rows::byName,
             row -> row.getSourceSystems() == GameItemSourceSystem.P4K);
+    Set<UUID> bases =
+        repairs.stream()
+            .map(repair -> repair.selection().getGuid())
+            .collect(Collectors.toUnmodifiableSet());
     for (P4kShipDto ship : catalogue.ships()) {
+      UUID guid = ship.parsedGuid();
+      if (guid != null && bases.contains(guid)) {
+        continue;
+      }
       String rawPlayability = ship.playability();
       P4kShipPlayability playability = P4kClosedSet.parse(P4kShipPlayability.class, rawPlayability);
       if (rawPlayability != null && playability == null) {
@@ -112,58 +138,37 @@ public class P4kShipReconciler {
           context,
           rows,
           (row, _) -> enrich(row, ship, context),
-          guid -> unmatched(ship, guid, seeding, context));
+          unmatchedGuid -> unmatched(ship, unmatchedGuid, seeding, context));
+    }
+    if (context.isApply()) {
+      repairs.forEach(repair -> rows.add(repair.row()));
     }
     variants.write(catalogue.ships(), catalogue.head().isComplete(P4kKind.SHIP), context);
     storeSlugCheck.check(catalogue.shipStoreSlugs(), context);
+    return repairs;
   }
 
   /**
-   * Groups the stored ship types by the class name the {@code ship_type_uex_alias} table ties their
-   * UEX vehicle id to (REQ-DATA-026).
+   * Writes the base with the same fact writer used for an ordinary matched ship.
    *
-   * @param stored every stored ship type
-   * @return the aliased ship types by folded alias class name
+   * @param repair the approved repair
+   * @param context the run
    */
-  @NotNull
-  private Map<String, List<ShipType>> aliasedByClassName(@NotNull List<ShipType> stored) {
-    Map<Integer, List<ShipType>> byVehicleId = new HashMap<>();
-    stored.stream()
-        .filter(row -> row.getUexVehicleId() != null)
-        .forEach(row ->
-            byVehicleId.computeIfAbsent(row.getUexVehicleId(), _ -> new ArrayList<>()).add(row));
-    Map<String, List<ShipType>> aliased = new HashMap<>();
-    for (ShipTypeUexAlias alias :
-        entityManager.createQuery(ALIASES, ShipTypeUexAlias.class).getResultList()) {
-      List<ShipType> holders = byVehicleId.get(alias.getUexVehicleId());
-      if (holders != null) {
-        aliased
-            .computeIfAbsent(P4kMatchKeys.fold(alias.getClassName()), _ -> new ArrayList<>())
-            .addAll(holders);
-      }
+  private void repair(
+      @NotNull P4kShipBaseRepairs.Repair repair, @NotNull P4kImportContext context) {
+    ShipType row = repair.row();
+    P4kShipDto base = repair.base();
+    UUID guid = repair.selection().getGuid();
+    final UUID oldGuid = Objects.requireNonNull(row.getP4kUuid());
+    if (!context.claim(P4kKind.SHIP, Objects.requireNonNull(row.getId()), guid)) {
+      throw new IllegalStateException("A ship repair collided with another source record.");
     }
-    return aliased;
-  }
-
-  /**
-   * Finds the ship types of a class name ignoring case, or, when none carries it, the ship types
-   * holding the UEX vehicle id the alias ties the class name to (REQ-DATA-026).
-   *
-   * @param rows the ship-type rows of the run
-   * @param aliased the aliased ship types by folded alias class name
-   * @param className the class name
-   * @return the direct matches, else the aliased rows, else an empty list
-   */
-  @NotNull
-  private static List<ShipType> byClassNameOrUexAlias(
-      @NotNull P4kRowIndex<ShipType> rows,
-      @NotNull Map<String, List<ShipType>> aliased,
-      @NotNull String className) {
-    List<ShipType> direct = rows.byClassName(className);
-    if (!direct.isEmpty()) {
-      return direct;
-    }
-    return List.copyOf(aliased.getOrDefault(P4kMatchKeys.fold(className), List.of()));
+    enrich(row, base, context);
+    context.stamp(P4kKind.SHIP, base, row, guid);
+    context
+        .getReport()
+        .changed(P4kKind.SHIP, base, "p4k_uuid", oldGuid.toString(), guid.toString());
+    context.getReport().matched(P4kKind.SHIP, true);
   }
 
   /**

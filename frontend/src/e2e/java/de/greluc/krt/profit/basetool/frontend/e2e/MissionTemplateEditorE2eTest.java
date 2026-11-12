@@ -153,6 +153,7 @@ class MissionTemplateEditorE2eTest {
     var seeder = new BackendSeeder();
     seeder.ensureIridiumMembership(USERNAME, PASSWORD);
     String iridium = "00000000-0000-0000-0000-000000000001";
+    String adminUserId = seeder.getUserId(USERNAME, PASSWORD);
     String suffix = UUID.randomUUID().toString();
     String template = "E2E application " + suffix;
     String mission = "E2E planned " + suffix;
@@ -181,8 +182,7 @@ class MissionTemplateEditorE2eTest {
         editor.getByTestId("mission-template-save").click();
         assertThat(editor.locator("#mission-template-editor")).isHidden();
 
-        seeder.assignTwoStaffelMemberships(
-            USERNAME, PASSWORD, seeder.getUserId(USERNAME, PASSWORD), iridium, secondOwner);
+        seeder.assignTwoStaffelMemberships(USERNAME, PASSWORD, adminUserId, iridium, secondOwner);
         E2eSupport.navigate(planner, STACK.baseUrl() + "/missions/new?operationId=" + operation);
         Locator owner = planner.locator("#owningOrgUnitId");
         owner.selectOption(iridium);
@@ -281,7 +281,7 @@ class MissionTemplateEditorE2eTest {
         assertThat(planner.locator("#mission-operation")).hasValue(operation);
         assertThat(planner.getByTestId("mission-name-input")).hasValue(mission);
       } finally {
-        seeder.ensureIridiumMembership(USERNAME, PASSWORD);
+        seeder.assignStaffelMembership(USERNAME, PASSWORD, adminUserId, iridium, false, false);
       }
     }
   }

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -175,6 +176,37 @@ class P4kMaterialGroupReviewTest {
         .isInstanceOf(BadRequestException.class);
     assertThat(open.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
     assertThat(open.getResolvedBy()).isNull();
+  }
+
+  @Test
+  void aMaterialThatVanishesIsExcludedFromTheGroupReviewInPreviewAndApply() {
+    Material vanished = material("Vanished P4K commodity", null);
+    vanished.setP4kUuid(UUID.randomUUID());
+    List<UUID> listed = P4kSweepFixtures.guids(19);
+    listed.forEach(guid -> material("Sweep " + guid, null).setP4kUuid(guid));
+    ObjectNode root = P4kTestCatalogues.tree();
+    P4kSweepFixtures.listOnly(root, "commodities", BORASE, listed);
+    ObjectNode completeness = (ObjectNode) root.get("completeness").get("commodities");
+    completeness.put("status", "partial");
+    runs.apply(P4kTestCatalogues.bytes(root), false);
+    P4kReviewCase open = groupCase(vanished);
+    assertThat(open.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+
+    completeness.put("status", "complete");
+    byte[] payload = P4kTestCatalogues.bytes(root);
+    assertThat(runs.previewWithReport(payload).changes())
+        .anyMatch(change ->
+            change.getChangeType() == P4kChangeType.VANISHED
+                && vanished.getP4kUuid().equals(change.getGuid()))
+        .noneMatch(change ->
+            change.getChangeType() == P4kChangeType.REVIEW
+                && open.getGuid().equals(change.getGuid()));
+
+    runs.apply(payload, false);
+
+    assertThat(vanished.getP4kDeletedAt()).isNotNull();
+    assertThat(groupCase(vanished).getStatus()).isEqualTo(P4kReviewStatus.REVIEWED);
+    assertThat(groupCase(vanished).getResolution()).isEqualTo(P4kReviewResolution.RESOLVED);
   }
 
   @Test

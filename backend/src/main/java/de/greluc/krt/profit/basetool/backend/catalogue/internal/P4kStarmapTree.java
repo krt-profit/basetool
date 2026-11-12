@@ -19,8 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
+import java.util.ArrayDeque;
 import java.util.Collection;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -49,6 +53,67 @@ record P4kStarmapTree(
   P4kStarmapTree {
     objects = Map.copyOf(objects);
     parents = Map.copyOf(parents);
+  }
+
+  /**
+   * Builds a GUID-keyed tree from objects and their persisted parent ids.
+   *
+   * @param stored the stored objects
+   * @return the stored tree
+   */
+  static P4kStarmapTree stored(@NotNull List<StarmapObject> stored) {
+    Map<UUID, StarmapObject> byGuid = new HashMap<>();
+    Map<UUID, UUID> guidsById = new HashMap<>();
+    Map<UUID, UUID> parentGuids = new HashMap<>();
+    stored.forEach(object -> {
+      byGuid.put(object.getP4kUuid(), object);
+      guidsById.put(object.getId(), object.getP4kUuid());
+    });
+    for (StarmapObject object : stored) {
+      UUID parentGuid = guidsById.get(object.getParentId());
+      if (parentGuid != null) {
+        parentGuids.put(object.getP4kUuid(), parentGuid);
+      }
+    }
+    return new P4kStarmapTree(byGuid, parentGuids);
+  }
+
+  /**
+   * Lists an object's named ancestors from the root to the object.
+   *
+   * @param guid the stored object's P4K GUID
+   * @return the display path
+   */
+  @NotNull
+  String path(@NotNull UUID guid) {
+    Deque<String> segments = new ArrayDeque<>();
+    Set<UUID> visited = new HashSet<>();
+    UUID current = guid;
+    while (current != null && visited.add(current)) {
+      StarmapObject object = objects.get(current);
+      if (object != null) {
+        segments.addFirst(objectLabel(object));
+      }
+      current = parents.get(current);
+    }
+    return String.join(" / ", segments);
+  }
+
+  /**
+   * Names an object with its English name, class or GUID.
+   *
+   * @param object the object
+   * @return its display label
+   */
+  @NotNull
+  static String objectLabel(@NotNull StarmapObject object) {
+    if (object.getName() != null && !object.getName().isBlank()) {
+      return object.getName();
+    }
+    if (object.getClassName() != null && !object.getClassName().isBlank()) {
+      return object.getClassName();
+    }
+    return object.getP4kUuid().toString();
   }
 
   /**

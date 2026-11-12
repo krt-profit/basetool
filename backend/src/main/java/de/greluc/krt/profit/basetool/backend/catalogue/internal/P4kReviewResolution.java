@@ -31,6 +31,9 @@ public enum P4kReviewResolution {
   /** The admin gave the material of a {@code NO_RESOURCE_GROUP} case an existing group. */
   ASSIGN,
 
-  /** A later run resolved the case itself; never an admin's choice. */
+  /** The administrator applied a verified catalogue proposal. */
+  APPLIED,
+
+  /** A later run resolved the case itself. */
   RESOLVED
 }

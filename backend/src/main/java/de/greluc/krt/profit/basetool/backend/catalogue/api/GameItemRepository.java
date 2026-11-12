@@ -243,6 +243,32 @@ public interface GameItemRepository
   Optional<GameItem> findByExternalUuid(UUID externalUuid);
 
   /**
+   * Reads rows carrying the requested cross-source UUIDs.
+   *
+   * @param externalUuids the UUIDs in the review queue
+   * @return the current catalogue rows
+   */
+  List<GameItem> findAllByExternalUuidIn(Collection<UUID> externalUuids);
+
+  /**
+   * Reads P4K UUIDs already held by catalogue rows.
+   *
+   * @param guids the incoming UUIDs to check
+   * @return the UUIDs with current owners
+   */
+  @Query("SELECT item.p4kUuid FROM GameItem item WHERE item.p4kUuid IN :guids")
+  List<UUID> findClaimedP4kGuids(@Param("guids") Collection<UUID> guids);
+
+  /**
+   * Reads catalogue rows for the normalized labels of prospective item merges.
+   *
+   * @param names case-folded names
+   * @return the named catalogue rows
+   */
+  @Query("SELECT item FROM GameItem item WHERE LOWER(item.name) IN :names")
+  List<GameItem> findAllByFoldedNames(@Param("names") Collection<String> names);
+
+  /**
    * Finds the GameItem row the P4K GUID identifies; {@code p4k_uuid} is unique per kind
    * (REQ-P4K-007).
    *

@@ -96,7 +96,7 @@ public class P4kRunResolvedCases {
       @NotNull Predicate<UUID> evaluated,
       @NotNull Instant now) {
     for (P4kReviewCase reviewCase : caseRepository.findByKindAndReasonIn(kind, reasons)) {
-      if (!evaluated.test(reviewCase.getGuid())) {
+      if (reviewCase.isShipRepairPending() || !evaluated.test(reviewCase.getGuid())) {
         continue;
       }
       boolean foundAgain = found.contains(new Found(reviewCase.getGuid(), reviewCase.getReason()));

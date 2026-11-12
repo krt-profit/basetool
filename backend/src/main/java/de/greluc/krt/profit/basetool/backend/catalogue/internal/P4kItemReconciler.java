@@ -242,7 +242,11 @@ public class P4kItemReconciler {
         row::setDescriptionDe);
     writer.nameKey(row.getNameKey(), P4kLocalisedText.keyOf(item.name()), row::setNameKey);
     if (context.isApply()) {
-      values.storeOn(row);
+      Manufacturer manufacturer = values.manufacturer();
+      if (manufacturer == null && context.isAuxiliaryManufacturer(item.manufacturerGuid())) {
+        manufacturer = row.getP4kManufacturer();
+      }
+      values.storeOn(row, manufacturer);
     }
     return writer.isChanged();
   }

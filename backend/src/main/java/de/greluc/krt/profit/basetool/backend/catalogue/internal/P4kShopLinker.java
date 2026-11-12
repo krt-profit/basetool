@@ -145,7 +145,7 @@ public class P4kShopLinker {
    * @return the terminals by place; a terminal without a linked place is left out
    */
   @NotNull
-  private Map<UUID, List<StarmapPlaceRow>> terminalsByPlace() {
+  Map<UUID, List<StarmapPlaceRow>> terminalsByPlace() {
     StarmapParentLinks<UUID> links = new StarmapParentLinks<>();
     for (StarmapPlaceKind kind : StarmapPlaceKind.values()) {
       if (kind == StarmapPlaceKind.TERMINAL) {

@@ -59,9 +59,14 @@ public class CatalogueAdminLiveSync {
     announce(List.of(STARMAP));
   }
 
-  /** Announces that a shop's terminal link changed. */
+  /** Announces that a place link and its dependent review proposals changed. */
+  public void starmapLinksChanged() {
+    announce(List.of(STARMAP, REVIEW));
+  }
+
+  /** Announces that a shop's terminal link and review proposals changed. */
   public void shopsChanged() {
-    announce(List.of(SHOPS));
+    announce(List.of(SHOPS, REVIEW));
   }
 
   /** Announces that an admin hid a game item as not obtainable or offered it again. */

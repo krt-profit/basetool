@@ -1,6 +1,4 @@
--- One applied P4K run with a 29-row change report and two open review cases on two P4K-seeded
--- ship types (REQ-P4K-015, REQ-P4K-016). change_number 1 keeps every real APPLY newer.
-
+-- Applied run, review group and exact SC Wiki identity.
 INSERT INTO p4k_import_run (id, job_id, channel, build_branch, build_version, change_number,
                             build_id, created_by, applied_at, version, created_at, updated_at)
 VALUES ('0e2e0000-0000-4000-8000-000000009401', NULL, 'LIVE', 'sc-alpha-e2e-report', 'E2E-REPORT',
@@ -52,5 +50,38 @@ VALUES ('0e2e0000-0000-4000-8000-000000009431', 'SHIP', '0e2e0000-0000-4000-8000
         'SEEDED_NOT_CREATABLE', 'OPEN', '0e2e0000-0000-4000-8000-000000009412',
         '0e2e0000-0000-4000-8000-000000009401', '0e2e0000-0000-4000-8000-000000009401', 0,
         now(), now())
+ON CONFLICT (id) DO UPDATE SET status = 'OPEN', resolution = NULL, resolved_by = NULL,
+    resolved_at = NULL;
+
+INSERT INTO ship_type (id, version, created_at, updated_at, name, hidden, source_systems,
+                       external_uuid, class_name, scwiki_slug)
+VALUES ('0e2e0000-0000-4000-8000-000000009413', 0, now(), now(), 'E2E Wiki Link Ship', false,
+        'WIKI_ONLY', '0e2e0000-0000-4000-8000-000000009423', 'E2E_WIKI_LINK_SHIP',
+        'e2e-wiki-link-ship')
+ON CONFLICT (id) DO UPDATE SET p4k_uuid = NULL, p4k_hidden_at = NULL, p4k_deleted_at = NULL;
+
+INSERT INTO p4k_import_change (id, run_id, kind, guid, change_type, field_name, class_name, name_en,
+                               record_path, position)
+VALUES (gen_random_uuid(), '0e2e0000-0000-4000-8000-000000009401', 'ITEM',
+        '0e2e0000-0000-4000-8000-000000009424', 'REVIEW', 'GUID_CONFLICT', 'E2E_DOOR_ONE', 'Door',
+        'libs/foundry/records/entities/scitem/doors/e2e_door_one', 29),
+       (gen_random_uuid(), '0e2e0000-0000-4000-8000-000000009401', 'ITEM',
+        '0e2e0000-0000-4000-8000-000000009425', 'REVIEW', 'GUID_CONFLICT', 'E2E_DOOR_TWO', 'Door',
+        'libs/foundry/records/entities/scitem/doors/e2e_door_two', 30),
+       (gen_random_uuid(), '0e2e0000-0000-4000-8000-000000009401', 'SHIP',
+        '0e2e0000-0000-4000-8000-000000009423', 'REVIEW', 'GUID_CONFLICT', 'E2E_WIKI_LINK_SHIP',
+        'E2E Wiki Link Ship', 'libs/foundry/records/entities/spaceships/e2e_wiki_link_ship', 31);
+
+INSERT INTO p4k_review_case (id, kind, guid, reason, status, first_run_id, last_run_id, version,
+                             created_at, updated_at)
+VALUES ('0e2e0000-0000-4000-8000-000000009433', 'ITEM', '0e2e0000-0000-4000-8000-000000009424',
+        'GUID_CONFLICT', 'OPEN', '0e2e0000-0000-4000-8000-000000009401',
+        '0e2e0000-0000-4000-8000-000000009401', 0, now(), now()),
+       ('0e2e0000-0000-4000-8000-000000009434', 'ITEM', '0e2e0000-0000-4000-8000-000000009425',
+        'GUID_CONFLICT', 'OPEN', '0e2e0000-0000-4000-8000-000000009401',
+        '0e2e0000-0000-4000-8000-000000009401', 0, now(), now()),
+       ('0e2e0000-0000-4000-8000-000000009435', 'SHIP', '0e2e0000-0000-4000-8000-000000009423',
+        'GUID_CONFLICT', 'OPEN', '0e2e0000-0000-4000-8000-000000009401',
+        '0e2e0000-0000-4000-8000-000000009401', 0, now(), now())
 ON CONFLICT (id) DO UPDATE SET status = 'OPEN', resolution = NULL, resolved_by = NULL,
     resolved_at = NULL;

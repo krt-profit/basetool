@@ -76,6 +76,30 @@ public class ItemReconciliationService {
       @NotNull UUID uexItemId,
       @NotNull UUID runId,
       @NotNull WikiIdentity incoming) {
+    return merge(wikiItem, uexItemId, runId, incoming);
+  }
+
+  /**
+   * Consolidates an administrator-confirmed UEX duplicate within the review transaction.
+   *
+   * @param wikiItem the surviving Wiki item
+   * @param uexItemId the retiring UEX row
+   * @param incoming the current Wiki identity used for revalidation
+   * @return the survivor, or null when the candidate no longer qualifies
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Nullable
+  GameItem mergeReviewed(
+      @NotNull GameItem wikiItem, @NotNull UUID uexItemId, @NotNull WikiIdentity incoming) {
+    return merge(wikiItem, uexItemId, null, incoming);
+  }
+
+  @Nullable
+  private GameItem merge(
+      @NotNull GameItem wikiItem,
+      @NotNull UUID uexItemId,
+      @Nullable UUID runId,
+      @NotNull WikiIdentity incoming) {
     if (wikiItem.getId().equals(uexItemId)) {
       return null;
     }
@@ -87,21 +111,7 @@ public class ItemReconciliationService {
             .filter(item -> item.getId().equals(wikiItem.getId()))
             .findFirst()
             .orElse(null);
-    if (source == null
-        || target == null
-        || source.getExternalUuid() != null
-        || source.getSourceSystems() != GameItemSourceSystem.UEX_ONLY
-        || target.getExternalUuid() == null
-        || target.getUexItemId() != null
-        || !ItemIdentityCompatibility.matches(
-            source, incoming.kind(), incoming.manufacturer(), incoming.className())
-        || !ItemIdentityCompatibility.matches(
-            source, target.getKind(), target.getManufacturer(), target.getClassName())) {
-      return null;
-    }
-    String sourceName = source.getUexName() == null ? source.getName() : source.getUexName();
-    String expectedName = UexIdentityCensus.nameKey(incoming.name());
-    if (expectedName == null || !expectedName.equals(UexIdentityCensus.nameKey(sourceName))) {
+    if (source == null || target == null || !compatible(source, target, incoming)) {
       return null;
     }
     Integer uexId = source.getUexItemId();
@@ -111,14 +121,16 @@ public class ItemReconciliationService {
     UUID retiredGuid = source.getP4kUuid();
     UUID survivorGuid = target.getP4kUuid();
     if (retiredGuid != null && survivorGuid != null && !retiredGuid.equals(survivorGuid)) {
-      p4kConflicts.record(source, retiredGuid, target, survivorGuid);
-      reports.logScwikiEvent(
-          runId,
-          SyncEventType.SOURCE_IDENTITY_CONFLICT,
-          ExternalSyncReport.GAME_ITEM,
-          target.getExternalUuid(),
-          target.getName(),
-          mergeDetails(uexItemId, target).flag("p4kGuidConflict").toString());
+      if (runId != null) {
+        p4kConflicts.record(source, retiredGuid, target, survivorGuid);
+        reports.logScwikiEvent(
+            runId,
+            SyncEventType.SOURCE_IDENTITY_CONFLICT,
+            ExternalSyncReport.GAME_ITEM,
+            target.getExternalUuid(),
+            target.getName(),
+            mergeDetails(uexItemId, target).flag("p4kGuidConflict").toString());
+      }
       return null;
     }
     final String archive = redirects.snapshot(uexItemId, target.getId());
@@ -152,14 +164,32 @@ public class ItemReconciliationService {
     redirects.saveAndFlush(redirect);
     items.delete(source);
     items.flush();
-    reports.logScwikiEvent(
-        runId,
-        SyncEventType.SOURCE_RECORDS_MERGED,
-        ExternalSyncReport.GAME_ITEM,
-        target.getExternalUuid(),
-        target.getName(),
-        mergeDetails(uexItemId, target).toString());
+    if (runId != null) {
+      reports.logScwikiEvent(
+          runId,
+          SyncEventType.SOURCE_RECORDS_MERGED,
+          ExternalSyncReport.GAME_ITEM,
+          target.getExternalUuid(),
+          target.getName(),
+          mergeDetails(uexItemId, target).toString());
+    }
     return target;
+  }
+
+  static boolean compatible(GameItem source, GameItem target, WikiIdentity incoming) {
+    if (source.getExternalUuid() != null
+        || source.getSourceSystems() != GameItemSourceSystem.UEX_ONLY
+        || target.getExternalUuid() == null
+        || target.getUexItemId() != null
+        || !ItemIdentityCompatibility.matches(
+            source, incoming.kind(), incoming.manufacturer(), incoming.className())
+        || !ItemIdentityCompatibility.matches(
+            source, target.getKind(), target.getManufacturer(), target.getClassName())) {
+      return false;
+    }
+    String sourceName = source.getUexName() == null ? source.getName() : source.getUexName();
+    String expectedName = UexIdentityCensus.nameKey(incoming.name());
+    return expectedName != null && expectedName.equals(UexIdentityCensus.nameKey(sourceName));
   }
 
   /**

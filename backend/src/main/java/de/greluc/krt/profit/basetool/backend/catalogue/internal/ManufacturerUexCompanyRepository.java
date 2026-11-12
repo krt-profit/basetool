@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.UexKeyRef;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -58,4 +59,13 @@ public interface ManufacturerUexCompanyRepository
    */
   @Query("SELECT a.uexCompanyId AS uexId, a.manufacturer.id AS id FROM ManufacturerUexCompany a")
   List<UexKeyRef> findCompanyRefs();
+
+  /**
+   * Loads the UEX company aliases that follow a manufacturer in a merge.
+   *
+   * @param manufacturerId the manufacturer that owns the aliases
+   * @return its UEX company aliases
+   */
+  @Query("SELECT a FROM ManufacturerUexCompany a WHERE a.manufacturer.id = :manufacturerId")
+  List<ManufacturerUexCompany> findOfManufacturer(@Param("manufacturerId") UUID manufacturerId);
 }

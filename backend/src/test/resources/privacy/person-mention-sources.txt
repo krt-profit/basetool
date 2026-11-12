@@ -321,6 +321,7 @@ exempt-table|game_item_redirect
 exempt-table|game_item_stat
 exempt-table|jurisdiction
 exempt-table|manufacturer
+exempt-table|manufacturer_p4k_alias
 exempt-table|manufacturer_scwiki_identity
 exempt-table|material
 exempt-table|moon
