@@ -54,9 +54,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 /**
  * Holds wave 6 of the REST API cut (the small rest: announcement, Materialbörse requests, the
  * deleted Fleetview import and the Lager deactivation) to the running application: the new paths of
- * the map are served, no handler answers an old path any more, the new paths demand authentication
- * and keep the gates of the operations they replace, and the old ones answer {@code 410 404}; with
- * the app gone there is no retired-path answer any more (ADR-0269).
+ * the map are served, no handler answers an old path, the new paths demand authentication and keep
+ * the gates of the operations they replace, and every old path answers {@code 404}.
  */
 @SpringBootTest
 class SmallRestPathCutTest {
