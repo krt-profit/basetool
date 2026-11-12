@@ -54,6 +54,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -122,6 +123,28 @@ public class MissionStructureService {
   }
 
   /**
+   * Appends a unit plan to a new mission in the create transaction and records the unit addition.
+   *
+   * @param mission the managed, already-persisted mission
+   * @param unit the submitted unit planning values
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void addUnitAtCreate(@NotNull Mission mission, @NotNull MissionTemplatePlan.Unit unit) {
+    MissionEdit edit =
+        appendUnit(
+            mission,
+            new UnitAttributes(
+                unit.name(),
+                unit.shipTypeId(),
+                null,
+                unit.highValueUnit(),
+                unit.frequency(),
+                null,
+                unit.note()));
+    missionEditor.audit(mission, edit);
+  }
+
+  /**
    * The editable attributes of one unit.
    *
    * @param name display name, blank derives from ship / ship type
@@ -133,13 +156,13 @@ public class MissionStructureService {
    * @param note free-text planning note
    */
   private record UnitAttributes(
-      String name,
-      UUID shipTypeId,
-      UUID shipId,
+      @Nullable String name,
+      @Nullable UUID shipTypeId,
+      @Nullable UUID shipId,
       boolean highValueUnit,
-      Double frequency,
-      UUID responsibleUserId,
-      String note) {}
+      @Nullable Double frequency,
+      @Nullable UUID responsibleUserId,
+      @Nullable String note) {}
 
   private MissionEdit appendUnit(@NotNull Mission mission, @NotNull UnitAttributes attributes) {
     final String name = attributes.name();
@@ -202,7 +225,7 @@ public class MissionStructureService {
    * @return the effective non-blank name to store
    * @throws IllegalArgumentException when neither a name nor a ship / ship type is present
    */
-  private static String resolveUnitName(String name, MissionUnit unit) {
+  private static String resolveUnitName(@Nullable String name, MissionUnit unit) {
     if (name != null && !name.isBlank()) {
       return name.trim();
     }
@@ -225,7 +248,7 @@ public class MissionStructureService {
    */
   @Contract("null -> null")
   @Nullable
-  private User resolveResponsibleUser(UUID responsibleUserId) {
+  private User resolveResponsibleUser(@Nullable UUID responsibleUserId) {
     if (responsibleUserId == null) {
       return null;
     }

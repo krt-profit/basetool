@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionTemplat
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 
@@ -38,12 +39,40 @@ public class MissionTemplateBackendClient {
 
   private static final String TEMPLATES = "/api/v1/mission-templates";
   private static final String TEMPLATE = TEMPLATES + "/{id}";
+  private static final String CHOICES = "/api/v1/missions/template-choices";
+  private static final String PREVIEW = "/api/v1/missions/template-preview/{id}";
+  private static final String OWNER_PARAM = "?owningOrgUnitId={ownerId}";
   private static final ParameterizedTypeReference<List<MissionTemplateSummaryDto>> SUMMARIES =
       new ParameterizedTypeReference<>() {};
   private static final ParameterizedTypeReference<List<MissionTemplateOwnerDto>> OWNERS =
       new ParameterizedTypeReference<>() {};
 
   private final BackendApiClient backend;
+
+  /**
+   * Lists templates applicable to the effective owner of a new mission.
+   *
+   * @param ownerId the optional picked owner
+   * @return the applicable templates
+   */
+  public List<MissionTemplateSummaryDto> choices(@Nullable UUID ownerId) {
+    return ownerId == null
+        ? backend.get(CHOICES, SUMMARIES)
+        : backend.get(CHOICES + OWNER_PARAM, SUMMARIES, ownerId);
+  }
+
+  /**
+   * Reads the applicable template and the revision used by the create form.
+   *
+   * @param id the template id
+   * @param ownerId the optional picked owner
+   * @return the scoped preview
+   */
+  public MissionTemplateDto preview(UUID id, @Nullable UUID ownerId) {
+    return ownerId == null
+        ? backend.get(PREVIEW, MissionTemplateDto.class, id)
+        : backend.get(PREVIEW + OWNER_PARAM, MissionTemplateDto.class, id, ownerId);
+  }
 
   /**
    * Reads the owning units the caller may manage in the active context.

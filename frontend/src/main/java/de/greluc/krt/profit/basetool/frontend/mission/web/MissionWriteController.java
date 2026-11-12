@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.mission.web;
 
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.problem;
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 import static de.greluc.krt.profit.basetool.frontend.mission.web.MissionWriteValues.parseToInstant;
 
@@ -31,10 +32,12 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionRequest
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionActualTimeUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionForm;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplatePlan;
 import de.greluc.krt.profit.basetool.frontend.mission.model.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.PatchMissionFlagsRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.PatchMissionScheduleRequest;
-import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -64,6 +67,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.RequestContextUtils;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.DeserializationFeature;
@@ -153,61 +157,9 @@ public class MissionWriteController {
       return missionPageController.createMissionForm(model, principal, null);
     }
     try {
-      Instant meetingTime =
-          (form.meetingTime() != null && !form.meetingTime().isBlank())
-              ? parseToInstant(form.meetingTime())
-              : null;
-      Instant plannedStartTime =
-          (form.plannedStartTime() != null && !form.plannedStartTime().isBlank())
-              ? parseToInstant(form.plannedStartTime())
-              : null;
-      Instant plannedEndTime =
-          (form.plannedEndTime() != null && !form.plannedEndTime().isBlank())
-              ? parseToInstant(form.plannedEndTime())
-              : null;
-
-      OperationDto operation =
-          (form.operationId() != null && !form.operationId().isBlank())
-              ? new OperationDto(
-                  UUID.fromString(form.operationId()),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null)
-              : null;
-
-      List<CreateMissionRequest.NewObjective> objectives =
-          parseCreateList(
-              form.objectivesJson(),
-              new TypeReference<List<CreateMissionRequest.NewObjective>>() {});
-      List<CreateMissionRequest.NewStep> steps =
-          parseCreateList(
-              form.stepsJson(), new TypeReference<List<CreateMissionRequest.NewStep>>() {});
-
-      CreateMissionRequest createRequest =
-          new CreateMissionRequest(
-              form.name(),
-              form.description(),
-              form.calendarLink(),
-              form.status(),
-              meetingTime,
-              plannedStartTime,
-              plannedEndTime,
-              form.isInternal(),
-              operation != null ? operation.id() : null,
-              form.owningOrgUnitId(),
-              form.meetingPoint(),
-              objectives,
-              steps);
-
-      MissionDto created = missionClient.createMission(createRequest);
-      liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
+      MissionDto created = saveCreatedMission(createRequest(form));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-      return "redirect:/missions/" + created.id() + "?tab=verw";
+      return "redirect:" + createdMissionTarget(created.id());
     } catch (BackendServiceException | JacksonException | IllegalArgumentException e) {
       log.error("Create mission failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.create");
@@ -217,11 +169,101 @@ public class MissionWriteController {
   }
 
   /**
+   * Creates a mission from the editable draft and reports validation or template conflicts in
+   * place.
+   *
+   * @param form the submitted draft
+   * @param bindingResult form validation results
+   * @param locale the request locale
+   * @param servletRequest the request carrying the success flash
+   * @param servletResponse the response carrying the flash session
+   * @return the detail navigation target or a typed refusal
+   */
+  @PostMapping("/ajax")
+  @ResponseBody
+  public ResponseEntity<Object> createMissionAjax(
+      @Valid @ModelAttribute("missionForm") MissionForm form,
+      BindingResult bindingResult,
+      Locale locale,
+      HttpServletRequest servletRequest,
+      HttpServletResponse servletResponse) {
+    if (bindingResult.hasErrors()) {
+      return ResponseEntity.unprocessableContent().body(fieldErrors(bindingResult, locale));
+    }
+    return relay(
+        log,
+        "create mission (ajax)",
+        () -> {
+          CreateMissionRequest request;
+          try {
+            request = createRequest(form);
+          } catch (JacksonException | IllegalArgumentException _) {
+            return problem(
+                HttpStatus.BAD_REQUEST,
+                "VALIDATION_FAILED",
+                messageSource.getMessage("error.mission.create", null, locale));
+          }
+          String target = createdMissionTarget(saveCreatedMission(request).id());
+          var flash = RequestContextUtils.getOutputFlashMap(servletRequest);
+          if (flash != null) {
+            flash.put("successToast", "notification.success.save");
+            RequestContextUtils.saveOutputFlashMap(target, servletRequest, servletResponse);
+          }
+          return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("targetUrl", target));
+        });
+  }
+
+  private static String createdMissionTarget(UUID id) {
+    return "/missions/" + id + "?tab=verw";
+  }
+
+  private MissionDto saveCreatedMission(CreateMissionRequest request) {
+    MissionDto created = missionClient.createMission(request);
+    liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
+    return created;
+  }
+
+  private CreateMissionRequest createRequest(MissionForm form) {
+    UUID operationId =
+        form.operationId() == null || form.operationId().isBlank()
+            ? null
+            : UUID.fromString(form.operationId());
+    List<CreateMissionRequest.NewObjective> objectives =
+        parseCreateList(
+            form.objectivesJson(), new TypeReference<List<CreateMissionRequest.NewObjective>>() {});
+    List<CreateMissionRequest.NewStep> steps =
+        parseCreateList(
+            form.stepsJson(), new TypeReference<List<CreateMissionRequest.NewStep>>() {});
+    List<MissionTemplatePlan.Unit> units =
+        parseCreateList(form.unitsJson(), new TypeReference<List<MissionTemplatePlan.Unit>>() {});
+    CreateMissionRequest.TemplateSelection selection =
+        form.templateId() == null && form.templateVersion() == null
+            ? null
+            : new CreateMissionRequest.TemplateSelection(form.templateId(), form.templateVersion());
+    return new CreateMissionRequest(
+        form.name(),
+        form.description(),
+        form.calendarLink(),
+        form.status(),
+        parseToInstant(form.meetingTime()),
+        parseToInstant(form.plannedStartTime()),
+        parseToInstant(form.plannedEndTime()),
+        form.isInternal(),
+        operationId,
+        form.owningOrgUnitId(),
+        form.meetingPoint(),
+        objectives,
+        steps,
+        units,
+        selection);
+  }
+
+  /**
    * Parses one of the create form's JSON row carriers into a nested create-request list.
    *
    * @param json the hidden carrier's raw JSON, or {@code null}/blank when the section is empty
    * @param typeRef the target list element type
-   * @param <T> the nested create-request element type ({@code NewObjective} / {@code NewStep})
+   * @param <T> the planning row type
    * @return the parsed list, or {@code null} when the carrier is blank or the array is empty
    * @throws JacksonException when the carrier holds malformed JSON or an unknown property
    */
@@ -360,17 +402,7 @@ public class MissionWriteController {
       BindingResult bindingResult,
       Locale locale) {
     if (bindingResult.hasErrors()) {
-      Map<String, String> fieldErrors = new LinkedHashMap<>();
-      for (FieldError fe : bindingResult.getFieldErrors()) {
-        String message;
-        try {
-          message = messageSource.getMessage(fe, locale);
-        } catch (NoSuchMessageException _) {
-          message = fe.getDefaultMessage();
-        }
-        fieldErrors.putIfAbsent(fe.getField(), message);
-      }
-      return ResponseEntity.unprocessableContent().body(fieldErrors);
+      return ResponseEntity.unprocessableContent().body(fieldErrors(bindingResult, locale));
     }
     return relay(
         log,
@@ -386,6 +418,20 @@ public class MissionWriteController {
           versions.put("flagsVersion", refreshed.flagsVersion());
           return ResponseEntity.ok(versions);
         });
+  }
+
+  private Map<String, String> fieldErrors(BindingResult bindingResult, Locale locale) {
+    Map<String, String> errors = new LinkedHashMap<>();
+    for (FieldError error : bindingResult.getFieldErrors()) {
+      String message;
+      try {
+        message = messageSource.getMessage(error, locale);
+      } catch (NoSuchMessageException _) {
+        message = error.getDefaultMessage();
+      }
+      errors.putIfAbsent(error.getField(), message);
+    }
+    return errors;
   }
 
   /**

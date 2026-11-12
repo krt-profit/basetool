@@ -105,7 +105,7 @@ Errors are `application/problem+json` with `type`, `title`, `status`, `detail`, 
 stable machine-readable `code`, and a per-request `correlationId`; validation errors add an
 `errors` object (field → message) **and** a structured `fieldErrors` array (`{field, message}`).
 The mission-template name conflict uses HTTP 409 `DUPLICATE_ENTITY` with a `name` field error
-(REQ-MISSION-035). Stale template revisions use `OPTIMISTIC_LOCK`.
+(REQ-MISSION-035). Template management uses `OPTIMISTIC_LOCK` for stale revisions. Mission creation uses `MISSION_TEMPLATE_STALE` when the selected revision is unavailable (REQ-MISSION-037).
 Titles and details are localized via `MessageSource`. Extend `GlobalExceptionHandler` rather than
 throwing into the void; problem-type URIs come from `AppProblemProperties`, not hardcoded strings.
 

@@ -84,6 +84,8 @@ class MissionServiceOperationLinkTest {
             auditRecorder,
             null,
             notificationPublisher,
+            null,
+            null,
             null);
   }
 
@@ -222,6 +224,8 @@ class MissionServiceOperationLinkTest {
         null,
         false,
         operationId,
+        null,
+        null,
         null,
         null,
         null,

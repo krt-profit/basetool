@@ -188,7 +188,9 @@ web, naming its client (REQ-AUDIT-005):
   notifications and notification-rule selectors — as a single summary event
   (`PERSONAL_DATA_PURGED_ON_USER_DELETION`, REQ-DATA-008) carrying the four row counts.
 - **Missionen** — mission create (incl. sub-mission; any goals/steps seeded on the create form each
-  additionally record their own `MISSION_OBJECTIVE_ADDED` / `MISSION_STEP_ADDED`, REQ-MISSION-015) /
+  additionally record their own `MISSION_OBJECTIVE_ADDED` / `MISSION_STEP_ADDED`, REQ-MISSION-015.
+  Create-time unit plans record `MISSION_UNIT_ADDED`. A rejected template revision produces no
+  mission or child audit event, REQ-MISSION-037) /
   edit (core, schedule, flags) / delete;
   participant add / remove / edit / check-in / check-out (the manager's check-in / check-out of
   everyone records one event per stamped row with `bulk=true`, REQ-MISSION-032); unit add / edit / remove; crew add / edit /

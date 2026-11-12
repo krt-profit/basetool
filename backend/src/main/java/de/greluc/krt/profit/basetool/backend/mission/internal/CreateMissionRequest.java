@@ -21,10 +21,12 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.DtoConstraints;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionObjectiveKind;
+import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplatePlan.Unit;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
@@ -42,8 +44,8 @@ import org.jetbrains.annotations.Nullable;
  *       de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver}. Sub-missions inherit
  *       their parent's and ignore it.
  *   <li>{@code parent} comes from the path variable.
- *   <li>Managers, participants, units, frequencies, inventory and refinery have their own
- *       endpoints.
+ *   <li>Managers, participants, frequencies, inventory and refinery have their own endpoints.
+ *   <li>Standalone and operation-linked missions may seed units and check a selected template.
  *   <li>{@code objectives} and {@code steps} may be seeded here; ids, order and done-state are
  *       assigned server-side.
  *   <li>{@code actualStartTime} / {@code actualEndTime} are set via {@code /schedule} or on status
@@ -70,8 +72,18 @@ public record CreateMissionRequest(
     @Nullable UUID operationId,
     @Nullable UUID owningOrgUnitId,
     @Nullable @Size(max = 200) String meetingPoint,
-    @Nullable List<@Valid NewObjective> objectives,
-    @Nullable List<@Valid NewStep> steps) {
+    @Nullable List<@NotNull @Valid NewObjective> objectives,
+    @Nullable List<@NotNull @Valid NewStep> steps,
+    @Nullable List<@NotNull @Valid Unit> units,
+    @Nullable @Valid TemplateSelection templateSelection) {
+
+  /**
+   * The revision of the scoped template applied to the mission draft.
+   *
+   * @param id the template id
+   * @param version the revision from the preview
+   */
+  public record TemplateSelection(@NotNull UUID id, @NotNull @PositiveOrZero Long version) {}
 
   /**
    * A goal (Ziel) created together with the mission; id and {@code orderIndex} are assigned

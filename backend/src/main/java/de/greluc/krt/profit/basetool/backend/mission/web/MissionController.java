@@ -184,6 +184,10 @@ public class MissionController {
   @PostMapping
   @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(summary = "Create a new mission")
+  @ApiResponse(responseCode = "200", description = "Mission created", useReturnTypeSchema = true)
+  @ApiResponse(
+      responseCode = "409",
+      description = "The selected mission template revision is unavailable")
   public MissionDto createMission(@RequestBody @Valid @NotNull CreateMissionRequest request) {
     return projection.cleanupForPeer(missionMapper.toDto(missionService.createMission(request)));
   }

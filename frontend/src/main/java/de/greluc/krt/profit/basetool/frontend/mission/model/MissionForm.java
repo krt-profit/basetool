@@ -37,7 +37,7 @@ import java.util.UUID;
  * <p>{@code owningOrgUnitId} is the owner-picker output, resolved by the backend (REQ-ORG-016);
  * {@code null} leaves the stamp to the resolver.
  *
- * <p>{@code objectivesJson} / {@code stepsJson} carry the create form's optional Ziele / Ablauf
+ * <p>{@code objectivesJson}, {@code stepsJson} and {@code unitsJson} carry the optional planning
  * rows as JSON arrays and are used only on create.
  *
  * <p>{@code dirtyCore} / {@code dirtySchedule} / {@code dirtyFlags} mark which header sections the
@@ -66,6 +66,9 @@ public record MissionForm(
     @Size(max = 200) String meetingPoint,
     @Size(max = 65535) String objectivesJson,
     @Size(max = 65535) String stepsJson,
+    @Size(max = 65535) String unitsJson,
+    UUID templateId,
+    Long templateVersion,
     Boolean dirtyCore,
     Boolean dirtySchedule,
     Boolean dirtyFlags) {}

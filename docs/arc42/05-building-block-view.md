@@ -172,7 +172,7 @@ headers are platform vocabulary (`platform.api.ActingMemberHeader`). The relay s
 frozen (D-05): `exchange-relay.openapi.json` and the wire records did not change.
 
 The mission module also owns the org-unit template aggregate and its lifecycle, described in
-[REQ-MISSION-035](../specs/mission-templates.md) and [ADR-0375](../adr/0375-mission-templates-have-one-owner-and-revision.md).
+[REQ-MISSION-035 and REQ-MISSION-037](../specs/mission-templates.md) and [ADR-0375](../adr/0375-mission-templates-have-one-owner-and-revision.md).
 
 `operation` followed: `OperationController` in `operation.web`; the operation, finance and payout
 services, the payout-status entity and repository, the finance and payout DTOs and

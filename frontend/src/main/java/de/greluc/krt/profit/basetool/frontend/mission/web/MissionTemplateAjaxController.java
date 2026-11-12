@@ -26,7 +26,9 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceExcep
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionTemplateBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionTemplateRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionTemplateRequest;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -38,13 +40,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Proxies mission template editor requests without building the layout model. */
+/** Proxies mission template management and create-form reads. */
 @RestController
-@RequestMapping("/mission-templates")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class MissionTemplateAjaxController {
@@ -52,12 +52,37 @@ public class MissionTemplateAjaxController {
   private final MissionTemplateBackendClient templates;
 
   /**
+   * Lists templates that the caller may apply in the mission's effective owner.
+   *
+   * @param owningOrgUnitId the optional picked owner
+   * @return the applicable templates
+   */
+  @GetMapping("/missions/template-choices")
+  public List<MissionTemplateSummaryDto> choices(
+      @RequestParam(required = false) UUID owningOrgUnitId) {
+    return withBackendStatus(() -> templates.choices(owningOrgUnitId));
+  }
+
+  /**
+   * Loads the selected template under the same owner resolution as mission creation.
+   *
+   * @param id the template id
+   * @param owningOrgUnitId the optional picked owner
+   * @return the applicable template and its revision
+   */
+  @GetMapping("/missions/template-preview/{id}")
+  public MissionTemplateDto preview(
+      @PathVariable UUID id, @RequestParam(required = false) UUID owningOrgUnitId) {
+    return withBackendStatus(() -> templates.preview(id, owningOrgUnitId));
+  }
+
+  /**
    * Reads the latest template for the editor.
    *
    * @param id the template id
    * @return the current template
    */
-  @GetMapping("/{id}")
+  @GetMapping("/mission-templates/{id}")
   public MissionTemplateDto detail(@PathVariable UUID id) {
     return withBackendStatus(() -> templates.detail(id));
   }
@@ -68,7 +93,7 @@ public class MissionTemplateAjaxController {
    * @param body the owner and initial planning content
    * @return the saved template or backend refusal
    */
-  @PostMapping
+  @PostMapping("/mission-templates")
   public ResponseEntity<Object> create(@RequestBody CreateMissionTemplateRequest body) {
     try {
       return ResponseEntity.status(HttpStatus.CREATED).body(templates.create(body));
@@ -84,7 +109,7 @@ public class MissionTemplateAjaxController {
    * @param body the updated planning content and expected revision
    * @return the updated template or backend refusal
    */
-  @PutMapping("/{id}")
+  @PutMapping("/mission-templates/{id}")
   public ResponseEntity<Object> update(
       @PathVariable UUID id, @RequestBody UpdateMissionTemplateRequest body) {
     try {
@@ -101,7 +126,7 @@ public class MissionTemplateAjaxController {
    * @param version the expected revision
    * @return an empty success or the backend refusal
    */
-  @DeleteMapping("/{id}")
+  @DeleteMapping("/mission-templates/{id}")
   public ResponseEntity<Object> delete(@PathVariable UUID id, @RequestParam long version) {
     try {
       templates.delete(id, version);

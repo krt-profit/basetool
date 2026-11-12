@@ -37,6 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -45,6 +46,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
@@ -173,6 +175,37 @@ class MissionPageControllerMvcTest {
                 .with(csrf()))
         .andExpect(redirectedUrl("/missions/new"));
     verify(backendApiClient, never()).post(eq("/api/v1/missions"), any(), eq(MissionDto.class));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void createMissionAjaxRelaysTheTypedStaleConflictAndTheNormalDestination() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID templateId = UUID.randomUUID();
+    when(backendApiClient.post(eq("/api/v1/missions"), any(), eq(MissionDto.class)))
+        .thenThrow(
+            new BackendServiceException(
+                "Stale template", null, 409, "MISSION_TEMPLATE_STALE", null, List.of(), null))
+        .thenReturn(minimalMission(missionId));
+    var draft =
+        post("/missions/ajax")
+            .param("name", "Draft mission")
+            .param("status", "PLANNED")
+            .param("unitsJson", "[{\"name\":\"Pathfinder\",\"highValueUnit\":false}]")
+            .with(csrf());
+    mockMvc
+        .perform(draft.param("templateId", templateId.toString()).param("templateVersion", "1"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MISSION_TEMPLATE_STALE"));
+    mockMvc
+        .perform(
+            post("/missions/ajax")
+                .param("name", "Draft mission")
+                .param("status", "PLANNED")
+                .param("unitsJson", "[{\"name\":\"Pathfinder\",\"highValueUnit\":false}]")
+                .with(csrf()))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.targetUrl").value("/missions/" + missionId + "?tab=verw"));
   }
 
   @Test

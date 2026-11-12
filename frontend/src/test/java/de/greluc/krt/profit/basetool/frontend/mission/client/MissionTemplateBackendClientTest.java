@@ -99,6 +99,33 @@ class MissionTemplateBackendClientTest {
     }
   }
 
+  /** Sends a picked owner only when the mission create form has one. */
+  @Test
+  void readsApplicationChoicesAndPreviewInTheRequestedScope() {
+    try (BackendClientHarness backend = BackendClientHarness.start()) {
+      var client = new MissionTemplateBackendClient(backend.backendApiClient());
+      String choices = "/api/v1/missions/template-choices";
+      String preview = "/api/v1/missions/template-preview/" + ID;
+      String owner = "?owningOrgUnitId=" + OWNER;
+
+      backend.answerJson("[]");
+      assertThat(client.choices(null)).isEmpty();
+      backend.expect("GET", choices, null);
+
+      backend.answerJson("[]");
+      assertThat(client.choices(OWNER)).isEmpty();
+      backend.expect("GET", choices + owner, null);
+
+      backend.answerJson(template(3));
+      assertThat(client.preview(ID, null).version()).isEqualTo(3);
+      backend.expect("GET", preview, null);
+
+      backend.answerJson(template(4));
+      assertThat(client.preview(ID, OWNER).version()).isEqualTo(4);
+      backend.expect("GET", preview + owner, null);
+    }
+  }
+
   private static String template(long version) {
     return """
     {"id":"%s","owningOrgUnitId":"%s","name":"Patrol","version":%d,

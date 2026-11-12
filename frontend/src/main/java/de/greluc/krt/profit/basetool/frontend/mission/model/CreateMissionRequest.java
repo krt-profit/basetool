@@ -47,7 +47,17 @@ public record CreateMissionRequest(
     UUID owningOrgUnitId,
     String meetingPoint,
     List<NewObjective> objectives,
-    List<NewStep> steps) {
+    List<NewStep> steps,
+    List<MissionTemplatePlan.Unit> units,
+    TemplateSelection templateSelection) {
+
+  /**
+   * The scoped template revision applied to the editable draft.
+   *
+   * @param id the applied template
+   * @param version the revision shown to the planner
+   */
+  public record TemplateSelection(UUID id, Long version) {}
 
   /**
    * A goal (Ziel) seeded together with the mission; mirrors the backend's {@code

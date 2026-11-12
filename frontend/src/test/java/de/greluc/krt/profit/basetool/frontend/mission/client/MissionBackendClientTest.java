@@ -295,7 +295,8 @@ class MissionBackendClientTest {
     backend.answerJson("{\"id\":\"" + ID + "\"}");
     CreateMissionRequest create =
         new CreateMissionRequest(
-            "Op", null, null, "PLANNED", null, null, null, false, null, null, null, null, null);
+            "Op", null, null, "PLANNED", null, null, null, false, null, null, null, null, null,
+            null, null);
 
     client.setPartyLead(ID, new SetPartyLeadRequest(THIRD, null, 4L));
     client.setOwner(ID, new UpdateMissionOwnerRequest(THIRD, 4L));
@@ -338,7 +339,8 @@ class MissionBackendClientTest {
         "{\"name\":\"Op\",\"description\":null,\"calendarLink\":null,\"status\":\"PLANNED\","
             + "\"meetingTime\":null,\"plannedStartTime\":null,\"plannedEndTime\":null,"
             + "\"isInternal\":false,\"operationId\":null,\"owningOrgUnitId\":null,"
-            + "\"meetingPoint\":null,\"objectives\":null,\"steps\":null}");
+            + "\"meetingPoint\":null,\"objectives\":null,\"steps\":null,\"units\":null,"
+            + "\"templateSelection\":null}");
   }
 
   @Test

@@ -27,6 +27,12 @@ Lifecycle events enter the Missionen activity audit in the same transaction. Aft
 owner's live-sync room invalidates the list section. Each subscriber refreshes that section
 through the scoped read, leaving open editor state and its revision intact.
 
+For mission creation, template access follows the mission create permission and effective owning
+unit (REQ-MISSION-037). The template preview reads the plan and version in one snapshot.
+The create transaction takes a shared lock on the scoped template row before checking its revision
+and saving the mission. The persisted mission owns its edited rows and carries no template
+dependency.
+
 ## Consequences
 
 A stale edit or delete receives a conflict. Independent templates have independent revisions.

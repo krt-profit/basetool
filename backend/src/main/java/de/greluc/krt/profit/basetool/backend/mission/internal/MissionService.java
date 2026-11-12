@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVers
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
+import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.math.BigDecimal;
@@ -72,6 +73,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -113,6 +115,9 @@ public class MissionService implements MissionCommands {
 
   /** The mission-detail rule, ancestors and the Mission Manager cascade included. */
   private final MissionVisibility missionVisibility;
+
+  private final MissionTemplateService missionTemplateService;
+  private final MissionStructureService missionStructureService;
 
   /**
    * Always throws; listing missions must go through {@link #searchMissions(String, Instant,
@@ -370,14 +375,12 @@ public class MissionService implements MissionCommands {
 
     userService.getCurrentUser().ifPresent(mission::setOwner);
 
-    if (mission.getOwner() != null) {
-      mission.setOwningOrgUnit(
-          orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(
-              mission.getOwner(), request.owningOrgUnitId()));
-    } else {
-      requestScopeResolver.currentOrgUnit().ifPresent(mission::setOwningOrgUnit);
-    }
+    mission.setOwningOrgUnit(resolveCreateOwner(mission.getOwner(), request.owningOrgUnitId()));
     requireOwningOrgUnitForInternal(mission.getIsInternal(), mission.getOwningOrgUnit());
+    if (request.templateSelection() != null) {
+      missionTemplateService.checkSelection(
+          mission.getOwningOrgUnit(), request.templateSelection());
+    }
 
     Mission saved = missionRepository.save(mission);
     auditRecorder.record(
@@ -387,7 +390,45 @@ public class MissionService implements MissionCommands {
         null,
         AuditDetails.of("status", mission.getStatus()));
     applyCreateTimeline(saved, request);
+    if (request.units() != null) {
+      request.units().forEach(unit -> missionStructureService.addUnitAtCreate(saved, unit));
+    }
     return saved;
+  }
+
+  /**
+   * Lists templates for the owner the mission create request would receive.
+   *
+   * @param owningOrgUnitId the optional owner pick
+   * @return available templates or an empty list while no owner is chosen or can be stamped
+   */
+  public List<MissionTemplateSummaryDto> templateChoices(@Nullable UUID owningOrgUnitId) {
+    try {
+      return missionTemplateService.choices(
+          resolveCreateOwner(userService.getCurrentUser().orElse(null), owningOrgUnitId));
+    } catch (OwnerOrgUnitRequiredException ignored) {
+      return List.of();
+    }
+  }
+
+  /**
+   * Reads a template and all of its planning rows at a single database snapshot.
+   *
+   * @param templateId the selected template
+   * @param owningOrgUnitId the optional owner pick
+   * @return the scoped planning defaults and revision
+   */
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public MissionTemplateDto templatePreview(UUID templateId, @Nullable UUID owningOrgUnitId) {
+    return missionTemplateService.preview(
+        resolveCreateOwner(userService.getCurrentUser().orElse(null), owningOrgUnitId), templateId);
+  }
+
+  @Nullable
+  private OrgUnit resolveCreateOwner(@Nullable User creator, @Nullable UUID owningOrgUnitId) {
+    return creator == null
+        ? requestScopeResolver.currentOrgUnit().orElse(null)
+        : orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(creator, owningOrgUnitId);
   }
 
   /**

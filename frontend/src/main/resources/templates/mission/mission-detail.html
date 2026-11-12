@@ -727,6 +727,33 @@
                         </fieldset>
 
                         <fieldset class="form-section" th:if="${isNew}">
+                            <legend class="form-section__head" th:text="#{mission.create.template.label}">Einsatzvorlage</legend>
+                            <div class="form-group">
+                                <label for="mission-create-template-select" th:text="#{mission.create.template.choice}">Vorlage auswählen</label>
+                                <select id="mission-create-template-select" disabled
+                                        th:attr="data-replace-title=#{mission.create.template.replace.title},
+                                                 data-replace=#{mission.create.template.replace},
+                                                 data-read-error=#{mission.create.template.readError},
+                                                 data-save-error=#{error.mission.create},
+                                                 data-hidden-ship-type=#{missionTemplate.shipType.hidden}">
+                                    <option value="" th:text="#{mission.create.template.none}">Ohne Vorlage</option>
+                                </select>
+                            </div>
+                            <div class="stack gap-2" id="mission-create-template-stale" hidden>
+                                <p class="field-error" role="alert" th:text="#{mission.create.template.stale}">Die Vorlage wurde geändert oder ist nicht mehr verfügbar.</p>
+                                <div class="cluster gap-2">
+                                    <button type="button" class="btn btn-ghost" id="mission-create-template-detach"
+                                            th:text="#{mission.create.template.detach}">Entwurf ohne Vorlage behalten</button>
+                                    <button type="button" class="btn btn-ghost" id="mission-create-template-reapply" hidden
+                                            th:text="#{mission.create.template.reapply}">Aktuelle Vorlage anwenden</button>
+                                </div>
+                            </div>
+                            <p id="mission-create-error" class="field-error" role="alert" hidden></p>
+                            <input type="hidden" name="templateId" th:value="*{templateId}">
+                            <input type="hidden" name="templateVersion" th:value="*{templateVersion}">
+                        </fieldset>
+
+                        <fieldset class="form-section" th:if="${isNew}">
                             <legend class="form-section__head"><span th:text="|4 · #{mission.objective.section}|">4 · Ziele</span> <span class="opt" th:text="|· #{form.optional}|">· optional</span></legend>
                             <div class="stack gap-3">
                                 <div class="ae-list" id="mission-create-objective-list"></div>
@@ -739,9 +766,9 @@
                                 <div class="ae-row">
                                     <span class="ae-num">1</span>
                                     <span class="ae-fields">
-                                        <input class="ae-title" type="text" maxlength="500"
+                                        <input class="ae-title" data-plan-field="title" type="text" maxlength="500"
                                                th:placeholder="#{mission.objective.title.placeholder}" th:aria-label="#{mission.objective.title.placeholder}">
-                                        <select class="ae-kind" th:aria-label="#{mission.objective.kind.label}">
+                                        <select class="ae-kind" data-plan-field="kind" th:aria-label="#{mission.objective.kind.label}">
                                             <option value="PRIMARY" th:text="#{mission.objective.kind.primary}">Hauptziel</option>
                                             <option value="SECONDARY" th:text="#{mission.objective.kind.secondary}">Nebenziel</option>
                                             <option value="NON_GOAL" th:text="#{mission.objective.kind.non_goal}">Nicht-Ziel</option>
@@ -772,9 +799,9 @@
                                 <div class="ae-row">
                                     <span class="ae-num">1</span>
                                     <span class="ae-fields">
-                                        <input class="ae-title" type="text" maxlength="500"
+                                        <input class="ae-title" data-plan-field="title" type="text" maxlength="500"
                                                th:placeholder="#{mission.step.title.placeholder}" th:aria-label="#{mission.step.title.placeholder}">
-                                        <input class="ae-meta" type="text" maxlength="200"
+                                        <input class="ae-meta" data-plan-field="meta" type="text" maxlength="200"
                                                th:placeholder="#{mission.step.meta.placeholder}" th:aria-label="#{mission.step.meta.placeholder}">
                                     </span>
                                     <span class="ae-move">
@@ -785,6 +812,50 @@
                                     </span>
                                     <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="create-step-delete"
                                             th:title="#{mission.step.remove}" th:aria-label="#{mission.step.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
+                                </div>
+                            </template>
+                        </fieldset>
+
+                        <fieldset class="form-section" th:if="${isNew}">
+                            <legend class="form-section__head" th:text="#{missionTemplate.units}">Einheitenplanung</legend>
+                            <div class="stack gap-3">
+                                <div class="ae-list" id="mission-create-unit-list"></div>
+                                <button type="button" class="btn btn-ghost editor-add" id="mission-create-unit-add"
+                                        data-trigger="create-unit-add"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{mission.unit.add}">Einheit hinzufügen</span></button>
+                            </div>
+                            <input type="hidden" name="unitsJson" id="mission-units-json" th:value="*{unitsJson}">
+                            <template id="mission-create-unit-row">
+                                <div class="ae-row">
+                                    <div class="form-grid grow">
+                                        <label class="form-group">
+                                            <span th:text="#{mission.unit.display_name}">Anzeigename</span>
+                                            <input type="text" data-plan-field="name" required maxlength="255">
+                                        </label>
+                                        <label class="form-group">
+                                            <span th:text="#{mission.unit.shiptype}">Schiffstyp</span>
+                                            <select data-plan-field="shipTypeId">
+                                                <option value="" th:text="#{general.none}">Keiner</option>
+                                                <option th:each="shipType : ${createShipTypes}" th:value="${shipType.id}"
+                                                        th:text="${shipType.displayName(#locale)}">Typ</option>
+                                            </select>
+                                        </label>
+                                        <label class="form-group">
+                                            <span th:text="#{mission.unit.frequency}">Frequenz</span>
+                                            <input type="text" data-plan-field="frequency" inputmode="decimal" data-number-input
+                                                   min="100" max="999.99" step="0.01"
+                                                   th:placeholder="#{mission.unit.frequency.placeholder}">
+                                        </label>
+                                        <label class="form-group">
+                                            <span th:text="#{mission.unit.note}">Notiz</span>
+                                            <input type="text" data-plan-field="note" maxlength="500">
+                                        </label>
+                                        <label class="cluster gap-2">
+                                            <input type="checkbox" data-plan-field="highValueUnit">
+                                            <span th:text="#{mission.unit.hvu}">High Value Unit</span>
+                                        </label>
+                                    </div>
+                                    <button type="button" class="btn btn-quiet-danger btn-icon" data-trigger="create-unit-delete"
+                                            th:title="#{missionTemplate.row.remove}" th:aria-label="#{missionTemplate.row.remove}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg></button>
                                 </div>
                             </template>
                         </fieldset>
@@ -851,9 +922,9 @@
                                     <span class="ae-grip" th:title="#{mission.step.drag}" aria-hidden="true">&#x283F;</span>
                                     <span class="ae-num" th:text="${st.count}">1</span>
                                     <span class="ae-fields">
-                                        <input class="ae-title" type="text" maxlength="500" th:value="${s.title}"
+                                        <input class="ae-title" data-plan-field="title" type="text" maxlength="500" th:value="${s.title}"
                                                th:placeholder="#{mission.step.title.placeholder}" th:aria-label="#{mission.step.title.placeholder}">
-                                        <input class="ae-meta" type="text" maxlength="200" th:value="${s.meta}"
+                                        <input class="ae-meta" data-plan-field="meta" type="text" maxlength="200" th:value="${s.meta}"
                                                th:placeholder="#{mission.step.meta.placeholder}" th:aria-label="#{mission.step.meta.placeholder}">
                                     </span>
                                     <span class="ae-move">
@@ -1629,6 +1700,7 @@
 </script>
 <script type="module" th:src="@{/js/mission/mission-detail.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/mission/mission-detail-modals.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:if="${isNew}" th:src="@{/js/mission/mission-create.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/mission/mission-detail-participants.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/mission/mission-detail-actions.js}" th:attr="nonce=${cspNonce}"></script>
 <script type="module" th:src="@{/js/mission/mission-detail-tabs.js}" th:attr="nonce=${cspNonce}"></script>

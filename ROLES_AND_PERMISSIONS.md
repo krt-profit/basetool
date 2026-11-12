@@ -736,7 +736,9 @@ mission's owner or co-manager an admin keeps those rights under any selection, l
 
 The owning unit must be active and within the caller's selected context. Each row in the owner
 picker passes the same gate as a direct template request. An admin without a pin may manage
-active units throughout the organisation (REQ-MISSION-035, REQ-ORG-032).
+active units throughout the organisation (REQ-MISSION-035, REQ-ORG-032). Anyone with mission-create
+permission may preview and apply templates from the effective mission owner while creating a
+standalone or operation-linked mission (REQ-MISSION-037).
 
 ### 3.6 Operations (mission bracket, finances & payouts)
 

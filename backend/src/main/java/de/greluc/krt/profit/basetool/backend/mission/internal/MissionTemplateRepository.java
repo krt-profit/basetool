@@ -34,6 +34,12 @@ interface MissionTemplateRepository extends JpaRepository<MissionTemplate, UUID>
   @Query("SELECT t FROM MissionTemplate t WHERE t.id = :id")
   Optional<MissionTemplate> lock(UUID id);
 
+  Optional<MissionTemplate> findByIdAndOwningOrgUnitId(UUID id, UUID owner);
+
+  @Lock(LockModeType.PESSIMISTIC_READ)
+  @Query("SELECT t FROM MissionTemplate t WHERE t.id = :id AND t.owningOrgUnit.id = :owner")
+  Optional<MissionTemplate> lockForApplication(UUID id, UUID owner);
+
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplateSummaryDto(

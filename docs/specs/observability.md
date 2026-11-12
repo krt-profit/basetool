@@ -1827,6 +1827,9 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse; the two
   `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events of REQ-ORDERS-047 and `JOB_ORDER_MONEY_*` events count under
   `JOB_ORDER`; the three mission-template lifecycle events count under `MISSION`, REQ-MISSION-035).
+  Mission creation with copied planning rows uses the existing mission and child event types
+  (REQ-MISSION-037). Template choices and preview use the standard authenticated request and
+  backend client telemetry.
   Order IDs, holders, amounts and submitted terms stay out of metric labels.
   Financial correction, holder identity maintenance and each recorded purpose reassignment leg count
   under the same `JOB_ORDER` domain. Targeted movement and correction notices use the existing

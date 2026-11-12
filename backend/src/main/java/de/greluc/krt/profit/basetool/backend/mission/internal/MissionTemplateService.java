@@ -46,7 +46,9 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -154,6 +156,35 @@ public class MissionTemplateService {
         .sorted(Comparator.comparing(OrgUnit::getName).thenComparing(OrgUnit::getId))
         .map(unit -> new MissionTemplateOwnerDto(unit.getId(), unit.getName()))
         .toList();
+  }
+
+  List<MissionTemplateSummaryDto> choices(@Nullable OrgUnit owner) {
+    return owner == null || !owner.isActive() ? List.of() : templates.list(owner.getId());
+  }
+
+  MissionTemplateDto preview(@Nullable OrgUnit owner, UUID id) {
+    if (owner == null || !owner.isActive()) {
+      throw new NotFoundException("Mission template not found");
+    }
+    return Entities.require(
+            templates.findByIdAndOwningOrgUnitId(id, owner.getId()), "Mission template not found")
+        .detail();
+  }
+
+  void checkSelection(@Nullable OrgUnit owner, CreateMissionRequest.TemplateSelection selection) {
+    if (owner == null || !owner.isActive()) {
+      throw new MissionTemplateStaleException();
+    }
+    MissionTemplate template =
+        templates
+            .lockForApplication(selection.id(), owner.getId())
+            .orElseThrow(MissionTemplateStaleException::new);
+    try {
+      OptimisticLock.checkRequired(
+          template.getVersion(), selection.version(), MissionTemplate.class, selection.id());
+    } catch (ObjectOptimisticLockingFailureException failure) {
+      throw new MissionTemplateStaleException(failure);
+    }
   }
 
   private void flush() {

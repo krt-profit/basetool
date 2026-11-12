@@ -56,3 +56,50 @@ refused with 403 on list and create.
   with a foreign template ID. Failed, stale and unauthorized writes leave no audit event.
 - [ ] A planning-row edit advances the revision. An authorized peer sees the list change while
   their open editor retains its unsaved inputs and its previous revision.
+
+### REQ-MISSION-037 - Apply editable template rows when creating a mission
+
+Standalone and operation-linked missions share one optional template selector in the
+[create draft](mission-detail-tabs.md#req-mission-015--create-time-zieleablauf-seeding-verwaltung-landing-and-floating-speichern).
+Choices and previews use the mission's effective owning org unit under REQ-ORG-004, REQ-ORG-016
+and REQ-ORG-032. The usual create permission and resolved owner govern template use. The linked
+operation's owner has no effect on template scope. No choices are offered for an ownerless draft
+or while an owner pick is required.
+
+Applying a template copies its goals, procedure steps and unit planning values into editable draft
+rows. Applying or reapplying requires confirmation when it would replace an existing row.
+Cancel leaves the draft as it was. Changing owners preserves all draft data and detaches the
+selected revision. The selector reloads in the new scope and discards pending responses from the
+previous scope. Validation failures leave the form and its inputs open.
+
+The preview reads all planning rows and the revision from one snapshot. Creation checks an
+applied template's scope and revision under a shared row lock before writing the mission or its
+audit event. Template writers acquire an exclusive lock on that row before changing the plan.
+A stale, deleted or inaccessible selected revision results in a conflict. The user can retain the
+rows by explicitly detaching the selection or apply the current plan if it is available.
+
+The create transaction stores the final submitted goals, procedure steps and units with fresh
+server-assigned IDs. It assigns goal and step order from the draft and initializes steps as open.
+The copied rows use normal mission validation, visibility, permissions and audit events
+(REQ-MISSION-015, REQ-AUDIT-001). Later template changes or deletion have no effect on saved
+missions. The create flow navigates to the new mission's management tab (REQ-FE-006).
+
+**API.** Under `/api/v1/missions`, `GET /template-choices` returns the scoped summaries and
+`GET /template-preview/{templateId}` returns the scoped planning data and revision. Both accept the
+optional `owningOrgUnitId` query parameter. A preview outside the resolved scope or with an
+unknown template ID returns 404. `POST /api/v1/missions` accepts optional `units` planning rows and
+`templateSelection: {id, version}`. A stale, deleted or inaccessible selected revision returns
+`409 MISSION_TEMPLATE_STALE`. Callers may omit the selection and submit the rows as manual data.
+
+**Acceptance**
+
+- [ ] A creator without template-management reach can apply plans from the effective mission
+  owner. A direct preview or submit cannot use a foreign template. The linked operation may
+  belong to a different unit.
+- [ ] Confirmation, cancellation, validation failure and scope changes preserve the relevant
+  draft data. A late preview cannot apply to the new scope.
+- [ ] A child-only template edit or deletion conflicts when the old revision is submitted. The
+  conflict writes neither a mission nor an audit event. Detachment and reapplication both allow
+  a deliberate retry.
+- [ ] Saved goals, steps and unit planning rows are independently editable and survive template
+  deletion.
