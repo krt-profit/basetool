@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateSubMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -108,7 +109,9 @@ class MissionServiceTest {
             auditService,
             null,
             mock(MissionNotificationPublisher.class),
-            missionVisibility);
+            missionVisibility,
+            null,
+            null);
   }
 
   @Test
@@ -360,6 +363,8 @@ class MissionServiceTest {
             null,
             null,
             null,
+            null,
+            null,
             null);
 
     assertThrows(IllegalArgumentException.class, () -> missionService.createMission(request));
@@ -378,6 +383,8 @@ class MissionServiceTest {
             now.plus(2, ChronoUnit.HOURS),
             now.plus(1, ChronoUnit.HOURS),
             false,
+            null,
+            null,
             null,
             null,
             null,
@@ -402,7 +409,7 @@ class MissionServiceTest {
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Test", null, null, "PLANNED", null, null, null, false, null, null, null, null,
-                null));
+                null, null, null));
 
     assertEquals(home, saved.getOwningOrgUnit());
     assertEquals(caller, saved.getOwner());
@@ -432,6 +439,8 @@ class MissionServiceTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null));
 
     assertNull(saved.getOwningOrgUnit(), "membershipless leadership owner → ownerless mission");
@@ -451,7 +460,7 @@ class MissionServiceTest {
             missionService.createMission(
                 new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                     "Intern", null, null, "PLANNED", null, null, null, true, null, null, null, null,
-                    null)));
+                    null, null, null)));
     verify(missionRepository, never()).save(any(Mission.class));
   }
 
@@ -468,7 +477,7 @@ class MissionServiceTest {
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
                 "Test", null, null, "PLANNED", null, null, null, false, null, null, null, null,
-                null));
+                null, null, null));
 
     assertEquals(scopeSquadron, saved.getOwningOrgUnit());
   }
@@ -500,6 +509,8 @@ class MissionServiceTest {
                 picked.getId(),
                 null,
                 null,
+                null,
+                null,
                 null));
 
     assertEquals(picked, saved.getOwningOrgUnit(), "picker output must be honoured verbatim");
@@ -520,7 +531,7 @@ class MissionServiceTest {
     Mission saved =
         missionService.addSubMission(
             parentId,
-            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
+            new CreateSubMissionRequest(
                 "Sub", null, null, "PLANNED", null, null, null, false, null, null, null, null,
                 null));
 

@@ -107,6 +107,10 @@ mission_ownership mission
 mission_participant mission
 mission_participant_org_unit mission
 mission_step mission
+mission_template mission
+mission_template_objective mission
+mission_template_step mission
+mission_template_unit mission
 mission_unit mission
 moon catalogue
 navigation_appearance navigation

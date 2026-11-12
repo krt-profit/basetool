@@ -106,7 +106,9 @@ class MissionServiceLifecycleTest {
             auditService,
             null,
             mock(MissionNotificationPublisher.class),
-            mock(MissionVisibility.class));
+            mock(MissionVisibility.class),
+            null,
+            null);
   }
 
   private static final UUID MISSION_ID = UUID.randomUUID();

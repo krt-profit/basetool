@@ -248,6 +248,12 @@ public final class HandleErasureCoverage {
           byHand("mission_objective.title", "Prose on a surviving mission."),
           byHand("mission_step.title", "Prose on a surviving mission."),
           byHand("mission_step.meta", "Prose on a surviving mission."),
+          byHand("mission_template.name", "Name on a template owned by an org unit."),
+          byHand("mission_template_objective.title", "Prose on an org unit's mission template."),
+          byHand("mission_template_step.title", "Prose on an org unit's mission template."),
+          byHand("mission_template_step.meta", "Prose on an org unit's mission template."),
+          byHand("mission_template_unit.name", "Prose on an org unit's mission template."),
+          byHand("mission_template_unit.note", "Prose on an org unit's mission template."),
           byHand("mission_unit.note", "Prose on a surviving mission."),
           byHand("mission_finance_entry.note", "Prose on a surviving mission's finances."),
           byHand(

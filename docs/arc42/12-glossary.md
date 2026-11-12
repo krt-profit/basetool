@@ -22,7 +22,8 @@ worth reading even if you know the domain.
 
 > **`owning_org_unit_id` vs `responsible_org_unit_id` / `requesting_org_unit_id`** — not synonyms.
 > Staffel-scoped aggregates (Mission, Operation, Ship, InventoryItem, RefineryOrder) carry
-> `owning_org_unit_id`, nullable for deliberately *ownerless* rows. Job Orders are scoped by a
+> `owning_org_unit_id`, nullable for deliberately *ownerless* rows. Mission templates always carry
+> an explicit `owning_org_unit_id`. Job Orders are scoped by a
 > **pair**: the responsible unit coordinates the work and the requesting unit commissions it.
 > The common order audience governs reading; processing authority and either unit relationship
 > are distinct concepts.
@@ -33,6 +34,7 @@ worth reading even if you know the domain.
 | --- | --- |
 | **Startseite / Dashboard** | The home page after login: a personalisable board of widgets such as the announcement, the next days, the next missions, favourites and unread notifications (see §12.6). |
 | **Einsatz / Mission** | A planned squadron mission members sign up to, check in and out of, and are paid for. Non-internal missions are visible to the whole organisation, not only to the owning unit. |
+| **Einsatzvorlage / Mission template** | An org unit's named, reusable plan containing goals, procedure steps and unit planning rows. See [REQ-MISSION-035](../specs/mission-templates.md). |
 | **Operation** | A grouping of missions with per-participant finances and a mark/clear payout gate. |
 | **Auftrag / Aufträge** | Current runtime: the material/item JobOrder queue. The approved, implementation-pending three-kind contract is defined in section 12.9; its canonical rules are [orders-core.md](../specs/orders-core.md). |
 | **Eintragung / material promise** | A Staffel's still-outstanding material/quality contribution within its single order participation. It is distinct from actual stock and historically credited provision (section 12.9). |

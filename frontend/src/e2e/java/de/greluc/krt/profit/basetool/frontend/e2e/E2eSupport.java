@@ -362,11 +362,32 @@ final class E2eSupport {
    * @param submit the submit control (a {@code <button type="submit">}) to click
    */
   static void clickSubmitClearingFooter(Locator submit) {
-    Page page = submit.page();
-    page.evaluate(
-        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
-            + " 'none'; } }");
-    awaitFormPost(page, submit::click);
+    awaitFormPost(submit.page(), () -> clickClearingFooter(submit));
+  }
+
+  /**
+   * Submits the mission create form and waits for the draft's AJAX response.
+   *
+   * @param page the mission create page
+   * @return the status of the mission create response
+   */
+  static int submitMissionDraft(Page page) {
+    return page.waitForResponse(
+            response ->
+                response.url().endsWith("/missions/ajax")
+                    && "POST".equals(response.request().method()),
+            new Page.WaitForResponseOptions().setTimeout(FORM_POST_TIMEOUT_MILLIS),
+            () -> clickClearingFooter(page.getByTestId("mission-save")))
+        .status();
+  }
+
+  private static void clickClearingFooter(Locator control) {
+    control
+        .page()
+        .evaluate(
+            "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+                + " 'none'; } }");
+    control.click();
   }
 
   /**

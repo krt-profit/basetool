@@ -89,6 +89,8 @@ class MissionServiceOperationLinkTest {
             auditRecorder,
             null,
             notificationPublisher,
+            null,
+            null,
             null);
   }
 
@@ -150,7 +152,7 @@ class MissionServiceOperationLinkTest {
     when(missionRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArgument(0));
 
-    Mission saved = missionService.addSubMission(parent.getId(), request(null));
+    Mission saved = missionService.addSubMission(parent.getId(), subMissionRequest(null));
 
     verify(auditRecorder)
         .record(
@@ -170,7 +172,8 @@ class MissionServiceOperationLinkTest {
     when(operationSummaryProvider.linkability(operationId))
         .thenReturn(OperationLinkability.NOT_LINKABLE);
 
-    assertThatThrownBy(() -> missionService.addSubMission(parent.getId(), request(operationId)))
+    CreateSubMissionRequest request = subMissionRequest(operationId);
+    assertThatThrownBy(() -> missionService.addSubMission(parent.getId(), request))
         .isInstanceOf(AccessDeniedException.class);
     verify(missionRepository, never()).save(any(Mission.class));
     verifyNoInteractions(auditRecorder);
@@ -277,6 +280,23 @@ class MissionServiceOperationLinkTest {
     return mission;
   }
 
+  private static CreateSubMissionRequest subMissionRequest(@Nullable UUID operationId) {
+    return new CreateSubMissionRequest(
+        "Einsatz",
+        null,
+        null,
+        "PLANNED",
+        null,
+        null,
+        null,
+        false,
+        operationId,
+        null,
+        null,
+        null,
+        null);
+  }
+
   private static CreateMissionRequest request(@Nullable UUID operationId) {
     return new CreateMissionRequest(
         "Einsatz",
@@ -288,6 +308,8 @@ class MissionServiceOperationLinkTest {
         null,
         false,
         operationId,
+        null,
+        null,
         null,
         null,
         null,

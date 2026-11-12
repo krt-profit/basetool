@@ -1814,7 +1814,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse; the two
   `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events of REQ-ORDERS-047 and `JOB_ORDER_MONEY_*` events count under
-  `JOB_ORDER`). Order IDs, holders, amounts and submitted terms stay out of metric labels.
+  `JOB_ORDER`; the three mission-template lifecycle events count under `MISSION`, REQ-MISSION-035).
+  Mission creation with copied planning rows uses the existing mission and child event types
+  (REQ-MISSION-037). Template choices and preview use the standard authenticated request and
+  backend client telemetry.
+  Order IDs, holders, amounts and submitted terms stay out of metric labels.
   Financial correction, holder identity maintenance and each recorded purpose reassignment leg count
   under the same `JOB_ORDER` domain. Targeted movement and correction notices use the existing
   bounded notification-type counter. Authenticated settlement and correction routes use the existing
@@ -2377,7 +2381,8 @@ counters carry a bounded `topic_class` label (one of the `LiveSyncTopicClass` la
 `materialboard`, `inventory_all`, since #1235 `missions_list`, `refinery_queue`, `members_roster`,
 the role tab's `member`,
 `org_structure`, since #1238 `refinery_order`, and since WP 4.4 of the exchange epic the personal
-`hangar_own` and `blueprints_own`, and the unit hangar rooms `hangar_unit` and `hangar_units`,
+`hangar_own` and `blueprints_own`, the unit template room `mission_templates` (REQ-MISSION-035),
+and the unit hangar rooms `hangar_unit` and `hangar_units`,
 ADR-0260, the admin dashboard room `admin_dashboard`, ADR-0328, the member catalogue room
 `catalogue`, the admin starmap, shops and P4K import room `catalogue_admin`, and the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`), and
 the meter names stay put — a rename would break the `07` panels and this alert set.

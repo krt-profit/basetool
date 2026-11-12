@@ -102,6 +102,8 @@ class MissionExpansionTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null));
 
     mission =

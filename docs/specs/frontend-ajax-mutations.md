@@ -1313,10 +1313,14 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `org-structure` (global) | units, forms | no | authenticated (the admin sections stay protected per fragment) |
 | `hangar:{userId}`        | ships                                                                                                                         | no            | the member whose id it is, or `ROLE_ADMIN` for the admin member hangar (local check against the socket's subject and authorities, fails closed) |
 | `hangar-unit:{orgUnitId}` | ships (the unit tab with a pinned unit, ADR-0260)                                                                            | no            | `GET /api/v1/hangar/units/{id}/overview-access` (the unit-overview scope, REQ-HANGAR-003)             |
+| `mission-templates:{orgUnitId}` | list (REQ-MISSION-035) | no | `GET /api/v1/mission-templates?owningOrgUnitId={orgUnitId}` (same gate as the template list) |
 | `hangar-units` (global)  | ships (the unit tab across every unit the viewer sees, ADR-0260)                                                              | no            | authenticated (each viewer re-pulls its own scoped overview)                                          |
 | `blueprints:{userId}`    | list                                                                                                                          | no            | the member whose id it is, and nobody else (local check against the socket's subject, fails closed)   |
 | `catalogue` (global) | catalogue | no | `ROLE_ADMIN`, `ROLE_LOGISTICIAN` or `ROLE_KRT_MEMBER` (local check, matching the member catalogue reads) |
 | `catalogue-admin` (global) | starmap, shops (the admin starmap and shops pages, REQ-P4K-035, REQ-P4K-038, REQ-P4K-043), items (the admin items page, REQ-P4K-048), runs, review (the P4K import page's run history with its import-due banner and its review cases, REQ-P4K-014, REQ-P4K-016) | no | `ROLE_ADMIN` (local check; the backend publishes it after an admin's link, visibility, obtainability or storage-place change, after a review resolution and after an APPLY) |
+
+Mission template lifecycle changes publish the `list` invalidation after commit. The editor stays
+outside the refreshed section so a peer change preserves its draft and revision (REQ-MISSION-035).
 
 Catalogue reconciliation is a backend writer into the existing `order:{id}` room. After committed
 item-reference replacements, `JobOrderItemReassignment` publishes `items`, `item-stock`,

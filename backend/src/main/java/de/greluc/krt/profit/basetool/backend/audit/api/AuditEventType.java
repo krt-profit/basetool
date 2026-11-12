@@ -296,6 +296,12 @@ public enum AuditEventType {
   MISSION_UPDATED(AuditDomain.MISSION),
   /** A mission was hard-deleted (its inventory/refinery links are detached, not deleted). */
   MISSION_DELETED(AuditDomain.MISSION),
+  /** An org unit's mission template was created. */
+  MISSION_TEMPLATE_CREATED(AuditDomain.MISSION),
+  /** An org unit's mission template was edited. */
+  MISSION_TEMPLATE_UPDATED(AuditDomain.MISSION),
+  /** An org unit's mission template was deleted. */
+  MISSION_TEMPLATE_DELETED(AuditDomain.MISSION),
   /** A participant (registered user or guest) joined or was added to a mission. */
   MISSION_PARTICIPANT_ADDED(AuditDomain.MISSION),
   /** A participant was removed from a mission. */

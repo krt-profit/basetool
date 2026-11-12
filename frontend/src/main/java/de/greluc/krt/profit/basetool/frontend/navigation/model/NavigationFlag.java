@@ -49,6 +49,9 @@ public enum NavigationFlag {
   /** The caller holds officer reach in at least one unit, whatever unit is pinned. */
   OFFICER_ANYWHERE,
 
+  /** The caller may manage mission templates in the active context. */
+  MANAGE_MISSION_TEMPLATES,
+
   /** The Leitung page is offered in the active context (officer reach). */
   OPEN_LEITUNG,
 
@@ -102,7 +105,13 @@ public enum NavigationFlag {
       case PURCHASING_PARTNERS, PURCHASING_DELEGATES, PURCHASING_REPORT ->
           !flags.contains(PURCHASING) || flags.contains(this);
       case ORDER_UNIT_WORK -> flags.contains(ORDER_WORKSPACE);
-      case LOGISTICIAN_HERE, CREATE_JOB_ORDERS, SUPPLY, PURCHASING, LANGUAGE_DE, LANGUAGE_EN ->
+      case LOGISTICIAN_HERE,
+          CREATE_JOB_ORDERS,
+          MANAGE_MISSION_TEMPLATES,
+          SUPPLY,
+          PURCHASING,
+          LANGUAGE_DE,
+          LANGUAGE_EN ->
           true;
     };
   }

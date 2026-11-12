@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+import static de.greluc.krt.profit.basetool.frontend.mission.web.MissionWriteValues.fieldErrors;
 import static de.greluc.krt.profit.basetool.frontend.mission.web.MissionWriteValues.parseToInstant;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -27,14 +28,12 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
-import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionActualTimeUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.PatchMissionFlagsRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.PatchMissionScheduleRequest;
-import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -45,9 +44,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.context.MessageSource;
-import org.springframework.context.NoSuchMessageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -56,7 +53,6 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,9 +61,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.json.JsonMapper;
 
 /** Handles mission creation, core edits, scheduling and deletion. */
 @Controller
@@ -82,9 +75,8 @@ public class MissionWriteController {
   private final MessageSource messageSource;
   private final MissionPageController missionPageController;
   private final LiveSyncLocalBus liveSyncLocalBus;
+  private final MissionCreation creation;
   private static final List<String> MISSIONS_LIST_SECTION = List.of("list");
-  private final JsonMapper objectMapper =
-      JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
   /**
    * Sets the mission's actual start or end time to the supplied UTC instant via {@code PATCH
@@ -153,85 +145,15 @@ public class MissionWriteController {
       return missionPageController.createMissionForm(model, principal, null);
     }
     try {
-      Instant meetingTime =
-          (form.meetingTime() != null && !form.meetingTime().isBlank())
-              ? parseToInstant(form.meetingTime())
-              : null;
-      Instant plannedStartTime =
-          (form.plannedStartTime() != null && !form.plannedStartTime().isBlank())
-              ? parseToInstant(form.plannedStartTime())
-              : null;
-      Instant plannedEndTime =
-          (form.plannedEndTime() != null && !form.plannedEndTime().isBlank())
-              ? parseToInstant(form.plannedEndTime())
-              : null;
-
-      OperationDto operation =
-          (form.operationId() != null && !form.operationId().isBlank())
-              ? new OperationDto(
-                  UUID.fromString(form.operationId()),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null)
-              : null;
-
-      List<CreateMissionRequest.NewObjective> objectives =
-          parseCreateList(
-              form.objectivesJson(),
-              new TypeReference<List<CreateMissionRequest.NewObjective>>() {});
-      List<CreateMissionRequest.NewStep> steps =
-          parseCreateList(
-              form.stepsJson(), new TypeReference<List<CreateMissionRequest.NewStep>>() {});
-
-      CreateMissionRequest createRequest =
-          new CreateMissionRequest(
-              form.name(),
-              form.description(),
-              form.calendarLink(),
-              form.status(),
-              meetingTime,
-              plannedStartTime,
-              plannedEndTime,
-              form.isInternal(),
-              operation != null ? operation.id() : null,
-              form.owningOrgUnitId(),
-              form.meetingPoint(),
-              objectives,
-              steps);
-
-      MissionDto created = missionClient.createMission(createRequest);
-      liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
+      String target = creation.save(creation.request(form));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-      return "redirect:/missions/" + created.id() + "?tab=verw";
+      return "redirect:" + target;
     } catch (BackendServiceException | JacksonException | IllegalArgumentException e) {
       log.error("Create mission failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.mission.create");
       redirectAttributes.addFlashAttribute("missionForm", form);
       return "redirect:/missions/new";
     }
-  }
-
-  /**
-   * Parses one of the create form's JSON row carriers into a nested create-request list.
-   *
-   * @param json the hidden carrier's raw JSON, or {@code null}/blank when the section is empty
-   * @param typeRef the target list element type
-   * @param <T> the nested create-request element type ({@code NewObjective} / {@code NewStep})
-   * @return the parsed list, or {@code null} when the carrier is blank or the array is empty
-   * @throws JacksonException when the carrier holds malformed JSON or an unknown property
-   */
-  @Nullable
-  private <T> List<T> parseCreateList(String json, TypeReference<List<T>> typeRef) {
-    if (json == null || json.isBlank()) {
-      return null;
-    }
-    List<T> list = objectMapper.readValue(json, typeRef);
-    return (list == null || list.isEmpty()) ? null : list;
   }
 
   /**
@@ -360,17 +282,8 @@ public class MissionWriteController {
       BindingResult bindingResult,
       Locale locale) {
     if (bindingResult.hasErrors()) {
-      Map<String, String> fieldErrors = new LinkedHashMap<>();
-      for (FieldError fe : bindingResult.getFieldErrors()) {
-        String message;
-        try {
-          message = messageSource.getMessage(fe, locale);
-        } catch (NoSuchMessageException _) {
-          message = fe.getDefaultMessage();
-        }
-        fieldErrors.putIfAbsent(fe.getField(), message);
-      }
-      return ResponseEntity.unprocessableContent().body(fieldErrors);
+      return ResponseEntity.unprocessableContent()
+          .body(fieldErrors(bindingResult, messageSource, locale));
     }
     return relay(
         log,
