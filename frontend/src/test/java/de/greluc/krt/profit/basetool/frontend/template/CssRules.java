@@ -54,13 +54,24 @@ final class CssRules {
   record Rule(@NotNull String selector, @NotNull String body) {
 
     /**
+     * Splits the selector list into its comma-separated selectors.
+     *
+     * @return the selectors in source order, with single spaces
+     */
+    @NotNull
+    @Unmodifiable
+    List<String> entries() {
+      return List.of(selector.split("\\s*,\\s*"));
+    }
+
+    /**
      * Tells whether the selector list contains a selector exactly.
      *
      * @param candidate the selector, with single spaces
      * @return whether one comma-separated entry equals it
      */
     boolean names(@NotNull String candidate) {
-      return List.of(selector.split("\\s*,\\s*")).contains(candidate);
+      return entries().contains(candidate);
     }
   }
 
@@ -127,10 +138,29 @@ final class CssRules {
    * @return whether the block's first declaration of the property has exactly that value
    */
   static boolean declares(@NotNull String body, @NotNull String property, @NotNull String value) {
-    Matcher declaration =
-        Pattern.compile("(?<![-\\w])" + Pattern.quote(property) + "\\s*:\\s*([^;]+);")
-            .matcher(body);
+    Matcher declaration = declaration(property).matcher(body);
     return declaration.find() && value.equals(collapse(declaration.group(1)));
+  }
+
+  /**
+   * Tells whether a declaration block sets a property, whatever its value.
+   *
+   * @param body the declaration block
+   * @param property the property name
+   * @return whether the block declares the property
+   */
+  static boolean sets(@NotNull String body, @NotNull String property) {
+    return declaration(property).matcher(body).find();
+  }
+
+  /**
+   * Builds the pattern of one declaration of a property; its group 1 is the raw value.
+   *
+   * @param property the property name
+   * @return the pattern, which does not match a longer property name that ends in this one
+   */
+  private static @NotNull Pattern declaration(@NotNull String property) {
+    return Pattern.compile("(?<![-\\w])" + Pattern.quote(property) + "\\s*:\\s*([^;]+);");
   }
 
   /**
