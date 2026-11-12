@@ -34,7 +34,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,7 @@ class JobOrderAccessPolicyTest {
   private JobOrderRepository jobOrderRepository;
 
   private JobOrderAccessPolicy policy;
+  private JobOrderResponsibilityGuard responsibilityGuard;
 
   private JobOrder order;
 
@@ -70,18 +73,27 @@ class JobOrderAccessPolicyTest {
     authHelper = mock(AuthHelperService.class);
     jobOrderRepository = mock(JobOrderRepository.class);
     when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
     when(accessGateService.canSeeSquadron(any())).thenReturn(false);
     when(accessGateService.canEditSquadron(any())).thenReturn(false);
     when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
-    when(authHelper.isLogisticianOrAbove()).thenReturn(true);
+    responsibilityGuard = mock(JobOrderResponsibilityGuard.class);
     policy =
         new JobOrderAccessPolicy(
             requestScopeResolver,
             accessGateService,
             authHelper,
             jobOrderRepository,
-            mock(JobOrderHandoverRepository.class),
-            mock(JobOrderItemHandoverRepository.class));
+            responsibilityGuard,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderUnitReadHistoryRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderParticipationRepository.class));
 
     Squadron foreign = new Squadron();
     foreign.setId(foreignUnitId);
@@ -109,6 +121,7 @@ class JobOrderAccessPolicyTest {
 
   @Test
   void assigneeGrant_opensNoWrite() {
+    when(responsibilityGuard.isValid(order)).thenReturn(true);
     assign(callerId);
 
     assertThat(policy.canEditJobOrder(order.getId())).isFalse();
@@ -157,6 +170,7 @@ class JobOrderAccessPolicyTest {
 
   @Test
   void canManageAssignees_aLogisticianOfTheOrdersUnitMayManage() {
+    when(responsibilityGuard.isValid(order)).thenReturn(true);
     when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     when(accessGateService.canActAsLogisticianInOwner(foreignUnitId)).thenReturn(true);
 

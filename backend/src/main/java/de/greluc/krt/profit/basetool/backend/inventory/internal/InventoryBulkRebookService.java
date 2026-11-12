@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryTransferNoticeService.TransferMove;
@@ -57,6 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class InventoryBulkRebookService {
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final UserRepository userRepository;
   private final LocationRepository locationRepository;
@@ -80,12 +82,14 @@ public class InventoryBulkRebookService {
    */
   @Transactional
   public void bulkCheckout(@NotNull BulkCheckoutRequest request, UUID currentUserId) {
+    orderWrites.lockEligibility();
     log.info(
         "Bulk checkout requested by user {} for {} items", currentUserId, request.itemIds().size());
 
-    List<UUID> toDelete = new ArrayList<>();
+    List<UUID> toDelete = request.itemIds().stream().distinct().sorted().toList();
+    orderWrites.prepareSelectedRowWrites(toDelete);
 
-    for (UUID itemId : request.itemIds()) {
+    for (UUID itemId : toDelete) {
       InventoryItem item =
           Entities.require(
               inventoryItemRepository.lockById(itemId),
@@ -101,10 +105,9 @@ public class InventoryBulkRebookService {
             "You are not allowed to check out inventory item: " + itemId);
       }
       InventoryDonationGuards.requireNoDonation(item);
-
-      toDelete.add(itemId);
     }
 
+    orderWrites.assertRows(toDelete);
     stockChangeObserver.beforeDelete(toDelete, StockChangeReason.BULK_CHECKOUT);
     inventoryItemRepository.deleteAllById(toDelete);
     log.info(
@@ -137,12 +140,19 @@ public class InventoryBulkRebookService {
   @NotNull
   @Transactional
   public BulkRebookResultDto bulkRebook(@NotNull BulkRebookRequest request, UUID currentUserId) {
+    orderWrites.lockEligibility();
     log.info(
         "Bulk rebook ({}) requested by user {} for {} items",
         request.mode(),
         currentUserId,
         request.itemIds().size());
 
+    orderWrites.lockTransformRows(
+        request.itemIds(),
+        request.itemIds().stream()
+            .map(id ->
+                new PoolRelocation(id, request.targetUserId(), request.targetLocationId(), null))
+            .toList());
     final List<InventoryItem> rows = loadOwnRowsForRebook(request.itemIds(), currentUserId);
     final User owner = rows.getFirst().getUser();
 
@@ -203,6 +213,7 @@ public class InventoryBulkRebookService {
       }
       rows.add(item);
     }
+    orderWrites.validateRows(orderedIds);
     return rows;
   }
 
@@ -364,7 +375,7 @@ public class InventoryBulkRebookService {
     newItem.setGameItem(source.getGameItem());
     newItem.setLocation(targetLocation);
     newItem.setQuality(source.getQuality());
-    newItem.setAmount(ScuAmounts.roundToScuScale(amount));
+    newItem.replaceQuantity(amount, source.getQuantityComposition());
     newItem.setPersonal(targetPersonal);
     newItem.setStolen(source.getStolen());
     newItem.setNote(source.getNote());
@@ -374,6 +385,8 @@ public class InventoryBulkRebookService {
     Map<UUID, Double> missionReductions =
         AllocationReductions.resolveReductionPlan(source, null, amount, false);
     InventoryAllocations.applyTransferInherit(source, newItem, orderReductions, missionReductions);
+    orderWrites.assertRow(newItem);
+    orderWrites.assertRow(source);
     final InventoryItem savedNew = inventoryItemRepository.save(newItem);
     stockChangeObserver.beforeDelete(List.of(source.getId()), StockChangeReason.REBOOK);
     inventoryItemRepository.delete(source);

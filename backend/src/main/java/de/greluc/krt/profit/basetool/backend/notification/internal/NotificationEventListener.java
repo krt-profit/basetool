@@ -20,62 +20,75 @@
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationFanout;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.platform.api.AsyncConfig;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/**
- * Bridges published {@link NotificationEvent}s to notification creation.
- *
- * <p>Runs after the originating transaction commits, on the {@link
- * AsyncConfig#NOTIFICATION_EXECUTOR} pool; failures are logged and swallowed.
- */
+/** Delivers original events and logical causes after commit through the existing async executor. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class NotificationEventListener {
-
   private final NotificationCreationService notificationCreationService;
   private final NotificationFanout notificationFanout;
 
   /**
-   * Creates notifications for an event, then pushes the real-time SSE event to the recipients once
-   * that creation has committed.
+   * Creates an original event's notices and signals its changed recipients after their commit.
    *
-   * <p>One push per recipient, whatever the event raised for them: the event carries no payload, so
-   * two pushes would say the same thing twice (ADR-0273). The push is best-effort; polling keeps
-   * the badge correct (REQ-NOTIF-010).
-   *
-   * @param event the published notification event
+   * @param event the committed original notification event
    */
   @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-  public void onNotificationEvent(NotificationEvent event) {
+  public void onNotificationEvent(@NotNull NotificationEvent event) {
     Set<UUID> recipients;
     try {
       recipients = notificationCreationService.createFromEvent(event);
-    } catch (RuntimeException e) {
+    } catch (RuntimeException failure) {
       log.error(
           "Failed to create notifications for event {} entity {}",
           event.eventType(),
           event.entityId(),
-          e);
+          failure);
       return;
     }
+    fanout(recipients);
+  }
+
+  /**
+   * Delivers a committed cause once and signals the union of changed recipients.
+   *
+   * @param cause the committed logical revision and original events
+   */
+  @Async(AsyncConfig.NOTIFICATION_EXECUTOR)
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onNotificationCause(@NotNull NotificationCause cause) {
+    Set<UUID> recipients;
+    try {
+      recipients = notificationCreationService.createFromCause(cause);
+    } catch (RuntimeException failure) {
+      log.error("Failed to create notifications for logical cause {}", cause.id(), failure);
+      return;
+    }
+    fanout(recipients);
+  }
+
+  private void fanout(@NotNull Set<UUID> recipients) {
     if (recipients.isEmpty()) {
       return;
     }
     try {
       notificationFanout.publish(recipients);
-    } catch (RuntimeException e) {
-      log.debug("Real-time notification push failed; polling fallback remains", e);
+    } catch (RuntimeException failure) {
+      log.debug("Real-time notification push failed; polling fallback remains", failure);
     }
   }
 }

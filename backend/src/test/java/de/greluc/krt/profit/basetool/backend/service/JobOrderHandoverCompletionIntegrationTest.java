@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
@@ -42,14 +45,25 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverService;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -58,6 +72,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest
 class JobOrderHandoverCompletionIntegrationTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   @Autowired private JobOrderHandoverService jobOrderHandoverService;
 
@@ -68,6 +84,7 @@ class JobOrderHandoverCompletionIntegrationTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private QualityTierRepository qualityTierRepository;
 
   @Autowired
@@ -75,14 +92,35 @@ class JobOrderHandoverCompletionIntegrationTest {
 
   @Autowired private TransactionTemplate transactionTemplate;
 
-  private record Fixture(UUID jobOrderId, UUID invItem1Id, UUID invItem2Id) {}
+  private record Fixture(
+      UUID jobOrderId, UUID actorId, UUID responsibleUnitId, UUID invItem1Id, UUID invItem2Id) {}
+
+  @AfterEach
+  void clearAuthentication() {
+    SecurityContextHolder.clearContext();
+  }
 
   private Fixture prepareFixture() {
     return transactionTemplate.execute(status -> {
+      Squadron processor = new Squadron();
+      String unitTag = UUID.randomUUID().toString().substring(0, 8);
+      processor.setName("Handover Processor " + unitTag);
+      processor.setShorthand("H" + unitTag);
+      withinProfit(processor, persistedProfitArea(orgUnitRepository));
+      processor = squadronRepository.save(processor);
+
       User user = new User();
       user.setId(UUID.randomUUID());
       user.setUsername("logistiker-" + UUID.randomUUID());
-      userRepository.save(user);
+      user.setApprovalStatus(ApprovalStatus.ACTIVE);
+      user.setInKeycloak(true);
+      user = userRepository.save(user);
+      OrgUnitMembership membership = new OrgUnitMembership();
+      membership.setId(new OrgUnitMembershipId(user.getId(), processor.getId()));
+      membership.setUser(user);
+      membership.setLogistician(true);
+      membership.setJoinedAt(Instant.now());
+      memberships.save(membership);
 
       Location location = new Location();
       location.setName("Hub-" + UUID.randomUUID());
@@ -100,16 +138,8 @@ class JobOrderHandoverCompletionIntegrationTest {
 
       JobOrder jobOrder =
           JobOrder.builder()
-              .responsibleOrgUnit(
-                  squadronRepository
-                      .findById(
-                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                      .orElseThrow())
-              .requestingOrgUnit(
-                  squadronRepository
-                      .findById(
-                          de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-                      .orElseThrow())
+              .responsibleOrgUnit(processor)
+              .requestingOrgUnit(processor)
               .handle("requester")
               .status(JobOrderStatus.OPEN)
               .build();
@@ -125,10 +155,7 @@ class JobOrderHandoverCompletionIntegrationTest {
 
       InventoryItem inv1 = new InventoryItem();
 
-      inv1.setOwningOrgUnit(
-          squadronRepository
-              .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-              .orElseThrow());
+      inv1.setOwningOrgUnit(processor);
       inv1.setUser(user);
       inv1.setLocation(location);
       inv1.setMaterial(aslarite);
@@ -139,10 +166,7 @@ class JobOrderHandoverCompletionIntegrationTest {
 
       InventoryItem inv2 = new InventoryItem();
 
-      inv2.setOwningOrgUnit(
-          squadronRepository
-              .findById(de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron.IRIDIUM_ID)
-              .orElseThrow());
+      inv2.setOwningOrgUnit(processor);
       inv2.setUser(user);
       inv2.setLocation(location);
       inv2.setMaterial(ouratite);
@@ -151,7 +175,8 @@ class JobOrderHandoverCompletionIntegrationTest {
       InventoryAllocations.addJobOrder(inv2, jobOrder.getId(), inv2.getAmount(), false);
       inv2 = inventoryItemRepository.save(inv2);
 
-      return new Fixture(jobOrder.getId(), inv1.getId(), inv2.getId());
+      return new Fixture(
+          jobOrder.getId(), user.getId(), processor.getId(), inv1.getId(), inv2.getId());
     });
   }
 
@@ -160,11 +185,18 @@ class JobOrderHandoverCompletionIntegrationTest {
    * required material must complete the JobOrder without an OL conflict.
    */
   @Test
-  @WithMockUser(
-      username = "logistiker",
-      roles = {"KRT_MEMBER", "LOGISTIKER"})
   void handover_exactlyCoversAllRemainingMaterials_completesOrderWithoutOptimisticLockConflict() {
     Fixture f = prepareFixture();
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new JwtAuthenticationToken(
+                Jwt.withTokenValue("handover-test")
+                    .header("alg", "none")
+                    .subject(f.actorId().toString())
+                    .build(),
+                List.of(
+                    new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                    new OrgUnitContextualAuthority(Roles.LOGISTICIAN, f.responsibleUnitId()))));
 
     JobOrderHandoverCreateDto dto =
         new JobOrderHandoverCreateDto(

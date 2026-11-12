@@ -179,7 +179,7 @@ class MaterialRequestServiceTest {
 
   /**
    * A board page resolves the game item of a request named by its catalogue row in the same batch
-   * as the product-keyed ones (ADR-0371).
+   * as the product-keyed ones (ADR-0372).
    */
   @Test
   void board_catalogueRowRequestCarriesItsGameItem() {
@@ -374,7 +374,7 @@ class MaterialRequestServiceTest {
 
   /**
    * Posting a request for a stocked item no blueprint produces persists it under its catalogue row
-   * and audits that row, never the display name (ADR-0371).
+   * and audits that row, never the display name (ADR-0372).
    */
   @Test
   void createItemRequest_gameItemWithoutBlueprint_persistsUnderTheCatalogueRow() {

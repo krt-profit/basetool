@@ -47,6 +47,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionRecipientDi
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitMembershipRecipientDirectory;
 import java.util.List;
 import java.util.Optional;
@@ -90,7 +91,9 @@ class RecipientDirectoriesTest {
   @BeforeEach
   void setUp() {
     roles = new UserRoleRecipientDirectory(userRepository, roleRepository);
-    orgUnits = new OrgUnitMembershipRecipientDirectory(orgUnitMembershipRepository);
+    orgUnits =
+        new OrgUnitMembershipRecipientDirectory(
+            orgUnitMembershipRepository, new OrgUnitWriterDirectory(orgUnitMembershipRepository));
     accounts =
         new OrgUnitBankRecipientDirectory(
             bankAccountGrantRepository,

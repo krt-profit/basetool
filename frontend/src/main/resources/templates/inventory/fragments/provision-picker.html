@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"><body>
+<th:block th:fragment="picker">
+<label class="form-group" data-provision-picker hidden th:data-error="#{orders.claim.provision.error}" th:data-stale="#{orders.claim.provision.stale}" th:data-conflict="#{orders.claim.provision.conflict}">
+    <span th:text="#{orders.claim.provision.label}"></span>
+    <select data-provision-select th:aria-label="#{orders.claim.provision.label}"><option value="" th:text="#{orders.claim.provision.none}"></option></select>
+    <input type="hidden" data-provision-claim-id>
+    <input type="hidden" data-provision-claim-version>
+    <small class="text-muted" data-provision-status role="status" th:text="#{orders.claim.provision.hint}"></small>
+</label>
+</th:block>
+</body></html>

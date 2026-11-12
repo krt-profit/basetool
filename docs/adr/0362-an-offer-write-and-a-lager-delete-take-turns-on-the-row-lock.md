@@ -41,11 +41,12 @@ removed, and its interested members got a `STOCK_GONE` after their `WITHDRAWN`.
    as absent, so the release answers the existing 404 (`Inventory item not found`) and the
    deactivation the existing `Offer not found`. The deactivation looks up the offer's row id first,
    locks the row, and only then loads the offer.
-3. **A bulk delete deletes exactly the rows it locked.** The global wipe locks the shared rows of
-   its scope in ascending id order (`lockNonPersonalIdsInScope`), audits the offers on those ids and
-   deletes those ids in one statement, binding them as one `uuid[]` parameter. A row booked into the
-   scope while the wipe runs survives it, as if it were booked after the wipe. Every later
-   server-side wipe follows the same lock, audit, delete-by-id order.
+3. **A bulk delete only deletes planned and locked rows still in scope.** The global wipe captures
+   the non-personal row ids in its scope, plans their order, material and stock resources, and locks
+   the captured rows in ascending id order. It rechecks their scope under the row locks, audits
+   the offers on that subset and deletes it in one statement with a single `uuid[]` parameter.
+   Rows that enter the scope after selection survive. Later server-side wipes follow the same
+   planning, locking, scope recheck, audit and delete-by-id order.
 4. **The account deletion locks the member's rows** (`StockRowLocks.lockRowsOf`) before the
    Materialbörse reads the offers on them.
 5. **The stock merge checks again after it locks.** Its locking read excludes offer-backed rows as
@@ -59,7 +60,7 @@ removed, and its interested members got a `STOCK_GONE` after their `WITHDRAWN`.
 - The release checks the offered amount against stock it holds locked.
 - A wipe blocks writes to the rows in its scope until it commits, and it waits for writes already
   holding one of them. It locks its rows in ascending id order.
-- The offer read by row ids binds one array parameter, so a wipe of any size stays one statement.
+- The offer read and the deletion each bind their row ids as one array parameter.
 - `StockCommands.lockRow` keeps Hibernate's follow-on locking: it loads the row with its
   associations, then locks and re-reads it. A row deleted while that lock waits raises a Hibernate
   `AssertionFailure` (a 500) rather than an empty result. The offer writes do not use it.

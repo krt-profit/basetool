@@ -115,6 +115,7 @@ class DeletionRequestServiceTest {
     user.setId(USER);
     user.setUsername(HANDLE);
     when(userRepository.findById(USER)).thenReturn(Optional.of(user));
+    when(deletionRequestRepository.findSubjectId(REQUEST)).thenReturn(Optional.of(USER));
     when(deletionRequestRepository.saveAndFlush(any()))
         .thenAnswer(inv -> inv.getArgument(0, DeletionRequest.class));
     when(deletionRequestRepository.save(any()))
@@ -175,7 +176,10 @@ class DeletionRequestServiceTest {
 
     service.execute(REQUEST, false, null);
 
-    verify(deletionRequestRepository).findByIdForDecision(REQUEST);
+    InOrder order = inOrder(deletionRequestRepository, userDeletionService);
+    order.verify(deletionRequestRepository).findSubjectId(REQUEST);
+    order.verify(userDeletionService).prepareErasure(USER);
+    order.verify(deletionRequestRepository).findByIdForDecision(REQUEST);
     verify(deletionRequestRepository, never()).findById(REQUEST);
   }
 

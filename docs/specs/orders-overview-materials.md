@@ -26,6 +26,10 @@ item-order view); this spec adds the per-bucket stock that the overview progress
 
 ### REQ-ORDERS-017 — Item-order overview shows aggregated materials with collection progress
 
+> **Approved target — implementation pending:** For the approved target, the material collection column is MATERIAL/ITEM-specific; aUEC shows target, net handover and remaining under REQ-ORDERS-057. MATERIAL/ITEM requesters receive the same permitted collection/progress facts as other readers under orders-core.md; requester progress is not omitted.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+
 The order-overview list's **Materialien** column MUST, for an `ITEM` order, render the order's
 **aggregated material list** — the materials derived and summed from the ordered items'
 blueprints, one row per material — with the same three columns a `MATERIAL` order shows:
@@ -41,9 +45,9 @@ allocation counts toward the aggregated bucket (REQ-ORDERS-037, [`orders-quality
 (one query per page, no N+1). `currentStock` is carried on
 `AggregatedMaterialDto` and populated by the backend for every item order it returns (list and
 detail); it is `0.0` when nothing is linked. An item order whose blueprints derived no
-material renders the empty-materials placeholder. The requester "Meine Aufträge" view omits the
-progress column, because its rows carry no collection-progress fields
-([`orders-requester-access.md`](orders-requester-access.md), REQ-ORDERS-023).
+material renders the empty-materials placeholder. The requester Meine view carries the same
+collection-progress facts as Alle ([`orders-requester-access.md`](orders-requester-access.md),
+REQ-ORDERS-023).
 
 **Acceptance**
 
@@ -59,6 +63,10 @@ progress column, because its rows carry no collection-progress fields
 `AggregatedMaterialDto.currentStock`, `templates/joborder/orders-index.html` · **Issues:** #595
 
 ### REQ-ORDERS-018 — Inventory may only be linked to an order that requires its material
+
+> **Approved target — implementation pending:** For the approved target, only MATERIAL/ITEM accept these stock/material links. Apply the common current order-read/capability contract in orders-core.md to web allocation eligibility; aUEC monetary holders are not inventory allocations. The reduced external-exchange contract remains separate and is not widened by the web read rule.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 Because the order's material view (the `MATERIAL` requirement rows and the `ITEM` aggregated
 list, REQ-ORDERS-017) is built **solely from the order's requirements** with linked stock
@@ -88,17 +96,24 @@ client-side: each order option carries a `data-materials` CSV built from `requir
 (the item-mode sibling `data-game-items` from `requiredGameItemIds`), and `inventory-input.js`
 filters the rows to the option whose CSV contains the picked material/game item.
 
-**Tenancy scope (REQ-ORG-003).** Every one of these write seams — the check-in allocations of
-`POST /api/v1/inventory`, `POST /api/v1/inventory/{id}/allocation`, and the pool earmarks the
-exchange writes — MUST accept only a job order the caller sees within the tenancy scope, by the
-same rule `GET /api/v1/orders/lookup` lists orders with (`JobOrderAccessPolicy.canSeeJobOrderInScope`:
-the caller reaches the queue, and the order has no responsible unit, a Spezialkommando's, or one
-in the caller's read scope). An order outside that scope MUST be refused with the same `404` as
-an unknown id, so the answer does not reveal that it exists. The requirement reads of
-`EarmarkTargets.JobOrders` (implemented by `JobOrderEarmarkTargets`) answer only for such an order,
-which puts the rule on every seam at once. The rule keys on the order, not on the stock: a member
-of two units earmarks stock owned by one of them to an order of the other, and the stock keeps its
-owning unit — that is how a cross-Staffel supply reaches an order („A bestellt, B liefert",
+**Order-link scope (REQ-ORDERS-052, REQ-ORG-003).** Check-in allocations at
+`POST /api/v1/inventory`, allocations at `POST /api/v1/inventory/{id}/allocation`, and the web
+refinery store use the common current order readership in [orders-core.md](orders-core.md), as
+`GET /api/v1/orders/lookup` does. The ordinary `requiredMaterialIds` and `requiredGameItemIds`
+reads of `EarmarkTargets.JobOrders` enforce that readership. The stock's independent write gate
+still applies. An unknown or unreadable target answers the same `404`.
+
+External exchange pool earmarks retain reduced tenancy scope through the explicit
+`requiredMaterialIdsInScope` and `requiredGameItemIdsInScope` reads, enforced by
+`InventoryPoolEntryCommands` for allocation additions and book-in earmarks. The caller must
+reach the queue, and the order must have no responsible unit, a Spezialkommando's, or one in the
+caller's reduced read scope (`JobOrderAccessPolicy.canSeeJobOrderInScope`). An unknown or
+out-of-scope target receives the same per-op `EARMARK_TARGET_INVALID` refusal. Common web
+readership does not widen this external contract.
+
+The target scope keys on the order, not on the stock: a member of two units may earmark stock
+owned by one to an order of the other, and the stock keeps its owning unit. Cross-Staffel supply
+remains permitted within the applicable target scope ("A bestellt, B liefert",
 `InventoryJobOrderScopeIntegrationTest`, e2e UC-08/UC-09).
 
 The lookup projection (`/api/v1/orders/lookup`; with `withNeeds=true` it also carries each order's
@@ -152,6 +167,10 @@ two gates are parallel, not a replacement.
 
 ### REQ-ORDERS-019 — Order detail surfaces orphaned linked inventory
 
+> **Approved target — implementation pending:** For the approved target, common authorised order readers retain visibility of orphaned stock facts. Cancellation releases MATERIAL/ITEM purpose links, not physical stock or delivery/production history; see orders-core.md. This is separate from explicit aUEC residual-money settlement.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+
 To make pre-existing orphaned links (inventory linked before the REQ-ORDERS-018 gate, or via a
 future path) discoverable, the order **detail** page MUST surface every inventory item linked to
 the order whose material is **not** among the order's requirements, as a warning section listing
@@ -177,6 +196,10 @@ detail view.
 `templates/joborder/orders-detail.html`
 
 ### REQ-ORDERS-020 — Order list is paginated server-side
+
+> **Approved target — implementation pending:** The approved common three-kind queue and all admitted reader relationships in orders-core.md apply to server-side pagination as well as details. Filtering/paging remains permission-scoped and in-place.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 The order-overview list (`GET /orders`) MUST fetch one **server-side page** of orders instead of
 the former unbounded `size=1000` pull, rendering the shared pagination component (the `.pagination`
@@ -216,6 +239,10 @@ live **inside** the `ordersResults` AJAX-swap fragment so a filter change re-ren
 
 ### REQ-ORDERS-022 — Overview surfaces the responsible (processing) org unit
 
+> **Approved target — implementation pending:** The approved responsibility model in orders-core.md permits the unique Profit Bereich itself and its active subordinate Staffeln/SK. Display exactly one current responsible unit plus historical changes; the removed profit-eligibility flag is not a picker filter or authority source.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
+
 The order-overview list's first cell (the one carrying the order id and the `MATERIAL`/`ITEM`
 kind badge) MUST also render the order's **responsible org unit** — the *processing* unit
 ("Bearbeitende Einheit", `JobOrderDto.responsibleOrgUnit`, the squadron or Spezialkommando
@@ -244,6 +271,10 @@ backend change is needed and the order-list endpoint gains no query; the badge r
 `.order-responsible-label` (`styles.css`), `orders.index.responsible` (i18n) · **Issues:** #1188
 
 ### REQ-ORDERS-027 — Overview: collapsible material sublist + status & squadron filters
+
+> **Approved target — implementation pending:** The approved overview supports MATERIAL, ITEM and aUEC kind filtering beside the existing useful filters; remember selection/return context. Do not render material collection widgets as aUEC fulfilment. See orders-core.md and orders-auec.md.
+>
+> The paragraphs and test references below describe the current implementation baseline; they do not prove the approved target.
 
 Three order-overview affordances, all persisted **per browser** in `localStorage` — the same
 client-side persistence the Lager tree uses (REQ-INV-002, [`inventory-lager.md`](inventory-lager.md)), and not a server cookie. Note the one
@@ -311,72 +342,52 @@ query) · **Code:** `templates/joborder/orders-index.html`, `static/js/joborder/
 
 ### REQ-ORDERS-040 — Overview scope segment „Meine · Ich bearbeite · Zu bearbeiten · Alle"
 
-A member chooses the scope of the overview with a segmented control (`scope`, REQ-UI-027), in this
-order. Which segments a member is offered follows from three capabilities: `canViewJobOrders` (the
-full queue), `canViewOwnJobOrders` and `canViewAssignedJobOrders` (at least one assignee entry).
+The overview offers the existing segments in this order: Meine, Ich bearbeite, Zu bearbeiten,
+Alle. Each segment narrows the same currently permitted order set; it confers no command authority.
 
-- `ALL` („Alle") reads `/api/v1/orders` with the status and squadron filters. Besides the tenancy
-  scope (`JOB_ORDER_SCOPE_PREDICATE`) it holds the orders the caller is an assignee of
-  (REQ-ORDERS-047), so an order visible only through the grant shows here too.
-- `TO_PROCESS` („Zu bearbeiten") reads `/api/v1/orders?toProcess=true` with the status filter: the
-  orders whose responsible (processing) unit is one of the caller's own units and is profit-eligible
-  (`is_profit_eligible`, „Auftragsbearbeitung pro Staffel / pro Spezialkommando" in the admin
-  settings). The caller's units are the pinned org unit when one is active, otherwise the caller's
-  direct memberships (no leadership cascade). The parameter is AND-ed with the tenancy scope
-  *without* the assignee grant, so it only narrows and never widens; a caller with no such unit gets
-  an empty page. The squadron filter is hidden and no squadron parameter is sent. The optional
-  `orgUnitId` parameter (with `toProcess`; the „Aufträge zu bearbeiten" widget of REQ-UI-034 sends
-  it for a pinned unit) keeps one of those units: a unit that is none of the caller's processing
-  units gives an empty page, never a wider one.
-- `ASSIGNED` („Ich bearbeite") reads `/api/v1/orders?assignedToMe=true` with the status filter: the
-  orders on which the caller holds a `JobOrderAssignee` entry, with the full progress column. The
-  entry is the visibility grant itself, so the read needs no profit access and never shows an order
-  the caller is not an assignee of. `assignedToMe` combines with neither `toProcess` nor a
-  `squadronId`: such a request answers `400`. The squadron filter is hidden and no squadron
-  parameter is sent. The page total is the count the „Ich bearbeite" widget (REQ-UI-034) shows.
-- `MINE` („Meine") reads `/api/v1/orders/requested` (REQ-ORDERS-023), ignores and hides the squadron
-  filter, sends no squadron parameters and hides the progress column, whose data is redacted there.
-  It is offered to a member who holds `canViewOwnJobOrders` and has a second list to switch to: the
-  queue or an assignee entry.
+- `MINE` reads `/api/v1/orders/requested`: current requesting units within the caller's effective
+  membership, leadership or contextual grant scope. It shows the full permitted facts and progress.
+- `ASSIGNED` reads `/api/v1/orders?assignedToMe=true`: only the caller's personal Bearbeiter
+  entries, independent of the general Profit capability. Personal assignment alone adds no unit
+  processing scope. Combining `assignedToMe` with `toProcess` or a squadron filter answers `400`.
+- `TO_PROCESS` reads `/api/v1/orders?toProcess=true`: current responsible or actively supporting
+  units in the caller's effective unit scope. Ordinary authorized unit members can read this view;
+  an editing role is not required. Ended support and former requester/responsible relations remain
+  concrete reads in Alle without becoming current unit work. An explicit `orgUnitId` must name a
+  unit in that current scope; any other identity yields an empty page. The squadron display filter
+  is hidden and omitted.
+- `ALL` reads `/api/v1/orders`: the complete permitted set under orders-core.md, including concrete
+  requester, personal assignment and retained unit relations. Status, implemented kind and squadron
+  display filters only narrow that set. Private blueprint producers and unrelated Inventory,
+  Mission, Bank and gateway surfaces retain their separate authorization.
 
-**Who is offered what.** A member who may see the queue chooses among all four (without „Meine"
-when they lack `canViewOwnJobOrders`). A member without the queue who holds an assignee entry is
-offered „Ich bearbeite" alone — plus „Meine" when they also hold `canViewOwnJobOrders`. A member
-without the queue and without an entry reads their own requested orders and sees no segment; a
-member with none of the three capabilities is sent to the order form. A `scope` parameter that is
-not offered to the caller falls back to the caller's default list (`ALL`, else `MINE`, else
-`ASSIGNED`) and never moves them onto another list.
+Backend capabilities distinguish the shared workspace, the unit-work view and creation from the
+narrow general Profit capability. A requester or personal assignee can choose Alle and their
+applicable existing segments. Zu bearbeiten requires a current unit-work context, not write
+permission. An unavailable or unknown segment falls back to Alle. A caller with no order-reading
+context cannot obtain rows through a forged scope.
 
-**Capability flag.** `canViewAssignedJobOrders` of `GET /api/v1/me/capabilities` (and of
-`/me/layout`) is `true` iff the caller holds at least one assignee entry. It does not depend on the
-pinned unit or on the profit gate. With it the navigation shows the „Aufträge" link — and its phone
-tab — for a member who has neither `canViewJobOrders` nor `canViewOwnJobOrders`; without an entry
-the link is absent. The sidebar entry registry carries it as the flag `ASSIGNED_JOB_ORDERS`.
+The initial view is Alle when no remembered choice exists. Scope, status, squadron and kind
+selections persist per browser (`orders_scope_filter`, `orders_type_filter`, REQ-UI-017); an explicit
+URL selection wins and a remembered scope is restored only while it is offered. The kind filter
+contains MATERIAL and ITEM only; unfinished aUEC work is not an available choice. Pagination and
+fragment requests carry all active narrowing filters. Count and rows use the same SQL predicate;
+permission filtering never happens after paging.
 
-The pagination URL carries `scope=` for every chosen segment but `ALL`. The choice persists per
-browser (`orders_scope_filter`, REQ-UI-017) and is restored only when that segment is offered on the
-page; an explicit `scope` query parameter wins. Switching segments swaps the results in place
-(REQ-FE-001). Adding or removing an assignee publishes the `queue` frame of the orders room, so an
-open list refreshes. The room is open to a caller with `canViewJobOrders` or
-`canViewAssignedJobOrders`; its frames carry only a section key and each viewer refetches their own
-scoped list, so an assignee without profit access learns of no order beyond their own and sees a
-new or removed assignment in place.
+Switching scope, filters or pages swaps the results in place (REQ-FE-001). Queue frames contain
+section keys only, and every viewer refetches through their own current permission checks. Detail
+subscriptions probe the same current common reader as direct detail requests. A peer update
+preserves focused input and open edit dialogs until their normal section refresh can run.
 
-**Enforced by:** `OrdersListPatternRenderTest` (four segments in order, assignee-only segment,
-`scope` cannot move an assignee), `OrderListScopeTest`, `NavigationRenderMvcTest`
-(`assigneeWithoutProfitAccessGetsTheOrdersLink`), `NavigationMenuTest`, `JobOrderControllerTest`
-(`getAllJobOrders_forwardsAssignedToMe`, rejected combinations),
-`JobOrderQueryServiceAssignedToMeTest`, `JobOrderServiceAssigneeAndListTest` (`toProcess_*`),
-`JobOrderScopeQueryIntegrationTest` (`processingFilter_*`, `assigneeGrant_inAllNotInToProcess`,
-`assignedToMe_*`), `JobOrderAssigneeGrantIntegrationTest` (`assignedToMe*`, capability flag),
-`JobOrderToProcessMvcTest` (`*OrgUnitId*`), `JobOrderControllerTest`
-(`getAllJobOrders_forwardsTheProcessingOrgUnit`), `MeControllerTest` (`canViewAssignedJobOrders`),
-`CapabilityFlagsAdviceTest` · **Code:** `JobOrderPageController.viewOrders`, `OrderListScope`,
-`joborder/orders-index.html`, `static/js/joborder/orders-index.js`,
-`JobOrderController.getAllJobOrders`, `JobOrderQueryService.getAllJobOrders` /
-`getAssignedJobOrders`, `JobOrderRepository.findScopedJobOrders` / `findAssignedJobOrders`,
-`MeController.CapabilitiesResponse`, `NavigationRegistry` (`orders.assigned`) · **Related:**
-REQ-ORDERS-023, REQ-ORDERS-027, REQ-ORDERS-047, REQ-UI-026, REQ-UI-027, REQ-UI-034
+**Enforced by:** `OrdersListPatternRenderTest`, `OrderListScopeTest`,
+`JobOrderHierarchyAuthorityIntegrationTest`, `JobOrderScopeQueryIntegrationTest`,
+`JobOrderScopeParityTest`, `JobOrderAssigneeGrantIntegrationTest`,
+`JobOrderResponsibilityRecoveryMvcTest`.
+**Code:** `JobOrderScope.READ_PREDICATE`, `JobOrderRepository.findScopedJobOrders`,
+`JobOrderQueryService`, `JobOrderWorkspaceAccess`, `JobOrderPageController.viewOrders`,
+`OrderListScope`, `static/js/joborder/orders-index.js`.
+**Related:** REQ-ORDERS-023, REQ-ORDERS-027, REQ-ORDERS-047, REQ-ORDERS-052,
+REQ-FE-015, REQ-UI-017, REQ-UI-027.
 
 ## Out of scope
 

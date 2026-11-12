@@ -134,25 +134,6 @@ class OrgStructureAuditorTest {
   }
 
   @Test
-  void profitEligibilityChanged_flip_recordsFromAndTo() {
-    staffel.setProfitEligible(true);
-
-    auditor.profitEligibilityChanged(staffel, false);
-
-    assertThat(recorded(AuditEventType.ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED, staffel))
-        .isEqualTo("kind=SQUADRON from=false to=true");
-  }
-
-  @Test
-  void profitEligibilityChanged_unchanged_recordsNothing() {
-    staffel.setProfitEligible(true);
-
-    auditor.profitEligibilityChanged(staffel, true);
-
-    verifyNoInteractions(auditRecorder);
-  }
-
-  @Test
   void parentChanged_detach_recordsFromReferenceToNone() {
     Bereich old = new Bereich();
     old.setId(UUID.randomUUID());

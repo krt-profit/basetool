@@ -28,7 +28,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The item an item offer or request names (ADR-0371): the blueprint product of an item an active
+ * The item an item offer or request names (ADR-0372): the blueprint product of an item an active
  * blueprint produces, or the catalogue row of an item no blueprint produces, with the display name
  * the entry snapshots. Exactly one of {@code productKey} and {@code gameItemId} is set.
  *

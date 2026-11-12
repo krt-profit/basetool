@@ -87,7 +87,7 @@ public class MaterialExchangeService {
 
   /**
    * Resolves the item an item offer names, by blueprint product or catalogue row, gating it and
-   * supplying the display name snapshotted onto the offer (REQ-MARKET-012, ADR-0371).
+   * supplying the display name snapshotted onto the offer (REQ-MARKET-012, ADR-0372).
    */
   private final ExchangeItemSubjects itemSubjects;
 
@@ -184,7 +184,7 @@ public class MaterialExchangeService {
    * (REQ-MARKET-014), re-releasing an existing active offer on the row.
    *
    * <p>The offer names the row's item by its blueprint product, else by its catalogue row
-   * (ADR-0371).
+   * (ADR-0372).
    *
    * @param item the caller's own game-item Lager row (ownership already checked)
    * @param request the release payload; {@code offeredAmount} is the whole-unit quantity
@@ -237,7 +237,7 @@ public class MaterialExchangeService {
    * active offer.
    *
    * <p>The item is named by an active blueprint product or by the catalogue row of an item the
-   * Lager books (ADR-0371); its name is snapshotted.
+   * Lager books (ADR-0372); its name is snapshotted.
    *
    * @param request the blueprint product key or catalogue row, the whole-piece quantity and the
    *     trade remark

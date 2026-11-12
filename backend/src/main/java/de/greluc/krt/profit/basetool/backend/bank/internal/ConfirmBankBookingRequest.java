@@ -27,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Write payload for a bank employee confirming a pending booking request (REQ-BANK-023).
  *
- * @param holderId the holder recorded for the booking; the source holder for a transfer
+ * @param holderId the booking's custodian, absent for an account-only transfer or authorisation
  * @param destinationHolderId the destination holder for a transfer; {@code null} otherwise
  * @param ownerApprovalConfirmed the attestation that the responsible holder approved; required for
  *     a request flagged {@code requiresOwnerApproval} (REQ-BANK-041), ignored otherwise
@@ -37,7 +37,7 @@ import org.jetbrains.annotations.Nullable;
  * @param version the request's echoed {@code @Version}; a mismatch surfaces as 409
  */
 public record ConfirmBankBookingRequest(
-    @NotNull UUID holderId,
+    @Nullable UUID holderId,
     @Nullable UUID destinationHolderId,
     boolean ownerApprovalConfirmed,
     @Nullable @Size(max = 500) String staffNote,

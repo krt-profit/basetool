@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -63,10 +64,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 /** Unit tests for the bulk checkout functionality in {@link InventoryCheckoutService}. */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemServiceBulkCheckoutTest {
 
-  @org.junit.jupiter.api.BeforeEach
+  @BeforeEach
   void wireCheckoutGraph() {
     inventoryItemService =
         InventoryCheckoutFixtures.create(
@@ -116,8 +120,8 @@ class InventoryItemServiceBulkCheckoutTest {
   @Test
   void bulkCheckout_successfullyRemovesMultipleItems() {
     UUID userId = UUID.randomUUID();
-    UUID itemId1 = UUID.randomUUID();
-    UUID itemId2 = UUID.randomUUID();
+    UUID itemId1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID itemId2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     InventoryItem item1 = itemOwnedBy(itemId1, userId);
     InventoryItem item2 = itemOwnedBy(itemId2, userId);
@@ -190,8 +194,8 @@ class InventoryItemServiceBulkCheckoutTest {
   @Test
   void bulkCheckout_refusesARowWithAPledgedDonation_andRemovesNothing() {
     UUID userId = UUID.randomUUID();
-    UUID freeItemId = UUID.randomUUID();
-    UUID pledgedItemId = UUID.randomUUID();
+    UUID freeItemId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID pledgedItemId = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     InventoryItem freeItem = itemOwnedBy(freeItemId, userId);
     InventoryItem pledgedItem = itemOwnedBy(pledgedItemId, userId);
@@ -267,8 +271,8 @@ class InventoryItemServiceBulkCheckoutTest {
   void bulkCheckout_stopsImmediately_whenFirstItemBelongsToOtherUser() {
     UUID currentUserId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
-    UUID itemId1 = UUID.randomUUID();
-    UUID itemId2 = UUID.randomUUID();
+    UUID itemId1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID itemId2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     InventoryItem foreignItem = itemOwnedBy(itemId1, otherUserId);
     when(inventoryItemRepository.lockById(itemId1)).thenReturn(Optional.of(foreignItem));

@@ -40,11 +40,39 @@ import org.jetbrains.annotations.Nullable;
  * @param splitPercent the whole percent to distribute, or {@code null} without a split
  */
 public record ExchangeBankRequestCreateDto(
-    @NotNull BankBookingRequestType type,
+    @NotNull RequestType type,
     @NotNull UUID sourceAccountId,
     @Nullable UUID targetAccountId,
     @NotNull BigDecimal amount,
     @Nullable String note,
     @Nullable String justification,
     boolean splitEnabled,
-    @Nullable BigDecimal splitPercent) {}
+    @Nullable BigDecimal splitPercent) {
+
+  /** Movement kinds admitted by the frozen exchange request schema. */
+  public enum RequestType {
+    /** Adds funds to an account. */
+    DEPOSIT(BankBookingRequestType.DEPOSIT),
+
+    /** Pays out funds from an account. */
+    WITHDRAWAL(BankBookingRequestType.WITHDRAWAL),
+
+    /** Moves funds between accounts. */
+    TRANSFER(BankBookingRequestType.TRANSFER);
+
+    private final BankBookingRequestType bankType;
+
+    RequestType(BankBookingRequestType bankType) {
+      this.bankType = bankType;
+    }
+
+    /**
+     * Maps this wire value to the Bank request kind.
+     *
+     * @return the corresponding Bank kind
+     */
+    public @org.jetbrains.annotations.NotNull BankBookingRequestType bankType() {
+      return bankType;
+    }
+  }
+}

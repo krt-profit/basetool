@@ -62,7 +62,14 @@ class JobOrderFormTest {
         5L,
         null,
         null,
-        false);
+        false,
+        false,
+        null,
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   /**

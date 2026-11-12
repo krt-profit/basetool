@@ -45,7 +45,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/** The game-item references of Materialbörse item rows (REQ-MARKET-023, ADR-0371). */
+/** The game-item references of Materialbörse item rows (REQ-MARKET-023, ADR-0372). */
 @ExtendWith(MockitoExtension.class)
 class ExchangeItemReferencesTest {
 

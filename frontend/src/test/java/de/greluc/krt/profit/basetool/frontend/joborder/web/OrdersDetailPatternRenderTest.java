@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyView;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
@@ -63,12 +64,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Renders the order detail page on the detail pattern (REQ-UI-027, REQ-ORDERS-026): the back-link
  * page head with the translated status badge, the delivered-against-required progress head, the
  * tabs filtered per order kind with the empty ones hidden, one primary action per tab, and the
- * requester-limited view (REQ-ORDERS-023).
+ * complete requester read (REQ-ORDERS-023).
  */
 @SpringBootTest
 class OrdersDetailPatternRenderTest {
@@ -171,7 +174,7 @@ class OrdersDetailPatternRenderTest {
             List.of(),
             false,
             1L);
-    stubOrder(order(orderId, "ITEM", "OPEN", List.of(), List.of(line), List.of(), false));
+    stubOrder(order(orderId, "ITEM", "OPEN", List.of(), List.of(line), List.of(), true));
 
     String html = render(orderId, "ROLE_KRT_MEMBER");
 
@@ -189,9 +192,9 @@ class OrdersDetailPatternRenderTest {
         .doesNotContain("data-trigger=\"od-open-production\"");
   }
 
-  /** The requester sees the demand only, without progress, handovers or assignees. */
+  /** An ordinary requester reads order progress and assignees without processing controls. */
   @Test
-  void requesterViewKeepsTheLimitedView() throws Exception {
+  void requesterReadsCompleteProgressWithoutProcessingOrEnrollmentControls() throws Exception {
     UUID orderId = UUID.randomUUID();
     stubOrder(
         order(
@@ -205,14 +208,194 @@ class OrdersDetailPatternRenderTest {
 
     String html = render(orderId, "ROLE_KRT_MEMBER");
 
-    assertThat(tabOrder(html)).containsExactly("tab-materials");
+    assertThat(tabOrder(html)).containsExactly("tab-materials", "tab-handovers", "tab-assignees");
     assertThat(html)
-        .doesNotContain("data-testid=\"order-progress\"")
-        .doesNotContain("id=\"order-handovers-results\"")
-        .doesNotContain("id=\"assignees-section\"")
+        .contains("data-testid=\"order-progress\"")
+        .contains("id=\"order-handovers-results\"")
+        .contains("id=\"assignees-section\"")
+        .contains("/orders/" + orderId + "/material-collection")
+        .doesNotContain("data-trigger=\"oa-add-me\"")
         .doesNotContain("id=\"status-select\"")
         .doesNotContain("id=\"order-menu\"")
-        .contains("data-modal-id=\"edit-modal\"");
+        .doesNotContain("data-modal-id=\"edit-modal\"");
+  }
+
+  /** Renders the requester cancellation with its own version and without processing controls. */
+  @Test
+  void requesterCanCancelWithTheLifecycleVersion() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    JobOrderDto order =
+        JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build()
+            .readValue(
+                """
+                {
+                  "id": "%s",
+                  "displayId": 7,
+                  "type": "MATERIAL",
+                  "status": "OPEN",
+                  "version": 17,
+                  "lifecycleVersion": 8,
+                  "canCancel": true,
+                  "canEditAsRequester": true
+                }
+                """
+                    .formatted(orderId),
+                JobOrderDto.class);
+    stubOrder(order);
+
+    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+        .containsPattern("data-testid=\"order-cancel\"[^>]*data-version=\"8\"")
+        .doesNotContain("id=\"status-select\"")
+        .doesNotContain("data-testid=\"order-reopen\"");
+  }
+
+  @Test
+  void moneyFragmentShowsTheWaitingPaymentAndTheAvailableBalanceSeparately() throws Exception {
+    UUID order = UUID.randomUUID();
+    UUID holder = UUID.randomUUID();
+    UUID accountHolding = UUID.randomUUID();
+    UUID bankAccount = UUID.randomUUID();
+    stubOrder(order(order, "AUEC", "IN_PROGRESS", List.of(), List.of(), List.of(), true));
+    JobOrderMoneyView money =
+        JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build()
+            .readValue(
+                """
+                {
+                  "target":"500000","targetVersion":0,"provided":"800000","holdings":"800000",
+                  "netHandedOver":"0","remaining":"500000","fees":"0","overpaid":"0",
+                  "responsibilityValid":true,"history":[],"targetChanges":[],"recipients":[],
+                  "holderIdentityHistory":[],"returnableRecipientIds":[],
+                  "holders":[{"id":"%s","displayName":"Alex","amount":"600000",
+                              "availableAmount":"97500","version":2}],
+                  "accountHoldings":[{"id":"%s","bankAccountId":"%s","amount":"200000",
+                                      "availableAmount":"175000","version":3}],
+                  "linkedAttempts":[{"operationId":"%s","holderId":"%s","amount":"500000",
+                     "bankHandling":true,"recordedAt":"2026-11-11T11:00:00Z","holderName":"Alex",
+                     "actorName":"Sam","recipientName":"Mika & Jo","kind":"HANDOVER",
+                     "fee":"2500","provision":"0","corrections":[],"state":"WAITING",
+                     "linkedRevision":1,"actualPayment":true,"actualFee":"2500","feeFunding":"ORDER"},
+                    {"operationId":"%s","accountHoldingId":"%s","amount":"25000",
+                     "bankHandling":true,"recordedAt":"2026-11-11T11:00:00Z","actorName":"Kim",
+                     "kind":"PURPOSE_HANDOVER","fee":"0","provision":"0","corrections":[],
+                     "state":"WAITING","linkedRevision":1,"actualPayment":false}]
+                }
+                """
+                    .formatted(
+                        holder,
+                        accountHolding,
+                        bankAccount,
+                        UUID.randomUUID(),
+                        holder,
+                        UUID.randomUUID(),
+                        accountHolding),
+                JobOrderMoneyView.class);
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/money"), eq(JobOrderMoneyView.class), eq(order)))
+        .thenReturn(money);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/{id}", order)
+                    .param("fragment", "money")
+                    .header("Accept-Language", "de")
+                    .with(authentication(token("ROLE_KRT_MEMBER"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .contains("data-testid=\"order-money-linked-attempt\"", "Wartet auf Bankbestätigung")
+        .contains("Spielzahlung gemeldet", "Mika &amp; Jo")
+        .contains("Gebucht: 600.000 aUEC", "Verfügbar: 97.500 aUEC")
+        .contains("data-testid=\"order-money-account-holding\"", "Erfasst von: Kim")
+        .contains("Übergabe an ein Empfängerkonto")
+        .contains("Gebucht: 200.000 aUEC", "Verfügbar: 175.000 aUEC")
+        .contains("Gebühr aus Auftragsmitteln: 2.500 aUEC")
+        .doesNotContain(bankAccount.toString(), "data-testid=\"order-money-history-entry\"");
+  }
+
+  /** A cancelled order retains its recorded handover without an active fulfillment action. */
+  @Test
+  void cancelledOrderKeepsHandoverHistoryWithoutRecordingControls() throws Exception {
+    CapabilityStubs.logistician(backendApiClient);
+    UUID orderId = UUID.randomUUID();
+    MaterialDto titanium = material("Titanium");
+    stubOrder(
+        order(
+            orderId,
+            "MATERIAL",
+            "CANCELLED",
+            List.of(materialLine(titanium, 300.0)),
+            List.of(),
+            List.of(handover(orderId, titanium, 100.0)),
+            false));
+
+    assertThat(render(orderId, "ROLE_LOGISTICIAN"))
+        .contains("data-testid=\"order-handover-row\"", "data-testid=\"order-progress\"")
+        .doesNotContain("data-testid=\"order-handover-open\"", "id=\"handover-form\"");
+  }
+
+  /** Displays permitted Staffel support actions and keeps ended participation visible. */
+  @Test
+  void supportActionsFollowTheBackendProjection() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    stubOrder(order(orderId, "MATERIAL", "OPEN", List.of(), List.of(), List.of(), true));
+    String support =
+        """
+        {
+          "participations": [
+            {
+              "id": "00000000-0000-0000-0000-000000000001",
+              "unit": {
+                "orgUnitId": "00000000-0000-0000-0000-000000000011",
+                "orgUnitName": "Own support",
+                "orgUnitShorthand": "OWN",
+                "kind": "SQUADRON"
+              },
+              "version": 9, "active": true, "canWithdraw": true
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000002",
+              "unit": {
+                "orgUnitId": "00000000-0000-0000-0000-000000000012",
+                "orgUnitName": "Past support",
+                "orgUnitShorthand": "PAST",
+                "kind": "SQUADRON"
+              },
+              "version": 17, "active": false, "canWithdraw": false
+            }
+          ],
+          "enrollmentOptions": [
+            {
+              "orgUnitId": "00000000-0000-0000-0000-000000000013",
+              "orgUnitName": "Joining Staffel",
+              "orgUnitShorthand": "JOIN",
+              "kind": "SQUADRON"
+            }
+          ]
+        }
+        """;
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/participations"),
+            org.mockito.ArgumentMatchers.<Class<Object>>any(),
+            eq(orderId)))
+        .thenAnswer(call ->
+            JsonMapper.builder().build().readValue(support, call.<Class<Object>>getArgument(1)));
+
+    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+        .contains(
+            "data-testid=\"order-support-enroll\"",
+            "Joining Staffel",
+            "Own support",
+            "Past support")
+        .containsPattern("data-testid=\"order-support-withdraw\"[^>]*data-version=\"9\"")
+        .doesNotContainPattern("data-testid=\"order-support-withdraw\"[^>]*data-version=\"17\"")
+        .doesNotContain("id=\"status-select\"");
   }
 
   /**
@@ -271,7 +454,7 @@ class OrdersDetailPatternRenderTest {
    * @param materials the material lines
    * @param items the item lines
    * @param handovers the material handovers
-   * @param redacted whether the backend redacted the order for its requester
+   * @param readOnly whether processing controls are unavailable
    * @return the order DTO
    */
   private static @NotNull JobOrderDto order(
@@ -281,7 +464,7 @@ class OrdersDetailPatternRenderTest {
       @NotNull List<JobOrderMaterialDto> materials,
       @NotNull List<JobOrderItemDto> items,
       @NotNull List<JobOrderHandoverDto> handovers,
-      boolean redacted) {
+      boolean readOnly) {
     return new JobOrderDto(
         orderId,
         7,
@@ -301,9 +484,16 @@ class OrdersDetailPatternRenderTest {
         List.of(),
         Instant.now(),
         1L,
-        !redacted,
+        !readOnly,
         null,
-        redacted);
+        false,
+        false,
+        !readOnly,
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   /**

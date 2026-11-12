@@ -27,13 +27,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code JobOrderDto} for both order kinds: {@code MATERIAL} orders
- * fill {@code materials} and {@code handovers}; {@code ITEM} orders fill {@code items}, {@code
+ * Frontend mirror of the backend {@code JobOrderDto}: {@code MATERIAL} orders fill {@code
+ * materials} and {@code handovers}; {@code ITEM} orders fill {@code items}, {@code
  * aggregatedMaterials} and {@code itemHandovers}. The other kind's lists are empty.
- *
- * <p>{@code canManageAssignees} is resolved on the detail and assignee reads only; {@code redacted}
- * is {@code true} when the caller sees the order only as a member of the requesting org unit
- * (REQ-ORDERS-023).
  */
 @DtoMirror
 public record JobOrderDto(
@@ -57,7 +53,14 @@ public record JobOrderDto(
     Long version,
     Boolean canEdit,
     Boolean canManageAssignees,
-    boolean redacted) {
+    boolean responsibilityInvalid,
+    boolean originalProfitBoundaryUnknown,
+    Boolean canTransferResponsibility,
+    Boolean canEditAsRequester,
+    Boolean canCancel,
+    Boolean canReopen,
+    Long lifecycleVersion,
+    Long responsibilityVersion) {
 
   /**
    * Whether the backend lets the caller edit this order: its {@code canEdit} row flag, which is
@@ -66,7 +69,25 @@ public record JobOrderDto(
    * @return {@code true} iff {@code canEdit} is {@code true}
    */
   public boolean callerMayEdit() {
-    return Boolean.TRUE.equals(canEdit);
+    return !responsibilityInvalid && Boolean.TRUE.equals(canEdit);
+  }
+
+  /**
+   * Whether the caller can use the processing editor before the first item handover.
+   *
+   * @return true when processing authority and the handover bound both allow the edit
+   */
+  public boolean callerMayUseItemProcessingEditor() {
+    return callerMayEdit() && (itemHandovers == null || itemHandovers.isEmpty());
+  }
+
+  /**
+   * Whether the backend permits the caller's restricted requesting-unit edit.
+   *
+   * @return true only for an explicitly permitted requester edit with valid responsibility
+   */
+  public boolean callerMayEditAsRequester() {
+    return !responsibilityInvalid && Boolean.TRUE.equals(canEditAsRequester);
   }
 
   /**
@@ -76,6 +97,6 @@ public record JobOrderDto(
    * @return {@code true} iff {@code canManageAssignees} is {@code true}
    */
   public boolean callerMayManageAssignees() {
-    return Boolean.TRUE.equals(canManageAssignees);
+    return !responsibilityInvalid && Boolean.TRUE.equals(canManageAssignees);
   }
 }

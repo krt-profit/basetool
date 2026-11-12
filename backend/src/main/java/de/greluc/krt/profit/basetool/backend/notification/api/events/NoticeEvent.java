@@ -52,6 +52,7 @@ import org.jetbrains.annotations.Unmodifiable;
  *     checked in
  * @param contextExchangeClientId the registry client the event concerns
  * @param contextAllExchangeClients whether the event concerns every client's holders
+ * @param observedRevision the revisions observed by an action prompt
  * @param renderParams the render parameters stored on the notification
  * @param resolvesNotificationTypes the types superseded for everyone
  * @param resolvesNotificationTypesForRecipients the types superseded for {@code
@@ -74,6 +75,7 @@ public record NoticeEvent(
     boolean contextMissionOnlyNotCheckedIn,
     @Nullable UUID contextExchangeClientId,
     boolean contextAllExchangeClients,
+    @Nullable NotificationRevision observedRevision,
     Map<String, String> renderParams,
     Set<NotificationType> resolvesNotificationTypes,
     Set<NotificationType> resolvesNotificationTypesForRecipients,
@@ -97,6 +99,7 @@ public record NoticeEvent(
    * @param contextMissionOnlyNotCheckedIn whether participants narrow to the not checked in
    * @param contextExchangeClientId the registry client
    * @param contextAllExchangeClients whether every client's holders are meant
+   * @param observedRevision the revisions observed by an action prompt
    * @param renderParams the render parameters
    * @param resolvesNotificationTypes the types superseded for everyone
    * @param resolvesNotificationTypesForRecipients the types superseded for named members

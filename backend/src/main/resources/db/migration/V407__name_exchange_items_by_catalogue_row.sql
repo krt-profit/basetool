@@ -1,6 +1,6 @@
 -- An ITEM offer or request names its item by exactly one identity: the blueprint product key of an
 -- item an active blueprint produces, or the catalogue row of an item no blueprint produces
--- (REQ-MARKET-012, REQ-MARKET-014, REQ-MARKET-015, ADR-0371). Only the ITEM branch widens, so rows
+-- (REQ-MARKET-012, REQ-MARKET-014, REQ-MARKET-015, ADR-0372). Only the ITEM branch widens, so rows
 -- an older application writes keep satisfying the checks.
 ALTER TABLE material_exchange_offer ADD COLUMN item_game_item_id UUID REFERENCES game_item (id);
 

@@ -1,6 +1,6 @@
 # ADR-0108 — Materialbörse stock-backed item offers (released from item stock)
 
-- **Status:** Accepted — the identity bridge is **amended by ADR-0371** (a row whose item no
+- **Status:** Accepted — the identity bridge is **amended by ADR-0372** (a row whose item no
   active blueprint produces is offered under its catalogue row)
 - **Date:** 2026-07-17
 - **Deciders:** @greluc

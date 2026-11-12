@@ -24,13 +24,10 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSet
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Outcome;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Planned;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeChangeSetAdapter.Write;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.Locks;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.PoolWrite;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolOutcome;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -101,17 +98,13 @@ class OrgStockExecutor {
    * @param plan the plan
    */
   private void lock(@NotNull List<Planned<PoolWrite>> plan) {
-    Locks locks = new Locks(new HashMap<>(), new HashSet<>(), new ArrayList<>());
+    List<ExchangeOrgStockLocks.Contributor> contributors = new ArrayList<>();
     for (Planned<PoolWrite> planned : plan) {
       if (planned instanceof Write<PoolWrite>(PoolWrite write)) {
-        write.lockInto(locks);
+        contributors.add(write);
       }
     }
-    if (!locks.holderLots().isEmpty()
-        || !locks.entries().isEmpty()
-        || !locks.relocations().isEmpty()) {
-      poolEntryCommands.lockLots(locks.holderLots(), locks.entries(), locks.relocations());
-    }
+    ExchangeOrgStockLocks.lock(poolEntryCommands, contributors);
   }
 
   /**

@@ -28,7 +28,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
@@ -43,6 +42,8 @@ import java.util.Locale;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -138,8 +139,46 @@ class OrdersListPatternRenderTest {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     return new PageResponse<>(List.of(order), 0, 100, 1L, 1, List.of());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ITEM", "AUEC"})
+  @WithMockUser
+  void kindFilterUsesBackendNarrowingAndSurvivesPagination(String kind) throws Exception {
+    when(backendApiClient.get(
+            eq(QUEUE_URL + "&type={type}"),
+            anyTypeRef(),
+            eq(0),
+            eq(100),
+            eq("OPEN"),
+            eq("IN_PROGRESS"),
+            eq(kind)))
+        .thenReturn(new PageResponse<>(onePage("OPEN").content(), 0, 100, 300L, 3, List.of()));
+
+    String html = render(true, "type=" + kind);
+
+    verify(backendApiClient)
+        .get(
+            eq(QUEUE_URL + "&type={type}"),
+            anyTypeRef(),
+            eq(0),
+            eq(100),
+            eq("OPEN"),
+            eq("IN_PROGRESS"),
+            eq(kind));
+    assertThat(html)
+        .containsPattern("<option value=\"" + kind + "\"[^>]*selected=\"selected\"")
+        .contains("type=" + kind)
+        .contains("<option value=\"AUEC\"");
   }
 
   /** The list renders on the pattern: head, scope segment, popover, row link, status, foot. */
@@ -150,7 +189,10 @@ class OrdersListPatternRenderTest {
             eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS")))
         .thenReturn(onePage("OPEN"));
 
-    String html = render(true, "");
+    String html =
+        render(
+            LayoutResponses.withOrderCreation(LayoutResponses.orderAccess(true, true, false), true),
+            "");
 
     assertThat(html)
         .contains("class=\"page-head\"")
@@ -212,7 +254,7 @@ class OrdersListPatternRenderTest {
         .containsPattern("name=\"scope\" value=\"MINE\" checked=\"checked\"")
         .containsPattern("id=\"ordersSquadronField\"[^>]*hidden")
         .containsPattern("class=\"status-pill status-in_progress\">In Bearbeitung<")
-        .doesNotContain(">Fortschritt<");
+        .contains(">Fortschritt<");
   }
 
   /**
@@ -263,21 +305,22 @@ class OrdersListPatternRenderTest {
         .doesNotContainPattern("id=\"ordersSquadronField\"[^>]*hidden");
   }
 
-  /** A requester without the queue sees their own orders and no scope segment. */
+  /** A requester reads the complete permitted set or narrows to current requesting units. */
   @Test
   @WithMockUser
-  void requesterSeesNoScopeSegment() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/orders/requested?"), anyTypeRef(), any(Object[].class)))
+  void requesterCanChooseMineAndTheCompletePermittedAllView() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onePage("OPEN"));
 
     String html = render(false, "scope=ALL");
 
     verify(backendApiClient)
-        .get(eq(REQUESTED_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
+        .get(eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
     assertThat(html)
         .contains("data-testid=\"order-row\"")
-        .doesNotContain("data-testid=\"segment-scope-mine\"")
+        .contains("data-testid=\"segment-scope-mine\"")
+        .contains("data-testid=\"segment-scope-all\"")
+        .containsPattern("name=\"scope\" value=\"ALL\" checked=\"checked\"")
         .doesNotContain("data-testid=\"segment-scope-to_process\"")
         .doesNotContain("id=\"squadronFilterContainer\"");
   }
@@ -285,15 +328,14 @@ class OrdersListPatternRenderTest {
   /** A requester cannot reach the to-process queue through the URL. */
   @Test
   @WithMockUser
-  void requesterAskingForToProcessStillReadsTheirOwnOrders() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/orders/requested?"), anyTypeRef(), any(Object[].class)))
+  void requesterAskingForToProcessFallsBackToPermittedAll() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onePage("OPEN"));
 
     render(false, "scope=TO_PROCESS");
 
     verify(backendApiClient)
-        .get(eq(REQUESTED_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
+        .get(eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
   }
 
   /** The four segments appear in the order Meine, Ich bearbeite, Zu bearbeiten, Alle. */
@@ -354,84 +396,68 @@ class OrdersListPatternRenderTest {
     assertThat(html).contains("orders-materials-table").contains(">Fortschritt<");
   }
 
-  /** A member without profit access but with an entry sees only the assigned segment. */
+  /** A personal assignee can read Alle and their assignment without gaining a unit-work scope. */
   @Test
   @WithMockUser
-  void assigneeWithoutProfitAccessSeesOnlyTheAssignedSegment() throws Exception {
+  void assigneeWithoutProfitAccessReadsAllOrTheirOwnAssignmentScope() throws Exception {
     when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(onePage("OPEN").content(), 0, 100, 300L, 3, List.of()));
 
     String html = render(LayoutResponses.orderAccess(false, false, true), "scope=ALL");
 
     verify(backendApiClient)
-        .get(
-            eq(QUEUE_URL + "&assignedToMe=true"),
-            anyTypeRef(),
-            eq(0),
-            eq(100),
-            eq("OPEN"),
-            eq("IN_PROGRESS"));
+        .get(eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
     assertThat(html)
         .contains("data-testid=\"segment-scope-assigned\"")
-        .containsPattern("name=\"scope\" value=\"ASSIGNED\" checked=\"checked\"")
+        .containsPattern("name=\"scope\" value=\"ALL\" checked=\"checked\"")
         .doesNotContain("data-testid=\"segment-scope-mine\"")
         .doesNotContain("data-testid=\"segment-scope-to_process\"")
-        .doesNotContain("data-testid=\"segment-scope-all\"")
+        .contains("data-testid=\"segment-scope-all\"")
         .doesNotContain("id=\"squadronFilterContainer\"")
         .contains("data-testid=\"order-row\"")
-        .contains("/orders?scope=ASSIGNED&amp;status=OPEN&amp;status=IN_PROGRESS");
+        .contains("/orders?status=OPEN&amp;status=IN_PROGRESS");
   }
 
-  /** Such a member cannot reach the queue or the to-process list through the URL. */
+  /** A personal assignee cannot select unit work without a current unit-work context. */
   @Test
   @WithMockUser
-  void assigneeWithoutProfitAccessCannotMoveOntoAnotherList() throws Exception {
+  void personalAssignmentDoesNotOfferUnitWorkAndFallsBackToAll() throws Exception {
     when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onePage("OPEN"));
 
     render(LayoutResponses.orderAccess(false, false, true), "scope=TO_PROCESS");
 
     verify(backendApiClient)
-        .get(
-            eq(QUEUE_URL + "&assignedToMe=true"),
-            anyTypeRef(),
-            eq(0),
-            eq(100),
-            eq("OPEN"),
-            eq("IN_PROGRESS"));
+        .get(eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
   }
 
-  /** A requester who is also an assignee chooses between their own and the assigned orders. */
+  /** A requester and personal assignee can narrow the default complete permitted view. */
   @Test
   @WithMockUser
-  void requesterWhoIsAnAssigneeChoosesBetweenMineAndAssigned() throws Exception {
-    when(backendApiClient.get(
-            contains("/api/v1/orders/requested?"), anyTypeRef(), any(Object[].class)))
+  void requesterWhoIsAnAssigneeDefaultsToAllAndCanChooseBothExistingScopes() throws Exception {
+    when(backendApiClient.get(contains("/api/v1/orders?"), anyTypeRef(), any(Object[].class)))
         .thenReturn(onePage("OPEN"));
 
     String html = render(LayoutResponses.orderAccess(false, true, true), "");
 
     verify(backendApiClient)
-        .get(eq(REQUESTED_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
+        .get(eq(QUEUE_URL), anyTypeRef(), eq(0), eq(100), eq("OPEN"), eq("IN_PROGRESS"));
     assertThat(html)
         .containsSubsequence(
             "data-testid=\"segment-scope-mine\"", "data-testid=\"segment-scope-assigned\"")
-        .containsPattern("name=\"scope\" value=\"MINE\" checked=\"checked\"")
+        .containsPattern("name=\"scope\" value=\"ALL\" checked=\"checked\"")
         .doesNotContain("data-testid=\"segment-scope-to_process\"")
-        .doesNotContain("data-testid=\"segment-scope-all\"");
+        .contains("data-testid=\"segment-scope-all\"");
   }
 
-  /** A member with no list at all is sent to the order form. */
+  /** A caller without a workspace context cannot enter a creation workflow through the list. */
   @Test
   @WithMockUser
-  void aMemberWithoutAnyListIsRedirectedToTheForm() throws Exception {
+  void aMemberWithoutAnyWorkspaceContextIsRefused() throws Exception {
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.orderAccess(false, false, false));
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    mockMvc
-        .perform(get("/orders").locale(Locale.GERMAN))
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/orders/create"));
+    mockMvc.perform(get("/orders").locale(Locale.GERMAN)).andExpect(status().isForbidden());
   }
 }

@@ -1435,7 +1435,7 @@ class InventoryItemControllerTest {
     UUID itemId = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L);
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
     when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(true);
@@ -1454,7 +1454,7 @@ class InventoryItemControllerTest {
     UUID itemId = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L);
+            InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
     when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);
@@ -1473,7 +1473,7 @@ class InventoryItemControllerTest {
     UUID itemId = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L);
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L, null);
     InventoryItemDto persisted = inventoryItem(itemId);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
     when(inventoryAccessPolicy.isLogisticianOfItem(any())).thenReturn(false);

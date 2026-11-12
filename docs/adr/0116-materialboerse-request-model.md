@@ -1,6 +1,6 @@
 # ADR-0116 — Materialbörse requests (Gesuche) as a sibling aggregate
 
-- **Status:** Accepted — item requests are **amended by ADR-0371** (an item no active blueprint
+- **Status:** Accepted — item requests are **amended by ADR-0372** (an item no active blueprint
   produces is named by its catalogue row)
 - **Date:** 2026-07-21
 - **Deciders:** @greluc

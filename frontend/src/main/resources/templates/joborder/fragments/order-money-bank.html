@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<fieldset th:fragment="mode(testId)" class="form-group" data-money-bank-mode>
+    <legend th:text="#{orders.money.bank.handling}"></legend>
+    <label class="cluster gap-2">
+        <input type="radio" name="bankHandling" value="bank" checked data-money-use-bank th:data-testid="${testId}">
+        <span th:text="#{orders.money.bank.use}"></span>
+    </label>
+    <label class="cluster gap-2">
+        <input type="radio" name="bankHandling" value="independent" data-money-bank-free th:data-testid="|${testId}-free|">
+        <span th:text="#{orders.money.bankFree}"></span>
+    </label>
+</fieldset>
+<div th:fragment="account(id, labelKey)" class="form-group" hidden>
+    <label th:for="${id}" th:text="#{__${labelKey}__}"></label>
+    <select th:id="${id}" name="bankAccountId" th:data-testid="${id}" required disabled>
+        <option value="" th:text="#{orders.create.select}"></option>
+    </select>
+    <p class="field-error" role="status" data-money-bank-account-error hidden
+       th:data-denied="#{orders.money.bank.accounts.denied}"
+       th:data-unavailable="#{orders.money.bank.accounts.unavailable}"></p>
+</div>
+<th:block th:fragment="provision">
+    <div class="form-group" hidden>
+        <label for="order-money-bank-purpose" th:text="#{orders.money.bank.purpose}"></label>
+        <select id="order-money-bank-purpose" name="bankPurpose" data-testid="order-money-bank-purpose" disabled>
+            <option value="DEPOSIT" th:text="#{orders.money.bank.provision.deposit}"></option>
+            <option value="AUTHORISATION" th:text="#{orders.money.bank.provision.authorisation}"></option>
+            <option value="WITHDRAWAL" th:text="#{orders.money.bank.provision.withdrawal}"></option>
+        </select>
+    </div>
+    <div th:replace="~{joborder/fragments/order-money-bank :: account('order-money-bank-account', 'orders.money.bank.account')}"></div>
+    <div class="form-group" hidden>
+        <label for="order-money-bank-payer" th:text="#{orders.money.bank.payer}"></label>
+        <select id="order-money-bank-payer" name="bankPayer" data-testid="order-money-bank-payer" disabled>
+            <option value="self" th:text="#{orders.money.bank.payer.self}"></option>
+            <option value="other" th:text="#{orders.money.bank.payer.other}"></option>
+        </select>
+    </div>
+    <div th:replace="~{joborder/fragments/order-money-movement :: partyChoice('order-money-bank-depositor', 'bankDepositor')}"></div>
+    <div class="form-group" hidden>
+        <label class="cluster gap-2">
+            <input type="checkbox" name="bankPayment" data-testid="order-money-bank-payment" required disabled>
+            <span th:text="#{orders.money.bank.paymentAlreadyMade}"></span>
+        </label>
+    </div>
+    <div class="form-group" hidden>
+        <label for="order-money-bank-custodian" th:text="#{orders.money.bank.custodian}"></label>
+        <select id="order-money-bank-custodian" name="bankCustodian" data-testid="order-money-bank-custodian" required disabled>
+            <option value="" th:text="#{orders.create.select}"></option>
+        </select>
+    </div>
+    <div class="form-group" hidden>
+        <label for="order-money-bank-justification" th:text="#{orders.money.bank.justification}"></label>
+        <textarea id="order-money-bank-justification" name="bankJustification" maxlength="1000"
+                  data-testid="order-money-bank-justification" disabled></textarea>
+    </div>
+</th:block>
+<th:block th:fragment="movement">
+    <div class="form-group" hidden>
+        <label for="order-money-movement-bank-effect" th:text="#{orders.money.bank.purpose}"></label>
+        <select id="order-money-movement-bank-effect" name="bankEffect" data-testid="order-money-movement-bank-effect" disabled>
+            <option value="DEPOSIT" th:text="#{orders.money.bank.provision.deposit}"></option>
+            <option value="HOLDER_TRANSFER" th:text="#{orders.money.bank.movement.holderTransfer}"></option>
+        </select>
+    </div>
+    <div th:replace="~{joborder/fragments/order-money-bank :: account('order-money-movement-bank-account', 'orders.money.bank.account')}"></div>
+    <div class="form-group" hidden>
+        <label for="order-money-movement-bank-custodian" th:text="#{orders.money.bank.custodian}"></label>
+        <select id="order-money-movement-bank-custodian" name="bankCustodian" data-testid="order-money-movement-bank-custodian" required disabled>
+            <option value="" th:text="#{orders.create.select}"></option>
+        </select>
+    </div>
+    <div class="form-group" hidden>
+        <label for="order-money-movement-bank-target-custodian" th:text="#{orders.money.bank.movement.receivingCustodian}"></label>
+        <select id="order-money-movement-bank-target-custodian" name="bankTargetCustodian"
+                data-testid="order-money-movement-bank-target-custodian" required disabled>
+            <option value="" th:text="#{orders.create.select}"></option>
+        </select>
+    </div>
+    <div class="form-group" hidden>
+        <label class="cluster gap-2">
+            <input type="checkbox" name="bankPayment" data-testid="order-money-movement-bank-payment" required disabled>
+            <span th:text="#{orders.money.bank.paymentAlreadyMade}"></span>
+        </label>
+    </div>
+    <div class="form-group" hidden>
+        <label for="order-money-movement-bank-justification" th:text="#{orders.money.bank.justification}"></label>
+        <p class="text-muted" th:text="#{orders.money.bank.justification.hint}"></p>
+        <input id="order-money-movement-bank-justification" name="bankJustification" type="text" maxlength="1000"
+               data-testid="order-money-movement-bank-justification" disabled>
+    </div>
+</th:block>
+<th:block th:fragment="preview">
+    <div data-preview-bank-debit hidden>
+        <dt class="fact-k" th:text="#{orders.money.bank.preview.debit}"></dt>
+        <dd class="fact-v" data-preview-value="bankDebit"></dd>
+    </div>
+    <div data-preview-bank-payer hidden>
+        <dt class="fact-k" th:text="#{orders.money.bank.preview.feePayer}"></dt>
+        <dd class="fact-v" data-preview-bank-payer-label
+            th:data-order="#{orders.money.bank.preview.payer.order}"
+            th:data-krt="#{orders.money.bank.preview.payer.krt}"
+            th:data-depositor="#{orders.money.bank.preview.payer.depositor}"
+            th:data-bank-source="#{orders.money.bank.preview.payer.bankSource}"></dd>
+    </div>
+</th:block>
+<p th:fragment="disposition" data-preview-bank-disposition role="status" hidden
+   th:data-direct="#{orders.money.bank.preview.direct}"
+   th:data-pending="#{orders.money.bank.preview.pending}"></p>
+<p th:fragment="problem" class="alert alert-warning" role="status" data-money-preview-error hidden
+   th:data-unavailable="#{orders.money.bank.preview.unavailable}"
+   th:data-denied="#{orders.money.bank.preview.denied}"
+   th:data-stale="#{orders.money.basis.changed}"></p>
+</body>
+</html>

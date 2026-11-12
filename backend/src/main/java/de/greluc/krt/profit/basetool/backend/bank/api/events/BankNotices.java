@@ -319,6 +319,35 @@ public final class BankNotices {
   }
 
   /**
+   * Bank staff directly authorised funds on an account without a booking.
+   *
+   * @param authorisationId the recorded authorisation
+   * @param accountId the funding account
+   * @param accountNo the funding account's number
+   * @param amount the authorised amount
+   * @param actor the deciding staff member
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent fundsAuthorised(
+      @NotNull UUID authorisationId,
+      @NotNull UUID accountId,
+      @NotNull String accountNo,
+      @NotNull BigDecimal amount,
+      @NotNull ActorRef actor) {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.BANK_FUNDS_AUTHORISED)
+        .actorSub(actor.id())
+        .entityType("BANK_AUTHORISATION")
+        .entityId(authorisationId)
+        .contextAccountId(accountId)
+        .renderParams(
+            Map.of(
+                "accountNo", accountNo, "amount", BankAmounts.plain(amount), "actor", actor.name()))
+        .build();
+  }
+
+  /**
    * A holder was deactivated but still holds aUEC.
    *
    * @param holderId the holder

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api.events;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -43,6 +44,7 @@ import org.jetbrains.annotations.Nullable;
  * @param requestingOrgUnit the requesting/customer org unit (id + kind)
  * @param jobOrderType the order type name ({@code MATERIAL} / {@code ITEM})
  * @param actorSub the creating user's sub, or {@code null} when anonymous/guest
+ * @param observedRevision the order revisions at creation
  */
 public record JobOrderCreatedEvent(
     UUID jobOrderId,
@@ -52,7 +54,8 @@ public record JobOrderCreatedEvent(
     String responsibleOrgUnitShorthand,
     @Nullable OrgUnitRef requestingOrgUnit,
     @Nullable String jobOrderType,
-    @Nullable UUID actorSub)
+    @Nullable UUID actorSub,
+    @NotNull NotificationRevision observedRevision)
     implements NotificationEvent {
 
   /** Loose entity-type tag stored on the produced notifications. */

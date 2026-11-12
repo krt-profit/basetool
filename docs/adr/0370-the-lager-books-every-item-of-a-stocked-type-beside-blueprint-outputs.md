@@ -1,6 +1,6 @@
 # ADR-0370 — The Lager books every item of a stocked type beside the blueprint outputs
 
-- **Status:** Accepted — the Materialbörse consequence is resolved by ADR-0371
+- **Status:** Accepted — the Materialbörse consequence is resolved by ADR-0372
 - **Date:** 2026-11-11
 - **Deciders:** @greluc
 - **Related:** amends the catalog predicate of ADR-0101 · ADR-0087, ADR-0108 (Materialbörse item

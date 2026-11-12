@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.ingest.support.ExchangeTestSupport;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -182,6 +183,18 @@ class ExchangeBankRequestWriteRouteTest {
         .andExpect(jsonPath("$.errors[0].pointer").value("/id"));
 
     verify(relay, never()).forward(any(), anyString(), any(), any(), any());
+    verify(relay, never()).forward(any(), anyString(), any(), any(), any(), any());
+  }
+
+  @Test
+  void internalRequestKindsAreRefusedBeforeTheRelay() throws Exception {
+    String withdrawal = example("bank-request-write--raise/valid/withdrawal.json");
+    for (String kind : List.of("HOLDER_TRANSFER", "AUTHORISATION")) {
+      call(HttpMethod.POST, ROUTE, withdrawal.replace("WITHDRAWAL", kind))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+    }
+
     verify(relay, never()).forward(any(), anyString(), any(), any(), any(), any());
   }
 

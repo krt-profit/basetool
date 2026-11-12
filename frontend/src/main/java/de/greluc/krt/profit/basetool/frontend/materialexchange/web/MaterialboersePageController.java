@@ -227,7 +227,7 @@ public class MaterialboersePageController {
   /**
    * Returns the items matching a name fragment for the "Item anbieten" and "Item suchen"
    * type-aheads: the blueprint products and the stocked items no blueprint produces, in one name
-   * order (ADR-0371).
+   * order (ADR-0372).
    *
    * @param q an item-name fragment, or {@code null} for the first items.
    * @return the matching options, or the backend error status + body.

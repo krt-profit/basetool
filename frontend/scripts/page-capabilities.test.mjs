@@ -24,6 +24,23 @@ const capabilities = {
     pageFocus: /data-focus-id|krt-focus-target/,
 };
 
+// A module can load controller-rendered fragments absent from its page markup.
+const fetchedFragments = new Map([
+    [
+        '/js/dashboard/dashboard-widgets.js',
+        [
+            'dashboard/fragments/admin-widgets',
+            'dashboard/fragments/order-widgets',
+            'dashboard/fragments/trade-widgets',
+            'dashboard/fragments/widgets',
+            'dashboard/fragments/work-widgets',
+        ],
+    ],
+    ['/js/inventory/inventory-common.js', ['inventory/fragments/inventory-stack-entries']],
+    ['/js/inventory/inventory-provision.js', ['joborder/fragments/provision-options']],
+    ['/js/joborder/orders-contribution-history.js', ['joborder/fragments/contribution-history']],
+]);
+
 function filesBelow(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
         const full = path.join(directory, entry.name);
@@ -31,21 +48,25 @@ function filesBelow(directory) {
     });
 }
 
-function contentsOf(view) {
+function sourceOf(item) {
+    const filename = item.startsWith('/js/')
+        ? path.join(resources, 'static', item)
+        : path.join(templates, `${item}.html`);
+    return readFileSync(filename, 'utf8');
+}
+
+function contentsOf(view, readSource = sourceOf) {
     const seen = new Set();
     const pending = [view];
     const parts = [];
-    const domain = view.split('/')[0];
     while (pending.length) {
         const item = pending.pop();
         if (seen.has(item) || item === 'kernel/fragments/layout') continue;
         seen.add(item);
-        const filename = item.startsWith('/js/')
-            ? path.join(resources, 'static', item)
-            : path.join(templates, `${item}.html`);
-        const source = readFileSync(filename, 'utf8');
+        const source = readSource(item);
         parts.push(source);
         if (item.startsWith('/js/')) {
+            pending.push(...(fetchedFragments.get(item) ?? []));
             pending.push(
                 ...Array.from(
                     source.matchAll(/(?:from\s*|import\s*)['"](\/js\/[^'"]+)['"]/g),
@@ -59,28 +80,40 @@ function contentsOf(view) {
                     (match) => match[1],
                 ),
             );
-            const scripts = Array.from(
-                source.matchAll(/th:src="@\{(\/js\/[^}]+\.js)\}"/g),
-                (match) => match[1],
+            pending.push(
+                ...Array.from(
+                    source.matchAll(/th:src="@\{(\/js\/[^}]+\.js)\}"/g),
+                    (match) => match[1],
+                ),
             );
-            pending.push(...scripts);
-            if (scripts.length) {
-                pending.push(
-                    ...filesBelow(path.join(templates, domain))
-                        .filter(
-                            (file) =>
-                                file.endsWith('.html') &&
-                                file.includes(`${path.sep}fragments${path.sep}`),
-                        )
-                        .map((file) =>
-                            path.relative(templates, file).replaceAll(path.sep, '/').slice(0, -5),
-                        ),
-                );
-            }
         }
     }
     return parts.join('\n');
 }
+
+const testViewSources = new Map([
+    [
+        'joborder/example',
+        '<div th:replace="~{joborder/fragments/included :: fields}"></div>' +
+            '<script th:src="@{/js/joborder/example.js}"></script>',
+    ],
+    [
+        'joborder/fragments/included',
+        '<div th:insert="~{joborder/fragments/nested :: fields}"></div>',
+    ],
+    ['joborder/fragments/nested', '<select data-krt-combobox></select>'],
+    ['joborder/fragments/unrelated', '<input data-number-input>'],
+    ['/js/joborder/example.js', "import '/js/joborder/orders-contribution-history.js';"],
+    ['/js/joborder/orders-contribution-history.js', ''],
+    ['joborder/fragments/contribution-history', '<input data-focus-id>'],
+]);
+const testContents = contentsOf('joborder/example', (item) => {
+    assert.ok(testViewSources.has(item), item);
+    return testViewSources.get(item);
+});
+assert.ok(capabilities.pagePickers.test(testContents));
+assert.ok(capabilities.pageFocus.test(testContents));
+assert.ok(!capabilities.pageNumbers.test(testContents));
 
 let checked = 0;
 for (const filename of filesBelow(templates).filter((file) => file.endsWith('.html'))) {

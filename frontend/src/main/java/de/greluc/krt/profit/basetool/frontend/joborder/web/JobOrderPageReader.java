@@ -23,11 +23,15 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyView;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSupportDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
@@ -35,6 +39,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import java.util.ArrayList;
@@ -77,6 +82,8 @@ public class JobOrderPageReader {
   private static final String TYPE_ITEM = "ITEM";
 
   private final JobOrderBackendClient jobOrderClient;
+  private final JobOrderMoneyBackendClient moneyClient;
+  private final OrgUnitBackendClient orgUnitClient;
   private final ParallelPageLoader parallelPageLoader;
 
   /**
@@ -121,6 +128,7 @@ public class JobOrderPageReader {
    * @param statuses the resolved status filter
    * @param squadronIds the selected squadron ids
    * @param withSquadronFilter whether the active squadrons of the filter picker are read
+   * @param types implemented kinds to keep, empty for all
    */
   public record OrderListQuery(
       @NotNull OrderListScope scope,
@@ -128,7 +136,8 @@ public class JobOrderPageReader {
       int size,
       @NotNull List<String> statuses,
       @NotNull List<UUID> squadronIds,
-      boolean withSquadronFilter) {}
+      boolean withSquadronFilter,
+      @NotNull List<String> types) {}
 
   /**
    * Everything the order list page renders.
@@ -171,10 +180,8 @@ public class JobOrderPageReader {
    *
    * @param authenticated whether the caller is signed in
    * @param tokenUserId the user id carried by the caller's token, or {@code null} when it has none
-   * @param logistician whether the caller reaches the Logistician authority
    */
-  public record OrderCaller(
-      boolean authenticated, @Nullable UUID tokenUserId, boolean logistician) {}
+  public record OrderCaller(boolean authenticated, @Nullable UUID tokenUserId) {}
 
   /**
    * Everything the order detail page renders. An empty {@link Optional} or an absent {@link Part}
@@ -185,6 +192,7 @@ public class JobOrderPageReader {
    * @param currentUserId the caller's user id, if it could be resolved
    * @param materials the material catalog, read for a requester or an assigning caller
    * @param squadrons the squadron catalog, read for an assigning caller
+   * @param responsibleOptions the currently eligible transfer and claim targets
    * @param requestingOptions the requesting org-unit options, read for an assigning caller
    * @param actingUser the production modal's acting user, present for an item order's full page;
    *     its value is {@code null} when the lookup failed
@@ -193,6 +201,10 @@ public class JobOrderPageReader {
    * @param blueprintOwners the blueprint owners of an item order
    * @param itemStockByGameItem the stock groups of an item order's lines keyed by game item
    * @param orphanedInventory the stock linked to the order but needed by none of its materials
+   * @param responsibleOptions the currently eligible responsible units
+   * @param claimingOptions the squadrons whose claims the caller may manage on this order
+   * @param support the Staffel participation and authorized enrollment choices
+   * @param money the aUEC projection and current action grants
    */
   public record OrderDetailPage(
       @NotNull JobOrderDto order,
@@ -206,31 +218,49 @@ public class JobOrderPageReader {
       int ageRedDays,
       @NotNull Part<JobOrderItemBlueprintOwnersDto> blueprintOwners,
       @NotNull Part<Map<UUID, JobOrderItemStockGroupDto>> itemStockByGameItem,
-      @NotNull Part<List<InventoryItemDto>> orphanedInventory) {}
+      @NotNull Part<List<InventoryItemDto>> orphanedInventory,
+      @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions,
+      @NotNull List<OrgUnitMembershipOptionDto> claimingOptions,
+      @NotNull Part<JobOrderSupportDto> support,
+      @NotNull Part<JobOrderMoneyView> money) {
+
+    /** Supplies the status badge class for the order detail and its fragments. */
+    @NotNull
+    String statusClass() {
+      return switch (order.status()) {
+        case "OPEN" -> "status-planned";
+        case "IN_PROGRESS" -> "status-active";
+        case "COMPLETED" -> "status-completed";
+        case null, default -> "status-cancelled";
+      };
+    }
+  }
 
   /**
-   * Everything the create form renders.
+   * Everything the authorized creation form renders.
    *
    * @param materials the material catalog, empty when unavailable
-   * @param hasOrderableItems whether an orderable item exists; {@code true} when the probe failed
+   * @param hasOrderableItems whether an orderable item exists; true when the probe is unavailable
    * @param squadrons the squadron catalog, empty when unavailable
-   * @param requestingOptions the requesting org-unit options, empty when unavailable
+   * @param options authoritative current unit choices, writer flags and a valid proposed pair
    */
   public record OrderCreatePage(
       @NotNull List<MaterialDto> materials,
       boolean hasOrderableItems,
       @NotNull List<SquadronDto> squadrons,
-      @NotNull List<OrgUnitMembershipOptionDto> requestingOptions) {}
+      @NotNull JobOrderCreateOptionsDto options) {}
 
   /** Why the item-order edit form is, or is not, offered. */
   public enum ItemEditAccess {
-    /** The order is an item order without item handovers and can be edited. */
+    /** The item order has a permitted processing or requester edit. */
     EDITABLE,
     /** The order could not be read. */
     ORDER_UNAVAILABLE,
     /** The order is missing or no item order. */
     NOT_AN_ITEM_ORDER,
-    /** The order has an item handover and is locked against editing. */
+    /** The order has invalid responsibility and permits recovery transfer only. */
+    RESPONSIBILITY_INVALID,
+    /** The processing editor cannot change a partially handed-over order. */
     HAS_ITEM_HANDOVERS
   }
 
@@ -244,6 +274,7 @@ public class JobOrderPageReader {
    * @param materials the material catalog, empty when not read or unavailable
    * @param hasOrderableItems whether an orderable item exists; {@code true} when the probe failed
    * @param squadrons the squadron catalog, empty when not read or unavailable
+   * @param responsibleOptions the currently eligible responsible units
    * @param requestingOptions the requesting org-unit options, empty when not read or unavailable
    */
   public record ItemEditPage(
@@ -252,11 +283,12 @@ public class JobOrderPageReader {
       @NotNull List<MaterialDto> materials,
       boolean hasOrderableItems,
       @NotNull List<SquadronDto> squadrons,
-      @NotNull List<OrgUnitMembershipOptionDto> requestingOptions) {
+      @NotNull List<OrgUnitMembershipOptionDto> requestingOptions,
+      @NotNull List<OrgUnitMembershipOptionDto> responsibleOptions) {
 
     private static ItemEditPage blocked(
         @NotNull ItemEditAccess access, @NotNull Optional<JobOrderDto> order) {
-      return new ItemEditPage(access, order, List.of(), true, List.of(), List.of());
+      return new ItemEditPage(access, order, List.of(), true, List.of(), List.of(), List.of());
     }
   }
 
@@ -299,13 +331,16 @@ public class JobOrderPageReader {
   public OrderDetailPage readOrderDetail(
       @NotNull UUID id, @NotNull OrderCaller caller, @Nullable String fragment) {
     JobOrderDto order = jobOrderClient.order(id);
-    boolean requesterView = order.redacted();
-    boolean canAssign = !requesterView && caller.logistician() && order.callerMayEdit();
+    boolean canAssign = order.callerMayEdit();
     boolean itemOrder = TYPE_ITEM.equals(order.type());
+    boolean moneyOrder = "AUEC".equals(order.type());
     Optional<UUID> currentUserId = currentUserId(caller);
-    DetailCatalogs catalogs = detailCatalogs(requesterView, canAssign);
+    DetailCatalogs catalogs =
+        detailCatalogs(!moneyOrder && order.callerMayEditAsRequester(), !moneyOrder && canAssign);
     Part<UserDto> actingUser =
-        canAssign && itemOrder && fragment == null ? actingUser() : Part.absent();
+        canAssign && itemOrder && (fragment == null || "dialogs".equalsIgnoreCase(fragment))
+            ? actingUser()
+            : Part.absent();
     JobOrderSettingsDto settings = settings();
     return new OrderDetailPage(
         order,
@@ -320,13 +355,39 @@ public class JobOrderPageReader {
         itemOrder && (fragment == null || "blueprint-owners".equalsIgnoreCase(fragment))
             ? blueprintOwners(id)
             : Part.absent(),
-        itemOrder && !requesterView && (fragment == null || "items".equalsIgnoreCase(fragment))
+        itemOrder && (fragment == null || "items".equalsIgnoreCase(fragment))
             ? itemStock(id)
             : Part.absent(),
-        fragment == null ? orphanedInventory(id) : Part.absent());
+        !moneyOrder && fragment == null ? orphanedInventory(id) : Part.absent(),
+        canAssign || Boolean.TRUE.equals(order.canTransferResponsibility())
+            ? responsibleOptions()
+            : List.of(),
+        !moneyOrder
+                && !order.responsibilityInvalid()
+                && (fragment == null
+                    || "materials".equalsIgnoreCase(fragment)
+                    || "aggregated".equalsIgnoreCase(fragment)
+                    || "dialogs".equalsIgnoreCase(fragment))
+            ? claimingOptions(id)
+            : List.of(),
+        fragment == null || "participations".equalsIgnoreCase(fragment)
+            ? support(id)
+            : Part.absent(),
+        moneyOrder
+                && (fragment == null
+                    || "money".equalsIgnoreCase(fragment)
+                    || "actions".equalsIgnoreCase(fragment))
+            ? SectionFallback.load(
+                log, "job-order-money", () -> Part.of(moneyClient.view(id)), Part.absent())
+            : Part.absent());
   }
 
-  private DetailCatalogs detailCatalogs(boolean requesterView, boolean canAssign) {
+  private Part<JobOrderSupportDto> support(@NotNull UUID id) {
+    return SectionFallback.load(
+        log, "job-order-support", () -> Part.of(jobOrderClient.support(id)), Part.absent());
+  }
+
+  private DetailCatalogs detailCatalogs(boolean canEditAsRequester, boolean canAssign) {
     if (canAssign) {
       CompletableFuture<List<MaterialDto>> materialsFuture =
           parallelPageLoader.loadAsync(this::materials);
@@ -341,7 +402,7 @@ public class JobOrderPageReader {
           Optional.of(optionsFuture.join()));
     }
     return new DetailCatalogs(
-        requesterView ? Optional.of(materials()) : Optional.empty(),
+        canEditAsRequester ? Optional.of(materials()) : Optional.empty(),
         Optional.empty(),
         Optional.empty());
   }
@@ -373,18 +434,20 @@ public class JobOrderPageReader {
   }
 
   /**
-   * Reads the create form: the material catalog, the orderable-item probe, the squadrons and the
-   * owner-picker options.
+   * Reads current creation authority before loading optional form catalogs.
    *
-   * @return the create page with every part defaulted when it is unavailable
+   * @return the authorized form, with optional catalogs defaulted when unavailable
    * @throws ReauthenticationRequiredException when the session is lost
+   * @throws org.springframework.security.access.AccessDeniedException when creation is not offered
    */
   @NotNull
   public OrderCreatePage readOrderCreate() {
-    List<MaterialDto> materials = materials();
-    boolean hasOrderableItems = hasOrderableItems();
-    List<SquadronDto> squadrons = squadrons();
-    return new OrderCreatePage(materials, hasOrderableItems, squadrons, requestingOptions());
+    JobOrderCreateOptionsDto options = jobOrderClient.createOptions();
+    if (options == null || !options.canCreate()) {
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Order creation is not permitted");
+    }
+    return new OrderCreatePage(materials(), hasOrderableItems(), squadrons(), options);
   }
 
   /**
@@ -409,19 +472,25 @@ public class JobOrderPageReader {
     if (order == null || !TYPE_ITEM.equals(order.type())) {
       return ItemEditPage.blocked(ItemEditAccess.NOT_AN_ITEM_ORDER, Optional.ofNullable(order));
     }
-    if (order.itemHandovers() != null && !order.itemHandovers().isEmpty()) {
+    if (order.responsibilityInvalid()) {
+      return ItemEditPage.blocked(ItemEditAccess.RESPONSIBILITY_INVALID, Optional.of(order));
+    }
+    if (!order.callerMayEdit() && !order.callerMayEditAsRequester()) {
+      throw new org.springframework.security.access.AccessDeniedException(
+          "Item order edit is not permitted");
+    }
+    boolean processing = order.callerMayUseItemProcessingEditor();
+    if (!processing && !order.callerMayEditAsRequester()) {
       return ItemEditPage.blocked(ItemEditAccess.HAS_ITEM_HANDOVERS, Optional.of(order));
     }
-    List<MaterialDto> materials = materials();
-    boolean hasOrderableItems = hasOrderableItems();
-    List<SquadronDto> squadrons = squadrons();
     return new ItemEditPage(
         ItemEditAccess.EDITABLE,
         Optional.of(order),
-        materials,
-        hasOrderableItems,
-        squadrons,
-        requestingOptions());
+        materials(),
+        hasOrderableItems(),
+        processing ? squadrons() : List.of(),
+        processing ? requestingOptions() : List.of(),
+        processing ? responsibleOptions() : List.of());
   }
 
   /**
@@ -445,7 +514,12 @@ public class JobOrderPageReader {
   private OrderListPage loadOrderList(@NotNull OrderListQuery query) {
     PageResponse<JobOrderDto> p =
         jobOrderClient.orders(
-            query.scope(), query.page(), query.size(), query.statuses(), query.squadronIds());
+            query.scope(),
+            query.page(),
+            query.size(),
+            query.statuses(),
+            query.squadronIds(),
+            query.types());
     List<JobOrderDto> orders = new ArrayList<>();
     if (p != null && p.content() != null) {
       orders = new ArrayList<>(p.content());
@@ -520,6 +594,25 @@ public class JobOrderPageReader {
             Comparator.comparing(
                 s -> s.name() != null ? s.name() : "", String.CASE_INSENSITIVE_ORDER))
         .toList();
+  }
+
+  @NotNull
+  private List<OrgUnitMembershipOptionDto> responsibleOptions() {
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(
+            log, "job-order-responsible-org-units", orgUnitClient::profitResponsibleOrgUnits, null);
+    return options != null ? options : List.of();
+  }
+
+  @NotNull
+  private List<OrgUnitMembershipOptionDto> claimingOptions(@NotNull UUID id) {
+    List<OrgUnitMembershipOptionDto> options =
+        SectionFallback.load(
+            log,
+            "job-order-claiming-org-units",
+            () -> jobOrderClient.claimingOptions(id),
+            List.of());
+    return options != null ? options : List.of();
   }
 
   @NotNull

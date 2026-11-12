@@ -241,7 +241,15 @@ export function publishBankLiveSync(form) {
             const sections = entry
                 .slice(slash + 1)
                 .split(',')
-                .filter(Boolean);
+                .filter(
+                    (section) =>
+                        section &&
+                        !(
+                            form.hasAttribute('data-server-request-sync') &&
+                            ((topic === 'bank' && section === 'requestQueue') ||
+                                (topic === 'orgunit-bank' && section === 'orgUnitBank'))
+                        ),
+                );
             if (!sections.length) {
                 return;
             }

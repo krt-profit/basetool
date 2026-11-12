@@ -1,6 +1,6 @@
 # ADR-0287 — Mission and job order each edit through one edit module
 
-- **Status:** Accepted
+- **Status:** Accepted; JobOrder contracts amended by [ADR-0359](0359-orders-record-money-operations-and-replay-their-outcomes.md) (approved, implementation pending).
 - **Date:** 2026-10-18
 - **Deciders:** @greluc
 - **Related:** implements [ADR-0236](0236-each-domain-owns-an-access-policy-over-the-scope-kernel.md)

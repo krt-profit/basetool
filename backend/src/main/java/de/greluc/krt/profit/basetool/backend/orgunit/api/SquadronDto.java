@@ -30,8 +30,6 @@ import org.jetbrains.annotations.Nullable;
  * @param shorthand short tag used on badges / column headers
  * @param description free-form text
  * @param active soft-delete flag; {@code true} for the active reference data
- * @param isProfitEligible whether the squadron may process job orders; changed only through {@code
- *     /api/v1/squadrons/{id}/profit-eligible}
  * @param version optimistic-lock counter
  */
 public record SquadronDto(
@@ -40,5 +38,4 @@ public record SquadronDto(
     String shorthand,
     @Nullable String description,
     Boolean active,
-    Boolean isProfitEligible,
     Long version) {}

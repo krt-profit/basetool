@@ -25,13 +25,13 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeOrgStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
-import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
+import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -53,6 +53,10 @@ import org.springframework.stereotype.Repository;
 public interface InventoryItemRepository
     extends JpaRepository<InventoryItem, UUID>,
         InventoryLotLockRepository,
+        InventoryOrderAllocationQueries,
+        InventoryQuantityQueries,
+        InventoryQuantityEvidenceLockRepository,
+        InventoryRestoreQueries,
         InventoryRowLockRepository {
 
   /**
@@ -757,102 +761,14 @@ public interface InventoryItemRepository
   List<InventoryItem> findGameItemRowsByJobOrderIdOrdered(@Param("jobOrderId") UUID jobOrderId);
 
   /**
-   * Loads the game-item rows of {@code gameItemId} earmarked to {@code jobOrderId}, oldest first,
-   * under a pessimistic write lock, as the stock a delivery consumes (REQ-ORDERS-030).
+   * Loads the already locked stock entries with their complete job-order slice collections.
    *
-   * @param jobOrderId the order whose earmarked game-item rows to consume from; never {@code null}.
-   * @param gameItemId the game item being delivered; never {@code null}.
-   * @return the order's game-item rows for that item, locked, oldest-first; never {@code null}.
+   * @param rowIds the exact prepared physical source set
+   * @return managed entries with audit label associations fetched, ordered by id
    */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query(
-      """
-      SELECT i FROM InventoryItem i WHERE i.gameItem.id = :gameItemId AND EXISTS
-      (SELECT 1 FROM InventoryJobOrderAllocation ja
-      WHERE ja.inventoryItem = i AND ja.jobOrderId = :jobOrderId)
-      ORDER BY i.createdAt ASC, i.id ASC
-      """)
-  List<InventoryItem> findGameItemRowsByJobOrderAndGameItemForUpdate(
-      @Param("jobOrderId") UUID jobOrderId, @Param("gameItemId") UUID gameItemId);
-
-  /**
-   * Returns every material allocation of the given job orders as one row each (row, material,
-   * quality, amount), in a single query (REQ-DATA-003).
-   *
-   * @param jobOrderIds the orders whose linked stock to project; an empty collection yields an
-   *     empty list.
-   * @return one {@link JobOrderMaterialStockRow} per material job-order allocation, never {@code
-   *     null}.
-   */
-  @Query(
-      """
-      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow(a.jobOrderId, a.inventoryItem.id, a.inventoryItem.material.id, a.inventoryItem.quality, a.amount)
-      FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
-      AND a.inventoryItem.material IS NOT NULL
-      """)
-  List<JobOrderMaterialStockRow> findMaterialStockRowsByJobOrderIds(
-      @Param("jobOrderIds") Collection<UUID> jobOrderIds);
-
-  /**
-   * Returns every game-item allocation of the given job orders as one row each, in a single query
-   * (REQ-INV-039).
-   *
-   * @param jobOrderIds the orders whose earmarked item stock to project; an empty collection yields
-   *     an empty list.
-   * @return one {@link
-   *     de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow} per game-item
-   *     job-order allocation, never {@code null}.
-   */
-  @Query(
-      """
-      SELECT new de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow(a.jobOrderId, a.inventoryItem.gameItem.id, a.amount)
-      FROM InventoryJobOrderAllocation a WHERE a.jobOrderId IN :jobOrderIds
-      AND a.inventoryItem.gameItem IS NOT NULL
-      """)
-  List<JobOrderGameItemStockRow> findGameItemStockRowsByJobOrderIds(
-      @Param("jobOrderIds") Collection<UUID> jobOrderIds);
-
-  /**
-   * Deletes every job-order allocation of the given order; the inventory entries themselves stay
-   * (REQ-INV-027).
-   *
-   * @param jobOrderId the order whose allocations to drop.
-   */
-  @Modifying
-  @Query("DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId")
-  void deleteJobOrderAllocationsByJobOrder(@Param("jobOrderId") UUID jobOrderId);
-
-  /**
-   * Deletes the order's job-order allocations on entries of one material; the entries themselves
-   * stay (REQ-INV-027). Flushes before and clears the persistence context after.
-   *
-   * @param jobOrderId the order whose allocations to drop.
-   * @param materialId the material to restrict the drop to.
-   */
-  @Modifying(clearAutomatically = true, flushAutomatically = true)
-  @Query(
-      """
-      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId AND
-      a.inventoryItem.id IN (SELECT i.id FROM InventoryItem i WHERE i.material.id = :materialId)
-      """)
-  void deleteJobOrderAllocationsByJobOrderAndMaterial(
-      @Param("jobOrderId") UUID jobOrderId, @Param("materialId") UUID materialId);
-
-  /**
-   * Deletes the order's job-order allocations on entries of one game item; the entries themselves
-   * stay (REQ-INV-031). Flushes before and clears the persistence context after.
-   *
-   * @param jobOrderId the order whose allocations to drop.
-   * @param gameItemId the game item to restrict the drop to.
-   */
-  @Modifying(clearAutomatically = true, flushAutomatically = true)
-  @Query(
-      """
-      DELETE FROM InventoryJobOrderAllocation a WHERE a.jobOrderId = :jobOrderId AND
-      a.inventoryItem.id IN (SELECT i.id FROM InventoryItem i WHERE i.gameItem.id = :gameItemId)
-      """)
-  void deleteJobOrderAllocationsByJobOrderAndGameItem(
-      @Param("jobOrderId") UUID jobOrderId, @Param("gameItemId") UUID gameItemId);
+  @EntityGraph(attributePaths = {"jobOrderAllocations", "material", "gameItem", "location"})
+  @Query("SELECT DISTINCT i FROM InventoryItem i WHERE i.id IN :rowIds ORDER BY i.id")
+  List<InventoryItem> findAllForJobOrderAllocationRelease(@Param("rowIds") Collection<UUID> rowIds);
 
   /**
    * Loads the rows sharing a stock's physical identity (user, catalog reference, location, quality,
@@ -1033,79 +949,6 @@ public interface InventoryItemRepository
       @Param("quality") int quality,
       @Param("stolen") boolean stolen);
 
-  /** The holder and lot of a Lager row, read without locking it (ADR-0229). */
-  interface RowLot {
-
-    /**
-     * The row id.
-     *
-     * @return the id of the {@code inventory_item} row
-     */
-    UUID getId();
-
-    /**
-     * The member who holds the row.
-     *
-     * @return the holder's user id
-     */
-    UUID getHolderId();
-
-    /**
-     * The row's material.
-     *
-     * @return the material id, or {@code null} on a game-item row
-     */
-    @Nullable
-    UUID getMaterialId();
-
-    /**
-     * The row's game item.
-     *
-     * @return the game item id, or {@code null} on a material row
-     */
-    @Nullable
-    UUID getGameItemId();
-
-    /**
-     * Where the row's stock lies.
-     *
-     * @return the location id
-     */
-    UUID getLocationId();
-
-    /**
-     * The row's quality.
-     *
-     * @return the quality, or {@code null} on a game-item row
-     */
-    @Nullable
-    Integer getQuality();
-
-    /**
-     * The row's stolen marker.
-     *
-     * @return whether the row is marked stolen
-     */
-    Boolean getStolen();
-  }
-
-  /**
-   * Reads the holder and lot of the given rows without locking them, so a writer can take the lots'
-   * advisory locks before it locks a row (ADR-0229).
-   *
-   * @param ids the rows
-   * @return one entry per existing row
-   */
-  @Query(
-      """
-      SELECT i.id AS id, u.id AS holderId, m.id AS materialId, g.id AS gameItemId,
-             l.id AS locationId, i.quality AS quality, i.stolen AS stolen
-        FROM InventoryItem i JOIN i.user u JOIN i.location l
-        LEFT JOIN i.material m LEFT JOIN i.gameItem g
-       WHERE i.id IN :ids
-      """)
-  List<RowLot> findRowLots(@Param("ids") Collection<UUID> ids);
-
   /**
    * Reads the ids of a member's rows of one material lot, personal and shared, without locking
    * them.
@@ -1160,6 +1003,29 @@ public interface InventoryItemRepository
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT i FROM InventoryItem i WHERE i.id IN :ids ORDER BY i.id")
   List<InventoryItem> lockAllByIdOrderById(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Locks stock rows in ascending id order without loading managed entities.
+   *
+   * @param ids the complete named row set
+   * @return the existing row ids locked for the transaction
+   */
+  default List<UUID> lockRowIdsOrderById(@NotNull Collection<UUID> ids) {
+    return lockRowIdsByArray(UuidArrayLiteral.of(ids));
+  }
+
+  /**
+   * Locks the named stock rows using one UUID array parameter.
+   *
+   * @param ids the complete named row set as a PostgreSQL UUID array literal
+   * @return the existing row ids locked for the transaction
+   */
+  @Query(
+      value =
+          "SELECT id FROM inventory_item WHERE id = ANY(CAST(:ids AS UUID[])) ORDER BY id FOR"
+              + " UPDATE",
+      nativeQuery = true)
+  List<UUID> lockRowIdsByArray(@Param("ids") String ids);
 
   /**
    * Counts the shared entries of one org unit's pool.

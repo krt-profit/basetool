@@ -127,6 +127,9 @@ public enum BankAuditEventType {
    */
   BOOKING_REQUEST_CONFIRMED,
 
+  /** Existing funds were authorised without moving the Bank ledger. */
+  FUNDS_AUTHORISED,
+
   /**
    * A bank employee rejected a booking request; no ledger effect, the reason is in details
    * (REQ-BANK-023).

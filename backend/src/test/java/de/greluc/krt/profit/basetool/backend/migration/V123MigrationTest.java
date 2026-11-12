@@ -45,10 +45,13 @@ class V123MigrationTest {
     Map<String, String> jobOrder = dataTypesOf("job_order");
     assertEquals("character varying", jobOrder.get("type"));
 
-    Long nonMaterial =
+    String defaultType =
         jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM job_order WHERE type IS NULL OR type <> 'MATERIAL'", Long.class);
-    assertEquals(0L, nonMaterial, "existing rows must be backfilled to MATERIAL");
+            "SELECT column_default FROM information_schema.columns"
+                + " WHERE table_schema = current_schema()"
+                + " AND table_name = 'job_order' AND column_name = 'type'",
+            String.class);
+    assertEquals("'MATERIAL'::character varying", defaultType, "new rows must default to MATERIAL");
   }
 
   @Test

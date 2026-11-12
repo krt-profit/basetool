@@ -31,7 +31,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * One entry of the Materialbörse item pickers (ADR-0371): a blueprint product, named by its product
+ * One entry of the Materialbörse item pickers (ADR-0372): a blueprint product, named by its product
  * key, or a stocked item no blueprint produces, named by its catalogue row. Exactly one of the two
  * identities is set.
  *

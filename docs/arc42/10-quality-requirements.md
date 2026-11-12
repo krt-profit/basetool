@@ -1,5 +1,7 @@
 # 10. Quality requirements
 
+> **JobOrder acceptance:** The shared requirements track [access and lifecycle](../specs/orders-core.md) and [material contributions](../specs/orders-material-claims.md). The [aUEC acceptance matrix](../specs/orders-auec.md#req-orders-068--both-operating-modes-have-verifiable-end-to-end-evidence) links the worked examples and both browser journeys. [Bank integration acceptance](../specs/orders-auec-bank.md#req-orders-076---integration-preserves-access-evidence-and-external-boundaries) tracks rollback, authority, notices and the Exchange boundary.
+
 ## 10.1 The quality tree
 
 ```
@@ -33,6 +35,7 @@ because a quality goal nobody measures is a preference, and a gate that cannot f
 | Q12 | A backend call hangs and the page blanks instead of degrading. | Resilience4j Timeout/CircuitBreaker with logged transitions; `REQ-FE-*` |
 | Q13 | A read's statement count starts growing with its row count, or a new foreign key ships without an index. | Hibernate `Statistics` statement-count tests (`BankReadNoNPlusOneTest`, `UserMappingNoNPlusOneTest`); `fail_on_pagination_over_collection_fetch`; `ForeignKeyIndexCoverageTest` over the live catalogue (`REQ-DATA-003`, `REQ-DATA-017`) |
 | Q14 | A release is applied by older host scripts than it was built with (the 2026-10-10 v1.14.0 outage). | The bundle's `host-scripts.sha256` against the host every tick (`HostScriptDrift`, `HostScriptsCheckStale`); `deploy.sh` refuses a release whose apply-path scripts differ; the mandatory pre-promotion comparison (`REQ-OPS-045`) |
+| Q15 | A material quantity receives credit twice after relocation/relinking, a connected correction leaves false credit, or concurrent demand/stock/promise writes exceed uncovered demand. | Public PostgreSQL integration and race checks against [REQ-ORDERS-024](../specs/orders-material-claims.md), quantity provenance tests and shared-view browser checks; the canonical requirement records actual acceptance. |
 
 ## 10.3 What operationalises them
 

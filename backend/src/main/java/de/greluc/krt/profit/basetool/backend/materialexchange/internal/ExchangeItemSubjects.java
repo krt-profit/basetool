@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves the item an item offer or request names (ADR-0371): an item an active blueprint produces
+ * Resolves the item an item offer or request names (ADR-0372): an item an active blueprint produces
  * by its blueprint product, any other item the Lager books by its catalogue row.
  */
 @Component

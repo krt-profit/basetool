@@ -86,11 +86,11 @@ public enum DashboardWidgetType {
   /** The viewable org-unit bank accounts; the org-unit bank page is for members and above. */
   BANK(NavigationGate.anyRole(Roles.KRT_MEMBER)),
 
-  /** The orders one of the member's units processes; the member has to enter the order area. */
-  ORDERS_TO_PROCESS(NavigationGate.requires(NavigationFlag.JOB_ORDERS)),
+  /** The orders a current unit processes or supports, independently of writer authority. */
+  ORDERS_TO_PROCESS(NavigationGate.requires(NavigationFlag.ORDER_UNIT_WORK)),
 
   /** The open material demand; the overview is part of the order area. */
-  MATERIAL_DEMAND(NavigationGate.requires(NavigationFlag.JOB_ORDERS)),
+  MATERIAL_DEMAND(NavigationGate.requires(NavigationFlag.ORDER_WORKSPACE)),
 
   /** The refinery orders that are ready to be stored; the refinery is open to every member. */
   REFINERY_READY(NavigationGate.ALWAYS),

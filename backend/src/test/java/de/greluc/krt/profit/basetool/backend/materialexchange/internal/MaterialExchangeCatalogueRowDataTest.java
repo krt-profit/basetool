@@ -42,7 +42,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Runs the catalogue-row identity of Materialbörse item entries against PostgreSQL (ADR-0371): the
+ * Runs the catalogue-row identity of Materialbörse item entries against PostgreSQL (ADR-0372): the
  * kind checks take exactly one of a product key and a catalogue row, and a catalogue merge moves
  * the entries named by the retired row. Each test rolls back.
  */

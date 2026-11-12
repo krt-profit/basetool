@@ -75,6 +75,7 @@ class AccessibilitySmokeE2eTest {
   private static Playwright playwright;
   private static Browser browser;
   private static Path storageState;
+  private static ContextualOrderCreator.RestoreStaffeln notificationRecipient;
 
   /** Launches the browser and captures one authenticated session reused across all page scans. */
   @BeforeAll
@@ -82,21 +83,24 @@ class AccessibilitySmokeE2eTest {
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     if (STACK.managesStack()) {
-      new BackendSeeder()
-          .seedUnreadNotification(USERNAME, PASSWORD, MEMBER_USER, MEMBER_PASSWORD, "A11y Bell");
+      BackendSeeder seeder = new BackendSeeder();
+      notificationRecipient = seeder.grantIridiumWriter(USERNAME, PASSWORD);
+      seeder.seedUnreadNotification(USERNAME, PASSWORD, MEMBER_USER, MEMBER_PASSWORD, "A11y Bell");
     }
     storageState =
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
   }
 
-  /** Releases the browser and the Playwright driver process. */
+  /** Releases browser resources and restores the recipient's Staffel memberships. */
   @AfterAll
   static void tearDown() {
-    if (browser != null) {
-      browser.close();
-    }
-    if (playwright != null) {
-      playwright.close();
+    try (var _ = notificationRecipient) {
+      if (browser != null) {
+        browser.close();
+      }
+      if (playwright != null) {
+        playwright.close();
+      }
     }
   }
 

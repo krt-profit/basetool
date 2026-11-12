@@ -79,7 +79,7 @@ public class MaterialRequestService {
 
   /**
    * Resolves the item an item request names, by blueprint product or catalogue row, gating it and
-   * supplying the display name snapshotted onto the request (REQ-MARKET-015, ADR-0371).
+   * supplying the display name snapshotted onto the request (REQ-MARKET-015, ADR-0372).
    */
   private final ExchangeItemSubjects itemSubjects;
 
@@ -154,7 +154,7 @@ public class MaterialRequestService {
 
   /**
    * Posts an item Gesuch to the board (REQ-MARKET-015); the item is named by an active blueprint
-   * product or by the catalogue row of an item the Lager books (ADR-0371), and its name is
+   * product or by the catalogue row of an item the Lager books (ADR-0372), and its name is
    * snapshotted.
    *
    * @param request the blueprint product key or catalogue row, the whole-piece quantity, an

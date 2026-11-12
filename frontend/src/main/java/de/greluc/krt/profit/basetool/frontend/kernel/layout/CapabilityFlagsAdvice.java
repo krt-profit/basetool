@@ -114,6 +114,40 @@ public class CapabilityFlagsAdvice {
   }
 
   /**
+   * Whether the shared permitted-order workspace is offered.
+   *
+   * @param caps the authoritative backend capability projection
+   * @return the current backend flag, or false when unresolved
+   */
+  @ModelAttribute("canViewOrderWorkspace")
+  public boolean canViewOrderWorkspace(
+      @ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canViewOrderWorkspace();
+  }
+
+  /**
+   * Whether the current units' responsible or supporting queue is offered.
+   *
+   * @param caps the authoritative backend capability projection
+   * @return the current backend flag, or false when unresolved
+   */
+  @ModelAttribute("canViewOrderUnitWork")
+  public boolean canViewOrderUnitWork(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canViewOrderUnitWork();
+  }
+
+  /**
+   * Whether at least one authorized unit pair can create an order.
+   *
+   * @param caps the authoritative backend capability projection
+   * @return the current backend flag, or false when unresolved
+   */
+  @ModelAttribute("canCreateJobOrders")
+  public boolean canCreateJobOrders(@ModelAttribute("meCapabilities") CapabilitiesResponse caps) {
+    return caps != null && caps.canCreateJobOrders();
+  }
+
+  /**
    * Whether stock may be booked in as, marked or unmarked „gestohlen" (REQ-INV-053); a server
    * switch that is the same for every caller. Reading, the chip and the filters never depend on it.
    *

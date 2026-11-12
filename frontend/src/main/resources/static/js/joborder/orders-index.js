@@ -420,8 +420,47 @@ function restoreScopeFilter() {
     return true;
 }
 
+const ORDERS_TYPE_FILTER_KEY = 'orders_type_filter';
+
+/** @returns {HTMLSelectElement | null} the implemented-kind filter */
+function typeFilter() {
+    return document.querySelector('#orders-type-filter');
+}
+
+function persistTypeFilter() {
+    const select = typeFilter();
+    if (!select) return;
+    try {
+        localStorage.setItem(ORDERS_TYPE_FILTER_KEY, JSON.stringify(select.value));
+    } catch (_e) {}
+}
+
+/** @returns {boolean} whether restoring the kind changes the server-rendered selection */
+function restoreTypeFilter() {
+    const select = typeFilter();
+    if (!select) return false;
+    if (new URLSearchParams(window.location.search).has('type')) {
+        persistTypeFilter();
+        return false;
+    }
+    try {
+        const saved = JSON.parse(localStorage.getItem(ORDERS_TYPE_FILTER_KEY) || 'null');
+        if (
+            typeof saved !== 'string' ||
+            saved === select.value ||
+            !Array.from(select.options).some((option) => option.value === saved)
+        )
+            return false;
+        select.value = saved;
+        return true;
+    } catch (_e) {
+        return false;
+    }
+}
+
 function countActiveOrdersFilters() {
     let active = statusBoxes().filter((b) => b.checked).length;
+    if (typeFilter()?.value) active++;
     if (!scopeHidesSquadronFilter()) {
         const boxes = squadronBoxes();
         if (boxes.some((b) => !b.checked)) active++;
@@ -451,15 +490,21 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
     colorOrderAges(document);
     restoreOrderMaterials(document);
+    const typeDiffers = restoreTypeFilter();
     const scopeDiffers = restoreScopeFilter();
     const statusDiffers = restoreStatusFilter();
     const squadronDiffers = restoreSquadronFilter();
     refreshOrdersFilterBadge();
     krtFilterChips.refresh();
-    if (scopeDiffers || statusDiffers || squadronDiffers) applyOrdersFilter();
+    if (typeDiffers || scopeDiffers || statusDiffers || squadronDiffers) applyOrdersFilter();
 
     const filterForm = document.getElementById('orders-filter-form');
     if (filterForm) {
+        typeFilter()?.addEventListener('change', () => {
+            persistTypeFilter();
+            refreshOrdersFilterBadge();
+            applyOrdersFilter();
+        });
         filterForm.addEventListener('submit', (event) => {
             event.preventDefault();
             applyOrdersFilter();

@@ -66,6 +66,6 @@ class BankStaffQueueReadServiceTest {
     assertThat(queue.snapshot(TestBankActor.member(UUID.randomUUID()).build(), null, null, 10))
         .isEmpty();
 
-    verify(requestRepository, never()).findAllByStatus(any());
+    verify(requestRepository, never()).findExchangeByStatus(any(), any());
   }
 }

@@ -121,7 +121,7 @@ public interface GameItemRepository
 
   /**
    * Pages the listed game items the Lager books through their type alone: items of a stocked type
-   * outside its excluded sub-types that no listed active blueprint produces (ADR-0371).
+   * outside its excluded sub-types that no listed active blueprint produces (ADR-0372).
    *
    * <p>Both collections must be non-empty.
    *

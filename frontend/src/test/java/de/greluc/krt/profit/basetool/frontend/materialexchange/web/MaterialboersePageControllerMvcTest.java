@@ -443,7 +443,7 @@ class MaterialboersePageControllerMvcTest {
 
   /**
    * The item pickers' relay merges the blueprint products and the stocked items without a blueprint
-   * into one name order, each entry carrying its own identity (ADR-0371).
+   * into one name order, each entry carrying its own identity (ADR-0372).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -479,7 +479,7 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(jsonPath("$[1].gameItemId").doesNotExist());
   }
 
-  /** The item-offer proxy relays an item named by its catalogue row unchanged (ADR-0371). */
+  /** The item-offer proxy relays an item named by its catalogue row unchanged (ADR-0372). */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void itemOfferProxy_relaysTheCatalogueRow() throws Exception {

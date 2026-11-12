@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.util.List;
@@ -40,7 +41,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -52,13 +52,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * view collapses same-identity rows for display), amounts are never touched and nothing is ever
  * deleted.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryOrgUnitReconcilerTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
 
   @Mock private AuditService auditService;
-  @InjectMocks private InventoryOrgUnitReconciler reconciler;
+  private InventoryOrgUnitReconciler reconciler;
 
   private Material matA;
   private Material matB;
@@ -66,6 +69,13 @@ class InventoryOrgUnitReconcilerTest {
 
   @BeforeEach
   void setUp() {
+    reconciler =
+        new InventoryOrgUnitReconciler(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryItemRepository,
+            auditService);
     matA = new Material();
     matA.setId(UUID.randomUUID());
     matB = new Material();

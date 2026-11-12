@@ -37,7 +37,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Resolves the items Materialbörse item offers and requests name, by blueprint product key or by
- * catalogue row (ADR-0371), to game-item references, so the board can show a component's type,
+ * catalogue row (ADR-0372), to game-item references, so the board can show a component's type,
  * size, grade and class (REQ-MARKET-023).
  *
  * <p>A whole page resolves in at most three queries, whatever its size; a page without an item row

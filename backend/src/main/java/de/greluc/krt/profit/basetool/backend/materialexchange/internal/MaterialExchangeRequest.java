@@ -91,7 +91,7 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
 
   /**
    * The normalized blueprint {@code product_key} of an item an active blueprint produces; {@code
-   * null} for a material request and for an item named by {@link #itemGameItemId} (ADR-0371).
+   * null} for a material request and for an item named by {@link #itemGameItemId} (ADR-0372).
    */
   @Column(name = "item_product_key", length = 255)
   @Nullable
@@ -99,7 +99,7 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
 
   /**
    * The catalogue row of an item no active blueprint produces; {@code null} for a material request
-   * and for an item named by {@link #itemProductKey} (ADR-0371). A DB {@code CHECK} keeps exactly
+   * and for an item named by {@link #itemProductKey} (ADR-0372). A DB {@code CHECK} keeps exactly
    * one of the two set on an item request.
    */
   @Column(name = "item_game_item_id")

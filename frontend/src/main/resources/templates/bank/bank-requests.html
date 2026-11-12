@@ -49,9 +49,13 @@
             </thead>
             <tbody>
             <th:block th:each="r : ${requests.content()}"
-                      th:with="hasDetail=${!#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='bank-req-' + ${r.id()},pending=${r.status() == 'PENDING'},approvalOpen=${r.requiresOwnerApproval() and !r.ownerApprovalGranted()},approverKey=${r.requiredApprover() != null ? r.requiredApprover() : 'RESPONSIBLE_HOLDER'},approverLabel=#{'bank.request.approver.' + ${approverKey}},mayConfirm=${pending and r.mayConfirm()}">
+                      th:with="hasDetail=${!#strings.isEmpty(r.note()) or !#strings.isEmpty(r.staffNote())},detailId='bank-req-' + ${r.id()},pending=${r.status() == 'PENDING'},approvalOpen=${r.requiresOwnerApproval() and !r.ownerApprovalGranted()},approverKey=${r.requiredApprover() != null ? r.requiredApprover() : 'RESPONSIBLE_HOLDER'},approverLabel=#{'bank.request.approver.' + ${approverKey}},mayConfirm=${pending and r.mayConfirm()},
+                               linked=${r.linked()},linkedHolder=${linked != null ? @handles.display(r.holderHandle()) : null},
+                               linkedDestination=${linked != null ? @handles.display(linked.destinationHolderHandle()) : null},
+                               requestLabel=${r.holderTransfer() ? #messages.msg('bank.request.type.HOLDER_TRANSFER') : r.accountNo()}">
             <tr data-testid="bank-request-row" class="bank-booking-row bank-req-row" th:data-focus-id="${r.id()}"
-                th:classappend="${(hasDetail ? ' is-expandable' : '') + (pending and !approvalOpen and mayConfirm ? ' bank-req-row--ready' : '')}">
+                th:classappend="${(hasDetail ? ' is-expandable' : '') + (pending and !approvalOpen and mayConfirm ? ' bank-req-row--ready' : '')}"
+                th:attr="data-linked-request=${linked != null ? 'true' : null},data-linked-holder-id=${linked != null ? r.holderId() : null},data-linked-holder=${linkedHolder},data-linked-destination-id=${linked != null ? linked.destinationHolderId() : null},data-linked-destination=${linkedDestination}">
                 <td>
                     <div class="bank-req-head">
                         <span class="chip"
@@ -60,13 +64,16 @@
                         <span class="cell-title" th:switch="${r.type()}">
                             <th:block th:case="'DEPOSIT'"><th:block th:if="${r.counterpartyHandle() != null}" th:text="${@handles.display(r.counterpartyHandle())} + ' &#8594; '">greluc &#8594; </th:block><th:block th:text="${r.accountName()}">Staffel ALPHA</th:block></th:block>
                             <th:block th:case="'WITHDRAWAL'"><th:block th:text="${r.accountName()}">Staffel ALPHA</th:block><th:block th:if="${r.counterpartyHandle() != null}" th:text="' &#8594; ' + ${@handles.display(r.counterpartyHandle())}"> &#8594; greluc</th:block></th:block>
+                            <th:block th:case="'HOLDER_TRANSFER'">
+                                <th:block th:replace="~{bank/fragments/bank-request-linked :: holderRoute(${r})}"></th:block>
+                            </th:block>
                             <th:block th:case="*"><th:block th:text="${r.accountName()}">Staffel ALPHA</th:block><th:block th:if="${r.targetAccountNo() != null}" th:text="' &#8594; ' + ${r.targetAccountNo()}"> &#8594; KB-0002</th:block></th:block>
                         </span>
                     </div>
                     <span class="cell-sub">
-                        <span th:text="${r.accountNo()}">KB-0001</span>
+                        <span th:if="${r.accountNo() != null}" th:text="${r.accountNo()}">KB-0001</span>
                         <th:block th:if="${!#strings.isEmpty(r.justification())}">
-                            <span aria-hidden="true">&middot;</span>
+                            <span th:if="${r.accountNo() != null}" aria-hidden="true">&middot;</span>
                             <span class="bank-req-justification" data-testid="bank-request-justification"
                                   th:text="'&#8222;' + ${r.justification()} + '&#8220;'">&#8222;Missionsfreigabe&#8220;</span>
                         </th:block>
@@ -81,8 +88,9 @@
                     <span class="cell-sub utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span>
                 </td>
                 <td class="num">
-                    <span class="bank-req-amount" th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
-                    <span th:if="${pending and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
+                    <span class="bank-req-amount" data-request-amount th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
+                    <th:block th:replace="~{bank/fragments/bank-request-linked :: fee(${r})}"></th:block>
+                    <span th:if="${pending and r.linked() == null and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
                           class="cell-sub bank-req-gross" data-testid="bank-request-gross"
                           th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'DEFAULT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
                     <span th:if="${pending and approvalOpen}" class="chip chip--warning bank-req-route"
@@ -92,7 +100,7 @@
                 <td class="cell-status">
                     <span class="chip"
                           th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : '')"
-                          th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                          th:text="#{__${r.statusLabelKey()}__}">Ausstehend</span>
                     <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
                           class="chip chip--success" data-testid="bank-request-approval-granted"
                           th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
@@ -106,12 +114,12 @@
                             <button type="button" class="btn btn-success btn-xs"
                                     data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
                                     data-testid="bank-request-confirm-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${requestLabel},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"
                                     th:text="#{bank.request.action.confirm}">Best&auml;tigen</button>
                             <button type="button" class="btn btn-ghost btn-xs"
                                     data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
                                     data-testid="bank-request-reject-btn"
-                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
+                                    th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${requestLabel}"
                                     th:text="#{bank.request.action.reject}">Ablehnen</button>
                         </th:block>
                         <th:block th:if="${pending and (approvalOpen or !mayConfirm)}">
@@ -125,12 +133,12 @@
                                     <button type="button" class="overflow-menu__item" role="menuitem" th:if="${mayConfirm}"
                                             data-trigger="open-modal-display" data-modal-id="bank-confirm-request-modal"
                                             data-testid="bank-request-confirm-btn"
-                                            th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"
+                                            th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${requestLabel},data-field-reqtype=${r.type()},data-field-reqamount=${r.amount()},data-field-requiresownerapproval=${r.requiresOwnerApproval()},data-field-ownerapprovalgranted=${r.ownerApprovalGranted()},data-field-splitenabled=${r.splitEnabled()},data-field-splitpercent=${r.splitPercent()},data-field-justification=${r.justification()},data-field-_livesyncaccount=${r.accountId()},data-field-_livesyncdestination=${r.targetAccountId() != null ? r.targetAccountId() : ''}"
                                             th:text="#{bank.request.action.confirmAttested}">Best&auml;tigen, Freigabe liegt vor &hellip;</button>
                                     <button type="button" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
                                             data-trigger="open-modal-display" data-modal-id="bank-reject-request-modal"
                                             data-testid="bank-request-reject-btn"
-                                            th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${r.accountNo()}"
+                                            th:attr="data-field-_id=${r.id()},data-field-version=${r.version()},data-field-reqlabel=${requestLabel}"
                                             th:text="#{bank.request.action.reject}">Ablehnen</button>
                                 </th:block>
                             </th:block>
@@ -207,7 +215,7 @@
                         </label>
                     </div>
 
-                    <div class="bank-form-row">
+                    <div class="bank-form-row" data-confirm-source-holder>
                         <label for="bank-confirm-holder" data-confirm-holder-label
                                th:attr="data-label-default=#{bank.field.holder},data-label-source=#{bank.field.holder.source}"
                                th:text="#{bank.field.holder}">Halter</label>
@@ -216,8 +224,18 @@
                             <option th:each="h : ${holders}" th:value="${h.id()}"
                                     th:text="${h.active()} ? ${@handles.display(h.handle())} : (${@handles.display(h.handle())} + ' ' + #{bank.holder.inactive})">greluc</option>
                         </select>
-                        <span class="bank-field-error" data-error-for="holderId"></span>
                     </div>
+
+                    <div class="bank-form-row" data-confirm-account-deposit-holder hidden>
+                        <label for="bank-confirm-account-deposit-holder" th:text="#{bank.field.holder}">Halter</label>
+                        <select id="bank-confirm-account-deposit-holder" name="holderId" disabled
+                                data-krt-combobox data-testid="bank-confirm-account-deposit-holder">
+                            <option value="" th:text="#{bank.field.holder.placeholder}">Halter w&auml;hlen &hellip;</option>
+                            <option th:each="h : ${activeHolders}" th:if="${h.userId() != null}"
+                                    th:value="${h.id()}" th:text="${@handles.display(h.handle())}">greluc</option>
+                        </select>
+                    </div>
+                    <span class="bank-field-error" data-error-for="holderId"></span>
 
                     <div class="bank-form-row" data-confirm-destination-holder hidden>
                         <label for="bank-confirm-destination-holder" th:text="#{bank.field.holder.target}">Ziel-Halter</label>
@@ -229,7 +247,26 @@
                         <span class="bank-field-error" data-error-for="destinationHolderId"></span>
                     </div>
 
-                    <p class="bank-field-hint" th:text="#{bank.request.confirm.modal.hint}">Erfasse den Halter, der das Geld erhalten bzw. ausgezahlt hat.</p>
+                    <p class="bank-field-hint" data-confirm-picker-hint th:text="#{bank.request.confirm.modal.hint}">Erfasse den Halter, der das Geld erhalten bzw. ausgezahlt hat.</p>
+
+                    <div class="bank-booking-detail-body" data-confirm-fixed-parties hidden>
+                        <input type="hidden" name="holderId" data-fixed-holder-id disabled>
+                        <input type="hidden" name="destinationHolderId" data-fixed-destination-id disabled>
+                        <div class="bank-detail-item">
+                            <span class="bank-detail-label" th:text="#{bank.request.col.amount}">Betrag</span>
+                            <span class="bank-detail-value" data-fixed-amount></span>
+                            <span class="bank-field-hint" data-fixed-fee hidden></span>
+                        </div>
+                        <div class="bank-detail-item" data-fixed-holder-row hidden>
+                            <span class="bank-detail-label" th:text="#{bank.field.holder}">Halter</span>
+                            <span class="bank-detail-value" data-fixed-holder></span>
+                        </div>
+                        <div class="bank-detail-item" data-fixed-destination-row hidden>
+                            <span class="bank-detail-label" th:text="#{bank.field.holder.target}">Ziel-Halter</span>
+                            <span class="bank-detail-value" data-fixed-destination></span>
+                        </div>
+                        <p class="bank-field-hint" data-fixed-authorisation-hint hidden th:text="#{bank.request.linked.noLedger}">Die Mittel werden ohne Buchung autorisiert.</p>
+                    </div>
 
                     <div class="bank-form-row">
                         <label for="bank-confirm-staff-note">

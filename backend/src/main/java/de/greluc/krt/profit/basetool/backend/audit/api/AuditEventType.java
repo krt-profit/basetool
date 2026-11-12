@@ -46,6 +46,10 @@ public enum AuditEventType {
   MARKET_CATALOGUE_REASSIGNED(AuditDomain.MARKET),
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
+  /** A false original physical quantity and its connected retained stock facts were corrected. */
+  INVENTORY_QUANTITY_CORRECTED(AuditDomain.INVENTORY),
+  /** An explicitly selected connected stock portion's false current quality was corrected. */
+  INVENTORY_QUALITY_CORRECTED(AuditDomain.INVENTORY),
   /**
    * A warehouse inventory row's associations / quality / amount were edited.
    *
@@ -163,6 +167,18 @@ public enum AuditEventType {
   INVENTORY_AUDIT_PURGED(AuditDomain.INVENTORY),
   /** A material job order was created. */
   JOB_ORDER_CREATED(AuditDomain.JOB_ORDER),
+  /** Actual aUEC reported as purpose-bound to one order. */
+  JOB_ORDER_MONEY_PROVIDED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_MOVED(AuditDomain.JOB_ORDER),
+  /** The authoritative Bank decision changed a linked order attempt. */
+  JOB_ORDER_MONEY_BANK_DECIDED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_CORRECTED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_REASSIGNED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_RECIPIENT_CHANGED(AuditDomain.JOB_ORDER),
+  JOB_ORDER_MONEY_TARGET_CHANGED(AuditDomain.JOB_ORDER),
+  /** A unit's outstanding aUEC commitment changed. */
+  JOB_ORDER_MONEY_COMMITMENT_CHANGED(AuditDomain.JOB_ORDER),
   /** An item job order was created. */
   JOB_ORDER_ITEM_CREATED(AuditDomain.JOB_ORDER),
   /** A material job order was edited (materials/handle/requesting unit). */
@@ -215,6 +231,10 @@ public enum AuditEventType {
   JOB_ORDER_CLAIM_UPSERTED(AuditDomain.JOB_ORDER),
   /** A squadron claim was withdrawn. */
   JOB_ORDER_CLAIM_WITHDRAWN(AuditDomain.JOB_ORDER),
+  /** A Staffel began active support for a job order. */
+  JOB_ORDER_PARTICIPATION_ENROLLED(AuditDomain.JOB_ORDER),
+  /** An active supporting participation ended. */
+  JOB_ORDER_PARTICIPATION_ENDED(AuditDomain.JOB_ORDER),
   /** A quality tier was added to the catalogue (REQ-ORDERS-036). */
   QUALITY_TIER_CREATED(AuditDomain.JOB_ORDER),
   /** A quality tier's code, labels, order or floor was changed. */

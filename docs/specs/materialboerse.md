@@ -23,7 +23,7 @@ offer:
   free-form Markdown remark ("was suchst du im Gegenzug?"); material and quality are read **live** from
   the item, and the offered amount is the owner's stored, clamped-to-stock choice (REQ-MARKET-002);
 - an **item offer** (#1185, REQ-MARKET-012) — an item the Lager books: a **blueprint product**, or a
-  stocked item no active blueprint produces, named by its **catalogue row** (ADR-0371). It comes in
+  stocked item no active blueprint produces, named by its **catalogue row** (ADR-0372). It comes in
   two flavours: a **free-stated** offer (no Lager row, the member states the
   quantity, craft-on-demand) and a **stock-backed** offer (REQ-MARKET-014, ADR-0108) released from a
   game-item Lager row, whose quantity is read/clamped against that row's stock exactly like a material
@@ -34,7 +34,7 @@ page is built on the DAS KARTELL design system's locked master-detail layout (`.
 `.master-list` / `.master-row` / `.detail-pane`, specimen
 `.claude/skills/das-kartell-design/components/MasterDetail/preview.html`) as this spec describes it.
 Data model + visibility decisions are recorded in ADR-0082 (offer model), ADR-0086 (partial offers),
-ADR-0087 (item offers) and ADR-0371 (items without a blueprint).
+ADR-0087 (item offers) and ADR-0372 (items without a blueprint).
 
 The board also carries the **inverse** listing — a **request (Gesuch)**: instead of releasing owned
 stock, a member advertises what they **want** — a material or an item, with a free-form
@@ -309,7 +309,7 @@ amount/stock/remark **length** only — never the remark body, never usernames).
 the subject label is the material name for a material offer or the item's display name for an item
 offer (both non-personal game-asset names). A catalogue reconciliation that moves an item offer or
 request named by a retired catalogue row to the surviving row writes `MARKET_CATALOGUE_REASSIGNED`
-per moved entry (ADR-0371). The unified audit viewer has a Materialbörse tab, whose event-type filter
+per moved entry (ADR-0372). The unified audit viewer has a Materialbörse tab, whose event-type filter
 also carries that event and the area's generic `MARKET_AUDIT_EXPORTED` / `MARKET_AUDIT_PURGED`
 events. See [`audit.md`](audit.md) (REQ-AUDIT-001/002).
 
@@ -447,7 +447,7 @@ EN + base bundles, `{interessent}`/`{material}` placeholders).
 
 A member may list an **item** on the board via the "Item anbieten" entry of the
 „Angebot erstellen" menu (beside "Material anbieten"). Offerable are the items the Lager books
-(REQ-INV-029), each named by **exactly one** identity (ADR-0371; both or neither is a `400`):
+(REQ-INV-029), each named by **exactly one** identity (ADR-0372; both or neither is a `400`):
 
 - a **blueprint product** — an item an active blueprint produces, named by its normalized
   `productKey`, which must resolve through `BlueprintProductService.resolveByProductKey(...)`
@@ -532,7 +532,7 @@ game-item row releases a **stock-backed item offer**: a `MaterialExchangeOffer` 
   game item via its blueprint product (`BlueprintProductService.resolveByGameItem`) — the same identity
   a free-stated offer of that item carries. A row whose item no active blueprint produces — the Lager
   books those through their type (REQ-INV-029, ADR-0370) — is offered under its catalogue row
-  (`itemGameItemId`, ADR-0371), whatever its type; only a retired item is refused (REQ-P4K-013).
+  (`itemGameItemId`, ADR-0372), whatever its type; only a retired item is refused (REQ-P4K-013).
   The `inventory_item_id` is the physical truth, so the product-key↔item fuzziness stays a display
   concern only.
 - **One active offer per row.** The V210 partial-unique index applies as-is (the row's non-null FK), so
@@ -604,7 +604,7 @@ A `KRT_MEMBER` posts a wanted-listing via the "Material suchen" / "Item suchen" 
 catalogue `Material` (picked from the material-catalogue type-ahead, not the caller's Lager) and a
 desired quantity in the material's own unit (SCU or Stück per `Material.quantityType`); an **item**
 request names an item by its blueprint product or, for a stocked item no active blueprint produces,
-by its catalogue row — validated exactly like a free-stated item offer (REQ-MARKET-012, ADR-0371) —
+by its catalogue row — validated exactly like a free-stated item offer (REQ-MARKET-012, ADR-0372) —
 and a whole-piece quantity. **Either kind** may carry an optional **minimum quality** (0–1000) — a stated
 requester preference, kept even for an item request although items have no intrinsic quality — plus a
 free-form Markdown description (≤ 20 000 chars). There is **no backing Lager row**: owner + org unit
@@ -762,7 +762,7 @@ or wanted.
   item whose product names no catalogued game item render as before, with the plain name only.
 - `MaterialExchangeOfferDto` and `MaterialRequestDto` carry a `gameItem` reference
   (`GameItemReferenceDto`), resolved from the row's blueprint product key to the product's output
-  item, or from the row's catalogue row itself (ADR-0371), following the redirect of a row a
+  item, or from the row's catalogue row itself (ADR-0372), following the redirect of a row a
   catalogue merge retired. The flat `itemName` stays the displayed name.
 - A board page resolves all its item rows in at most three queries (`ExchangeItemReferences`): one
   scan of the active blueprint products, skipped for a page without product keys, one batch load of

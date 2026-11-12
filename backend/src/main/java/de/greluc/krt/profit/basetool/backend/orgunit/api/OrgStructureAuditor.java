@@ -122,24 +122,6 @@ public class OrgStructureAuditor {
   }
 
   /**
-   * Records {@link AuditEventType#ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED} when the flag flipped.
-   *
-   * @param unit the persisted org unit, carrying the new flag
-   * @param wasEligible the flag before the write
-   */
-  public void profitEligibilityChanged(@NotNull OrgUnit unit, boolean wasEligible) {
-    if (unit.isProfitEligible() == wasEligible) {
-      return;
-    }
-    record(
-        AuditEventType.ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED,
-        unit,
-        AuditDetails.of("kind", unit.getKind())
-            .with("from", wasEligible)
-            .with("to", unit.isProfitEligible()));
-  }
-
-  /**
    * Records {@link AuditEventType#ORG_UNIT_PARENT_CHANGED} when the parent edge moved.
    *
    * @param unit the persisted org unit, carrying the new parent

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<form th:fragment="recipientForm" id="order-money-recipient-form">
+    <div class="krt-modal-body">
+        <div class="form-group">
+            <label for="order-money-recipient-mode" th:text="#{orders.money.recipient}"></label>
+            <select id="order-money-recipient-mode" name="mode" data-testid="order-money-recipient-mode">
+                <option value="existing" th:text="#{orders.money.holder.existing}"></option>
+                <option value="new" th:text="#{orders.money.holder.new}"></option>
+                <option value="bank" th:text="#{orders.money.recipient.bankDestination}"></option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="order-money-recipient-holder" th:text="#{orders.money.holder.existing}"></label>
+            <select id="order-money-recipient-holder" name="holderId" data-testid="order-money-recipient-holder" required>
+                <option value="" th:text="#{orders.create.select}"></option>
+            </select>
+        </div>
+        <div th:replace="~{joborder/fragments/order-money-movement :: partyChoice('order-money-recipient-choice', 'party')}"></div>
+        <div th:replace="~{joborder/fragments/order-money-bank :: account('order-money-recipient-bank-account', 'orders.money.recipient.bankDestination')}"></div>
+    </div>
+    <div class="krt-modal-foot">
+        <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                data-modal-id="order-money-recipient-modal" th:text="#{general.cancel}"></button>
+        <button type="submit" class="btn btn--cta" data-testid="order-money-recipient-save"
+                th:text="#{orders.detail.save}" disabled></button>
+    </div>
+</form>
+
+<th:block th:fragment="editForms">
+    <div class="krt-modal-body">
+        <form id="order-money-edit-target-form" class="form-section">
+            <p class="alert alert-info" role="status" data-money-basis-changed hidden
+               th:text="#{orders.money.basis.changed}"></p>
+            <div class="form-group">
+                <label for="order-money-edit-target" th:text="#{orders.money.target.withUnit}"></label>
+                <input type="text" id="order-money-edit-target" name="target" inputmode="numeric"
+                       data-number-input="exact-whole" data-testid="order-money-edit-target"
+                       th:data-invalid="#{orders.money.amount.invalid}" required>
+            </div>
+            <p role="status" data-target-completes hidden th:text="#{orders.money.target.completes}"></p>
+            <p role="status" data-target-reopens hidden th:text="#{orders.money.target.reopens}"></p>
+            <button type="submit" class="btn btn-ghost" data-testid="order-money-save-target"
+                    th:text="#{orders.money.target.save}"></button>
+        </form>
+        <form id="order-money-edit-information-form" class="form-section">
+            <p class="alert alert-info" role="status" data-money-basis-changed hidden
+               th:text="#{orders.money.basis.changed}"></p>
+            <div class="form-group">
+                <label for="order-money-edit-handle" th:text="#{orders.detail.handle}"></label>
+                <input type="text" id="order-money-edit-handle" name="handle"
+                       data-testid="order-money-edit-handle" maxlength="200" required>
+            </div>
+            <div class="form-group">
+                <label for="order-money-edit-comment" th:text="#{orders.detail.comment}"></label>
+                <textarea id="order-money-edit-comment" name="comment" rows="4" maxlength="1000"
+                          data-testid="order-money-edit-comment"></textarea>
+            </div>
+            <button type="submit" class="btn btn--cta" data-testid="order-money-save-information"
+                    th:text="#{orders.money.information.save}"></button>
+        </form>
+    </div>
+</th:block>
+</body>
+</html>

@@ -59,7 +59,8 @@ import org.jetbrains.annotations.Nullable;
  */
 public record CreateBankBookingRequest(
     @NotNull UUID sourceAccountId,
-    @NotNull BankBookingRequestType type,
+    @NotNull @Schema(allowableValues = {"DEPOSIT", "WITHDRAWAL", "TRANSFER"})
+        BankBookingRequestType type,
     @Nullable UUID targetAccountId,
     @NotNull @DecimalMin("1") @DecimalMax("1000000000000.0") @WholeNumber BigDecimal amount,
     @Nullable @Size(max = 500) String note,
@@ -68,6 +69,21 @@ public record CreateBankBookingRequest(
     @Nullable @DecimalMin("1") @DecimalMax("100") @WholeNumber BigDecimal splitPercent,
     @Nullable UUID counterpartyUserId,
     @Nullable UUID counterpartyOrgUnitId) {
+
+  /**
+   * Checks that the ordinary request form names an account movement.
+   *
+   * @return whether the type is valid for this form, with absence checked separately
+   */
+  @Schema(hidden = true)
+  @AssertTrue(message = "Only deposits, withdrawals and transfers use this request form")
+  public boolean isOrdinaryType() {
+    return switch (type) {
+      case DEPOSIT, WITHDRAWAL, TRANSFER -> true;
+      case null -> true;
+      case HOLDER_TRANSFER, AUTHORISATION -> false;
+    };
+  }
 
   /**
    * Cross-field rule (REQ-BANK-043): a split is DEPOSIT-only and, when enabled, requires a

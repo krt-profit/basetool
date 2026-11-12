@@ -31,27 +31,23 @@ import org.mapstruct.Mapping;
 public interface SpecialCommandMapper {
 
   /**
-   * Maps a {@link SpecialCommand} to its DTO, including {@code isProfitEligible} but omitting audit
-   * fields.
+   * Maps a {@link SpecialCommand} to its DTO, omitting audit fields.
    *
    * @param entity the persisted entity
    * @return the DTO; never {@code null}
    */
-  @Mapping(target = "isProfitEligible", source = "profitEligible")
   SpecialCommandDto toDto(SpecialCommand entity);
 
   /**
    * Builds a new {@link SpecialCommand} entity from the DTO.
    *
-   * <p>Ignores the server-managed fields, {@code profitEligible} (changed only through its
-   * dedicated toggle endpoint) and the {@code parent} hierarchy link.
+   * <p>Ignores server-managed fields and the {@code parent} hierarchy link.
    *
    * @param dto the inbound DTO; never {@code null}
    * @return a transient {@link SpecialCommand} ready to be saved
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  @Mapping(target = "profitEligible", ignore = true)
   @Mapping(target = "parent", ignore = true)
   @Mapping(target = "department", ignore = true)
   SpecialCommand toEntity(SpecialCommandDto dto);

@@ -193,7 +193,7 @@ class NavigationHiddenMvcTest {
   @Test
   @DisplayName("a group whose links are all hidden stays in the markup for edit mode")
   void keepsAnEmptiedGroupForEditMode() throws Exception {
-    stored(1, "refinery.orders", "storage.overview", "orders.create");
+    stored(1, "refinery.orders", "storage.overview");
 
     assertThat(page(member()))
         .contains("nav-group-emptied")

@@ -28,6 +28,13 @@ target|JOB_ORDER|job_order_assignees|note|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_handover|recipient_handle|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_handover|recipient_squadron|job_order_id|JOB_ORDER
 target|JOB_ORDER|job_order_item_handover|recipient_handle|job_order_id|JOB_ORDER
+target|JOB_ORDER|job_order_linked_money_attempt|counterparty_name|order_id|JOB_ORDER
+target|JOB_ORDER|job_order_linked_money_attempt|selected_accountless_name|order_id|JOB_ORDER
+target|JOB_ORDER|job_order_money_holder_change|name|order_id|JOB_ORDER
+target|JOB_ORDER|job_order_money_holder_change|previous_name|order_id|JOB_ORDER
+target|JOB_ORDER|job_order_money_holder|accountless_name|order_id|JOB_ORDER
+target|JOB_ORDER|job_order_money_operation|selected_accountless_name|order_id|JOB_ORDER
+target|JOB_ORDER|job_order_money_recipient|accountless_name|order_id|JOB_ORDER
 target|JOB_ORDER|job_order|comment|id|JOB_ORDER
 target|JOB_ORDER|job_order|handle|id|JOB_ORDER
 target|LOCATION|location|description|id|null
@@ -95,6 +102,7 @@ exempt-column|bank_booking_request.purpose_kind
 exempt-column|bank_booking_request.required_approver
 exempt-column|bank_booking_request.status
 exempt-column|bank_booking_request.type
+exempt-column|bank_linked_attempt.purpose_kind
 exempt-column|bank_transaction.counterparty_org_unit_name
 exempt-column|bank_transaction.type
 exempt-column|blueprint_dismantle_return.wiki_name_snapshot
@@ -165,6 +173,15 @@ exempt-column|frequency_type.updated_by
 exempt-column|job_order.status
 exempt-column|job_order.type
 exempt-column|job_order_handover_item.location_name
+exempt-column|job_order_linked_money_attempt.bank_type
+exempt-column|job_order_linked_money_attempt.fee_funding
+exempt-column|job_order_linked_money_attempt.kind
+exempt-column|job_order_linked_money_attempt.selection_kind
+exempt-column|job_order_linked_money_attempt.state
+exempt-column|job_order_money_commitment_change.reason
+exempt-column|job_order_money_holder_change.kind
+exempt-column|job_order_money_operation.kind
+exempt-column|job_order_money_operation.selection_kind
 exempt-column|job_type.archetype
 exempt-column|job_type.description
 exempt-column|job_type.name
@@ -183,6 +200,7 @@ exempt-column|material_external_alias.external_code
 exempt-column|material_external_alias.external_key
 exempt-column|material_external_alias.external_name
 exempt-column|material_external_alias.source_system
+exempt-column|material_provision_credit.evidence
 exempt-column|member_payout_setting.default_payout_preference
 exempt-column|mission.calendar_link
 exempt-column|mission.status

@@ -18,24 +18,23 @@
  */
 
 /**
- * Toggles a transfer-only row and its select: shown, enabled and required only for a transfer,
- * otherwise hidden, disabled and cleared.
+ * Shows or hides a required picker and clears its value when it is disabled.
  *
- * @param {HTMLElement|null} row the transfer-only row wrapper
- * @param {boolean} isTransfer whether the current request type is TRANSFER
+ * @param {HTMLElement | null} row the picker row
+ * @param {boolean} enabled whether the picker applies
  */
-export function toggleTransferOnlyControl(row, isTransfer) {
+export function toggleRequiredPicker(row, enabled) {
     if (!row) {
         return;
     }
-    row.hidden = !isTransfer;
+    row.hidden = !enabled;
     const control = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (
         row.querySelector('select, .krt-combobox input[type="hidden"]')
     );
     if (control) {
-        control.disabled = !isTransfer;
-        control.required = isTransfer;
-        if (!isTransfer) {
+        control.disabled = !enabled;
+        control.required = enabled;
+        if (!enabled) {
             if (control.krtCombobox) {
                 control.krtCombobox.setValue('');
             } else {
@@ -47,7 +46,7 @@ export function toggleTransferOnlyControl(row, isTransfer) {
             box ? box.querySelector('.krt-combobox__input') : null
         );
         if (textbox) {
-            textbox.disabled = !isTransfer;
+            textbox.disabled = !enabled;
         }
     }
 }

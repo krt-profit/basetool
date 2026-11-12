@@ -122,6 +122,38 @@ public class BankExportSections implements PersonalDataExportSection {
                 """)
             .scrubbing("note", "justification"),
         new Section(
+            413,
+            "bankRequestsAsCustodian",
+            ART_15,
+            "Linked booking requests that name the member as a custodian.",
+            """
+            SELECT r.type, r.amount, r.status, r.created_at, r.decided_at,
+                   (h.id = r.requested_holder_id AND
+                    r.type IN ('WITHDRAWAL', 'TRANSFER', 'HOLDER_TRANSFER'))
+                       AS member_is_source_custodian,
+                   (r.type = 'DEPOSIT' OR h.id IS NOT DISTINCT FROM r.requested_target_holder_id)
+                       AS member_is_destination_custodian,
+                   (r.type = 'AUTHORISATION') AS member_is_funding_custodian
+            FROM bank_booking_request r JOIN bank_holder h
+              ON h.id = r.requested_holder_id OR h.id = r.requested_target_holder_id
+                OR (r.linked_attempt_id IS NOT NULL AND r.type = 'DEPOSIT' AND h.id = r.holder_id)
+            WHERE h.user_id = :userId
+            ORDER BY r.created_at, r.id
+            """),
+        new Section(
+            415,
+            "bankFundsAuthorisations",
+            ART_15,
+            "A funds authorisation the member performed or held custody for.",
+            """
+            SELECT a.amount, a.authorised_at,
+                   COALESCE(a.authorised_by = :userId, FALSE) AS member_authorised,
+                   COALESCE(h.user_id = :userId, FALSE) AS member_is_custodian
+            FROM bank_authorisation a LEFT JOIN bank_holder h ON h.id = a.holder_id
+            WHERE a.authorised_by = :userId OR h.user_id = :userId
+            ORDER BY a.authorised_at, a.id
+            """),
+        new Section(
             440,
             "bankAuditActionsByMember",
             ART_15,

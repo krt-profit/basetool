@@ -77,6 +77,8 @@ public enum LiveSyncTopicClass {
       true,
       Set.of(
           "header",
+          "actions",
+          "dialogs",
           "kpi",
           "materials",
           "aggregated",
@@ -86,17 +88,18 @@ public enum LiveSyncTopicClass {
           "item-handovers",
           "item-handover-lines",
           "blueprint-owners",
-          "assignees"),
+          "assignees",
+          "participations",
+          "money"),
       false,
       "order_detail",
       "/api/v1/orders/{id}",
       null),
 
   /**
-   * Global job-order queue room, authorized by the {@code canViewJobOrders} or the {@code
-   * canViewAssignedJobOrders} capability; its frames carry only a section key, and each viewer
-   * refreshes their own scoped list, so an assignee learns of no order beyond their own. Sections
-   * {@code queue} (the order list) and {@code demand} (the material-demand overview,
+   * Global order invalidation room, authorised by an existing queue, requester or assignee list
+   * capability. Frames carry section keys only; every viewer refreshes its own permitted rows.
+   * Sections {@code queue} (the order list) and {@code demand} (the material-demand overview,
    * REQ-ORDERS-034).
    */
   ORDERS_QUEUE(
@@ -106,7 +109,7 @@ public enum LiveSyncTopicClass {
       false,
       "orders_queue",
       "/api/v1/me/capabilities",
-      "canViewJobOrders|canViewAssignedJobOrders"),
+      "canViewOrderWorkspace"),
 
   /**
    * Per-refinery-order room for {@code /refinery-orders/{id}}, authorized by {@code GET

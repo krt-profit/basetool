@@ -83,6 +83,7 @@ public class RecipientResolutionService {
       case LEAD -> orgUnitRecipientDirectory.leadsOf(orgUnitId);
       case LOGISTICIAN -> orgUnitRecipientDirectory.logisticiansOf(orgUnitId);
       case MISSION_MANAGER -> orgUnitRecipientDirectory.missionManagersOf(orgUnitId);
+      case UNIT_WRITER -> orgUnitRecipientDirectory.writersOf(orgUnitId);
     };
   }
 

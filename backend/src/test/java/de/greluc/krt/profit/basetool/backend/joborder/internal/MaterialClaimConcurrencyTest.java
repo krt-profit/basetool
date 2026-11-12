@@ -19,18 +19,28 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.ClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
-import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -38,33 +48,41 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Races two concurrent first claims on one material bucket against the real Postgres container
- * (REQ-ORDERS-024, ADR-0092).
+ * Verifies serialized first claims and overclaim rejection against real PostgreSQL.
  *
- * <p>Same squadron: both writers succeed and exactly one row remains (last writer wins). Different
- * squadrons past the required amount: exactly one wins and the other gets a {@link
- * BadRequestException}. Not {@code @Transactional}, so each worker runs its own session.
+ * <p>Each worker uses its own transaction through the public claim endpoint.
  */
 @SpringBootTest
-@WithMockUser(roles = {"ADMIN"})
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 class MaterialClaimConcurrencyTest {
+  /** Removes managed participation dependents before deleting their fixture units. */
+  private final JobOrderParticipationRepository participations;
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final int THREADS = 2;
   private static final int START_TIMEOUT_SECONDS = 5;
@@ -79,7 +97,6 @@ class MaterialClaimConcurrencyTest {
    */
   private static final double OVERCLAIM_EACH = 70.0;
 
-  @Autowired private MaterialClaimService materialClaimService;
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private MaterialClaimRepository materialClaimRepository;
   @Autowired private SquadronRepository squadronRepository;
@@ -87,6 +104,8 @@ class MaterialClaimConcurrencyTest {
   @Autowired private MaterialRepository materialRepository;
   @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private TransactionTemplate transactionTemplate;
+  @Autowired private WebApplicationContext context;
+  @Autowired private ObjectMapper json;
 
   /**
    * Seeded fixture ids of one test run, deleted in {@code @AfterEach}.
@@ -102,6 +121,52 @@ class MaterialClaimConcurrencyTest {
       UUID orderId, UUID materialId, UUID squadronId, UUID squadronBId, UUID skId) {}
 
   private Fixture fixture;
+  private MockMvc mvc;
+
+  @BeforeEach
+  void prepareMvc() {
+    mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+  }
+
+  private static RequestPostProcessor admin() {
+    return jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+  }
+
+  @Test
+  void explicitEnrollmentAndFirstPromiseShareOneParticipation() throws Exception {
+    fixture = seed();
+    String path = "/api/v1/orders/" + fixture.orderId();
+    var start = new CyclicBarrier(THREADS);
+    try (var workers = Executors.newFixedThreadPool(THREADS)) {
+      var enrollment =
+          workers.submit(() -> {
+            start.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return mvc.perform(put(path + "/participations/" + fixture.squadronId()).with(admin()))
+                .andExpect(status().isNoContent());
+          });
+      var promise =
+          workers.submit(() -> {
+            start.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return postClaim(claim(AMOUNT_A)).andExpect(status().isCreated());
+          });
+      enrollment.get(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+      promise.get(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+
+    String support =
+        mvc.perform(get(path + "/participations").with(admin()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.participations.length()").value(1))
+            .andExpect(jsonPath("$.participations[0].active").value(true))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String participationId = json.readTree(support).at("/participations/0/id").asString();
+    mvc.perform(get(path + "/claims/history").with(admin()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].participationId").value(participationId))
+        .andExpect(jsonPath("$[0].openAmount").value(AMOUNT_A));
+  }
 
   /** Removes the seeded rows so adjacent tests inherit a clean baseline (no outer transaction). */
   @AfterEach
@@ -112,6 +177,8 @@ class MaterialClaimConcurrencyTest {
     transactionTemplate.executeWithoutResult(st -> {
       materialClaimRepository.deleteAll(
           materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId()));
+      participations.deleteAll(
+          participations.findByJobOrderIdOrderById(fixture.orderId(), Pageable.unpaged()));
       jobOrderRepository.deleteById(fixture.orderId());
       squadronRepository.deleteById(fixture.squadronId());
       if (fixture.squadronBId() != null) {
@@ -124,80 +191,58 @@ class MaterialClaimConcurrencyTest {
   }
 
   /**
-   * Two threads lodge the first claim for the same squadron in lockstep; neither throws, and
-   * exactly one claim with one of the two amounts remains.
+   * Two first writes create one promise; the losing meaningful edit requires a deliberate retry.
    *
    * @throws Exception if a worker future does not complete within the timeout
    */
   @Test
-  void firstClaimRace_sameSquadron_lastWriterWins_noServerError() throws Exception {
+  void firstClaimsRequireAFreshVersionForTheLosingWriter() throws Exception {
     fixture = seed();
-    final List<CreateClaimDto> payloads = List.of(claim(AMOUNT_A), claim(AMOUNT_B));
+    List<ClaimAttempt> attempts = raceClaims(List.of(claim(AMOUNT_A), claim(AMOUNT_B)));
+    assertThat(attempts)
+        .extracting(ClaimAttempt::statusCode)
+        .containsExactlyInAnyOrder(HttpStatus.CREATED.value(), HttpStatus.CONFLICT.value());
 
-    final SecurityContext adminContext = SecurityContextHolder.getContext();
-
-    CountDownLatch ready = new CountDownLatch(THREADS);
-    CountDownLatch go = new CountDownLatch(1);
-    AtomicInteger successCount = new AtomicInteger();
-    AtomicInteger otherErrorCount = new AtomicInteger();
-    List<Throwable> unexpectedErrors = new CopyOnWriteArrayList<>();
-
-    ExecutorService pool = Executors.newFixedThreadPool(THREADS);
-    List<Future<?>> futures = new ArrayList<>(THREADS);
-    try {
-      for (int i = 0; i < THREADS; i++) {
-        final CreateClaimDto payload = payloads.get(i);
-        futures.add(
-            pool.submit(() -> {
-              SecurityContextHolder.setContext(adminContext);
-              try {
-                ready.countDown();
-                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                  otherErrorCount.incrementAndGet();
-                  return;
-                }
-                materialClaimService.upsertClaim(fixture.orderId(), payload);
-                successCount.incrementAndGet();
-              } catch (Throwable t) {
-                otherErrorCount.incrementAndGet();
-                unexpectedErrors.add(t);
-              } finally {
-                SecurityContextHolder.clearContext();
-              }
-            }));
-      }
-
-      assertThat(ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-          .as("both writers should have entered the race within %ds", START_TIMEOUT_SECONDS)
-          .isTrue();
-      go.countDown();
-
-      for (Future<?> f : futures) {
-        f.get(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-      }
-    } finally {
-      pool.shutdownNow();
-      pool.awaitTermination(5, TimeUnit.SECONDS);
-    }
-
-    assertThat(otherErrorCount.get())
-        .as(
-            "the losing first-claim writer must retry in a fresh transaction, never surface a"
-                + " 500 / propagated conflict — got: %s",
-            unexpectedErrors)
-        .isZero();
-    assertThat(successCount.get())
-        .as("both concurrent same-squadron upserts must complete (last-writer-wins)")
-        .isEqualTo(THREADS);
-
+    ClaimDto winner =
+        readClaim(
+            attempts.stream()
+                .filter(attempt -> attempt.statusCode() == HttpStatus.CREATED.value())
+                .findFirst()
+                .orElseThrow()
+                .result());
+    CreateClaimDto loser =
+        attempts.stream()
+            .filter(attempt -> attempt.statusCode() == HttpStatus.CONFLICT.value())
+            .findFirst()
+            .orElseThrow()
+            .payload();
     List<MaterialClaim> rows =
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId());
-    assertThat(rows)
-        .as("the same-squadron upsert must collapse to exactly one row for the bucket")
-        .hasSize(1);
-    assertThat(rows.get(0).getAmount())
-        .as("the surviving row carries one of the two racing writers' amounts (last-writer-wins)")
-        .isIn(AMOUNT_A, AMOUNT_B);
+    assertThat(rows).hasSize(1);
+    assertThat(rows.getFirst().getId()).isEqualTo(winner.id());
+    assertThat(rows.getFirst().getAmount()).isEqualTo(winner.amount());
+    assertThat(rows.getFirst().getVersion()).isEqualTo(winner.version());
+    assertThat(loser.amount()).isNotEqualTo(winner.amount());
+
+    var retry =
+        new CreateClaimDto(
+            loser.materialId(),
+            loser.qualityRequirement(),
+            loser.claimingOrgUnitId(),
+            loser.amount(),
+            winner.version());
+    ClaimDto retried = readClaim(postClaim(retry).andExpect(status().isCreated()).andReturn());
+    assertThat(retried.id()).isEqualTo(winner.id());
+    assertThat(retried.amount()).isEqualTo(loser.amount());
+    assertThat(retried.version()).isGreaterThan(winner.version());
+    assertThat(materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId()))
+        .hasSize(1)
+        .first()
+        .satisfies(row -> {
+          assertThat(row.getId()).isEqualTo(retried.id());
+          assertThat(row.getAmount()).isEqualTo(retried.amount());
+          assertThat(row.getVersion()).isEqualTo(retried.version());
+        });
   }
 
   /**
@@ -213,13 +258,13 @@ class MaterialClaimConcurrencyTest {
       SpecialCommand sk = new SpecialCommand();
       sk.setName("ClaimRace-SK-" + tag);
       sk.setShorthand("S" + tag);
-      sk.setProfitEligible(true);
+      withinProfit(sk, persistedProfitArea(orgUnitRepository));
       sk = specialCommandRepository.save(sk);
 
       Squadron sq = new Squadron();
       sq.setName("ClaimRace-A-" + tag);
       sq.setShorthand("A" + tag);
-      sq.setProfitEligible(true);
+      withinProfit(sq, persistedProfitArea(orgUnitRepository));
       sq = squadronRepository.save(sq);
 
       Material mat = new Material();
@@ -248,78 +293,21 @@ class MaterialClaimConcurrencyTest {
 
   /**
    * Two squadrons claim {@link #OVERCLAIM_EACH} each of a {@link #REQUIRED_AMOUNT} bucket at once;
-   * exactly one wins, the other gets a {@link BadRequestException}, and the committed sum never
-   * exceeds the requirement.
+   * exactly one wins, the other gets HTTP 400, and the committed sum never exceeds the requirement.
    *
    * @throws Exception if a worker future does not complete within the timeout
    */
   @Test
   void firstClaimRace_differentSquadrons_neverOverclaims() throws Exception {
     fixture = seedTwoSquadrons();
-    final List<CreateClaimDto> payloads =
-        List.of(
-            claimFor(fixture.squadronId(), OVERCLAIM_EACH),
-            claimFor(fixture.squadronBId(), OVERCLAIM_EACH));
-
-    final SecurityContext adminContext = SecurityContextHolder.getContext();
-
-    CountDownLatch ready = new CountDownLatch(THREADS);
-    CountDownLatch go = new CountDownLatch(1);
-    AtomicInteger successCount = new AtomicInteger();
-    AtomicInteger overclaimRejectedCount = new AtomicInteger();
-    AtomicInteger otherErrorCount = new AtomicInteger();
-    List<Throwable> unexpectedErrors = new CopyOnWriteArrayList<>();
-
-    ExecutorService pool = Executors.newFixedThreadPool(THREADS);
-    List<Future<?>> futures = new ArrayList<>(THREADS);
-    try {
-      for (int i = 0; i < THREADS; i++) {
-        final CreateClaimDto payload = payloads.get(i);
-        futures.add(
-            pool.submit(() -> {
-              SecurityContextHolder.setContext(adminContext);
-              try {
-                ready.countDown();
-                if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                  otherErrorCount.incrementAndGet();
-                  return;
-                }
-                materialClaimService.upsertClaim(fixture.orderId(), payload);
-                successCount.incrementAndGet();
-              } catch (BadRequestException overclaim) {
-                overclaimRejectedCount.incrementAndGet();
-              } catch (Throwable t) {
-                otherErrorCount.incrementAndGet();
-                unexpectedErrors.add(t);
-              } finally {
-                SecurityContextHolder.clearContext();
-              }
-            }));
-      }
-
-      assertThat(ready.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS))
-          .as("both writers should have entered the race within %ds", START_TIMEOUT_SECONDS)
-          .isTrue();
-      go.countDown();
-
-      for (Future<?> f : futures) {
-        f.get(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-      }
-    } finally {
-      pool.shutdownNow();
-      pool.awaitTermination(5, TimeUnit.SECONDS);
-    }
-
-    assertThat(otherErrorCount.get())
-        .as("no writer may see a 500 / unexpected error — got: %s", unexpectedErrors)
-        .isZero();
-    assertThat(successCount.get())
-        .as("exactly one squadron may win the 70-of-100 first claim")
-        .isEqualTo(1);
-    assertThat(overclaimRejectedCount.get())
-        .as("the other squadron must be rejected with an overclaim BadRequestException")
-        .isEqualTo(1);
-
+    List<ClaimAttempt> attempts =
+        raceClaims(
+            List.of(
+                claimFor(fixture.squadronId(), OVERCLAIM_EACH),
+                claimFor(fixture.squadronBId(), OVERCLAIM_EACH)));
+    assertThat(attempts)
+        .extracting(ClaimAttempt::statusCode)
+        .containsExactlyInAnyOrder(HttpStatus.CREATED.value(), HttpStatus.BAD_REQUEST.value());
     List<MaterialClaim> rows =
         materialClaimRepository.findByJobOrderIdOrderByCreatedAtDesc(fixture.orderId());
     double committedSum = rows.stream().mapToDouble(MaterialClaim::getAmount).sum();
@@ -329,15 +317,45 @@ class MaterialClaimConcurrencyTest {
     assertThat(rows).as("only the winning squadron's single claim persists").hasSize(1);
   }
 
-  /**
-   * Builds a claim payload for the seeded bucket and the (single-squadron) fixture squadron at the
-   * given amount.
-   *
-   * @param amount the claimed partial quantity
-   * @return the create-claim payload
-   */
+  private record ClaimAttempt(CreateClaimDto payload, MvcResult result) {
+    int statusCode() {
+      return result.getResponse().getStatus();
+    }
+  }
+
+  private List<ClaimAttempt> raceClaims(List<CreateClaimDto> payloads) throws Exception {
+    var start = new CyclicBarrier(THREADS);
+    try (var workers = Executors.newFixedThreadPool(THREADS)) {
+      List<Future<ClaimAttempt>> pending = new ArrayList<>(payloads.size());
+      for (CreateClaimDto payload : payloads) {
+        pending.add(
+            workers.submit(() -> {
+              start.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+              return new ClaimAttempt(payload, postClaim(payload).andReturn());
+            }));
+      }
+      List<ClaimAttempt> attempts = new ArrayList<>(pending.size());
+      for (Future<ClaimAttempt> worker : pending) {
+        attempts.add(worker.get(FINISH_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+      }
+      return attempts;
+    }
+  }
+
+  private ResultActions postClaim(CreateClaimDto payload) throws Exception {
+    return mvc.perform(
+        post("/api/v1/orders/{id}/claims", fixture.orderId())
+            .with(admin())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(payload)));
+  }
+
+  private ClaimDto readClaim(MvcResult result) throws Exception {
+    return json.readValue(result.getResponse().getContentAsString(), ClaimDto.class);
+  }
+
   private CreateClaimDto claim(double amount) {
-    return new CreateClaimDto(fixture.materialId(), "GOOD", fixture.squadronId(), amount);
+    return claimFor(fixture.squadronId(), amount);
   }
 
   /**
@@ -348,7 +366,7 @@ class MaterialClaimConcurrencyTest {
    * @return the create-claim payload
    */
   private CreateClaimDto claimFor(UUID squadronId, double amount) {
-    return new CreateClaimDto(fixture.materialId(), "GOOD", squadronId, amount);
+    return new CreateClaimDto(fixture.materialId(), "GOOD", squadronId, amount, null);
   }
 
   /**
@@ -363,19 +381,19 @@ class MaterialClaimConcurrencyTest {
       SpecialCommand sk = new SpecialCommand();
       sk.setName("ClaimRace-SK-" + tag);
       sk.setShorthand("S" + tag);
-      sk.setProfitEligible(true);
+      withinProfit(sk, persistedProfitArea(orgUnitRepository));
       sk = specialCommandRepository.save(sk);
 
       Squadron sqA = new Squadron();
       sqA.setName("ClaimRace-A-" + tag);
       sqA.setShorthand("A" + tag);
-      sqA.setProfitEligible(true);
+      withinProfit(sqA, persistedProfitArea(orgUnitRepository));
       sqA = squadronRepository.save(sqA);
 
       Squadron sqB = new Squadron();
       sqB.setName("ClaimRace-B-" + tag);
       sqB.setShorthand("B" + tag);
-      sqB.setProfitEligible(true);
+      withinProfit(sqB, persistedProfitArea(orgUnitRepository));
       sqB = squadronRepository.save(sqB);
 
       Material mat = new Material();

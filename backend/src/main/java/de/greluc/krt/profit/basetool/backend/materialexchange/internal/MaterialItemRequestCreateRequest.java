@@ -29,7 +29,7 @@ import java.util.UUID;
 /**
  * Payload for posting an item wanted-listing (Gesuch) to the Materialbörse (REQ-MARKET-015).
  *
- * <p>Exactly one of {@link #productKey} and {@link #gameItemId} names the item (ADR-0371): a
+ * <p>Exactly one of {@link #productKey} and {@link #gameItemId} names the item (ADR-0372): a
  * product key an active blueprint produces, or the catalogue row of an item the Lager books; the
  * display name, owner and squadron are set server-side.
  *

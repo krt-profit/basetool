@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<section th:fragment="linkedAttempts" th:if="${money.linkedAttempts != null and !#lists.isEmpty(money.linkedAttempts)}"
+         class="card" aria-labelledby="order-money-linked-attempts">
+    <h3 id="order-money-linked-attempts" class="section-title" th:text="#{orders.money.bank.attempts}"></h3>
+    <ul class="od-assignee-list">
+        <li class="od-assignee split" th:each="attempt : ${money.linkedAttempts}"
+            data-testid="order-money-linked-attempt"
+            th:with="holder=${@handles.display(attempt.holderName) ?: #messages.msg('orders.money.nameUnavailable')},
+                     actor=${@handles.display(attempt.actorName) ?: #messages.msg('orders.money.nameUnavailable')},
+                     recipient=${@handles.display(attempt.recipientName)},
+                     depositor=${@handles.display(attempt.counterpartyName)},
+                     kindKey=${attempt.kind == 'PURPOSE_HANDOVER' and attempt.accountHoldingId != null ? 'orders.money.bank.kind.accountHandover' : 'orders.money.bank.kind.' + attempt.kind},
+                     statusKey=${attempt.clarificationResolved == true ? 'orders.money.bank.clarificationResolved' :
+                        'orders.money.bank.state.' + attempt.state}">
+            <div>
+                <strong th:text="${#messages.msg(statusKey)}"></strong>
+                <div th:text="#{orders.money.bank.operation(
+                    ${#messages.msg(kindKey)}, ${@moneyFormat.exactWhole(attempt.amount, #locale)})}"></div>
+                <div th:if="${attempt.accountHoldingId == null and recipient != null}"
+                     th:text="#{orders.money.history.parties(${holder}, ${recipient}, ${actor})}"></div>
+                <div th:if="${attempt.accountHoldingId == null and recipient == null}"
+                     th:text="#{orders.money.history.names(${holder}, ${actor})}"></div>
+                <div th:if="${attempt.accountHoldingId != null}" th:text="#{orders.money.history.recordedBy(${actor})}"></div>
+                <div th:if="${attempt.kind == 'PROVISION' and depositor != null}"
+                     th:text="#{orders.money.bank.depositor(${depositor})}"></div>
+                <div th:if="${attempt.actualPayment}" th:text="#{orders.money.bank.actualPayment}"></div>
+                <div th:if="${attempt.actualFee != null and attempt.actualFee != '0' and attempt.feeFunding != null}"
+                     th:text="${#messages.msg('orders.money.bank.fee.' + attempt.feeFunding, @moneyFormat.exactWhole(attempt.actualFee, #locale))}"></div>
+                <div th:if="${attempt.activeLinkedRevision == false}" th:text="#{orders.money.bank.superseded}"></div>
+            </div>
+            <div>
+                <button th:if="${attempt.activeLinkedRevision == true and money.replaceableOperationIds != null and
+                            #lists.contains(money.replaceableOperationIds, attempt.operationId)}"
+                        type="button" class="btn btn-ghost" data-trigger="od-money-bank-repair"
+                        data-testid="order-money-bank-repair" th:data-repair-operation="${attempt.operationId}"
+                        th:text="#{orders.money.bank.repair}"></button>
+                <time class="od-money-date" th:datetime="${attempt.recordedAt}" th:data-utc="${attempt.recordedAt}"></time>
+            </div>
+        </li>
+    </ul>
+</section>
+</body>
+</html>

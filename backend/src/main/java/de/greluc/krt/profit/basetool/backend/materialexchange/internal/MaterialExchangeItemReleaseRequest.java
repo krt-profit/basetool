@@ -29,7 +29,7 @@ import java.util.UUID;
  * Payload for listing an item on the Materialbörse without a backing Lager row, the item
  * counterpart to {@link MaterialExchangeReleaseRequest} (REQ-MARKET-012).
  *
- * <p>Exactly one of {@link #productKey} and {@link #gameItemId} names the item (ADR-0371): a
+ * <p>Exactly one of {@link #productKey} and {@link #gameItemId} names the item (ADR-0372): a
  * product key an active blueprint produces, or the catalogue row of an item the Lager books; the
  * display name, owner and squadron are set server-side.
  *

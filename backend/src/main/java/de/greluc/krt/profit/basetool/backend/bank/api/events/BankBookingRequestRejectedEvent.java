@@ -50,8 +50,8 @@ import org.jetbrains.annotations.Unmodifiable;
  */
 public record BankBookingRequestRejectedEvent(
     UUID requestId,
-    UUID accountId,
-    String accountNo,
+    @Nullable UUID accountId,
+    @Nullable String accountNo,
     BigDecimal amount,
     String reason,
     @Nullable UUID requesterSub,
@@ -77,6 +77,7 @@ public record BankBookingRequestRejectedEvent(
     return requesterSub;
   }
 
+  @Nullable
   @Override
   public UUID contextAccountId() {
     return accountId;
@@ -91,7 +92,7 @@ public record BankBookingRequestRejectedEvent(
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
-    params.put("accountNo", accountNo);
+    params.put("accountNo", accountNo == null ? "" : accountNo);
     params.put("amount", BankAmounts.plain(amount));
     if (reason != null && !reason.isBlank()) {
       params.put("reason", reason);

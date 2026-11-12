@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Runs the Lager item picker read against PostgreSQL (REQ-INV-029): every listed blueprint output
  * and every listed item of a stocked type is bookable; consumables, clothing, paints, turrets,
  * untyped rows and retired rows are not. The Materialbörse's read of the stocked items no active
- * recipe produces runs here too (ADR-0371).
+ * recipe produces runs here too (ADR-0372).
  */
 @SpringBootTest
 @Transactional

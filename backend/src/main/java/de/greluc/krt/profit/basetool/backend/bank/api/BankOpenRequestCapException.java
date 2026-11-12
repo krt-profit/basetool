@@ -25,8 +25,7 @@ import org.springframework.http.HttpStatus;
 
 /**
  * Thrown when a connected application raises a booking request for a member who already holds
- * {@code app.bank.exchange.open-request-cap} pending requests, whichever channel raised them
- * (REQ-BXCH-004).
+ * {@code app.bank.exchange.open-request-cap} Exchange-visible pending requests (REQ-BXCH-004).
  *
  * <p>Answers {@code 409} with code {@code BANK_OPEN_REQUEST_CAP}; nothing is raised.
  */

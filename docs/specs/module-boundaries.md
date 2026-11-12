@@ -91,6 +91,14 @@ derives schema names from them, and the module baseline names classes by simple 
 
 ### REQ-MOD-003 — A module depends only on lower ranks and on its allow rows
 
+> **JobOrder and Bank composition:** The application adapter uses `joborder.api` and `bank.api` at
+> their existing ranks. Each domain owns its aggregates and repositories. The commands, required
+> Bank observer and audit share a transaction. Notices and live invalidations follow commit. The
+> configuration-owning admin API provides the fee snapshot and calculation. See the
+> [aUEC contract](orders-auec.md) and the [optional Bank contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 An ArchUnit `modules()` rule over the domain map checks every class dependency between two modules:
 module A may depend on itself, on every module of lower rank, and on a same-rank module named by an
 `allow` row. Allow rows exist only between two different modules of the same rank, never in both
@@ -239,6 +247,10 @@ events and its conflict exception expose, and the bank access policy (ADR-0352):
 `BankAdmission`, `BankStaffRights` and `BankRequestApprover`; its implementation stays in
 `bank.internal`.
 Every `<module>.web` and `<module>.internal` package is internal to its module.
+
+The application reads order workspace capabilities through `joborder.api.JobOrderWorkspaceAccess`;
+its repository-backed implementation stays in `joborder.internal`, keeping the API independent
+of internal persistence and the module's layers acyclic.
 
 A domain whose services return its REST DTOs keeps those DTOs in `<module>.internal`, beside the
 services, so `web` depends on `internal` and never the other way: the layers inside a module stay

@@ -72,7 +72,10 @@ import org.springframework.security.access.AccessDeniedException;
  * personalised, dropping its job-order and mission links ({@link
  * AuditEventType#INVENTORY_ITEM_PERSONALIZED}).
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemServicePersonalRebookTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;

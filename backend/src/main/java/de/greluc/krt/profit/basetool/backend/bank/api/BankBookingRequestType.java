@@ -37,5 +37,11 @@ public enum BankBookingRequestType {
    * books a {@code TRANSFER} on confirmation via {@code BankLedgerService.bookTransfer}, with the
    * destination and both holders recorded by the bank employee at confirmation.
    */
-  TRANSFER
+  TRANSFER,
+
+  /** A custody transfer between registered Bank custodians. */
+  HOLDER_TRANSFER,
+
+  /** Debit-equivalent authorisation of existing Bank funds without a ledger transaction. */
+  AUTHORISATION
 }

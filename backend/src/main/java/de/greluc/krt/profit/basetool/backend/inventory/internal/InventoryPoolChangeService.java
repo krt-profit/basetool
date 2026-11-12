@@ -76,6 +76,7 @@ public class InventoryPoolChangeService {
   /** Name shown in a notification for a member or unit without one. */
   private static final String UNKNOWN_NAME = "—";
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipQueryService membershipQueryService;
@@ -111,9 +112,12 @@ public class InventoryPoolChangeService {
   @Transactional
   public @NotNull InventoryItemDto changePool(
       @NotNull UUID itemId, @NotNull InventoryItemPoolChangeDto dto, @NotNull UUID callerId) {
+    orderWrites.lockEligibility();
+    orderWrites.lockTransformRows(List.of(itemId), List.of());
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.lockById(itemId), () -> "Inventory item not found: " + itemId);
+    orderWrites.validateRows(List.of(itemId));
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
     OrgUnit source = requireSharedRow(item);
@@ -190,6 +194,7 @@ public class InventoryPoolChangeService {
       @Nullable Double amount,
       boolean mergeStock,
       @NotNull UUID actorId) {
+    orderWrites.lockEligibility();
     OrgUnit source = requireSharedRow(item);
     if (source.getId().equals(targetId)) {
       return item;
@@ -237,6 +242,7 @@ public class InventoryPoolChangeService {
   @NotNull
   InventoryItem moveUnitlessRowIntoPool(
       @NotNull InventoryItem item, double amount, @NotNull OrgUnit target) {
+    orderWrites.lockEligibility();
     if (Boolean.TRUE.equals(item.getPersonal()) || item.getOwningOrgUnit() != null) {
       throw new BadRequestException("Only a shared row without an org unit can move this way");
     }
@@ -293,6 +299,7 @@ public class InventoryPoolChangeService {
       @NotNull InventoryItem item, @NotNull OrgUnit target) {
     InventoryDonationGuards.requireNoDonation(item);
     item.setOwningOrgUnit(target);
+    orderWrites.assertRow(item);
     return inventoryItemRepository.saveAndFlush(item);
   }
 
@@ -317,12 +324,11 @@ public class InventoryPoolChangeService {
     if (refusal != null) {
       throw splitProblem(refusal);
     }
-    final InventoryItem savedPart =
-        inventoryItemRepository.save(
-            LotRows.split(
-                item,
-                amount,
-                LotRows.Placement.of(item).withOwningOrgUnit(target).withPersonal(false)));
+    InventoryItem part =
+        LotRows.split(
+            item, amount, LotRows.Placement.of(item).withOwningOrgUnit(target).withPersonal(false));
+    orderWrites.assertRow(part);
+    final InventoryItem savedPart = inventoryItemRepository.save(part);
     LotRows.lower(
         inventoryItemRepository,
         stockChangeObserver,

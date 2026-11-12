@@ -552,7 +552,7 @@ class MaterialExchangeServiceTest {
 
   /**
    * Listing a stocked item no blueprint produces persists an ITEM offer under its catalogue row,
-   * with no product key, and audits the catalogue row (ADR-0371).
+   * with no product key, and audits the catalogue row (ADR-0372).
    */
   @Test
   void releaseItem_gameItemWithoutBlueprint_persistsOfferUnderTheCatalogueRow() {
@@ -989,7 +989,7 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * A game-item row no active blueprint produces is offered under its catalogue row (ADR-0371): the
+   * A game-item row no active blueprint produces is offered under its catalogue row (ADR-0372): the
    * offer carries the row's game item and no product key, and the audit names the catalogue row.
    */
   @Test

@@ -44,7 +44,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.Generated;
+import org.hibernate.annotations.OptimisticLock;
 import org.jetbrains.annotations.Nullable;
 
 /** Job Order JPA entity. */
@@ -57,6 +59,7 @@ import org.jetbrains.annotations.Nullable;
 @Builder
 @Table(name = "job_order")
 @BatchSize(size = 100)
+@DynamicUpdate
 public class JobOrder extends AbstractEntity<UUID> {
 
   /**
@@ -75,27 +78,36 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Generated
   private Integer displayId;
 
-  /**
-   * The profit-eligible squadron or Spezialkommando that processes this order. It governs
-   * visibility: a squadron-responsible order is private to that squadron and admins, an
-   * SK-responsible order is public. Changed only via {@code PATCH
-   * /api/v1/orders/{id}/responsible-org-unit}.
-   */
+  /** The current Profit-hierarchy processing unit, changed through the responsibility endpoint. */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "responsible_org_unit_id", nullable = false)
+  @OptimisticLock(excluded = true)
   private OrgUnit responsibleOrgUnit;
 
+  /** The independently observed revision of the responsible unit. */
+  @Column(name = "responsibility_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  @Builder.Default
+  private Long responsibilityVersion = 0L;
+
   /**
-   * The org unit that placed the order and receives the goods; any squadron or Spezialkommando.
-   * Mandatory and editable by Logistician+, but it grants no visibility.
+   * The customer unit granting complete order read and its current writer's requester capability.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requesting_org_unit_id", nullable = false)
   private OrgUnit requestingOrgUnit;
 
+  /** Verified Profit boundary at creation; null preserves unknown legacy provenance. */
+  @Column(name = "original_profit_org_unit_id")
+  @Nullable
+  private UUID originalProfitOrgUnitId;
+
   @Column private String handle;
 
-  @Column @Nullable private Integer priority;
+  @Column
+  @Nullable
+  @OptimisticLock(excluded = true)
+  private Integer priority;
 
   /**
    * Optional, untrusted free-text comment from the order creator, at most {@value
@@ -109,13 +121,24 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   @Builder.Default
+  @OptimisticLock(excluded = true)
   private JobOrderStatus status = JobOrderStatus.OPEN;
 
+  /** The independently observed revision of the order's lifecycle. */
+  @Column(name = "lifecycle_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  @Builder.Default
+  private Long lifecycleVersion = 0L;
+
+  /** The independently observed contact and comment revision of an aUEC order. */
+  @Column(name = "money_information_version", nullable = false)
+  @OptimisticLock(excluded = true)
+  @Builder.Default
+  private long moneyInformationVersion = 0L;
+
   /**
-   * Order kind. {@link JobOrderType#MATERIAL} (the default, and the value backfilled onto every
-   * pre-existing row by migration V123) requests raw materials directly via {@link #materials};
-   * {@link JobOrderType#ITEM} requests finished items via {@link #items}, from which the material
-   * requirements are derived. Never {@code null}.
+   * Exclusive order kind: raw materials, finished items, or an independently tracked net aUEC
+   * amount.
    */
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
@@ -139,12 +162,7 @@ public class JobOrder extends AbstractEntity<UUID> {
   @Builder.Default
   private Set<JobOrderMaterial> materials = new HashSet<>();
 
-  /**
-   * Users who signed up to work on this order (the "Bearbeiter"), each as a {@link
-   * JobOrderAssignee} edge that additionally carries the assignee's optional note. A
-   * {@code @OneToMany} child collection (not a plain {@code @ManyToMany}) since the V147 promotion
-   * so the per-assignee note + version live on the edge.
-   */
+  /** Personal assignee edges carrying independently versioned optional notes. */
   @OneToMany(
       mappedBy = "jobOrder",
       cascade = CascadeType.ALL,

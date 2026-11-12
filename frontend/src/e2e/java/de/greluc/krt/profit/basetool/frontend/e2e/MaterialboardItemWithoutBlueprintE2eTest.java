@@ -37,7 +37,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
  * E2E flows for Materialbörse item offers of an item no blueprint produces (REQ-MARKET-012,
- * REQ-MARKET-014, ADR-0371): a Lager row of such an item is released from the "Material anbieten"
+ * REQ-MARKET-014, ADR-0372): a Lager row of such an item is released from the "Material anbieten"
  * picker, and the item is offered free-stated from the "Item anbieten" picker.
  *
  * <p>Seeds two FPS weapons without a blueprint, one with a stock row; runs as {@code test-admin}.

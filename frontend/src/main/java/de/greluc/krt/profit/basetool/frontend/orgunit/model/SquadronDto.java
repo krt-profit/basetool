@@ -30,16 +30,8 @@ import java.util.UUID;
  * @param shorthand short tag
  * @param description free-form text
  * @param active soft-delete flag
- * @param isProfitEligible whether the squadron appears in the Job-Order responsible (processing)
- *     picker
  * @param version optimistic-lock counter
  */
 @DtoMirror
 public record SquadronDto(
-    UUID id,
-    String name,
-    String shorthand,
-    String description,
-    Boolean active,
-    Boolean isProfitEligible,
-    Long version) {}
+    UUID id, String name, String shorthand, String description, Boolean active, Long version) {}

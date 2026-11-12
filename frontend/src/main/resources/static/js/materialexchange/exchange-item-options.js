@@ -3,7 +3,7 @@
  * Copyright (C) 2026 Lucas Greuloch
  * SPDX-License-Identifier: GPL-3.0-only
  *
- * The item picker entries the Materialbörse offer and request dialogs share (ADR-0371).
+ * The item picker entries the Materialbörse offer and request dialogs share (ADR-0372).
  */
 
 import { krtHtml } from '/js/kernel/krt-html.js';

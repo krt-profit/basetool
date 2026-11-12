@@ -74,7 +74,7 @@ public class GameItemController {
   /**
    * Pages the game items bookable as Lager item stock (every blueprint output and every item of a
    * stocked type, REQ-INV-029), only those orderable as item-order lines, or only the stocked items
-   * no blueprint produces (ADR-0371).
+   * no blueprint produces (ADR-0372).
    *
    * @param q optional case-insensitive item-name filter
    * @param orderable {@code true} narrows to blueprint outputs with at least one resolvable

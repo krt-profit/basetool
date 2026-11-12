@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Outbound mirror of the backend {@code MaterialItemRequestCreateRequest}: posts an item
  * wanted-listing to the Materialbörse, named by exactly one of its blueprint product and its
- * catalogue row (ADR-0371).
+ * catalogue row (ADR-0372).
  *
  * @param productKey the normalized blueprint product key, or {@code null}
  * @param gameItemId the catalogue row of an item no blueprint produces, or {@code null}

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
@@ -36,6 +38,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -67,6 +70,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  */
 @SpringBootTest
 class InventoryEarmarkReadNoNPlusOneTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final int FEW = 3;
 
@@ -108,7 +113,7 @@ class InventoryEarmarkReadNoNPlusOneTest {
     Squadron squadron = new Squadron();
     squadron.setName("Earmark Unit " + tag);
     squadron.setShorthand("E" + tag);
-    squadron.setProfitEligible(true);
+    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
     unit = squadronRepository.save(squadron);
     SecurityContextHolder.getContext()
         .setAuthentication(

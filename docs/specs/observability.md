@@ -727,6 +727,11 @@ it is invisible until something waits on the container's health.
 
 ### REQ-OBS-006 — No PII and no unbounded labels in metrics
 
+> **JobOrder metrics:** Order and linked Bank observations use counts, waiting age and bounded
+> labels. The linked-money gauges and counter have no participant, order, account or payment
+> dimensions. See the [aUEC order contract](orders-auec.md) and [optional Bank
+> contract](orders-auec-bank.md).
+
 Metric names, label keys, label values and measured values must never contain
 user-identifying data (usernames, e-mails, `sub` UUIDs, IPs, tokens) or free text. Labels
 must come from **bounded, enumerable sets** (status enums, task names, HTTP status classes,
@@ -1254,6 +1259,11 @@ The metrics/dashboards derived from these streams carry **no** per-user labels (
 aggregated counts and bounded `app`/`host` labels.
 
 ### REQ-OBS-011 — Business metrics (`basetool_*`)
+
+> **Linked order money:** The operations dashboard shows waiting count and age, clarification,
+> contradictions and technical failures. The contradiction alert fires after 15 minutes of a
+> positive contradiction count. Routine approval waiting contributes to the waiting gauges.
+> See the [optional Bank contract](orders-auec-bank.md).
 
 > **Status: shipped** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, map #2800) for the signals
 > of the amendment at the end of this requirement.
@@ -1811,7 +1821,13 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   exists for — a realm-side role rename — happens at 03:00 when the request rate is near zero.
 - `basetool_audit_events_total{domain}` counter at the single `AuditService.record` choke point
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse; the two
-  `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events of REQ-ORDERS-047 count under `JOB_ORDER`). Silence
+  `JOB_ORDER_EXTERNAL_ASSIGNEE_*` events of REQ-ORDERS-047 and `JOB_ORDER_MONEY_*` events count under
+  `JOB_ORDER`). Order IDs, holders, amounts and submitted terms stay out of metric labels.
+  Financial correction, holder identity maintenance and each recorded purpose reassignment leg count
+  under the same `JOB_ORDER` domain. Targeted movement and correction notices use the existing
+  bounded notification-type counter. Authenticated settlement and correction routes use the existing
+  HTTP observations. A terminal order's settlement indication is derived from its money view. The
+  order keeps its existing lifecycle status and queue metric labels. Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
   **30 d** while others stay active — the domain-lost-its-wiring failure mode the global sum masks).
@@ -1846,6 +1862,21 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   bookings need no dedicated meter — `JOB_ORDER_PRODUCTION_BOOKED` and
   `INVENTORY_CONSUMED_BY_PRODUCTION` roll into the existing `JOB_ORDER` and `INVENTORY` domain
   counts (REQ-ORDERS-025).
+  Material promises, explicit provision credit, connected correction and participation ending
+  likewise use the existing `JOB_ORDER` audit domain; their physical Inventory effects use
+  `INVENTORY` (REQ-ORDERS-024). `JOB_ORDER_PARTICIPATION_ENDED` therefore appears in the same
+  domain-wide operations panels and silence rule without a new label or exception. The audit
+  counter counts calls to `AuditService.record`, including attempts whose surrounding transaction
+  later rolls back; persisted audit rows remain transactional. It is not a committed quantity or
+  performance meter. HTTP authorization/version refusals retain the existing bounded error
+  counters. Committed peer invalidations and grouped material notices use the existing Live and
+  notification meters; cause replay, rollback and true no-ops create no extra notice or refresh.
+  `NotificationFlood` already includes every notification type, including
+  `MATERIAL_CONTRIBUTIONS_CHANGED`. No order, unit, material, receipt identity or quantity becomes
+  a metric label. Public `NotificationCauseIntegrationTest`,
+  `MaterialContributionEffectsIntegrationTest`, `MaterialClaimNoOpIntegrationTest` and
+  `JobOrderProductionResourcePlanningIntegrationTest` establish the corresponding committed,
+  replay/no-op and stock-only effects.
 - **`client_id` on the two exchange request counters** (`refused_total`, `relay_total`): the
   registry client id when the registry lists the token's `azp`, otherwise `unregistered`,
   `unknown` while the registry cannot be read, and `none` before a token names a client (and on
@@ -2079,7 +2110,9 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   sensitive audited area had **zero** volume signal; this counter is that signal — **counts only,
   never amounts, account numbers or holder identities** (REQ-OBS-006). It backs
   `BankAuditSilenceAnomaly` (the bank analogue of `AuditSilenceAnomaly`) and a bank-volume panel on
-  the operations dashboard.
+  the operations dashboard. `FUNDS_AUTHORISED` counts final debit-equivalent authorisations
+  through the same bounded event type. The existing request count and age gauges include linked
+  requests while they are pending.
 - `basetool_ratelimit_rejections_total{bucket,key_source}` counter at the `RateLimitingFilter` reject
   branch (`bucket` = the rule name, or `global` for the umbrella `/api/**` budget), paired since
   #1041 item 19 with `basetool_ratelimit_requests_total{bucket}` bumped on **every** bucket
@@ -2110,6 +2143,17 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - `basetool_bank_ledger_integrity_violations{category}` gauge fed by the hourly integrity sweep
   (six `category` values; **any value > 0 is CRITICAL** — the ledger broke an invariant).
 
+- Linked order money exposes the current waiting count, oldest waiting age, clarification count
+  and local financial contradiction count as `basetool_job_order_linked_money_*` gauges. The
+  technical failure counter counts infrastructure errors applying a synchronous linked outcome.
+  These metrics carry no participant, order, account or payment dimensions. Routine approval
+  waiting and clarification are visible on the operations dashboard. An alert fires for
+  persistent contradictory order effects.
+  `JobOrderLinkedMoneyMetricsTest` passed both sampling and technical-failure checks. It
+  verifies waiting age, gauge reset, the failure counter and untagged meter registration.
+  Prometheus 3.16.0 validated the business rule file and passed the linked-money alert test,
+  including ordinary waiting, the 15-minute threshold and recovery.
+  [Alert test](../../monitoring/prometheus/tests/job_order_linked_money_test.yml)
 - `basetool_job_order_integrity_violations{category}` gauge fed by the hourly `JobOrderIntegrityTask`
   (REQ-ORDERS-033; one `category` today, `item_line_blueprint_drift`). `> 0` means an ordered-item
   line's blueprint no longer produces the ordered item after an SC-Wiki re-point, so that order
@@ -4275,3 +4319,24 @@ refusals by reason, the request writes, the gateway's switch refusals and the sw
 `monitoring/prometheus/tests/exchange_registry_alerts_test.yml`,
 `monitoring/grafana/dashboards/15-exchange.json` · **Related:** REQ-OBS-005, REQ-OBS-011,
 REQ-BXCH-006 · **Issues:** #3121, #3156
+
+The JobOrder hierarchy foundation adds the unlabelled gauge
+`basetool_job_order_invalid_responsibility`, counting every lifecycle status whose current
+responsibility fails active Profit hierarchy or a verified original boundary. Unknown legacy
+origin alone is not a violation. `JobOrderInvalidResponsibility` warns after 15 minutes and the
+operations dashboard shows the count. Cancelled orders still contribute when their responsibility
+is invalid. The active queue gauges continue to count only `OPEN` and `IN_PROGRESS`, and the oldest
+age continues to track `OPEN`. Deliberate reopening returns the order to the `OPEN` queue.
+Existing HTTP, audit and live-sync observations cover the target picker, recovery transfer and
+automatic promise endings. Notification creation counters use the bounded notification types for
+participation and clarification. No identity or amount is a metric label.
+
+Initial promise reconciliation runs before application readiness and uses the same audited state
+transition and live notifications. A failed reconciliation rolls back and prevents readiness; the
+existing backend availability/readiness probes expose that failure. It has no schedule, feature
+switch, user labels or separate external surface.
+
+The complete MATERIAL/ITEM workspace, kind narrowing and retained concrete unit reads reuse the
+existing templated HTTP spans, order audit events, `order_detail` / `orders_queue` live-sync classes
+and authenticated `/orders` probe. No public gateway, scheduled job, status or metric label is added;
+reader/unit/order identities and retained relationship timestamps remain outside metric labels.

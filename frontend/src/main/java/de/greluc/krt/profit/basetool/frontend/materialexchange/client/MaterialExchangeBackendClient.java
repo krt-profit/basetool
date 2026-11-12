@@ -179,7 +179,7 @@ public class MaterialExchangeBackendClient {
 
   /**
    * Searches the stocked items no blueprint produces, which the item pickers name by their
-   * catalogue row (ADR-0371).
+   * catalogue row (ADR-0372).
    *
    * @param q the name fragment, or {@code null}/blank for the first items
    * @param size the page size

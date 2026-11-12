@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -32,13 +34,22 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStation;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryJobOrderAllocation;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryGood;
@@ -47,6 +58,8 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepo
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -75,6 +88,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -107,6 +121,14 @@ class RefineryOrderWebLockOrderIntegrationTest {
   @Autowired private RefineryOrderRepository refineryOrderRepository;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private TransactionTemplate transactions;
+  @Autowired private OrgUnitRepository orgUnits;
+  @Autowired private QualityTierRepository qualityTiers;
+  @Autowired private JobOrderRepository jobOrders;
+  @Autowired private InventoryItemRepository inventory;
+  private final List<UUID> linkedOrders = new ArrayList<>();
+  private final List<UUID> responsibleUnits = new ArrayList<>();
+  private final List<UUID> extraMaterials = new ArrayList<>();
 
   private final ExecutorService pool = Executors.newSingleThreadExecutor();
 
@@ -177,6 +199,11 @@ class RefineryOrderWebLockOrderIntegrationTest {
     HOOK.disarm();
     pool.shutdownNow();
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", owner.getId());
+    linkedOrders.forEach(id -> {
+      jdbc.update("DELETE FROM job_order_material WHERE job_order_id = ?", id);
+      jdbc.update("DELETE FROM job_order WHERE id = ?", id);
+    });
+    responsibleUnits.forEach(id -> jdbc.update("DELETE FROM org_unit WHERE id = ?", id));
     jdbc.update("DELETE FROM refinery_good WHERE refinery_order_id = ?", orderId);
     jdbc.update("DELETE FROM refinery_order WHERE id = ?", orderId);
     jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", owner.getId());
@@ -184,6 +211,7 @@ class RefineryOrderWebLockOrderIntegrationTest {
     jdbc.update("DELETE FROM location WHERE id = ?", station.getId());
     jdbc.update("DELETE FROM space_station WHERE id = ?", spaceStation.getId());
     jdbc.update("DELETE FROM material WHERE id = ?", ore.getId());
+    extraMaterials.forEach(id -> jdbc.update("DELETE FROM material WHERE id = ?", id));
   }
 
   @Test
@@ -246,6 +274,159 @@ class RefineryOrderWebLockOrderIntegrationTest {
     Map<String, Object> row = rowAfterTheWriter();
     assertThat(row.get("stored_at")).isNotNull();
     assertThat(row.get("other_expenses")).isEqualTo(77d);
+  }
+
+  @Test
+  void aMultiMaterialStoreBooksEveryLinkedRequirementInOneTransaction() throws Exception {
+    HOOK.disarm();
+    Material second = new Material();
+    second.setName("Second yield " + UUID.randomUUID());
+    second.setType(MaterialType.RAW);
+    second = materialRepository.saveAndFlush(second);
+    UUID secondId = second.getId();
+    extraMaterials.add(secondId);
+    UUID target =
+        transactions.execute(_ -> {
+          SpecialCommand responsible = new SpecialCommand();
+          responsible.setName("Yield processor " + UUID.randomUUID());
+          responsible.setShorthand("YP" + UUID.randomUUID().toString().substring(0, 6));
+          withinProfit(responsible, persistedProfitArea(orgUnits));
+          responsible = orgUnits.saveAndFlush(responsible);
+          responsibleUnits.add(responsible.getId());
+          JobOrder order = new JobOrder();
+          order.setRequestingOrgUnit(
+              squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
+          order.setResponsibleOrgUnit(responsible);
+          for (UUID materialId : List.of(ore.getId(), secondId)) {
+            JobOrderMaterial demand = new JobOrderMaterial();
+            demand.setMaterial(materialRepository.findById(materialId).orElseThrow());
+            demand.setQualityTier(qualityTiers.findByCode("NONE").orElseThrow());
+            demand.setAmount(10.0);
+            order.addMaterial(demand);
+          }
+          UUID targetId = jobOrders.saveAndFlush(order).getId();
+          linkedOrders.add(targetId);
+          RefineryOrder refinery = refineryOrderRepository.findById(orderId).orElseThrow();
+          RefineryGood good = new RefineryGood();
+          good.setInputMaterial(materialRepository.findById(secondId).orElseThrow());
+          good.setInputQuantity(10);
+          good.setOutputMaterial(materialRepository.findById(secondId).orElseThrow());
+          good.setOutputQuantity(10);
+          good.setQuality(100);
+          good.setRefineryOrder(refinery);
+          refinery.getGoods().add(good);
+          refineryOrderRepository.saveAndFlush(refinery);
+          return targetId;
+        });
+    ObjectNode body = objectMapper.createObjectNode();
+    for (UUID materialId : List.of(ore.getId(), secondId)) {
+      ObjectNode item = body.withArray("items").addObject();
+      item.put("materialId", materialId.toString());
+      item.put("locationId", station.getId().toString());
+      item.put("quality", 100);
+      item.put("amount", 3);
+      item.put("jobOrderId", target.toString());
+    }
+
+    mockMvc
+        .perform(
+            post("/api/v1/refinery-orders/" + orderId + "/store")
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(owner.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.toString()))
+        .andExpect(status().isOk());
+
+    assertThat(materialAmountsOfOrder(target)).containsExactlyInAnyOrder(3.0, 3.0);
+  }
+
+  @Test
+  void aFreshScuStoreDoesNotWriteAnUnrelatedInvalidOrderInTheSameHolderLot() throws Exception {
+    HOOK.disarm();
+    List<UUID> targets =
+        transactions.execute(_ -> {
+          List<UUID> orderIds = new ArrayList<>();
+          for (boolean valid : List.of(false, true)) {
+            SpecialCommand responsible = new SpecialCommand();
+            responsible.setName("Independent yield " + UUID.randomUUID());
+            responsible.setShorthand("IY" + UUID.randomUUID().toString().substring(0, 6));
+            if (valid) {
+              withinProfit(responsible, persistedProfitArea(orgUnits));
+            }
+            responsible = orgUnits.saveAndFlush(responsible);
+            responsibleUnits.add(responsible.getId());
+            JobOrder linked = new JobOrder();
+            linked.setRequestingOrgUnit(
+                squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow());
+            linked.setResponsibleOrgUnit(responsible);
+            JobOrderMaterial demand = new JobOrderMaterial();
+            demand.setMaterial(materialRepository.findById(ore.getId()).orElseThrow());
+            demand.setQualityTier(qualityTiers.findByCode("NONE").orElseThrow());
+            demand.setAmount(10.0);
+            linked.addMaterial(demand);
+            UUID id = jobOrders.saveAndFlush(linked).getId();
+            linkedOrders.add(id);
+            orderIds.add(id);
+          }
+          InventoryItem unrelated = new InventoryItem();
+          unrelated.setUser(userRepository.findById(owner.getId()).orElseThrow());
+          unrelated.setMaterial(materialRepository.findById(ore.getId()).orElseThrow());
+          unrelated.setLocation(locationRepository.findById(station.getId()).orElseThrow());
+          unrelated.setQuality(100);
+          unrelated.setPersonal(false);
+          unrelated.setAmount(2.0);
+          unrelated
+              .getJobOrderAllocations()
+              .add(
+                  InventoryJobOrderAllocation.builder()
+                      .inventoryItem(unrelated)
+                      .jobOrderId(orderIds.getFirst())
+                      .amount(2.0)
+                      .build());
+          inventory.saveAndFlush(unrelated);
+          return orderIds;
+        });
+    ObjectNode body = objectMapper.createObjectNode();
+    ObjectNode item = body.putArray("items").addObject();
+    item.put("materialId", ore.getId().toString());
+    item.put("locationId", station.getId().toString());
+    item.put("quality", 100);
+    item.put("amount", 3);
+    item.put("jobOrderId", targets.getLast().toString());
+
+    mockMvc
+        .perform(
+            post("/api/v1/refinery-orders/" + orderId + "/store")
+                .with(
+                    jwt()
+                        .jwt(token -> token.subject(owner.getId().toString()))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.toString()))
+        .andExpect(result ->
+            assertThat(result.getResponse().getStatus())
+                .as(result.getResponse().getContentAsString())
+                .isEqualTo(200));
+
+    assertThat(materialAmountsOfOrder(targets.getFirst())).containsExactly(2.0);
+    assertThat(materialAmountsOfOrder(targets.getLast())).containsExactly(3.0);
+  }
+
+  /**
+   * Reads the physical amounts of material rows allocated to one fixture order.
+   *
+   * @param target the linked order
+   * @return the allocated material rows' physical amounts
+   */
+  private @NotNull List<Double> materialAmountsOfOrder(UUID target) {
+    return jdbc.queryForList(
+        "SELECT i.amount FROM inventory_item i"
+            + " JOIN inventory_item_job_order_allocation a ON a.inventory_item_id = i.id"
+            + " WHERE a.job_order_id = ? AND i.material_id IS NOT NULL",
+        Double.class,
+        target);
   }
 
   /**

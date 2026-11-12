@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** The merged entries of the Materialbörse item pickers (ADR-0371). */
+/** The merged entries of the Materialbörse item pickers (ADR-0372). */
 class ExchangeItemOptionTest {
 
   private static final UUID RAILGUN = UUID.fromString("0b7c3e1a-2d4f-4a5b-9c6d-7e8f9a0b1c2d");

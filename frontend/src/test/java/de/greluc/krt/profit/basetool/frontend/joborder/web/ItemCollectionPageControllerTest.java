@@ -61,9 +61,9 @@ class ItemCollectionPageControllerTest {
                 4L,
                 List.of(
                     new JobOrderItemStockEntryDto(
-                        UUID.randomUUID(), 0L, "Alice", null, null, null, 3L, 3L, true),
+                        UUID.randomUUID(), 0L, "Alice", null, null, null, 3L, 3L, true, false),
                     new JobOrderItemStockEntryDto(
-                        UUID.randomUUID(), 0L, "Bob", null, null, null, 1L, 1L, false))));
+                        UUID.randomUUID(), 0L, "Bob", null, null, null, 1L, 1L, false, false))));
     List<LocationReferenceDto> locations =
         List.of(new LocationReferenceDto(UUID.randomUUID(), "Port Olisar"));
 

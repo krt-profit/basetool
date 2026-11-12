@@ -41,11 +41,16 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+/** @type {WeakSet<Element>} */
+const boundOrderControls = new WeakSet();
+
+/** Binds material and item handover forms once per rendered form. */
+function initHandoverForms() {
     const handoverForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('handover-form')
     );
-    if (handoverForm) {
+    if (handoverForm && !boundOrderControls.has(handoverForm)) {
+        boundOrderControls.add(handoverForm);
         handoverForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!validateHandoverAmounts()) return;
@@ -78,6 +83,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'order-handovers-results', 'handovers');
                     _swapOrderSection(orderId, 'order-header-results', 'header');
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
+                        joborderHooks.refreshOrderSection?.([
+                            'participations',
+                            'actions',
+                            'dialogs',
+                        ]);
                         _publishOrdersQueue();
                     }
                 },
@@ -87,7 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemHandoverForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('item-handover-form')
     );
-    if (itemHandoverForm) {
+    if (itemHandoverForm && !boundOrderControls.has(itemHandoverForm)) {
+        boundOrderControls.add(itemHandoverForm);
         itemHandoverForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!validateItemHandoverForm()) return;
@@ -120,13 +131,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     _swapOrderSection(orderId, 'order-kpi-results', 'kpi');
                     krtPageSections.publish('inventory', ['stock']);
                     if (order && (order.status === 'COMPLETED' || order.status === 'REJECTED')) {
+                        joborderHooks.refreshOrderSection?.([
+                            'participations',
+                            'actions',
+                            'dialogs',
+                        ]);
                         _publishOrdersQueue();
                     }
                 },
             });
         });
     }
-});
+}
 
 /**
  * Renders the created dates, elapsed days and handover times under `root` in the viewer's locale.
@@ -158,7 +174,7 @@ function localizeOrderDates(root) {
             targetEl.classList.add('text-warning');
         }
     });
-    scope.querySelectorAll('.handover-time-span').forEach((el) => {
+    scope.querySelectorAll('.handover-time-span, .od-money-date').forEach((el) => {
         const utcDateStr = el.getAttribute('data-utc');
         if (utcDateStr) {
             const dateObj = new Date(utcDateStr);
@@ -178,12 +194,14 @@ document.addEventListener('krt:swapped', (e) => {
     localizeOrderDates(e && e.detail ? e.detail.container : document);
 });
 
-document.addEventListener('DOMContentLoaded', () => {
+/** Binds material row controls once per rendered editor. */
+function initMaterialEditor() {
     localizeOrderDates(document);
 
     const materialsContainer = document.getElementById('materials-container');
     const addMaterialBtn = document.getElementById('add-material-btn');
-    if (addMaterialBtn && materialsContainer) {
+    if (addMaterialBtn && materialsContainer && !boundOrderControls.has(materialsContainer)) {
+        boundOrderControls.add(materialsContainer);
         /**
          * Shows the unit and the SCU hint matching the material chosen in an edit-form row.
          *
@@ -301,7 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
-});
+}
 
 /**
  * Sends an order write through krtFetch, serialized per order and with the order's conflict
@@ -320,7 +338,8 @@ function initOrdersDetailEdit() {
     const form = /** @type {HTMLFormElement | null} */ (
         document.getElementById('delete-order-form')
     );
-    if (!form) return;
+    if (!form || boundOrderControls.has(form)) return;
+    boundOrderControls.add(form);
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
@@ -347,8 +366,6 @@ function initOrdersDetailEdit() {
         }
     });
 }
-
-initOrdersDetailEdit();
 
 /**
  * Collects the order edit form into the request body.
@@ -388,7 +405,8 @@ function _serializeEditForm() {
 }
 function initOrdersDetailEdit2() {
     const form = /** @type {HTMLFormElement | null} */ (document.getElementById('edit-order-form'));
-    if (!form) return;
+    if (!form || boundOrderControls.has(form)) return;
+    boundOrderControls.add(form);
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const orderId = form.getAttribute('data-order-id');
@@ -401,8 +419,8 @@ function initOrdersDetailEdit2() {
             showFrontendErrorToast(MSG_MATERIAL_INVALID);
             return;
         }
-        const requesterView = form.getAttribute('data-requester-view') === 'true';
-        const updateUrl = requesterView
+        const requesterEdit = form.getAttribute('data-requester-edit') === 'true';
+        const updateUrl = requesterEdit
             ? `/orders/${orderId}/requested-update`
             : `/orders/${orderId}/update`;
         await krtOrderWrite({
@@ -424,8 +442,6 @@ function initOrdersDetailEdit2() {
         });
     });
 }
-
-initOrdersDetailEdit2();
 
 /**
  * Re-renders the materials, aggregated and KPI sections of the order in place.
@@ -495,7 +511,7 @@ export async function unlinkInventoryItem(btn) {
         toast: false,
         errorMessage: MSG_INVENTORY_UNLINK_ERROR,
         sectionKey: 'header',
-        propagateVersion: true,
+        refresh: ['header'],
         onSuccess(data) {
             if (data && data.version != null) {
                 const editVer = _odEditVersionInput();
@@ -506,3 +522,13 @@ export async function unlinkInventoryItem(btn) {
         },
     });
 }
+
+/** Binds forms replaced when current responsibility changes. */
+function initOrderWriteControls() {
+    initHandoverForms();
+    initMaterialEditor();
+    initOrdersDetailEdit();
+    initOrdersDetailEdit2();
+}
+document.addEventListener('DOMContentLoaded', initOrderWriteControls);
+document.addEventListener('krt:swapped', initOrderWriteControls);

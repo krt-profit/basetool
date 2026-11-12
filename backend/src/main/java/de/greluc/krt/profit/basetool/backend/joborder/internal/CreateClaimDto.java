@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityAware;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ValidQuantityAmount;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -34,9 +36,13 @@ import java.util.UUID;
  *     NONE} (REQ-ORDERS-036)
  * @param claimingOrgUnitId the squadron making the claim; one the caller may act for
  * @param amount the claimed quantity; positive and at most the bucket's open remainder
+ * @param version observed claim version; absent only for a new promise
  */
+@ValidQuantityAmount
 public record CreateClaimDto(
     @NotNull UUID materialId,
     @NotBlank @Size(max = 32) String qualityRequirement,
     @NotNull UUID claimingOrgUnitId,
-    @NotNull @Positive Double amount) {}
+    @NotNull @Positive Double amount,
+    Long version)
+    implements QuantityAware {}

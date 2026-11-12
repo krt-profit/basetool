@@ -23,17 +23,12 @@ import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.util.UUID;
 
 /**
- * Lean org-unit option derived from a user's membership, for {@code <select>} pickers.
+ * Lean org-unit option for membership, responsibility and claiming-unit pickers.
  *
  * @param orgUnitId the org unit's id, used as the option value
  * @param orgUnitName the org unit's name, used as the option label
  * @param orgUnitShorthand the org unit's shorthand, or {@code null} when none is set
  * @param kind the org unit's kind, used to group options into {@code <optgroup>} sections
- * @param isProfitEligible whether the org unit may be picked as the responsible unit of a Job Order
  */
 public record OrgUnitMembershipOptionDto(
-    UUID orgUnitId,
-    String orgUnitName,
-    String orgUnitShorthand,
-    OrgUnitKind kind,
-    Boolean isProfitEligible) {}
+    UUID orgUnitId, String orgUnitName, String orgUnitShorthand, OrgUnitKind kind) {}

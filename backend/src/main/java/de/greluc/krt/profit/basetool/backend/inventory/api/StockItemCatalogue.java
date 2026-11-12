@@ -44,7 +44,7 @@ public interface StockItemCatalogue {
 
   /**
    * Pages the game items the Lager books through their type alone, those no active blueprint
-   * produces, optionally filtered by name (ADR-0371).
+   * produces, optionally filtered by name (ADR-0372).
    *
    * @param search case-insensitive name substring, or {@code null}/blank for no filter
    * @param pageable page request (whitelisted {@code name} / {@code id} sort)

@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.StockBookInScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
@@ -99,7 +100,11 @@ class ItemReconciliationConcurrencyIntegrationTest {
                         locations.getReferenceById(fixture.location()),
                         null,
                         false);
-                stock.lockLots(fixture.member(), List.of(lot.key()));
+                stock.prepareWrites(
+                    List.of(),
+                    List.of(
+                        new StockBookInScope(fixture.member(), lot, List.of(), true, null, true)),
+                    List.of());
                 advisoryHeld.countDown();
                 await(catalogueLocked);
                 stock.bookIn(fixture.member(), lot, 3);

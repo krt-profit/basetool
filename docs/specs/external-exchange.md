@@ -1624,6 +1624,20 @@ changed afterwards or a merge removed, and does not restore Materialbörse offer
 the same undo for every member of one client at once (REQ-XCH-034). Refinery-order writes are
 journaled and undone section by section (REQ-XCH-056).
 
+A stock journal without recoverable physical quantity identity still supports the same ordinary
+quantity undo. Its restored unknown portion contributes to current stock coverage, but cannot
+create new Staffel contribution credit; exact known composition remains preserved when available
+([REQ-ORDERS-024](orders-material-claims.md), ADR-0360). This adds no member action and changes no
+existing skip, authority or version rule.
+
+New internal personal-stock journal states may retain the actual admitted operation step in both
+the before and after facts. Use that ordering only for matching states inside the same database
+transaction and server batch; it does not reorder independent groups or other batches. Complete
+quantity composition is optional: missing historical proof is distinct from known empty quantity.
+A known before-boundary must come from the actual coherent operation sequence, never UUID order,
+timestamps or an inferred physical identity. This metadata adds no Exchange request field or member
+action and preserves the existing public skip reasons.
+
 **Acceptance**
 
 - [x] Undo after a later web edit skips that row and reports it. *`ExchangeUndoControllerTest`.*
@@ -1662,9 +1676,13 @@ change-log entry is not the client's last write, or is missing, then it is skipp
 `CHANGED_AFTERWARDS`: without the change-log entry nothing proves that nobody changed the entry
 since. One that no longer belongs to the member or names something gone is skipped as `GONE`. A
 ship is locked only when it is still the member's; one given to another member is skipped without
-locking its row. The lots to restore are locked like a stock write's (ADR-0229) before any entry is
-checked, and restored in the order of their keys, so an undo meeting a running write waits for it
-and then skips its lot as `CHANGED_AFTERWARDS`. A ship also goes back to the org unit its journaled
+locking its row. The originally declared lots are locked like a stock write's (ADR-0229) before
+restoration, in the order of their keys, so an undo meeting a running write waits for it
+and then skips its lot as `CHANGED_AFTERWARDS`. After evidence-guard waits and again after the
+complete lot-lock wait, apply the existing skip and authority checks before resimulating accepted
+restorations. Each selection may only drop unchanged declarations from the preceding selection in
+their original order; the complete initial resource and evidence plan and final restoration proofs
+still govern every retained operation. A ship also goes back to the org unit its journaled
 earlier state names (`orgUnit`, none included): one that still exists moves there through the
 Hangar's unit change behind its current unit counter (REQ-HANGAR-009, ADR-0258, audited
 `HANGAR_SHIP_ORG_UNIT_CHANGED`, its `version` untouched), and a recreated one is created in it. An
