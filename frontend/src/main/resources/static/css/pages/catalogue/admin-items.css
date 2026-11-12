@@ -1,0 +1,10 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .admin-items-section {
+        margin-top: var(--space-6);
+    }
+    .admin-items-section-title {
+        margin: 0 0 var(--space-3);
+    }
+}

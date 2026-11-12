@@ -433,7 +433,7 @@ class LiveSyncSectionMapParityTest {
   @Test
   void adminCatalogueSeamMaps_coverTheCatalogueAdminTopicWhitelist() throws IOException {
     Set<String> jsKeys = new LinkedHashSet<>();
-    for (String page : List.of("starmap.js", "shops.js", "p4k-report.js")) {
+    for (String page : List.of("starmap.js", "shops.js", "admin-items.js", "p4k-report.js")) {
       String path = "/static/js/catalogue/" + page;
       assertThat(readResource(path))
           .contains("topicClass: 'CATALOGUE_ADMIN'", "topic: 'catalogue-admin'");

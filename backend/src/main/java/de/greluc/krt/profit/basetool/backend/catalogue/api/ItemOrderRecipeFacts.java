@@ -77,7 +77,10 @@ public final class ItemOrderRecipeFacts {
       @Nullable QuantityType quantityType,
       @Nullable Long version) {}
 
-  /** The surviving item and retirement state resolved from a submitted local identity. */
+  /**
+   * The surviving item resolved from a submitted local identity; {@code retired} holds when a new
+   * line may not take it, because the P4K retired it or an admin hid it as not obtainable.
+   */
   public record OrderedItem(
       @NotNull UUID requestedId,
       @NotNull UUID canonicalId,

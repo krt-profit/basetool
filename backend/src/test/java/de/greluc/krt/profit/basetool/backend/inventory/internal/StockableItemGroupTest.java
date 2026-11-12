@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -50,6 +51,7 @@ class StockableItemGroupTest {
         "Gadget",
         "SalvageModifier",
         "InventoryContainer",
+        "RemovableChip",
         "Misc"
       })
   void theGroupsBookTheGearAndLootTypes(String type) {
@@ -70,7 +72,6 @@ class StockableItemGroupTest {
         "Drink",
         "Bottle",
         "Grenade",
-        "RemovableChip",
         "Currency",
         "Cargo",
         "Seat",
@@ -89,6 +90,24 @@ class StockableItemGroupTest {
             assertThat(StockableItemGroup.TYPES.contains(component.getWikiType()))
                 .as(component.name())
                 .isEqualTo(component != ShipComponentType.TURRET));
+  }
+
+  @ParameterizedTest(name = "{0}:{1} books {2}")
+  @CsvSource(
+      value = {
+        "WeaponPersonal, Large, true",
+        "Misc, NULL, true",
+        "Char_Armor_Helmet, Heavy, true",
+        "RemovableChip, SystemAccess, true",
+        "WeaponPersonal, Grenade, false",
+        "Misc, Mineable, false",
+        "Paints, UNDEFINED, false",
+        "NULL, NULL, false"
+      },
+      nullValues = "NULL")
+  void oneItemIsBookedByItsTypeUnlessItsSubTypeIsLeftOut(
+      String type, String subType, boolean booked) {
+    assertThat(StockableItemGroup.covers(type, subType)).isEqualTo(booked);
   }
 
   @Test

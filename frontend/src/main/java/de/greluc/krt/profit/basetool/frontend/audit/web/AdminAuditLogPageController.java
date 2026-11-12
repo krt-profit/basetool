@@ -344,6 +344,7 @@ public class AdminAuditLogPageController {
                   "MARKET_REQUEST_DEACTIVATED",
                   "MARKET_REQUEST_INTEREST_SIGNALLED",
                   "MARKET_REQUEST_INTEREST_WITHDRAWN",
+                  "MARKET_CATALOGUE_REASSIGNED",
                   "MARKET_AUDIT_EXPORTED",
                   "MARKET_AUDIT_PURGED")),
           Map.entry(
@@ -463,6 +464,7 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_STARMAP_LINK_CLEARED",
                   "CATALOGUE_STARMAP_LINK_RELEASED",
                   "CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN",
+                  "CATALOGUE_GAME_ITEM_OBTAINABILITY_CHANGED",
                   "CATALOGUE_STORAGE_PLACE_CREATED",
                   "CATALOGUE_SHOP_LINK_SET",
                   "CATALOGUE_SHOP_LINK_CLEARED",

@@ -103,7 +103,7 @@ public class JobOrderItemServiceImpl implements JobOrderItemService {
    * @return a populated {@link JobOrderItem} with its {@link JobOrderItemMaterial} children
    * @throws NotFoundException when the game item or blueprint id is unknown
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
-   * @throws RetiredGameItemException when the P4K retired the ordered game item
+   * @throws RetiredGameItemException when the ordered game item is retired or unobtainable
    * @throws RetiredBlueprintException when the P4K retired the chosen blueprint
    */
   @NotNull
@@ -139,8 +139,8 @@ public class JobOrderItemServiceImpl implements JobOrderItemService {
    * @param line the payload with game item, blueprint, amount and quality choices
    * @throws NotFoundException when the game item or blueprint id is unknown
    * @throws BadRequestException when the chosen blueprint does not produce the ordered game item
-   * @throws RetiredGameItemException when the P4K retired the ordered game item, also on a line
-   *     that keeps it
+   * @throws RetiredGameItemException when the ordered game item is retired or unobtainable, also on
+   *     a line that keeps it
    * @throws RetiredBlueprintException when the P4K retired the chosen blueprint, also on a line
    *     that keeps it
    */

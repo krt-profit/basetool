@@ -86,7 +86,7 @@
             </div>
         </th:block>
 
-        <div th:unless="${#lists.isEmpty(blueprints)}" class="master-detail card card--flush krt-bp-md" id="krt-bp-md">
+        <div th:unless="${#lists.isEmpty(blueprints)}" class="master-detail master-detail--panes card card--flush krt-bp-md" id="krt-bp-md">
             <div class="master-list">
                 <div class="krt-bp-master-rows" id="krt-bp-master-rows" role="listbox"
                      th:aria-label="#{personalInventory.blueprints.list.aria}">

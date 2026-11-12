@@ -38,9 +38,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Runs the Lager item picker read against PostgreSQL (REQ-INV-029): every listed blueprint output
- * and every listed item of a stocked type is bookable; consumables, clothing, paints, turrets,
- * untyped rows and retired rows are not.
+ * Runs the Lager item picker read against PostgreSQL (REQ-INV-029, REQ-P4K-048): every listed
+ * blueprint output and every listed item of a stocked type is bookable; consumables, clothing,
+ * paints, turrets, untyped rows, retired rows and rows an admin hid as not obtainable are not. The
+ * Materialbörse's read of the stocked items no active recipe produces runs here too (ADR-0372).
  */
 @SpringBootTest
 @Transactional
@@ -66,6 +67,7 @@ class InventoryBookableItemsTest {
     item("Remote Turret", "Turret", "GunTurret");
     item("Artifact", "Misc", "UNDEFINED");
     item("Medal", "Misc", null);
+    item("Comp-Board", "RemovableChip", "SystemAccess");
     item("Gem", "Misc", "Mineable");
     item("MedPen", "FPS_Consumable", "Medical");
     item("Shirt", "Char_Clothing_Torso_0", "UNDEFINED");
@@ -83,6 +85,7 @@ class InventoryBookableItemsTest {
             name("Shield"),
             name("Artifact"),
             name("Medal"),
+            name("Comp-Board"),
             name("Untyped Crafted"));
   }
 
@@ -100,6 +103,65 @@ class InventoryBookableItemsTest {
     blueprintRepository.flush();
 
     assertThat(bookable(TAG)).containsExactly(name("Live Railgun"));
+  }
+
+  @Test
+  void anItemAnAdminHidAsUnobtainableIsNotBookable_untilItIsOfferedAgain() {
+    item("Offered Railgun", "WeaponPersonal", "Large");
+    GameItem hidden = item("Unobtainable Railgun", "WeaponPersonal", "Large");
+    hidden.setUnobtainableSince(RETIRED);
+    crafted(item("Unobtainable Magazine", "WeaponAttachment", "Magazine"))
+        .getOutputItem()
+        .setUnobtainableSince(RETIRED);
+    gameItemRepository.flush();
+
+    assertThat(bookable(TAG)).containsExactly(name("Offered Railgun"));
+
+    hidden.setUnobtainableSince(null);
+    gameItemRepository.flush();
+
+    assertThat(bookable(TAG))
+        .containsExactlyInAnyOrder(name("Offered Railgun"), name("Unobtainable Railgun"));
+  }
+
+  @Test
+  void theBoerseReadLeavesOutAnItemAnAdminHidAsUnobtainable() {
+    item("Offered Railgun", "WeaponPersonal", "Large");
+    item("Unobtainable Railgun", "WeaponPersonal", "Large").setUnobtainableSince(RETIRED);
+    gameItemRepository.flush();
+
+    assertThat(
+            catalogue
+                .findBookableItemsWithoutBlueprint(TAG, PageRequest.of(0, 100))
+                .getContent()
+                .stream()
+                .map(InventoryGameItemReferenceDto::name)
+                .toList())
+        .containsExactly(name("Offered Railgun"));
+  }
+
+  @Test
+  void theBoerseReadOffersOnlyStockedItemsNoActiveRecipeProduces() {
+    item("Railgun", "WeaponPersonal", "Large");
+    crafted(item("Crafted Scope", "WeaponAttachment", "IronSight"));
+    crafted(item("Crafted Magazine", "WeaponAttachment", "Magazine"));
+    crafted(item("Old Helmet", "Char_Armor_Helmet", "Heavy")).setP4kDeletedAt(RETIRED);
+    item("Magazine", "WeaponAttachment", "Magazine");
+    item("Shirt", "Char_Clothing_Torso_0", "UNDEFINED");
+    GameItem swept = item("Swept Railgun", "WeaponPersonal", "Large");
+    swept.setP4kUuid(UUID.randomUUID());
+    swept.setP4kDeletedAt(RETIRED);
+    gameItemRepository.flush();
+    blueprintRepository.flush();
+
+    assertThat(
+            catalogue
+                .findBookableItemsWithoutBlueprint(TAG, PageRequest.of(0, 100))
+                .getContent()
+                .stream()
+                .map(InventoryGameItemReferenceDto::name)
+                .toList())
+        .containsExactlyInAnyOrder(name("Railgun"), name("Old Helmet"));
   }
 
   @Test

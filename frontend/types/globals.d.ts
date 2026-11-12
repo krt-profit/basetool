@@ -1008,6 +1008,8 @@ interface Window {
     krtStarmapI18n?: KrtI18nDict;
     /** Labels of the admin shops page, from `shops.html`. */
     krtShopsI18n?: KrtI18nDict;
+    /** Labels of the admin items page, from `items.html`. */
+    krtAdminItemsI18n?: KrtI18nDict;
     krtBlueprintsImportI18n?: KrtI18nDict;
     krtBlueprintsRecipeI18n?: KrtI18nDict;
 

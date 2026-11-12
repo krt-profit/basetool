@@ -48,6 +48,7 @@ public final class ApiDomains {
           Map.entry("AdminDeletionRequestController", "identity"),
           Map.entry("AdminExchangeBulkUndoController", "exchange"),
           Map.entry("AdminExchangeRegistryController", "exchange"),
+          Map.entry("AdminGameItemController", "catalogue"),
           Map.entry("AdminP4kImportController", "catalogue"),
           Map.entry("AdminP4kImportReportController", "catalogue"),
           Map.entry("AdminStarmapController", "catalogue"),

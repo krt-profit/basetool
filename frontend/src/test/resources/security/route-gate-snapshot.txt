@@ -38,6 +38,9 @@
 /admin/exchange-clients/{id}/undo POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#startUndo gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/{id}/undo/installations GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#undoInstallations gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/{id}/undo/preview POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#previewUndo gate=class:hasRole('ADMIN') layout=no
+/admin/items GET -> AdminItemsPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/items/list GET -> AdminItemsController#items gate=class:hasRole('ADMIN') layout=no
+/admin/items/{id}/obtainability POST -> AdminItemsController#setObtainability gate=class:hasRole('ADMIN') layout=no
 /admin/locations GET -> AdminLocationsPageController#listData gate=class:hasRole('ADMIN') layout=yes
 /admin/locations/{id}/toggle-home-location POST -> AdminLocationsPageController#toggleHomeLocation gate=method:hasRole('ADMIN') layout=yes
 /admin/locations/{id}/toggle-home-location POST headers=[X-Requested-With=XMLHttpRequest] -> AdminLocationsPageController#toggleHomeLocationAjax gate=method:hasRole('ADMIN') layout=yes
@@ -372,9 +375,9 @@
 /manifest.webmanifest GET -> WebAppManifestController#manifest gate=none layout=no
 /materialboerse GET -> MaterialboersePageController#board gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/item-offers/ajax POST -> MaterialboersePageController#releaseItem gate=class:hasRole('KRT_MEMBER') layout=yes
+/materialboerse/item-options GET -> MaterialboersePageController#itemOptions gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/item-requests/ajax POST -> MaterialboersePageController#createItemRequest gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/items/{inventoryItemId}/deactivate/ajax POST -> MaterialboersePageController#deactivateForItem gate=class:hasRole('KRT_MEMBER') layout=yes
-/materialboerse/offerable-products GET -> MaterialboersePageController#offerableProducts gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/offers/ajax POST -> MaterialboersePageController#release gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/offers/{id}/deactivate/ajax POST -> MaterialboersePageController#deactivate gate=class:hasRole('KRT_MEMBER') layout=yes
 /materialboerse/offers/{id}/interest/ajax DELETE -> MaterialboersePageController#withdrawInterest gate=class:hasRole('KRT_MEMBER') layout=yes

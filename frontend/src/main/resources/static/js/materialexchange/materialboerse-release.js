@@ -19,6 +19,13 @@ import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { krtHooks } from '/js/kernel/krt-hooks.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
+import {
+    itemIdentityOf,
+    itemOptionsUrl,
+    renderItemOption,
+} from '/js/materialexchange/exchange-item-options.js';
+
+/** @import { ExchangeItemOption } from '/js/materialexchange/exchange-item-options.js' */
 
 function initMaterialboerseRelease() {
     /**
@@ -44,6 +51,7 @@ function initMaterialboerseRelease() {
      * @property {string | null} mode `new`, `lager`, `item`, `edit` or null while closed
      * @property {string | null} itemId the picked inventory entry
      * @property {string | null} productKey the picked blueprint product
+     * @property {string | null} gameItemId the picked item no blueprint produces
      * @property {string | null} offerId the offer being edited
      * @property {string | null} version the offer's version
      * @property {number | null} available the stock ceiling of the amount field
@@ -65,6 +73,7 @@ function initMaterialboerseRelease() {
         mode: null,
         itemId: null,
         productKey: null,
+        gameItemId: null,
         offerId: null,
         version: null,
         available: null,
@@ -88,20 +97,10 @@ function initMaterialboerseRelease() {
      * @property {boolean} [stolen] whether the entry is stolen stock
      */
 
-    /**
-     * One blueprint product of the item picker.
-     *
-     * @typedef {object} MaterialProductItem
-     * @property {string} productKey the product
-     * @property {string} name the product name
-     * @property {string} [manufacturerName] the manufacturer
-     * @property {string | null} [manufacturerNameDe] the manufacturer's German name
-     */
-
     /** @type {MaterialPickerItem[]} */
     let pickerItems = [];
-    /** @type {MaterialProductItem[]} */
-    let productItems = [];
+    /** @type {ExchangeItemOption[]} */
+    let itemOptions = [];
     /** @type {HTMLElement | null} */
     let lastFocused = null;
     let pickerSeq = 0;
@@ -324,6 +323,7 @@ function initMaterialboerseRelease() {
             mode,
             itemId: ctx.itemId || null,
             productKey: null,
+            gameItemId: null,
             offerId: ctx.offerId || null,
             version: ctx.version || null,
             available: null,
@@ -435,6 +435,7 @@ function initMaterialboerseRelease() {
             mode: null,
             itemId: null,
             productKey: null,
+            gameItemId: null,
             offerId: null,
             version: null,
             available: null,
@@ -600,33 +601,32 @@ function initMaterialboerseRelease() {
     }
 
     /**
-     * Loads the offerable blueprint products, optionally filtered by a search text.
+     * Loads the items the dialog can list, optionally filtered by a search text.
      *
      * @param {string} query the search text; empty for all
      */
     function loadItemPicker(query) {
         const seq = ++itemPickerSeq;
-        const url = `/materialboerse/offerable-products${query ? `?q=${encodeURIComponent(query)}` : ''}`;
         krtFetch
-            .getJson(url)
+            .getJson(itemOptionsUrl(query))
             .then((items) => {
                 if (seq !== itemPickerSeq) {
                     return;
                 }
-                productItems = Array.isArray(items) ? items : [];
+                itemOptions = Array.isArray(items) ? items : [];
                 renderItemPicker();
             })
             .catch(() => {
                 if (seq !== itemPickerSeq) {
                     return;
                 }
-                productItems = [];
+                itemOptions = [];
                 renderItemPicker();
             });
     }
 
     /**
-     * Debounces a server-side blueprint-product search so every keystroke does not fire a request.
+     * Debounces a server-side item search so every keystroke does not fire a request.
      *
      * @param {string} query the search text
      */
@@ -639,7 +639,7 @@ function initMaterialboerseRelease() {
         }, PICKER_SEARCH_DEBOUNCE_MS);
     }
 
-    /** Opens the item (blueprint-product) picker dropdown on an explicit user gesture. */
+    /** Opens the item picker dropdown on an explicit user gesture. */
     function openItemPickerList() {
         itemPickerListOpen = true;
         const list = q('[data-mb-item-picker-list]');
@@ -662,7 +662,7 @@ function initMaterialboerseRelease() {
         if (!list) {
             return;
         }
-        if (!productItems.length) {
+        if (!itemOptions.length) {
             krtHtml.set(
                 list,
                 krtHtml`<li class="krt-combobox__notice">${i18n.itemPickerEmpty || ''}</li>`,
@@ -670,25 +670,19 @@ function initMaterialboerseRelease() {
             list.hidden = !itemPickerListOpen;
             return;
         }
-        const html = productItems.map((it) => {
-            const manufacturer = localisedName(it.manufacturerName, it.manufacturerNameDe);
-            return krtHtml`<li class="krt-combobox__option" role="option" data-product-key="${
-                it.productKey
-            }" data-name="${it.name}"><strong>${it.name}</strong>${
-                manufacturer ? krtHtml` <small>${manufacturer}</small>` : ''
-            }</li>`;
-        });
-        krtHtml.set(list, html);
+        krtHtml.set(list, itemOptions.map(renderItemOption));
         list.hidden = !itemPickerListOpen;
     }
 
     /**
-     * Takes over a picked blueprint product.
+     * Takes over a picked item.
      *
      * @param {Element} li the clicked picker option
      */
-    function pickProduct(li) {
-        state.productKey = li.getAttribute('data-product-key');
+    function pickItemOption(li) {
+        const identity = itemIdentityOf(li);
+        state.productKey = identity.productKey;
+        state.gameItemId = identity.gameItemId;
         /** @type {HTMLInputElement | null} */
         const input = q('[data-mb-item-picker-input]');
         if (input) {
@@ -753,13 +747,13 @@ function initMaterialboerseRelease() {
     }
 
     /**
-     * Submits an item offer for the picked blueprint product and a whole quantity ≥ 1; on success
-     * notifies peers and closes the modal.
+     * Submits an item offer for the picked item and a whole quantity ≥ 1; on success notifies peers
+     * and closes the modal.
      *
      * @param {string} remark the remark text
      */
     function submitItem(remark) {
-        if (!state.productKey) {
+        if (!state.productKey && !state.gameItemId) {
             return;
         }
         /** @type {HTMLInputElement | null} */
@@ -776,7 +770,12 @@ function initMaterialboerseRelease() {
         krtFetch.write({
             method: 'POST',
             url: '/materialboerse/item-offers/ajax',
-            payload: { productKey: state.productKey, quantity, remark },
+            payload: {
+                productKey: state.productKey,
+                gameItemId: state.gameItemId,
+                quantity,
+                remark,
+            },
             successMessage: i18n.itemReleased || i18n.released,
             errorMessage: i18n.error,
             serialize: SERIALIZE_KEY,
@@ -838,7 +837,7 @@ function initMaterialboerseRelease() {
         }
         const pli = target.closest('[data-mb-item-picker-list] .krt-combobox__option');
         if (pli) {
-            pickProduct(pli);
+            pickItemOption(pli);
         }
     });
 

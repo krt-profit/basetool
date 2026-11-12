@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_BLUEPRINT;
 import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_ITEM;
+import static de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItemJpql.SELECTABLE_ITEM;
 
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -49,21 +50,43 @@ public interface GameItemRepository
   /** Joins an item's type and sub-type into the keys {@link #findStockable} leaves out. */
   String TYPE_KEY_SEPARATOR = ":";
 
+  /** The game item aliased {@code gi} has a name that contains {@code :q}. */
+  String NAME_MATCH = " LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\' ";
+
   /**
-   * The {@code WHERE} clause of the Lager item picker over a game item aliased {@code gi}: a listed
-   * item whose name contains {@code :q} and that a listed active blueprint produces, or whose type
-   * is one of {@code :types} and whose type and sub-type key is not one of {@code
-   * :excludedTypeSubTypes}.
+   * A selectable game item aliased {@code gi} whose name contains {@code :q}: listed by the P4K and
+   * not hidden as not obtainable (REQ-P4K-048).
+   */
+  String SELECTABLE_NAME_MATCH = SELECTABLE_ITEM + "AND" + NAME_MATCH;
+
+  /** The game item aliased {@code gi} is the output of a listed active blueprint. */
+  String ACTIVE_BLUEPRINT_OUTPUT =
+      " EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi AND b.scwikiDeletedAt IS NULL AND"
+          + LISTED_BLUEPRINT
+          + ")";
+
+  /**
+   * The type of the game item aliased {@code gi} is one of {@code :types}, and its type and
+   * sub-type key is not one of {@code :excludedTypeSubTypes}.
+   */
+  String STOCKED_TYPE =
+      " (gi.wikiType IN :types AND CONCAT(gi.wikiType, '"
+          + TYPE_KEY_SEPARATOR
+          + "', COALESCE(gi.wikiSubType, '')) NOT IN :excludedTypeSubTypes)";
+
+  /**
+   * The {@code WHERE} clause of the Lager item picker: a selectable, name-matching item that is a
+   * blueprint output or of a stocked type.
    */
   String STOCKABLE_ITEM_FILTER =
-      LISTED_ITEM
-          + "AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'"
-          + " AND (EXISTS (SELECT 1 FROM Blueprint b WHERE b.outputItem = gi"
-          + " AND b.scwikiDeletedAt IS NULL AND"
-          + LISTED_BLUEPRINT
-          + ") OR (gi.wikiType IN :types AND CONCAT(gi.wikiType, '"
-          + TYPE_KEY_SEPARATOR
-          + "', COALESCE(gi.wikiSubType, '')) NOT IN :excludedTypeSubTypes))";
+      SELECTABLE_NAME_MATCH + " AND (" + ACTIVE_BLUEPRINT_OUTPUT + " OR" + STOCKED_TYPE + ")";
+
+  /**
+   * The {@code WHERE} clause of the stocked items no blueprint produces: a selectable,
+   * name-matching item of a stocked type that is no blueprint output.
+   */
+  String STOCKED_WITHOUT_BLUEPRINT_FILTER =
+      SELECTABLE_NAME_MATCH + " AND NOT" + ACTIVE_BLUEPRINT_OUTPUT + " AND" + STOCKED_TYPE;
 
   /**
    * Builds the key {@link #findStockable} compares an item's type and sub-type with.
@@ -78,8 +101,9 @@ public interface GameItemRepository
   }
 
   /**
-   * Pages the listed game items the Lager books as item stock (REQ-INV-029): every output of a
-   * listed active blueprint, and every item of a stocked type outside its excluded sub-types.
+   * Pages the selectable game items the Lager books as item stock (REQ-INV-029, REQ-P4K-048): every
+   * output of a listed active blueprint, and every item of a stocked type outside its excluded
+   * sub-types.
    *
    * <p>Both collections must be non-empty.
    *
@@ -101,6 +125,84 @@ public interface GameItemRepository
       @Param("types") Collection<String> types,
       @Param("excludedTypeSubTypes") Collection<String> excludedTypeSubTypes,
       Pageable pageable);
+
+  /**
+   * Pages the selectable game items the Lager books through their type alone: items of a stocked
+   * type outside its excluded sub-types that no listed active blueprint produces (ADR-0372,
+   * REQ-P4K-048).
+   *
+   * <p>Both collections must be non-empty.
+   *
+   * @param q case-insensitive, LIKE-escaped name substring; must be non-null ({@code ""} = no
+   *     filter)
+   * @param types the item types the Lager books without a blueprint
+   * @param excludedTypeSubTypes {@link #typeSubTypeKey(String, String)} keys left out of {@code
+   *     types}
+   * @param pageable page request (whitelisted {@code name} / {@code id} sort)
+   * @return a page of stocked game items without a blueprint
+   */
+  @Query(
+      value =
+          "SELECT gi FROM GameItem gi LEFT JOIN FETCH gi.manufacturer WHERE"
+              + STOCKED_WITHOUT_BLUEPRINT_FILTER,
+      countQuery = "SELECT COUNT(gi) FROM GameItem gi WHERE" + STOCKED_WITHOUT_BLUEPRINT_FILTER)
+  Page<GameItem> findStockedWithoutBlueprint(
+      @Param("q") String q,
+      @Param("types") Collection<String> types,
+      @Param("excludedTypeSubTypes") Collection<String> excludedTypeSubTypes,
+      Pageable pageable);
+
+  /**
+   * Pages the game items the P4K lists whose name contains {@code q}, the ones an admin hid as not
+   * obtainable included, for the admin item list (REQ-P4K-048).
+   *
+   * @param q case-insensitive, LIKE-escaped name substring; must be non-null ({@code ""} = no
+   *     filter)
+   * @param pageable page request (whitelisted {@code name} / {@code id} sort)
+   * @return a page of listed game items, manufacturers loaded
+   */
+  @Query(
+      value =
+          "SELECT gi FROM GameItem gi LEFT JOIN FETCH gi.manufacturer WHERE"
+              + LISTED_ITEM
+              + "AND"
+              + NAME_MATCH,
+      countQuery = "SELECT COUNT(gi) FROM GameItem gi WHERE" + LISTED_ITEM + "AND" + NAME_MATCH)
+  Page<GameItem> findListedByName(@Param("q") String q, Pageable pageable);
+
+  /**
+   * Pages the game items an admin hid as not obtainable whose name contains {@code q}, the ones the
+   * P4K retired since included (REQ-P4K-048).
+   *
+   * @param q case-insensitive, LIKE-escaped name substring; must be non-null ({@code ""} = no
+   *     filter)
+   * @param pageable page request (whitelisted {@code name} / {@code id} sort)
+   * @return a page of unobtainable game items, manufacturers loaded
+   */
+  @Query(
+      value =
+          "SELECT gi FROM GameItem gi LEFT JOIN FETCH gi.manufacturer"
+              + " WHERE gi.unobtainableSince IS NOT NULL AND"
+              + NAME_MATCH,
+      countQuery =
+          "SELECT COUNT(gi) FROM GameItem gi WHERE gi.unobtainableSince IS NOT NULL AND"
+              + NAME_MATCH)
+  Page<GameItem> findUnobtainableByName(@Param("q") String q, Pageable pageable);
+
+  /**
+   * Lists the ids of the game items an admin hid as not obtainable (REQ-P4K-048).
+   *
+   * @return the ids, in no particular order
+   */
+  @Query("SELECT gi.id FROM GameItem gi WHERE gi.unobtainableSince IS NOT NULL")
+  List<UUID> findUnobtainableIds();
+
+  /**
+   * Counts the game items an admin hid as not obtainable (REQ-P4K-048).
+   *
+   * @return the count
+   */
+  long countByUnobtainableSinceIsNotNull();
 
   /**
    * Loads the surviving item for a live or retained local id.

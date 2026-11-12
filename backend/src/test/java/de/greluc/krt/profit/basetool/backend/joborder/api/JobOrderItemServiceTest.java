@@ -165,7 +165,7 @@ class JobOrderItemServiceTest {
                 .filter(Objects::nonNull)
                 .map(item ->
                     new ItemOrderRecipeFacts.OrderedItem(
-                        item.getId(), item.getId(), item.isP4kRetired(), item.getVersion()))
+                        item.getId(), item.getId(), !item.isSelectable(), item.getVersion()))
                 .toList());
     lenient().when(blueprintRepository.findItemOrderRetainedItems(any())).thenReturn(List.of());
     lenient()
@@ -440,6 +440,20 @@ class JobOrderItemServiceTest {
     CreateJobOrderItemLineDto line =
         new CreateJobOrderItemLineDto(
             null, retired.getId(), UUID.randomUUID(), 1, List.of(), null, null);
+
+    assertThatThrownBy(() -> service.buildItemLine(line))
+        .isInstanceOf(RetiredGameItemException.class);
+  }
+
+  @Test
+  void buildItemLineRefusesAnItemAnAdminHidAsUnobtainable() {
+    GameItem unobtainable = gameItem("Ballista", GameItemKind.WEAPON);
+    unobtainable.setUnobtainableSince(Instant.now());
+    givenGameItem(unobtainable);
+
+    CreateJobOrderItemLineDto line =
+        new CreateJobOrderItemLineDto(
+            null, unobtainable.getId(), UUID.randomUUID(), 1, List.of(), null, null);
 
     assertThatThrownBy(() -> service.buildItemLine(line))
         .isInstanceOf(RetiredGameItemException.class);

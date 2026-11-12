@@ -226,7 +226,10 @@ pass, REQ-P4K-040, REQ-P4K-041), and the orphan sweep `P4kSweeper`; `P4kImportRe
 reports and the review list; its wire format and streaming reader are `catalogue.internal.p4k`
 (REQ-P4K-001…016). The starmap tree (`StarmapObject`) is imported by `P4kStarmapReconciler`,
 `P4kStarmapLinker` links the nine UEX location tables to it through `StarmapPlaceRows`, and
-`StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038). The shops
+`StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038).
+`GameItemAdminService` serves the admin's hide of a game item as not obtainable, a state of its own
+that the item pickers and `SelectableGameItems` read beside the P4K retirement (REQ-P4K-048,
+ADR-0373). The shops
 (`Shop`, `ShopItem`) are imported by `P4kShopReconciler`, `P4kShopLinker` links each to a UEX
 terminal of its place by name (`ShopTerminalNames`), and `ShopAdminService` serves the admin's
 manual links; `ItemCatalogueDetailsService` shows an item's shops as "available at"
@@ -530,11 +533,11 @@ identity Prometheus sends (ADR-0265, REQ-OBS-005). Rules, dashboards and probes:
 
 `catalogue.internal.ItemReconciliationIndex` holds scalar source identity candidates;
 `ItemReconciliationService` validates and locks a verified pair and calls the owner-implemented
-`catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply
-and purchasing update only their own references and emit their own audit/live events. The
-catalogue archives both original item/price/stat sets in `game_item_redirect` before retiring
-the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical ids
-have a separate reference seam for bulk reads.
+`catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply,
+purchasing and the Materialbörse update only their own references and emit their own audit/live
+events. The catalogue archives both original item/price/stat sets in `game_item_redirect` before
+retiring the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical
+ids have a separate reference seam for bulk reads.
 
 `ScWikiRequestExecutor` owns pacing/retry transport, `ScWikiClient` owns the scoped game build,
 and `SyncChunkWriter` owns isolated application transactions. `SyncRunService` persists attempt

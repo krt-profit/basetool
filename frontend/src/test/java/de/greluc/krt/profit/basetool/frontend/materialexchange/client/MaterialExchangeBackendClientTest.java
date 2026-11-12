@@ -111,6 +111,8 @@ class MaterialExchangeBackendClientTest {
     backend.answerJson("[]");
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(EMPTY_PAGE);
+    backend.answerJson(EMPTY_PAGE);
 
     assertThat(client.offerableProducts("Gladius Wing", 25)).isEmpty();
     assertThat(client.offerableProducts(null, 25)).isEmpty();
@@ -118,6 +120,8 @@ class MaterialExchangeBackendClientTest {
     assertThat(client.releasableItems(null, null)).isEmpty();
     assertThat(client.requestMaterials("agri", 25)).isNotNull();
     assertThat(client.requestMaterials(" ", 25)).isNotNull();
+    assertThat(client.itemsWithoutBlueprint("Scourge Rail", 25)).isNotNull();
+    assertThat(client.itemsWithoutBlueprint(null, 25)).isNotNull();
 
     backend.expect("GET", "/api/v1/blueprints/products/search?limit=25&q=Gladius%20Wing");
     backend.expect("GET", "/api/v1/blueprints/products/search?limit=25");
@@ -125,16 +129,20 @@ class MaterialExchangeBackendClientTest {
     backend.expect("GET", "/api/v1/material-exchange/releasable-items");
     backend.expect("GET", "/api/v1/materials/search?size=25&search=agri");
     backend.expect("GET", "/api/v1/materials/search?size=25");
+    backend.expect(
+        "GET", "/api/v1/game-items?withoutBlueprint=true&size=25&sort=name,asc&q=Scourge%20Rail");
+    backend.expect("GET", "/api/v1/game-items?withoutBlueprint=true&size=25&sort=name,asc");
   }
 
   @Test
   void offerWrites() {
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
       backend.answerEmpty();
     }
 
     client.release(new MaterialExchangeReleaseRequest(ITEM, 5.0, "Tausch"));
-    client.releaseItem(new MaterialExchangeItemReleaseRequest("gladius", 2, null));
+    client.releaseItem(new MaterialExchangeItemReleaseRequest("gladius", null, 2, null));
+    client.releaseItem(new MaterialExchangeItemReleaseRequest(null, ITEM, 1, "x"));
     client.updateOffer(ID, new MaterialExchangeOfferUpdateRequest(120.0, "neu", 0L));
     client.deactivateOffer(ID);
     client.deactivateOfferForItem(ITEM);
@@ -148,7 +156,11 @@ class MaterialExchangeBackendClientTest {
     backend.expect(
         "POST",
         "/api/v1/material-exchange/item-offers",
-        "{\"productKey\":\"gladius\",\"quantity\":2,\"remark\":null}");
+        "{\"productKey\":\"gladius\",\"gameItemId\":null,\"quantity\":2,\"remark\":null}");
+    backend.expect(
+        "POST",
+        "/api/v1/material-exchange/item-offers",
+        "{\"productKey\":null,\"gameItemId\":\"" + ITEM + "\",\"quantity\":1,\"remark\":\"x\"}");
     backend.expect(
         "PUT",
         "/api/v1/material-exchange/offers/" + ID + "/remark",
@@ -167,7 +179,7 @@ class MaterialExchangeBackendClientTest {
     }
 
     client.createMaterialRequest(new MaterialRequestCreateRequest(MATERIAL, 600, 12.5, "Dringend"));
-    client.createItemRequest(new MaterialItemRequestCreateRequest("gladius", null, 1, null));
+    client.createItemRequest(new MaterialItemRequestCreateRequest("gladius", null, null, 1, null));
     client.updateRequest(ID, new MaterialRequestUpdateRequest(5.0, null, "", 2L));
     client.deactivateRequest(ID);
     client.signalFulfillment(ID);
@@ -182,7 +194,8 @@ class MaterialExchangeBackendClientTest {
     backend.expect(
         "POST",
         "/api/v1/material-exchange/requests/item",
-        "{\"productKey\":\"gladius\",\"minQuality\":null,\"quantity\":1,\"remark\":null}");
+        "{\"productKey\":\"gladius\",\"gameItemId\":null,\"minQuality\":null,\"quantity\":1,"
+            + "\"remark\":null}");
     backend.expect(
         "PUT",
         "/api/v1/material-exchange/requests/" + ID,

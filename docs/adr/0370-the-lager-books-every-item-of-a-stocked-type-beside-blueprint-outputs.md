@@ -1,6 +1,7 @@
 # ADR-0370 — The Lager books every item of a stocked type beside the blueprint outputs
 
-- **Status:** Accepted
+- **Status:** Accepted — the Materialbörse consequence is resolved by ADR-0372; access chips join
+  the groups by Amendment 1 below
 - **Date:** 2026-11-11
 - **Deciders:** @greluc
 - **Related:** amends the catalog predicate of ADR-0101 · ADR-0087, ADR-0108 (Materialbörse item
@@ -75,3 +76,19 @@ plus ground-vehicle missile launchers, mining and salvage modules, storage conta
   reward and pledge items would drop out.
 - **Rows without a type by their UEX-derived kind.** Rejected: they are mostly duplicates of typed
   rows or bundles, so a member would book the same item under two catalogue rows.
+
+## Amendment 1 (2026-11-12) — access chips join the groups
+
+The DCHS-01 to DCHS-07 Comp-Boards that open the Executive Hangar are catalogue items of the type
+`RemovableChip` (sub-type `SystemAccess`), which no group named, so the Lager could not book them.
+A production read on 2026-11-12 found 41 listed `RemovableChip` items, none with a blueprint: the
+seven Comp-Boards, a server blade and an alignment blade, two passcode disks, four data drives, 25
+keycards, access cards and inverter codes, and one mission datachip (sub-type `Utility`).
+Comp-Boards and keycards share the type and the sub-type, so no type rule tells them apart.
+
+The owner decided that the Lager books the whole type: the group `ACCESS_CHIPS` names
+`RemovableChip` and leaves no sub-type out. Keycards no longer count as consumables, and the
+Materialbörse offers them too, because it offers what the Lager books (ADR-0372).
+
+- **Rejected: keeping only the boards by class name** (`Carryable_1H_SQ_…`). It would be a second
+  rule beside the type allow-list, and it breaks when the game renames its internal classes.
