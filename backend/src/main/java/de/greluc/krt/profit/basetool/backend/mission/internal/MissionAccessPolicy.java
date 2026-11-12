@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -66,7 +64,6 @@ public class MissionAccessPolicy implements MissionVisibility {
   private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final MissionRepository missionRepository;
-  private final UserService userService;
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
 
@@ -171,7 +168,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return false;
     }
 
-    UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID currentUserId = authHelper.currentUserId().orElse(null);
     if (currentUserId != null && p.getUser().getId().equals(currentUserId)) {
       return true;
     }
@@ -201,7 +198,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return true;
     }
 
-    UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID currentUserId = authHelper.currentUserId().orElse(null);
     if (currentUserId == null) {
       return false;
     }
@@ -236,7 +233,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return true;
     }
 
-    UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID currentUserId = authHelper.currentUserId().orElse(null);
     if (currentUserId == null
         || entry.getParticipant().getUser() == null
         || !entry.getParticipant().getUser().getId().equals(currentUserId)) {
@@ -305,7 +302,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return true;
     }
 
-    UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID userId = authHelper.currentUserId().orElse(null);
     return userId != null
         && mission.getOwner() != null
         && mission.getOwner().getId().equals(userId);
@@ -339,7 +336,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return false;
     }
 
-    UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID userId = authHelper.currentUserId().orElse(null);
     if (userId == null) {
       return false;
     }

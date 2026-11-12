@@ -28,7 +28,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
@@ -52,8 +51,6 @@ import org.springframework.security.core.Authentication;
 class MissionAccessPolicyGateTest {
 
   @Mock private MissionRepository missionRepository;
-
-  @Mock private UserService userService;
 
   @Mock private MissionParticipantRepository missionParticipantRepository;
 
@@ -81,7 +78,6 @@ class MissionAccessPolicyGateTest {
                 accessGateService,
                 authHelperService,
                 missionRepository,
-                userService,
                 missionParticipantRepository,
                 missionFinanceEntryRepository));
 
@@ -111,7 +107,7 @@ class MissionAccessPolicyGateTest {
   void canManageMission_FlatRolesWithoutAGrant_ShouldReturnFalse() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canManageMission(missionId, authentication));
   }
@@ -120,7 +116,7 @@ class MissionAccessPolicyGateTest {
   void canManageMission_ManagerList_Owner_ShouldReturnTrue() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     mission.setOwner(user);
 
     assertTrue(missionAccessPolicy.canManageMission(missionId, authentication));
@@ -130,7 +126,7 @@ class MissionAccessPolicyGateTest {
   void canManageMission_ManagerList_CoManager_ShouldReturnTrue() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     mission.getManagers().add(user);
 
     assertTrue(missionAccessPolicy.canManageMission(missionId, authentication));
@@ -140,7 +136,7 @@ class MissionAccessPolicyGateTest {
   void canManageMission_ManagerList_RegularUser_ShouldReturnFalse() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canManageMission(missionId, authentication));
   }
@@ -154,7 +150,7 @@ class MissionAccessPolicyGateTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(accessGateService.canManageMissionsOf(foreignUnitId)).thenReturn(false);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canManageMission(missionId, authentication));
   }
@@ -162,7 +158,7 @@ class MissionAccessPolicyGateTest {
   @Test
   void canEdit_ManageGate_AdmitsTheOwner() {
     when(authentication.isAuthenticated()).thenReturn(true);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     mission.setOwner(user);
 
     assertTrue(missionAccessPolicy.canEdit(mission, MissionGate.MANAGE, authentication));
@@ -191,7 +187,7 @@ class MissionAccessPolicyGateTest {
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertTrue(
         missionAccessPolicy.canAccessLoadedParticipant(mission, participantId, authentication));
@@ -210,7 +206,7 @@ class MissionAccessPolicyGateTest {
     when(missionParticipantRepository.findById(participantId)).thenReturn(Optional.of(participant));
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(
         missionAccessPolicy.canAccessLoadedParticipant(mission, participantId, authentication));
@@ -249,7 +245,7 @@ class MissionAccessPolicyGateTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getPrincipal()).thenReturn("some-jwt-principal");
     when(accessGateService.canManageMissionsOf(null)).thenReturn(false);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(
         missionAccessPolicy.canAccessLoadedParticipant(mission, participantId, authentication));
@@ -400,7 +396,7 @@ class MissionAccessPolicyGateTest {
     UUID unitId = givenOwnedMission();
     givenAuthenticatedCaller();
     when(accessGateService.canActAsOfficerInOwner(unitId)).thenReturn(false);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
   }
@@ -410,7 +406,7 @@ class MissionAccessPolicyGateTest {
     UUID unitId = givenOwnedMission();
     givenAuthenticatedCaller();
     when(accessGateService.canActAsOfficerInOwner(unitId)).thenReturn(false);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
   }
@@ -420,7 +416,7 @@ class MissionAccessPolicyGateTest {
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     givenAuthenticatedCaller();
     when(accessGateService.canActAsOfficerInOwner(null)).thenReturn(false);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
   }
@@ -430,7 +426,7 @@ class MissionAccessPolicyGateTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
   }
@@ -440,7 +436,7 @@ class MissionAccessPolicyGateTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     mission.getManagers().add(user);
 
     assertFalse(
@@ -453,19 +449,19 @@ class MissionAccessPolicyGateTest {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     mission.setOwner(user);
 
     assertTrue(missionAccessPolicy.canChangeOwner(missionId, authentication));
   }
 
   @Test
-  void canChangeOwner_OwnerButGetCurrentUserReturnsEmpty_ShouldReturnFalse() {
+  void canChangeOwner_OwnerButNoCurrentUserId_ShouldReturnFalse() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(authentication.getPrincipal()).thenReturn("real-jwt-sub");
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
     mission.setOwner(user);
-    when(userService.getCurrentUser()).thenReturn(Optional.empty());
+    when(authHelperService.currentUserId()).thenReturn(Optional.empty());
 
     assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
   }
@@ -490,7 +486,7 @@ class MissionAccessPolicyGateTest {
     mission.setOwner(differentOwner);
 
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canChangeOwner(missionId, authentication));
   }
@@ -514,7 +510,7 @@ class MissionAccessPolicyGateTest {
 
     when(authentication.isAuthenticated()).thenReturn(true);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
         .thenReturn(Optional.of(own));
 
@@ -529,7 +525,7 @@ class MissionAccessPolicyGateTest {
 
     when(authentication.isAuthenticated()).thenReturn(true);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
         .thenReturn(Optional.of(own));
 
@@ -541,7 +537,7 @@ class MissionAccessPolicyGateTest {
   void canCreateFinanceEntry_MemberOfAnotherSquadronNotOnTheMission_ShouldReturnFalse() {
     when(authentication.isAuthenticated()).thenReturn(true);
     when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.empty());
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
         .thenReturn(Optional.empty());
 
@@ -602,7 +598,7 @@ class MissionAccessPolicyGateTest {
     when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
     givenAuthenticatedCaller();
     when(accessGateService.canActAsOfficerInOwner(unitId)).thenReturn(false);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canEditFinanceEntry(entryId, authentication));
   }
@@ -622,7 +618,7 @@ class MissionAccessPolicyGateTest {
     when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
     givenAuthenticatedCaller();
     when(accessGateService.canActAsOfficerInOwner(unitId)).thenReturn(false);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
 
     assertFalse(missionAccessPolicy.canEditFinanceEntry(entryId, authentication));
   }
@@ -638,7 +634,7 @@ class MissionAccessPolicyGateTest {
 
     when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
     when(authentication.isAuthenticated()).thenReturn(true);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
         .thenReturn(Optional.of(participant));
 
@@ -656,7 +652,7 @@ class MissionAccessPolicyGateTest {
 
     when(missionFinanceEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
     when(authentication.isAuthenticated()).thenReturn(true);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(userId));
     when(missionParticipantRepository.findByMissionIdAndUserId(missionId, userId))
         .thenReturn(Optional.empty());
 

@@ -243,7 +243,7 @@ class MissionAccessPolicyDifferentialTest {
       }
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       scopeHub = new ScopeHubMissionGates(accessGateService, authHelper, repository);
-      policy = new MissionAccessPolicy(accessGateService, authHelper, repository, null, null, null);
+      policy = new MissionAccessPolicy(accessGateService, authHelper, repository, null, null);
     }
 
     private static Mission mission(UUID unit, boolean internal, Mission parent) {

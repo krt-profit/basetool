@@ -222,7 +222,7 @@ class ScopeKernelTest {
         new RefineryAccessPolicy(
             accessGateService, authHelper, refineryOrderRepository, userAccessPolicy);
     missionPolicy =
-        new MissionAccessPolicy(accessGateService, authHelper, missionRepository, null, null, null);
+        new MissionAccessPolicy(accessGateService, authHelper, missionRepository, null, null);
     inventoryPolicy =
         new InventoryAccessPolicy(accessGateService, inventoryItemRepository, userAccessPolicy);
     hangarPolicy = new HangarAccessPolicy(requestScopeResolver, accessGateService, shipRepository);

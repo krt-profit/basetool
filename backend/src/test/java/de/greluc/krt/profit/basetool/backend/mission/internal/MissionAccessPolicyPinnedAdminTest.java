@@ -25,7 +25,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntry;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
@@ -68,7 +67,7 @@ class MissionAccessPolicyPinnedAdminTest {
   private final MissionRepository missions = mock(MissionRepository.class);
   private final MissionFinanceEntryRepository financeEntries =
       mock(MissionFinanceEntryRepository.class);
-  private final UserService userService = mock(UserService.class);
+  private @Nullable UUID callerId;
   private final Map<UUID, Mission> missionsById = new HashMap<>();
   private final UUID missionOfA = mission(UNIT_A, null);
   private final UUID missionOfB = mission(UNIT_B, null);
@@ -108,6 +107,7 @@ class MissionAccessPolicyPinnedAdminTest {
     AuthHelperService authHelper = mock(AuthHelperService.class);
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(callerIsAdmin);
+    when(authHelper.currentUserId()).thenReturn(Optional.ofNullable(callerId));
     OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
     when(orgUnits.existsByIdAndActiveTrue(any())).thenReturn(true);
     RequestScopeResolver resolver =
@@ -121,7 +121,6 @@ class MissionAccessPolicyPinnedAdminTest {
         new AccessGateService(resolver, authHelper),
         authHelper,
         missions,
-        userService,
         mock(MissionParticipantRepository.class),
         financeEntries);
   }
@@ -162,7 +161,7 @@ class MissionAccessPolicyPinnedAdminTest {
     User self = new User();
     self.setId(UUID.randomUUID());
     UUID ownMissionOfB = mission(UNIT_B, self);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(self));
+    callerId = self.getId();
     MissionAccessPolicy policy = policyFor(UNIT_A);
 
     assertThat(policy.canManageMission(ownMissionOfB, admin)).isTrue();
@@ -183,7 +182,7 @@ class MissionAccessPolicyPinnedAdminTest {
     User self = new User();
     self.setId(UUID.randomUUID());
     UUID ownMission = mission(UNIT_B, self);
-    when(userService.getCurrentUser()).thenReturn(Optional.of(self));
+    callerId = self.getId();
     MissionAccessPolicy policy = policy(false, UnboundRequestProxy.create());
 
     assertThat(policy.canManageMission(ownMission, member)).isTrue();

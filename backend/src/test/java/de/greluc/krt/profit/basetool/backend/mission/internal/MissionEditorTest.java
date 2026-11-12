@@ -37,7 +37,6 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
@@ -168,7 +167,6 @@ class MissionEditorTest {
             mock(AccessGateService.class),
             authHelperService,
             missionRepository,
-            mock(UserService.class),
             mock(MissionParticipantRepository.class),
             mock(MissionFinanceEntryRepository.class));
     MissionEditor withRealPolicy =
