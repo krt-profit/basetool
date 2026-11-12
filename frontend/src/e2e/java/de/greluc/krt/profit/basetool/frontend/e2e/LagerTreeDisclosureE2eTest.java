@@ -49,7 +49,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * level's disclosure button: by keyboard it expands and collapses the level on Enter and Space,
  * mirrors the state in {@code aria-expanded}, loads the stack's entries on the first expand and
  * comes back expanded after a reload; it shows the orange focus ring, and on the touch classes it
- * carries a hit area of the touch floor without wrapping its name (REQ-INV-002, REQ-UI-009).
+ * carries a hit area of the touch floor without wrapping its name. The group checkbox in the same
+ * row marks entries without toggling the group (REQ-INV-002, REQ-INV-034, REQ-UI-009).
  */
 @Tag("e2e")
 class LagerTreeDisclosureE2eTest {
@@ -176,6 +177,48 @@ class LagerTreeDisclosureE2eTest {
         assertThat(groupItems).isHidden();
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "lager-tree-disclosure-keyboard");
+        throw failure;
+      }
+    }
+  }
+
+  /**
+   * A mouse click on the group checkbox of the collapsed group leaves it collapsed; with the group
+   * and its stack open, Space on the checkbox marks and unmarks the loaded entry and leaves both
+   * levels open. The checkbox reflects the loaded entries, so on a group with none loaded it does
+   * not stay ticked.
+   */
+  @Test
+  void theGroupCheckboxMarksWithoutTogglingTheGroup() {
+    try (BrowserContext context = newContext(1280, 800)) {
+      Page page = context.newPage();
+      try {
+        E2eSupport.navigate(page, STACK.baseUrl() + "/inventory?storage=my");
+        Locator groupToggle = groupToggle(page);
+        Locator groupCheckbox = page.locator(groupRow() + " input.group-select-all");
+        Locator entryCheckbox =
+            page.locator("input.inventory-item-checkbox[data-id='" + itemId + "']");
+        assertThat(groupToggle).isVisible(afterLoad());
+
+        groupCheckbox.click();
+        assertThat(groupToggle).hasAttribute("aria-expanded", "false");
+        assertThat(page.locator("#lager-group-" + materialId)).isHidden();
+
+        groupToggle.click();
+        stackToggle(page).click();
+        assertThat(entryCheckbox).isVisible(afterLoad());
+
+        groupCheckbox.focus();
+        page.keyboard().press("Space");
+        assertThat(groupCheckbox).isChecked();
+        assertThat(entryCheckbox).isChecked();
+        page.keyboard().press("Space");
+        assertThat(groupCheckbox).not().isChecked();
+        assertThat(entryCheckbox).not().isChecked();
+        assertThat(groupToggle).hasAttribute("aria-expanded", "true");
+        assertThat(stackToggle(page)).hasAttribute("aria-expanded", "true");
+      } catch (RuntimeException | AssertionError failure) {
+        E2eSupport.dump(page, "lager-tree-disclosure-group-checkbox");
         throw failure;
       }
     }

@@ -374,6 +374,29 @@ function createLager(cfg) {
     }
 
     /**
+     * Whether a click on a tree toggle row started on another control inside the row, such as the
+     * „Mein Lager" group checkbox, which does its own job and must not expand or collapse the
+     * level. A click on the row's chevron button or on plain row content toggles.
+     *
+     * @param {Element} row the toggle row
+     * @param {Event} event the click
+     * @returns {boolean} true when the click belongs to another control of the row
+     */
+    function isFromRowControl(row, event) {
+        const target = event.target;
+        if (!(target instanceof Element)) return false;
+        const control = target.closest(
+            'input, select, textarea, a, label, button, [role="button"]',
+        );
+        return (
+            control !== null &&
+            control !== row &&
+            row.contains(control) &&
+            !control.classList.contains('tree-chevron')
+        );
+    }
+
+    /**
      * Expands or collapses a material / game-item group and persists the choice.
      *
      * @param {Element} row the group row
@@ -1867,8 +1890,12 @@ function createLager(cfg) {
         document.addEventListener('DOMContentLoaded', restoreExpandedTree);
         document.addEventListener('click', closeMultiSelectsOnOutsideClick);
         document.addEventListener('change', clearFamilyFromChip);
-        krtEvents.on('click', trigger('toggle-group'), toggleGroup);
-        krtEvents.on('click', trigger('toggle-stack'), toggleStack);
+        krtEvents.on('click', trigger('toggle-group'), (row, event) => {
+            if (!isFromRowControl(row, event)) toggleGroup(row);
+        });
+        krtEvents.on('click', trigger('toggle-stack'), (row, event) => {
+            if (!isFromRowControl(row, event)) toggleStack(row);
+        });
         krtEvents.on('click', trigger('stack-page'), goToStackEntriesPage);
         bindAssoc();
         krtEvents.on('click', trigger('bookout'), (el) => {

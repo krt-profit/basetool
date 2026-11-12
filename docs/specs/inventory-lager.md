@@ -139,8 +139,9 @@ The chevron of each group row and stack header is the level's disclosure control
 `<button type="button" class="tree-chevron">` with `aria-expanded`, an `aria-controls` naming the
 container's id (`lager-group-<material or game item id>` for a group's items,
 `lager-group-<id>-stack-<n>` for the entries of its n-th stack) and an `aria-label` that names the
-group or stack (`inventory.tree.toggle.*`). It takes focus and toggles on Enter and Space; the whole
-row stays clickable. Every expand and collapse — by mouse, keyboard or the restore after a re-swap —
+group or stack (`inventory.tree.toggle.*`). It takes focus and toggles on Enter and Space; the rest
+of the row stays clickable, except that a click on another control inside it — the „Mein Lager"
+group checkbox — only does that control's job and leaves the level as it is. Every expand and collapse — by mouse, keyboard or the restore after a re-swap —
 sets `aria-expanded` with the `hidden` attribute, and the kernel turns the chevron from
 `aria-expanded`. The row itself takes no role, because the „Mein Lager" group row holds the group
 checkbox, which must not sit inside a button. The button shows the orange focus ring and reaches the
@@ -177,6 +178,8 @@ touch floor through its overlay (REQ-UI-009).
   render; Enter and Space on the focused button expand and collapse the level and flip
   `aria-expanded`, the first expand of a stack loads its entries, and a restored level comes back
   with `aria-expanded="true"`.
+- [ ] Ticking or unticking the „Mein Lager" group checkbox, by mouse or Space, marks or unmarks the
+  group's loaded entries and neither expands nor collapses the group.
 
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
 `InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`,
