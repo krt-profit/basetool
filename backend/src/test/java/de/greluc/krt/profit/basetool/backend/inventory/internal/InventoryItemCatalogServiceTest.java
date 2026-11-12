@@ -96,6 +96,38 @@ class InventoryItemCatalogServiceTest {
   }
 
   @Test
+  void findBookableItemsWithoutBlueprint_asksForTheStockedTypesWithAnEscapedTerm() {
+    GameItem railgun = new GameItem();
+    railgun.setId(UUID.randomUUID());
+    railgun.setName("Scourge Railgun");
+    Pageable pageable = PageRequest.of(0, 20);
+    InventoryGameItemReferenceDto ref =
+        new InventoryGameItemReferenceDto(railgun.getId(), "Scourge Railgun", "Behring", "WEAPON");
+    when(gameItemRepository.findStockedWithoutBlueprint(
+            "50\\%",
+            StockableItemGroup.TYPES, StockableItemGroup.EXCLUDED_TYPE_SUB_TYPES, pageable))
+        .thenReturn(new PageImpl<>(List.of(railgun), pageable, 1));
+    when(inventoryItemMapper.gameItemToReferenceDto(railgun)).thenReturn(ref);
+
+    assertThat(service.findBookableItemsWithoutBlueprint(" 50% ", pageable).getContent())
+        .containsExactly(ref);
+    verifyNoInteractions(blueprintRepository);
+  }
+
+  @Test
+  void isStockedByType_followsTheStockedItemGroups() {
+    GameItem helmet = new GameItem();
+    helmet.setWikiType("Char_Armor_Helmet");
+    helmet.setWikiSubType("Heavy");
+    GameItem grenade = new GameItem();
+    grenade.setWikiType("WeaponPersonal");
+    grenade.setWikiSubType("Grenade");
+
+    assertThat(service.isStockedByType(helmet)).isTrue();
+    assertThat(service.isStockedByType(grenade)).isFalse();
+  }
+
+  @Test
   void findOrderableItems_projectsRepositoryPageThroughTheMapperAndNeverTouchesTheBookableQuery() {
     GameItem scope = new GameItem();
     scope.setId(UUID.randomUUID());
