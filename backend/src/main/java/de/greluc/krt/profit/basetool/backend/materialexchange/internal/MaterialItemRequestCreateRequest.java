@@ -22,24 +22,26 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.UUID;
 
 /**
- * Payload for posting a craftable-item wanted-listing (Gesuch) to the Materialbörse
- * (REQ-MARKET-015).
+ * Payload for posting an item wanted-listing (Gesuch) to the Materialbörse (REQ-MARKET-015).
  *
- * <p>The {@link #productKey} must resolve to an item an active blueprint produces; the display
- * name, owner and squadron are set server-side.
+ * <p>Exactly one of {@link #productKey} and {@link #gameItemId} names the item (ADR-0372): a
+ * product key an active blueprint produces, or the catalogue row of an item the Lager books; the
+ * display name, owner and squadron are set server-side.
  *
- * @param productKey the normalized blueprint product key of the requested item.
+ * @param productKey the normalized blueprint product key of the requested item, or {@code null}
+ * @param gameItemId the catalogue row of the requested item, or {@code null}
  * @param minQuality the optional minimum desired quality (0–1000), or {@code null} for no floor.
  * @param quantity the desired whole-piece quantity; at least 1.
  * @param remark the Markdown description, at most 20 000 characters (may be blank).
  */
 public record MaterialItemRequestCreateRequest(
-    @NotBlank @Size(max = 255) String productKey,
+    @Size(max = 255) String productKey,
+    UUID gameItemId,
     @QualityValue Integer minQuality,
     @NotNull @Min(1) @Max(1_000_000) Integer quantity,
     @Size(max = 20000) String remark) {}

@@ -104,7 +104,7 @@ class MaterialExchangeControllerTest {
   @Test
   void releaseItemDelegates() {
     MaterialExchangeItemReleaseRequest request =
-        new MaterialExchangeItemReleaseRequest("venture helmet", 5, "gegen aUEC");
+        new MaterialExchangeItemReleaseRequest("venture helmet", null, 5, "gegen aUEC");
     MaterialExchangeOfferDto dto = sampleDto();
     when(service.releaseItem(request)).thenReturn(dto);
 

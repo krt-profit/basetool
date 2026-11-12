@@ -45,7 +45,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/** The game-item references of Materialbörse item rows (REQ-MARKET-023). */
+/** The game-item references of Materialbörse item rows (REQ-MARKET-023, ADR-0372). */
 @ExtendWith(MockitoExtension.class)
 class ExchangeItemReferencesTest {
 
@@ -55,6 +55,7 @@ class ExchangeItemReferencesTest {
   private ExchangeItemReferences references;
   private GameItem shield;
   private GameItem paint;
+  private GameItem railgun;
 
   @BeforeEach
   void setUp() {
@@ -73,6 +74,11 @@ class ExchangeItemReferencesTest {
     paint.setKind(GameItemKind.VEHICLE_ITEM);
     paint.setWikiType("Paints");
     paint.setGrade("A");
+    railgun = new GameItem();
+    railgun.setId(UUID.randomUUID());
+    railgun.setName("Scourge Railgun");
+    railgun.setKind(GameItemKind.WEAPON);
+    railgun.setWikiType("WeaponPersonal");
   }
 
   @Test
@@ -85,33 +91,46 @@ class ExchangeItemReferencesTest {
     keys.add(null);
     when(blueprintProducts.outputItemIdsByProductKey(anyCollection()))
         .thenReturn(Map.of("fr-66", shield.getId(), "paint", paint.getId()));
-    when(gameItemRepository.findAllById(any())).thenReturn(List.of(shield, paint));
+    when(gameItemRepository.findAllById(any())).thenReturn(List.of(shield, paint, railgun));
 
-    Map<String, GameItemReferenceDto> resolved = references.byProductKey(keys);
+    ExchangeItemReferences.PageItems resolved =
+        references.ofPage(keys, Arrays.asList(railgun.getId(), null, railgun.getId()));
 
-    assertThat(resolved)
+    assertThat(resolved.byProductKey())
         .containsOnly(
             Map.entry(
                 "fr-66",
                 new GameItemReferenceDto(
                     shield.getId(), "FR-66", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY")),
             Map.entry("paint", new GameItemReferenceDto(paint.getId(), "Paint", "VEHICLE_ITEM")));
+    assertThat(resolved.byGameItemId())
+        .containsOnly(Map.entry(railgun.getId(), GameItemReferenceDto.of(railgun)));
     verify(blueprintProducts, times(1)).outputItemIdsByProductKey(anyCollection());
     verify(gameItemRepository, times(1)).findAllById(any());
   }
 
   @Test
   void aPageWithoutAnItemRowIssuesNoQuery() {
-    assertThat(references.byProductKey(Arrays.asList(null, " "))).isEmpty();
-    assertThat(references.ofProductKey(null)).isNull();
+    assertThat(references.ofPage(Arrays.asList(null, " "), Arrays.asList((UUID) null)))
+        .isEqualTo(ExchangeItemReferences.PageItems.EMPTY);
+    assertThat(references.ofEntry(null, null)).isNull();
     verifyNoInteractions(blueprintProducts, gameItemRepository);
+  }
+
+  @Test
+  void aPageOfCatalogueRowsOnlyLooksUpNoProduct() {
+    when(gameItemRepository.findAllById(any())).thenReturn(List.of(railgun));
+
+    assertThat(references.ofEntry(null, railgun.getId()))
+        .isEqualTo(GameItemReferenceDto.of(railgun));
+    verifyNoInteractions(blueprintProducts);
   }
 
   @Test
   void aKeyWithoutAnOutputItemLoadsNoGameItem() {
     when(blueprintProducts.outputItemIdsByProductKey(anyCollection())).thenReturn(Map.of());
 
-    assertThat(references.ofProductKey("ghost")).isNull();
+    assertThat(references.ofEntry("ghost", null)).isNull();
     verify(gameItemRepository, never()).findAllById(any());
   }
 
@@ -124,6 +143,16 @@ class ExchangeItemReferencesTest {
     when(gameItemRepository.findLocalIdRedirects(anyCollection()))
         .thenReturn(Map.of(retiredId, shield.getId()));
 
-    assertThat(references.ofProductKey("fr-66")).isEqualTo(GameItemReferenceDto.of(shield));
+    assertThat(references.ofEntry("fr-66", null)).isEqualTo(GameItemReferenceDto.of(shield));
+  }
+
+  @Test
+  void aCatalogueRowTheReconciliationRetiredResolvesToItsSurvivor() {
+    UUID retiredId = UUID.randomUUID();
+    when(gameItemRepository.findAllById(any())).thenReturn(List.of(railgun));
+    when(gameItemRepository.findLocalIdRedirects(anyCollection()))
+        .thenReturn(Map.of(retiredId, railgun.getId()));
+
+    assertThat(references.ofEntry(null, retiredId)).isEqualTo(GameItemReferenceDto.of(railgun));
   }
 }

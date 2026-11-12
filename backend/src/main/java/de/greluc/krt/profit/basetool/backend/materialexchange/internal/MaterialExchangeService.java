@@ -22,8 +22,7 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.BlueprintProducts;
-import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
@@ -87,10 +86,10 @@ public class MaterialExchangeService {
   private final MaterialExchangeBoardService boardService;
 
   /**
-   * Resolves the blueprint product of an item offer, gating it and supplying the display name
-   * snapshotted onto the offer (REQ-MARKET-012).
+   * Resolves the item an item offer names, by blueprint product or catalogue row, gating it and
+   * supplying the display name snapshotted onto the offer (REQ-MARKET-012, ADR-0372).
    */
-  private final BlueprintProducts blueprintProductService;
+  private final ExchangeItemSubjects itemSubjects;
 
   /**
    * Resolves the acting member's active {@link
@@ -128,8 +127,9 @@ public class MaterialExchangeService {
    * @return the resulting offer detail, including interessenten names
    * @throws NotFoundException if the item does not exist, or was deleted while the lock waited
    * @throws AccessDeniedException if the item does not belong to the caller
-   * @throws BadRequestException if the amount exceeds the stock, or a game-item row is not produced
-   *     by any active blueprint
+   * @throws BadRequestException if the amount exceeds the stock
+   * @throws RetiredGameItemException if no blueprint produces a game-item row's item and the P4K
+   *     retired it
    */
   @Transactional
   public MaterialExchangeOfferDto release(MaterialExchangeReleaseRequest request) {
@@ -183,25 +183,20 @@ public class MaterialExchangeService {
    * Releases a game-item Lager row as a stock-backed {@link MaterialExchangeOfferKind#ITEM} offer
    * (REQ-MARKET-014), re-releasing an existing active offer on the row.
    *
-   * <p>The product key and name come from {@link BlueprintProductService#resolveByGameItem(UUID)}.
+   * <p>The offer names the row's item by its blueprint product, else by its catalogue row
+   * (ADR-0372).
    *
    * @param item the caller's own game-item Lager row (ownership already checked)
    * @param request the release payload; {@code offeredAmount} is the whole-unit quantity
    * @param viewerId the acting owner
    * @return the resulting offer detail, including interessenten names
-   * @throws BadRequestException if the quantity is not a positive whole number, exceeds the stock,
-   *     or the item is not produced by any active blueprint
+   * @throws BadRequestException if the quantity is not a positive whole number or exceeds the stock
+   * @throws RetiredGameItemException if no blueprint produces the item and the P4K retired it
    */
   private MaterialExchangeOfferDto releaseFromItemStock(
       StockRow item, @NotNull MaterialExchangeReleaseRequest request, UUID viewerId) {
     final int quantity = requireOfferableItemQuantity(request.offeredAmount(), item);
-    ResolvedProduct product =
-        blueprintProductService
-            .resolveByGameItem(Objects.requireNonNull(item.getGameItem()).getId())
-            .orElseThrow(() ->
-                new BadRequestException(
-                    "This item is not produced by any active blueprint and cannot be"
-                        + " offered."));
+    ExchangeItemSubject subject = itemSubjects.stocked(Objects.requireNonNull(item.getGameItem()));
 
     MaterialExchangeOffer offer =
         offerRepository
@@ -216,8 +211,7 @@ public class MaterialExchangeService {
       offer.setOwningOrgUnit(item.getOwningOrgUnit());
       offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
     }
-    offer.setItemProductKey(product.productKey());
-    offer.setItemName(product.productName());
+    subject.applyTo(offer);
     offer.setItemQuantity(quantity);
     offer.setRemark(request.remark());
     offer.setReleasedAt(Instant.now());
@@ -228,9 +222,9 @@ public class MaterialExchangeService {
         saved.getId(),
         offerLabel(saved),
         item.getUser().getId(),
-        AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM)
-            .with("item", item.getId())
-            .with("product", product.productKey())
+        subject
+            .withIdentity(
+                AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM).with("item", item.getId()))
             .with("qty", quantity)
             .with("stock", item.getAmount())
             .with("remarkLen", remarkLength(request.remark()))
@@ -239,32 +233,33 @@ public class MaterialExchangeService {
   }
 
   /**
-   * Lists a craftable item on the board without a backing Lager row (REQ-MARKET-012); always
-   * inserts a new active offer.
+   * Lists an item on the board without a backing Lager row (REQ-MARKET-012); always inserts a new
+   * active offer.
    *
-   * <p>The product key must resolve to an active blueprint product, whose name is snapshotted.
+   * <p>The item is named by an active blueprint product or by the catalogue row of an item the
+   * Lager books (ADR-0372); its name is snapshotted.
    *
-   * @param request the blueprint product key, the whole-piece quantity and the trade remark
+   * @param request the blueprint product key or catalogue row, the whole-piece quantity and the
+   *     trade remark
    * @return the resulting offer detail, including interessenten names
-   * @throws NotFoundException if the caller is unknown or the product key resolves to no active
-   *     blueprint product
+   * @throws NotFoundException if the caller is unknown, the product key resolves to no active
+   *     blueprint product or the catalogue row is unknown
+   * @throws BadRequestException if both or neither identities are given, or the row is no item the
+   *     Lager books
+   * @throws RetiredGameItemException if the P4K retired the catalogue row
    */
   @Transactional
   public MaterialExchangeOfferDto releaseItem(MaterialExchangeItemReleaseRequest request) {
     UUID viewerId = requireViewerId();
     User owner =
         Entities.require(userRepository.findById(viewerId), () -> "User not found: " + viewerId);
-    ResolvedProduct product =
-        Entities.require(
-            blueprintProductService.resolveByProductKey(request.productKey()),
-            () -> "No craftable item (blueprint product) for key: " + request.productKey());
+    ExchangeItemSubject subject = itemSubjects.named(request.productKey(), request.gameItemId());
 
     MaterialExchangeOffer offer = new MaterialExchangeOffer();
     offer.setKind(MaterialExchangeOfferKind.ITEM);
+    subject.applyTo(offer);
     offer.setOwner(owner);
     offer.setOwningOrgUnit(requestScopeResolver.currentOrgUnit().orElse(null));
-    offer.setItemProductKey(product.productKey());
-    offer.setItemName(product.productName());
     offer.setItemQuantity(request.quantity());
     offer.setRemark(request.remark());
     offer.setStatus(MaterialExchangeOfferStatus.ACTIVE);
@@ -276,8 +271,8 @@ public class MaterialExchangeService {
         saved.getId(),
         offerLabel(saved),
         owner.getId(),
-        AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM)
-            .with("product", product.productKey())
+        subject
+            .withIdentity(AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM))
             .with("qty", request.quantity())
             .with("remarkLen", remarkLength(request.remark())));
     return boardService.detailDto(saved, viewerId);
@@ -624,15 +619,16 @@ public class MaterialExchangeService {
 
   /**
    * Builds the PII-free {@code kind=… subject=…} audit details of an offer: the Lager row id for a
-   * material offer, the blueprint product key for an item offer.
+   * material offer, the blueprint product key or the catalogue row for an item offer.
    *
    * @param offer the offer
    * @return the composed audit details
    */
   private static AuditDetails offerSubjectDetails(MaterialExchangeOffer offer) {
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
-      return AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM)
-          .with("product", offer.getItemProductKey());
+      return new ExchangeItemSubject(
+              offer.getItemProductKey(), offer.getItemGameItemId(), offer.getItemName())
+          .withIdentity(AuditDetails.of("kind", MaterialExchangeOfferKind.ITEM));
     }
     return AuditDetails.of("kind", MaterialExchangeOfferKind.MATERIAL)
         .with("item", offer.getInventoryItemId());

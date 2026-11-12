@@ -42,6 +42,8 @@ public enum AuditEventType {
   SUPPLY_CATALOGUE_REASSIGNED(AuditDomain.SUPPLY),
   /** A purchasing deal was linked to the surviving catalogue item. */
   PURCHASING_CATALOGUE_REASSIGNED(AuditDomain.PURCHASING),
+  /** A Materialbörse item offer or request was linked to the surviving catalogue item. */
+  MARKET_CATALOGUE_REASSIGNED(AuditDomain.MARKET),
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
   /** A false original physical quantity and its connected retained stock facts were corrected. */

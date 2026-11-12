@@ -104,7 +104,7 @@ class MaterialRequestControllerTest {
   @Test
   void createItemRequestDelegates() {
     MaterialItemRequestCreateRequest request =
-        new MaterialItemRequestCreateRequest("venture helmet", null, 5, "gegen aUEC");
+        new MaterialItemRequestCreateRequest("venture helmet", null, null, 5, "gegen aUEC");
     MaterialRequestDto dto = sampleDto();
     when(service.createItemRequest(request)).thenReturn(dto);
 

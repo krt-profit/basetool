@@ -40,7 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Runs the Lager item picker read against PostgreSQL (REQ-INV-029): every listed blueprint output
  * and every listed item of a stocked type is bookable; consumables, clothing, paints, turrets,
- * untyped rows and retired rows are not.
+ * untyped rows and retired rows are not. The Materialbörse's read of the stocked items no active
+ * recipe produces runs here too (ADR-0372).
  */
 @SpringBootTest
 @Transactional
@@ -100,6 +101,30 @@ class InventoryBookableItemsTest {
     blueprintRepository.flush();
 
     assertThat(bookable(TAG)).containsExactly(name("Live Railgun"));
+  }
+
+  @Test
+  void theBoerseReadOffersOnlyStockedItemsNoActiveRecipeProduces() {
+    item("Railgun", "WeaponPersonal", "Large");
+    crafted(item("Crafted Scope", "WeaponAttachment", "IronSight"));
+    crafted(item("Crafted Magazine", "WeaponAttachment", "Magazine"));
+    crafted(item("Old Helmet", "Char_Armor_Helmet", "Heavy")).setP4kDeletedAt(RETIRED);
+    item("Magazine", "WeaponAttachment", "Magazine");
+    item("Shirt", "Char_Clothing_Torso_0", "UNDEFINED");
+    GameItem swept = item("Swept Railgun", "WeaponPersonal", "Large");
+    swept.setP4kUuid(UUID.randomUUID());
+    swept.setP4kDeletedAt(RETIRED);
+    gameItemRepository.flush();
+    blueprintRepository.flush();
+
+    assertThat(
+            catalogue
+                .findBookableItemsWithoutBlueprint(TAG, PageRequest.of(0, 100))
+                .getContent()
+                .stream()
+                .map(InventoryGameItemReferenceDto::name)
+                .toList())
+        .containsExactlyInAnyOrder(name("Railgun"), name("Old Helmet"));
   }
 
   @Test
