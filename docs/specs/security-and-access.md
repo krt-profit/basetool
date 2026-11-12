@@ -176,6 +176,11 @@ fixture rules, an unknown manager) · **Code:** test-only, `AuthorizationMatrix`
 
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 
+> [!note] Amended 2026-11-12 (ADR-0269) — three `permitAll()` handlers
+> The `permitAll()` bullet counted `GET /api/v1/app/version-policy`, removed with the app floor
+> (REQ-API-020, superseded); it names the three handlers that remain and the rule by its current
+> name, `permitAllIsDeclaredOnlyOnThePublicEndpoints`.
+
 The following must always hold and are enforced as ArchUnit rules in
 [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
 (backend) and its [frontend](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/ArchitectureTest.java)
@@ -196,8 +201,8 @@ equivalents — a new violation fails `./gradlew test`:
   by `thePublicByDesignAllowListNamesOnlyControllersThatExist`); the ingest module holds every
   controller and every `@PostMapping` to it (`everyRestControllerShouldBeAuthorisationAnnotated`,
   `everyPostMappingShouldBeAuthorisationAnnotated`).
-- `permitAll()` appears on exactly four backend handlers — the two anonymous reads, the Keycloak SPI
-  precheck and `/error` (`permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`, REQ-SEC-052).
+- `permitAll()` appears on exactly three backend handlers — the anonymous terms read, the Keycloak
+  SPI precheck and `/error` (`permitAllIsDeclaredOnlyOnThePublicEndpoints`, REQ-SEC-052).
 - Staffel-scoped services wire a scope-kernel service or `AuthHelperService`
   (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
   the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007). Write endpoints of
@@ -2391,6 +2396,11 @@ answer from it identically for seventeen paths.
 
 ### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
 
+> [!note] Amended 2026-11-12 (ADR-0269) — one anonymous read is left
+> `GET /api/v1/app/version-policy` is removed with the app floor (REQ-API-020, superseded), so the
+> note of 2026-09-06 below counts one anonymous read where it counted two; the lesson it states is
+> unchanged.
+
 > [!note] Amended 2026-10-17 (ADR-0272, #2673) — the limiter stays, and its reason is now a smaller
 > one
 > Both rate limiters are **kept**. The per-IP budget was written when the API vhost put `/api/v1` on
@@ -2408,15 +2418,15 @@ answer from it identically for seventeen paths.
 
 > [!note] Amended 2026-09-06 (ADR-0159) — the lesson outlived the surface
 > There is no anonymous surface left to bound: `AnonymousPageSizeFilter` and its page-size ceiling
-> are gone, and no paginated endpoint answers an unauthenticated caller. The two that do
-> (REQ-SEC-052) are unpaginated, and the per-IP limiter bounds them.
+> are gone, and no paginated endpoint answers an unauthenticated caller. The one that does
+> (REQ-SEC-052) is unpaginated, and the per-IP limiter bounds it.
 >
 > **The verb-agnostic lesson below is the part that stays load-bearing.** A tightening placed above
 > an all-verb `permitAll` must itself be all-verb, or the rule underneath grants every verb the
 > tightening does not claim — that is how a `HEAD` once ran the material price matrix query
-> anonymously and returned its `Content-Length`. The two remaining anonymous reads are `GET`-scoped
-> on purpose, and `AnonymousSurfaceSweepTest` issues a `HEAD` against every `GET` mapping for
-> exactly this reason.
+> anonymously and returned its `Content-Length`. The remaining anonymous read is `GET`-scoped on
+> purpose, and `AnonymousSurfaceSweepTest` issues a `HEAD` against every `GET` mapping for exactly
+> this reason.
 >
 > The `basetool_http_error_total{code="PAGE_SIZE_TOO_LARGE"}` label value disappears with the
 > filter (REQ-OBS-011's bounded-label review).
@@ -4302,6 +4312,12 @@ one is a `400` instead of the `500` an unguarded `UUID.fromString` produced. **E
 
 ### REQ-SEC-052 — No anonymous surface beyond the landing page and the enumerated infrastructure paths
 
+> [!note] Amended 2026-11-12 (ADR-0269) — the body counts one anonymous read
+> The backend table loses its `GET /api/v1/app/version-policy` row, removed with the app floor
+> (REQ-API-020, superseded). The `HEAD` paragraph and the acceptance lines count what remains: one
+> anonymous read, three `permitAll()` methods and one operation with `security: []`; the ArchUnit
+> rule appears under its current name.
+
 > [!note] Amended 2026-10-17 (#2673) — the backend's half is one `/api/v1` read
 > `GET /api/v1/app/version-policy` is gone with the app floor (REQ-API-020, superseded), so the
 > backend's anonymous `/api/v1` surface is `GET /api/v1/terms/document` alone, beside
@@ -4392,13 +4408,12 @@ a method gate.
 
 |                   Path                    |                                                                                                                             Why it stays                                                                                                                              |
 |-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GET /api/v1/app/version-policy`          | The forced-update gate (REQ-API-010). A version gate that only answers after a login is silent in exactly the case it exists for: an app too old to log in must still learn that it is too old. Three integers and a public release URL.                              |
 | `GET /api/v1/terms/document`              | The Terms-of-Use wording (ADR-0138 / REQ-SEC-028). A document everyone must read before agreeing to anything cannot require having agreed, and the same text is already on the public `/terms` page.                                                                  |
 | `/internal/**`                            | The Keycloak SPI's account-existence precheck (REQ-SEC-022) — machine-to-machine behind a constant-time shared-secret header, `401` without it. Keycloak sits outside the resource server's trust boundary and carries no JWT to gate on. Not an anonymous data path. |
 | `/actuator/health`, `/actuator/health/**` | The container health check on the local stacks; in prod Actuator lives on the internal management port (ADR-0134).                                                                                                                                                    |
 | `/error`                                  | Spring's error dispatch.                                                                                                                                                                                                                                              |
 
-**Both anonymous reads are `GET`-scoped**, so a `HEAD` on either falls to the authenticated
+**The anonymous read is `GET`-scoped**, so a `HEAD` on it falls to the authenticated
 catch-all and answers `401`. That is deliberate and it is the REQ-SEC-032 lesson: Spring Security
 compares the verb with `String.equals`, so a method-scoped tightening placed above an all-verb
 `permitAll` grants every verb it does not claim — which is how a `HEAD` once ran the material price
@@ -4431,11 +4446,12 @@ because it is anonymous access in the brief's sense.
 
 - [x] Every mapping the dispatcher knows refuses a caller with no token, except the four paths above
   — asserted by enumerating `RequestMappingHandlerMapping`, not by listing paths somebody thought of.
-- [x] Every `GET` is additionally issued as `HEAD`, and the two `GET`-scoped reads answer `401` to it.
-- [x] Exactly four methods declare `@PreAuthorize("permitAll()")` — the two anonymous reads, the SPI
+- [x] Every `GET` is additionally issued as `HEAD`, and the `GET`-scoped anonymous read answers `401`
+  to it.
+- [x] Exactly three methods declare `@PreAuthorize("permitAll()")` — the anonymous read, the SPI
   precheck and `BasetoolErrorController#handleError` (added 2026-09-07, when the rule learned to see
-  `@RequestMapping`); a fifth fails the build.
-- [x] Exactly two OpenAPI operations declare `security: []`, and no operation references a security
+  `@RequestMapping`); a fourth fails the build.
+- [x] Exactly one OpenAPI operation declares `security: []`, and no operation references a security
   scheme the document does not define.
 - [x] The landing page mints no session and makes no backend call: `getSession(false) == null`, no
   `__Host-SESSION` (formerly `SESSION`) cookie, `verifyNoInteractions(backendApiClient)`.
@@ -4446,7 +4462,7 @@ because it is anonymous access in the brief's sense.
 `EndpointEnumerationTest` (the enumeration both sweeps ask the dispatcher with, shared since #1804 —
 a defect there would turn both guards green at once, so it is tested on its own rather than only
 through them) ·
-`ArchitectureTest#permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`,
+`ArchitectureTest#permitAllIsDeclaredOnlyOnThePublicEndpoints`,
 `#readEndpointsMustDeclareAnAuthorisationAnnotation` · `OpenApiAnonymousOperationsTest` ·
 `RouteGateSnapshotTest` (the frontend: every handler carries a gate except the nine public ones,
 REQ-FE-025) ·
@@ -4460,6 +4476,11 @@ the nightly `edge-deny-probe.yml` (the same statuses from outside the host) · *
 ---
 
 ### REQ-SEC-053 — Every account is at least a member; a role-less token is refused
+
+> [!note] Amended 2026-11-12 (ADR-0269) — two exempt paths
+> The acceptance line counted `GET /api/v1/app/version-policy` among the paths a role-less token
+> still reaches; it is removed with the app floor (REQ-API-020, superseded), and the line counts the
+> two the rule names.
 
 There is no role below member. The seeded `GUEST` role is gone (`V239`), and with it the state it
 represented — an authenticated caller with an **empty authority set**.
@@ -4520,7 +4541,7 @@ covers the path, so the annotation is the only gate; `GameItemControllerTest` ev
 
 - [x] An approved account holding no stored role is refused `403 NO_ROLE` on `/api/v1/users/me`,
   on the JWT path and through `ActingMemberFilter`.
-- [x] The three exempt paths still answer such a token.
+- [x] The two exempt paths still answer such a token.
 - [x] A sync run writes no role, so a member keeps every stored role (REQ-SEC-088).
 - [x] `V239` leaves no `GUEST` role, no `user_roles` row for it, and logs the affected user ids
   before deleting — identifiers, not identities.
@@ -6166,18 +6187,28 @@ second pattern already matches it, so the first was removed without a change in 
 
 ### REQ-SEC-080 — Gate exemptions are exact sets of real paths
 
+> [!note] Corrected 2026-11-12 — the acting-member set is not counted
+> The acting-member bullet counted seventeen paths; `ActingMemberFilter.ACTING_PATHS` holds 29 and
+> grows with every exchange mapping, so the bullet names the set by its rule, and
+> `FilterExemptionSetsTest` pins the list.
+
+> [!note] Amended 2026-11-12 (ADR-0269) — the version policy leaves both exemption lists
+> `GET /api/v1/app/version-policy` is removed with the app floor (REQ-API-020, superseded), so the
+> pending-approval and the terms-acceptance lists below no longer name it; each is the set its
+> filter holds.
+
 Three filters decide by path which requests they leave alone, and each list MUST be an exact set of
 literal paths, each naming a real mapping:
 
 - **Pending approval and role-less** (`PendingApprovalAccessFilter`):
-  `/api/v1/users/me/registration-status`, `/api/v1/app/version-policy`, `/api/v1/terms/document`.
+  `/api/v1/users/me/registration-status`, `/api/v1/terms/document`.
 - **Terms acceptance** (`TermsAcceptanceAccessFilter`): `/api/v1/terms/document`,
-  `/api/v1/terms/status`, `/api/v1/terms/acceptance`, `/api/v1/users/me/registration-status`,
-  `/api/v1/app/version-policy`. This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`,
-  under which a future `/api/v1/terms/admin` would have escaped the gate; for the three mappings
-  under `/api/v1/terms` the behaviour is identical.
-- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the seventeen exchange paths the ingest
-  gateway may act on; every mapping under `/api/v1/exchange` is one of them.
+  `/api/v1/terms/status`, `/api/v1/terms/acceptance`, `/api/v1/users/me/registration-status`.
+  This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`, under which a future
+  `/api/v1/terms/admin` would have escaped the gate; for the three mappings under `/api/v1/terms`
+  the behaviour is identical.
+- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the exchange paths the ingest gateway may
+  act on; every mapping under `/api/v1/exchange` is one of them.
 
 A new mapping under `/api/v1/terms` fails the test until it is listed as exempt or as gated by
 consent.

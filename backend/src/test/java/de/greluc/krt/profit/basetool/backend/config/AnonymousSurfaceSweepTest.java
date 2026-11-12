@@ -69,8 +69,8 @@ class AnonymousSurfaceSweepTest {
   private static final List<String> NOT_SWEPT = List.of("/internal", "/error");
 
   /**
-   * The three {@code /api} paths a refused but authenticated caller may still reach: the
-   * registration status and the two anonymous reads.
+   * The two {@code /api} paths a refused but authenticated caller may still reach: the registration
+   * status and the anonymous terms read.
    */
   private static final Set<String> REACHABLE_WHILE_REFUSED =
       Set.of("/api/v1/users/me/registration-status", "/api/v1/terms/document");
@@ -136,7 +136,7 @@ class AnonymousSurfaceSweepTest {
 
   /** Pass 1: no token at all. */
   @Test
-  @DisplayName("nothing answers a caller with no token, except the four public paths")
+  @DisplayName("nothing answers a caller with no token, except the three public paths")
   void noMappingAnswersAnAnonymousCaller() throws Exception {
     List<String> served = new ArrayList<>();
     for (Call call : allCalls()) {
@@ -154,17 +154,17 @@ class AnonymousSurfaceSweepTest {
     }
     Assertions.assertThat(served)
         .as(
-            "REQ-SEC-052: every mapping outside the four public paths must refuse an anonymous"
+            "REQ-SEC-052: every mapping outside the three public paths must refuse an anonymous"
                 + " caller. A 2xx or 3xx here is a path that serves the internet.")
         .isEmpty();
   }
 
   /**
    * Pass 1b: every {@code GET} is repeated as {@code HEAD}, which must be refused wherever the
-   * {@code GET} is and on the two {@code GET}-scoped anonymous reads (REQ-SEC-032).
+   * {@code GET} is and on the {@code GET}-scoped anonymous read (REQ-SEC-032).
    */
   @Test
-  @DisplayName("a HEAD is refused wherever the GET is, and on the two GET-scoped reads too")
+  @DisplayName("a HEAD is refused wherever the GET is, and on the GET-scoped read too")
   void headIsRefusedEverywhere() throws Exception {
     List<String> served = new ArrayList<>();
     for (Call call : allCalls()) {
@@ -181,8 +181,8 @@ class AnonymousSurfaceSweepTest {
     }
     Assertions.assertThat(served)
         .as(
-            "A HEAD must be refused wherever its GET is. The two anonymous /api reads are"
-                + " GET-scoped on purpose, so their HEAD answers 401.")
+            "A HEAD must be refused wherever its GET is. The anonymous /api read is GET-scoped"
+                + " on purpose, so its HEAD answers 401.")
         .isEmpty();
   }
 
@@ -249,22 +249,22 @@ class AnonymousSurfaceSweepTest {
 
   /** Pass 2: a bearer whose only authority is the pending marker. */
   @Test
-  @DisplayName("a pending registration reaches nothing but its own status")
+  @DisplayName("a pending registration reaches nothing but its status and the terms document")
   void pendingRegistrationIsRefusedEverywhere() throws Exception {
     assertRefusedEverywhere(
         jwt().authorities(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL")),
         "REQ-SEC-017: a PENDING registration must be refused on every /api mapping except the"
-            + " three it is allowed to read.");
+            + " two it is allowed to read.");
   }
 
   /** Pass 3: a bearer that maps to no application role (REQ-SEC-053). */
   @Test
-  @DisplayName("a role-less token reaches nothing but the three exempt reads")
+  @DisplayName("a role-less token reaches nothing but the two exempt reads")
   void roleLessTokenIsRefusedEverywhere() throws Exception {
     assertRefusedEverywhere(
         jwt().authorities(new SimpleGrantedAuthority("ROLE_NO_ROLE")),
         "REQ-SEC-053: a token carrying no application role must be refused on every /api mapping"
-            + " except the three it is allowed to read.");
+            + " except the two it is allowed to read.");
   }
 
   /**
