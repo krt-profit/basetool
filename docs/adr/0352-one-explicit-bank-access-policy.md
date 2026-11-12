@@ -1,6 +1,6 @@
 # ADR-0352 — One explicit bank access policy
 
-- **Status:** Accepted — **amended by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): decision 4 — the web passes the honoured pin of REQ-ORG-032, not the header as sent, and the pin narrows an admin's view and account settings as well
+- **Status:** Accepted — **amended by [ADR-0374](0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): decision 4 — the web passes the honoured pin of REQ-ORG-032, not the header as sent, and the pin narrows an admin's view and account settings as well
 - **Date:** 2026-11-08
 - **Deciders:** Repository owner (@greluc)
 - **Related:** decided in [#3114](https://github.com/krt-profit/basetool/issues/3114) · ADR-0020

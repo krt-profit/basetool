@@ -1425,7 +1425,7 @@ backend serves every member) but no control that writes.
   `KRT Member`: without it no membership confers anything — no reach, no switcher entry, no
   explicit Logistiker or Einsatzleiter flag, no bank membership audience (REQ-SEC-015,
   REQ-ORG-032).
-- **A deactivated unit confers nothing** (REQ-ORG-032, ADR-0373 D10): its memberships stay stored
+- **A deactivated unit confers nothing** (REQ-ORG-032, ADR-0374 D10): its memberships stay stored
   for a reactivation, but give no reach, no officer, Logistician, Mission Manager or seat right, no
   leadership cascade, no SK roster management and no notices until the unit is active again.
 - **Role powers follow the active org unit** (REQ-ORG-032): with a unit selected, every column

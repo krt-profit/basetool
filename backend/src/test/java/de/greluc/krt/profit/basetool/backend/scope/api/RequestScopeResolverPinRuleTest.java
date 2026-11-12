@@ -50,7 +50,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * The one pin rule of the scope kernel (REQ-ORG-032, ADR-0373): a pin counts only when the caller
+ * The one pin rule of the scope kernel (REQ-ORG-032, ADR-0374): a pin counts only when the caller
  * may select its unit, every surface treats any other pin as no pin, and the effective context the
  * layout reports names one unit of any kind, all own units, every unit or none (REQ-ORG-024).
  */

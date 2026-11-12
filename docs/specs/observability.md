@@ -1269,7 +1269,7 @@ aggregated counts and bounded `app`/`host` labels.
 > positive contradiction count. Routine approval waiting contributes to the waiting gauges.
 > See the [optional Bank contract](orders-auec-bank.md).
 
-> **Status: shipped** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, ADR-0373, map #2800) for
+> **Status: shipped** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, ADR-0374, map #2800) for
 > the signals of the amendments at the end of this requirement.
 
 The three modules expose custom `basetool_*` business metrics on existing choke points so
@@ -2926,7 +2926,7 @@ A low minimum stock level is a notification (REQ-NOTIF-030), **never an alert**.
 `StockLevelNoticeIntegrationTest`, `InventoryBusinessGaugesTest`, `NavigationMetricsTest`,
 `navigation_endpoints_erroring_test.yml`
 
-#### Amendment (ADR-0373)
+#### Amendment (ADR-0374)
 
 A member's stored choice of the active org unit (REQ-ORG-031) is counted, not audited, like the
 navigation preferences (REQ-AUDIT-001, „Deliberately not audited").

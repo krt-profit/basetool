@@ -1743,7 +1743,7 @@ the exchange, which has no active context (REQ-BXCH-001)
 > other recipient is left alone. A holder change with no added holder (only a departure) tells nobody
 > and only reconciles.
 >
-> **Deactivated units (REQ-ORG-032, ADR-0373 D10):** the audit diff and the hand-over compare the
+> **Deactivated units (REQ-ORG-032, ADR-0374 D10):** the audit diff and the hand-over compare the
 > **stored** seats (`resolveResponsibleHolderUserIds`), whether the owning unit is active or not, so
 > a holder change on a deactivated unit is recorded like any other. A **notice** addresses only the
 > seats on active units (`resolveNotifiedResponsibleHolderUserIds`, behind

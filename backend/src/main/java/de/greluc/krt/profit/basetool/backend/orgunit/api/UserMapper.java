@@ -336,7 +336,7 @@ public abstract class UserMapper {
 
   /**
    * Whether the user's memberships confer a flag: only while the user holds the stored role {@code
-   * KRT Member} (REQ-SEC-015, ADR-0373).
+   * KRT Member} (REQ-SEC-015, ADR-0374).
    *
    * @param user the user being projected; may be {@code null}
    * @return {@code true} iff the user has an id and holds {@code KRT Member}

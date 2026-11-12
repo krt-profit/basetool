@@ -216,7 +216,7 @@ member's direct memberships (`resolveOwnerMembershipTarget`).
 > Every other aggregate's owning OrgUnit remains create-time-only, except the owner's re-stamp of a
 > personal Lager row above (REQ-INV-052).
 >
-> **Amended by ADR-0373 (REQ-ORG-032):** the direct memberships of the auto-stamp are the stampable
+> **Amended by ADR-0374 (REQ-ORG-032):** the direct memberships of the auto-stamp are the stampable
 > units above, and a mission or operation created without a pick is stamped on the honoured pin
 > first, which may be a unit below a leader's own; a personal row keeps to its owner's stampable
 > units.
@@ -587,7 +587,7 @@ extended:
   cascade already widens for the owning leadership and keeps closed for subordinates. The ownerless
   `NULL` leadership path (REQ-ORG-009) is **preserved unchanged** (no backfill). The REQ-ORG-011 owner-bypass stays ahead of the scope check.
 
-> **Amended by ADR-0373 (REQ-ORG-032):** the direct memberships here are the stampable units of
+> **Amended by ADR-0374 (REQ-ORG-032):** the direct memberships here are the stampable units of
 > REQ-ORG-004 (active units, `KRT Member`), the units a caller may edit lie inside the active
 > context, and a mission or operation created without a pick is stamped on the honoured pin, so a
 > leader pinned to a unit below them creates it there; a personal row keeps to its owner's
@@ -861,7 +861,7 @@ predicate `canSeeOperationLedger` (the same two branches **minus** the participa
   missions, which `canSeeMission` would refuse the same caller directly. The ledger lists the
   refinery orders of every linked mission, those a participant of another unit filed included
   (REQ-SEC-042): by owner decision this is an explicitly cross-unit part of the ledger
-  (ADR-0373 D9).
+  (ADR-0374 D9).
 - `GET /api/v1/operations/{id}/payouts` keeps `canSeeOperation`, and a caller who passes **only**
   through the escape receives **their own payout row and nothing else**. `totalDonations` is
   recomputed over the reduced list, so the operation-wide aggregate does not leak either.
@@ -1038,7 +1038,7 @@ can be retired once both rules are merged.
 ### REQ-ORG-031 — A member's choice of the active org unit is stored and restored
 
 A member who picks an org unit under **„Aktive Org-Einheit"** finds it again at the next login:
-every switch is stored per member, and a new session starts from the stored choice (ADR-0373).
+every switch is stored per member, and a new session starts from the stored choice (ADR-0374).
 
 - **Storage.** The scope module's table `member_active_org_unit` holds one row per member (`user_id`
   key, own `version`); `org_unit_id = NULL` is an explicit „Alle meine Org-Einheiten". Deleting the
@@ -1087,13 +1087,13 @@ every switch is stored per member, and a new session starts from the stored choi
 `ActiveOrgUnitRestoreTest`, `MeFrontendControllerTest`, `ActiveOrgUnitContextE2eTest` · **Code:**
 `scope.internal.ActiveOrgUnitChoices`, `scope.internal.ActiveOrgUnitChoiceMetrics`,
 `scope.web.ActiveOrgUnitChoiceController`, `kernel.web.ActiveOrgUnitRestore`,
-`orgunit.web.MeFrontendController`, `V408__create_member_active_org_unit.sql` · **ADR:** ADR-0373 ·
+`orgunit.web.MeFrontendController`, `V409__create_member_active_org_unit.sql` · **ADR:** ADR-0374 ·
 **Related:** REQ-ORG-008, REQ-ORG-032, REQ-AUDIT-001, REQ-DATA-021, REQ-OBS-011
 
 ### REQ-ORG-032 — One pin rule for every surface
 
 A member's active org unit (the pin of REQ-ORG-008) means the same on every surface: the lists, the
-detail gates, create-time stamping, role powers and the oversight reach (ADR-0373).
+detail gates, create-time stamping, role powers and the oversight reach (ADR-0374).
 
 - **Honoured or no pin.** A pin counts when it names a unit the caller may select: for an admin an
   existing active org unit, for everyone else a unit of their reach — direct memberships plus the
@@ -1257,7 +1257,7 @@ detail gates, create-time stamping, role powers and the oversight reach (ADR-037
 `mission.internal.MissionAccessPolicy`, `supply.internal.SupplyAccessPolicy`,
 `purchasing.internal.PurchasingAccessPolicy`, `mission.api.MissionRepository#findEarmarks`,
 `inventory.api.EarmarkTargets`, `kernel.layout.OrgUnitContextAdvice`,
-`static/js/kernel/org-unit-context-sync.js` · **ADR:** ADR-0373, ADR-0329 · **Related:**
+`static/js/kernel/org-unit-context-sync.js` · **ADR:** ADR-0374, ADR-0329 · **Related:**
 REQ-ORG-002, REQ-ORG-008, REQ-ORG-017, REQ-ORG-024, REQ-ORG-031, REQ-SEC-005, REQ-SEC-015,
 REQ-SEC-065, REQ-INV-027, REQ-SUP-003, REQ-PUR-023, REQ-UI-026, REQ-FE-001
 

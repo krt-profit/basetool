@@ -2,7 +2,7 @@
 
 - **Status:** Accepted — implemented on the integration branch (#2847); the production
   realm-role deletion is a separate owner-approved provisioner run (ADR-0202 amendment 8).
-  **Amended by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)**
+  **Amended by [ADR-0374](0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)**
   (2026-11-11): decision 2 — the active context drives role powers and writes, an admin's
   included, not only visibility; decision 4 — without `KRT Member` no membership confers anything,
   the explicit Logistiker and Einsatzleiter flags included (REQ-ORG-032).

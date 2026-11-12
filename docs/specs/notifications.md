@@ -1030,7 +1030,7 @@ are read **directly in that unit**: the seat holders of a Bereich or the Organis
 included for a Staffel, and a Bereich's rule does not reach its Staffeln.
 
 **Only with `KRT Member`.** Without the stored role `KRT Member` no membership confers anything
-(REQ-SEC-015, ADR-0373 D7), so none yields a recipient. Every selector that reads org-unit
+(REQ-SEC-015, ADR-0374 D7), so none yields a recipient. Every selector that reads org-unit
 memberships — `UNIT_LEADERSHIP`, `OFFICER`, `LEAD`, `LOGISTICIAN`, `MISSION_MANAGER`,
 `SEAT_HOLDERS`, the bank's `ACCOUNT_RESPONSIBLE` and `REQUEST_RESPONSIBLE`, and the responsible
 holders and OL members of `REQUIRED_APPROVER` — keeps only the members who hold it, and so does the
@@ -1082,7 +1082,7 @@ data only through its SPIs `MissionRecipientDirectory` and `ExchangeRecipientDir
 `orgunit/internal/OrgUnitMembershipRecipientDirectory`, `orgunit/api/OrgUnitSeatEligibility`,
 `bank/internal/OrgUnitBankRecipientDirectory` · **Decision:**
 [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md),
-[ADR-0373](../adr/0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md) ·
+[ADR-0374](../adr/0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md) ·
 **Issues:** #2414
 
 ### REQ-NOTIF-025 — Supersede for named recipients

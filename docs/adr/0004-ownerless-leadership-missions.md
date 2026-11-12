@@ -1,6 +1,6 @@
 # ADR-0004 — Ownerless leadership ("Bereichsleitung") missions
 
-- **Status:** Accepted — **narrowed by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): a mission is ownerless only when its creator has neither a stampable unit nor a pin, and an admin manages a mission without a unit only without a pin (REQ-ORG-009, REQ-ORG-032)
+- **Status:** Accepted — **narrowed by [ADR-0374](0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): a mission is ownerless only when its creator has neither a stampable unit nor a pin, and an admin manages a mission without a unit only without a pin (REQ-ORG-009, REQ-ORG-032)
 - **Date:** 2026-06-07
 - **Deciders:** Repository owner (@greluc)
 - **Related:** spec [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003/004/009` · [`security-and-access.md`](../specs/security-and-access.md) · [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md) §3.5 · direct production report (no tracking issue)

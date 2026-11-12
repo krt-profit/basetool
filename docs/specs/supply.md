@@ -2,7 +2,7 @@
 > **Owner area:** SUP · **Related ADRs:** [ADR-0252](../adr/0252-stockcommands-gains-the-pool-and-donation-commands.md),
 > [ADR-0253](../adr/0253-material-supply-and-purchasing-are-two-modules.md),
 > [ADR-0320](../adr/0320-a-need-shows-its-linked-orders-stock-and-only-donations-and-purchases-cover-it.md),
-> [ADR-0373](../adr/0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)
+> [ADR-0374](../adr/0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)
 
 # Bedarf & Spenden (supply)
 

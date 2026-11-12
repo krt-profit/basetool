@@ -1,6 +1,6 @@
 # ADR-0022 — Bank booking-request notifications via `ACCOUNT_GRANT` + `EVENT_RECIPIENT` selector kinds
 
-- **Status:** Accepted — **amended by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): `ACCOUNT_GRANT` resolves only the grantees who hold `Bank Employee` or a role above it (REQ-NOTIF-007)
+- **Status:** Accepted — **amended by [ADR-0374](0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): `ACCOUNT_GRANT` resolves only the grantees who hold `Bank Employee` or a role above it (REQ-NOTIF-007)
 - **Date:** 2026-06-17
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-026 · REQ-NOTIF-011 · REQ-NOTIF-007 · ADR-0015 · issue #666
@@ -29,7 +29,7 @@ a `resolveAccountGrantHolders(accountId)` backed by `BankAccountGrantRepository.
 A seeded default rule (V160) maps `BANK_BOOKING_REQUEST_CREATED` to a notification with a
 `ROLE` selector (`BANK_MANAGEMENT`) and an `ACCOUNT_GRANT` selector, excluding the requester.
 
-> **Amended by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)
+> **Amended by [ADR-0374](0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)
 > (2026-11-11, REQ-NOTIF-007):** `ACCOUNT_GRANT` resolves only the grantees who hold `Bank Employee`
 > or a role above it, in one query (`BankAccountGrantRepository#findGranteeIdsHoldingAnyRole`); the
 > inert grant of anyone else resolves to nobody.

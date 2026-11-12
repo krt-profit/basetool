@@ -81,7 +81,7 @@ public class OrgUnitSeatEligibility {
 
   /**
    * Whether the user holds the stored {@code KRT Member} role, without which none of their
-   * memberships confers anything (REQ-SEC-015, ADR-0373).
+   * memberships confers anything (REQ-SEC-015, ADR-0374).
    *
    * @param userId the user to check; never {@code null}
    * @return {@code true} iff the user holds {@code KRT Member}
@@ -93,7 +93,7 @@ public class OrgUnitSeatEligibility {
   /**
    * Keeps those of the given members who hold the stored {@code KRT Member} role, the only members
    * a seat, a membership or a Logistiker or Einsatzleiter flag confers anything on (REQ-SEC-015,
-   * ADR-0373); one query for the whole set (REQ-DATA-003).
+   * ADR-0374); one query for the whole set (REQ-DATA-003).
    *
    * @param userIds the members to check; never {@code null}
    * @return the {@code KRT Member} holders among them; never {@code null}, empty for no member

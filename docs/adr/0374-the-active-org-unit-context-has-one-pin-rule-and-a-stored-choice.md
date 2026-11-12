@@ -1,4 +1,4 @@
-# ADR-0373 — The active org-unit context has one pin rule and a stored choice
+# ADR-0374 — The active org-unit context has one pin rule and a stored choice
 
 - **Status:** Accepted
 - **Date:** 2026-11-11

@@ -16,7 +16,7 @@ worth reading even if you know the domain.
 | **Bereichsleitung** | The leadership of a Bereich — Bereichsleiter, -koordinator and -operator, carried as membership flags. |
 | **Leitung** | Leadership, both as a role and as the delegated administration page. |
 | **Logistiker (einer Einheit)** | A member whose membership in that unit carries `is_logistician` **or** any leadership rank. Not the same as the flag alone: an officer of a unit is its Logistician without the flag being set. The web also grants it to a leadership rank's cascaded reach; the exchange does not (ADR-0257). |
-| **Aktive Org-Einheit / pin** | The unit a member picks in the switcher, relayed as `X-Active-Org-Unit-Id` and stored per member (REQ-ORG-031). It counts only when the member may select the unit; reads, writes, role powers and create-time stamping then act in that unit alone, an admin's included (REQ-ORG-032, ADR-0373). |
+| **Aktive Org-Einheit / pin** | The unit a member picks in the switcher, relayed as `X-Active-Org-Unit-Id` and stored per member (REQ-ORG-031). It counts only when the member may select the unit; reads, writes, role powers and create-time stamping then act in that unit alone, an admin's included (REQ-ORG-032, ADR-0374). |
 | **„Alle meine Org-Einheiten"** | The context without a pin: the union of a member's units, named so in the switcher and the title. An admin's counterpart is „Alle Org-Einheiten", every unit (REQ-ORG-024). |
 | **Stampable unit** | A unit a new row lands in without a pick: the owner's or creator's direct memberships on active units, none while they lack `KRT Member` (REQ-ORG-004). |
 

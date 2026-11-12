@@ -521,7 +521,7 @@ counted by `basetool_audit_events_total{domain}` (REQ-OBS-011).
 
 **Deliberately not audited:** navigation preferences (favourites, hidden entries, order, tab-bar
 slots, display mode) and the home dashboard (widgets, options, start page), including their resets,
-and a member's stored choice of the active org unit (REQ-ORG-031, ADR-0373). They are an account's
+and a member's stored choice of the active org unit (REQ-ORG-031, ADR-0374). They are an account's
 own presentation choices, owner-only and read by nobody else (ADR-0298); a trail of them would
 record personal habits, such as who looked at which unit when, without serving any oversight. The
 active org unit only narrows what its member sees and may do, and every act in it is audited in its

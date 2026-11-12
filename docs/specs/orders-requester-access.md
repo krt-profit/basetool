@@ -1,5 +1,5 @@
 > **Doc type:** Living spec - complete MATERIAL/ITEM reading and requester need editing. Last reviewed: 2026-11-12.
-> **Owner area:** ORDERS · **Related ADRs:** ADR-0091, ADR-0356, ADR-0373
+> **Owner area:** ORDERS · **Related ADRs:** ADR-0091, ADR-0356, ADR-0374
 
 # Requesting-unit JobOrder access
 
