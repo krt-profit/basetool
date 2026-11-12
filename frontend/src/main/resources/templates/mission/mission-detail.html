@@ -33,6 +33,13 @@
             <div class="page-actions">
                 <button th:if="${mission.canEdit or mission.canManageManagers}" id="mission-edit-btn" type="button" class="btn btn-ghost"
                         data-testid="mission-edit-toggle" aria-controls="pane-verw" aria-pressed="false" th:title="#{mission.edit.toggle}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg> <span class="mission-head-action-label" th:text="#{mission.edit.toggle}">Bearbeiten</span></button>
+                <a th:if="${navigationAccess != null and navigationAccess.flags.contains(T(de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag).MANAGE_MISSION_TEMPLATES)}"
+                   class="btn btn-ghost" data-testid="mission-save-as-template"
+                   th:href="@{/mission-templates(sourceMissionId=${mission.id})}"
+                   th:title="#{missionTemplate.fromMission}" th:aria-label="#{missionTemplate.fromMission}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>
+                    <span class="mission-head-action-label" th:text="#{missionTemplate.fromMission}">Als Vorlage speichern</span>
+                </a>
                 <button id="add-participant-btn" type="button" class="btn btn--cta" data-testid="page-head-primary"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg> <span th:text="#{mission.participant.add}">Anmelden</span></button>
                 <th:block sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)">
                     <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id='mission-more-menu', items=~{::mission-more-items})}">
