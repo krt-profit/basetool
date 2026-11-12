@@ -265,7 +265,7 @@
                         </div>
                     </div>
 
-                    <div class="tree-group-items">
+                    <div class="tree-group-items" hidden>
                         <div th:each="stack : ${group.stacks}">
                             <div class="tree-row tree-row--mid stack-header" data-trigger="inv-my-toggle-stack"
                                  data-stack-loaded="false"
@@ -293,7 +293,7 @@
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries">
+                            <div class="tree-stack-entries" hidden>
                                 <div class="stack-entries-content">
                                 </div>
                             </div>
@@ -320,7 +320,7 @@
                         contextText=${#lists.size(group.stacks) == 1} ? #{inventory.tree.stackCount.one} : #{inventory.tree.stackCount.many(${#lists.size(group.stacks)})},
                         selectTrigger='inv-my-toggle-group-cb')}"></div>
 
-                    <div class="tree-group-items">
+                    <div class="tree-group-items" hidden>
                         <div th:each="stack : ${group.stacks}">
                             <div class="tree-row tree-row--mid stack-header" data-trigger="inv-my-toggle-stack"
                                  data-stack-loaded="false"
@@ -343,7 +343,7 @@
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries">
+                            <div class="tree-stack-entries" hidden>
                                 <div class="stack-entries-content">
                                 </div>
                             </div>
