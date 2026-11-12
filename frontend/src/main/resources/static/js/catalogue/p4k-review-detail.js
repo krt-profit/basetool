@@ -149,15 +149,13 @@ export function createReviewDetail({ pageUrl, t, sections, onApplied, onConflict
     }
 
     /**
-     * Loads the comparison for the selected case and discards the prior preview.
+     * Loads the comparison and clears the preview if the case or its proposals change.
      *
      * @param {string} id the case
      */
     async function load(id) {
         const requestId = ++request;
-        selected = null;
-        detail = null;
-        if (content) krtHtml.set(content, t('summaryRunning'));
+        if (!detail && content) krtHtml.set(content, t('summaryRunning'));
         const response = await krtFetch
             .get(pageUrl(`/review-workspace/${encodeURIComponent(id)}`), {
                 key: DETAIL_TARGET,
@@ -173,9 +171,13 @@ export function createReviewDetail({ pageUrl, t, sections, onApplied, onConflict
         const value = response?.ok ? await response.json().catch(() => null) : null;
         if (caseId !== id || requestId !== request) return;
         if (!value?.review || !value.options) {
+            selected = null;
+            detail = null;
             if (content) krtHtml.set(content, t('reviewDetailUnavailable'));
             return;
         }
+        if (detail && JSON.stringify(detail) === JSON.stringify(value)) return;
+        selected = null;
         detail = value;
         render();
     }
@@ -188,6 +190,8 @@ export function createReviewDetail({ pageUrl, t, sections, onApplied, onConflict
     function open(id) {
         if (!panel) return;
         caseId = id;
+        selected = null;
+        detail = null;
         panel.hidden = false;
         panel.focus();
         load(id);
@@ -279,7 +283,10 @@ export function createReviewDetail({ pageUrl, t, sections, onApplied, onConflict
             selected = Number(button.dataset.reviewPreview);
             render();
             const confirm = content?.querySelector('button[data-review-confirm]');
-            if (confirm instanceof HTMLButtonElement) confirm.focus();
+            if (confirm instanceof HTMLButtonElement) {
+                confirm.scrollIntoView({ block: 'nearest' });
+                confirm.focus({ preventScroll: true });
+            }
         } else if (button.hasAttribute('data-review-confirm')) {
             apply(button);
         }

@@ -1762,7 +1762,9 @@ confirms a single proposal or explicitly selects versioned members of a compatib
 matches alone qualify a record for inspection. Identity writes recheck the candidate and case
 under the import and synchronization lock. One stale member rejects the entire selected group.
 The case records the resolution and the audit log records the action. Review changes update peers
-through the catalogue admin room (REQ-FE-015).
+through the catalogue admin room (REQ-FE-015). An open preview stays available when a refresh
+returns the same comparison. A changed comparison requires a fresh preview. The confirmation
+control scrolls clear of the bottom navigation on touch devices.
 
 Manufacturer branding records do not supply canonical company fields. Confirmed manufacturer
 aliases survive later imports. Manufacturer and item merges retain source identities and catalogue

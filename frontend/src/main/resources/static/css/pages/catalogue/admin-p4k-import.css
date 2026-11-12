@@ -84,6 +84,10 @@
         margin-block: var(--space-3);
     }
 
+    .p4k-review-preview [data-review-confirm] {
+        scroll-margin-block-end: calc(var(--krt-tabbar-height) + var(--space-3));
+    }
+
     .p4k-review-batch-selected {
         max-block-size: 12rem;
         overflow: auto;

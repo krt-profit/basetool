@@ -50,6 +50,7 @@ const STUBS = {
         'const krtModal = { open(id) { __ui.opened.push(id); }, close(id) { __ui.closed.push(id); } };',
     '/js/kernel/krt-fetch.js': [
         'const krtFetch = {',
+        '  get(url, opts) { return __net.read(url, opts || {}); },',
         '  getJson(url, opts) { return __net.read(url, opts || {}); },',
         '  write(opts) { __net.writes.push(opts); return Promise.resolve({ ok: false }); },',
         '};',
@@ -374,6 +375,83 @@ await test('a peer admin resolution or APPLY refreshes the workspace in place', 
             .some((path) => path.startsWith('/review-workspace?')),
         'an APPLY also reloads the review queue',
     );
+});
+
+await test('a detail refresh keeps the same preview and clears a stale one', async () => {
+    const panel = new FakeElement('krt-p4k-review-detail');
+    const content = new FakeElement('krt-p4k-review-detail-content');
+    panel.focus = () => {};
+    content.replaceChildren = () => {
+        content.markup = null;
+    };
+    const reads = [];
+    const page = load(
+        'catalogue/p4k-review-detail.js',
+        { [panel.id]: panel, [content.id]: content },
+        (url) => {
+            assert.equal(url, '/review-workspace/c-1');
+            const read = pending();
+            reads.push(read);
+            return read.promise;
+        },
+        { '/js/catalogue/catalogue-link-admin.js': LINK_ADMIN_AS_IMPORTED },
+    );
+    const answer = async (detail, status = 200) => {
+        assert.equal(reads.length, 1);
+        reads.shift().resolve({ status, ok: status === 200, json: async () => detail });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    const pane = page.fn('createReviewDetail')({
+        pageUrl: (path) => path,
+        t: (key) => key,
+        sections: { write: page.fn('krtFetch').write },
+    });
+    const Button = page.fn('HTMLButtonElement');
+    const click = (attribute) => {
+        const target = new Button(attribute);
+        target.dataset.reviewPreview = '0';
+        target.closest = (selector) => (selector === 'button' ? target : null);
+        target.hasAttribute = (name) => name === attribute;
+        panel.listeners.click({ target });
+    };
+    const confirm = new Button('confirm');
+    const focusCalls = [];
+    confirm.scrollIntoView = () => focusCalls.push('scroll');
+    confirm.focus = () => focusCalls.push('focus');
+    content.querySelector = () => confirm;
+
+    const detail = {
+        review: { id: 'c-1', version: 1 },
+        options: {
+            candidates: [{ action: 'ATTACH_P4K', targetId: 'target-1', targetVersion: 2 }],
+        },
+    };
+    pane.open('c-1');
+    await answer(detail);
+    click('data-review-preview');
+    const preview = content.markup;
+    assert.match(JSON.stringify(preview), /data-review-confirm/);
+
+    pane.refresh();
+    assert.equal(content.markup, preview, 'the preview remains usable during the read');
+    await answer(structuredClone(detail));
+    assert.equal(content.markup, preview, 'the same response preserves the preview DOM');
+    assert.deepEqual(focusCalls, ['scroll', 'focus'], 'refresh leaves focus in place');
+    click('data-review-confirm');
+    assert.equal(page.net.writes.length, 1);
+    assert.equal(page.net.writes[0].payload.version, 1);
+    assert.equal(page.net.writes[0].payload.targetVersion, 2);
+
+    pane.refresh();
+    await answer({ ...detail, review: { ...detail.review, version: 2 } });
+    assert.doesNotMatch(JSON.stringify(content.markup), /data-review-confirm/);
+    click('data-review-confirm');
+    assert.equal(page.net.writes.length, 1, 'the stale preview cannot send a write');
+
+    pane.refresh();
+    await answer(null, 404);
+    assert.equal(panel.hidden, true);
+    assert.equal(content.markup, null);
 });
 
 await test('refreshing a review queue that shrank reloads its last page', async () => {
