@@ -74,11 +74,12 @@ class BankNoticeIntegrationTest {
     accountId = UUID.randomUUID();
     entityId = UUID.randomUUID();
     Role management = roleRepository.findByNameIgnoreCase("Bank Management").orElseThrow();
+    Role employee = roleRepository.findByNameIgnoreCase("Bank Employee").orElseThrow();
     user(REQUESTER, "bank-requester", Set.of());
     user(MANAGER, "bank-manager", Set.of(management));
     user(ACTOR, "bank-actor", Set.of(management));
-    user(GRANTEE, "bank-grantee", Set.of());
-    user(OTHER_GRANTEE, "bank-other-grantee", Set.of());
+    user(GRANTEE, "bank-grantee", Set.of(employee));
+    user(OTHER_GRANTEE, "bank-other-grantee", Set.of(employee));
   }
 
   private void user(UUID id, String name, Set<Role> roles) {

@@ -70,6 +70,8 @@ final class BankAccessMatrix {
     EMPLOYEE_TRANSFER,
     /** The Bankleitung. */
     MANAGEMENT,
+    /** The Bankleitung with a selectable membership of the own Staffel. */
+    MANAGEMENT_MEMBER,
     /** An administrator without memberships. */
     ADMIN,
     /** A registration still waiting for approval. */

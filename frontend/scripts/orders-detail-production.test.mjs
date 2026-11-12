@@ -146,7 +146,11 @@ function load({ memberships = [], membershipsByOwner, active, actor = 'actor', d
     ]);
     const context = vm.createContext({
         __net: net,
-        PRODUCTION_I18N: { orgUnitPlaceholder: '-- Bitte wählen --' },
+        PRODUCTION_I18N: {},
+        window: {
+            krtOwnerPickerI18n: { placeholder: '-- Bitte wählen --' },
+            addEventListener() {},
+        },
         document: {
             getElementById: (id) => elements.get(id) || null,
             createElement: () => new FakeOption(),
@@ -223,7 +227,7 @@ async function test(name, fn) {
 
 await test('the active org unit is preselected when the owner is a direct member of it', async () => {
     const h = await picker({ memberships: ['a', 'b', 'r'], active: 'b' });
-    assert.deepEqual(h.net.urls, ['/users/actor/memberships?allKinds=true']);
+    assert.deepEqual(h.net.urls, ['/users/actor/memberships?allKinds=true&ownerPicker=true']);
     assert.deepEqual(values(h.select), ['a', 'b', 'r'], 'no empty choice');
     assert.equal(h.select.value, 'b');
     assert.equal(h.select.required, false);
@@ -319,7 +323,7 @@ await test('an owner cleared without an acting user hides the picker and re-runs
     h.owner.value = 'member';
     h.refresh();
     await settle();
-    assert.deepEqual(h.net.urls, ['/users/member/memberships?allKinds=true']);
+    assert.deepEqual(h.net.urls, ['/users/member/memberships?allKinds=true&ownerPicker=true']);
     h.location.value = 'loc';
     h.reconcile();
     assert.equal(h.bookButton.disabled, true, 'the member has to choose');

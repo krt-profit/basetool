@@ -301,7 +301,6 @@ class InventoryJobOrderScopeIntegrationTest {
 
   private enum LinkedStockMutation {
     RELEASE_ROW,
-    RELEASE_MATERIAL,
     CHANGE,
     REMOVE,
     BOOK_OUT,
@@ -318,8 +317,6 @@ class InventoryJobOrderScopeIntegrationTest {
     MockHttpServletRequestBuilder request =
         switch (mutation) {
           case RELEASE_ROW -> delete("/api/v1/orders/" + orderId + "/allocations/" + rowId);
-          case RELEASE_MATERIAL ->
-              delete("/api/v1/orders/" + orderId + "/materials/" + material.getId());
           case CHANGE ->
               patch(PATH + "/" + rowId + "/allocation")
                   .content(json.writeValueAsString(allocation));

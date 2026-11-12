@@ -39,13 +39,13 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UnknownRolePermissionException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -127,19 +127,30 @@ class RoleServiceTest {
   }
 
   @Test
-  void updatePermissions_rendersAnEmptySideAsADash_andCountsUnknownValuesWithoutNamingThem() {
-    when(roleRepository.lockByName("Officer")).thenReturn(Optional.of(officer));
-    when(roleRepository.saveAndFlush(officer)).thenReturn(officer);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(ACTOR));
+  void updatePermissions_rejectsUnknownValuesWithoutWritingOrAuditing() {
+    var refused =
+        assertThrows(
+            UnknownRolePermissionException.class,
+            () -> roleService.updatePermissions("Officer", Set.of(NOT_A_PERMISSION), 0L));
 
-    roleService.updatePermissions(
-        "Officer",
-        Set.of(Permissions.HANGAR_READ, Permissions.MISSION_READ, NOT_A_PERMISSION),
-        officer.getPermissionsVersion());
+    assertEquals("UNKNOWN_ROLE_PERMISSION", refused.code());
+    assertEquals(400, refused.status().value());
+    assertEquals(0L, officer.getPermissionsVersion());
+    verify(roleRepository, never()).lockByName(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
 
-    String details = capturedDetails();
-    assertEquals("added=- removed=- unknownAdded=1 unknownRemoved=0", details);
-    assertFalse(details.contains(NOT_A_PERMISSION), details);
+  @Test
+  void updatePermissions_rejectsANullValueWithoutWritingOrAuditing() {
+    Set<String> permissions = new HashSet<>();
+    permissions.add(null);
+
+    assertThrows(
+        UnknownRolePermissionException.class,
+        () -> roleService.updatePermissions("Officer", permissions, 0L));
+
+    verify(roleRepository, never()).lockByName(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -155,35 +166,6 @@ class RoleServiceTest {
     String details = capturedDetails();
     assertEquals("added=- removed=- unknownAdded=0 unknownRemoved=1", details);
     assertFalse(details.contains(NOT_A_PERMISSION), details);
-  }
-
-  @Test
-  void updatePermissions_doesNotCountAnUnknownPermissionThatTheEditLeavesInPlace() {
-    officer.setPermissions(new HashSet<>(Set.of(Permissions.HANGAR_READ, NOT_A_PERMISSION)));
-    when(roleRepository.lockByName("Officer")).thenReturn(Optional.of(officer));
-    when(roleRepository.saveAndFlush(officer)).thenReturn(officer);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(ACTOR));
-
-    roleService.updatePermissions(
-        "Officer",
-        Set.of(Permissions.HANGAR_READ, Permissions.MISSION_READ, NOT_A_PERMISSION),
-        officer.getPermissionsVersion());
-
-    assertEquals("added=MISSION_READ removed=- unknownAdded=0 unknownRemoved=0", capturedDetails());
-  }
-
-  @Test
-  void updatePermissions_countsANullElementInTheRequestBodyInsteadOfFailing() {
-    when(roleRepository.lockByName("Officer")).thenReturn(Optional.of(officer));
-    when(roleRepository.saveAndFlush(officer)).thenReturn(officer);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(ACTOR));
-
-    roleService.updatePermissions(
-        "Officer",
-        new HashSet<>(Arrays.asList(Permissions.HANGAR_READ, Permissions.MISSION_READ, null)),
-        officer.getPermissionsVersion());
-
-    assertEquals("added=- removed=- unknownAdded=1 unknownRemoved=0", capturedDetails());
   }
 
   @Test
@@ -218,7 +200,9 @@ class RoleServiceTest {
   }
 
   @Test
-  void updatePermissions_logsAnUnknownValueAsACountAndNeverAsText() {
+  void updatePermissions_logsUnknownRemovedValuesAsACountAndNeverAsText() {
+    officer.setPermissions(
+        new HashSet<>(Set.of(Permissions.HANGAR_READ, NOT_A_PERMISSION, "%n%nFAKE")));
     when(roleRepository.lockByName("Officer")).thenReturn(Optional.of(officer));
     when(roleRepository.saveAndFlush(officer)).thenReturn(officer);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ACTOR));
@@ -229,16 +213,14 @@ class RoleServiceTest {
     logger.addAppender(appender);
     try {
       roleService.updatePermissions(
-          "Officer",
-          Set.of(Permissions.HANGAR_READ, Permissions.MISSION_READ, NOT_A_PERMISSION, "%n%nFAKE"),
-          officer.getPermissionsVersion());
+          "Officer", Set.of(Permissions.HANGAR_READ), officer.getPermissionsVersion());
     } finally {
       logger.detachAppender(appender);
     }
 
     assertEquals(1, appender.list.size());
     String message = appender.list.getFirst().getFormattedMessage();
-    assertTrue(message.contains("unknownAdded=2"), message);
+    assertTrue(message.contains("unknownRemoved=2"), message);
     assertFalse(message.contains(NOT_A_PERMISSION), message);
     assertFalse(message.contains("FAKE"), message);
   }
@@ -266,12 +248,8 @@ class RoleServiceTest {
       officer.setPermissions(new HashSet<>());
       roleService.updatePermissions("Officer", Set.of(permission), officer.getPermissionsVersion());
     }
-    officer.setPermissions(new HashSet<>());
-    roleService.updatePermissions(
-        "Officer", Set.of(NOT_A_PERMISSION), officer.getPermissionsVersion());
-
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
-    verify(auditService, times(constants.size() + 1))
+    verify(auditService, times(constants.size()))
         .record(any(AuditEventType.class), isNull(), eq("OFFICER"), isNull(), details.capture());
     List<CharSequence> captured = details.getAllValues();
     for (int i = 0; i < constants.size(); i++) {
@@ -283,8 +261,6 @@ class RoleServiceTest {
               + " is not part of the audited vocabulary: RoleService must derive it from the"
               + " Permissions constants, never from a hand-written list");
     }
-    assertEquals(
-        "added=- removed=- unknownAdded=1 unknownRemoved=0", captured.getLast().toString());
   }
 
   /**

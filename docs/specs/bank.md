@@ -298,6 +298,9 @@ the grant table.
 
 ### REQ-BANK-009 — Per-account grants: view + deposit / withdraw / transfer
 
+Withdrawing a role that removes bank staff eligibility clears any notices delivered only through
+the now-inert grant (REQ-NOTIF-024). An independent recipient path keeps the notice.
+
 Fine-grained bank permissions are **app-managed grants**, not Keycloak roles
 (ADR-0011): a `bank_account_grant` row per (user, account) with three independent
 capability flags — `can_deposit`, `can_withdraw`, `can_transfer`. The **existence** of a
@@ -1702,11 +1705,10 @@ the exchange, which has no active context (REQ-BXCH-001)
 > employee and the OL (ADR-0066, corrected from the Bereichsleiter Profit by ADR-0109). This is an
 > approval-routing refinement only; the OL stays the KRT account's balance-target/visibility owner. So
 > `resolveResponsibleHolderUserIds(CARTEL)` returns **all `OL_MEMBER`s**, of whom the notification
-> selectors keep those holding `KRT Member` (REQ-NOTIF-024); the
-> middle-band Bankleitung is a `BANK_MANAGEMENT` Keycloak role (not an org-unit membership) so it is not
-> notified via this seam but picks the request up in its bank-staff queue (ADR-0109). Each approver
-> still sees only its own band in „Anträge an unsere Konten" (the org-unit bank tab called „Fremde
-> Anträge" until 2026-10-03).
+> selectors keep those holding `KRT Member` (REQ-NOTIF-024). For a middle-band request,
+> `REQUIRED_APPROVER` resolves the stored Basetool role `BANK_MANAGEMENT` (ADR-0355, REQ-NOTIF-033).
+> Each approver sees only its own band in „Anträge an unsere Konten". Requests without an approval
+> band do not appear there for Bankleitung or OL acting in those roles.
 >
 > **Amended by ADR-0070 (responsible-holder change audit):** a **change** of an account's derived
 > responsible holder is now recorded in the admin bank audit log (REQ-BANK-012) as
@@ -2677,19 +2679,19 @@ management/admins book directly unrestricted, and the request-confirmation path 
 request — like every booking request they are (re-)recorded by the confirming bank employee
 (REQ-BANK-040); only the amount, note and justification transfer.
 
-**Notifications.** The responsible-holder notification (REQ-BANK-026) for a KRT request reaches all
-`OL_MEMBER`s (the collegial owner + top-band approver). The middle-band approver is the Bankleitung — a
-`BANK_MANAGEMENT` Keycloak realm role, not an org-unit membership, so it is not enumerable through the
-membership-based notification seam; the Bankleitung instead picks the request up in its bank-staff queue
-(reachable via `BANK_MANAGEMENT > BANK_EMPLOYEE`) and the requester notifies them directly (ADR-0109).
+**Notifications.** On KRT-account requests, the `REQUIRED_APPROVER` selector resolves the stored
+Basetool role `BANK_MANAGEMENT` for the middle band and `OL_MEMBER` seat holders with `KRT Member` for
+the top band (ADR-0355, REQ-NOTIF-033). No responsible-holder fallback applies on the KRT account.
+Bank staff retain their independent notification and queue rights (REQ-BANK-026).
 
 **Acceptance**
 
 - [x] A KRT withdrawal/transfer request is stamped `required_approver = null` (≤ T1) /
   `BANK_MANAGEMENT` (T1..T2) / `ORGANISATIONSLEITUNG` (> T2) at creation; a ≤ T1 request needs no
   approval, an over-band request needs the band approver's grant + the confirm checkbox.
-- [x] „Anträge an unsere Konten" routes a KRT band request only to its band approver (Bankleitung / OL); the
-  responsible-holder routing for every other account is unchanged.
+- [x] „Anträge an unsere Konten" routes a KRT request only to its band approver (Bankleitung / OL).
+  Unrouted requests are hidden from both when acting in those roles. Other accounts use the
+  responsible-holder approval route.
 - [x] `T1`/`T2` are settable only via `PATCH …/approval-tiers` gated `BANK_MANAGEMENT`, CARTEL-only,
   `T2 ≥ T1`, audited `CARTEL_APPROVAL_TIERS_SET/CLEARED`; the per-audience limit editor is hidden for
   the KRT account.
@@ -3249,7 +3251,8 @@ frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, with
 > bypass strict invalid-responsibility protection.
 
 The member who raised a booking request **MUST NOT grant its owner approval and MUST NOT confirm it**
-(`BANK_FOUR_EYES_REQUIRED`, 409). A second person decides. The check runs in
+A second person decides. If the requester would otherwise be permitted to act on the request,
+the guard returns `BANK_FOUR_EYES_REQUIRED` (409). The check runs in
 `BankBookingRequestService` under the row lock, after the pending and version guards, for `confirm`
 and for the grant of the owner approval; revoking an approval is not a grant and stays open.
 
@@ -3271,7 +3274,8 @@ and for the grant of the owner approval; revoking an approval is not a grant and
 **Acceptance**
 
 - [x] Confirming or granting the owner approval of one's own request is a 409
-  `BANK_FOUR_EYES_REQUIRED` and changes nothing.
+  `BANK_FOUR_EYES_REQUIRED` if the requester otherwise has the matching right. An unrouted
+  KRT request gives the OL no approval right (REQ-BANK-047), so the approval gate returns 403.
 - [x] An admin confirms and approves their own request.
 - [x] The requester rejects their own request.
 - [x] The queue marks the caller's own request as not confirmable; the approval list omits it for a

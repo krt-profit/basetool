@@ -184,7 +184,8 @@ class HangarPagePatternRenderTest {
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(assigned), 1L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
-    when(backendApiClient.get(eq("/api/v1/org-units/me/memberships?allKinds=true"), anyTypeRef()))
+    when(backendApiClient.get(
+            eq("/api/v1/org-units/me/memberships?allKinds=true&ownerPicker=true"), anyTypeRef()))
         .thenReturn(
             List.of(
                 new OrgUnitMembershipOptionDto(unitId, "Owner SK", "OSK", "SPECIAL_COMMAND"),

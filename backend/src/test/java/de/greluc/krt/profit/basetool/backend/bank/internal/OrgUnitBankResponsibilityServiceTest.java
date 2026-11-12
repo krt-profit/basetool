@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankAccountResponsibleAssignedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
@@ -73,6 +74,7 @@ class OrgUnitBankResponsibilityServiceTest {
   @Mock private BankBookingRequestRepository bankBookingRequestRepository;
   @Mock private AuthHelperService authHelperService;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private RoleRecipientDirectory roleRecipientDirectory;
 
   @InjectMocks private OrgUnitBankResponsibilityService service;
 

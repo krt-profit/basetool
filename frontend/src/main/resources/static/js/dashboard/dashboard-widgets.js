@@ -168,7 +168,7 @@ function showError(item, body) {
  * are counted on the badge.
  *
  * @param {HTMLElement} content the instance's body content
- * @param {Array<{ text?: string, read?: boolean, createdAtDisplay?: string, href?: string }>} items
+ * @param {Array<{ text?: string, read?: boolean, createdAtDisplay?: string, href?: string, orgUnitLabel?: string, activeUnitHint?: string }>} items
  *     the notifications, newest first
  */
 function renderNotifications(content, items) {
@@ -199,6 +199,19 @@ function renderNotifications(content, items) {
         time.className = 'cell-sub';
         time.textContent = item.createdAtDisplay != null ? item.createdAtDisplay : '';
         main.appendChild(text);
+        if (item.orgUnitLabel) {
+            const unit = document.createElement('span');
+            unit.className = 'chip';
+            unit.setAttribute('data-notif-org-unit', '');
+            unit.textContent = item.orgUnitLabel;
+            main.appendChild(unit);
+        }
+        if (item.activeUnitHint) {
+            const hint = document.createElement('span');
+            hint.className = 'cell-sub';
+            hint.textContent = item.activeUnitHint;
+            main.appendChild(hint);
+        }
         main.appendChild(time);
         li.appendChild(main);
         list.appendChild(li);

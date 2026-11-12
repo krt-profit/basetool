@@ -33,7 +33,23 @@ import java.util.List;
  * @param totalDonations operation-wide sum of donated shares (always &gt;= 0); zero when nobody
  *     donated
  * @param payouts the per-participant payout rows, sorted by participant name
+ * @param payoutInputsFrozen whether payout marks prevent the editor from changing mission links
+ * @param orphanedPaidMarkKeys opaque reversal keys visible to authorized reviewers
  */
 @DtoMirror
 public record OperationPayoutSummaryDto(
-    BigDecimal totalDonations, List<OperationPayoutDto> payouts) {}
+    BigDecimal totalDonations,
+    List<OperationPayoutDto> payouts,
+    boolean payoutInputsFrozen,
+    List<String> orphanedPaidMarkKeys) {
+
+  /**
+   * Builds a summary without unmatched paid marks.
+   *
+   * @param totalDonations the donated total
+   * @param payouts the calculated payout rows
+   */
+  public OperationPayoutSummaryDto(BigDecimal totalDonations, List<OperationPayoutDto> payouts) {
+    this(totalDonations, payouts, false, List.of());
+  }
+}

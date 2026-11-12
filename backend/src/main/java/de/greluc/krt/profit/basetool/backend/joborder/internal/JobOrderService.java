@@ -897,40 +897,6 @@ public class JobOrderService {
   }
 
   /**
-   * Removes a material requirement from the order and unlinks the inventory items linked to it via
-   * a bulk update.
-   *
-   * @param jobOrderId job order primary key
-   * @param materialId material to unlink
-   */
-  @Transactional
-  public void unlinkMaterial(UUID jobOrderId, UUID materialId) {
-    jobOrderEditor.editWithoutProjection(
-        jobOrderId,
-        JobOrderGate.EDIT,
-        order ->
-            new JobOrderEditPlan(
-                Set.of(),
-                Set.copyOf(stockReads.earmarkedMaterialRowIds(jobOrderId, Set.of(materialId))),
-                false,
-                current -> unlinkMaterialWithinTransaction(current, materialId)));
-  }
-
-  private JobOrderEdit unlinkMaterialWithinTransaction(JobOrder order, UUID materialId) {
-    var requirement = order.getMaterials();
-    java.util.function.Predicate<JobOrderMaterial> matches =
-        row -> row.getMaterial().getId().equals(materialId);
-    if (requirement.stream().noneMatch(matches)) {
-      throw new NotFoundException("Material not linked to job order: " + materialId);
-    }
-    stockCommands.releaseJobOrderMaterialEarmarks(order.getId(), materialId);
-    requirement.removeIf(matches);
-    jobOrderRepository.save(order);
-    return JobOrderEdit.audited(
-        order, AuditEventType.JOB_ORDER_MATERIAL_UNLINKED, AuditDetails.of("material", materialId));
-  }
-
-  /**
    * Detaches a single inventory item from the order. The item stays in the user's inventory; it
    * just stops counting toward the order's completion.
    *

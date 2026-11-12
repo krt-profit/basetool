@@ -859,17 +859,6 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Removes a material requirement from an order, keeping its inventory items.
-   *
-   * @param id the order
-   * @param materialId the material
-   */
-  public void unlinkMaterial(@NotNull UUID id, @NotNull UUID materialId) {
-    backendApiClient.delete(
-        "/api/v1/orders/{id}/materials/{materialId}", Void.class, id, materialId);
-  }
-
-  /**
    * Detaches an inventory item from an order.
    *
    * @param id the order

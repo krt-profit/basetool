@@ -22,11 +22,12 @@ admin is judged like everyone else; the `OFFICER` role plays no part.
 
 - **When it fires.** `OrgUnitMembershipService` calls `OrgUnitSeatNotifier#seatChanged` after
   `assignSquadronRank`, `removeSquadronRank`, `addBereichLeader`, `removeBereichLeader`,
-  `addOlMember`, `removeOlMember` and `toggleLead`; a member who still holds a seat and no `KRT
-  Member` afterwards is reported (`seatCode` `APPOINTED` / `REMOVED`). A role reconciliation is the
-  usual trigger: `UserReconciliationService` tells the identity-owned `RolesChangedObserver`
-  (implemented by `OrgUnitSeatNotifier#onRolesChanged`) whenever it replaces a member's roles, and a
-  seat holder whose new roles lack `KRT Member` is reported with one of their seats (`seatCode`
+  `addOlMember`, `removeOlMember`, `toggleLead`, and after `removeMember` or
+  `reconcileStaffelMemberships` removes a membership carrying a seat. A member who still holds a seat
+  and no `KRT Member` afterwards is reported (`seatCode` `APPOINTED` / `REMOVED`).
+  `RoleChangeRecorder` calls the identity-owned `RolesChangedObserver`
+  (implemented by `OrgUnitSeatNotifier#onRolesChanged`) whenever a stored role is assigned or
+  withdrawn. A seat holder whose new roles lack `KRT Member` is reported with one of their seats (`seatCode`
   `ROLES_RECONCILED`, no actor). The seat itself stays.
 - **What it says.** `ORG_LEADERSHIP_ROLE_MISMATCH`; the default rule notifies every admin (`ROLE`
   `ADMIN`, the actor included) with the member, the unit, the coded seat change (`seatCode`), the
@@ -63,7 +64,7 @@ Bereich's leadership is told as well, once per Bereich. The departed member is n
 `OrgUnitMembershipServiceTest`, `UserReconciliationServiceTest`, `SeededNotificationRulesIntegrationTest`,
 `NotificationPageControllerTest` (`targetOf_…`) · **Code:** `orgunit/api/events/OrgNotices`,
 `orgunit/api/OrgUnitSeatNotifier`, `orgunit/internal/OrgUnitDepartureNotifier`, `orgunit/api/OrgUnitMembershipService`,
-`identity/api/UserReconciliationService`, `identity/api/RolesChangedObserver`, `orgunit/api/OrgUnitMembershipRepository#existsLeadershipSeat`,
+`identity/internal/RoleChangeRecorder`, `identity/api/RolesChangedObserver`, `orgunit/api/OrgUnitMembershipRepository#existsLeadershipSeat`,
 `identity/api/UserRepository#hasAnyRoleCode`, `V279__seed_organisation_notification_rules.sql`,
 `scripts/officer-cut-report.sql` ·
 **Issues:** #2414, #2841

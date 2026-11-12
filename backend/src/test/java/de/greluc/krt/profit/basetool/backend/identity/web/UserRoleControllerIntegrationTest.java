@@ -38,7 +38,11 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.MemberDepartedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRoleAudience;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -80,6 +84,7 @@ class UserRoleControllerIntegrationTest {
   @Autowired private AuditEventRepository auditEventRepository;
   @Autowired private MeterRegistry meterRegistry;
   @Autowired private EntityManager entityManager;
+  @Autowired private NotificationRepository notificationRepository;
   @Autowired private ApplicationEvents events;
 
   private MockMvc mockMvc;
@@ -152,6 +157,38 @@ class UserRoleControllerIntegrationTest {
 
     assertThat(onlyEvent(AuditEventType.USER_ROLE_WITHDRAWN).getDetails())
         .contains("role=" + Roles.BANK_EMPLOYEE);
+  }
+
+  @Test
+  void withdrawalClearsOnlyNoticesWhoseLastEligiblePathWasRemoved() throws Exception {
+    change(asAdmin(admin), member, Roles.BANK_EMPLOYEE, true, 0L).andExpect(status().isOk());
+    Notification seat = saveNotice(NotificationRoleAudience.MEMBER);
+    Notification grant = saveNotice(NotificationRoleAudience.BANK_STAFF);
+    Notification both = saveNotice(NotificationRoleAudience.MEMBER_OR_BANK_STAFF);
+    Notification direct = saveNotice(NotificationRoleAudience.DIRECT);
+
+    change(asAdmin(admin), member, Roles.KRT_MEMBER, false, 1L).andExpect(status().isOk());
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(notificationRepository.findById(seat.getId())).isEmpty();
+    assertThat(notificationRepository.findById(grant.getId())).isPresent();
+    assertThat(notificationRepository.findById(both.getId())).isPresent();
+
+    change(asAdmin(admin), member, Roles.BANK_EMPLOYEE, false, 2L).andExpect(status().isOk());
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(notificationRepository.findById(grant.getId())).isEmpty();
+    assertThat(notificationRepository.findById(both.getId())).isEmpty();
+    assertThat(notificationRepository.findById(direct.getId())).isPresent();
+  }
+
+  private Notification saveNotice(NotificationRoleAudience audience) {
+    return notificationRepository.saveAndFlush(
+        Notification.builder()
+            .recipientUserId(member.getId())
+            .type(NotificationType.JOB_ORDER_CREATED)
+            .roleAudience(audience)
+            .build());
   }
 
   @Test

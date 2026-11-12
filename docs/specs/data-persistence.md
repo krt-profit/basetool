@@ -735,7 +735,7 @@ centralised:
   its return type diverges (`Optional<T>` for a unique name, `List<GameItem>` for
   `GameItemRepository`, whose `name` is not unique), and a base interface method can only declare one
   return type.
-- **One `static final String` JPQL fragment per aggregate, beside the aggregate's repository** (since 2026-10-12, option B1 confirmed by the owner): `mission.api.MissionScope#PREDICATE`, `hangar.api.ShipScope#TRIPLE`, `joborder.api.JobOrderScope#READ_PREDICATE` and `inventory.api.InventoryScope#TRIPLE` (the Materialbörse's offer repository splices the Lager's, so it is published), and `RefineryAccessPolicy#REFINERY_ORDER_SCOPE_TRIPLE` and `OperationAccessPolicy#OPERATION_SCOPE_PREDICATE` inside their access policies (their repositories are `internal`). `ScopeSpecifications` is gone. The fragments are
+- **One shared HQL scope predicate per aggregate, beside the aggregate's repository** (since 2026-10-12, option B1 confirmed by the owner): `mission.api.MissionScope#PREDICATE`, `hangar.api.ShipScope#TRIPLE`, `joborder.api.JobOrderScope#READ_PREDICATE` and `inventory.api.InventoryScope#TRIPLE` (the Materialbörse's offer repository splices the Lager's, so it is published), and `RefineryAccessPolicy#REFINERY_ORDER_SCOPE_TRIPLE` and `OperationAccessPolicy#OPERATION_SCOPE_PREDICATE` inside their access policies (their repositories are `internal`). The mission predicate is paired with a recursive query prefix that excludes descendants of unreadable ancestors before pagination (REQ-MISSION-008). `ScopeSpecifications` is gone. The fragments are
   referenced from each repository's `@Query` value via compile-time constant-expression concatenation
   (JLS 15.28/4.12.4 — the same technique REQ-SEC-002a's `Roles.X` constants use inside
   `@PreAuthorize`, since an annotation value cannot invoke a method). The alias is baked into each
@@ -922,7 +922,8 @@ subclass repository's SQL discriminator filter 1:1. Pure non-loading queries on 
 repositories (`existsById`, `findAllByActiveTrue` list screens, count/aggregate queries) remain
 fine.
 
-**Enforced by:** `OrgUnitStampingService.resolveStampedOrgUnit` / `resolveSquadronForPickerOutput`
+**Enforced by:** `OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable` /
+`resolveOrgUnitForUnitOwnedAggregate` / `resolveOrgUnitForAdminOnBehalf`
 (one polymorphic load replacing the Squadron→SK→base probe chain),
 `RequestScopeResolver.currentSquadron`, `StaffelMembershipResolver.resolveNameSortedStaffeln`,
 `OrgUnitMembershipQueryService.listOptionsForUser` / `findAllMembershipsForUser` (batched, also
@@ -1164,7 +1165,9 @@ only through a reviewed crossing listed with its reason in `TableOwnershipTest`,
 repository declares runs only in the four listed classes: the three GDPR registries'
 executors (`DataExportService`, `PersonSearchService` and the merge's `OwnedRowsMover`, which runs
 the tables the modules' `UserReassignmentParticipant`s declare) and
-`ChangeSourceTransactionManager`.
+`ChangeSourceTransactionManager`. The mission, participant and finance guards read the
+operation's paid-out marks. The refinery guard follows the linked mission to those marks.
+These crossings protect the same settlement across every writer (REQ-MISSION-034, ADR-0375).
 
 Every table and column a trigger function names — `NEW.x`, `OLD.x`, `alias.x`, an `INSERT` column
 list, and every table, through every schema function the trigger calls — **resolves against
@@ -1803,6 +1806,10 @@ cannot suppress it. Content, blank-banner visibility and optimistic conflicts re
 existing contracts.
 
 ### REQ-DATA-040 — Transaction resources follow suspension and resumption
+
+Inventory, mission and refinery use `TransactionMemo` for transaction binding and typed
+persistence-context scans. The inventory memo keeps caller-visible mission details separate
+from the lookup for existing allocations (REQ-INV-027).
 
 Live-sync flushes and transaction-local mission, inventory and refinery memos unbind when their
 own transaction is suspended and rebind when it resumes. A `REQUIRES_NEW` transaction cannot

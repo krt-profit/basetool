@@ -36,8 +36,8 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.util.List;
 import java.util.Optional;
@@ -69,7 +69,7 @@ class InventoryOrgUnitChangeServiceTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
-  @Mock private OrgUnitMembershipQueryService membershipQueryService;
+  @Mock private OrgUnitSeatEligibility seatEligibility;
   @Mock private InventoryCheckoutService inventoryCheckoutService;
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private AuditService auditService;
@@ -87,7 +87,7 @@ class InventoryOrgUnitChangeServiceTest {
                 org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             orgUnitRepository,
-            membershipQueryService,
+            seatEligibility,
             inventoryCheckoutService,
             inventoryItemMapper,
             auditService);
@@ -99,8 +99,7 @@ class InventoryOrgUnitChangeServiceTest {
   void movesAnUnstampedPersonalRowOntoAMembershipAndMerges() {
     InventoryItem row = row(CALLER, true, null);
     stubRow(row);
-    when(membershipQueryService.findDirectMembershipOrgUnitIds(CALLER))
-        .thenReturn(Set.of(alpha.getId()));
+    when(seatEligibility.findStampableOrgUnitIds(CALLER)).thenReturn(Set.of(alpha.getId()));
     when(orgUnitRepository.findById(alpha.getId())).thenReturn(Optional.of(alpha));
     when(inventoryItemRepository.saveAndFlush(row)).thenReturn(row);
     when(inventoryCheckoutService.mergeStockIfRequested(row, true)).thenReturn(row);
@@ -132,7 +131,7 @@ class InventoryOrgUnitChangeServiceTest {
     service.changeOrgUnit(row.getId(), new InventoryItemOrgUnitChangeDto(null, null, null), CALLER);
 
     assertThat(row.getOwningOrgUnit()).isNull();
-    verify(membershipQueryService, never()).findDirectMembershipOrgUnitIds(any());
+    verify(seatEligibility, never()).findStampableOrgUnitIds(any());
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_ORG_UNIT_CHANGED),
@@ -146,8 +145,7 @@ class InventoryOrgUnitChangeServiceTest {
   void leavingTheUnitAsItIsChangesAndRecordsNothing() {
     InventoryItem row = row(CALLER, true, alpha);
     stubRow(row);
-    when(membershipQueryService.findDirectMembershipOrgUnitIds(CALLER))
-        .thenReturn(Set.of(alpha.getId()));
+    when(seatEligibility.findStampableOrgUnitIds(CALLER)).thenReturn(Set.of(alpha.getId()));
     when(orgUnitRepository.findById(alpha.getId())).thenReturn(Optional.of(alpha));
 
     service.changeOrgUnit(
@@ -161,7 +159,7 @@ class InventoryOrgUnitChangeServiceTest {
   void refusesAUnitTheCallerIsNotAMemberOf() {
     InventoryItem row = row(CALLER, true, null);
     stubRow(row);
-    when(membershipQueryService.findDirectMembershipOrgUnitIds(CALLER)).thenReturn(Set.of());
+    when(seatEligibility.findStampableOrgUnitIds(CALLER)).thenReturn(Set.of());
 
     assertThrows(
         BadRequestException.class,
@@ -214,8 +212,7 @@ class InventoryOrgUnitChangeServiceTest {
     InventoryItem already = row(CALLER, true, alpha);
     stubRow(moving);
     stubRow(already);
-    when(membershipQueryService.findDirectMembershipOrgUnitIds(CALLER))
-        .thenReturn(Set.of(alpha.getId()));
+    when(seatEligibility.findStampableOrgUnitIds(CALLER)).thenReturn(Set.of(alpha.getId()));
     when(orgUnitRepository.findById(alpha.getId())).thenReturn(Optional.of(alpha));
     when(inventoryItemRepository.saveAndFlush(moving)).thenReturn(moving);
 

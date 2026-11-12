@@ -205,14 +205,13 @@ that rounded only the sum let a figure with a fourth decimal pass in the dialog 
 `422` from the backend's unrounded comparison. Below the cards the modal carries the book-in
 section (location — required, the booking button stays disabled without it —, owner defaulting to
 the acting user, owning org unit, personal flag, "allocate to order") that fills the `bookIn` block.
-The owning org unit picker („Buchen in OrgUnit") lists the owner's direct memberships
-(`GET /users/{id}/memberships?allKinds=true`, reloaded when the owner changes; only the newest
+The owning org unit picker („Buchen in OrgUnit") lists the owner's stampable units
+(`GET /users/{id}/memberships?allKinds=true&ownerPicker=true`, reloaded when the owner changes; only the newest
 reload renders, and the booking button stays disabled while it loads) and preselects the active
 org unit (`activeSquadronId`, REQ-ORG-024, REQ-ORG-032) when the owner is a direct member of it,
 else the owner's only membership. Otherwise it leads with the empty „-- Bitte wählen --" choice of
 the owner pickers (REQ-ORG-023), is required, and the booking button stays disabled until a unit is
-chosen; the first unit of the list is never booked silently. An owner without a membership gets no
-picker.
+chosen. An owner without a stampable unit gets no picker.
 The relay `JobOrderWriteController.bookProductionAjax`
 (`POST /orders/{id}/items/{itemId}/production`, consumes JSON) forwards the payload to the backend,
 re-fetches the order, and returns it so `orders-detail.js` re-renders the affected sections in place

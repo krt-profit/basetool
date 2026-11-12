@@ -952,8 +952,6 @@ class JobOrderHierarchyAuthorityIntegrationTest {
     mvc.perform(put(endpoint).with(writer).contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.handle").value("Hierarchy test"));
-    mvc.perform(delete(endpoint + "/materials/" + material).with(writer))
-        .andExpect(status().isNoContent());
   }
 
   @Test

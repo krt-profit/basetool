@@ -109,21 +109,66 @@ public class AccountConsolidationService {
 
     Optional<KeycloakService.DiscordLink> link = resolveDiscordLink(duplicate);
     assertTargetCanTakeTheLink(target, link.orElse(null));
+    userAccountMergeService.assertMergeable(duplicateId, targetUserId);
     String guildNickname = duplicate.getDiscordGuildNickname();
 
-    link.ifPresent(resolved ->
-        keycloakService.linkDiscordIdentity(targetUserId, resolved.userId(), resolved.userName()));
-    User result =
-        selfProvider
-            .getObject()
-            .completeConsolidationTransactionally(
-                duplicateId,
-                targetUserId,
-                link.map(KeycloakService.DiscordLink::userId).orElse(null),
-                guildNickname,
-                adminId);
+    KeycloakService.DiscordLink resolved = link.orElse(null);
+    boolean linkCreated =
+        resolved != null
+            && keycloakService.linkDiscordIdentity(
+                targetUserId, resolved.userId(), resolved.userName());
+    User result;
+    try {
+      result =
+          selfProvider
+              .getObject()
+              .completeConsolidationTransactionally(
+                  duplicateId,
+                  targetUserId,
+                  resolved == null ? null : resolved.userId(),
+                  guildNickname,
+                  adminId);
+    } catch (RuntimeException failure) {
+      if (linkCreated) {
+        link.ifPresent(
+            created -> removeFailedConsolidationLink(duplicateId, targetUserId, created, failure));
+      }
+      throw failure;
+    }
     keycloakService.deleteUser(duplicateId);
     return result;
+  }
+
+  /**
+   * Compensates a failed database merge while the duplicate still exists.
+   *
+   * @param duplicateId the account that still owns the belongings
+   * @param targetUserId the account to detach
+   * @param link the link this consolidation created
+   * @param failure the database failure to preserve
+   */
+  private void removeFailedConsolidationLink(
+      UUID duplicateId,
+      UUID targetUserId,
+      KeycloakService.DiscordLink link,
+      RuntimeException failure) {
+    try {
+      if (userRepository.existsById(duplicateId)
+          && keycloakService
+              .readDiscordLink(targetUserId)
+              .map(current -> link.userId().equals(current.userId()))
+              .orElse(false)) {
+        keycloakService.unlinkDiscordIdentity(targetUserId);
+      }
+    } catch (RuntimeException rollbackFailure) {
+      String kind = rollbackFailure.getClass().getSimpleName();
+      log.warn(
+          "Could not detach the Discord link after a failed consolidation of {} into {} ({})",
+          duplicateId,
+          targetUserId,
+          kind);
+      failure.addSuppressed(new IllegalStateException("Discord link compensation failed: " + kind));
+    }
   }
 
   /**

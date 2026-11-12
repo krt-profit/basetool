@@ -298,25 +298,6 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Returns the active org units the caller is a direct member of, without the leadership cascade,
-   * while the caller holds {@code KRT Member} (ADR-0300, REQ-ORG-032).
-   *
-   * @return the caller's direct-membership org-unit ids, empty without {@code KRT Member}; never
-   *     {@code null}.
-   */
-  @NotNull
-  public Set<UUID> currentDirectMembershipOrgUnitIds() {
-    if (!authHelper.holdsKrtMember()) {
-      return Set.of();
-    }
-    Set<UUID> ids = new LinkedHashSet<>();
-    for (OrgUnitMembership m : currentCallerMemberships()) {
-      ids.add(m.getId().getOrgUnitId());
-    }
-    return ids;
-  }
-
-  /**
    * Whether the caller may see the job-order list and details: admins always, others only as a
    * member of at least one active Profit-hierarchy org unit. Memoised per request.
    *

@@ -60,7 +60,9 @@ public class NotificationCreationService {
    */
   @Transactional
   public @NotNull Set<UUID> createFromEvent(@NotNull NotificationEvent event) {
-    var prepared = eventPreparation.resolve(event);
+    var candidate = eventPreparation.resolve(event);
+    var prepared =
+        eventPreparation.prepare(candidate, eventPreparation.lockRoles(List.of(candidate)));
     Set<UUID> changed = new HashSet<>(eventPreparation.removeCaptured(event));
     changed.addAll(eventPreparation.removeObsolete(prepared));
     List<Notification> notices = eventPreparation.missing(prepared);
@@ -81,8 +83,15 @@ public class NotificationCreationService {
     if (notificationRepository.claimCause(cause.id()) == 0) {
       return Set.of();
     }
-    List<NotificationEventPreparation.Prepared> preferred = prepare(cause.preferredEvents());
-    List<NotificationEventPreparation.Prepared> additional = prepare(cause.events());
+    var preferredCandidates = candidates(cause.preferredEvents());
+    var additionalCandidates = candidates(cause.events());
+    var roles =
+        eventPreparation.lockRoles(
+            Stream.concat(preferredCandidates.stream(), additionalCandidates.stream()).toList());
+    var preferred =
+        preferredCandidates.stream().map(event -> eventPreparation.prepare(event, roles)).toList();
+    var additional =
+        additionalCandidates.stream().map(event -> eventPreparation.prepare(event, roles)).toList();
     Set<UUID> changed = new HashSet<>();
     Stream.concat(cause.preferredEvents().stream(), cause.events().stream())
         .forEach(event -> changed.addAll(eventPreparation.removeCaptured(event)));
@@ -102,7 +111,7 @@ public class NotificationCreationService {
     return Set.copyOf(changed);
   }
 
-  private List<NotificationEventPreparation.Prepared> prepare(List<NotificationEvent> events) {
+  private List<NotificationEventPreparation.Candidate> candidates(List<NotificationEvent> events) {
     return events.stream()
         .filter(event -> causeGuards.stream().allMatch(guard -> guard.isCurrent(event)))
         .map(eventPreparation::resolve)

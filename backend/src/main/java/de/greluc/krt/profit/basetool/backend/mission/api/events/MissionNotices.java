@@ -287,16 +287,18 @@ public final class MissionNotices {
    * @param missionName its name
    * @param participantId the removed member, the single recipient
    * @param actor who removed them
-   * @return the event
+   * @param notifyParticipant whether the removed member may still receive mission data
+   * @return the event, which clears the removed member's earlier notices
    */
   @NotNull
   public static NoticeEvent participantRemoved(
       @NotNull UUID missionId,
       @NotNull String missionName,
       @NotNull UUID participantId,
-      @NotNull ActorRef actor) {
+      @NotNull ActorRef actor,
+      boolean notifyParticipant) {
     return base(NotificationEventType.MISSION_PARTICIPANT_REMOVED, missionId, actor)
-        .contextRecipientUserId(participantId)
+        .contextRecipientUserId(notifyParticipant ? participantId : null)
         .renderParams(params("mission", text(missionName), "actor", text(actor.name())))
         .resolvesNotificationTypesForRecipients(PARTICIPANT_NOTICES)
         .supersedeRecipients(Set.of(participantId))

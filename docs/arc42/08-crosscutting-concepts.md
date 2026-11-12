@@ -182,6 +182,9 @@ Transaction-bound live-sync flushes and read memos follow suspension and resumpt
 Role permissions and descriptions use independent row-locked section counters
 ([REQ-SEC-088](../specs/security-and-access.md#req-sec-088--the-four-application-roles-are-assigned-in-the-basetool)).
 
+Operation payout marks and input writes share a transaction lock per operation. The settlement
+rule and the retained fee and attendance basis live in [ADR-0375](../adr/0375-operation-payout-inputs-freeze-while-paid.md).
+
 ## 8.5 API conventions
 
 Bank statement and management PDFs separate repeatable-read query snapshots from rendering and

@@ -254,6 +254,21 @@ class OrgRoleManagementSecurityServiceTest {
   }
 
   @Test
+  void bereichsleiterCannotDemoteAnExistingBereichsleiter() {
+    UUID bereichId = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    callerIs(bereichId, MembershipRole.BEREICHSLEITER);
+    OrgUnitMembership existing = new OrgUnitMembership();
+    existing.setRole(MembershipRole.BEREICHSLEITER);
+    when(membershipRepository.findById(new OrgUnitMembershipId(target, bereichId)))
+        .thenReturn(Optional.of(existing));
+
+    assertFalse(
+        service.canAppointBereichRole(
+            bereichId, target, BereichLeadershipRole.KOORDINATOR, authed));
+  }
+
+  @Test
   void koordinator_appointedByForeignBereichsleiter_denied() {
     UUID bereichId = UUID.randomUUID();
     callerIs(UUID.randomUUID(), MembershipRole.BEREICHSLEITER);

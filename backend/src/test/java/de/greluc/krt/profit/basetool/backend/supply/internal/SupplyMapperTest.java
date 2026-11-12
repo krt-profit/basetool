@@ -179,7 +179,7 @@ class SupplyMapperTest {
     JobOrderMaterialCoverage coverage = mock(JobOrderMaterialCoverage.class);
     when(coverage.coverageOf(Set.of(orderId)))
         .thenReturn(
-            Map.of(orderId, new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of())));
+            Map.of(orderId, new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of(), null)));
     SupplyMapper unpinned = mapperFor(SupplyAccessPolicies.admin(null), coverage);
     SupplyMapper pinned = mapperFor(SupplyAccessPolicies.admin(unit.getId()), coverage);
 
@@ -202,7 +202,8 @@ class SupplyMapperTest {
             orderId,
             42,
             JobOrderStatus.IN_PROGRESS,
-            List.of(new BucketCoverage(material.getId(), good.getId(), 12.4, 12.4)));
+            List.of(new BucketCoverage(material.getId(), good.getId(), 12.4, 12.4)),
+            null);
 
     NeedDto dto =
         mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(unit.getId()), order));
@@ -216,7 +217,7 @@ class SupplyMapperTest {
   void aLinkedOrderWithoutTheNeedsBucketCarriesNoCoverage() {
     QualityTier good = goodTier();
     UUID orderId = UUID.randomUUID();
-    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
+    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of(), null);
 
     NeedDto dto =
         mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(unit.getId()), order));
@@ -230,7 +231,7 @@ class SupplyMapperTest {
   void aMemberWhoDoesNotManageTheUnitAndAClosedNeedGetNoLinkedOrder() {
     QualityTier good = goodTier();
     UUID orderId = UUID.randomUUID();
-    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
+    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of(), null);
     SupplyNeed fulfilled = linkedNeed(orderId, good);
     fulfilled.setStatus(NeedStatus.FULFILLED);
 
@@ -250,7 +251,7 @@ class SupplyMapperTest {
   void theResponseCarriesTheOrderLinkOnlyForAManagerOfTheUnit() {
     QualityTier good = goodTier();
     UUID orderId = UUID.randomUUID();
-    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
+    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of(), null);
     SupplyNeed need = linkedNeed(orderId, good);
 
     JsonNode foreign = onTheWire(mapper.toDto(need, linkedContext(Set.of(), order)));

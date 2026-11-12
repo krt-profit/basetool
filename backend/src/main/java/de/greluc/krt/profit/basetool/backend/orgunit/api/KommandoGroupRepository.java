@@ -33,16 +33,6 @@ import org.springframework.stereotype.Repository;
 public interface KommandoGroupRepository extends JpaRepository<KommandoGroup, UUID> {
 
   /**
-   * Lists every Kommandogruppe of the given Staffel, ordered by {@link
-   * KommandoGroup#getSortIndex()} ascending so the UI renders the up-to-four groups
-   * deterministically.
-   *
-   * @param squadronOrgUnitId the Staffel's org-unit id; never {@code null}.
-   * @return the squadron's Kommandogruppen in display order; never {@code null}, possibly empty.
-   */
-  List<KommandoGroup> findBySquadronIdOrderBySortIndexAsc(UUID squadronOrgUnitId);
-
-  /**
    * Reads command groups for all visible squadrons in their display order.
    *
    * @param squadronIds the visible squadrons

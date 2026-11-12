@@ -28,8 +28,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationDecidedEvent;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
-import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
@@ -39,8 +37,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleSe
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.SelectorKind;
-import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
-import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
 import de.greluc.krt.profit.basetool.backend.notification.internal.RecipientResolutionService;
 import java.util.HashSet;
@@ -67,19 +64,6 @@ class NotificationRuleEngineIntegrationTest {
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
   @Autowired private TransactionTemplate transactionTemplate;
-
-  private static JobOrderCreatedEvent eventForRandomUnits() {
-    return new JobOrderCreatedEvent(
-        UUID.randomUUID(),
-        123,
-        "Integration order",
-        new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
-        "ALP",
-        new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
-        "MATERIAL",
-        null,
-        new NotificationRevision(0, 0));
-  }
 
   @Test
   void seededDefaultRuleIsPresentWithSelectors() {
@@ -200,7 +184,7 @@ class NotificationRuleEngineIntegrationTest {
           userRepository.save(target);
           NotificationRule rule =
               NotificationRule.builder()
-                  .eventType(NotificationEventType.JOB_ORDER_CREATED)
+                  .eventType(NotificationEventType.OPERATION_COMPLETED_UNOWNED)
                   .notificationType(NotificationType.JOB_ORDER_CREATED)
                   .description("integration-test specific-user rule")
                   .enabled(true)
@@ -215,7 +199,12 @@ class NotificationRuleEngineIntegrationTest {
         });
 
     try {
-      JobOrderCreatedEvent event = eventForRandomUnits();
+      NoticeEvent event =
+          NoticeEvent.builder()
+              .eventType(NotificationEventType.OPERATION_COMPLETED_UNOWNED)
+              .entityType("OPERATION")
+              .entityId(UUID.randomUUID())
+              .build();
       Set<UUID> recipients = notificationCreationService.createFromEvent(event);
 
       assertThat(recipients).isNotEmpty();

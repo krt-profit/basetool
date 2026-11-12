@@ -93,13 +93,12 @@ class NotificationRecipientQueriesIntegrationTest {
   void seed() {
     Role krtMember = roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow();
     Set<User> users = new HashSet<>();
-    for (UUID id : Set.of(OWNER, MANAGER, CHECKED_IN, WAITING, PLAIN_MEMBER)) {
+    for (UUID id : Set.of(OWNER, MANAGER, PLAIN_MEMBER, RETAINED_SEAT, FLAGGED_WITHOUT_ROLE)) {
       users.add(user(id, Set.of()));
     }
-    users.add(user(RETAINED_SEAT, Set.of()));
-    users.add(user(FLAGGED_WITHOUT_ROLE, Set.of()));
-    users.add(user(STAFFELLEITER, Set.of(krtMember)));
-    users.add(user(FLAGGED, Set.of(krtMember)));
+    for (UUID id : Set.of(CHECKED_IN, WAITING, STAFFELLEITER, FLAGGED)) {
+      users.add(user(id, Set.of(krtMember)));
+    }
     User owner = users.stream().filter(u -> OWNER.equals(u.getId())).findFirst().orElseThrow();
     User manager = users.stream().filter(u -> MANAGER.equals(u.getId())).findFirst().orElseThrow();
 

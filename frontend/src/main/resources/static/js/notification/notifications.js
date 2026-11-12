@@ -160,6 +160,19 @@ function buildItem(item) {
     } else {
         body.appendChild(text);
     }
+    if (typeof item.orgUnitLabel === 'string' && item.orgUnitLabel) {
+        const unit = document.createElement('span');
+        unit.className = 'chip';
+        unit.setAttribute('data-notif-org-unit', '');
+        unit.textContent = item.orgUnitLabel;
+        body.appendChild(unit);
+    }
+    if (typeof item.activeUnitHint === 'string' && item.activeUnitHint) {
+        const hint = document.createElement('span');
+        hint.className = 'notification-item-time';
+        hint.textContent = item.activeUnitHint;
+        body.appendChild(hint);
+    }
     body.appendChild(time);
 
     const actions = document.createElement('div');

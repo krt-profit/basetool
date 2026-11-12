@@ -31,6 +31,7 @@ import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { ownerPickerError } from '/js/kernel/krt-owner-picker.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
@@ -555,7 +556,6 @@ function adminUmbuchenInput(id) {
  * @param {string | null} locationId the current location's id
  * @param {string | null} locationName the current location's label
  * @param {string | null} quantityType `PIECE` or `SCU`
- * @param {string | null} owningOrgUnitId the row's owning org unit
  */
 function openUmbuchenModal(
     id,
@@ -567,11 +567,9 @@ function openUmbuchenModal(
     locationId,
     locationName,
     quantityType,
-    owningOrgUnitId,
 ) {
     adminUmbuchenItemId = id;
     adminUmbuchenSource = { userId: userId || null, locationId: locationId || null };
-    adminLager.setUmbuchenCurrentOwningOrgUnit(owningOrgUnitId || null);
     const isScu = quantityType !== 'PIECE';
     const amountEl = adminUmbuchenInput('umbuchenAmount');
     const targetEl = adminUmbuchenInput('umbuchenTargetAmount');
@@ -642,9 +640,16 @@ function submitUmbuchen(event) {
     const amountEl = adminUmbuchenInput('umbuchenAmount');
     const targetUserEl = adminUmbuchenInput('umbuchenTargetUserId');
     const targetLocationEl = adminUmbuchenInput('umbuchenTargetLocationId');
-    const targetOrgUnitEl = adminUmbuchenInput('umbuchenTargetOwningOrgUnitId');
+    const targetOrgUnitEl = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('umbuchenTargetOwningOrgUnitId')
+    );
     const versionEl = adminUmbuchenInput('umbuchenVersion');
     if (!amountEl || !targetUserEl || !targetLocationEl || !targetOrgUnitEl || !versionEl) return;
+    const pickerError = ownerPickerError(targetOrgUnitEl);
+    if (pickerError !== null) {
+        showFrontendErrorToast(pickerError);
+        return;
+    }
     const amount = krtScuInput.parse(amountEl.value);
     const submitBtn = /** @type {HTMLButtonElement | null} */ (
         document.getElementById('umbuchenSubmitBtn')
@@ -791,7 +796,6 @@ krtEvents.on('click', 'inv-admin-umbuchen', (el) => {
         el.getAttribute('data-location-id'),
         el.getAttribute('data-location-name'),
         el.getAttribute('data-quantity-type'),
-        el.getAttribute('data-owning-org-unit-id'),
     );
 });
 krtEvents.on('click', 'inv-admin-open-note', (el) => {

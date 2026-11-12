@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -44,6 +45,21 @@ public interface OrgUnitMembershipRepository
   List<OrgUnitMembership> findAllByIdUserId(UUID userId);
 
   /**
+   * Locks existing membership rows until the account merge commits.
+   *
+   * @param userIds the merge participants
+   * @return the owning user id of each locked membership
+   */
+  @Query(
+      value =
+          """
+          SELECT user_id FROM org_unit_membership WHERE user_id IN (:userIds)
+          ORDER BY user_id, org_unit_id FOR UPDATE
+          """,
+      nativeQuery = true)
+  List<UUID> lockMembershipsForMerge(@Param("userIds") Collection<UUID> userIds);
+
+  /**
    * Returns the given user's memberships on active org units: the memberships that confer reach,
    * rights and notices (REQ-ORG-032). A membership on a deactivated unit stays stored for its
    * reactivation and confers nothing meanwhile.
@@ -58,6 +74,20 @@ public interface OrgUnitMembershipRepository
       (SELECT o.id FROM OrgUnit o WHERE o.active = true)
       """)
   List<OrgUnitMembership> findAllOnActiveOrgUnitsByIdUserId(@Param("userId") UUID userId);
+
+  /**
+   * Reads the memberships that confer reach on active units for a set of members.
+   *
+   * @param userIds candidate member ids
+   * @return active-unit memberships for those members
+   */
+  @Query(
+      """
+      SELECT m FROM OrgUnitMembership m WHERE m.id.userId IN :userIds AND m.id.orgUnitId IN
+      (SELECT o.id FROM OrgUnit o WHERE o.active = true)
+      """)
+  List<OrgUnitMembership> findAllOnActiveOrgUnitsByUserIds(
+      @Param("userIds") Collection<UUID> userIds);
 
   /**
    * Counts the org-unit memberships of the given user. Used by {@code OrgUnitMembershipService} to
@@ -105,6 +135,15 @@ public interface OrgUnitMembershipRepository
    * @return memberships of this org unit; never {@code null}, possibly empty.
    */
   List<OrgUnitMembership> findAllByIdOrgUnitId(UUID orgUnitId);
+
+  /**
+   * Checks whether a unit already has a member with the specified rank.
+   *
+   * @param orgUnitId the unit
+   * @param role the membership rank
+   * @return whether the rank is occupied
+   */
+  boolean existsByIdOrgUnitIdAndRole(@NotNull UUID orgUnitId, @NotNull MembershipRole role);
 
   /**
    * Reads visible-unit rosters with the to-one values used by the leadership overview.

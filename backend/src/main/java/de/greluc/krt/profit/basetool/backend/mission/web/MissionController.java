@@ -184,6 +184,12 @@ public class MissionController {
   @PostMapping
   @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(summary = "Create a new mission")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Mission created."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "The destination operation's payout inputs are frozen.")
+  })
   public MissionDto createMission(@RequestBody @Valid @NotNull CreateMissionRequest request) {
     return projection.cleanupForPeer(missionMapper.toDto(missionService.createMission(request)));
   }
@@ -194,11 +200,17 @@ public class MissionController {
    *
    * @param id parent mission id
    * @param request create payload for the sub-mission
-   * @return the persisted parent DTO with the new sub-mission attached
+   * @return the persisted sub-mission DTO
    */
   @PostMapping("/{id}/sub-missions")
   @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(summary = "Create a sub-mission")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Sub-mission created."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "The destination operation's payout inputs are frozen.")
+  })
   public MissionDto createSubMission(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull CreateMissionRequest request) {
     return projection.cleanupForPeer(
@@ -218,9 +230,15 @@ public class MissionController {
   @Operation(
       summary = "Patch mission core section",
       description =
-          "Patches only the core section (name, description, calendar link, status) of a mission."
-              + " Other sections and sub-aggregates stay untouched. A version conflict returns HTTP"
-              + " 409 (application/problem+json).")
+          "Patches the core section, including its optional operation link."
+              + " A changed link requires the destination operation's edit right."
+              + " A version or payout conflict returns HTTP 409 (application/problem+json).")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Mission core updated."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "Stale core version or frozen payout inputs on an affected operation.")
+  })
   public MissionDto patchMissionCore(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull PatchMissionCoreRequest request) {
@@ -267,6 +285,12 @@ public class MissionController {
   @DeleteMapping("/{id}")
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   @Operation(summary = "Delete a mission")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "Mission deleted."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "A linked operation's payout inputs are frozen.")
+  })
   public ResponseEntity<Void> deleteMission(@PathVariable @NotNull UUID id) {
     missionService.deleteMission(id);
     return ResponseEntity.noContent().build();

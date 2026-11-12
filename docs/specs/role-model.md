@@ -6,10 +6,10 @@
 
 ## Context & goal
 
-The single flat Keycloak `OFFICER` role is no longer enough to model squadron leadership. Each
+Membership ranks define the scope of squadron leadership. Each
 Staffel has exactly one **Staffelleiter**, up to four **Kommandoleiter** and four **stellvertretende
 Kommandoleiter**, and up to four **Ensigns**, each assigned to a Kommandogruppe or generally to the
-Staffelleitung (a group has at most one Kommandoleiter and one stellv.). Each Bereich has one
+Staffelleitung (a group has at most one Kommandoleiter and one stellv.). Each Bereich has at most one
 **Bereichsleiter**, plus zero-or-more **Bereichskoordinatoren** and **Bereichsoperatoren**. Members
 can belong to the **Organisationsleitung (OL)**; every Bereichsleiter is automatically part of the OL
 body.
@@ -176,12 +176,19 @@ group, and a group at most one Kommandoleiter and one stellv. (ADR-0322).
 
 **Enforced by:** `OrgHierarchyMigrationTest` (V185, `v188SquadronRankSingletonIndexes`, `v313AllowsKommandoleiterWithoutGroup`), `KommandoGroupServiceTest`, `OrgUnitMembershipServiceTest` (squadron-rank cardinality, ungrouped ranks) · **Code:** `KommandoGroup`, `KommandoGroupRepository`, `KommandoGroupService`, `KommandoGroupController`, `OrgUnitMembershipService#assignSquadronRank`, `SquadronRankCaps`, `SquadronRoleController`, `V185__create_kommando_group.sql`, `V188__squadron_rank_singleton_indexes.sql`, `V313__allow_kommandoleiter_without_group.sql` · **Decision:** ADR-0042, ADR-0322 · **Issues:** #800
 
+A Bereich may have at most one `BEREICHSLEITER`. The appointment service refuses an occupied
+Leiter seat with HTTP 400. A partial unique index rejects a concurrent second appointment
+with HTTP 409. Before deployment, the
+[read-only preflight](../../scripts/bereich-leader-singleton-preflight.sql) verifies that existing
+areas have at most one Leiter. Resolve duplicates through the role-management workflow before applying the
+migration.
+
 ### REQ-ROLE-004 — Delegated appointment ladder, no self-promotion
 
 Rank assignment is delegated down a strict ladder, with admin able to do everything:
 
 - Admin → OL members (pure `OL_MEMBER`);
-- OL members → Bereichsleiter;
+- OL members → Bereichsleiter, including a change from that rank to Koordinator or Operator;
 - Bereichsleiter → Staffelleiter + SK-Lead + Bereichskoordinator + Bereichsoperator, for units in
   their own Bereich;
 - Staffelleiter → Kommandoleiter + stellv. Kommandoleiter + Ensign + Kommandogruppen, for their own
@@ -243,7 +250,8 @@ Staffeln · Spezialkommandos", each unit with its Bereich colour square and memb
 search over unit names, shorthands and member names; on the right the selected unit — its kind
 and Bereich as eyebrow, its name, „Mitglied hinzufügen" where the caller may add members (OL,
 Bereich, SK — a Staffel's members come from its memberships and have no add here), and the tabs
-„Mitglieder (n)" and, for a Staffel, „Kommandogruppen (n)". `?unit=<id>` selects the unit (an
+„Mitglieder (n)" and, for a Staffel, „Kommandogruppen (n)". The groups come from the scoped
+`GET /api/v1/leadership` view. `?unit=<id>` selects the unit (an
 unknown id selects the first), `?tab=groups` the second tab; the selection rewrites the address in
 place and the tree moves with the arrow keys. An editable rank or Kommandogruppe is a select that
 **saves on change** — one versioned write per change, a toast on success, the conflict dialog on a

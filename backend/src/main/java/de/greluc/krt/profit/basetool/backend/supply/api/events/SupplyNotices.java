@@ -166,7 +166,7 @@ public final class SupplyNotices {
    * @param needId the need
    * @param unitId the raising unit
    * @param unitKind the raising unit's kind
-   * @param unitName the raising unit's name
+   * @param unitName the linked order's current responsible unit name
    * @param entry the material name
    * @param orderNumber the linked order's number
    * @return the event

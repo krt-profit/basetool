@@ -42,14 +42,19 @@ class ScopeActiveOrgUnitProviderTest {
     when(requestScopeResolver.currentActiveContext())
         .thenReturn(ActiveOrgUnitContext.orgUnit(orgUnitId));
 
-    assertThat(provider.activeOrgUnitId()).contains(orgUnitId);
+    assertThat(provider.activeOrgUnitLogValue()).isEqualTo(orgUnitId.toString());
   }
 
   @Test
-  void isEmptyWhenTheContextSpansSeveralUnits() {
+  void distinguishesAllMyUnitsFromAllUnitsAndNone() {
     when(requestScopeResolver.currentActiveContext())
-        .thenReturn(ActiveOrgUnitContext.ALL_MY_ORG_UNITS);
+        .thenReturn(
+            ActiveOrgUnitContext.ALL_MY_ORG_UNITS,
+            ActiveOrgUnitContext.ALL_ORG_UNITS,
+            ActiveOrgUnitContext.NONE);
 
-    assertThat(provider.activeOrgUnitId()).isEmpty();
+    assertThat(provider.activeOrgUnitLogValue()).isEqualTo("mine");
+    assertThat(provider.activeOrgUnitLogValue()).isEqualTo("all");
+    assertThat(provider.activeOrgUnitLogValue()).isEqualTo("none");
   }
 }

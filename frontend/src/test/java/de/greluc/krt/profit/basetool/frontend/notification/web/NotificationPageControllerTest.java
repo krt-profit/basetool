@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationDto;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationPageSliceDto;
@@ -63,6 +64,8 @@ class NotificationPageControllerTest {
     MessageSource messageSource = mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any(Locale.class)))
         .thenReturn("Notification text");
+    when(messageSource.getMessage(eq("notifications.activeUnitHint"), any(), any(Locale.class)))
+        .thenReturn("Choose the unit of this notice.");
     return new NotificationPageController(
         new NotificationBackendClient(backendApiClient),
         messageSource,
@@ -88,6 +91,9 @@ class NotificationPageControllerTest {
               null,
               0L,
               Instant.parse("2026-01-01T00:00:00Z"),
+              null,
+              null,
+              null,
               null));
     }
     return new PageResponse<>(content, pageIndex, size, totalElements, totalPages, List.of());
@@ -205,7 +211,7 @@ class NotificationPageControllerTest {
     assertEquals(0, pageArg.getValue());
   }
 
-  /** The page slice carries each row's link target for the load-more rows. */
+  /** The page slice carries the link and guidance under a different active unit. */
   @Test
   void pageItems_carriesTheLinkTarget() {
     UUID orderId = UUID.randomUUID();
@@ -224,7 +230,10 @@ class NotificationPageControllerTest {
                         null,
                         0L,
                         Instant.parse("2026-01-01T00:00:00Z"),
-                        null)),
+                        null,
+                        UUID.randomUUID(),
+                        "SQUADRON",
+                        "BRAVO")),
                 1,
                 50,
                 51L,
@@ -235,5 +244,14 @@ class NotificationPageControllerTest {
     NotificationPageSliceDto slice = controller.pageItems(1);
 
     assertEquals("/orders/" + orderId, slice.items().get(0).href());
+    assertEquals("BRAVO", slice.items().get(0).orgUnitLabel());
+    ActiveSquadronContext.set(UUID.randomUUID());
+    try {
+      var marked = controller.pageItems(1).items().getFirst();
+      assertEquals("Choose the unit of this notice.", marked.activeUnitHint());
+      assertEquals("/orders/" + orderId, marked.href());
+    } finally {
+      ActiveSquadronContext.clear();
+    }
   }
 }

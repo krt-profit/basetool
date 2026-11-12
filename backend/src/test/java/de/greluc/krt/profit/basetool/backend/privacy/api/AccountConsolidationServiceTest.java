@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -265,6 +266,49 @@ class AccountConsolidationServiceTest {
         () -> service.consolidate(DUPLICATE_ID, TARGET_ID, 0L, ADMIN_ID));
 
     verifyNoInteractions(keycloakService, userAccountMergeService, userDeletionService);
+  }
+
+  @Test
+  void consolidate_withIncompatibleMembershipsDoesNotWriteToKeycloak() {
+    when(userRepository.findById(DUPLICATE_ID)).thenReturn(Optional.of(duplicate()));
+    when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target()));
+    doThrow(new BusinessConflictException("Incompatible membership"))
+        .when(userAccountMergeService)
+        .assertMergeable(DUPLICATE_ID, TARGET_ID);
+
+    assertThrows(
+        BusinessConflictException.class,
+        () -> service.consolidate(DUPLICATE_ID, TARGET_ID, null, ADMIN_ID));
+
+    verify(keycloakService, never()).linkDiscordIdentity(any(), any(), any());
+    verify(keycloakService, never()).deleteUser(any());
+    verifyNoInteractions(userDeletionService);
+  }
+
+  @Test
+  void failedDatabaseMergeCompensatesOnlyANewlyCreatedDiscordLink() {
+    User duplicate = duplicate();
+    KeycloakService.DiscordLink link = new KeycloakService.DiscordLink(SNOWFLAKE, "duplicate");
+    when(userRepository.findById(DUPLICATE_ID)).thenReturn(Optional.of(duplicate));
+    when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target()));
+    when(userRepository.existsById(DUPLICATE_ID)).thenReturn(true);
+    when(keycloakService.readDiscordLink(DUPLICATE_ID)).thenReturn(Optional.of(link));
+    when(keycloakService.readDiscordLink(TARGET_ID)).thenReturn(Optional.of(link));
+    when(keycloakService.linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "duplicate"))
+        .thenReturn(true, false);
+    when(selfProvider.getObject()).thenReturn(service);
+    when(userAccountMergeService.merge(DUPLICATE_ID, TARGET_ID, ADMIN_ID))
+        .thenThrow(new BusinessConflictException("Membership changed"));
+
+    assertThrows(
+        BusinessConflictException.class,
+        () -> service.consolidate(DUPLICATE_ID, TARGET_ID, null, ADMIN_ID));
+    assertThrows(
+        BusinessConflictException.class,
+        () -> service.consolidate(DUPLICATE_ID, TARGET_ID, null, ADMIN_ID));
+
+    verify(keycloakService).unlinkDiscordIdentity(TARGET_ID);
+    verify(keycloakService, never()).deleteUser(any());
   }
 
   @Test

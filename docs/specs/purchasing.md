@@ -203,10 +203,12 @@ they hold `KRT Member` (REQ-NOTIF-024).
 
 ### REQ-PUR-019 — Pause
 
-The raising unit's lead (officer reach in that unit, REQ-SEC-015, or its SK lead), the governing
-leadership and an admin pause and resume purchasing for the whole
-organisation or for one raising unit with a reason code. While paused no tranche is requested (so no
-deal is submitted); deliveries, acceptance and settlement go on. A pause is audited and noticed (N6).
+A raising unit's lead pauses and resumes purchasing for that unit through officer reach
+(REQ-SEC-015, including the SK lead). The governing leadership and admins can act globally or for
+an individual unit. A pause requires a reason code. The purchasing page takes its scope options
+and resume permissions from the same backend policy as the writes. While paused no tranche is
+requested and no deal is submitted. Deliveries, acceptance and settlement go on. A pause is
+audited and noticed (N6).
 
 **Enforced by:** `PurchasingPauseServiceTest`, `PurchasingTrancheServiceTest` · **Code:**
 `purchasing/internal/PurchasingPauseService`

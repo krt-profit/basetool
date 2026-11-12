@@ -59,8 +59,7 @@ public class BankGrantService {
    * that reach it through the hierarchy. A grant of anyone holding none of them is inert. Joining
    * or leaving an org unit changes none of these (REQ-BANK-008).
    */
-  static final Set<String> ELIGIBLE_ROLE_CODES =
-      Set.of(Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT, Roles.ADMIN);
+  static final Set<String> ELIGIBLE_ROLE_CODES = Roles.BANK_STAFF_ROLES;
 
   private final BankAccountGrantRepository grantRepository;
   private final BankAccountRepository accountRepository;

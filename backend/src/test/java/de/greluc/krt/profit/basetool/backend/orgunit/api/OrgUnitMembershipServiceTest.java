@@ -26,11 +26,14 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
@@ -47,6 +50,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -283,7 +287,6 @@ class OrgUnitMembershipServiceTest {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
-    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
     when(membershipRepository.save(any(OrgUnitMembership.class)))
         .thenAnswer(inv -> inv.getArgument(0));
 
@@ -298,7 +301,6 @@ class OrgUnitMembershipServiceTest {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
-    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
     when(membershipRepository.save(any(OrgUnitMembership.class)))
         .thenAnswer(inv -> inv.getArgument(0));
 
@@ -308,13 +310,27 @@ class OrgUnitMembershipServiceTest {
   }
 
   @Test
-  void addMember_userAlreadyHadMemberships_doesNotPromoteInventory() {
+  void addMember_userAlreadyHasAnActiveMembership_doesNotPromoteInventory() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
     when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
-    when(membershipRepository.countByIdUserId(userId)).thenReturn(2L);
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(userId))
+        .thenReturn(Set.of(UUID.randomUUID()));
     when(membershipRepository.save(any(OrgUnitMembership.class)))
         .thenAnswer(inv -> inv.getArgument(0));
+
+    membershipService.addMember(scId, userId);
+
+    verify(firstMembershipObserver, never()).onUserGainedFirstOrgUnit(any(), any());
+  }
+
+  @Test
+  void addMember_withoutKrtMember_doesNotAdoptInventory() {
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.save(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+    stubWithoutKrtMember();
 
     membershipService.addMember(scId, userId);
 
@@ -324,28 +340,58 @@ class OrgUnitMembershipServiceTest {
   @Test
   void removeMember_existing_deletes() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(membershipRepository.existsById(id)).thenReturn(true);
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(id);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(membership));
 
     membershipService.removeMember(scId, userId);
 
-    verify(membershipRepository).deleteById(id);
+    verify(membershipRepository).delete(membership);
+    verify(auditService, never())
+        .record(eq(AuditEventType.ROLE_REVOKED), eq(scId), any(), eq(userId), any());
+    verifyNoInteractions(seatNotifier);
     verify(auditService)
         .record(eq(AuditEventType.MEMBERSHIP_REVOKED), eq(scId), any(), eq(userId), any());
   }
 
   @Test
+  void removeMember_skLead_recordsSeatRevocationAfterRemovingMembership() {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(id);
+    membership.setRole(MembershipRole.SK_LEAD);
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(membership));
+
+    membershipService.removeMember(scId, userId);
+
+    var ordered = inOrder(membershipRepository, auditService, seatNotifier);
+    ordered.verify(membershipRepository).delete(membership);
+    ordered
+        .verify(auditService)
+        .record(
+            eq(AuditEventType.ROLE_REVOKED),
+            eq(scId),
+            eq("ALF"),
+            eq(userId),
+            argThat(details -> "role=SK_LEAD".contentEquals(details)));
+    ordered.verify(seatNotifier).seatChanged(userId, "ALF", MembershipRole.SK_LEAD, false, null);
+  }
+
+  @Test
   void removeMember_nonMember_throwsNotFound() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(membershipRepository.existsById(id)).thenReturn(false);
+    when(membershipRepository.findById(id)).thenReturn(Optional.empty());
 
     assertThrows(NotFoundException.class, () -> membershipService.removeMember(scId, userId));
-    verify(membershipRepository, never()).deleteById(any(OrgUnitMembershipId.class));
+    verify(membershipRepository, never()).delete(any());
   }
 
   @Test
   void removeMember_lastMembership_demotesInventoryToPersonal() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(membershipRepository.existsById(id)).thenReturn(true);
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(id);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(membership));
     when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
 
     membershipService.removeMember(scId, userId);
@@ -356,7 +402,9 @@ class OrgUnitMembershipServiceTest {
   @Test
   void removeMember_userStillHasMemberships_doesNotDemoteInventory() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
-    when(membershipRepository.existsById(id)).thenReturn(true);
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(id);
+    when(membershipRepository.findById(id)).thenReturn(Optional.of(membership));
     when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
 
     membershipService.removeMember(scId, userId);
@@ -497,7 +545,7 @@ class OrgUnitMembershipServiceTest {
     sqA.setShorthand("ALP");
     when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
     when(squadronRepository.findById(squadronA)).thenReturn(Optional.of(sqA));
-    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(1L);
     when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
 
@@ -627,6 +675,36 @@ class OrgUnitMembershipServiceTest {
   }
 
   @Test
+  void reconcileStaffelMemberships_removesRankedMember_recordsSeatRevocationAfterFlush() {
+    UUID squadronId = UUID.randomUUID();
+    Squadron squadron = new Squadron();
+    squadron.setShorthand("ALP");
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(userId, squadronId));
+    membership.setRole(MembershipRole.STAFFELLEITER);
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(1L, 0L);
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(membership));
+    when(orgUnitRepository.findById(squadronId)).thenReturn(Optional.of(squadron));
+
+    membershipService.reconcileStaffelMemberships(user, List.of());
+
+    var ordered = inOrder(membershipRepository, auditService, seatNotifier);
+    ordered.verify(membershipRepository).flush();
+    ordered
+        .verify(auditService)
+        .record(
+            eq(AuditEventType.ROLE_REVOKED),
+            eq(squadronId),
+            eq("ALP"),
+            eq(userId),
+            argThat(details -> "role=STAFFELLEITER".contentEquals(details)));
+    ordered
+        .verify(seatNotifier)
+        .seatChanged(userId, "ALP", MembershipRole.STAFFELLEITER, false, null);
+  }
+
+  @Test
   void reconcileStaffelMemberships_patchesFlagsInPlace_whenSquadronStays() {
     UUID squadronA = UUID.randomUUID();
     Squadron sqA = new Squadron();
@@ -699,6 +777,22 @@ class OrgUnitMembershipServiceTest {
 
     verify(auditService)
         .record(eq(AuditEventType.ROLE_CHANGED), eq(bereichId), any(), eq(userId), any());
+  }
+
+  @Test
+  void addBereichLeader_refusesAnOccupiedLeiterSeat() {
+    UUID bereichId = UUID.randomUUID();
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.existsByIdOrgUnitIdAndRole(bereichId, MembershipRole.BEREICHSLEITER))
+        .thenReturn(true);
+
+    assertThrows(
+        BadRequestException.class,
+        () -> membershipService.addBereichLeader(bereichId, userId, BereichLeadershipRole.LEITER));
+    verify(membershipRepository, never()).saveAndFlush(any(OrgUnitMembership.class));
   }
 
   @Test

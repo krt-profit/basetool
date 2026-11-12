@@ -132,7 +132,7 @@ class MemberHangarPageControllerTest {
     when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/org-units/members/{id}/memberships?allKinds=true"),
+            eq("/api/v1/org-units/members/{id}/memberships?allKinds=true&ownerPicker=true"),
             anyTypeRef(),
             eq(MEMBER)))
         .thenReturn(
@@ -323,7 +323,7 @@ class MemberHangarPageControllerTest {
     when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
         .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
     when(backendApiClient.get(
-            eq("/api/v1/org-units/members/{id}/memberships?allKinds=true"),
+            eq("/api/v1/org-units/members/{id}/memberships?allKinds=true&ownerPicker=true"),
             anyTypeRef(),
             eq(MEMBER)))
         .thenReturn(

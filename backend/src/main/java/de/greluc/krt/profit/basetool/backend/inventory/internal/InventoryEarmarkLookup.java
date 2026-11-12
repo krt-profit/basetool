@@ -55,6 +55,17 @@ public interface InventoryEarmarkLookup {
   MissionEarmark shownMission(@NotNull UUID missionId);
 
   /**
+   * Finds a target the caller may earmark new stock to.
+   *
+   * @param missionId the mission
+   * @return the visible mission, or {@code null} for an unknown or hidden mission
+   */
+  default @Nullable MissionEarmark missionForAllocation(@NotNull UUID missionId) {
+    MissionEarmark target = shownMission(missionId);
+    return target != null && target.visible() ? target : null;
+  }
+
+  /**
    * Returns a job order the Lager's stock is earmarked to; the first miss in a transaction loads
    * every job order the loaded Lager rows are earmarked to in one read.
    *

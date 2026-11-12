@@ -1057,6 +1057,19 @@ val testShipTypePickerJs =
     )
   }
 
+val testOwnerPickerJs =
+  registerNodeScriptTest(
+    "testOwnerPickerJs",
+    "Tests for shared owner-picker defaults, rendering and stale responses.",
+    "scripts/krt-owner-picker.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-owner-picker.js"),
+    )
+  }
+
 val testOrdersDetailProductionJs =
   registerNodeScriptTest(
     "testOrdersDetailProductionJs",
@@ -1072,6 +1085,9 @@ val testOrdersDetailProductionJs =
     )
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/joborder/joborder-hooks.js"),
+    )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-owner-picker.js"),
     )
   }
 
@@ -1233,6 +1249,7 @@ tasks.named("check").configure {
     testBlueprintStatsJs,
     testCatalogueAdminJs,
     testShipTypePickerJs,
+    testOwnerPickerJs,
     testOrdersDetailProductionJs,
     testOrgUnitContextSyncJs,
     testEslintBans,

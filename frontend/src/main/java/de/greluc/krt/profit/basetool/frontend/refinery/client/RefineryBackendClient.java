@@ -304,7 +304,7 @@ public class RefineryBackendClient {
   @Nullable
   public List<OrgUnitMembershipOptionDto> memberships(@NotNull UUID userId) {
     return backendApiClient.get(
-        "/api/v1/org-units/members/{id}/memberships?allKinds=true",
+        "/api/v1/org-units/members/{id}/memberships?allKinds=true&ownerPicker=true",
         ORG_UNIT_MEMBERSHIP_OPTION_LIST,
         userId);
   }

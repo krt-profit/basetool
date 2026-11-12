@@ -59,6 +59,7 @@ class OrgUnitMembershipQueryServiceTest {
   @Mock private SpecialCommandRepository specialCommandRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
+  @Mock private OrgUnitSeatEligibility seatEligibility;
   @Mock private StaffelMembershipResolver staffelMembershipResolver;
 
   @Spy
@@ -95,6 +96,24 @@ class OrgUnitMembershipQueryServiceTest {
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
+  }
+
+  @Test
+  void listOwnerMembershipOptionsWithoutStampableUnitsIsEmpty() {
+    assertTrue(queryService.listOwnerMembershipOptions(userId).isEmpty());
+    verify(orgUnitRepository, never()).findAllById(any());
+  }
+
+  @Test
+  void listOwnerMembershipOptionsUsesOnlyStampableUnits() {
+    when(seatEligibility.findStampableOrgUnitIds(userId)).thenReturn(Set.of(scId));
+    when(orgUnitRepository.findAllById(Set.of(scId))).thenReturn(List.of(sc));
+
+    assertEquals(
+        List.of(scId),
+        queryService.listOwnerMembershipOptions(userId).stream()
+            .map(OrgUnitMembershipOptionDto::orgUnitId)
+            .toList());
   }
 
   @Test

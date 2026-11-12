@@ -20,34 +20,17 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
-import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.ArrayList;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/**
- * Compares the bank seam's {@code AREA_MEMBERS} cascade check (REQ-BANK-048) with the scope hub's
- * former {@code currentUserIsMemberOfAreaCascade} over the caller matrix of plan §5.4: admin pinned
- * and unpinned, anonymous, members of no unit, of the Bereich, of a child Staffel or
- * Spezialkommando, of a foreign Bereich or its child, and of two units, for every target unit. The
- * callers hold {@code KRT Member}, without which no membership counts (REQ-SEC-015).
- */
+/** Verifies the bank's area cascade check against the actor's direct seats (REQ-BANK-048). */
 class OrgUnitBankAreaCascadeDifferentialTest {
 
   private static final UUID CALLER = UUID.randomUUID();
@@ -82,103 +65,52 @@ class OrgUnitBankAreaCascadeDifferentialTest {
       List.of(BEREICH, OTHER_BEREICH, EMPTY_BEREICH, CHILD_STAFFEL, OTHER_STAFFEL);
 
   @Test
-  void seamGivesTheVerdictOfTheFormerHubMethodOverTheWholeMatrix() {
-    int verdicts = 0;
-    int admitted = 0;
+  void matchesTheCallerSeatsThatConferMembershipOverTheWholeMatrix() {
     for (boolean authenticated : List.of(true, false)) {
       for (boolean admin : List.of(false, true)) {
-        for (UUID pin : new UUID[] {null, BEREICH, OTHER_STAFFEL}) {
+        for (boolean member : List.of(false, true)) {
           for (Set<UUID> memberships : MEMBERSHIPS) {
-            Fixture fixture = Fixture.of(authenticated, admin, pin, memberships);
+            BankActor actor = actor(authenticated, admin, member, memberships);
             for (UUID target : TARGETS) {
-              boolean expected = formerHubVerdict(target, fixture.callerMemberships());
+              List<UUID> children = CHILDREN.get(target);
+              boolean expected =
+                  authenticated
+                      && member
+                      && memberships.stream()
+                          .anyMatch(id -> id.equals(target) || children.contains(id));
               boolean actual =
-                  BankAccessJudgement.isMemberOfAreaCascade(
-                      target,
-                      fixture.resolver().currentDirectMembershipOrgUnitIds(),
-                      fixture.orgUnits().findChildOrgUnitIds(target));
+                  BankAccessJudgement.membershipsConfer(actor)
+                      && BankAccessJudgement.isMemberOfAreaCascade(
+                          target, actor.memberOrgUnitIds(), children);
               assertThat(actual)
                   .as(
-                      "authenticated=%s admin=%s pin=%s memberships=%s target=%s",
-                      authenticated, admin, pin, memberships, target)
+                      "authenticated=%s admin=%s member=%s memberships=%s target=%s",
+                      authenticated, admin, member, memberships, target)
                   .isEqualTo(expected);
-              verdicts++;
-              admitted += actual ? 1 : 0;
             }
           }
         }
       }
     }
-    assertThat(verdicts).isEqualTo(2 * 2 * 3 * MEMBERSHIPS.size() * TARGETS.size());
-    assertThat(admitted).isPositive().isLessThan(verdicts);
   }
 
-  /**
-   * The former {@code RequestScopeResolver#currentUserIsMemberOfAreaCascade}, verbatim over the
-   * caller's membership rows.
-   *
-   * @param bereichId the target unit
-   * @param memberships the caller's membership rows
-   * @return the former hub's verdict
-   */
-  private static boolean formerHubVerdict(UUID bereichId, List<OrgUnitMembership> memberships) {
-    List<UUID> childIds = CHILDREN.get(bereichId);
-    return memberships.stream()
-        .anyMatch(m -> {
-          UUID ou = m.getId().getOrgUnitId();
-          return ou.equals(bereichId) || childIds.contains(ou);
-        });
-  }
-
-  /**
-   * One caller situation wired into a real {@link RequestScopeResolver}.
-   *
-   * @param resolver the real resolver
-   * @param orgUnits the org-unit repository answering the child queries
-   * @param callerMemberships the caller's membership rows
-   */
-  private record Fixture(
-      RequestScopeResolver resolver,
-      OrgUnitRepository orgUnits,
-      List<OrgUnitMembership> callerMemberships) {
-
-    private static List<OrgUnitMembership> rows(boolean authenticated, Set<UUID> memberships) {
-      List<OrgUnitMembership> rows = new ArrayList<>();
-      if (authenticated) {
-        for (UUID unit : memberships) {
-          OrgUnitMembership row = new OrgUnitMembership();
-          row.setId(new OrgUnitMembershipId(CALLER, unit));
-          row.setKind(unit.equals(CHILD_SK) ? OrgUnitKind.SPECIAL_COMMAND : OrgUnitKind.SQUADRON);
-          rows.add(row);
-        }
-      }
-      return rows;
+  private static BankActor actor(
+      boolean authenticated, boolean admin, boolean member, Set<UUID> memberships) {
+    if (!authenticated) {
+      return BankActor.NOBODY;
     }
-
-    static Fixture of(boolean authenticated, boolean admin, UUID pin, Set<UUID> memberships) {
-      List<OrgUnitMembership> rows = rows(authenticated, memberships);
-      AuthHelperService authHelper = mock(AuthHelperService.class);
-      OrgUnitMembershipRepository membershipRepository = mock(OrgUnitMembershipRepository.class);
-      OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
-      HttpServletRequest request = mock(HttpServletRequest.class);
-      when(authHelper.isAuthenticated()).thenReturn(authenticated);
-      when(authHelper.isAdmin()).thenReturn(admin);
-      when(authHelper.holdsKrtMember()).thenReturn(true);
-      when(authHelper.currentUserId())
-          .thenReturn(authenticated ? Optional.of(CALLER) : Optional.empty());
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-          .thenReturn(pin == null ? null : pin.toString());
-      when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(CALLER)).thenReturn(rows);
-      when(orgUnits.findChildOrgUnitIds(any(UUID.class)))
-          .thenAnswer(inv -> CHILDREN.get(inv.<UUID>getArgument(0)));
-      RequestScopeResolver resolver =
-          new RequestScopeResolver(
-              authHelper,
-              membershipRepository,
-              orgUnits,
-              mock(OrgUnitCascadeService.class),
-              request);
-      return new Fixture(resolver, orgUnits, rows);
+    Set<String> roles = new java.util.HashSet<>();
+    if (admin) {
+      roles.add(Roles.ADMIN);
     }
+    if (member) {
+      roles.add(Roles.KRT_MEMBER);
+    }
+    return new BankActor(
+        CALLER,
+        roles,
+        memberships.stream().map(id -> new BankActor.Seat(id, MembershipRole.MEMBER)).toList(),
+        Set.of(),
+        Map.of());
   }
 }

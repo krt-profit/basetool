@@ -57,6 +57,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -92,10 +93,12 @@ class InventoryEarmarkReadNoNPlusOneTest {
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private EntityManagerFactory entityManagerFactory;
+  @Autowired private JdbcTemplate jdbc;
 
   private Squadron unit;
 
   private final List<Object> created = new ArrayList<>();
+  private final List<UUID> donations = new ArrayList<>();
 
   /**
    * One seeded Lager.
@@ -128,6 +131,7 @@ class InventoryEarmarkReadNoNPlusOneTest {
   @AfterEach
   void signOutAndCleanUp() {
     SecurityContextHolder.clearContext();
+    donations.forEach(id -> jdbc.update("DELETE FROM supply_donation WHERE id = ?", id));
     for (Object entity : created.reversed()) {
       switch (entity) {
         case InventoryItem item -> inventoryItemRepository.deleteById(item.getId());
@@ -217,6 +221,10 @@ class InventoryEarmarkReadNoNPlusOneTest {
                 .allSatisfy(m -> assertThat(m.missionName()).isNotBlank());
             assertThat(dto.jobOrderAllocations()).hasSize(1);
             assertThat(dto.jobOrderAllocations().getFirst().jobOrderDisplayId()).isNotNull();
+            assertThat(dto.donationAllocations())
+                .singleElement()
+                .satisfies(
+                    pledge -> assertThat(pledge.receivingUnitName()).isEqualTo(unit.getName()));
           });
       assertThat(manyStatements)
           .as(read.getKey() + " statements for " + MANY + " rows against " + FEW + " (N+1)")
@@ -256,9 +264,24 @@ class InventoryEarmarkReadNoNPlusOneTest {
       InventoryAllocations.addMission(item, mission("Own " + tag + " " + i).getId(), 2.0);
       InventoryAllocations.addJobOrder(
           item, jobOrder("earmark-" + tag + "-" + i).getId(), 3.0, false);
+      InventoryAllocations.addDonation(item, donation(owner.getId(), material.getId()), 1.0);
       created.add(inventoryItemRepository.save(item));
     }
     return new Seed(owner, material, location, shared);
+  }
+
+  private UUID donation(UUID owner, UUID material) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO supply_donation"
+            + " (id, donor_user_id, receiving_org_unit_id, material_id, pledged_amount, status)"
+            + " VALUES (?, ?, ?, ?, 1, 'PLEDGED')",
+        id,
+        owner,
+        unit.getId(),
+        material);
+    donations.add(id);
+    return id;
   }
 
   private Mission mission(String name) {

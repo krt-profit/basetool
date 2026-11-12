@@ -106,7 +106,7 @@ class PurchasingTemplateRenderTest {
         .thenReturn(Collections.emptyList());
     givenState(false, false);
     answers.clear();
-    answers.put("pause", new PauseStateDto(false, null, null, List.of()));
+    answers.put("pause", new PauseStateDto(false, null, null, List.of(), false, List.of()));
     when(backendApiClient.get(anyString(), anyClass()))
         .thenAnswer(invocation -> answer(invocation.getArgument(0), null));
     when(backendApiClient.get(anyString(), anyClass(), any(Object[].class)))
@@ -263,7 +263,7 @@ class PurchasingTemplateRenderTest {
   }
 
   @Test
-  void theBannerNamesEveryPauseButOffersNoResumeToAMemberWithoutGoverningRights() throws Exception {
+  void theBannerNamesEveryPauseButOffersNoResumeToAMemberWithoutPauseRights() throws Exception {
     UUID unitId = UUID.randomUUID();
     givenDeals();
     answers.put(
@@ -272,7 +272,9 @@ class PurchasingTemplateRenderTest {
             true,
             "BUDGET",
             CREATED_AT,
-            List.of(new UnitPause(unitId, "ARGON", "INCIDENT", CREATED_AT))));
+            List.of(new UnitPause(unitId, "ARGON", "INCIDENT", CREATED_AT, false)),
+            false,
+            List.of()));
     givenState(true, false);
 
     String html = render("/purchasing/deals?fragment=results");
@@ -295,7 +297,9 @@ class PurchasingTemplateRenderTest {
             true,
             "BUDGET",
             CREATED_AT,
-            List.of(new UnitPause(unitId, "ARGON", "INCIDENT", CREATED_AT))));
+            List.of(new UnitPause(unitId, "ARGON", "INCIDENT", CREATED_AT, true)),
+            true,
+            List.of()));
     givenState(false, true);
 
     String html = render("/purchasing/deals?fragment=results");
@@ -308,19 +312,32 @@ class PurchasingTemplateRenderTest {
   }
 
   @Test
-  void aUnitPauseAloneOffersNoGlobalResume() throws Exception {
+  void aUnitLeadCanResumeOnlyTheirUnitWhileTheGlobalPauseRemains() throws Exception {
     UUID unitId = UUID.randomUUID();
+    UUID otherUnitId = UUID.randomUUID();
     givenDeals();
     answers.put(
         "pause",
         new PauseStateDto(
-            false, null, null, List.of(new UnitPause(unitId, "ARGON", "OTHER", CREATED_AT))));
-    givenState(false, true);
+            true,
+            "BUDGET",
+            CREATED_AT,
+            List.of(
+                new UnitPause(unitId, "ARGON", "OTHER", CREATED_AT, true),
+                new UnitPause(otherUnitId, "BRAVO", "INCIDENT", CREATED_AT, false)),
+            false,
+            List.of(new PauseStateDto.PausableUnit(unitId, "ARGON"))));
+    givenState(false, false);
 
     String html = render("/purchasing/deals?fragment=results");
 
     assertThat(buttons(html, "purchasing-resume")).hasSize(1);
-    assertThat(html).doesNotContain("purchasing-resume-global").contains("Sonstiger Grund");
+    assertThat(html)
+        .doesNotContain("purchasing-resume-global", "data-unit-id=\"" + otherUnitId + "\"")
+        .contains("data-unit-id=\"" + unitId + "\"", "Sonstiger Grund");
+    assertThat(render("/purchasing/deals"))
+        .contains("data-testid=\"purchasing-pause\"", "value=\"" + unitId + "\"")
+        .doesNotContain("value=\"" + otherUnitId + "\"");
   }
 
   @Test

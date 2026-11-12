@@ -159,8 +159,9 @@ class UserAccountMergeEndStateTest {
     long sourceRolesVersion = rolesVersion(source);
     long targetRolesVersion = rolesVersion(target);
     long bystanderRolesVersion = rolesVersion(bystander);
-    assertThat(counts(source)).as("the source owns rows in every followed column").hasSize(29);
-    assertThat(counts(source).values()).doesNotContain(0);
+    Map<String, Integer> sourceBefore = counts(source);
+    assertThat(sourceBefore).as("the source owns rows in every followed column").hasSize(29);
+    assertThat(sourceBefore.values()).doesNotContain(0);
 
     mergeService.merge(source, target, admin);
     entityManager.flush();
@@ -198,7 +199,7 @@ class UserAccountMergeEndStateTest {
                     + " AND target_user_id = ?",
                 String.class,
                 target))
-        .containsExactly(expectedDetails(source));
+        .containsExactly(expectedDetails(source, sourceBefore));
   }
 
   @Test
@@ -306,10 +307,15 @@ class UserAccountMergeEndStateTest {
         .isZero();
   }
 
-  private String expectedDetails(UUID source) {
+  private String expectedDetails(UUID source, Map<String, Integer> sourceBefore) {
     StringBuilder details = new StringBuilder("fromUser=" + source + " rows=33");
-    EXPECTED_MOVED.forEach(
-        (column, rows) -> details.append(' ').append(column).append('=').append(rows));
+    EXPECTED_MOVED.forEach((column, rows) -> {
+      details.append(' ').append(column).append('=').append(rows);
+      int dropped = sourceBefore.get(column) - rows;
+      if (dropped > 0) {
+        details.append(' ').append(column).append(".dropped=").append(dropped);
+      }
+    });
     return details.toString();
   }
 

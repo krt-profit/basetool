@@ -24,6 +24,7 @@ import { krtOrderWrite } from '/js/joborder/orders-detail-edit.js';
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { renderOwnerPicker } from '/js/kernel/krt-owner-picker.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { joborderHooks } from '/js/joborder/joborder-hooks.js';
@@ -743,21 +744,6 @@ let prodOrgUnitRefresh = 0;
 let prodOrgUnitLoading = false;
 
 /**
- * Picks the owning org unit the book-in preselects among the owner's direct memberships: the active
- * org unit, else the only membership (REQ-ORDERS-025, REQ-ORG-032).
- *
- * @param {string[]} optionIds the org units the owner is a direct member of
- * @param {string} activeId the active org unit of the page, empty without one
- * @returns {string} the org unit to preselect, empty when the member has to choose
- */
-function _prodOrgUnitPreset(optionIds, activeId) {
-    if (activeId !== '' && optionIds.includes(activeId)) {
-        return activeId;
-    }
-    return optionIds.length === 1 ? optionIds[0] : '';
-}
-
-/**
  * Reloads the owning org-unit choices for the chosen owner, shows or hides the picker and re-runs
  * the booking gate, which stays shut while the memberships load; without a preselection the picker
  * leads with the required empty choice. Only the newest refresh renders.
@@ -784,7 +770,7 @@ export function _prodRefreshOrgUnitPicker() {
     prodOrgUnitLoading = true;
     _prodReconcile();
     krtFetch
-        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
+        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true&ownerPicker=true`)
         .then((memberships) => {
             if (refresh !== prodOrgUnitRefresh) {
                 return;
@@ -793,26 +779,12 @@ export function _prodRefreshOrgUnitPicker() {
                 wrapper.hidden = true;
                 return;
             }
-            const preset = _prodOrgUnitPreset(
-                memberships.map((m) => {
-                    return m.orgUnitId;
-                }),
-                wrapper.getAttribute('data-owner-picker-active') || '',
+            renderOwnerPicker(
+                select,
+                memberships,
+                wrapper.getAttribute('data-owner-picker-active'),
             );
-            if (!preset) {
-                const placeholder = document.createElement('option');
-                placeholder.value = '';
-                placeholder.textContent = PRODUCTION_I18N.orgUnitPlaceholder;
-                select.appendChild(placeholder);
-            }
-            memberships.forEach((opt) => {
-                const o = document.createElement('option');
-                o.value = opt.orgUnitId;
-                o.textContent = opt.orgUnitName;
-                select.appendChild(o);
-            });
-            select.value = preset;
-            select.required = !preset;
+            select.required = !select.value;
             wrapper.hidden = false;
         })
         .catch(() => {

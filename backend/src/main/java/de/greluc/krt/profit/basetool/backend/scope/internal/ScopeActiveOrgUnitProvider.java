@@ -20,31 +20,29 @@
 package de.greluc.krt.profit.basetool.backend.scope.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.ActiveOrgUnitProvider;
+import de.greluc.krt.profit.basetool.backend.scope.api.ActiveOrgUnitContext;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
-/**
- * The scope module's {@link ActiveOrgUnitProvider}: the one org unit the current request's
- * effective context covers ({@link RequestScopeResolver#currentActiveContext()}).
- */
+/** Maps the request's effective context to the org-unit MDC value. */
 @Service
 @RequiredArgsConstructor
 public class ScopeActiveOrgUnitProvider implements ActiveOrgUnitProvider {
 
   private final RequestScopeResolver requestScopeResolver;
 
-  /**
-   * The honoured pin, or a member's only org unit.
-   *
-   * @return the org unit id, or empty when the context covers several units or none
-   */
   @Override
   @NotNull
-  public Optional<UUID> activeOrgUnitId() {
-    return Optional.ofNullable(requestScopeResolver.currentActiveContext().orgUnitId());
+  public String activeOrgUnitLogValue() {
+    ActiveOrgUnitContext context = requestScopeResolver.currentActiveContext();
+    return switch (context.kind()) {
+      case ORG_UNIT -> Objects.requireNonNull(context.orgUnitId()).toString();
+      case ALL_MY_ORG_UNITS -> "mine";
+      case ALL_ORG_UNITS -> "all";
+      case NONE -> "none";
+    };
   }
 }

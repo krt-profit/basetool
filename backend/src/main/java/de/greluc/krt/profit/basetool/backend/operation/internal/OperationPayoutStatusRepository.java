@@ -42,6 +42,23 @@ public interface OperationPayoutStatusRepository
   List<OperationPayoutStatus> findByOperationId(UUID operationId);
 
   /**
+   * Checks whether an operation still has a paid-out mark that freezes its inputs.
+   *
+   * @param operationId the operation to check
+   * @return whether a participant is currently marked paid
+   */
+  boolean existsByOperationIdAndPaidOutTrue(UUID operationId);
+
+  /**
+   * Finds a current paid mark by its opaque id inside the given operation.
+   *
+   * @param id the mark to reverse
+   * @param operationId the operation it must belong to
+   * @return the paid mark if it belongs to this operation and has not been reversed
+   */
+  Optional<OperationPayoutStatus> findByIdAndOperationIdAndPaidOutTrue(UUID id, UUID operationId);
+
+  /**
    * Looks up the status row for a specific (operation, participant-key) tuple. The toggle endpoint
    * uses this to decide whether to materialize a new row or update the existing one in place.
    *

@@ -166,6 +166,31 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
+   * Checks an appointment against the requested rank and the target's current rank.
+   *
+   * @param bereichId the Bereich
+   * @param userId the target member
+   * @param role the requested rank
+   * @param authentication the current authentication
+   * @return whether the appointment is allowed
+   */
+  public boolean canAppointBereichRole(
+      @NotNull UUID bereichId,
+      @NotNull UUID userId,
+      @Nullable BereichLeadershipRole role,
+      @Nullable Authentication authentication) {
+    if (denyUnauthenticated(authentication) || role == null) {
+      return false;
+    }
+    return canAppointBereichRole(
+        bereichId,
+        roleOf(userId, bereichId) == MembershipRole.BEREICHSLEITER
+            ? BereichLeadershipRole.LEITER
+            : role,
+        authentication);
+  }
+
+  /**
    * Whether the caller may remove the member's Bereich membership, routed by the member's current
    * rank like {@link #canAppointBereichRole}.
    *

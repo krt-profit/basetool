@@ -23,7 +23,11 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankAccountResponsibleAssignedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.RolesChangedObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
@@ -43,6 +47,7 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -56,7 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracker {
+public class OrgUnitBankResponsibilityService
+    implements ResponsibleHolderTracker, RolesChangedObserver {
 
   private final BankAccountRepository bankAccountRepository;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -65,6 +71,40 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
   private final BankBookingRequestRepository bankBookingRequestRepository;
   private final AuthHelperService authHelperService;
   private final ApplicationEventPublisher eventPublisher;
+  private final RoleRecipientDirectory roleRecipientDirectory;
+
+  /**
+   * Rechecks open booking requests when a responsible holder's seat eligibility changes.
+   *
+   * @param userId the member whose roles were reconciled
+   * @param roles the resulting roles
+   */
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void onRolesChanged(@NotNull UUID userId, @NotNull Set<Role> roles) {
+    Set<UUID> affected = new LinkedHashSet<>();
+    orgUnitMembershipRepository
+        .findAllOnActiveOrgUnitsByIdUserId(userId)
+        .forEach(seat -> {
+          switch (seat.getRole()) {
+            case STAFFELLEITER, SK_LEAD, BEREICHSLEITER ->
+                affected.addAll(responsibleAuditAccountIds(seat.getId().getOrgUnitId()));
+            case OL_MEMBER ->
+                bankAccountRepository
+                    .findFirstByType(BankAccountType.CARTEL)
+                    .ifPresent(account -> affected.add(account.getId()));
+            default -> {}
+          }
+        });
+    if (affected.isEmpty()) {
+      return;
+    }
+    Set<UUID> recipients = new LinkedHashSet<>(roleRecipientDirectory.holdersOfRole(Roles.ADMIN));
+    recipients.add(userId);
+    for (BankAccount account : bankAccountRepository.findAllById(affected)) {
+      reconcileRequests(account, openRequests(account.getId()), recipients);
+    }
+  }
 
   /**
    * Resolves the seat holders responsible for an account (REQ-BANK-034) from the stored seats,
@@ -260,9 +300,7 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
     Set<UUID> changed = new LinkedHashSet<>(added);
     oldHolders.stream().filter(holder -> !newHolders.contains(holder)).forEach(changed::add);
 
-    List<BankBookingRequest> open =
-        bankBookingRequestRepository.findByAccountIdAndStatusOrderByCreatedAtAsc(
-            accountId, BankBookingRequestStatus.PENDING);
+    List<BankBookingRequest> open = openRequests(accountId);
     int awaitingHolder =
         (int)
             open.stream()
@@ -277,20 +315,31 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
           new BankAccountResponsibleAssignedEvent(
               accountId, holder, account.getAccountNo(), awaitingHolder, actor));
     }
+    changed.addAll(roleRecipientDirectory.holdersOfRole(Roles.ADMIN));
+    reconcileRequests(account, open, changed);
+  }
+
+  private List<BankBookingRequest> openRequests(UUID accountId) {
+    return bankBookingRequestRepository.findByAccountIdAndStatusOrderByCreatedAtAsc(
+        accountId, BankBookingRequestStatus.PENDING);
+  }
+
+  private void reconcileRequests(
+      BankAccount account, List<BankBookingRequest> requests, Set<UUID> recipients) {
     OrgUnit orgUnit = account.getOrgUnit();
     String shorthand = orgUnit == null ? null : orgUnit.getShorthand();
-    for (BankBookingRequest request : open) {
+    for (BankBookingRequest request : requests) {
       eventPublisher.publishEvent(
           new BankBookingRequestNoticesReconciledEvent(
               request.getId(),
-              accountId,
+              account.getId(),
               request.getType(),
               request.getAmount(),
               account.getAccountNo(),
               request.getRequesterHandle(),
               shorthand,
               request.getRequestedBy(),
-              changed));
+              recipients));
     }
   }
 

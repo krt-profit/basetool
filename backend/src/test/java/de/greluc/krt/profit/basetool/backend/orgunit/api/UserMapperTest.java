@@ -117,7 +117,7 @@ class UserMapperTest {
     assertEquals(5, dto.rank());
     assertEquals("desc", dto.description());
     assertEquals(Set.of("ADMIN", "OFFICER"), dto.roles());
-    assertEquals(Set.of("USER_MANAGE", "ROLE_ASSIGN", "MISSION_MANAGE"), dto.permissions());
+    assertEquals(Set.of("USER_MANAGE", "MISSION_MANAGE"), dto.permissions());
     assertEquals(Boolean.FALSE, dto.discordLinked());
   }
 

@@ -37,22 +37,28 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankRecipientD
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankResponsibilityService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.internal.UserRoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionRecipientDirectoryImpl;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitMembershipRecipientDirectory;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -82,6 +88,7 @@ class RecipientDirectoriesTest {
   @Mock private UserRepository userRepository;
   @Mock private RoleRepository roleRepository;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BankAccountGrantRepository bankAccountGrantRepository;
   @Mock private OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
   @Mock private BankAccountRepository bankAccountRepository;
@@ -102,7 +109,8 @@ class RecipientDirectoriesTest {
         new OrgUnitMembershipRecipientDirectory(
             orgUnitMembershipRepository,
             seatEligibility,
-            new OrgUnitWriterDirectory(orgUnitMembershipRepository));
+            new OrgUnitWriterDirectory(orgUnitMembershipRepository),
+            orgUnitRepository);
     OrgUnitBankRecipientDirectory accounts =
         new OrgUnitBankRecipientDirectory(
             bankAccountGrantRepository,
@@ -117,7 +125,12 @@ class RecipientDirectoriesTest {
             roles,
             orgUnits,
             accounts,
-            new MissionRecipientDirectoryImpl(missionParticipantRepository, missionRepository),
+            new MissionRecipientDirectoryImpl(
+                missionParticipantRepository,
+                missionRepository,
+                userRepository,
+                orgUnitMembershipRepository,
+                new OrgUnitCascadeService(orgUnitRepository)),
             new ExchangeInstallationRecipientDirectory(exchangeInstallationRepository));
   }
 
@@ -223,10 +236,27 @@ class RecipientDirectoriesTest {
         .thenReturn(Set.of(ALICE, BOB));
     when(missionParticipantRepository.findNotCheckedInUserIdsByMission(mission))
         .thenReturn(Set.of(BOB));
+    when(missionRepository.findByIdForAuthorization(mission))
+        .thenReturn(Optional.of(new Mission()));
+    User alice = activeMember(ALICE);
+    User bob = activeMember(BOB);
+    when(userRepository.findActiveWithRolesByIds(Set.of(ALICE, BOB)))
+        .thenReturn(List.of(alice, bob));
+    when(userRepository.findActiveWithRolesByIds(Set.of(BOB))).thenReturn(List.of(bob));
 
     assertThat(resolution.resolveMissionParticipants(mission, false))
         .containsExactlyInAnyOrder(ALICE, BOB);
     assertThat(resolution.resolveMissionParticipants(mission, true)).containsExactly(BOB);
+  }
+
+  private static User activeMember(UUID id) {
+    Role member = new Role();
+    member.setCode(Roles.KRT_MEMBER);
+    User user = new User();
+    user.setId(id);
+    user.setApprovalStatus(ApprovalStatus.ACTIVE);
+    user.getRoles().add(member);
+    return user;
   }
 
   @Test
@@ -368,7 +398,11 @@ class RecipientDirectoriesTest {
   private static BankBookingRequest request(BankRequestApprover approver, boolean approved) {
     BankBookingRequest request = new BankBookingRequest();
     request.setId(UUID.randomUUID());
-    request.setAccount(account(BankAccountType.CARTEL));
+    request.setAccount(
+        account(
+            approver == BankRequestApprover.RESPONSIBLE_HOLDER
+                ? BankAccountType.ORG_UNIT
+                : BankAccountType.CARTEL));
     request.setStatus(BankBookingRequestStatus.PENDING);
     request.setRequestedBy(CAROL);
     request.setRequiresOwnerApproval(true);

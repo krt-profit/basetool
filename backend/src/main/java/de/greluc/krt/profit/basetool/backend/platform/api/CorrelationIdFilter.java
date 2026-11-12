@@ -37,8 +37,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Binds the correlation id, user id and squadron id to the MDC for each request and echoes the
- * correlation id in the response header.
+ * Binds the correlation id, user id and effective org-unit context to the MDC for each request and
+ * echoes the correlation id in the response header.
  *
  * <p>The correlation id comes from the inbound header ({@link
  * LoggingProperties#correlationIdHeader()}) or is a fresh UUID; the user id is the caller's {@code
@@ -85,7 +85,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
     }
     final String correlationId = resolveCorrelationId(request);
     final String userId = resolveUserId();
-    final String orgUnitId = resolveSquadronId();
+    final String orgUnitId = resolveOrgUnitLogValue();
 
     MDC.put(loggingProperties.correlationIdMdcKey(), correlationId);
     MDC.put(loggingProperties.userIdMdcKey(), userId);
@@ -161,24 +161,19 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   }
 
   /**
-   * Resolves the squadron MDC value: the one org unit the request's effective context covers (the
-   * honoured pin, or a member's only unit); {@code all} for an admin without a pin, the anonymous
-   * marker when unauthenticated, {@code none} when the context covers several units or none, or the
-   * lookup fails.
+   * Resolves the org-unit MDC value for an authenticated, anonymous, or failed scope lookup.
+   *
+   * @return the effective context value, {@code anonymous}, or {@code unavailable}
    */
   @NotNull
-  private String resolveSquadronId() {
+  private String resolveOrgUnitLogValue() {
     try {
-      if (!authHelperService.isAuthenticated()) {
-        return ANONYMOUS;
-      }
-      return activeOrgUnitProvider
-          .activeOrgUnitId()
-          .map(UUID::toString)
-          .orElseGet(() -> authHelperService.isAdmin() ? "all" : "none");
+      return authHelperService.isAuthenticated()
+          ? activeOrgUnitProvider.activeOrgUnitLogValue()
+          : ANONYMOUS;
     } catch (RuntimeException ex) {
-      log.debug("squadronId MDC resolution failed, falling back to 'none'", ex);
-      return "none";
+      log.debug("orgUnitId MDC resolution failed, falling back to 'unavailable'", ex);
+      return "unavailable";
     }
   }
 

@@ -42,7 +42,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -99,7 +98,7 @@ class GlobalExceptionHandlerCorrelationIdTest {
     AuthHelperService authHelperService = mock(AuthHelperService.class);
     ActiveOrgUnitProvider activeOrgUnitProvider = mock(ActiveOrgUnitProvider.class);
     when(authHelperService.isAuthenticated()).thenReturn(false);
-    when(activeOrgUnitProvider.activeOrgUnitId()).thenReturn(Optional.empty());
+    when(activeOrgUnitProvider.activeOrgUnitLogValue()).thenReturn("none");
 
     mockMvc =
         MockMvcBuilders.standaloneSetup(new ThrowingController())

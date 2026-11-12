@@ -202,7 +202,6 @@ class LeitungViewServiceTest {
     verify(membershipRepository).findAllByIdOrgUnitIdIn(any());
     verify(kommandoGroupRepository).findBySquadronIdInOrderBySortIndexAsc(any());
     verify(membershipRepository, never()).findAllByIdOrgUnitId(any());
-    verify(kommandoGroupRepository, never()).findBySquadronIdOrderBySortIndexAsc(any());
   }
 
   @Test

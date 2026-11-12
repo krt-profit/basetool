@@ -124,7 +124,7 @@ class SettlementOverdueNoticeIntegrationTest {
     Role krtMember = roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow();
     UUID delegate = user("pur-ov-delegate-" + suffix, Set.of());
     UUID leader = user("pur-ov-leader-" + suffix, Set.of(krtMember));
-    UUID formerLeader = user("pur-ov-former-" + suffix, Set.of());
+    UUID ineligibleCoordinator = user("pur-ov-ineligible-" + suffix, Set.of());
     UUID coordinator = user("pur-ov-coord-" + suffix, Set.of(krtMember));
     UUID operator = user("pur-ov-oper-" + suffix, Set.of(krtMember));
 
@@ -143,7 +143,7 @@ class SettlementOverdueNoticeIntegrationTest {
     area.setParent(ol);
     area = orgUnitRepository.saveAndFlush(area);
     member(leader, area, MembershipRole.BEREICHSLEITER);
-    member(formerLeader, area, MembershipRole.BEREICHSLEITER);
+    member(ineligibleCoordinator, area, MembershipRole.BEREICHSKOORDINATOR);
     member(coordinator, area, MembershipRole.BEREICHSKOORDINATOR);
     member(operator, area, MembershipRole.BEREICHSOPERATOR);
 
@@ -171,7 +171,7 @@ class SettlementOverdueNoticeIntegrationTest {
     Map<NotificationType, Set<UUID>> recipients = ruleEvaluationService.resolveRecipients(notice);
     assertThat(recipients.get(NotificationType.PURCHASING_SETTLEMENT_OVERDUE))
         .contains(delegate, leader, coordinator)
-        .doesNotContain(operator, formerLeader);
+        .doesNotContain(operator, ineligibleCoordinator);
   }
 
   private UUID user(String name, Set<Role> roles) {

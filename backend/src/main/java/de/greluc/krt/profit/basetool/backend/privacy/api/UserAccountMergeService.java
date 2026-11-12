@@ -107,6 +107,17 @@ public class UserAccountMergeService {
   }
 
   /**
+   * Checks all participants before an external account link is changed.
+   *
+   * @param sourceUserId the account being emptied
+   * @param targetUserId the account being kept
+   */
+  @Transactional(readOnly = true)
+  public void assertMergeable(@NotNull UUID sourceUserId, @NotNull UUID targetUserId) {
+    inRunOrder().forEach(participant -> participant.assertMergeable(sourceUserId, targetUserId));
+  }
+
+  /**
    * Moves everything {@code sourceUserId} owns onto {@code targetUserId}.
    *
    * <p>The emptied source row is left in place; removing it is the separate user-deletion flow.
@@ -125,6 +136,7 @@ public class UserAccountMergeService {
     if (sourceUserId.equals(targetUserId)) {
       throw new BusinessConflictException("An account cannot be merged into itself");
     }
+    userRepository.lockAccountsForMerge(List.of(sourceUserId, targetUserId));
     final User source =
         Entities.require(userRepository.findById(sourceUserId), "Source account not found");
     final User target =
@@ -151,6 +163,9 @@ public class UserAccountMergeService {
     AuditDetails details = AuditDetails.of("fromUser", sourceUserId).with("rows", total);
     for (Moved column : moved) {
       details = details.with(column.column(), column.rows());
+      if (column.dropped() > 0) {
+        details = details.with(column.column() + ".dropped", column.dropped());
+      }
     }
     auditRecorder.record(AuditEventType.USER_MERGED, null, null, targetUserId, details);
 

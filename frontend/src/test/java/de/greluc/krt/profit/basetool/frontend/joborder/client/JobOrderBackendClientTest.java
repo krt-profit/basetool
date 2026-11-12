@@ -426,11 +426,10 @@ class JobOrderBackendClientTest {
   }
 
   @Test
-  void handoversProductionAndUnlinks() {
+  void handoversProductionAndInventoryUnlink() {
     backend.answerJson("{}");
     backend.answerJson("{}");
     backend.answerJson("{}");
-    backend.answerEmpty();
     backend.answerEmpty();
 
     client.createHandover(
@@ -446,7 +445,6 @@ class JobOrderBackendClientTest {
             TIME, "Pilot", List.of(new JobOrderItemHandoverEntryCreateDto(OTHER, 2))));
     client.bookProduction(
         ORDER, OTHER, new JobOrderItemProductionCreateDto(3, 2L, List.of(), List.of(), null));
-    client.unlinkMaterial(ORDER, MATERIAL);
     client.unlinkInventoryItem(ORDER, OTHER);
 
     backend.expect(
@@ -468,7 +466,6 @@ class JobOrderBackendClientTest {
         "/api/v1/orders/" + ORDER + "/items/" + OTHER + "/production",
         "{\"amount\":3,\"version\":2,\"consumption\":[],\"skippedMaterialIds\":[],"
             + "\"bookIn\":null}");
-    backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/materials/" + MATERIAL, null);
     backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/allocations/" + OTHER, null);
   }
 

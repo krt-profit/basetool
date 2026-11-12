@@ -1269,39 +1269,6 @@ class JobOrderServiceTest {
   }
 
   @Test
-  void unlinkMaterial_ShouldCallUnlinkAndRemoveMaterialFromJobOrder() {
-    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderRepository.save(any(JobOrder.class))).thenReturn(jobOrder);
-
-    jobOrderService.unlinkMaterial(orderId, materialId);
-
-    verify(jobOrderRepository).save(jobOrder);
-    assertTrue(
-        jobOrder.getMaterials().isEmpty(), "Material should have been removed from job order");
-  }
-
-  @Test
-  void unlinkMaterial_WhenJobOrderNotFound_ShouldThrowNotFound() {
-    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.empty());
-
-    assertThrows(
-        NotFoundException.class, () -> jobOrderService.unlinkMaterial(orderId, materialId));
-    verify(inventoryItemRepository, never())
-        .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
-  }
-
-  @Test
-  void unlinkMaterial_WhenMaterialNotLinked_ShouldThrowNotFound() {
-    UUID otherMaterialId = UUID.randomUUID();
-    when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(jobOrder));
-
-    assertThrows(
-        NotFoundException.class, () -> jobOrderService.unlinkMaterial(orderId, otherMaterialId));
-    verify(inventoryItemRepository, never())
-        .findAllForJobOrderAllocationRelease(org.mockito.ArgumentMatchers.anyCollection());
-  }
-
-  @Test
   void unlinkInventoryItem_ShouldDropTheOrdersAllocationSlice() {
     UUID inventoryItemId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem item =
