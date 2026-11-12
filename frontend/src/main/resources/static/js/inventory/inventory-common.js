@@ -26,6 +26,7 @@ import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { refreshOwnerPicker } from '/js/kernel/krt-owner-picker.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtEnhanceComboboxes } from '/js/kernel/krt-searchable-select.js';
@@ -142,8 +143,6 @@ function createLager(cfg) {
      */
     let stolenMarkTarget = { id: null, version: null, stolen: true, max: 0, piece: false };
     let stolenMarkInFlight = false;
-    /** @type {string | null} */
-    let umbuchenCurrentOwningOrgUnitId = null;
 
     /**
      * The address of the Lager tab with this page's storage option selected; the caller appends
@@ -1280,61 +1279,21 @@ function createLager(cfg) {
         if (modal) krtModal.close(modal);
     }
 
-    /**
-     * Records the Umbuchen row's current owning org unit, used to preset the target-OrgUnit
-     * picker.
-     *
-     * @param {string | null} orgUnitId the row's owning org unit, or null for an ownerless row
-     */
-    function setUmbuchenCurrentOwningOrgUnit(orgUnitId) {
-        umbuchenCurrentOwningOrgUnitId = orgUnitId || null;
-    }
-
-    /**
-     * Fills the Umbuchen target-OrgUnit picker with the target user's direct memberships of
-     * all org-unit kinds, preset to the row's current owning unit when the target is a member
-     * of it. Hidden when the target has no membership.
-     */
+    /** Refreshes the transfer destination from the receiving member's stampable units. */
     function refreshUmbuchenTransferOrgUnitPicker() {
         const wrapper = document.getElementById('umbuchenTargetOwningOrgUnitWrapper');
         const select = /** @type {HTMLSelectElement | null} */ (
             document.getElementById('umbuchenTargetOwningOrgUnitId')
         );
-        const userSelect = input('umbuchenTargetUserId');
-        if (!wrapper || !select || !userSelect) return;
-        const targetUserId = userSelect.value;
-        select.replaceChildren();
-        if (!targetUserId) {
-            wrapper.hidden = true;
-            return;
-        }
-        krtFetch
-            .getJson(`/users/${encodeURIComponent(targetUserId)}/memberships?allKinds=true`)
-            .then(
-                /** @param {Array<{ orgUnitId: string, orgUnitName: string }>} memberships */
-                (memberships) => {
-                    if (!Array.isArray(memberships) || memberships.length < 1) {
-                        wrapper.hidden = true;
-                        return;
-                    }
-                    memberships.forEach((opt) => {
-                        select.appendChild(new Option(opt.orgUnitName, opt.orgUnitId));
-                    });
-                    const current = umbuchenCurrentOwningOrgUnitId;
-                    if (
-                        current &&
-                        memberships.some((m) => {
-                            return m.orgUnitId === current;
-                        })
-                    ) {
-                        select.value = current;
-                    }
-                    wrapper.hidden = false;
-                },
-            )
-            .catch(() => {
-                wrapper.hidden = true;
-            });
+        const targetUserId = input('umbuchenTargetUserId')?.value;
+        if (!wrapper || !select) return;
+        refreshOwnerPicker(
+            select,
+            wrapper,
+            targetUserId
+                ? `/users/${encodeURIComponent(targetUserId)}/memberships?allKinds=true&ownerPicker=true`
+                : null,
+        );
     }
 
     /**
@@ -1954,7 +1913,6 @@ function createLager(cfg) {
         broadcastOrdersChanged,
         broadcastBoardChanged,
         closeUmbuchenModal,
-        setUmbuchenCurrentOwningOrgUnit,
         refreshUmbuchenTransferOrgUnitPicker,
         toggleMultiSelect,
         toggleSelectAll,

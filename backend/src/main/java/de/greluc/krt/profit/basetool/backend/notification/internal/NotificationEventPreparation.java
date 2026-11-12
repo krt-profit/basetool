@@ -23,12 +23,18 @@ import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRoleAudience;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -48,15 +54,57 @@ public class NotificationEventPreparation {
   private final NotificationRepository notificationRepository;
   private final NotificationParamsCodec notificationParamsCodec;
   private final NotificationMuteService notificationMuteService;
+  private final RecipientResolutionService recipientResolutionService;
 
   @NotNull
-  Prepared resolve(@NotNull NotificationEvent event) {
+  Candidate resolve(@NotNull NotificationEvent event) {
     if (reconciling(event) && !validReconciliation(event)) {
       log.warn("Event {} reconciles without notice types or entity; ignored", event.eventType());
-      return new Prepared(event, Map.of(), Map.of());
+      return new Candidate(event, Map.of());
     }
-    Map<NotificationType, Set<UUID>> audience = ruleEvaluationService.resolveRecipients(event);
-    return new Prepared(event, audience, notificationMuteService.withoutMuted(audience));
+    return new Candidate(event, ruleEvaluationService.resolveRoleAudiences(event));
+  }
+
+  @NotNull
+  RoleRecipientDirectory.RoleState lockRoles(@NotNull List<Candidate> candidates) {
+    Set<UUID> gated = new HashSet<>();
+    for (Candidate item : candidates) {
+      item.paths()
+          .values()
+          .forEach(recipients ->
+              recipients.forEach((id, audience) -> {
+                if (audience != NotificationRoleAudience.DIRECT) {
+                  gated.add(id);
+                }
+              }));
+    }
+    return gated.isEmpty()
+        ? new RoleRecipientDirectory.RoleState(Set.of(), Set.of())
+        : recipientResolutionService.lockRoleState(gated);
+  }
+
+  @NotNull
+  Prepared prepare(
+      @NotNull Candidate candidate, @NotNull RoleRecipientDirectory.RoleState current) {
+    Map<NotificationType, Map<UUID, NotificationRoleAudience>> paths =
+        new EnumMap<>(NotificationType.class);
+    candidate
+        .paths()
+        .forEach((type, recipients) -> {
+          Map<UUID, NotificationRoleAudience> eligible = new HashMap<>();
+          recipients.forEach((id, audience) -> {
+            if (audience.admits(current.members().contains(id), current.bankStaff().contains(id))) {
+              eligible.put(id, audience);
+            }
+          });
+          if (!eligible.isEmpty()) {
+            paths.put(type, eligible);
+          }
+        });
+    NotificationEvent event = candidate.event();
+    RuleEvaluationService.dropOutranked(paths, event.outrankedNotificationTypes());
+    Map<NotificationType, Set<UUID>> audience = RuleEvaluationService.recipientIds(paths);
+    return new Prepared(event, audience, notificationMuteService.withoutMuted(audience), paths);
   }
 
   @NotNull
@@ -93,6 +141,9 @@ public class NotificationEventPreparation {
     Set<UUID> existing = reconciling(event) ? holders(event) : Set.of();
     List<Notification> result = new ArrayList<>();
     String params = notificationParamsCodec.serialize(event.renderParams());
+    OrgUnitRef unit = recipientResolutionService.subjectOrgUnit(event);
+    String unitName =
+        unit == null ? null : recipientResolutionService.unitName(unit.id()).orElse(null);
     prepared.recipients().entrySet().stream()
         .sorted(Map.Entry.comparingByKey())
         .forEach(entry -> {
@@ -109,6 +160,11 @@ public class NotificationEventPreparation {
                     .params(params)
                     .entityType(event.entityType())
                     .entityId(event.entityId())
+                    .orgUnitId(unit == null ? null : unit.id())
+                    .orgUnitKind(unit == null ? null : unit.kind())
+                    .orgUnitName(unitName)
+                    .roleAudience(
+                        Objects.requireNonNull(prepared.paths().get(entry.getKey())).get(recipient))
                     .read(false)
                     .build());
           }
@@ -122,13 +178,27 @@ public class NotificationEventPreparation {
     Set<UUID> entitled = new HashSet<>();
     prepared.recipients().values().forEach(entitled::addAll);
     entitled.retainAll(event.reconcileRecipients());
-    existing.removeAll(entitled);
-    if (existing.isEmpty()) {
-      return Set.of();
+    Set<UUID> stale = new HashSet<>(existing);
+    stale.removeAll(entitled);
+    existing.retainAll(entitled);
+    for (NotificationType type : event.outrankedNotificationTypes().keySet()) {
+      if (!event.resolvesNotificationTypes().contains(type)) {
+        continue;
+      }
+      Set<UUID> previous =
+          Set.copyOf(
+              notificationRepository.findRecipientUserIdsByTypeInAndEntity(
+                  Set.of(type), event.entityType(), event.entityId()));
+      Set<UUID> expected = prepared.recipients().getOrDefault(type, Set.of());
+      existing.stream()
+          .filter(id -> previous.contains(id) != expected.contains(id))
+          .forEach(stale::add);
     }
-    notificationRepository.deleteByTypeInAndEntityForRecipients(
-        event.resolvesNotificationTypes(), event.entityType(), event.entityId(), existing);
-    return existing;
+    if (!stale.isEmpty()) {
+      notificationRepository.deleteByTypeInAndEntityForRecipients(
+          event.resolvesNotificationTypes(), event.entityType(), event.entityId(), stale);
+    }
+    return stale;
   }
 
   private @NotNull Set<UUID> holders(@NotNull NotificationEvent event) {
@@ -183,14 +253,26 @@ public class NotificationEventPreparation {
   }
 
   /**
+   * Original event and its audience paths before checking concurrent role changes.
+   *
+   * @param event immutable original domain event
+   * @param paths resolved delivery paths
+   */
+  record Candidate(
+      @NotNull NotificationEvent event,
+      @NotNull Map<NotificationType, Map<UUID, NotificationRoleAudience>> paths) {}
+
+  /**
    * Original event and its resolved audience before and after preferences.
    *
    * @param event immutable original domain event
    * @param audience entitled recipients by original notification type before mutes
    * @param recipients eligible recipients by original notification type after mutes
+   * @param paths the delivery paths of each eligible recipient
    */
   record Prepared(
       @NotNull NotificationEvent event,
       @NotNull Map<NotificationType, Set<UUID>> audience,
-      @NotNull Map<NotificationType, Set<UUID>> recipients) {}
+      @NotNull Map<NotificationType, Set<UUID>> recipients,
+      @NotNull Map<NotificationType, Map<UUID, NotificationRoleAudience>> paths) {}
 }

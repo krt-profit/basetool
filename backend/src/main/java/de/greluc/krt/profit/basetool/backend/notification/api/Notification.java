@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.notification.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -86,6 +87,25 @@ public class Notification extends AbstractEntity<UUID> {
   /** Loose id of the originating aggregate for deep-linking; {@code null} if absent. No FK. */
   @Column(name = "entity_id")
   private UUID entityId;
+
+  /** Optional display unit of the subject, without a foreign key. */
+  @Column(name = "org_unit_id")
+  private UUID orgUnitId;
+
+  /** Kind of the subject unit. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "org_unit_kind", length = 32)
+  private OrgUnitKind orgUnitKind;
+
+  /** Subject unit label recorded at delivery. */
+  @Column(name = "org_unit_name")
+  private String orgUnitName;
+
+  /** Independent ways the recipient qualifies to retain this notice. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "role_audience", nullable = false, length = 32)
+  @Builder.Default
+  private NotificationRoleAudience roleAudience = NotificationRoleAudience.DIRECT;
 
   /** Whether the recipient has marked this notification read. */
   @Column(name = "is_read", nullable = false)

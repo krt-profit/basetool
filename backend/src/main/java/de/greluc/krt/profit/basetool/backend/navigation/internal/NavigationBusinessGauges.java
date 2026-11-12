@@ -65,8 +65,8 @@ public class NavigationBusinessGauges implements BusinessGaugeSource {
   @Override
   public void register(@NotNull MeterRegistry registry) {
     accounts.forEach((section, value) ->
-        Gauge.builder(NavigationMetrics.PERSONALISED_ACCOUNTS, value, AtomicLong::doubleValue)
-            .tag(NavigationMetrics.TAG_SECTION, section.getTag())
+        Gauge.builder(NavigationMetricNames.PERSONALISED_ACCOUNTS, value, AtomicLong::doubleValue)
+            .tag(NavigationMetricNames.TAG_SECTION, section.getTag())
             .register(registry));
   }
 

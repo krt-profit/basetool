@@ -17,12 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_YIELD_BONUS_WEEK, MATERIAL_YIELD_BONUS_MONTH, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, MSG_SAVING, MSG_REFINERY_UPDATE_FAILED, MSG_REFINERY_STORE_FAILED, MSG_REFINERY_CANCEL_FAILED, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS, REFINERY_DETAIL_MSG, STORE_INHERITED_ORG_UNIT_ID, STORE_ORG_UNIT_PLACEHOLDER, RATING_LEVELS, SPEED_LEVELS */
+/* global MATERIAL_YIELD_BONUSES, MATERIAL_YIELD_BONUS_HELP, MATERIAL_YIELD_BONUS_WEEK, MATERIAL_YIELD_BONUS_MONTH, MATERIAL_ENTRY_TITLE_LABEL, MATERIAL_REMOVE_LABEL, MSG_SAVING, MSG_REFINERY_UPDATE_FAILED, MSG_REFINERY_STORE_FAILED, MSG_REFINERY_CANCEL_FAILED, MSG_CANCEL_CONFIRM, MSG_CANCEL_TITLE, MSG_CANCEL_DISMISS, REFINERY_DETAIL_MSG, RATING_LEVELS, SPEED_LEVELS */
 
 import { showFrontendErrorToast, showKrtConfirm } from '/js/kernel/toast.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { ownerPickerError, refreshOwnerPicker } from '/js/kernel/krt-owner-picker.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
@@ -311,6 +312,10 @@ function duplicateStoreItem(btn) {
     blockToCopy.after(newBlock);
     reindexStoreItems();
     syncStorePersonalJobOrder(newBlock);
+    const receiver = /** @type {HTMLSelectElement | null} */ (
+        newBlock.querySelector('[id^="storeUser_"]')
+    );
+    if (receiver) refreshStoreOwnerPicker(receiver);
     krtEnhanceComboboxes(newBlock);
 }
 
@@ -361,33 +366,23 @@ function syncStorePersonalJobOrder(block) {
 }
 
 /**
- * Replaces the options of an org-unit select, keeping the previous or the inherited choice.
+ * Loads the unit picker of an output row for the selected receiver.
  *
- * @param {HTMLSelectElement} selectEl the org-unit select
- * @param {{orgUnitId: string, orgUnitName: string}[]} options the org units to offer
+ * @param {HTMLSelectElement} receiver the output's receiver picker
  */
-function rebuildOrgUnitOptions(selectEl, options) {
-    const previous = selectEl.value;
-    while (selectEl.firstChild) {
-        selectEl.removeChild(selectEl.firstChild);
-    }
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = STORE_ORG_UNIT_PLACEHOLDER;
-    selectEl.appendChild(placeholder);
-    let hasInherited = false;
-    let hasPrevious = false;
-    options.forEach((o) => {
-        const opt = document.createElement('option');
-        opt.value = o.orgUnitId;
-        opt.textContent = o.orgUnitName;
-        selectEl.appendChild(opt);
-        if (o.orgUnitId === STORE_INHERITED_ORG_UNIT_ID) hasInherited = true;
-        if (previous && o.orgUnitId === previous) hasPrevious = true;
-    });
-    if (hasInherited) selectEl.value = /** @type {string} */ (STORE_INHERITED_ORG_UNIT_ID);
-    else if (hasPrevious) selectEl.value = previous;
-    else selectEl.value = '';
+function refreshStoreOwnerPicker(receiver) {
+    const index = receiver.id.substring('storeUser_'.length);
+    const orgSelect = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById(`storeOrgUnit_${index}`)
+    );
+    if (!orgSelect) return;
+    refreshOwnerPicker(
+        orgSelect,
+        null,
+        receiver.value
+            ? `/refinery-orders/users/${encodeURIComponent(receiver.value)}/org-units`
+            : null,
+    );
 }
 
 document.addEventListener('change', (e) => {
@@ -395,18 +390,9 @@ document.addEventListener('change', (e) => {
     if (!sel || !sel.id || !sel.closest || !sel.closest('#storeItemsContainer')) return;
     if (sel.id.startsWith('storePersonal_')) {
         syncStorePersonalJobOrder(sel.closest('.store-item-block'));
-        return;
+    } else if (sel.id.startsWith('storeUser_')) {
+        refreshStoreOwnerPicker(sel);
     }
-    if (!sel.id.startsWith('storeUser_')) return;
-    const index = sel.id.substring('storeUser_'.length);
-    const orgSelect = /** @type {HTMLSelectElement | null} */ (
-        document.getElementById(`storeOrgUnit_${index}`)
-    );
-    if (!orgSelect || !sel.value) return;
-    krtFetch
-        .getJson(`/refinery-orders/users/${encodeURIComponent(sel.value)}/org-units`)
-        .then((opts) => rebuildOrgUnitOptions(orgSelect, Array.isArray(opts) ? opts : []))
-        .catch(() => rebuildOrgUnitOptions(orgSelect, []));
 });
 
 function initRefineryStoreSection() {
@@ -963,9 +949,20 @@ function submitRefineryMainForm(form, submitter) {
  * @param {HTMLElement | null} submitter the submit control
  */
 function submitRefineryStoreForm(form, submitter) {
+    /** @type {NodeListOf<HTMLSelectElement>} */
+    const pickers = form.querySelectorAll('.store-org-unit-select');
+    for (const picker of pickers) {
+        const pickerError = ownerPickerError(picker);
+        if (pickerError !== null) {
+            showFrontendErrorToast(pickerError);
+            return;
+        }
+    }
     const btn = /** @type {HTMLButtonElement | null} */ (form.querySelector('button[type=submit]'));
     const btnLabel = btn ? btn.querySelector('span') : null;
     const originalLabel = btnLabel ? btnLabel.textContent : null;
+    if (btn) btn.disabled = true;
+    if (btnLabel) btnLabel.textContent = MSG_SAVING;
     const jobOrderIds = refineryStoreJobOrderIds(form);
     _submitRefinery({
         form,

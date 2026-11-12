@@ -23,13 +23,18 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RolesChangedObserver;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.RoleNotices;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRolePruner;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -56,6 +61,7 @@ public class RoleChangeRecorder {
   private final MeterRegistry meterRegistry;
   private final ApplicationEventPublisher eventPublisher;
   private final List<RolesChangedObserver> rolesChangedObservers;
+  private final NotificationRolePruner notificationRolePruner;
 
   /**
    * Records a role an admin or the bank management assigned or withdrew.
@@ -92,6 +98,16 @@ public class RoleChangeRecorder {
       boolean assigned,
       @Nullable UUID actorId,
       AuditDetails details) {
+    if (!assigned
+        && (Roles.KRT_MEMBER.equals(role.getCode())
+            || Roles.BANK_STAFF_ROLES.contains(role.getCode()))) {
+      Set<String> remainingRoles =
+          user.getRoles().stream().map(Role::getCode).collect(Collectors.toUnmodifiableSet());
+      notificationRolePruner.prune(
+          user.getId(),
+          remainingRoles.contains(Roles.KRT_MEMBER),
+          remainingRoles.stream().anyMatch(Roles.BANK_STAFF_ROLES::contains));
+    }
     rolesChangedObservers.forEach(
         observer -> observer.onRolesChanged(user.getId(), user.getRoles()));
     auditRecorder.record(

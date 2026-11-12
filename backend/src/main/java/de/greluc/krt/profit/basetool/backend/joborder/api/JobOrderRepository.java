@@ -199,7 +199,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
         "materials.material",
         "items",
         "items.materials",
-        "items.materials.material"
+        "items.materials.material",
+        "responsibleOrgUnit"
       })
   @Query("SELECT o FROM JobOrder o WHERE o.id IN :ids")
   List<JobOrder> findAllWithMaterialRequirements(@Param("ids") Collection<UUID> ids);
@@ -392,7 +393,7 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
-   * @param requesterOrgUnitIds the caller's direct-membership org-unit ids; never empty.
+   * @param requesterOrgUnitIds the org units in the caller's requester scope; never empty.
    * @param pageable page request (carries the sort).
    * @return paged job orders the caller's org units requested.
    */

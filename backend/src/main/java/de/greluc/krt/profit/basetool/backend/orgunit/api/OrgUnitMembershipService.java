@@ -46,6 +46,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,6 +77,7 @@ public class OrgUnitMembershipService {
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
   private final OrgUnitSeatNotifier seatNotifier;
   private final OrgUnitSeatEligibility seatEligibility;
+  private final OrgRoleManagementSecurityService roleManagementSecurity;
 
   /**
    * Lazily resolved seam that audits changes to the accounts' responsible holders around each
@@ -102,7 +104,10 @@ public class OrgUnitMembershipService {
       throw new DuplicateEntityException("User is already a member of this Spezialkommando");
     }
 
-    final boolean wasMembershipless = membershipRepository.countByIdUserId(userId) == 0;
+    final boolean adoptInventory =
+        sc.isActive()
+            && seatEligibility.holdsKrtMember(userId)
+            && membershipRepository.findActiveOrgUnitIdsByUserId(userId).isEmpty();
 
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(userId, sc.getId()));
@@ -111,7 +116,7 @@ public class OrgUnitMembershipService {
     membership.setJoinedAt(Instant.now());
     OrgUnitMembership saved = membershipRepository.save(membership);
 
-    if (wasMembershipless && sc.isActive()) {
+    if (adoptInventory) {
       firstMembershipObserver.onUserGainedFirstOrgUnit(userId, sc);
     }
     auditRecorder.record(
@@ -136,22 +141,17 @@ public class OrgUnitMembershipService {
   public void removeMember(@NotNull UUID specialCommandId, @NotNull UUID userId) {
     SpecialCommand sc = specialCommandService.getSpecialCommandById(specialCommandId);
     OrgUnitMembershipId id = new OrgUnitMembershipId(userId, sc.getId());
-    if (!membershipRepository.existsById(id)) {
-      throw new NotFoundException("Membership not found");
-    }
+    OrgUnitMembership membership =
+        Entities.require(membershipRepository.findById(id), "Membership not found");
     final Map<UUID, Set<UUID>> responsibleBefore =
         responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(sc.getId());
-    membershipRepository.deleteById(id);
+    membershipRepository.delete(membership);
 
     if (membershipRepository.countByIdUserId(userId) == 0) {
       firstMembershipObserver.onUserLostLastOrgUnit(userId);
     }
-    auditRecorder.record(
-        AuditEventType.MEMBERSHIP_REVOKED,
-        sc.getId(),
-        OrgUnitLabels.shorthandOrName(sc),
-        userId,
-        "kind=SPECIAL_COMMAND");
+    recordMembershipRevoked(
+        membership, OrgUnitKind.SPECIAL_COMMAND, OrgUnitLabels.shorthandOrName(sc));
     responsibleHolderTrackerProvider.getObject().recordResponsibleHolderChanges(responsibleBefore);
   }
 
@@ -170,6 +170,10 @@ public class OrgUnitMembershipService {
    * @throws BadRequestException if {@code bereichId} is not a Bereich, or the user belongs to a
    *     Staffel.
    */
+  @PreAuthorize(
+      "hasRole('ADMIN') or (@orgRoleManagementSecurityService.canAppointBereichRole("
+          + "#bereichId, #userId, #role, authentication) and"
+          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication))")
   @Transactional
   public OrgUnitMembership addBereichLeader(
       @NotNull UUID bereichId, @NotNull UUID userId, @NotNull BereichLeadershipRole role) {
@@ -187,6 +191,13 @@ public class OrgUnitMembershipService {
     OrgUnitMembership m =
         membershipRepository.findById(new OrgUnitMembershipId(userId, bereichId)).orElse(null);
     final MembershipRole previousRole = m != null ? m.getRole() : null;
+    roleManagementSecurity.requireBereichAppointment(bereichId, userId, previousRole, role);
+    if (role == BereichLeadershipRole.LEITER
+        && previousRole != MembershipRole.BEREICHSLEITER
+        && membershipRepository.existsByIdOrgUnitIdAndRole(
+            bereichId, MembershipRole.BEREICHSLEITER)) {
+      throw new BadRequestException("A Bereich may have only one Bereichsleiter");
+    }
     if (m == null) {
       m = new OrgUnitMembership();
       m.setId(new OrgUnitMembershipId(userId, bereichId));
@@ -223,12 +234,17 @@ public class OrgUnitMembershipService {
    * @param userId the user to remove; never {@code null}.
    * @throws NotFoundException if the user is not a member of the Bereich.
    */
+  @PreAuthorize(
+      "hasRole('ADMIN') or (@orgRoleManagementSecurityService.canRemoveBereichRole("
+          + "#bereichId, #userId, authentication) and"
+          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication))")
   @Transactional
   public void removeBereichLeader(@NotNull UUID bereichId, @NotNull UUID userId) {
     OrgUnitMembershipId id = new OrgUnitMembershipId(userId, bereichId);
     OrgUnitMembership m =
         Entities.require(membershipRepository.findById(id), "Bereichsleitung membership not found");
     final MembershipRole previousRole = m.getRole();
+    roleManagementSecurity.requireBereichRemoval(bereichId, userId, previousRole);
     final Map<UUID, Set<UUID>> responsibleBefore =
         responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);
@@ -566,6 +582,8 @@ public class OrgUnitMembershipService {
     }
 
     final long membershipsBefore = membershipRepository.countByIdUserId(user.getId());
+    final boolean hadNoActiveMembership =
+        membershipRepository.findActiveOrgUnitIdsByUserId(user.getId()).isEmpty();
     List<OrgUnitMembership> currentStaffel =
         membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON);
     Map<UUID, OrgUnitMembership> currentById = new LinkedHashMap<>();
@@ -588,7 +606,8 @@ public class OrgUnitMembershipService {
       membershipRepository.deleteAll(toRemove);
       membershipRepository.flush();
       for (OrgUnitMembership removed : toRemove) {
-        recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
+        recordMembershipRevoked(
+            removed, OrgUnitKind.SQUADRON, orgUnitLabelById(removed.getId().getOrgUnitId()));
       }
       responsibleHolderTrackerProvider
           .getObject()
@@ -630,7 +649,9 @@ public class OrgUnitMembershipService {
       }
     }
 
-    if (membershipsBefore == 0 && !addedSquadrons.isEmpty()) {
+    if (hadNoActiveMembership
+        && !addedSquadrons.isEmpty()
+        && seatEligibility.holdsKrtMember(user.getId())) {
       addedSquadrons.stream()
           .filter(Squadron::isActive)
           .min(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
@@ -976,20 +997,24 @@ public class OrgUnitMembershipService {
   }
 
   /**
-   * Records a {@link AuditEventType#MEMBERSHIP_REVOKED} event for a removed Staffel membership
-   * (REQ-AUDIT-001); the details carry only the org-unit kind.
+   * Records an SK or Staffel membership revocation and checks any vacated seat.
    *
-   * @param squadronOrgUnitId the Staffel the removed membership pointed at; never {@code null}.
-   * @param userId the user whose Staffel membership was removed; never {@code null}.
+   * @param membership the removed membership
+   * @param kind the kind of its org unit
+   * @param label the label of its org unit
    */
-  private void recordStaffelMembershipRevoked(
-      @NotNull UUID squadronOrgUnitId, @NotNull UUID userId) {
+  private void recordMembershipRevoked(
+      @NotNull OrgUnitMembership membership, @NotNull OrgUnitKind kind, @Nullable String label) {
+    UUID orgUnitId = membership.getId().getOrgUnitId();
+    UUID userId = membership.getId().getUserId();
     auditRecorder.record(
-        AuditEventType.MEMBERSHIP_REVOKED,
-        squadronOrgUnitId,
-        orgUnitLabelById(squadronOrgUnitId),
-        userId,
-        "kind=SQUADRON");
+        AuditEventType.MEMBERSHIP_REVOKED, orgUnitId, label, userId, AuditDetails.of("kind", kind));
+    MembershipRole role = membership.getRole();
+    if (role == MembershipRole.SK_LEAD || role.isSquadronRank()) {
+      auditRecorder.record(
+          AuditEventType.ROLE_REVOKED, orgUnitId, label, userId, AuditDetails.of("role", role));
+      seatNotifier.seatChanged(userId, unitName(label), role, false, null);
+    }
   }
 
   /**

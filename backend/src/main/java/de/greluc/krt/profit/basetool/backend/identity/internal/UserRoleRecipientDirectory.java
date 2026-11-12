@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.identity.internal;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +30,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The identity module's {@link RoleRecipientDirectory}, reading the role catalogue and the synced
@@ -40,6 +43,18 @@ public class UserRoleRecipientDirectory implements RoleRecipientDirectory {
 
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull RoleState lockRoleState(@NotNull Set<UUID> recipients) {
+    if (recipients.isEmpty()) {
+      return new RoleState(Set.of(), Set.of());
+    }
+    userRepository.lockRoleSetsForNotice(recipients);
+    return new RoleState(
+        userRepository.findRoleHoldersAmong(recipients, Roles.KRT_MEMBER),
+        userRepository.findAnyRoleHoldersAmong(recipients, Roles.BANK_STAFF_ROLES));
+  }
 
   /**
    * Every holder of a global role.

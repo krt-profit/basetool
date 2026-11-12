@@ -13,7 +13,7 @@ Empfänger ist `test-admin` (globaler Admin). Auslöser der Benachrichtigung ist
 
 ## Vorbedingungen
 
-- Die Admin-Realm-Rolle ist ins Backend gespiegelt (`getUserId(test-admin)` **vor** dem Ereignis), da der `JOB_ORDER_CREATED`-Regel-Selektor `ROLE ADMIN` die Empfänger aus `user_roles` auflöst.
+- `test-admin` hält vor dem Ereignis die gespeicherte Basetool-Rolle `Admin`. Der `JOB_ORDER_CREATED`-Selektor `ROLE ADMIN` liest seine Empfänger aus `user_roles`.
 - `test-member` legt einen Job Order für die IRIDIUM-Staffel an (`createJobOrder`); die geseedete Regel benachrichtigt die Verantwortlichen der Einheit **plus** globale Admins, ohne den Akteur.
 - Die `displayId` des Auftrags (aus `GET /api/v1/orders/{id}`) macht den Benachrichtigungstext (`New job order #<displayId> for <Einheit>`) auf dem geteilten Stack eindeutig lokalisierbar.
 
@@ -34,6 +34,6 @@ Die geseedete Benachrichtigung erscheint in der Liste (Nachweis, dass die Ereign
 ## Sonderfälle & Lehren
 
 - **Akteur-Ausschluss:** Erzeuger (`test-member`) und Empfänger (`test-admin`) sind bewusst verschieden; ein einzelner User würde seine eigene Aktion nie sehen.
-- **Rollen-Spiegelung vor dem Ereignis:** `getUserId(test-admin)` loggt den Admin ein und synct dessen `Admin`-Rolle nach `user_roles` — passiert das erst nach dem Ereignis, verpasst der `ROLE ADMIN`-Selektor den Empfänger.
+- **Empfängerrolle vor dem Ereignis:** Der Teststack hinterlegt die Basetool-Rolle `Admin` beim Start. `getUserId(test-admin)` stellt beim Anmelden den Testnutzer bereit.
 - **Geteilter Stack:** Schwester-Suiten legen ebenfalls Aufträge an, daher nie absolute Zähler prüfen, nur die spezifische Zeile über die `displayId` und ihren Zustandswechsel.
 - **Live-SSE bewusst nicht geprüft:** Best-effort-Push mit gejittertem Reconnect und ≤60-s-Poll-Fallback ist deutlich flakiger — die persistierte Liste nach Navigation ist der robuste Vertrag.

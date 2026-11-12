@@ -19,24 +19,21 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.TransactionMemo;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationLookup;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import jakarta.persistence.EntityManager;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.engine.spi.SessionImplementor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * The mission module's per-transaction memo of the operations its missions belong to (plan §7.5
@@ -57,7 +54,8 @@ public class MissionOperationSummaryCache implements MissionOperationLookup {
     if (known != null) {
       return known.orElse(null);
     }
-    Set<UUID> wanted = new LinkedHashSet<>(operationsInContext());
+    Set<UUID> wanted =
+        TransactionMemo.idsInContext(entityManager, Mission.class, Mission::getOperationId);
     wanted.add(operationId);
     wanted.removeAll(memo.keySet());
     Map<UUID, MissionOperationSummary> found = operations.operations(wanted);
@@ -67,51 +65,8 @@ public class MissionOperationSummaryCache implements MissionOperationLookup {
     return found.get(operationId);
   }
 
-  private Set<UUID> operationsInContext() {
-    Set<UUID> ids = new LinkedHashSet<>();
-    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      return ids;
-    }
-    for (Map.Entry<Object, ?> entry :
-        entityManager
-            .unwrap(SessionImplementor.class)
-            .getPersistenceContextInternal()
-            .reentrantSafeEntityEntries()) {
-      if (entry.getKey() instanceof Mission mission && mission.getOperationId() != null) {
-        ids.add(mission.getOperationId());
-      }
-    }
-    return ids;
-  }
-
   private Memo memoObject() {
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      return new Memo();
-    }
-    if (TransactionSynchronizationManager.getResource(this) instanceof Memo bound) {
-      return bound;
-    }
-    Memo memo = new Memo();
-    TransactionSynchronizationManager.bindResource(this, memo);
-    TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronization() {
-          @Override
-          public void suspend() {
-            TransactionSynchronizationManager.unbindResource(MissionOperationSummaryCache.this);
-          }
-
-          @Override
-          public void resume() {
-            TransactionSynchronizationManager.bindResource(MissionOperationSummaryCache.this, memo);
-          }
-
-          @Override
-          public void afterCompletion(int status) {
-            TransactionSynchronizationManager.unbindResourceIfPossible(
-                MissionOperationSummaryCache.this);
-          }
-        });
-    return memo;
+    return TransactionMemo.bound(this, Memo.class, Memo::new);
   }
 
   /** One transaction's memo. */

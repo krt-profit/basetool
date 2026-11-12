@@ -97,6 +97,7 @@ class MissionUnitDecimalPlaceTest {
     ship.setName("Test Ship Decimal");
     ship.setOwner(officerUser);
     ship.setShipType(shipType);
+    ship.setInsurance("LTI");
     shipRepository.save(ship);
 
     mission = new Mission();

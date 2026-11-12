@@ -41,6 +41,7 @@ public class OperationSummaryReader implements OperationSummaryProvider {
 
   private final OperationRepository operationRepository;
   private final OperationAccessPolicy operationAccessPolicy;
+  private final OperationPayoutStatusRepository payoutStatusRepository;
 
   @Override
   @Transactional(readOnly = true)
@@ -58,12 +59,21 @@ public class OperationSummaryReader implements OperationSummaryProvider {
   @Override
   @Transactional(readOnly = true)
   public @NotNull OperationLinkability linkability(@NotNull UUID operationId) {
-    return operationRepository
-        .findById(operationId)
-        .map(operation ->
-            operationAccessPolicy.canEdit(operation)
-                ? OperationLinkability.LINKABLE
-                : OperationLinkability.NOT_LINKABLE)
-        .orElse(OperationLinkability.NO_SUCH_OPERATION);
+    var operation = operationRepository.findById(operationId);
+    if (operation.isEmpty()) {
+      return OperationLinkability.NO_SUCH_OPERATION;
+    }
+    if (!operationAccessPolicy.canEdit(operation.orElseThrow())) {
+      return OperationLinkability.NOT_LINKABLE;
+    }
+    return hasPaidOutPayouts(operationId)
+        ? OperationLinkability.SETTLED
+        : OperationLinkability.LINKABLE;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public boolean hasPaidOutPayouts(@NotNull UUID operationId) {
+    return payoutStatusRepository.existsByOperationIdAndPaidOutTrue(operationId);
   }
 }

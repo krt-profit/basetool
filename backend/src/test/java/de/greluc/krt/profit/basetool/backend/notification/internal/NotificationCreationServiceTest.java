@@ -39,7 +39,9 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMetric
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRoleAudience;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -47,6 +49,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +73,7 @@ class NotificationCreationServiceTest {
   @Mock private NotificationRepository notificationRepository;
   @Mock private NotificationParamsCodec notificationParamsCodec;
   @Mock private NotificationMuteService notificationMuteService;
+  @Mock private RecipientResolutionService recipientResolutionService;
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
   private NotificationCreationService service;
 
@@ -81,13 +85,26 @@ class NotificationCreationServiceTest {
                 ruleEvaluationService,
                 notificationRepository,
                 notificationParamsCodec,
-                notificationMuteService),
+                notificationMuteService,
+                recipientResolutionService),
             notificationRepository,
             meterRegistry,
             List.of());
     lenient()
         .when(notificationMuteService.withoutMuted(any()))
         .thenAnswer(invocation -> invocation.getArgument(0));
+  }
+
+  private static Map<NotificationType, Map<UUID, NotificationRoleAudience>> direct(
+      Map<NotificationType, Set<UUID>> recipients) {
+    Map<NotificationType, Map<UUID, NotificationRoleAudience>> result =
+        new java.util.EnumMap<>(NotificationType.class);
+    recipients.forEach((type, ids) -> {
+      Map<UUID, NotificationRoleAudience> audience = new java.util.HashMap<>();
+      ids.forEach(id -> audience.put(id, NotificationRoleAudience.DIRECT));
+      result.put(type, audience);
+    });
+    return result;
   }
 
   private static JobOrderCreatedEvent event() {
@@ -106,9 +123,12 @@ class NotificationCreationServiceTest {
   @Test
   void createsOneRowPerRecipientWithEventFields() {
     JobOrderCreatedEvent event = event();
-    when(ruleEvaluationService.resolveRecipients(event))
-        .thenReturn(Map.of(NotificationType.JOB_ORDER_CREATED, Set.of(A, B)));
+    when(ruleEvaluationService.resolveRoleAudiences(event))
+        .thenReturn(direct(Map.of(NotificationType.JOB_ORDER_CREATED, Set.of(A, B))));
     when(notificationParamsCodec.serialize(any())).thenReturn("{\"displayId\":\"9\"}");
+    OrgUnitRef unit = event.subjectOrgUnit();
+    when(recipientResolutionService.subjectOrgUnit(event)).thenReturn(unit);
+    when(recipientResolutionService.unitName(unit.id())).thenReturn(Optional.of("ALP"));
 
     Set<UUID> recipients = service.createFromEvent(event);
 
@@ -122,6 +142,9 @@ class NotificationCreationServiceTest {
           assertThat(n.getType()).isEqualTo(NotificationType.JOB_ORDER_CREATED);
           assertThat(n.getEntityType()).isEqualTo("JOB_ORDER");
           assertThat(n.getEntityId()).isEqualTo(event.entityId());
+          assertThat(n.getOrgUnitId()).isEqualTo(unit.id());
+          assertThat(n.getOrgUnitKind()).isEqualTo(unit.kind());
+          assertThat(n.getOrgUnitName()).isEqualTo("ALP");
           assertThat(n.getParams()).isEqualTo("{\"displayId\":\"9\"}");
           assertThat(n.isRead()).isFalse();
         });
@@ -137,9 +160,32 @@ class NotificationCreationServiceTest {
   }
 
   @Test
+  void concurrentRoleLossDropsTheGatedPathAndKeepsTheIndependentPath() {
+    JobOrderCreatedEvent event = event();
+    when(ruleEvaluationService.resolveRoleAudiences(event))
+        .thenReturn(
+            Map.of(
+                NotificationType.JOB_ORDER_CREATED,
+                Map.of(A, NotificationRoleAudience.MEMBER, B, NotificationRoleAudience.DIRECT)));
+    when(recipientResolutionService.lockRoleState(Set.of(A)))
+        .thenReturn(new RoleRecipientDirectory.RoleState(Set.of(), Set.of()));
+
+    assertThat(service.createFromEvent(event)).containsExactly(B);
+
+    ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.captor();
+    verify(notificationRepository).saveAll(captor.capture());
+    assertThat(captor.getValue())
+        .singleElement()
+        .satisfies(notice -> {
+          assertThat(notice.getRecipientUserId()).isEqualTo(B);
+          assertThat(notice.getRoleAudience()).isEqualTo(NotificationRoleAudience.DIRECT);
+        });
+  }
+
+  @Test
   void writesNothingWhenNoRecipients() {
     JobOrderCreatedEvent event = event();
-    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+    when(ruleEvaluationService.resolveRoleAudiences(event)).thenReturn(Map.of());
 
     Set<UUID> recipients = service.createFromEvent(event);
 
@@ -150,7 +196,7 @@ class NotificationCreationServiceTest {
   @Test
   void plainEventDoesNotTouchSupersedeQueries() {
     JobOrderCreatedEvent event = event();
-    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+    when(ruleEvaluationService.resolveRoleAudiences(event)).thenReturn(Map.of());
 
     service.createFromEvent(event);
 
@@ -175,8 +221,9 @@ class NotificationCreationServiceTest {
     when(notificationRepository.deleteByTypeInAndEntity(
             superseded, "BANK_BOOKING_REQUEST", requestId))
         .thenReturn(2);
-    when(ruleEvaluationService.resolveRecipients(event))
-        .thenReturn(Map.of(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED, Set.of(requester)));
+    when(ruleEvaluationService.resolveRoleAudiences(event))
+        .thenReturn(
+            direct(Map.of(NotificationType.BANK_BOOKING_REQUEST_CONFIRMED, Set.of(requester))));
     when(notificationParamsCodec.serialize(any())).thenReturn("{}");
 
     Set<UUID> affected = service.createFromEvent(event);
@@ -207,7 +254,7 @@ class NotificationCreationServiceTest {
     when(notificationRepository.deleteByTypeInAndEntity(
             superseded, "BANK_BOOKING_REQUEST", requestId))
         .thenReturn(1);
-    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+    when(ruleEvaluationService.resolveRoleAudiences(event)).thenReturn(Map.of());
 
     Set<UUID> affected = service.createFromEvent(event);
 
@@ -225,7 +272,7 @@ class NotificationCreationServiceTest {
             eq("BANK_BOOKING_REQUEST"),
             eq(requestId)))
         .thenReturn(List.of());
-    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+    when(ruleEvaluationService.resolveRoleAudiences(event)).thenReturn(Map.of());
 
     Set<UUID> affected = service.createFromEvent(event);
 
@@ -264,9 +311,10 @@ class NotificationCreationServiceTest {
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             notices, "BANK_BOOKING_REQUEST", event.entityId()))
         .thenReturn(List.of(formerHolder, staff));
-    when(ruleEvaluationService.resolveRecipients(event))
+    when(ruleEvaluationService.resolveRoleAudiences(event))
         .thenReturn(
-            Map.of(NotificationType.BANK_BOOKING_REQUEST_CREATED, Set.of(staff, newHolder)));
+            direct(
+                Map.of(NotificationType.BANK_BOOKING_REQUEST_CREATED, Set.of(staff, newHolder))));
     when(notificationRepository.deleteByTypeInAndEntityForRecipients(
             notices, "BANK_BOOKING_REQUEST", event.entityId(), Set.of(formerHolder)))
         .thenReturn(1);
@@ -295,8 +343,9 @@ class NotificationCreationServiceTest {
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             notices, "BANK_BOOKING_REQUEST", event.entityId()))
         .thenReturn(List.of(formerHolder));
-    when(ruleEvaluationService.resolveRecipients(event))
-        .thenReturn(Map.of(NotificationType.BANK_BOOKING_REQUEST_CREATED, Set.of(formerHolder)));
+    when(ruleEvaluationService.resolveRoleAudiences(event))
+        .thenReturn(
+            direct(Map.of(NotificationType.BANK_BOOKING_REQUEST_CREATED, Set.of(formerHolder))));
 
     Set<UUID> affected = service.createFromEvent(event);
 
@@ -314,11 +363,12 @@ class NotificationCreationServiceTest {
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             BankBookingRequestEvent.OPEN_REQUEST_NOTICES, "BANK_BOOKING_REQUEST", event.entityId()))
         .thenReturn(List.of());
-    when(ruleEvaluationService.resolveRecipients(event))
+    when(ruleEvaluationService.resolveRoleAudiences(event))
         .thenReturn(
-            Map.of(
-                NotificationType.BANK_BOOKING_REQUEST_CREATED,
-                Set.of(newHolder, staffWhoDeletedTheirNotice)));
+            direct(
+                Map.of(
+                    NotificationType.BANK_BOOKING_REQUEST_CREATED,
+                    Set.of(newHolder, staffWhoDeletedTheirNotice))));
     when(notificationParamsCodec.serialize(any())).thenReturn("{}");
 
     Set<UUID> affected = service.createFromEvent(event);
@@ -342,7 +392,7 @@ class NotificationCreationServiceTest {
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity))
         .thenReturn(List.of(A, B));
-    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+    when(ruleEvaluationService.resolveRoleAudiences(event)).thenReturn(Map.of());
 
     Set<UUID> result = service.createFromEvent(event);
 
@@ -364,7 +414,7 @@ class NotificationCreationServiceTest {
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity))
         .thenReturn(List.of(B));
-    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+    when(ruleEvaluationService.resolveRoleAudiences(event)).thenReturn(Map.of());
 
     Set<UUID> affected = service.createFromEvent(event);
 
@@ -379,7 +429,7 @@ class NotificationCreationServiceTest {
         StubNotificationEvent.builder()
             .resolvesNotificationTypesForRecipients(Set.of(NotificationType.JOB_ORDER_CREATED))
             .build();
-    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+    when(ruleEvaluationService.resolveRoleAudiences(event)).thenReturn(Map.of());
 
     service.createFromEvent(event);
 
@@ -402,7 +452,7 @@ class NotificationCreationServiceTest {
     when(notificationRepository.findRecipientUserIdsByTypeInAndEntity(
             Set.of(NotificationType.JOB_ORDER_CREATED), "STUB", entity))
         .thenReturn(List.of(A, B));
-    when(ruleEvaluationService.resolveRecipients(event)).thenReturn(Map.of());
+    when(ruleEvaluationService.resolveRoleAudiences(event)).thenReturn(Map.of());
 
     Set<UUID> affected = service.createFromEvent(event);
 

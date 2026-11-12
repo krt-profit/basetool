@@ -104,7 +104,7 @@ public class SupplyOrderCoveredNoticeProducer implements TimedNoticeProducer {
               need.getId(),
               unit.getId(),
               unit.getKind(),
-              unit.getName(),
+              order.responsibleOrgUnitName() == null ? "-" : order.responsibleOrgUnitName(),
               need.getMaterial() == null ? "—" : need.getMaterial().getName(),
               order.displayId() == null ? "—" : "#" + order.displayId()));
       raised++;

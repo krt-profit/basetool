@@ -27,8 +27,8 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -56,7 +56,7 @@ public class InventoryOrgUnitChangeService {
   private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final OrgUnitRepository orgUnitRepository;
-  private final OrgUnitMembershipQueryService membershipQueryService;
+  private final OrgUnitSeatEligibility seatEligibility;
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryItemMapper inventoryItemMapper;
   private final AuditRecorder auditRecorder;
@@ -189,19 +189,19 @@ public class InventoryOrgUnitChangeService {
   }
 
   /**
-   * Resolves the target unit, which must be one of the caller's direct memberships of any kind.
+   * Resolves the target unit, which must be one of the caller's stampable units.
    *
    * @param callerId the authenticated caller
    * @param orgUnitId the requested unit, or {@code null} for no unit
    * @return the unit, or {@code null} for no unit
-   * @throws BadRequestException when the caller is not a direct member of the unit
+   * @throws BadRequestException when the unit is outside the caller's stampable units
    */
   private @Nullable OrgUnit resolveTarget(@NotNull UUID callerId, @Nullable UUID orgUnitId) {
     if (orgUnitId == null) {
       return null;
     }
-    if (!membershipQueryService.findDirectMembershipOrgUnitIds(callerId).contains(orgUnitId)) {
-      throw new BadRequestException("The target org unit is not one of your memberships");
+    if (!seatEligibility.findStampableOrgUnitIds(callerId).contains(orgUnitId)) {
+      throw new BadRequestException("error.org_unit.owner_target_not_allowed");
     }
     return Entities.require(orgUnitRepository.findById(orgUnitId), "Org unit not found");
   }

@@ -191,13 +191,6 @@
         validation: /*[[#{error.validation.failed}]]*/ 'Eingaben pruefen.',
         allocAmountMissing: /*[[#{inventory.input.alloc.amountMissing}]]*/ 'Menge fehlt.'
     };
-    const INV_OWNER_PICKER_MSG = {
-        placeholder: /*[[#{ownerPicker.placeholder}]]*/ '-- Bitte waehlen --',
-        ORGANISATIONSLEITUNG: /*[[#{ownerPicker.organisationsleitung}]]*/ 'Organisationsleitung',
-        BEREICH: /*[[#{ownerPicker.bereich}]]*/ 'Bereich',
-        SQUADRON: /*[[#{ownerPicker.staffel}]]*/ 'Staffel',
-        SPECIAL_COMMAND: /*[[#{ownerPicker.specialCommand}]]*/ 'Spezialkommando'
-    };
 </script>
 <script type="module" th:src="@{/js/inventory/inventory-input.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>

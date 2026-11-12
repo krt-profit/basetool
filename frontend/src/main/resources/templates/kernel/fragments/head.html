@@ -86,7 +86,14 @@
     </script>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
         window.krtOwnerPickerI18n = {
-            required: /*[[#{ownerPicker.error.required}]]*/ 'Please choose an org unit for this entry.'
+            required: /*[[#{ownerPicker.error.required}]]*/ 'Please choose an org unit for this entry.',
+            loading: /*[[#{ownerPicker.loading}]]*/ 'Loading org units.',
+            unavailable: /*[[#{ownerPicker.error.load}]]*/ 'Could not load org units.',
+            placeholder: /*[[#{ownerPicker.placeholder}]]*/ 'Please choose',
+            ORGANISATIONSLEITUNG: /*[[#{ownerPicker.organisationsleitung}]]*/ 'Organisationsleitung',
+            BEREICH: /*[[#{ownerPicker.bereich}]]*/ 'Bereich',
+            SQUADRON: /*[[#{ownerPicker.staffel}]]*/ 'Squadron',
+            SPECIAL_COMMAND: /*[[#{ownerPicker.specialCommand}]]*/ 'Special command'
         };
     </script>
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">

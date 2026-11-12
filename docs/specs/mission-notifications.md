@@ -21,15 +21,22 @@ Each can be muted by the member (REQ-NOTIF-027).
 meeting time or the planned start **actually changes** (old → new time of the one that moved);
 `#updateCoreSection` publishes `MISSION_CANCELLED` on the transition to
 `CANCELLED`; `#deleteMission` publishes `MISSION_DELETED`, listing the participants captured before
-the delete (`EVENT_RECIPIENTS`), because the mission is gone. The default rules notify the mission's
+the delete (`EVENT_RECIPIENTS`). The default rules notify the mission's
 participants (`MISSION_PARTICIPANTS`) and exclude the actor. Only the latest change stays: a reschedule
 clears the earlier reschedule and reminder notices, a cancellation and a deletion clear every open
 notice of the mission. A reschedule resets both reminder markers.
 
+A registered participant receives a participant notice only while their active account passes the
+mission member gate and can read the mission and every ancestor (REQ-MISSION-008). Delivery
+evaluates the recipient's current rights across their units, independently of any active-unit pin.
+Internal flags, a change of owning unit and loss of membership or the member role take effect on
+the next notice. Deletion captures only recipients who may read the mission immediately before it
+is deleted.
+
 ### REQ-MISSION-022 — Reminders 24 hours and one hour before the Einsatz
 
 `MissionReminderNoticeProducer` (a `TimedNoticeProducer`, REQ-NOTIF-026) raises `MISSION_REMINDER_DUE`
-for every registered participant of a `PLANNED` mission whose meeting time (planned start without one)
+for every registered participant eligible to read a `PLANNED` mission whose meeting time (planned start without one)
 lies in the hour after the 24-hour mark, and again in the last hour before it. The mission's
 `reminder_24h_sent_at` / `reminder_1h_sent_at` marker is set in the same transaction that publishes the
 events, so each fires at most once; editing the time resets both. The notice names the mission, the
@@ -48,8 +55,9 @@ clears **that participant's** `MISSION_CHECKIN_OPEN` notice only (REQ-NOTIF-025)
 
 `MissionParticipantService#addParticipant` publishes `MISSION_PARTICIPANT_ADDED` and `#removeParticipant`
 publishes `MISSION_PARTICIPANT_REMOVED` when the acting member is not the participant (a guest has no
-inbox). The add notice names the mission, its start, the actor and the payout choice stamped on the
-member; removal clears that member's add, reminder and check-in notices, an add clears a removal notice.
+inbox) and the recipient can still read the mission. The add notice names the mission, its start, the actor and the payout choice stamped on the
+member. Removal clears that member's add, reminder and check-in notices even when the member
+no longer receives the removal notice. An add clears a removal notice.
 
 ### REQ-MISSION-025 — An Einsatz that was never ended
 
@@ -81,7 +89,8 @@ notifies the mission leadership and names the freed slot or Funktion. The leaver
 change to paid out and `OPERATION_PAYOUT_UNMARKED` on a real change back. The default rule notifies the
 participant (`EVENT_RECIPIENT`, a guest or a deleted account has nobody to tell) with the operation, the
 payout amount, the donation, the fee and the actor; taking the mark back clears that notice. The last
-open payout also clears the managers' completion notice (REQ-MISSION-029).
+open payout also clears the managers' completion notice (REQ-MISSION-029). The amount uses the
+retained settlement basis of REQ-MISSION-034 until the last current paid-out mark is reversed.
 
 ### REQ-MISSION-029 — An operation is complete and its payouts are due
 

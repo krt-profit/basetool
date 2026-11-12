@@ -160,12 +160,19 @@ final class BankAccessSeeder {
     Bereich foreignBereich = orgUnit(new Bereich(), "Fremdbereich", ol, Department.FORSCHUNG);
     Bereich profitBereich = persistedProfitArea(orgUnitRepository);
     profitBereich.setParent(ol);
+    List<OrgUnitMembership> priorProfitLeads =
+        membershipRepository.findAllByIdOrgUnitId(profitBereich.getId()).stream()
+            .filter(member -> member.getRole() == MembershipRole.BEREICHSLEITER)
+            .toList();
+    membershipRepository.deleteAll(priorProfitLeads);
+    membershipRepository.flush();
     Squadron ownStaffel = orgUnit(new Squadron(), "Staffel", ownBereich, null);
     SpecialCommand specialCommand = orgUnit(new SpecialCommand(), "SK", ownBereich, null);
     Squadron foreignStaffel = orgUnit(new Squadron(), "Fremdstaffel", foreignBereich, null);
     Squadron closedStaffel = orgUnit(new Squadron(), "Altstaffel", ownBereich, null);
 
     seat(users.get(Actor.MEMBER), ownStaffel, MembershipRole.MEMBER);
+    seat(users.get(Actor.MANAGEMENT_MEMBER), ownStaffel, MembershipRole.MEMBER);
     seat(users.get(Actor.STAFFELLEITER), ownStaffel, MembershipRole.STAFFELLEITER);
     seat(users.get(Actor.SK_LEAD), specialCommand, MembershipRole.SK_LEAD);
     seat(users.get(Actor.BEREICHSLEITER), ownBereich, MembershipRole.BEREICHSLEITER);
@@ -292,7 +299,7 @@ final class BankAccessSeeder {
                 Set.of(member);
             case EMPLOYEE, EMPLOYEE_VIEW, EMPLOYEE_DEPOSIT, EMPLOYEE_WITHDRAW, EMPLOYEE_TRANSFER ->
                 Set.of(member, employee);
-            case MANAGEMENT -> Set.of(member, role("Bank Management"));
+            case MANAGEMENT, MANAGEMENT_MEMBER -> Set.of(member, role("Bank Management"));
             case ADMIN -> Set.of(role("Admin"));
             case PENDING -> Set.of();
           };

@@ -262,19 +262,14 @@ skew that `NotificationStreamObservationPredicate` already suppresses (REQ-OBS-0
 emits its single `INFO` access-log line, so the one-line-per-request guarantee holds; relay health
 stays visible through the dedicated SSE meters, not the access log.
 
-**The frontend binds `orgUnitId` too.** The MDC contract above names the field for backend *and*
-frontend, but until 2026-08 only the backend ever bound it: the frontend's Logback patterns rendered
-no third bracket and its prod JSON encoder exported no such key, so a frontend line could not be
-attributed to an org-unit context at all — the spec and the code disagreed.
-`ActiveSquadronContextFilter` now binds the active-pin UUID, or the literal `none` when the user has
-no pin, and removes the key in a `finally` so a pooled or virtual thread cannot carry it into the
-next request. **Filter order is load-bearing:** `CorrelationIdFilter` runs at
-`LOWEST_PRECEDENCE-100` and `ActiveSquadronContextFilter` at `-99`, because the pin is not resolvable
-yet inside the correlation filter — binding it there would have written `null` on every request.
-Both Logback text patterns (console + file, `[%X{orgUnitId:-}]` after `userId`, so an unpinned
-request keeps the column as an empty bracket pair) and the prod `PiiMaskingLogstashEncoder` carry the
-field. The ingest carve-out above is unchanged: the gateway relays drafts and owns no
-squadron-scoped data.
+**The backend logs effective scope.** `orgUnitId` is the effective unit's UUID, `mine` for
+all of the caller's units, `all` for all units, `none` for no effective unit, `anonymous`
+for an unauthenticated request, or `unavailable` if context resolution fails.
+
+**The frontend logs the requested scope.** `ActiveSquadronContextFilter` binds the session pin's
+UUID or `unpinned` when the request carries no selection. Use `correlationId` to match it to
+the backend's effective context. The filter runs after `CorrelationIdFilter` and clears
+the field on exit. Both Logback text patterns and the production JSON encoder carry the field.
 
 **Async dispatches keep the request's MDC (2026-09-25).** A request whose handler returns an
 `SseEmitter`, a `DeferredResult` or a `Callable` is dispatched a second time — `DispatcherType.ASYNC`,
@@ -372,15 +367,9 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
 - **UEX requests are unconditional** — UEX serves neither `ETag` nor `Last-Modified`, so
   `UexClient` sends plain GETs and every run imports the full payload; there is no `304` outcome to
   log.
-- **Role-sync summary** (`UserReconciliationService.logRoleSyncSummary`, `UserSyncService`) — one
-  aggregate `INFO` per run (roles mapped, Guest fallbacks, dropped role names, accounts newly flagged
-  as departed), escalating to `WARN` past a threshold (more than 3 Guest demotions, more than 10
-  newly-missing accounts). Per-account detail stays `DEBUG` and carries the `sub` UUID only: a full
-  roster at `INFO` would be a per-run flood and would name accounts.
-- **Keycloak role-mapping summary** (`KeycloakService`) — `INFO` with matched / mappable / realm-role
-  / holder counts; `WARN` **only** in the degenerate `matched == 0` case. A naive per-role "missing
-  from the realm" WARN would fire on every single run, because the mappable set is the entire local
-  catalogue including the seeded local-only `Guest` role.
+- **User reconciliation** (`UserSyncTask`, `UserSyncService`) synchronizes the Keycloak roster
+  and account state. The scheduler reports the `user_sync` outcome, processed items and last
+  success. Application roles are assigned in the Basetool (REQ-SEC-088).
 - **SSE send failure and cap eviction** (`NotificationStreamService`) — `DEBUG`, deliberately not
   raised. A broken pipe arrives on every browser tab close, and a user opening a sixth tab evicts
   their oldest emitter by design; both are client-paced. The throwable is now passed to the logger
@@ -1281,8 +1270,8 @@ figures are exposed as **counts only**, never balances or transaction amounts.
 **Mechanics.** Meter names live in constants holders, the single source of truth for names, tag
 keys and the non-enum label values. In the backend `platform.api.MetricNames` holds the names and
 tag values several modules share or the platform owns; every other name sits in the owning module's
-`<Module>MetricNames` in its `api` package (`BankMetricNames`, `ExchangeMetricNames`, …), so a module
-adds a metric without touching the platform. The frontend (package `metrics`) and the ingest
+`<Module>MetricNames` in its `api` package (`BankMetricNames`, `ExchangeMetricNames`, …). A module
+with no published API keeps its holder in `internal` (`NavigationMetricNames`). The frontend (package `metrics`) and the ingest
 (`observability`) each have their own `MetricNames`. Scheduled-job health flows through the
 shared `platform.api.TaskMetrics` wrapper; queue depth is sampled by the `app.internal.BusinessMetricsCollector`, which runs the `platform.api.BusinessGaugeSource` each owning module publishes (`IdentityBusinessGauges`, `DeletionRequestBusinessGauges`, `BankBusinessGauges`, `JobOrderBusinessGauges`, `OperationBusinessGauges`, `RefineryBusinessGauges`, `P4kImportBusinessGauges`, `MaterialExchangeBusinessGauges`, `SupplyBusinessGauges`),
 on a fixed timer (`app.monitoring.business-metrics.interval-ms`, default 60 s, one read-only
@@ -1709,9 +1698,8 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   the Keycloak user last (REQ-SEC-026, ADR-0111); when that last step throws, the account has
   no local row left, so it cannot appear in `basetool_users_pending_deletion_count` — that
   gauge counts the opposite orphan. The surviving Keycloak account can still log in, and the
-  reconciliation then inserts a fresh row: PENDING and refusable for an ordinary member, but
-  **ACTIVE** for an ADMIN-realm-role holder, because the approval gate carves admins out for
-  bootstrap safety. Backs `AccountErasureKeycloakDeleteFailed` (any occurrence in 24 h,
+  reconciliation then inserts a fresh row as PENDING. The explicit Admin bootstrap configuration
+  can activate an allowlisted subject (REQ-SEC-088). Backs `AccountErasureKeycloakDeleteFailed` (any occurrence in 24 h,
   warning) and is paired with an `ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED` audit row carrying
   the account id the Keycloak console needs (added 2026-09-17).
 - `basetool_admin_registration_auto_activated_total` counter (untagged,
@@ -2868,7 +2856,7 @@ signals. Every label is bounded by REQ-OBS-006; **the quick-access search term n
 label**, a tag, an MDC field or a log line.
 
 - `basetool_navigation_preference_writes_total{section, outcome}` counter in
-  the `navigation` module (`NavigationMetrics`), one increment per preference or dashboard write
+  the `navigation` module (`NavigationMetrics`, with names in `NavigationMetricNames`), one increment per preference or dashboard write
   (REQ-UI-032, REQ-UI-034). `section` ∈ `favourites`, `hidden`, `order`, `tabbar`, `display`,
   `dashboard`; `outcome` ∈ `ok`, `conflict` (the `409` of a stale section version), `rejected` (a
   `400` / `403` / `422`). A reset counts once per section it wrote, and a write that moves a page

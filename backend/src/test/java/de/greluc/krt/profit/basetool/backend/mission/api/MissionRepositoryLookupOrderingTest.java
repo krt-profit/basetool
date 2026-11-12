@@ -82,7 +82,7 @@ class MissionRepositoryLookupOrderingTest {
    * {@code PLANNED} one.
    */
   @Test
-  void findFirstByPlannedStartTimeAfterAndStatusIn_skipsTerminalStatusEvenWhenItSortsEarlier() {
+  void upcomingCandidates_forAdminSkipTerminalStatusEvenWhenItSortsEarlier() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     Squadron squadron = new Squadron();
     squadron.setName("Next-Status-" + tag);
@@ -96,9 +96,16 @@ class MissionRepositoryLookupOrderingTest {
 
     Mission next =
         missionRepository
-            .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-                lowerBound, List.of("PLANNED", "ACTIVE"))
-            .orElseThrow();
+            .findUpcomingOwnOrSignedUp(
+                lowerBound,
+                List.of("PLANNED", "ACTIVE"),
+                true,
+                false,
+                null,
+                Set.of(),
+                null,
+                PageRequest.of(0, 1))
+            .getFirst();
 
     assertThat(next.getId()).isEqualTo(plannedId);
   }
@@ -108,7 +115,7 @@ class MissionRepositoryLookupOrderingTest {
    * mission and a terminal public one (REQ-MISSION-008).
    */
   @Test
-  void findNextPublicMission_skipsInternalAndTerminalMissions() {
+  void upcomingCandidates_publicOnly_skipsInternalAndTerminalMissions() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     OrgUnit foreign = newSquadron("Public-Foreign-" + tag, "PF" + tag);
 
@@ -123,8 +130,16 @@ class MissionRepositoryLookupOrderingTest {
 
     Mission next =
         missionRepository
-            .findNextPublicMission(lowerBound, List.of("PLANNED", "ACTIVE"))
-            .orElseThrow();
+            .findUpcomingOwnOrSignedUp(
+                lowerBound,
+                List.of("PLANNED", "ACTIVE"),
+                false,
+                true,
+                null,
+                Set.of(),
+                null,
+                PageRequest.of(0, 1))
+            .getFirst();
 
     assertThat(next.getId()).isEqualTo(publicId);
   }
@@ -134,7 +149,7 @@ class MissionRepositoryLookupOrderingTest {
    * mission, ignoring terminal and foreign missions (REQ-MISSION-008).
    */
   @Test
-  void findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal() {
+  void upcomingCandidates_scoped_returnsOwnUnitNextSkippingForeignAndTerminal() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     OrgUnit mine = newSquadron("Scoped-Mine-" + tag, "SM" + tag);
     OrgUnit foreign = newSquadron("Scoped-Foreign-" + tag, "SF" + tag);
@@ -149,21 +164,27 @@ class MissionRepositoryLookupOrderingTest {
         saveMission(mine, "Mine-Later", Instant.parse("2099-03-01T00:00:00Z"), "PLANNED", false);
 
     List<Mission> head =
-        missionRepository.findNextScopedMission(
+        missionRepository.findUpcomingOwnOrSignedUp(
             lowerBound,
             List.of("PLANNED", "ACTIVE"),
+            false,
+            false,
             null,
             Set.of(mine.getId()),
+            null,
             PageRequest.of(0, 1));
 
     assertThat(head).extracting(Mission::getId).containsExactly(mineSoonId);
 
     List<Mission> all =
-        missionRepository.findNextScopedMission(
+        missionRepository.findUpcomingOwnOrSignedUp(
             lowerBound,
             List.of("PLANNED", "ACTIVE"),
+            false,
+            false,
             null,
             Set.of(mine.getId()),
+            null,
             PageRequest.of(0, 50));
     assertThat(all).extracting(Mission::getId).containsExactly(mineSoonId, mineLaterId);
   }
@@ -173,7 +194,7 @@ class MissionRepositoryLookupOrderingTest {
    * public one.
    */
   @Test
-  void findNextScopedMission_includesOwnInternalMission() {
+  void upcomingCandidates_scoped_includesOwnInternalMission() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     OrgUnit mine = newSquadron("Scoped-Int-" + tag, "SI" + tag);
 
@@ -183,11 +204,14 @@ class MissionRepositoryLookupOrderingTest {
     saveMission(mine, "Mine-Public", Instant.parse("2099-03-01T00:00:00Z"), "PLANNED", false);
 
     List<Mission> head =
-        missionRepository.findNextScopedMission(
+        missionRepository.findUpcomingOwnOrSignedUp(
             lowerBound,
             List.of("PLANNED", "ACTIVE"),
+            false,
+            false,
             null,
             Set.of(mine.getId()),
+            null,
             PageRequest.of(0, 1));
     assertThat(head).extracting(Mission::getId).containsExactly(internalId);
   }

@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * Stateless math behind the operation payout breakdown: turns already-loaded finance entries,
  * refinery orders and the participant graph into the total sum, per-participant out-of-pocket
  * reimbursements and the attendance breakdown. Uses no repository or security context; the only
- * clock read is {@link Instant#now()} for clamping still-running participants.
+ * clock read is for clamping still-running participants when no settlement basis is supplied.
  */
 public final class OperationPayoutCalculator {
 
@@ -126,6 +126,19 @@ public final class OperationPayoutCalculator {
    */
   @NotNull
   public static ParticipationBreakdown computeParticipationBreakdown(@NotNull Operation operation) {
+    return computeParticipationBreakdown(operation, Instant.now());
+  }
+
+  /**
+   * Computes attendance using one reference time for all participants who have yet to check out.
+   *
+   * @param operation the operation with its missions and participants loaded
+   * @param referenceTime the end time used for open participation
+   * @return the participation breakdown
+   */
+  @NotNull
+  static ParticipationBreakdown computeParticipationBreakdown(
+      @NotNull Operation operation, @NotNull Instant referenceTime) {
     Map<String, String> participantNames = new HashMap<>();
     Map<String, Long> validDurations = new HashMap<>();
     Map<String, PayoutPreference> preferences = new HashMap<>();
@@ -158,7 +171,7 @@ public final class OperationPayoutCalculator {
         if (participantStart == null) {
           continue;
         }
-        Instant participantEnd = p.getEndTime() != null ? p.getEndTime() : Instant.now();
+        Instant participantEnd = p.getEndTime() != null ? p.getEndTime() : referenceTime;
 
         Instant effectiveStart =
             participantStart.isBefore(actualStart) ? actualStart : participantStart;

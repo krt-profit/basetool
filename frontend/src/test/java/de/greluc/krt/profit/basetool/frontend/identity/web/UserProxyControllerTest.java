@@ -49,7 +49,7 @@ class UserProxyControllerTest {
 
   /** The URI template of the per-user membership lookup. */
   private static final String MEMBERSHIPS_URI =
-      "/api/v1/org-units/members/{userId}/memberships?allKinds={allKinds}";
+      "/api/v1/org-units/members/{userId}/memberships?allKinds={allKinds}&ownerPicker={ownerPicker}";
 
   @Test
   void searchUsers_ShouldCallWebClient() {
@@ -181,10 +181,10 @@ class UserProxyControllerTest {
                     "ALP",
                     "SQUADRON")));
 
-    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, true);
+    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, true, true);
 
     assertNotNull(result);
-    verify(backendApiClient).get(eq(MEMBERSHIPS_URI), anyTypeRef(), eq(id), eq(true));
+    verify(backendApiClient).get(eq(MEMBERSHIPS_URI), anyTypeRef(), eq(id), eq(true), eq(true));
   }
 
   @Test
@@ -196,10 +196,10 @@ class UserProxyControllerTest {
     when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
-    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, false);
+    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, false, false);
 
     assertNotNull(result);
-    verify(backendApiClient).get(eq(MEMBERSHIPS_URI), anyTypeRef(), eq(id), eq(false));
+    verify(backendApiClient).get(eq(MEMBERSHIPS_URI), anyTypeRef(), eq(id), eq(false), eq(false));
   }
 
   @Test
@@ -210,7 +210,7 @@ class UserProxyControllerTest {
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000046");
     when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(null);
 
-    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, true);
+    List<OrgUnitMembershipOptionDto> result = controller.userMemberships(id, true, true);
 
     assertNotNull(result);
     assertTrue(result.isEmpty());

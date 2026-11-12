@@ -258,9 +258,8 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Paged list of the orders requested by org units the caller is a direct member of, inside the
-   * active context, the "Meine Auftr&auml;ge" list (REQ-ORDERS-023, REQ-ORG-032). A memberless
-   * caller, or one pinned to a unit they are no direct member of, gets an empty page.
+   * Lists orders requested by units in the caller's active Logistician scope (REQ-ORDERS-023,
+   * REQ-ORG-032).
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param pageable page request

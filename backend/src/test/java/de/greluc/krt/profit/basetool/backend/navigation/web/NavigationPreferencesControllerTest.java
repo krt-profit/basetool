@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
-import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationMetrics;
+import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -233,8 +233,8 @@ class NavigationPreferencesControllerTest {
   private double rejected() {
     return meterRegistry
         .counter(
-            NavigationMetrics.PREFERENCE_WRITES,
-            NavigationMetrics.TAG_SECTION,
+            NavigationMetricNames.PREFERENCE_WRITES,
+            NavigationMetricNames.TAG_SECTION,
             "favourites",
             MetricNames.TAG_OUTCOME,
             "rejected")
@@ -559,8 +559,8 @@ class NavigationPreferencesControllerTest {
   private double rejected(String section) {
     return meterRegistry
         .counter(
-            NavigationMetrics.PREFERENCE_WRITES,
-            NavigationMetrics.TAG_SECTION,
+            NavigationMetricNames.PREFERENCE_WRITES,
+            NavigationMetricNames.TAG_SECTION,
             section,
             MetricNames.TAG_OUTCOME,
             "rejected")

@@ -845,7 +845,7 @@ class InventoryItemServiceTest {
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(jobOrderRepository.findById(orderAId)).thenReturn(Optional.of(orderA));
     when(jobOrderRepository.findById(orderBId)).thenReturn(Optional.of(orderB));
-    when(earmarkTargets.mission(missionXId))
+    when(earmarkTargets.missionForAllocation(missionXId))
         .thenReturn(
             new MissionEarmark(missionXId, missionX.getName(), missionX.getPlannedStartTime()));
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class)))

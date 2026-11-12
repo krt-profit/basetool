@@ -715,7 +715,6 @@ interface KrtInventoryLager {
     /** Closes the Umbuchen modal and resets its Herkunft picker. */
     closeUmbuchenModal(): void;
     /** Records the Umbuchen row's owning org unit the target-OrgUnit picker is preset to. */
-    setUmbuchenCurrentOwningOrgUnit(orgUnitId: string | null): void;
     /** Fills the Umbuchen target-OrgUnit picker from the selected target user's memberships. */
     refreshUmbuchenTransferOrgUnitPicker(): void;
     /** Opens one multi-select filter dropdown and closes the others; a second click closes it. */

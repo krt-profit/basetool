@@ -61,6 +61,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolic
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionFinanceEntryController;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationDashboardWidget;
+import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.web.OperationController;
@@ -157,6 +158,10 @@ class TenancyGuardTest {
   /** Org-unit references that are no tenancy boundary, each with the reason. */
   private static final Map<String, String> NOT_TENANT_SCOPE =
       Map.ofEntries(
+          Map.entry(
+              key(Notification.class, "orgUnitId"),
+              "the subject unit is display metadata; all inbox reads and writes follow the"
+                  + " recipient"),
           Map.entry(
               key(NavigationDashboardWidget.class, "orgUnitId"),
               "the unit a member pins a widget to, read only by its owner; the widget's data reads"
@@ -429,9 +434,6 @@ class TenancyGuardTest {
               "JobOrderEditor checks the order gate on the loaded order"),
           Map.entry(
               new HandlerKey(JobOrderController.class, "updateItemJobOrderAsRequester"),
-              "JobOrderEditor checks the order gate on the loaded order"),
-          Map.entry(
-              new HandlerKey(JobOrderMaterialController.class, "unlinkMaterial"),
               "JobOrderEditor checks the order gate on the loaded order"),
           Map.entry(
               new HandlerKey(JobOrderMaterialController.class, "unlinkInventoryItem"),

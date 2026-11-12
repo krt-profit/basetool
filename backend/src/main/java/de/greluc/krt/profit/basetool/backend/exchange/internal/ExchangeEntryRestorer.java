@@ -78,8 +78,11 @@ interface ExchangeEntryRestorer {
    *
    * @param member the member whose entries are set back
    * @param clientId the client whose writes are undone
-   * @param memberships the member's direct org-unit memberships, loaded on first use
+   * @param stampableUnits the member's active direct units while they hold KRT Member, loaded on
+   *     first use
    */
   record UndoScope(
-      @NotNull UUID member, @NotNull String clientId, @NotNull Supplier<Set<UUID>> memberships) {}
+      @NotNull UUID member,
+      @NotNull String clientId,
+      @NotNull Supplier<Set<UUID>> stampableUnits) {}
 }

@@ -1745,11 +1745,12 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   - *Foot* — „Administration" (administrators only), the personal panel, and the user row: name,
     `<org unit> · <role>`, the language menu and logout.
 - **Information architecture.** „Rechtliches" is not in the menu — the legal links stay in the
-  fixed footer. „Persönlich" (Mein Inventar, Meine Blueprints, Profil, Verbundene Anwendungen) is
-  the panel the user row opens. **Administration is a mode:** the entry replaces the groups with the
-  four admin groups (Benutzer & Inhalte, Stammdaten, Kartellbank, System & Daten) and a „Hauptmenü"
-  control; on `/admin/**` pages and on any page whose link lives in an admin group the drawer opens
-  in that mode.
+  fixed footer. The footer puts localized text links to the DAS KARTELL forum's Basetool changelog
+  and discussion thread beside the handbook, with no Basetool sign-in required to see the links.
+  „Persönlich" (Mein Inventar, Meine Blueprints, Profil, Verbundene Anwendungen) is the panel the
+  user row opens. **Administration is a mode:** the entry replaces the groups with the four admin
+  groups (Benutzer & Inhalte, Stammdaten, Kartellbank, System & Daten) and a „Hauptmenü" control;
+  on `/admin/**` pages and on any page whose link lives in an admin group the drawer opens in that mode.
 - **The menu filter** searches every group the member has, the personal links and — for
   administrators — the admin groups. A link matches when its label, its search terms or its group's
   label contains the text; only matching groups show, all open, and the top entries hide. With
@@ -1803,9 +1804,10 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
 - **Phones (≤ 768 px).** The header is 56 px: logo, title, search. A fixed tab bar (64 px plus the
   safe area) holds five slots: three the member chooses (REQ-UI-032; Missionen · Lager · Aufträge by
   default), „Meldungen" with the unread count and „Menü"; the current area is marked. „Menü" opens the same drawer as a sheet above the tab bar — its groups an
-  accordion with the current page's group open, the legal links, the handbook and the version at the
-  end of the list, the same foot with 44–48 px rows. The fixed footer is hidden while the tab bar
-  shows; `main` reserves the tab bar, `--krt-footer-height` stays `0px`, and bars pinned to the
+  accordion with the current page's group open, the legal links, the handbook, the changelog, the
+  forum discussion and the version at the end of the list, the same foot with 44–48 px rows.
+  The fixed footer is hidden while the tab bar shows. `main` reserves the tab bar,
+  `--krt-footer-height` stays `0px`, and bars pinned to the
   bottom of the viewport sit above the tab bar (`--krt-tabbar-height`). Pointer drags that scroll at
   the viewport's bottom edge measure that edge from the top of the tab bar, and a drop released over
   the tab bar is cancelled (the crew board, REQ-MISSION-005). The quick access opens full

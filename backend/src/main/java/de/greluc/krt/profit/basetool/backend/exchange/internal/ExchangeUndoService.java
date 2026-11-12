@@ -25,7 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeMetricNames;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.platform.api.MetricNames;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -83,7 +83,7 @@ public class ExchangeUndoService {
   private final ExchangeStockRestoration stockRestoration;
   private final ExchangeRefineryOrderJournal refineryOrderJournal;
   private final ExchangeOrgUnitService orgUnitService;
-  private final OrgUnitMembershipQueryService membershipQueryService;
+  private final OrgUnitSeatEligibility seatEligibility;
   private final AuditRecorder auditRecorder;
   private final ExchangeLiveSync liveSync;
   private final ExchangeEntryLabels entryLabels;
@@ -204,8 +204,7 @@ public class ExchangeUndoService {
         new ExchangeEntryRestorer.UndoScope(
             member,
             clientId,
-            SingletonSupplier.of(
-                () -> membershipQueryService.findDirectMembershipOrgUnitIds(member)));
+            SingletonSupplier.of(() -> seatEligibility.findStampableOrgUnitIds(member)));
     for (List<ExchangeJournalEntry> group : groups.values()) {
       ExchangeJournalEntry newest = group.getFirst();
       ExchangeResource entryResource = newest.getResource();

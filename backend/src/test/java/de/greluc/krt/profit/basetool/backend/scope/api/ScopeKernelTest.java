@@ -188,7 +188,10 @@ class ScopeKernelTest {
           }
           return ids;
         });
-    lenient().when(seatEligibility.holdsKrtMember(any())).thenReturn(true);
+    lenient()
+        .when(seatEligibility.findStampableOrgUnitIds(any()))
+        .thenAnswer(invocation ->
+            orgUnitMembershipRepository.findActiveOrgUnitIdsByUserId(invocation.getArgument(0)));
 
     wireDelegates();
   }
@@ -212,7 +215,6 @@ class ScopeKernelTest {
             requestScopeResolver,
             accessGateService,
             authHelper,
-            orgUnitMembershipRepository,
             orgUnitRepository,
             seatEligibility);
     operationPolicy = new OperationAccessPolicy(accessGateService, authHelper, operationRepository);
@@ -1555,37 +1557,7 @@ class ScopeKernelTest {
   }
 
   @Test
-  void resolveSquadronForPickerOutput_singleStaffelOnlyMembership_nullPicker_autoStamps() {
-    Squadron homeStaffel = new Squadron();
-    UUID homeStaffelId = UUID.randomUUID();
-    homeStaffel.setId(homeStaffelId);
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
-        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
-    when(orgUnitRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
-
-    Squadron result = orgUnitStampingService.resolveSquadronForPickerOutput(user, null);
-
-    assertSame(homeStaffel, result);
-  }
-
-  @Test
-  void resolveSquadronForPickerOutput_noMembershipAtAll_throwsBadRequest() {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
-
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class,
-            () -> orgUnitStampingService.resolveSquadronForPickerOutput(user, null));
-    assertTrue(ex.getMessage().toLowerCase().contains("no org-unit membership"), ex.getMessage());
-    verify(orgUnitRepository, never()).findById(any());
-  }
-
-  @Test
-  void resolveSquadronForPickerOutput_multipleMemberships_nullPicker_throwsOwnerRequired() {
+  void resolveOrgUnitForPickerOutputNullable_multipleMemberships_nullPicker_throwsOwnerRequired() {
     Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
     homeStaffel.setId(homeStaffelId);
@@ -1600,7 +1572,7 @@ class ScopeKernelTest {
     OwnerOrgUnitRequiredException ex =
         assertThrows(
             OwnerOrgUnitRequiredException.class,
-            () -> orgUnitStampingService.resolveSquadronForPickerOutput(user, null));
+            () -> orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, null));
     assertTrue(
         ex.getMessage().toLowerCase().contains("owningorgunitid is required"), ex.getMessage());
     assertEquals("OWNER_ORG_UNIT_REQUIRED", ex.code());
@@ -1608,30 +1580,7 @@ class ScopeKernelTest {
   }
 
   @Test
-  void resolveSquadronForPickerOutput_multiMembership_nullPicker_withPin_stampsPinnedStaffel() {
-    Squadron staffelA = new Squadron();
-    UUID staffelAId = UUID.randomUUID();
-    staffelA.setId(staffelAId);
-    UUID staffelBId = UUID.randomUUID();
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    callerIs(user);
-    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
-        .thenReturn(
-            List.of(
-                staffelMembership(user.getId(), staffelAId),
-                staffelMembership(user.getId(), staffelBId)));
-    when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-        .thenReturn(staffelAId.toString());
-    when(orgUnitRepository.findById(staffelAId)).thenReturn(Optional.of(staffelA));
-
-    Squadron result = orgUnitStampingService.resolveSquadronForPickerOutput(user, null);
-
-    assertSame(staffelA, result, "the pinned Staffel is stamped without an explicit pick");
-  }
-
-  @Test
-  void resolveSquadronForPickerOutput_multiMembership_nullPicker_foreignPin_stillThrows() {
+  void resolveOrgUnitForPickerOutputNullable_multiMembership_nullPicker_foreignPin_stillThrows() {
     UUID staffelAId = UUID.randomUUID();
     UUID staffelBId = UUID.randomUUID();
     User user = new User();
@@ -1646,12 +1595,12 @@ class ScopeKernelTest {
 
     assertThrows(
         OwnerOrgUnitRequiredException.class,
-        () -> orgUnitStampingService.resolveSquadronForPickerOutput(user, null));
+        () -> orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, null));
     verify(orgUnitRepository, never()).findById(any());
   }
 
   @Test
-  void resolveOrgUnitForPickerOutput_multiMembership_nullPicker_withPin_stampsPinned() {
+  void resolveOrgUnitForPickerOutputNullable_multiMembership_nullPicker_withPin_stampsPinned() {
     Squadron staffelA = new Squadron();
     UUID staffelAId = UUID.randomUUID();
     staffelA.setId(staffelAId);
@@ -1668,13 +1617,13 @@ class ScopeKernelTest {
         .thenReturn(staffelAId.toString());
     when(orgUnitRepository.findById(staffelAId)).thenReturn(Optional.of(staffelA));
 
-    var result = orgUnitStampingService.resolveOrgUnitForPickerOutput(user, null);
+    var result = orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, null);
 
     assertSame(staffelA, result);
   }
 
   @Test
-  void resolveSquadronForPickerOutput_validStaffelPick_returnsPickedSquadron() {
+  void resolveOrgUnitForPickerOutputNullable_validStaffelPick_returnsPickedSquadron() {
     Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
     homeStaffel.setId(homeStaffelId);
@@ -1684,13 +1633,14 @@ class ScopeKernelTest {
         .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
     when(orgUnitRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
 
-    Squadron result = orgUnitStampingService.resolveSquadronForPickerOutput(user, homeStaffelId);
+    var result = orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, homeStaffelId);
 
     assertSame(homeStaffel, result, "the picked Staffel must be returned verbatim");
   }
 
   @Test
-  void resolveSquadronForPickerOutput_validMultiMembershipStaffelPick_returnsPickedSquadron() {
+  void
+      resolveOrgUnitForPickerOutputNullable_validMultiMembershipStaffelPick_returnsPickedSquadron() {
     Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
     homeStaffel.setId(homeStaffelId);
@@ -1704,54 +1654,14 @@ class ScopeKernelTest {
                 skMembership(user.getId(), UUID.randomUUID())));
     when(orgUnitRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
 
-    Squadron result = orgUnitStampingService.resolveSquadronForPickerOutput(user, homeStaffelId);
+    var result = orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, homeStaffelId);
 
     assertSame(homeStaffel, result);
   }
 
   @Test
-  void resolveSquadronForPickerOutput_foreignOrgUnitChoice_throwsBadRequest() {
-    UUID homeStaffelId = UUID.randomUUID();
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
-        .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
-    UUID foreignId = UUID.randomUUID();
-
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class,
-            () -> orgUnitStampingService.resolveSquadronForPickerOutput(user, foreignId));
-    assertTrue(ex.getMessage().toLowerCase().contains("not a membership"), ex.getMessage());
-    verify(orgUnitRepository, never()).findById(any());
-  }
-
-  @Test
-  void resolveSquadronForPickerOutput_pickedOrgUnitIsSpecialCommand_throwsBadRequest() {
-    UUID homeStaffelId = UUID.randomUUID();
-    User user = new User();
-    user.setId(UUID.randomUUID());
-
-    UUID skId = UUID.randomUUID();
-    de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand sk =
-        new de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand();
-    sk.setId(skId);
-    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
-        .thenReturn(
-            List.of(
-                staffelMembership(user.getId(), homeStaffelId), skMembership(user.getId(), skId)));
-    when(orgUnitRepository.findById(skId)).thenReturn(Optional.of(sk));
-
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class,
-            () -> orgUnitStampingService.resolveSquadronForPickerOutput(user, skId));
-    assertTrue(
-        ex.getMessage().toLowerCase().contains("spezialkommando ownership"), ex.getMessage());
-  }
-
-  @Test
-  void resolveOrgUnitForPickerOutput_singleStaffelOnlyMembership_nullPicker_returnsStaffel() {
+  void
+      resolveOrgUnitForPickerOutputNullable_singleStaffelOnlyMembership_nullPicker_returnsStaffel() {
     Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
     homeStaffel.setId(homeStaffelId);
@@ -1762,14 +1672,14 @@ class ScopeKernelTest {
     when(orgUnitRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
 
     de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit result =
-        orgUnitStampingService.resolveOrgUnitForPickerOutput(user, null);
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, null);
 
     assertSame(homeStaffel, result);
     verify(orgUnitRepository).findById(homeStaffelId);
   }
 
   @Test
-  void resolveOrgUnitForPickerOutput_pickedSpecialCommand_isHonoured() {
+  void resolveOrgUnitForPickerOutputNullable_pickedSpecialCommand_isHonoured() {
     UUID homeStaffelId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
@@ -1787,13 +1697,13 @@ class ScopeKernelTest {
     when(orgUnitRepository.findById(skId)).thenReturn(Optional.of(sk));
 
     de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit result =
-        orgUnitStampingService.resolveOrgUnitForPickerOutput(user, skId);
+        orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, skId);
 
     assertSame(sk, result);
   }
 
   @Test
-  void resolveOrgUnitForPickerOutput_foreignOrgUnitChoice_throwsBadRequest() {
+  void resolveOrgUnitForPickerOutputNullable_foreignOrgUnitChoice_throwsBadRequest() {
     UUID homeStaffelId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
@@ -1804,21 +1714,8 @@ class ScopeKernelTest {
     BadRequestException ex =
         assertThrows(
             BadRequestException.class,
-            () -> orgUnitStampingService.resolveOrgUnitForPickerOutput(user, foreignId));
+            () -> orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, foreignId));
     assertTrue(ex.getMessage().toLowerCase().contains("editable scope"), ex.getMessage());
-  }
-
-  @Test
-  void resolveOrgUnitForPickerOutput_noMembershipAtAll_throwsBadRequest() {
-    User user = new User();
-    user.setId(UUID.randomUUID());
-    when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
-
-    BadRequestException ex =
-        assertThrows(
-            BadRequestException.class,
-            () -> orgUnitStampingService.resolveOrgUnitForPickerOutput(user, null));
-    assertTrue(ex.getMessage().toLowerCase().contains("no org-unit membership"), ex.getMessage());
   }
 
   @Test
@@ -2875,8 +2772,11 @@ class ScopeKernelTest {
           .thenReturn(List.of(bereichLeadMembership(leader.getId())));
       when(orgUnitRepository.findById(BEREICH_ID)).thenReturn(Optional.of(bereich));
 
-      assertSame(bereich, orgUnitStampingService.resolveOrgUnitForPickerOutput(leader, null));
-      assertSame(bereich, orgUnitStampingService.resolveOrgUnitForPickerOutput(leader, BEREICH_ID));
+      assertSame(
+          bereich, orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(leader, null));
+      assertSame(
+          bereich,
+          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(leader, BEREICH_ID));
     }
 
     @Test
@@ -2897,7 +2797,8 @@ class ScopeKernelTest {
 
       assertSame(
           descendant,
-          orgUnitStampingService.resolveOrgUnitForPickerOutput(leader, DESCENDANT_STAFFEL_ID));
+          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
+              leader, DESCENDANT_STAFFEL_ID));
     }
 
     @Test
@@ -2916,7 +2817,9 @@ class ScopeKernelTest {
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
-              () -> orgUnitStampingService.resolveOrgUnitForPickerOutput(leader, foreignStaffelId));
+              () ->
+                  orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
+                      leader, foreignStaffelId));
       assertTrue(ex.getMessage().toLowerCase().contains("editable scope"), ex.getMessage());
     }
 
@@ -2943,8 +2846,8 @@ class ScopeKernelTest {
           .thenReturn(List.of(olMembership(olLeader.getId())));
       when(orgUnitRepository.findById(OL_ID)).thenReturn(Optional.of(ol));
 
-      assertSame(ol, orgUnitStampingService.resolveOrgUnitForPickerOutput(olLeader, null));
-      assertSame(ol, orgUnitStampingService.resolveOrgUnitForPickerOutput(olLeader, OL_ID));
+      assertSame(ol, orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(olLeader, null));
+      assertSame(ol, orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(olLeader, OL_ID));
     }
 
     @Test
@@ -2966,7 +2869,7 @@ class ScopeKernelTest {
 
       assertSame(
           descendantSk,
-          orgUnitStampingService.resolveOrgUnitForPickerOutput(leader, descendantSkId));
+          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(leader, descendantSkId));
     }
 
     @Test
@@ -2992,7 +2895,8 @@ class ScopeKernelTest {
 
       assertSame(
           descendant,
-          orgUnitStampingService.resolveOrgUnitForPickerOutput(receiver, DESCENDANT_STAFFEL_ID));
+          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
+              receiver, DESCENDANT_STAFFEL_ID));
     }
 
     @Test
@@ -3017,7 +2921,8 @@ class ScopeKernelTest {
           assertThrows(
               BadRequestException.class,
               () ->
-                  orgUnitStampingService.resolveOrgUnitForPickerOutput(receiver, foreignToBothId));
+                  orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
+                      receiver, foreignToBothId));
       assertTrue(ex.getMessage().toLowerCase().contains("editable scope"), ex.getMessage());
     }
   }

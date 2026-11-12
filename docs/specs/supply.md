@@ -49,6 +49,8 @@ REQ-SUP-003.
 A Logistician of a unit with `may_raise_needs`, the lead included, and an admin raise a need: a
 material xor a game item, an amount above zero (whole units for pieces and game items), a quality
 tier for a material (the base tier when omitted), a priority and an optional job order of that unit.
+A responsibility transfer keeps the existing link and uses the new responsible unit in coverage
+notices (REQ-SUP-023, REQ-SUP-024).
 Any other caller receives 403. The catalogue entry and the tier of a need are fixed; a different one
 is a new need. A game item the P4K retired cannot be raised, and a need that holds one cannot be
 edited, only withdrawn (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013). A unit's leadership seat always confers the contextual Logistician authority of that
@@ -129,6 +131,9 @@ added by single `UPDATE` statements that leave the need's version alone (REQ-SUP
 `supply/internal/SupplyNeedRepository`
 
 ### REQ-SUP-006 — Need visibility and redaction
+
+The same scoped need projection decides purchase-field visibility for list, detail and
+mutation responses.
 
 Every member sees the `OPEN` needs; the managers of a unit, the governing leadership and an admin see
 every state of the unit's needs. The maximum unit price, the purchased amount and the UEX reference
@@ -326,6 +331,11 @@ A need and a donation for a game item show the Lager chips beside the item's nam
 `kernel/fragments/item-chips.html` · **Issues:** #2725
 
 ### REQ-SUP-023 — A linked need shows its order's stock
+
+A link may be created only while the order is the raising unit's responsibility (REQ-SUP-003).
+The link stays when responsibility moves to another unit. The raising unit can still follow the
+order under REQ-ORDERS-052. Coverage notices go to the raising unit and name the order's current
+responsible unit.
 
 For the managers of the raising unit (an admin among them by the rule of REQ-SUP-003), an `OPEN` or
 `PAUSED` need linked to a job order shows that order's number and, when the order is open or in

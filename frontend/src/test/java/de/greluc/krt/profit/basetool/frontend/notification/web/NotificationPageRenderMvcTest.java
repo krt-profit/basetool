@@ -92,6 +92,9 @@ class NotificationPageRenderMvcTest {
               null,
               0L,
               Instant.parse("2026-01-01T00:00:00Z"),
+              null,
+              null,
+              null,
               null));
     }
     return new PageResponse<>(content, 0, 50, totalElements, totalPages, List.of());
@@ -159,7 +162,10 @@ class NotificationPageRenderMvcTest {
         null,
         0L,
         Instant.parse("2026-01-01T00:00:00Z"),
-        null);
+        null,
+        UUID.randomUUID(),
+        "SQUADRON",
+        "BRAVO");
   }
 
   /**
@@ -190,6 +196,8 @@ class NotificationPageRenderMvcTest {
     assertTrue(html.contains("class=\"card card--flush notification-inbox\""));
     assertTrue(html.contains("data-notif-filter=\"unread\""));
     assertTrue(html.contains("id=\"notification-page-list\""));
+    assertTrue(html.contains("data-notif-org-unit"));
+    assertTrue(html.contains(">BRAVO</span>"));
     assertTrue(html.contains("data-notif-read=\"false\""));
     assertTrue(html.contains("data-notif-read=\"true\""));
     assertTrue(

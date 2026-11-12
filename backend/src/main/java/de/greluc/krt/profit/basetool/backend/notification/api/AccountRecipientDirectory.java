@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.api;
 
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -31,6 +34,15 @@ import org.jetbrains.annotations.NotNull;
  * <p>Owned by the notification module and implemented by the bank module.
  */
 public interface AccountRecipientDirectory {
+
+  /**
+   * Identifies the unit a bank account is attached to for the subject marker.
+   *
+   * @param accountId the account
+   * @return the linked unit if it exists
+   */
+  @NotNull
+  Optional<OrgUnitRef> orgUnitOfAccount(@NotNull UUID accountId);
 
   /**
    * The grantees of a {@code bank_account_grant} on an account who hold Bank Employee or a role
@@ -65,12 +77,24 @@ public interface AccountRecipientDirectory {
 
   /**
    * The members whose approval a booking request still waits for, a seat holder only while they
-   * hold {@code KRT Member} (REQ-NOTIF-033, REQ-BANK-041).
+   * hold {@code KRT Member}. Administrators receive a holder-routed request with nobody eligible to
+   * approve it (REQ-NOTIF-033, REQ-BANK-041).
    *
    * @param requestId the booking request
    * @return their user subs, never the requester; empty when the request is missing, no longer
    *     pending, needs no approval or is already approved
    */
   @NotNull
-  Set<UUID> requiredApproversOf(@NotNull UUID requestId);
+  default Set<UUID> requiredApproversOf(@NotNull UUID requestId) {
+    return requiredApproverAudienceOf(requestId).keySet();
+  }
+
+  /**
+   * Identifies approval recipients and whether a seat makes them eligible.
+   *
+   * @param requestId the booking request
+   * @return recipients with the access path each uses
+   */
+  @NotNull
+  Map<UUID, NotificationRoleAudience> requiredApproverAudienceOf(@NotNull UUID requestId);
 }

@@ -538,7 +538,7 @@
                         <select id="umbuchenTargetLocationId" class="w-full" data-krt-combobox="remote-locations"></select>
                     </div>
                 </div>
-                <div id="umbuchenTargetOwningOrgUnitWrapper" class="lager-org-unit-wrapper" hidden>
+                <div id="umbuchenTargetOwningOrgUnitWrapper" th:data-owner-picker-active="${activeSquadronId}" class="lager-org-unit-wrapper" hidden>
                     <label for="umbuchenTargetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
                     <select id="umbuchenTargetOwningOrgUnitId" class="w-full"></select>
                 </div>
@@ -553,7 +553,7 @@
 
             <div id="umbuchenPersonalFields" class="lager-mb" hidden>
                 <p id="umbuchenPersonalHint" class="lager-modal-hint"></p>
-                <div id="umbuchenPersonalOrgUnitWrapper" hidden>
+                <div id="umbuchenPersonalOrgUnitWrapper" th:data-owner-picker-active="${activeSquadronId}" hidden>
                     <label for="umbuchenPersonalOrgUnitId" class="form-label" th:text="#{inventory.rebook.targetOrgUnit}">Buchen in OrgUnit</label>
                     <select id="umbuchenPersonalOrgUnitId" class="w-full"></select>
                 </div>
@@ -646,7 +646,7 @@
 
             <p id="bulkRebookPersonalHint" class="lager-modal-hint" hidden></p>
 
-            <div id="bulkRebookOrgUnitWrapper" class="lager-org-unit-wrapper" hidden>
+            <div id="bulkRebookOrgUnitWrapper" th:data-owner-picker-active="${activeSquadronId}" class="lager-org-unit-wrapper" hidden>
                 <label for="bulkRebookOrgUnitId" class="form-label" th:text="#{inventory.rebook.targetOrgUnit}">Buchen in OrgUnit</label>
                 <select id="bulkRebookOrgUnitId" class="w-full"></select>
             </div>

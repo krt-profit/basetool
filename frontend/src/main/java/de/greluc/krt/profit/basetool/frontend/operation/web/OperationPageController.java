@@ -283,10 +283,7 @@ public class OperationPageController {
     OperationFinanceSummaryDto operationFinance = financeF.join();
     model.addAttribute("operationFinance", operationFinance);
 
-    OperationPayoutSummaryDto payoutSummary = payoutsF.join();
-    model.addAttribute("operationPayouts", payoutSummary.payouts());
-    model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
-    model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
+    addPayoutSummary(model, payoutsF.join());
 
     BigDecimal maxMissionResult =
         operationFinance.missions() == null
@@ -312,11 +309,16 @@ public class OperationPageController {
    */
   private void loadPayoutModel(UUID id, @NotNull Model model) {
     model.addAttribute("operation", operationClient.operation(id));
-    OperationPayoutSummaryDto payoutSummary = operationClient.payouts(id);
-    model.addAttribute("operationPayouts", payoutSummary.payouts());
-    model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
-    model.addAttribute("payoutProgress", OperationPayoutProgress.of(payoutSummary.payouts()));
+    addPayoutSummary(model, operationClient.payouts(id));
     model.addAttribute("canEdit", missionManagerGate.isGranted());
+  }
+
+  private static void addPayoutSummary(Model model, OperationPayoutSummaryDto summary) {
+    model.addAttribute("operationPayouts", summary.payouts());
+    model.addAttribute("operationDonationTotal", summary.totalDonations());
+    model.addAttribute("payoutProgress", OperationPayoutProgress.of(summary.payouts()));
+    model.addAttribute("payoutInputsFrozen", summary.payoutInputsFrozen());
+    model.addAttribute("orphanedPaidMarkKeys", summary.orphanedPaidMarkKeys());
   }
 
   /**

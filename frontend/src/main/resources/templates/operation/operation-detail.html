@@ -85,7 +85,8 @@
                            data-kpi-total=${kpiTotal},
                            data-kpi-total-negative=${totalNegative},
                            data-kpi-donated=${kpiDonated},
-                           data-kpi-participants=${payoutProgress.participants()}"></span>
+                           data-kpi-participants=${payoutProgress.participants()},
+                           data-payout-inputs-frozen=${payoutInputsFrozen}"></span>
             <div class="op-overview">
                 <div class="card card--flush op-results" sec:authorize="isAuthenticated()">
                     <div class="op-card-head">
@@ -146,7 +147,8 @@
         <section id="pane-op-missions" class="tab-pane" role="tabpanel" aria-labelledby="optab-missions">
             <div class="op-pane-head">
                 <h2 class="card-title" th:text="#{operation.overview.missions_of}">Eins&auml;tze der Operation</h2>
-                <a th:if="${canEdit}" th:href="@{/missions/new(operationId=${operation.id})}" class="btn btn--cta"
+                <a id="operation-add-mission" th:if="${canEdit}" th:href="@{/missions/new(operationId=${operation.id})}"
+                   class="btn btn--cta" th:classappend="${payoutInputsFrozen} ? 'is-hidden' : ''"
                    data-testid="operation-add-mission"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{operation.mission.add}">Einsatz hinzuf&uuml;gen</span></a>
             </div>
             <div id="op-missions-results" class="card card--flush">
@@ -199,6 +201,20 @@
                  class="alert alert-info" role="status" data-testid="operation-payout-preliminary">
                 <strong th:text="#{operation.payout.preliminary.title}">Vorl&auml;ufige Werte</strong>
                 <span th:text="' ' + #{operation.payout.preliminary.message}">Die Anteile sind noch nicht endg&uuml;ltig.</span>
+            </div>
+            <div class="alert alert-info" data-testid="operation-payout-orphaned"
+                 th:if="${canEdit and orphanedPaidMarkKeys != null and !orphanedPaidMarkKeys.isEmpty()}">
+                <strong th:text="#{operation.payout.orphaned.title}"></strong>
+                <p th:text="#{operation.payout.orphaned.hint}"></p>
+                <ul>
+                    <li th:each="mark, markStat : ${orphanedPaidMarkKeys}">
+                        <label class="payout-paid-label">
+                            <input type="checkbox" class="payout-paid-checkbox" checked="checked" data-orphaned-paid-mark="true"
+                                   th:attr="data-participant-id=${mark}, data-operation-id=${operation.id}">
+                            <span th:text="#{operation.payout.orphaned.mark(${markStat.count})}"></span>
+                        </label>
+                    </li>
+                </ul>
             </div>
             <div class="card card--flush">
                 <div class="table-responsive" th:if="${operationPayouts != null and !operationPayouts.isEmpty()}">
@@ -425,7 +441,6 @@
 
     const MSG_PAYOUT_PAID_ERROR = /*[[#{operation.payout.paid.error}]]*/ 'Auszahlungsstatus konnte nicht aktualisiert werden.';
     const MSG_PAYOUT_PAID_FORBIDDEN = /*[[#{operation.payout.paid.forbidden}]]*/ 'Keine Berechtigung.';
-    const MSG_PAYOUT_PAID_UNSET_LOCKED = /*[[#{operation.payout.paid.unset.locked}]]*/ 'Nur Offiziere und Admins koennen den Bezahlt-Status zuruecksetzen.';
     const OPS_FINANCE_DETAIL_ERROR = /*[[#{operation.finance.detail.error}]]*/ 'Details konnten nicht geladen werden.';
 </script>
 <script type="module" th:src="@{/js/operation/operation-detail.js}" th:attr="nonce=${cspNonce}"></script>

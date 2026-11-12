@@ -340,13 +340,14 @@ public class OperationController {
               + "the payout rows in an object that also carries `totalDonations` — the "
               + "operation-wide sum of every DONATE participant's contributed share "
               + "(`donatedAmount` per row), shown centrally and never redistributed to PAYOUT "
-              + "participants.")
+              + "participants. Operation editors receive the payout-input freeze state."
+              + " Authorized payout reviewers also receive opaque reversal keys for paid marks"
+              + " that no longer have a payout row.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Payout breakdown returned."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
     @ApiResponse(responseCode = "404", description = "Operation not found.")
   })
-  @Transactional(readOnly = true)
   public OperationPayoutSummaryDto getOperationPayouts(@PathVariable UUID id) {
     return operationPayoutService.getOperationPayoutSummary(id);
   }
@@ -375,9 +376,9 @@ public class OperationController {
               + " `paidOut=false` keeps the last audit fields as a historical record. The"
               + " participantKey matches the opaque key returned by `/payouts` (real user UUID"
               + " stringified, `guest_<name>` for an external participant, or"
-              + " `deleted_<participantId>` for a participant whose account was deleted). Returns"
-              + " only the participant's paid-out status block (flag + audit trace) — a toggle"
-              + " never changes any amount, so the payout computation is not re-run.")
+              + " `deleted_<participantId>` for a participant whose account was deleted). A key"
+              + " from `orphanedPaidMarkKeys` accepts only `paidOut=false` and only for an"
+              + " unmatched mark on this operation. Returns the refreshed paid-out status block.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Paid-out flag updated."),
     @ApiResponse(responseCode = "400", description = "Validation failed."),
@@ -476,7 +477,8 @@ public class OperationController {
     @ApiResponse(responseCode = "204", description = "Operation deleted."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated."),
     @ApiResponse(responseCode = "403", description = "Caller lacks the ADMIN role."),
-    @ApiResponse(responseCode = "404", description = "Operation not found.")
+    @ApiResponse(responseCode = "404", description = "Operation not found."),
+    @ApiResponse(responseCode = "409", description = "The operation's payout inputs are frozen.")
   })
   public ResponseEntity<Void> deleteOperation(@PathVariable UUID id) {
     operationService.deleteOperation(id);

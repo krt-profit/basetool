@@ -48,5 +48,5 @@ Zusätzlich abgedeckt:
 - **SK ist eine vollwertige besitzende OrgUnit fürs Inventar.** Die ältere Annahme „SK als Eigentümer 400t" gilt **nicht** mehr fürs `inventory_item`: V103 hat die Legacy-Spalte `owning_squadron_id` dort entfernt, `owning_org_unit_id` ist seit V132 nullable. SK-eigene und eigentümerlose Einträge sind anlegbar.
 - **`memberOrgUnitIds` = Vereinigung aller Mitgliedschaften** (Staffel **und** SK, Quelle `org_unit_membership`). Ein Staffel+SK-Mitglied sieht beide Pools.
 - **Admin-Pin verengt.** Ein gepinnter Admin ist wie ein Mitglied der gepinnten OrgUnit gescopt — nicht allsehend; eigentümerlose Zeilen sieht nur der **ungepinnte** Admin (und der Eigentümer in seiner persönlichen View).
-- **Keycloak-Rolle ≠ Mitgliedschaft.** `test-none` trägt die Basisrolle „KRT Member", hat aber keine `org_unit_membership` — der Scope-Prädikat-Pfad ist damit leer (sieht nichts im Einheitslager).
+- **Basetool-Rolle und Mitgliedschaft sind getrennt.** `test-none` trägt die Basisrolle „KRT Member", hat aber keine `org_unit_membership` — der Scope-Prädikat-Pfad ist damit leer (sieht nichts im Einheitslager).
 - **Verifikation via API.** Die gruppierte Lager-Ansicht lädt Stacks lazy; gegen die gescopten Endpunkte als verschiedene Nutzer zu assertieren ist die etablierte, race-freie Methode für Tenancy-Grenzen (vgl. UC-08/UC-09).

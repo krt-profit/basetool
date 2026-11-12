@@ -1085,33 +1085,6 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Removes a material requirement from the order without deleting any associated inventory items
-   * (the items keep their job-order link cleared by the backend).
-   *
-   * @return redirect to the order detail page
-   */
-  @NotNull
-  @PostMapping("/{id}/materials/unlink")
-  public String unlinkMaterial(
-      @PathVariable UUID id, @RequestParam UUID materialId, RedirectAttributes redirectAttributes) {
-    try {
-      jobOrderClient.unlinkMaterial(id, materialId);
-      redirectAttributes.addFlashAttribute("successToast", "orders.detail.material.unlink.success");
-    } catch (BackendServiceException bse) {
-      if (isBackendRefusal(bse)) {
-        throw bse;
-      }
-      BackendErrorLogging.warn(log, "DELETE /api/v1/orders/{id}/materials/{materialId}", id, bse);
-      redirectAttributes.addFlashAttribute("errorToast", "orders.detail.material.unlink.error");
-    } catch (Exception e) {
-      SectionFallback.rethrowIfReauthenticationRequired(e);
-      log.error("Failed to unlink material {} from jobOrder={}", materialId, id, e);
-      redirectAttributes.addFlashAttribute("errorToast", "orders.detail.material.unlink.error");
-    }
-    return "redirect:/orders/" + id;
-  }
-
-  /**
    * Detaches an inventory item from the job order. The item stays in the user's inventory but no
    * longer counts towards the order's progress.
    *

@@ -306,7 +306,7 @@
         <th:block th:ref="storeModal-body">
             <div id="refinery-store-results" class="krt-modal-flow">
             <th:block th:fragment="refineryStoreSection">
-            <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}" data-trigger="rod-disable-submit">
+            <form id="storeForm" th:action="@{/refinery-orders/{id}/store(id=${orderId})}" method="post" th:object="${storeForm}">
                 <div class="krt-modal-body">
                 <div id="storeItemsContainer" class="stack gap-3">
                     <div th:each="item, stat : *{items}" class="store-item-block card card--inset">
@@ -354,7 +354,7 @@
                             </div>
                             <div class="form-group">
                                 <label th:for="'storeOrgUnit_' + ${stat.index}" th:text="#{refineryorder.store.orgUnit}">Org-Einheit</label>
-                                <select th:id="'storeOrgUnit_' + ${stat.index}" class="store-org-unit-select" th:field="*{items[__${stat.index}__].owningOrgUnitId}">
+                                <select th:id="'storeOrgUnit_' + ${stat.index}" class="store-org-unit-select" th:data-owner-picker-active="${activeSquadronId}" th:field="*{items[__${stat.index}__].owningOrgUnitId}">
                                     <option value="" th:text="#{refineryorder.store.orgUnit.placeholder}">-- Org-Einheit w&#228;hlen --</option>
                                     <option th:each="ou : ${storeOrgUnitOptions}" th:value="${ou.orgUnitId()}" th:text="${ou.orgUnitName()}"></option>
                                 </select>
@@ -432,8 +432,6 @@
         storeSplitRemove: /*[[#{refineryorder.store.split.remove}]]*/ 'Aufteilung entfernen'
     };
 
-    const STORE_INHERITED_ORG_UNIT_ID = /*[[${orderOwningOrgUnitId}]]*/ null;
-    const STORE_ORG_UNIT_PLACEHOLDER = /*[[#{refineryorder.store.orgUnit.placeholder}]]*/ 'Select org unit';
 
     const RATING_LEVELS = {
         1: /*[[#{refining.rating.level.1}]]*/ 'Niedrig',

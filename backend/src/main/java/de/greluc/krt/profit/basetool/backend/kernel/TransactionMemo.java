@@ -17,26 +17,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.refinery.internal;
+package de.greluc.krt.profit.basetool.backend.kernel;
 
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.hibernate.engine.spi.SessionImplementor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * The per-transaction memo the refinery's read lookups share, so a page of orders costs one lookup
- * per kind of reference, not one per row (REQ-DATA-003).
- */
-final class RefineryTransactionMemo {
+/** Shares transaction-bound memo state and persistence-context traversal. */
+public final class TransactionMemo {
 
-  /** Not instantiable. */
-  private RefineryTransactionMemo() {}
+  private TransactionMemo() {}
 
   /**
    * Returns the memo bound to {@code owner} in the running transaction, binding a new one on first
@@ -49,7 +50,7 @@ final class RefineryTransactionMemo {
    * @param <T> the memo type
    * @return the bound memo, or a fresh one outside a transaction
    */
-  static <T> @NotNull T bound(
+  public static <T> @NotNull T bound(
       @NotNull Object owner, @NotNull Class<T> type, @NotNull Supplier<T> factory) {
     if (!TransactionSynchronizationManager.isSynchronizationActive()) {
       return factory.get();
@@ -81,26 +82,59 @@ final class RefineryTransactionMemo {
   }
 
   /**
-   * Returns the refinery orders the running transaction's persistence context holds; empty outside
-   * a transaction.
+   * Returns the identifiers referenced by managed entities of one type.
    *
    * @param entityManager the shared entity manager
-   * @return the managed orders
+   * @param type the managed entity type
+   * @param targetId extracts the referenced identifier, or {@code null} for no reference
+   * @param <T> the managed entity type
+   * @return the distinct non-null identifiers
    */
-  static @NotNull List<RefineryOrder> ordersInContext(@NotNull EntityManager entityManager) {
-    List<RefineryOrder> orders = new ArrayList<>();
+  public static <T> @NotNull Set<UUID> idsInContext(
+      @NotNull EntityManager entityManager,
+      @NotNull Class<T> type,
+      @NotNull Function<T, UUID> targetId) {
+    Set<UUID> ids = new LinkedHashSet<>();
+    forEachEntity(
+        entityManager,
+        type,
+        entity -> {
+          UUID id = targetId.apply(entity);
+          if (id != null) {
+            ids.add(id);
+          }
+        });
+    return ids;
+  }
+
+  /**
+   * Returns the managed entities of one type in the active transaction.
+   *
+   * @param entityManager the shared entity manager
+   * @param type the managed entity type
+   * @param <T> the managed entity type
+   * @return the managed entities, empty without an active transaction
+   */
+  public static <T> @NotNull List<T> entitiesInContext(
+      @NotNull EntityManager entityManager, @NotNull Class<T> type) {
+    List<T> entities = new ArrayList<>();
+    forEachEntity(entityManager, type, entities::add);
+    return entities;
+  }
+
+  private static <T> void forEachEntity(
+      EntityManager entityManager, Class<T> type, Consumer<T> visit) {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      return orders;
+      return;
     }
     for (Map.Entry<Object, ?> entry :
         entityManager
             .unwrap(SessionImplementor.class)
             .getPersistenceContextInternal()
             .reentrantSafeEntityEntries()) {
-      if (entry.getKey() instanceof RefineryOrder order) {
-        orders.add(order);
+      if (type.isInstance(entry.getKey())) {
+        visit.accept(type.cast(entry.getKey()));
       }
     }
-    return orders;
   }
 }

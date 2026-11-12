@@ -30,9 +30,22 @@ import org.jetbrains.annotations.Nullable;
  * @param id the mission
  * @param name the mission's name, or {@code null} for a caller who may not read the mission
  * @param plannedStartTime the mission's planned start, or {@code null}
+ * @param visible whether the lookup may expose the mission's details
  */
 public record MissionEarmark(
-    @NotNull UUID id, @Nullable String name, @Nullable Instant plannedStartTime) {
+    @NotNull UUID id, @Nullable String name, @Nullable Instant plannedStartTime, boolean visible) {
+
+  /**
+   * Creates a mission reference with its details.
+   *
+   * @param id the mission
+   * @param name the mission's name
+   * @param plannedStartTime the planned start
+   */
+  public MissionEarmark(
+      @NotNull UUID id, @Nullable String name, @Nullable Instant plannedStartTime) {
+    this(id, name, plannedStartTime, true);
+  }
 
   /**
    * Returns this earmark as a caller who may not read the mission is shown it (REQ-INV-027).
@@ -40,6 +53,6 @@ public record MissionEarmark(
    * @return the earmark with the mission's id alone
    */
   public @NotNull MissionEarmark withoutDetails() {
-    return new MissionEarmark(id, null, null);
+    return new MissionEarmark(id, null, null, false);
   }
 }

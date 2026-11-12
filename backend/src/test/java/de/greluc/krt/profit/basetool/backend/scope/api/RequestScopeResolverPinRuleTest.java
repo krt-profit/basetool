@@ -275,7 +275,6 @@ class RequestScopeResolverPinRuleTest {
           .thenReturn(Set.of(bereich, staffelBelow));
 
       assertThat(resolver.currentMemberOrgUnitIds()).isEmpty();
-      assertThat(resolver.currentDirectMembershipOrgUnitIds()).isEmpty();
       assertThat(resolver.isSelectable(bereich)).isFalse();
       assertThat(resolver.isSelectable(staffelBelow)).isFalse();
     }

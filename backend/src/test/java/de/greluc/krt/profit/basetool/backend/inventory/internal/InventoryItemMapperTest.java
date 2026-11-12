@@ -184,7 +184,9 @@ class InventoryItemMapperTest {
     InventoryAllocations.addMission(item, missionId, 4.0);
     mapper.setEarmarkTargets(
         callersView(
-            Map.of(missionId, new MissionEarmark(missionId, null, null)), Map.of(), Map.of()));
+            Map.of(missionId, new MissionEarmark(missionId, null, null, false)),
+            Map.of(),
+            Map.of()));
 
     InventoryItemDto dto = mapper.toDto(item);
 

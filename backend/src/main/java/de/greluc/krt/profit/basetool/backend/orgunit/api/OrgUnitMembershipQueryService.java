@@ -19,10 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.orgunit.api;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -62,7 +60,7 @@ public class OrgUnitMembershipQueryService {
   private final SpecialCommandService specialCommandService;
   private final StaffelMembershipResolver staffelMembershipResolver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
-  private final UserRepository userRepository;
+  private final OrgUnitSeatEligibility seatEligibility;
   private final ProfitHierarchyService profitHierarchy;
 
   /**
@@ -277,7 +275,7 @@ public class OrgUnitMembershipQueryService {
    */
   @NotNull
   public Set<UUID> findLogisticianOrgUnitIds(@NotNull UUID userId) {
-    if (!userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER))) {
+    if (!seatEligibility.holdsKrtMember(userId)) {
       return Set.of();
     }
     return orgUnitCascadeService.grantedUnits(
@@ -295,7 +293,21 @@ public class OrgUnitMembershipQueryService {
    */
   @NotNull
   public List<OrgUnitMembershipOptionDto> listDirectMembershipOptions(@NotNull UUID userId) {
-    Set<UUID> ids = findDirectMembershipOrgUnitIds(userId);
+    return listMembershipOptions(findDirectMembershipOrgUnitIds(userId));
+  }
+
+  /**
+   * Lists the owner's active direct memberships available in a personal owner picker.
+   *
+   * @param userId the owner
+   * @return the stampable options in picker order, empty without the stored KRT Member role
+   */
+  @NotNull
+  public List<OrgUnitMembershipOptionDto> listOwnerMembershipOptions(@NotNull UUID userId) {
+    return listMembershipOptions(seatEligibility.findStampableOrgUnitIds(userId));
+  }
+
+  private List<OrgUnitMembershipOptionDto> listMembershipOptions(Set<UUID> ids) {
     if (ids.isEmpty()) {
       return List.of();
     }

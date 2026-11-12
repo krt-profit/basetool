@@ -136,9 +136,9 @@ departing member's ships (REQ-DATA-008).
 ### REQ-HANGAR-009 — The owner changes a ship's org unit afterwards
 
 The owner of a ship MUST be able to change its owning org unit after creation, from the row action
-„Einheit ändern" in „Meine Schiffe". The choice is one of the owner's **direct** memberships, of
-any of the four kinds, or „Keine Einheit"; neither the caller's leadership scope nor an
-active-context pin widens it. The ship then appears in, or leaves, that unit's hangar overview
+„Einheit ändern" in „Meine Schiffe". The choice is one of the owner's **stampable units** or „Keine Einheit". Stampable units are
+active direct memberships of any of the four kinds while the owner holds the stored `KRT Member`
+role (REQ-ORG-004). The ship then appears in, or leaves, that unit's hangar overview
 (REQ-HANGAR-001/003), and every row of „Meine Schiffe" shows its unit.
 
 The change has its own endpoint, `PUT /api/v1/hangar/ships/{id}/org-unit` with `orgUnitId` (or
@@ -160,7 +160,7 @@ ADR-0260). The create dialog keeps the „Zuordnen zu" picker; the edit dialog d
 
 - [x] A ship without a unit is assigned to one of the owner's units from the row action and shows
   it in place; „Keine Einheit" removes it again.
-- [x] Another member's ship → 403; a target outside the owner's direct memberships → 400; a stale
+- [x] Another member's ship → 403; a target outside the owner's stampable units → 400; a stale
   or missing `owningOrgUnitVersion` → 409 / 400.
 - [x] A field edit with the old ship `version` succeeds after a unit change and keeps the unit, and
   a unit change with the old counter succeeds after a field edit; an edit flushed from a stale
@@ -181,7 +181,7 @@ ADR-0260). The create dialog keeps the „Zuordnen zu" picker; the edit dialog d
 ### REQ-HANGAR-010 — The owner changes the org unit of several ships at once
 
 The owner MUST be able to select several ships in „Meine Schiffe" and move them to one of their
-direct memberships, or to „Keine Einheit", in one action (REQ-HANGAR-009 for the single ship). This
+stampable units, or to „Keine Einheit", in one action (REQ-HANGAR-009 for the single ship). This
 is the repair after a connected application created many ships without a unit.
 
 - **Selection bar.** Each row has a checkbox, the list head a box that selects the shown page. While
@@ -198,7 +198,7 @@ is the repair after a connected application created many ships without a unit.
   overlapping selections queue instead of deadlocking. Every moved ship's `owningOrgUnitVersion`
   goes up (ADR-0258), so a single-ship dialog opened before the bulk action 409s.
 - **Refusal as a whole.** An unknown ship → 404, another member's ship → 403, a target outside the
-  owner's direct memberships → 400; nothing changes. Ships already in the target are skipped and
+  owner's stampable units → 400; nothing changes. Ships already in the target are skipped and
   counted; a selection already wholly in the target writes nothing, records nothing and validates no
   target.
 - **Audit.** One `HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED` summary (REQ-HANGAR-004) with `changed`,
@@ -237,7 +237,7 @@ An admin MUST be able to list, add, edit and delete the ships of one member on
   change notifies the member.
 - **Writes.** Add, edit and delete use the ship dialog of „Meine Schiffe" (design system: one CTA in
   the page head and one in the dialog, icon-only edit per row, quiet-danger delete behind a danger
-  confirm). An added ship takes the unit picked from the member's direct memberships; with more than
+  confirm). An added ship takes the unit picked from the member's stampable units; with more than
   one, the pick is required and starts empty, never preset from the admin's own active unit.
   Without a pick the backend stamps the member's only stampable unit — a direct membership on an
   active unit, while the member holds the stored role `KRT Member` (REQ-ORG-032) —, refuses a member
@@ -255,7 +255,7 @@ An admin MUST be able to list, add, edit and delete the ships of one member on
   writes.
 - [x] Add, edit and delete go to the member's admin paths and update the list in place.
 - [x] An edit carries the version and no unit; an add carries the picked unit and no version.
-- [x] The backend takes the added ship's unit from the member's direct memberships only: a pick
+- [x] The backend takes the added ship's unit from the member's stampable units only: a pick
   outside them is a `400`; without a pick the member's only stampable unit is stamped, several need
   a pick, and none — a member without `KRT Member` included — leaves the ship without a unit; the
   admin's own active unit never decides it.
@@ -275,7 +275,7 @@ An admin MUST be able to change the owning org unit of a member's ships on the a
 (REQ-HANGAR-011), singly from the row action and in bulk from a selection bar, with the rules of
 REQ-HANGAR-009 and REQ-HANGAR-010 applied to the **member**.
 
-- **Targets.** The member's direct memberships (all four kinds) or „Keine Einheit", never the
+- **Targets.** The member's stampable units (all four kinds) or „Keine Einheit", never the
   admin's own: a unit only the admin belongs to is a 400. The dialog offers the member's units, and a
   unit the member has since left as the current choice.
 - **Endpoints.** `PUT /api/v1/hangar/admin/users/{userId}/ships/{shipId}/org-unit` (`orgUnitId`,
@@ -301,7 +301,7 @@ REQ-HANGAR-009 and REQ-HANGAR-010 applied to the **member**.
 **Acceptance**
 
 - [x] An admin moves one ship and several ships of a member; the admin page updates in place.
-- [x] A target outside the member's direct memberships → 400, even when the admin belongs to it.
+- [x] A target outside the member's stampable units → 400, even when the admin belongs to it.
 - [x] A non-admin calling the admin endpoints → 403.
 - [x] The member receives one notice per single or bulk change; an admin acting on their own ships
   hears nothing.

@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -62,10 +63,19 @@ class MissionScopeParityTest {
   private void run(boolean memberOrAbove) {
     ScopeParityCallers.Units units = ScopeParityCallers.persistUnits(squadronRepository);
     UUID callerId = ScopeParityCallers.persistUser(userRepository, "caller").getId();
+    Mission hiddenParent = mission(units.unitB(), true);
+    Mission publicChild = mission(units.unitA(), false, hiddenParent);
+    Mission publicGrandchild = mission(null, false, publicChild);
+    Mission publicParent = mission(units.unitB(), false);
+    Mission internalChild = mission(units.unitA(), true, publicParent);
     List<ScopeParityCallers.Row> rows =
         List.of(
             row("internal mission of A", mission(units.unitA(), true)),
-            row("internal mission of B", mission(units.unitB(), true)),
+            row("internal mission of B", hiddenParent),
+            row("public child of an internal parent", publicChild),
+            row("public grandchild of an internal grandparent", publicGrandchild),
+            row("public parent", publicParent),
+            row("internal child of a public parent", internalChild),
             row("internal mission of child C", mission(units.childC(), true)),
             row("public mission of B", mission(units.unitB(), false)),
             row("public ownerless mission", mission(null, false)));
@@ -76,17 +86,36 @@ class MissionScopeParityTest {
         callerId,
         memberOrAbove,
         rows,
-        wired ->
-            missionRepository
-                .findAllActiveReference(
-                    wired.predicate().adminAllScope(),
-                    wired.predicate().activeOrgUnitId(),
-                    wired.predicate().memberOrgUnitIds(),
-                    wired.authHelper().isMemberOrAbove(),
-                    Instant.EPOCH)
-                .stream()
-                .map(MissionReferenceDto::id)
-                .collect(Collectors.toSet()),
+        wired -> {
+          var pickerIds =
+              missionRepository
+                  .findAllActiveReference(
+                      wired.predicate().adminAllScope(),
+                      wired.predicate().activeOrgUnitId(),
+                      wired.predicate().memberOrgUnitIds(),
+                      wired.authHelper().isMemberOrAbove(),
+                      Instant.EPOCH)
+                  .stream()
+                  .map(MissionReferenceDto::id)
+                  .collect(Collectors.toSet());
+          var page =
+              missionRepository.searchMissions(
+                  "Parity-M-",
+                  null,
+                  null,
+                  List.of("PLANNED"),
+                  null,
+                  null,
+                  null,
+                  wired.predicate().adminAllScope(),
+                  wired.predicate().activeOrgUnitId(),
+                  wired.predicate().memberOrgUnitIds(),
+                  wired.authHelper().isMemberOrAbove(),
+                  PageRequest.of(0, 1));
+          org.assertj.core.api.Assertions.assertThat(page.getTotalElements())
+              .isEqualTo(rows.stream().filter(row -> pickerIds.contains(row.id())).count());
+          return pickerIds;
+        },
         (wired, id) ->
             new MissionAccessPolicy(wired.gate(), wired.authHelper(), missionRepository, null, null)
                 .canSeeMission(id));
@@ -97,11 +126,16 @@ class MissionScopeParityTest {
   }
 
   private Mission mission(UUID unit, boolean internal) {
+    return mission(unit, internal, null);
+  }
+
+  private Mission mission(UUID unit, boolean internal, Mission parent) {
     Mission mission = new Mission();
     mission.setName("Parity-M-" + UUID.randomUUID());
     mission.setStatus("PLANNED");
     mission.setIsInternal(internal);
     mission.setOwningOrgUnit(unit == null ? null : squadronRepository.getReferenceById(unit));
+    mission.setParent(parent);
     return missionRepository.save(mission);
   }
 }

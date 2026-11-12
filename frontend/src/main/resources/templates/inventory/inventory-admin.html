@@ -493,7 +493,7 @@
                         <select id="umbuchenTargetLocationId" class="w-full" data-krt-combobox="remote-locations"></select>
                     </div>
                 </div>
-                <div id="umbuchenTargetOwningOrgUnitWrapper" class="lager-org-unit-wrapper" hidden>
+                <div id="umbuchenTargetOwningOrgUnitWrapper" th:data-owner-picker-active="${activeSquadronId}" class="lager-org-unit-wrapper" hidden>
                     <label for="umbuchenTargetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
                     <select id="umbuchenTargetOwningOrgUnitId" class="w-full"></select>
                 </div>

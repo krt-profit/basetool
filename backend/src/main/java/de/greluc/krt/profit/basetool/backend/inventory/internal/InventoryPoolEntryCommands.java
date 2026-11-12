@@ -558,7 +558,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   }
 
   /**
-   * Whether a target exists and, for a job order, lies in reduced scope and needs the stock.
+   * Whether a new allocation may target the mission or job order.
    *
    * @param row the entry
    * @param targetId the job order or mission
@@ -568,7 +568,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
   private boolean targetExists(
       @NotNull InventoryItem row, @NotNull UUID targetId, boolean jobOrder) {
     if (!jobOrder) {
-      return earmarkLookup.mission(targetId) != null;
+      return earmarkLookup.missionForAllocation(targetId) != null;
     }
     orderWrites.lockEarmarkTargets(List.of(targetId));
     Set<UUID> needed =
@@ -708,7 +708,7 @@ public class InventoryPoolEntryCommands implements PoolEntryCommands {
       }
     }
     for (PoolEarmark earmark : bookIn.missions()) {
-      if (earmarkLookup.mission(earmark.targetId()) == null) {
+      if (earmarkLookup.missionForAllocation(earmark.targetId()) == null) {
         return PoolRefusal.EARMARK_TARGET_INVALID;
       }
     }

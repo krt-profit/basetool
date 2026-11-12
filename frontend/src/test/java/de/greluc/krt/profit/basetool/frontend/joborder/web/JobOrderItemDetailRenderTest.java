@@ -1159,8 +1159,8 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         .as("choosing an org unit re-runs the booking gate")
         .contains("data-trigger=\"od-production-bookin-changed\"");
     assertThat(html)
-        .as("the required empty choice reads like the shared owner picker's")
-        .contains("orgUnitPlaceholder: \"-- Bitte w");
+        .as("the shared owner-picker dictionary supplies the localized empty choice")
+        .containsPattern("window\\.krtOwnerPickerI18n\\s*=\\s*\\{[^}]*placeholder: \"-- Bitte w");
   }
 
   @Test

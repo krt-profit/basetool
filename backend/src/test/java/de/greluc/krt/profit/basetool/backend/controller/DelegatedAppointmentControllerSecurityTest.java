@@ -222,7 +222,7 @@ class DelegatedAppointmentControllerSecurityTest {
 
   @Test
   void addBereichRole_delegatedOlMember_isAllowed() throws Exception {
-    when(orgRoleManagementSecurityService.canAppointBereichRole(any(), any(), any()))
+    when(orgRoleManagementSecurityService.canAppointBereichRole(any(), any(), any(), any()))
         .thenReturn(true);
     when(orgRoleManagementSecurityService.targetsAnotherUser(any(), any())).thenReturn(true);
     OrgUnitMembership m = new OrgUnitMembership();
@@ -267,7 +267,7 @@ class DelegatedAppointmentControllerSecurityTest {
 
   @Test
   void addBereichRole_delegatedLeaderOnOwnSeat_isForbidden() throws Exception {
-    when(orgRoleManagementSecurityService.canAppointBereichRole(any(), any(), any()))
+    when(orgRoleManagementSecurityService.canAppointBereichRole(any(), any(), any(), any()))
         .thenReturn(true);
     when(orgRoleManagementSecurityService.targetsAnotherUser(any(), any())).thenReturn(false);
     mockMvc

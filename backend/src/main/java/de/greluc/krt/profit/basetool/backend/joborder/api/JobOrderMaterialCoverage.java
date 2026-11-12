@@ -88,7 +88,14 @@ public class JobOrderMaterialCoverage {
               : List.of();
       result.put(
           order.getId(),
-          new OrderCoverage(order.getId(), order.getDisplayId(), order.getStatus(), buckets));
+          new OrderCoverage(
+              order.getId(),
+              order.getDisplayId(),
+              order.getStatus(),
+              buckets,
+              order.getResponsibleOrgUnit() == null
+                  ? null
+                  : order.getResponsibleOrgUnit().getName()));
     }
     return Map.copyOf(result);
   }
@@ -164,12 +171,14 @@ public class JobOrderMaterialCoverage {
    * @param displayId the order's number
    * @param status the order's status
    * @param buckets the order's buckets; empty for a terminal order
+   * @param responsibleOrgUnitName the current responsible unit's name, if assigned
    */
   public record OrderCoverage(
       @NotNull UUID id,
       @Nullable Integer displayId,
       @NotNull JobOrderStatus status,
-      @NotNull @Unmodifiable List<BucketCoverage> buckets) {
+      @NotNull @Unmodifiable List<BucketCoverage> buckets,
+      @Nullable String responsibleOrgUnitName) {
 
     /**
      * Finds the bucket of one material at one tier.

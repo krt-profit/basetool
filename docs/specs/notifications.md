@@ -198,7 +198,11 @@ no CHECK constraint and the engine is data-driven.
 
 **Enforced by:** spec review · **Code:** `event/*`, `notification/api/NotificationEventType`
 
-### REQ-NOTIF-004 — Per-user isolation (not org-unit scoped)
+### REQ-NOTIF-004 — Per-user isolation
+
+The bell, inbox and dashboard widget mark a notice with its subject's org unit when the event
+identifies one. The stored display marker does not restrict inbox reads. Notices without
+recorded unit metadata remain visible without a marker.
 
 The inbox is isolated by the JWT `sub` only; it is **not** org-unit scoped. Every read and
 mutation is keyed by the caller's `sub`; an id that is unknown **or** owned by someone else
@@ -293,10 +297,12 @@ resolves only members who hold `KRT Member` (REQ-NOTIF-024).
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
 disabled and deleted at runtime via an admin-only API — **every** rule, including the seeded ones:
-every selector kind is accepted on create and update. The event-derived kinds are stored
-with every selector column `null`, whatever the request carried. (Until 2026-09-22 the service
-refused those three as "seed-only", so no seeded bank, Materialbörse or account-deletion rule could be
-saved from the editor — not even to disable it.)
+all selector kinds remain available for compatible events. Unit events and events with a scoped
+audience require selectors derived from the event, except for designated global roles such as
+`BANK_MANAGEMENT` for new booking requests. Saving an enabled rule with a broader selector
+returns `400 BAD_REQUEST`. Existing incompatible selectors contribute no recipients. Unowned
+operation completion can still use `SEAT_HOLDERS`. The event-derived kinds are stored with every
+selector column `null`, whatever the request carried.
 
 **Acceptance**
 
@@ -987,7 +993,9 @@ processes the event in reconcile mode instead of the normal one:
 account's responsible holders change, names the members who became or stopped being holders and is
 evaluated against the `BANK_BOOKING_REQUEST_CREATED` rules: the new holder gets the request's notice,
 a former holder loses it unless another selector (bank management, an account grant) still reaches
-them, and the bank staff keep theirs untouched.
+them, and the bank staff keep theirs untouched. Delivery checks that the request is still pending
+under the same request lock as settlement. A delayed reconciliation for a settled or cancelled
+request does not recreate its open notice.
 
 **Acceptance**
 
@@ -1039,9 +1047,13 @@ or a member flagged Logistiker or Einsatzleiter who lost the role is no recipien
 an admin is judged alike. `ROLE` reads a stored global role, as does the Bankleitung band of
 `REQUIRED_APPROVER`, `SPECIFIC_USER` names a member and `ACCOUNT_GRANT` follows the bank roles
 (REQ-NOTIF-007); none of them reads a membership. Each directory filters a resolved set with one
-batch role lookup (`OrgUnitSeatEligibility#krtMembersAmong`, REQ-DATA-003). The filter decides who
-gets a new notice; one delivered before the role was withdrawn stays until it is deleted or
-superseded.
+batch role lookup (`OrgUnitSeatEligibility#krtMembersAmong`, REQ-DATA-003). Notices retain the
+recipient's role-dependent delivery paths. A role withdrawal clears the member's notices when
+every recorded path has become unavailable. If the member has an independent delivery path,
+the notice remains. Delivery locks and checks affected recipients' stored roles before persisting
+notices, so a concurrent withdrawal cannot leave a new stale notice. Existing notices use the
+role paths that can be reconstructed from their type, request, account grant or seat. Historical
+delivery paths that cannot be identified are retained.
 
 `OFFICER` is no stored role any more (V318). `OrgRelativeRole.OFFICER` is an alias of
 `UNIT_LEADERSHIP`. V320 turned every `ROLE` selector with the code `OFFICER` into a `SEAT_HOLDERS`
@@ -1360,6 +1372,9 @@ it is about when the viewer can open it. `NotificationViewDto.href` is set by
   officers.
 - **Every type is decided.** Each `NotificationType` is either in `NotificationTargets.TARGETS` or in
   `UNLINKED_TYPES`; a type added without a decision fails the build.
+- **Different active unit.** A notice for a different unit shows a hint to select that unit if
+  its subject link is unavailable in the active context. Opening a notice does not change the
+  selected unit or override the target's access check.
 
 | Notification types | Link |
 | --- | --- |
@@ -1427,7 +1442,8 @@ A booking request that needs an approval (REQ-BANK-041, REQ-BANK-047) raises the
 account's responsible holders when the request is over their limit, the Bankleitung on the middle
 KRT band (`T1 < amount ≤ T2`), the OL above `T2`. It is a data-driven rule (ADR-0015): the selector
 `REQUIRED_APPROVER` reads the request's `required_approver` (a missing value counts as the
-responsible holders) and never resolves the requester (REQ-BANK-062).
+responsible holders outside the KRT account) and never resolves the requester (REQ-BANK-062).
+If a holder-routed request has no eligible approver, it notifies administrators.
 
 - **One notice per member and request.** For the required approver the approval notice replaces the
   generic `…_CREATED` / `…_UPDATED` notice: an event may name notice types that outrank others
@@ -1446,9 +1462,10 @@ responsible holders) and never resolves the requester (REQ-BANK-062).
 - **The same set as the queue.** The requests carrying this notice for a member are the requests
   waiting for their approval. A responsible holder or OL member without `KRT Member` may approve
   nothing (REQ-BANK-034), so their seat yields neither this notice nor the generic one
-  (REQ-NOTIF-024); a bank role still reaches them through its own selectors. On an account whose
-  only holder lacks the role a request tells no responsible holder; a new holder is told of the
-  open requests when the seat passes (REQ-NOTIF-023).
+  (REQ-NOTIF-024). A bank role still reaches them through its own selectors. If an over-limit
+  request waits on an ineligible responsible holder, the approval notice goes to administrators.
+  When a holder becomes eligible, reconciliation moves the open notice to them
+  (REQ-NOTIF-023).
 
 Notifications are not audited, so this adds no audit event. Rendered with `type`, `amount`,
 `accountNo` and `requester`; linked to `/org-unit-bank?focus={id}#tab=fremde` (REQ-NOTIF-032).
@@ -1462,6 +1479,8 @@ Notifications are not audited, so this adds no audit event. Rendered with `type`
 - [x] A correction below the limit replaces the approval notice with the generic one.
 - [x] A responsible holder or OL member without `KRT Member` is no required approver and is not
   told of the account's requests as its holder.
+- [x] A holder-routed request without an eligible approver notifies the administrators. Approving
+  the request clears the fallback notice.
 
 **Enforced by:** `ApprovalNeededNoticeIntegrationTest`, `RecipientDirectoriesTest`,
 `SeededNotificationRulesIntegrationTest`, `NotificationRuleEngineIntegrationTest` · **Code:**

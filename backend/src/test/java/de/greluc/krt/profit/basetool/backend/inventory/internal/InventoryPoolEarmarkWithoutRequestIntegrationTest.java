@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.Ear
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolEntryChange;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolOutcome;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRefusal;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRestore;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRestoreResult;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
@@ -175,33 +176,51 @@ class InventoryPoolEarmarkWithoutRequestIntegrationTest {
   }
 
   @Test
-  void anEarmarkWriteLabelsItsAuditWithTheNameOfAMissionTheWriterMayNotRead() throws Exception {
+  void rejectsNewEarmarksOnHiddenAndUnknownMissionsTheSameWay() throws Exception {
+    UUID hidden = internalMission(otherUnit, "Hidden mission");
+    UUID entry = stock(10);
+    for (UUID target : List.of(hidden, UUID.randomUUID())) {
+      PoolOutcome outcome =
+          withoutRequest(
+              caller(writer, Roles.KRT_MEMBER),
+              () ->
+                  poolEntryCommands.allocate(
+                      new PoolAllocation(
+                          entry,
+                          pool,
+                          0,
+                          EarmarkChange.ADD,
+                          EarmarkDimension.MISSION,
+                          target,
+                          EARMARKED,
+                          QuantityType.SCU.name()),
+                      false));
+      assertThat(outcome.refusal()).isEqualTo(PoolRefusal.EARMARK_TARGET_INVALID);
+    }
+    assertThat(missionEarmarks(entry, hidden)).isEmpty();
+  }
+
+  @Test
+  void anExistingHiddenEarmarkCanBeChangedWithoutARequest() throws Exception {
     String name = "Secret-Op-" + UUID.randomUUID();
     UUID mission = internalMission(otherUnit, name);
     UUID entry = stock(10);
+    jdbc.update(
+        "INSERT INTO inventory_item_mission_allocation"
+            + " (id, inventory_item_id, mission_id, amount, created_at, updated_at)"
+            + " VALUES (?, ?, ?, ?, now(), now())",
+        UUID.randomUUID(),
+        entry,
+        mission,
+        2.0);
 
-    PoolOutcome outcome =
-        withoutRequest(
-            caller(writer, Roles.KRT_MEMBER),
-            () ->
-                poolEntryCommands.allocate(
-                    new PoolAllocation(
-                        entry,
-                        pool,
-                        0,
-                        EarmarkChange.ADD,
-                        EarmarkDimension.MISSION,
-                        mission,
-                        EARMARKED,
-                        QuantityType.SCU.name()),
-                    false));
+    earmark(entry, 0, EarmarkChange.CHANGE, mission, EARMARKED);
 
-    assertThat(outcome.refusal()).isNull();
     assertThat(missionEarmarks(entry, mission)).containsExactly(EARMARKED);
     assertThat(
             jdbc.queryForList(
                 "SELECT details FROM audit_event WHERE subject_id = ?"
-                    + " AND event_type = 'INVENTORY_ALLOCATION_ADDED'",
+                    + " AND event_type = 'INVENTORY_ALLOCATION_CHANGED'",
                 String.class,
                 entry))
         .singleElement()

@@ -31,7 +31,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the six JPQL scope fragments of REQ-DATA-010 byte for byte: the fragment of every scoped
+ * Pins the HQL scope fragments of REQ-DATA-010 byte for byte: the fragment of every scoped
  * aggregate is the text recorded in {@code scope/scope-fragments.txt}, wherever its owning module
  * keeps the constant.
  *
@@ -44,6 +44,9 @@ class ScopeFragmentsGoldenTest {
 
   private static final List<String[]> FRAGMENTS =
       List.of(
+          new String[] {
+            "MISSION_ANCESTOR_VISIBILITY", BASE + "mission.api.MissionScope", "ANCESTOR_VISIBILITY"
+          },
           new String[] {"MISSION_SCOPE_PREDICATE", BASE + "mission.api.MissionScope", "PREDICATE"},
           new String[] {"SHIP_SCOPE_TRIPLE", BASE + "hangar.api.ShipScope", "TRIPLE"},
           new String[] {

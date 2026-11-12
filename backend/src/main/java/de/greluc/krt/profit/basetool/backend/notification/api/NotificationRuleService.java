@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.api;
 
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
@@ -143,6 +144,13 @@ public class NotificationRuleService {
       @NotNull NotificationRule rule, @NotNull NotificationRuleWriteRequest request) {
     for (NotificationRuleSelectorWriteRequest selectorRequest : request.selectors()) {
       String resolvedRoleCode = validateSelector(selectorRequest);
+      if (request.enabled()
+          && !request
+              .eventType()
+              .permitsSelector(selectorRequest.kind(), resolvedRoleCode, false)) {
+        throw new BadRequestException(
+            "Selector can reach outside the event's notification audience");
+      }
       if (selectorRequest.kind().readsNoSelectorColumns()) {
         rule.addSelector(NotificationRuleSelector.builder().kind(selectorRequest.kind()).build());
         continue;

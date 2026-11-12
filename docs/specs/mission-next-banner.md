@@ -63,9 +63,9 @@ strictly after "now" is the next mission.
 
 **Enforced by:** `MissionServiceTest` (`getNextMission_*` — status passed to the finder),
 `MissionRepositoryLookupOrderingTest`
-(`findFirstByPlannedStartTimeAfterAndStatusIn_skipsTerminalStatusEvenWhenItSortsEarlier`).
+(`upcomingCandidates_forAdminSkipTerminalStatusEvenWhenItSortsEarlier`).
 **Code:** `MissionService#getNextMission`,
-`MissionRepository#findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc`,
+`MissionRepository#findUpcomingOwnOrSignedUp`,
 `MissionController` `/api/v1/missions/next`. (The home page no longer consumes `/next` — its
 upcoming-missions grid is REQ-MISSION-012.)
 
@@ -88,6 +88,9 @@ the viewer has any:
   cascade above (REQ-ORG-015), to the Mission Manager cascade and to admins. No other viewer sees a
   foreign internal mission through this lookup, any fallback of it, the lists, the search, the
   calendar, the dashboard widgets or the operation finance views.
+- The next lookup, search and pickers apply the mission read rule to the mission and every parent.
+  When an earlier candidate has a hidden ancestor, the next lookup continues to the first readable
+  candidate. A public child still requires access to its internal parent.
 - **A mission reference read for another module** (`mission.api.MissionReferences`) returns a
   mission the viewer may not see (the mission and every ancestor) without its name and planned
   start; its id and status stay.
@@ -121,16 +124,8 @@ the viewer has any:
 - [ ] A viewer who may not see an operation's child mission gets its line anonymised (no name, entries or orders, amount kept) in the full, summary and per-mission finance reads.
 - [ ] A scoped viewer with no upcoming own-unit mission gets `204`, even if other units have upcoming missions.
 
-**Enforced by:** `MissionServiceTest`
-(`getNextMission_scopedMember_usesScopedQueryThenRefetches`,
-`getNextMission_scopedPinned_passesActiveOrgUnitId`,
-`getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch`,
-`getNextMission_refetchesByIdThroughGraph` (admin all-squadrons),
-`getNextMission_memberWithoutUnit_readsPublicMissionsOnly`),
-`MissionRepositoryLookupOrderingTest`
-(`findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal`,
-`findNextScopedMission_includesOwnInternalMission`,
-`findNextPublicMission_skipsInternalAndTerminalMissions`),
+**Enforced by:** `MissionServiceTest` (`getNextMission_*`), `MissionRepositoryLookupOrderingTest`
+(`upcomingCandidates_*`), `MissionScopeParityTest` (parent and grandparent visibility),
 `MissionServiceSectionPatchTest` (`updateFlagsSection_shouldRejectInternal_whenMissionHasNoOwningOrgUnit`,
 `updateOwningOrgUnit_shouldRejectOwnerlessTarget_whenMissionIsInternal`), `MissionServiceTest`
 (`createMission_internalWithoutOwningOrgUnit_isRejectedAndNotPersisted`),
@@ -138,10 +133,10 @@ the viewer has any:
 (`*_anonymises*`, `getMissionFinanceDetail_hiddenMission_returnsTheAnonymisedSummary`),
 `OperationPageControllerMvcTest` (anonymised label), `MissionCreatePageTest`
 (`testCreateMissionPage_WithoutPickableUnit_DisablesTheInternalSwitch`).
-**Code:** `MissionService#getNextMission` + `#findNextScopedMissionHead` +
+**Code:** `MissionService#getNextMission` +
 `#requireOwningOrgUnitForInternal`, `OperationFinanceService`, `MissionVisibility`,
 migration `V329__constrain_internal_mission_to_owning_org_unit.sql`,
-`MissionRepository#findNextScopedMission` + `#findNextPublicMission`,
+`MissionRepository#findUpcomingOwnOrSignedUp`, `MissionScope`,
 `RequestScopeResolver#currentScopePredicate` (scope vector + leadership cascade).
 
 ### REQ-MISSION-012 — Home-page upcoming-missions tile grid (next 7 days)

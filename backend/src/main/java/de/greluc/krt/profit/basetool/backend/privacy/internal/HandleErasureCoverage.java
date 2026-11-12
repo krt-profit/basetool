@@ -211,6 +211,9 @@ public final class HandleErasureCoverage {
               "org_unit.name",
               "An organisational unit: a squadron or special command, named by the organisation"
                   + " and not after the member."),
+          notTheMember(
+              "notification.org_unit_name",
+              "A display-name snapshot of the notification's organisational unit."),
           notTheMember("org_unit.shorthand", "An organisational unit's short form."),
           notTheMember("mission_frequency.name", "A radio frequency's label."),
           notTheMember(

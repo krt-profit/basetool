@@ -27,6 +27,8 @@ import de.greluc.krt.profit.basetool.backend.mission.api.events.MissionNotices;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.ApplicationEventPublisher;
@@ -50,6 +52,7 @@ public class MissionReminderNoticeProducer implements TimedNoticeProducer {
 
   private final MissionRepository missionRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final MissionRecipientDirectoryImpl missionRecipients;
 
   @Override
   @NotNull
@@ -79,21 +82,25 @@ public class MissionReminderNoticeProducer implements TimedNoticeProducer {
   }
 
   private int remind(Mission mission, String lead) {
+    Set<UUID> recipients =
+        missionRecipients.visibleMembers(
+            mission, MissionNotificationPublisher.participantUserIds(mission));
     int count = 0;
     for (MissionParticipant participant : mission.getParticipants()) {
-      if (participant.getUser() == null) {
+      if (participant.getUser() == null || !recipients.contains(participant.getUser().getId())) {
         continue;
       }
       JobType role = participant.getPlannedMissionJobType();
       eventPublisher.publishEvent(
           MissionNotices.reminder(
-              mission.getId(),
-              mission.getName(),
-              participant.getUser().getId(),
-              lead,
-              mission.referenceTime(),
-              mission.getMeetingPoint(),
-              role == null ? null : role.getName()));
+                  mission.getId(),
+                  mission.getName(),
+                  participant.getUser().getId(),
+                  lead,
+                  mission.referenceTime(),
+                  mission.getMeetingPoint(),
+                  role == null ? null : role.getName())
+              .inOrgUnit(MissionNotificationPublisher.subjectUnit(mission)));
       count++;
     }
     return count;

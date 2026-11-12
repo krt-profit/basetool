@@ -36,8 +36,10 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -79,6 +81,7 @@ class HangarShipAdminOrgUnitChangeIntegrationTest {
   @Autowired private ShipRepository shipRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private AuditEventRepository auditEventRepository;
@@ -98,6 +101,9 @@ class HangarShipAdminOrgUnitChangeIntegrationTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     member = saveUser("admin-unit-member");
     admin = saveUser("admin-unit-admin");
+    var krtMember = roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow();
+    member.getRoles().add(krtMember);
+    admin.getRoles().add(krtMember);
     membersCommand = saveCommand("Admin Unit Member SK", "AUMS");
     adminsCommand = saveCommand("Admin Unit Admin SK", "AUAS");
     saveMembership(member, Squadron.IRIDIUM_ID);
@@ -154,6 +160,19 @@ class HangarShipAdminOrgUnitChangeIntegrationTest {
 
     single(admin, member, ship, adminsCommand.getId(), 0L).andExpect(status().isBadRequest());
     bulk(admin, member, List.of(ship), adminsCommand.getId()).andExpect(status().isBadRequest());
+
+    assertThat(unitOf(ship)).isNull();
+    assertThat(notices()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a stored membership without KRT Member is not an eligible target")
+  void refusesAFormerMembersStoredUnit() throws Exception {
+    member.getRoles().clear();
+    UUID ship = saveShip(member, "Alpha");
+
+    single(admin, member, ship, membersCommand.getId(), 0L).andExpect(status().isBadRequest());
+    bulk(admin, member, List.of(ship), membersCommand.getId()).andExpect(status().isBadRequest());
 
     assertThat(unitOf(ship)).isNull();
     assertThat(notices()).isEmpty();

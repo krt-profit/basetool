@@ -63,7 +63,7 @@ class MemberMembershipControllerTest {
         new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", OrgUnitKind.SQUADRON);
     when(orgUnitMembershipQueryService.listOptionsForUser(userId)).thenReturn(List.of(option));
 
-    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
+    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false, false);
 
     assertEquals(1, result.size());
     assertSame(option, result.getFirst());
@@ -79,10 +79,25 @@ class MemberMembershipControllerTest {
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(userId))
         .thenReturn(List.of(bereich));
 
-    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, true);
+    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, true, false);
 
     assertSame(bereich, result.getFirst());
     verify(orgUnitMembershipQueryService).listDirectMembershipOptions(userId);
+  }
+
+  @Test
+  void ownerPickersUseStampableOptionsForTheNamedUserAndTheCaller() {
+    UUID userId = UUID.randomUUID();
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+    OrgUnitMembershipOptionDto option =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Hel", "HEL", OrgUnitKind.SQUADRON);
+    when(orgUnitMembershipQueryService.listOwnerMembershipOptions(userId))
+        .thenReturn(List.of(option));
+    when(orgUnitMembershipQueryService.listOwnerMembershipOptions(CALLER_ID)).thenReturn(List.of());
+
+    assertEquals(List.of(option), controller.getUserMemberships(userId, true, true));
+    assertTrue(controller.getMyMemberships(jwt, true, true).isEmpty());
+    verify(orgUnitMembershipQueryService, never()).listDirectMembershipOptions(any());
   }
 
   @Test
@@ -90,7 +105,7 @@ class MemberMembershipControllerTest {
     UUID userId = UUID.randomUUID();
     when(orgUnitMembershipQueryService.listOptionsForUser(userId)).thenReturn(List.of());
 
-    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
+    List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false, false);
 
     assertTrue(result.isEmpty());
   }
@@ -133,7 +148,7 @@ class MemberMembershipControllerTest {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
     when(orgUnitMembershipQueryService.listOptionsForUser(CALLER_ID)).thenReturn(List.of());
 
-    assertTrue(controller.getMyMemberships(jwt, false).isEmpty());
+    assertTrue(controller.getMyMemberships(jwt, false, false).isEmpty());
     verify(orgUnitMembershipQueryService).listOptionsForUser(CALLER_ID);
     verify(orgUnitMembershipQueryService, never()).listDirectMembershipOptions(any());
   }
@@ -144,7 +159,7 @@ class MemberMembershipControllerTest {
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(CALLER_ID))
         .thenReturn(List.of());
 
-    assertTrue(controller.getMyMemberships(jwt, true).isEmpty());
+    assertTrue(controller.getMyMemberships(jwt, true, false).isEmpty());
     verify(orgUnitMembershipQueryService).listDirectMembershipOptions(CALLER_ID);
   }
 

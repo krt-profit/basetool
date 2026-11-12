@@ -301,7 +301,8 @@ The navigation preference store is the module `navigation`:
 - Moving classes into module packages — the later phases of the plan; each move adds its module's
   declarations under REQ-MOD-006.
 - The re-keyed security and structural ArchUnit rules (G-01) and the other guards of plan §6.1.
-- Table ownership and native SQL across modules (G-10).
+- Table ownership and native SQL across modules (G-10). The database guards for settled operation
+  payouts are listed cross-module reads under REQ-DATA-020 and ADR-0375.
 
 ## Open questions
 

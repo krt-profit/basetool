@@ -26,13 +26,11 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UpdateKommandoGroupRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -52,19 +50,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class KommandoGroupController {
 
   private final KommandoGroupService kommandoGroupService;
-
-  /**
-   * Lists the Kommandogruppen of a Staffel in display order.
-   *
-   * @param squadronId the Staffel whose groups to list; never {@code null}.
-   * @return the squadron's groups, ascending by sort index.
-   */
-  @GetMapping("/api/v1/squadrons/{squadronId}/kommando-groups")
-  @PreAuthorize("isAuthenticated()")
-  @Operation(summary = "List a squadron's Kommandogruppen")
-  public List<KommandoGroupDto> list(@PathVariable @NotNull UUID squadronId) {
-    return kommandoGroupService.listGroups(squadronId);
-  }
 
   /**
    * Creates a Kommandogruppe in a Staffel (admin, or the squadron's Staffelleiter).

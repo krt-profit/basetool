@@ -229,9 +229,10 @@ coverage; `BANK_HOLDER_OVERDRAFT` is retired.
 
 **Enforced by:** `BankLedgerServiceTest` (account overdraft code + concurrency tests, holder-may-go-negative) · **Code:** `bank/internal/BankLedgerService` (pessimistic account lock + account-only coverage guard) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
-### REQ-BANK-007 — Keycloak roles & hierarchy
+### REQ-BANK-007 — Bank roles & hierarchy
 
-Bank access is anchored on two **Keycloak realm roles**:
+Bank access is anchored on two **Basetool application roles** stored in `user_roles` (REQ-SEC-088,
+ADR-0355):
 
 - `Bank Employee` → `ROLE_BANK_EMPLOYEE` — may use the bank area within the limits of
   their per-account grants (REQ-BANK-009).
@@ -239,11 +240,11 @@ Bank access is anchored on two **Keycloak realm roles**:
   **all** accounts, holders and grants.
 
 Role hierarchy (both `SecurityConfig` beans, kept in sync):
-`ROLE_ADMIN > ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE`. Admins therefore pass every
-bank gate (REQ-BANK-010); bank management passes every employee gate. The roles are
-seeded in `DataInitializer` (matched by code `BANK_EMPLOYEE` / `BANK_MANAGEMENT`),
-documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
-(`frontend/src/e2e/resources/realm-export.e2e.json`).
+`ROLE_ADMIN > ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE`. Admins pass the bank role gates
+(REQ-BANK-010), and bank management passes the employee role gate. `DataInitializer` seeds the
+role definitions by code (`BANK_EMPLOYEE` / `BANK_MANAGEMENT`), and the E2E stack seeds account
+assignments in `user_roles`. Admins manage both roles on the member page. Bank management can
+assign and withdraw `Bank Employee` from the bank grant-management view.
 
 **Acceptance**
 
@@ -257,7 +258,7 @@ documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
 ### REQ-BANK-008 — Bank membership is independent of org-unit membership
 
 Working in the bank — as employee or management — requires only a basetool account and
-the respective Keycloak role (REQ-BANK-007) plus grants (REQ-BANK-009). It is **fully
+the applicable Basetool role (REQ-BANK-007) plus grants (REQ-BANK-009). It is **fully
 independent of org-unit membership**: a bank employee or bank manager may, but need
 not, also be a member of a Staffel, Spezialkommando or any other org unit. Org-unit
 memberships neither qualify nor disqualify anyone for the bank, and joining or leaving
@@ -298,8 +299,11 @@ the grant table.
 
 ### REQ-BANK-009 — Per-account grants: view + deposit / withdraw / transfer
 
-Fine-grained bank permissions are **app-managed grants**, not Keycloak roles
-(ADR-0011): a `bank_account_grant` row per (user, account) with three independent
+Withdrawing a role that removes bank staff eligibility clears any notices delivered only through
+the now-inert grant (REQ-NOTIF-024). An independent recipient path keeps the notice.
+
+Fine-grained bank permissions are **per-account grants** (ADR-0011): a
+`bank_account_grant` row per (user, account) with three independent
 capability flags — `can_deposit`, `can_withdraw`, `can_transfer`. The **existence** of a
 grant row gives **view access** to that account (a row with all flags false is
 view-only). A grant of a user who holds neither `Bank Employee` nor a role above it is inert: it
@@ -434,10 +438,9 @@ survive user deletion), event type, affected account/transaction/target-user ref
 a compact details payload, and — since V238 — the bounded **originating client**
 ([REQ-AUDIT-005](audit.md), [ADR-0153](../adr/0153-the-bank-trail-records-the-client-through-the-same-seam.md)):
 which client software the mutation came through, recorded through the same `ClientAttribution`
-seam and vocabulary as the shared trail, because the bank realm roles have sat on the mobile
-client's Keycloak scope since it was provisioned and the actor alone therefore never identified
-the origin here. Rows predating V238 carry `NULL`, which means **not recorded** and must not be
-read as "the web frontend". The audit log is readable **only by admins**
+seam and vocabulary as the shared trail. The client identifies the software that sent the
+request, independently of the actor's stored roles (REQ-SEC-088). Rows predating V238 carry
+`NULL`, which means **not recorded**, because the origin cannot be inferred from the actor. The audit log is readable **only by admins**
 (`hasRole('ADMIN')` on URL **and** method gate), paginated and filterable (period, actor,
 event type, client; the API additionally accepts an `accountId` filter the viewer does not offer).
 It is read on the Bank tab of the unified viewer ([REQ-AUDIT-002](audit.md)). Audit rows are never
@@ -1702,11 +1705,10 @@ the exchange, which has no active context (REQ-BXCH-001)
 > employee and the OL (ADR-0066, corrected from the Bereichsleiter Profit by ADR-0109). This is an
 > approval-routing refinement only; the OL stays the KRT account's balance-target/visibility owner. So
 > `resolveResponsibleHolderUserIds(CARTEL)` returns **all `OL_MEMBER`s**, of whom the notification
-> selectors keep those holding `KRT Member` (REQ-NOTIF-024); the
-> middle-band Bankleitung is a `BANK_MANAGEMENT` Keycloak role (not an org-unit membership) so it is not
-> notified via this seam but picks the request up in its bank-staff queue (ADR-0109). Each approver
-> still sees only its own band in „Anträge an unsere Konten" (the org-unit bank tab called „Fremde
-> Anträge" until 2026-10-03).
+> selectors keep those holding `KRT Member` (REQ-NOTIF-024). For a middle-band request,
+> `REQUIRED_APPROVER` resolves the stored Basetool role `BANK_MANAGEMENT` (ADR-0355, REQ-NOTIF-033).
+> Each approver sees only its own band in „Anträge an unsere Konten". Requests without an approval
+> band do not appear there for Bankleitung or OL acting in those roles.
 >
 > **Amended by ADR-0070 (responsible-holder change audit):** a **change** of an account's derived
 > responsible holder is now recorded in the admin bank audit log (REQ-BANK-012) as
@@ -2677,19 +2679,19 @@ management/admins book directly unrestricted, and the request-confirmation path 
 request — like every booking request they are (re-)recorded by the confirming bank employee
 (REQ-BANK-040); only the amount, note and justification transfer.
 
-**Notifications.** The responsible-holder notification (REQ-BANK-026) for a KRT request reaches all
-`OL_MEMBER`s (the collegial owner + top-band approver). The middle-band approver is the Bankleitung — a
-`BANK_MANAGEMENT` Keycloak realm role, not an org-unit membership, so it is not enumerable through the
-membership-based notification seam; the Bankleitung instead picks the request up in its bank-staff queue
-(reachable via `BANK_MANAGEMENT > BANK_EMPLOYEE`) and the requester notifies them directly (ADR-0109).
+**Notifications.** On KRT-account requests, the `REQUIRED_APPROVER` selector resolves the stored
+Basetool role `BANK_MANAGEMENT` for the middle band and `OL_MEMBER` seat holders with `KRT Member` for
+the top band (ADR-0355, REQ-NOTIF-033). No responsible-holder fallback applies on the KRT account.
+Bank staff retain their independent notification and queue rights (REQ-BANK-026).
 
 **Acceptance**
 
 - [x] A KRT withdrawal/transfer request is stamped `required_approver = null` (≤ T1) /
   `BANK_MANAGEMENT` (T1..T2) / `ORGANISATIONSLEITUNG` (> T2) at creation; a ≤ T1 request needs no
   approval, an over-band request needs the band approver's grant + the confirm checkbox.
-- [x] „Anträge an unsere Konten" routes a KRT band request only to its band approver (Bankleitung / OL); the
-  responsible-holder routing for every other account is unchanged.
+- [x] „Anträge an unsere Konten" routes a KRT request only to its band approver (Bankleitung / OL).
+  Unrouted requests are hidden from both when acting in those roles. Other accounts use the
+  responsible-holder approval route.
 - [x] `T1`/`T2` are settable only via `PATCH …/approval-tiers` gated `BANK_MANAGEMENT`, CARTEL-only,
   `T2 ≥ T1`, audited `CARTEL_APPROVAL_TIERS_SET/CLEARED`; the per-audience limit editor is hidden for
   the KRT account.
@@ -3249,7 +3251,8 @@ frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, with
 > bypass strict invalid-responsibility protection.
 
 The member who raised a booking request **MUST NOT grant its owner approval and MUST NOT confirm it**
-(`BANK_FOUR_EYES_REQUIRED`, 409). A second person decides. The check runs in
+A second person decides. If the requester would otherwise be permitted to act on the request,
+the guard returns `BANK_FOUR_EYES_REQUIRED` (409). The check runs in
 `BankBookingRequestService` under the row lock, after the pending and version guards, for `confirm`
 and for the grant of the owner approval; revoking an approval is not a grant and stays open.
 
@@ -3271,7 +3274,8 @@ and for the grant of the owner approval; revoking an approval is not a grant and
 **Acceptance**
 
 - [x] Confirming or granting the owner approval of one's own request is a 409
-  `BANK_FOUR_EYES_REQUIRED` and changes nothing.
+  `BANK_FOUR_EYES_REQUIRED` if the requester otherwise has the matching right. An unrouted
+  KRT request gives the OL no approval right (REQ-BANK-047), so the approval gate returns 403.
 - [x] An admin confirms and approves their own request.
 - [x] The requester rejects their own request.
 - [x] The queue marks the caller's own request as not confirmable; the approval list omits it for a
@@ -3639,7 +3643,7 @@ read out of the rest of the bank.
 
 ## Open questions
 
-1. ~~**Final role naming**~~ — **Resolved:** the realm roles are `Bank Employee` /
+1. ~~**Final role naming**~~ — **Resolved:** the Basetool roles are `Bank Employee` /
    `Bank Management`, seeded as `BANK_EMPLOYEE` / `BANK_MANAGEMENT` (REQ-BANK-007).
 2. ~~**Transfer destination rule**~~ — **Resolved:** a direct transfer needs the destination to be
    visible to the employee (REQ-BANK-011); a transfer *request* may target any active account and its
