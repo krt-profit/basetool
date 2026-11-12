@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { krtNumberInput } from '/js/kernel/krt-number-input.js';
+import { createMissionPlanningRows } from '/js/mission/mission-planning-rows.js';
 
 /** @typedef {string | number | boolean | null | undefined} FieldValue */
 /** @typedef {Record<string, FieldValue>} PlanningRow */
@@ -28,58 +28,10 @@ import { krtNumberInput } from '/js/kernel/krt-number-input.js';
  * @param {HTMLElement} list the row container
  * @param {HTMLTemplateElement} template the row markup
  * @param {HTMLInputElement} carrier the serialized planning rows
- * @param {string} hiddenShipType the fallback label for an unavailable ship type
+ * @param {Parameters<typeof createMissionPlanningRows>[2]} options the row controls and labels
  */
-export function createMissionDraftRows(list, template, carrier, hiddenShipType) {
-    /** Numbers rows in their current display order. */
-    function renumber() {
-        Array.from(list.children).forEach((row, index) => {
-            const badge = row.querySelector('.ae-num');
-            if (badge) badge.textContent = String(index + 1);
-        });
-    }
-
-    /**
-     * @param {PlanningRow} values the initial field values
-     * @returns {HTMLElement} the new row
-     */
-    function add(values = {}) {
-        const row = /** @type {HTMLElement} */ (
-            template.content.firstElementChild?.cloneNode(true)
-        );
-        row.querySelectorAll('[data-plan-field]').forEach((element) => {
-            const field = /** @type {HTMLInputElement | HTMLSelectElement} */ (element);
-            const name = field.dataset.planField || '';
-            if (!Object.hasOwn(values, name)) return;
-            const value = values[name];
-            if (field instanceof HTMLInputElement && field.type === 'checkbox') {
-                field.checked = value === true;
-                return;
-            }
-            const text = value == null ? '' : String(value);
-            if (
-                name === 'shipTypeId' &&
-                text &&
-                field instanceof HTMLSelectElement &&
-                !Array.from(field.options).some((option) => option.value === text)
-            ) {
-                field.add(new Option(hiddenShipType, text));
-            }
-            field.value = text;
-        });
-        list.append(row);
-        krtNumberInput.enhanceWithin(row);
-        return row;
-    }
-
-    /**
-     * @param {PlanningRow[]} rows the plan section displayed in the draft
-     */
-    function fill(rows) {
-        list.replaceChildren();
-        rows.forEach(add);
-        renumber();
-    }
+export function createMissionDraftRows(list, template, carrier, options) {
+    const planning = createMissionPlanningRows(list, template, options);
 
     /** Serializes the current draft for the mission create endpoint. */
     function serialize() {
@@ -104,11 +56,11 @@ export function createMissionDraftRows(list, template, carrier, hiddenShipType) 
     if (carrier.value) {
         try {
             const parsed = JSON.parse(carrier.value);
-            if (Array.isArray(parsed)) fill(parsed);
+            if (Array.isArray(parsed)) planning.fill(parsed);
         } catch (error) {
             if (!(error instanceof SyntaxError)) throw error;
         }
     }
 
-    return { list, add, renumber, fill, serialize };
+    return { ...planning, serialize };
 }

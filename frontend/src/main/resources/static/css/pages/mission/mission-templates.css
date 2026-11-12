@@ -46,6 +46,10 @@
         margin-block-start: 0.75rem;
     }
 
+    [data-template-delete][hidden] {
+        display: none;
+    }
+
     .mission-template-error {
         color: var(--color-danger-text);
     }

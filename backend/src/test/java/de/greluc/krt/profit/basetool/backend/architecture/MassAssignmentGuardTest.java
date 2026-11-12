@@ -63,6 +63,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.AddExternalParticipantRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionTemplateRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateSubMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionOwningOrgUnitRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateParticipantRequest;
@@ -324,6 +325,13 @@ class MassAssignmentGuardTest {
           Map.entry(OperationUpdateDto.class, Map.of("status", LIFECYCLE)),
           Map.entry(
               CreateMissionRequest.class, Map.of("owningOrgUnitId", STAMP, "status", LIFECYCLE)),
+          Map.entry(
+              CreateSubMissionRequest.class,
+              Map.of(
+                  "owningOrgUnitId",
+                  "the owning unit is stamped from the parent mission",
+                  "status",
+                  LIFECYCLE)),
           Map.entry(
               CreateMissionTemplateRequest.class,
               Map.of(

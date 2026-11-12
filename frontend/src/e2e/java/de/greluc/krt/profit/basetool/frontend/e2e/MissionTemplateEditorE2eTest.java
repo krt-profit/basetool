@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
@@ -39,6 +40,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -72,9 +74,10 @@ class MissionTemplateEditorE2eTest {
           E2eSupport.navigate(writer, STACK.baseUrl() + "/missions");
           writer.getByTestId("page-tabs").locator("a[href='/mission-templates']").click();
           E2eSupport.navigate(peer, STACK.baseUrl() + "/mission-templates");
+          String topic =
+              "mission-templates:" + peer.locator("#mission-template-scope").inputValue();
           peer.waitForFunction(
-              "window.krtLiveSync.subscribedTopics().some(topic => "
-                  + "topic.startsWith('mission-templates:'))");
+              "topic => window.krtLiveSync?.subscribedTopics().includes(topic)", topic);
 
           peer.getByTestId("mission-template-create").click();
           peer.locator("#mission-template-name").fill(draft);
@@ -103,8 +106,23 @@ class MissionTemplateEditorE2eTest {
               .filter(new Locator.FilterOptions().setHasText(name))
               .locator("[data-template-edit]")
               .click();
+          Locator objectives = writer.locator("[data-template-rows='objectives']");
+          Locator titles = objectives.locator("input[name='title']");
           writer.locator("[data-template-add='objectives']").click();
-          writer.locator("[data-template-rows='objectives'] input").fill("Rally at the jump point");
+          titles.first().fill("Rally at the jump point");
+          writer.locator("[data-template-add='objectives']").click();
+          Locator scout = objectives.locator("[data-planning-row]").last();
+          Locator scoutTitle = scout.locator("input[name='title']");
+          scoutTitle.fill("Scout ahead");
+          assertThat(scout.getByTestId("reorder-up"))
+              .hasAttribute("aria-label", java.util.regex.Pattern.compile(".*Scout ahead.*"));
+          scoutTitle.press("Alt+ArrowUp");
+          assertThat(titles.first()).hasValue("Scout ahead");
+          assertThat(titles.first()).isFocused();
+          assertThat(objectives.getByTestId("reorder-up").first())
+              .hasAttribute("aria-disabled", "true");
+          assertThat(writer.locator("#mission-template-form").getByTestId("reorder-live"))
+              .containsText("Scout ahead");
           writer.getByTestId("mission-template-save").click();
           assertThat(writer.locator("#mission-template-editor")).isHidden();
           writer
@@ -112,8 +130,8 @@ class MissionTemplateEditorE2eTest {
               .filter(new Locator.FilterOptions().setHasText(name))
               .locator("[data-template-edit]")
               .click();
-          assertThat(writer.locator("[data-template-rows='objectives'] input"))
-              .hasValue("Rally at the jump point");
+          assertThat(titles.first()).hasValue("Scout ahead");
+          assertThat(titles.last()).hasValue("Rally at the jump point");
 
           writer.locator("[data-template-delete]").click();
           writer.locator(".krt-confirm-ok").click();
@@ -174,16 +192,22 @@ class MissionTemplateEditorE2eTest {
             .getByTestId("mission-start-date")
             .fill(java.time.LocalDate.now().plusDays(7).toString());
         planner.getByTestId("mission-start-time").fill("12:00");
-        planner.locator("#mission-create-objective-add").click();
-        Locator goal = planner.locator("#mission-create-objective-list .ae-title");
+        Locator addGoal = planner.locator("#mission-create-objective-add");
+        Locator goals = planner.locator("#mission-create-objective-list");
+        addGoal.click();
+        Locator goal = goals.locator(".ae-title").first();
         goal.fill("Manual");
+        addGoal.click();
+        goals.locator(".ae-title").last().fill("Manual first");
+        goals.getByTestId("reorder-up").last().click();
+        assertThat(goal).hasValue("Manual first");
         Locator select = planner.locator("#mission-create-template-select");
         assertThat(
                 select.locator("option").filter(new Locator.FilterOptions().setHasText(template)))
             .hasCount(1);
         select.selectOption(new SelectOption().setLabel(template));
         planner.locator(".krt-confirm-cancel").click();
-        assertThat(goal).hasValue("Manual");
+        assertThat(goal).hasValue("Manual first");
 
         select.selectOption(new SelectOption().setLabel(template));
         planner.locator(".krt-confirm-ok").click();
@@ -195,7 +219,7 @@ class MissionTemplateEditorE2eTest {
 
         Locator calendarLink = planner.locator("#mission-calendar-link");
         calendarLink.fill("http://example.invalid");
-        E2eSupport.clickSubmitClearingFooter(planner.getByTestId("mission-save"));
+        assertEquals(422, E2eSupport.submitMissionDraft(planner));
         assertThat(planner.locator("[data-error-for='calendarLink']")).isVisible();
         assertThat(calendarLink).hasValue("http://example.invalid");
         assertThat(goal).hasValue("Rally");
@@ -225,7 +249,7 @@ class MissionTemplateEditorE2eTest {
         editor.getByTestId("mission-template-save").click();
         assertThat(editor.locator("#mission-template-editor")).isHidden();
 
-        E2eSupport.clickSubmitClearingFooter(planner.getByTestId("mission-save"));
+        assertEquals(409, E2eSupport.submitMissionDraft(planner));
         Locator detach = planner.locator("#mission-create-template-detach");
         assertThat(detach).isVisible();
         assertThat(goal).hasValue("Rally");
@@ -247,10 +271,10 @@ class MissionTemplateEditorE2eTest {
         editor.locator(".krt-confirm-ok").click();
         assertThat(editor.getByText(template)).hasCount(0);
 
-        E2eSupport.clickSubmitClearingFooter(planner.getByTestId("mission-save"));
+        assertEquals(409, E2eSupport.submitMissionDraft(planner));
         assertThat(detach).isVisible();
         detach.click();
-        E2eSupport.clickSubmitClearingFooter(planner.getByTestId("mission-save"));
+        assertEquals(201, E2eSupport.submitMissionDraft(planner));
         planner.waitForURL(url -> url.contains("?tab=verw"));
         assertThat(planner.locator("#mission-objective-list .ae-title")).hasValue("Rally again");
         assertThat(planner.locator(".mission-unit-box .uname")).containsText("Pathfinder");
@@ -298,15 +322,7 @@ class MissionTemplateEditorE2eTest {
           assertThat(editor.locator("[data-template-delete]")).isHidden();
           editor.locator("[data-template-cancel]").click();
           assertThat(editor).isHidden();
-          assertEquals(
-              0,
-              JsonParser.parseString(
-                      seeder.getBody(
-                          USERNAME,
-                          PASSWORD,
-                          "/api/v1/mission-templates?owningOrgUnitId=" + destination))
-                  .getAsJsonArray()
-                  .size());
+          assertEquals(0, readTemplates(seeder, destination).size());
 
           E2eSupport.navigate(page, missionUrl);
           page.getByTestId("mission-save-as-template").click();
@@ -322,7 +338,7 @@ class MissionTemplateEditorE2eTest {
           Locator unit = editor.locator("[data-template-rows='units'] li");
           assertThat(unit.locator("[name='shipTypeId']")).hasValue(shipType);
           assertThat(unit.locator("[name='highValueUnit']")).isChecked();
-          assertThat(unit.locator("[name='frequency']")).hasValue("127.46");
+          assertThat(unit.locator("[name='frequency']")).hasValue(Pattern.compile("^127[.,]46$"));
 
           editor.locator("#mission-template-owner").selectOption(destination);
           name.fill(templateName);
@@ -403,12 +419,16 @@ class MissionTemplateEditorE2eTest {
     return missionId;
   }
 
+  private static JsonArray readTemplates(BackendSeeder seeder, String destination) {
+    return JsonParser.parseString(
+            seeder.getBody(
+                USERNAME, PASSWORD, "/api/v1/mission-templates?owningOrgUnitId=" + destination))
+        .getAsJsonObject()
+        .getAsJsonArray("content");
+  }
+
   private static JsonObject readSavedTemplate(BackendSeeder seeder, String destination) {
-    var list =
-        JsonParser.parseString(
-                seeder.getBody(
-                    USERNAME, PASSWORD, "/api/v1/mission-templates?owningOrgUnitId=" + destination))
-            .getAsJsonArray();
+    var list = readTemplates(seeder, destination);
     assertEquals(1, list.size());
     String id = list.get(0).getAsJsonObject().get("id").getAsString();
     return JsonParser.parseString(

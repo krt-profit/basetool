@@ -52,12 +52,15 @@ class MissionTemplateBackendClientTest {
 
       backend.answerJson(
           """
-          [{"id":"%s","owningOrgUnitId":"%s","name":"Patrol","version":4}]
+          {"content":[{"id":"%s","owningOrgUnitId":"%s","name":"Patrol","version":4}],
+           "page":1,"size":50,"totalElements":51,"totalPages":2,"sort":[]}
           """
               .formatted(ID, OWNER));
-      assertThat(client.list(OWNER))
+      var page = client.list(OWNER, 1);
+      assertThat(page.totalElements()).isEqualTo(51);
+      assertThat(page.content())
           .containsExactly(new MissionTemplateSummaryDto(ID, OWNER, "Patrol", 4));
-      backend.expect("GET", BASE + "?owningOrgUnitId=" + OWNER, null);
+      backend.expect("GET", BASE + "?owningOrgUnitId=" + OWNER + "&page=1", null);
 
       backend.answerJson(template(4));
       assertThat(client.detail(ID).version()).isEqualTo(4);
@@ -108,13 +111,17 @@ class MissionTemplateBackendClientTest {
       String preview = "/api/v1/missions/template-preview/" + ID;
       String owner = "?owningOrgUnitId=" + OWNER;
 
-      backend.answerJson("[]");
-      assertThat(client.choices(null)).isEmpty();
-      backend.expect("GET", choices, null);
+      String emptyPage =
+          """
+          {"content":[],"page":0,"size":50,"totalElements":0,"totalPages":0,"sort":[]}
+          """;
+      backend.answerJson(emptyPage);
+      assertThat(client.choices(null, 0).content()).isEmpty();
+      backend.expect("GET", choices + "?page=0", null);
 
-      backend.answerJson("[]");
-      assertThat(client.choices(OWNER)).isEmpty();
-      backend.expect("GET", choices + owner, null);
+      backend.answerJson(emptyPage);
+      assertThat(client.choices(OWNER, 1).content()).isEmpty();
+      backend.expect("GET", choices + owner + "&page=1", null);
 
       backend.answerJson(template(3));
       assertThat(client.preview(ID, null).version()).isEqualTo(3);

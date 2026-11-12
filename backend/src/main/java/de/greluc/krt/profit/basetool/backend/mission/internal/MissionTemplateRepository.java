@@ -20,9 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
 import jakarta.persistence.LockModeType;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -48,5 +49,5 @@ interface MissionTemplateRepository extends JpaRepository<MissionTemplate, UUID>
       WHERE t.owningOrgUnit.id = :owner
       ORDER BY t.name, t.id
       """)
-  List<MissionTemplateSummaryDto> list(UUID owner);
+  Page<MissionTemplateSummaryDto> list(UUID owner, Pageable pageable);
 }

@@ -47,6 +47,8 @@ class NoStoreApiScopesTest {
         "/api/v1/notifications/stream",
         "/api/v1/mission-templates",
         "/api/v1/mission-templates/{templateId}",
+        "/api/v1/missions/template-choices",
+        "/api/v1/missions/template-preview/{templateId}",
         "/api/v1/missions/{missionId}/finance-entries",
         "/api/v1/missions/00000000-0000-4000-8000-000000000000/finance-entries",
         "/api/v1/operations/00000000-0000-4000-8000-000000000000/payouts",
@@ -191,7 +193,7 @@ class NoStoreApiScopesTest {
         .as(
             "the number of no-store families. Raise it here when you add one, and add the path to"
                 + " sensitiveFamiliesMatch in the same change")
-        .isEqualTo(34);
+        .isEqualTo(36);
     assertThat(NoStoreApiScopes.revalidateFamilies()).hasSize(28);
   }
 }

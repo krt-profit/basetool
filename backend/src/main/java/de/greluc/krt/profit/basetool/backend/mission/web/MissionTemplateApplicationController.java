@@ -19,13 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.web;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplateSummaryDto;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
@@ -50,15 +51,22 @@ class MissionTemplateApplicationController {
    * Lists templates for the effective mission owner.
    *
    * @param owningOrgUnitId the optional owner pick
-   * @return the available templates
+   * @param page the zero-based page index
+   * @param size the requested page size
+   * @return the page of available templates
    */
   @GetMapping("/template-choices")
   @Operation(
       operationId = "listMissionTemplateChoices",
-      summary = "List templates for mission creation")
-  public List<MissionTemplateSummaryDto> listChoices(
-      @RequestParam(required = false) @Nullable UUID owningOrgUnitId) {
-    return missions.templateChoices(owningOrgUnitId);
+      summary = "List templates for mission creation",
+      description = "Returns template summaries ordered by name and id.")
+  public PageResponse<MissionTemplateSummaryDto> listChoices(
+      @RequestParam(required = false) @Nullable UUID owningOrgUnitId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    return PageResponse.of(
+        missions.templateChoices(
+            owningOrgUnitId, PaginationUtil.createUnsortedPageRequest(page, size)));
   }
 
   /**

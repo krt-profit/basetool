@@ -27,18 +27,48 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.context.MessageSource;
+import org.springframework.context.NoSuchMessageException;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 
-/** Parses the JSON and datetime values of mission write adapters. */
+/** Resolves form values and field messages for mission write adapters. */
 @Slf4j
 final class MissionWriteValues {
 
   private MissionWriteValues() {}
 
   private static final ZoneId MISSION_TIME_ZONE = ZoneId.of("Europe/Berlin");
+
+  /**
+   * Resolves one localized validation message per invalid form field.
+   *
+   * @param bindingResult the form's validation result
+   * @param messageSource the localized messages
+   * @param locale the request locale
+   * @return the messages keyed by field
+   */
+  static Map<String, String> fieldErrors(
+      BindingResult bindingResult, MessageSource messageSource, Locale locale) {
+    Map<String, String> errors = new LinkedHashMap<>();
+    for (FieldError error : bindingResult.getFieldErrors()) {
+      String message;
+      try {
+        message = messageSource.getMessage(error, locale);
+      } catch (NoSuchMessageException _) {
+        message = error.getDefaultMessage();
+      }
+      errors.putIfAbsent(error.getField(), message);
+    }
+    return errors;
+  }
 
   /**
    * Reads a browser JSON value as a UUID.

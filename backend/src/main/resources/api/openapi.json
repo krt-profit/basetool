@@ -35037,6 +35037,7 @@
     },
     "/api/v1/mission-templates" : {
       "get" : {
+        "description" : "Returns template summaries ordered by name and id.",
         "operationId" : "listMissionTemplates",
         "parameters" : [ {
           "in" : "query",
@@ -35046,16 +35047,29 @@
             "type" : "string",
             "format" : "uuid"
           }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
         } ],
         "responses" : {
           "200" : {
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/MissionTemplateSummaryDto"
-                  }
+                  "$ref" : "#/components/schemas/PageResponseMissionTemplateSummaryDto"
                 }
               }
             },
@@ -35159,6 +35173,7 @@
         "x-domain" : "mission"
       },
       "post" : {
+        "description" : "A duplicate name in the owning org unit returns 409 DUPLICATE_ENTITY with a fieldErrors entry for name.",
         "operationId" : "createMissionTemplate",
         "requestBody" : {
           "content" : {
@@ -35388,6 +35403,7 @@
     },
     "/api/v1/mission-templates/{id}" : {
       "delete" : {
+        "description" : "A stale revision returns 409 OPTIMISTIC_LOCK.",
         "operationId" : "deleteMissionTemplate",
         "parameters" : [ {
           "in" : "path",
@@ -35619,6 +35635,7 @@
         "x-domain" : "mission"
       },
       "put" : {
+        "description" : "A stale revision returns 409 OPTIMISTIC_LOCK. A duplicate name in the owning org unit returns 409 DUPLICATE_ENTITY with a fieldErrors entry for name.",
         "operationId" : "updateMissionTemplate",
         "parameters" : [ {
           "in" : "path",
@@ -36649,6 +36666,7 @@
     },
     "/api/v1/missions/template-choices" : {
       "get" : {
+        "description" : "Returns template summaries ordered by name and id.",
         "operationId" : "listMissionTemplateChoices",
         "parameters" : [ {
           "in" : "query",
@@ -36658,37 +36676,41 @@
             "type" : "string",
             "format" : "uuid"
           }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
         } ],
         "responses" : {
           "200" : {
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/MissionTemplateSummaryDto"
-                  }
+                  "$ref" : "#/components/schemas/PageResponseMissionTemplateSummaryDto"
                 }
               }
             },
             "description" : "OK",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy: no-cache, must-revalidate",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -36812,21 +36834,12 @@
             "description" : "Template preview",
             "headers" : {
               "Cache-Control" : {
-                "description" : "Caching policy: no-cache, must-revalidate",
-                "schema" : {
-                  "type" : "string"
-                }
-              },
-              "ETag" : {
-                "description" : "Entity Tag for conditional requests",
+                "description" : "Caching policy: private, no-store",
                 "schema" : {
                   "type" : "string"
                 }
               }
             }
-          },
-          "304" : {
-            "description" : "Not Modified (ETag/If-None-Match)"
           },
           "400" : {
             "content" : {
@@ -41048,7 +41061,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/CreateMissionRequest"
+                "$ref" : "#/components/schemas/CreateSubMissionRequest"
               }
             }
           },
@@ -90637,6 +90650,73 @@
         },
         "required" : [ "channel", "contactVia", "kind", "name" ]
       },
+      "CreateSubMissionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "calendarLink" : {
+            "type" : "string",
+            "maxLength" : 2048,
+            "minLength" : 0,
+            "pattern" : "^(https://.*)?$"
+          },
+          "description" : {
+            "type" : "string",
+            "maxLength" : 20000,
+            "minLength" : 0
+          },
+          "isInternal" : {
+            "type" : "boolean"
+          },
+          "meetingPoint" : {
+            "type" : "string",
+            "maxLength" : 200,
+            "minLength" : 0
+          },
+          "meetingTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "name" : {
+            "type" : "string",
+            "maxLength" : 255,
+            "minLength" : 0
+          },
+          "objectives" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NewObjective"
+            }
+          },
+          "operationId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "owningOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "plannedEndTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "plannedStartTime" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string",
+            "maxLength" : 64,
+            "minLength" : 0
+          },
+          "steps" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/NewStep"
+            }
+          }
+        },
+        "required" : [ "name" ]
+      },
       "DashboardCatalogueResponse" : {
         "type" : "object",
         "properties" : {
@@ -100257,6 +100337,39 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/MissionListDto"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "size" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sort" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "totalElements" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "totalPages" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "PageResponseMissionTemplateSummaryDto" : {
+        "type" : "object",
+        "properties" : {
+          "content" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MissionTemplateSummaryDto"
             }
           },
           "page" : {

@@ -19,12 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.web;
 
+import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionTemplateRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplateDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplateOwnerDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplateService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionTemplateSummaryDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateMissionTemplateRequest;
+import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -58,14 +60,21 @@ public class MissionTemplateController {
    * Lists templates in one manageable org unit.
    *
    * @param owningOrgUnitId the requested unit
-   * @return the unit's template summaries
+   * @param page the zero-based page index
+   * @param size the requested page size
+   * @return the unit's page of template summaries
    */
   @GetMapping
   @Operation(
       operationId = "listMissionTemplates",
-      summary = "List mission templates in one owning org unit")
-  public List<MissionTemplateSummaryDto> list(@RequestParam UUID owningOrgUnitId) {
-    return templates.list(owningOrgUnitId);
+      summary = "List mission templates in one owning org unit",
+      description = "Returns template summaries ordered by name and id.")
+  public PageResponse<MissionTemplateSummaryDto> list(
+      @RequestParam UUID owningOrgUnitId,
+      @RequestParam(required = false) Integer page,
+      @RequestParam(required = false) Integer size) {
+    return PageResponse.of(
+        templates.list(owningOrgUnitId, PaginationUtil.createUnsortedPageRequest(page, size)));
   }
 
   /**
@@ -76,7 +85,12 @@ public class MissionTemplateController {
    */
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @Operation(operationId = "createMissionTemplate", summary = "Create a mission template")
+  @Operation(
+      operationId = "createMissionTemplate",
+      summary = "Create a mission template",
+      description =
+          "A duplicate name in the owning org unit returns 409 DUPLICATE_ENTITY with a"
+              + " fieldErrors entry for name.")
   public MissionTemplateDto create(@Valid @RequestBody CreateMissionTemplateRequest request) {
     return templates.create(request);
   }
@@ -101,7 +115,12 @@ public class MissionTemplateController {
    * @return the saved template and editor revision
    */
   @PutMapping("/{id}")
-  @Operation(operationId = "updateMissionTemplate", summary = "Update a mission template")
+  @Operation(
+      operationId = "updateMissionTemplate",
+      summary = "Update a mission template",
+      description =
+          "A stale revision returns 409 OPTIMISTIC_LOCK. A duplicate name in the owning org unit"
+              + " returns 409 DUPLICATE_ENTITY with a fieldErrors entry for name.")
   public MissionTemplateDto update(
       @PathVariable UUID id, @Valid @RequestBody UpdateMissionTemplateRequest request) {
     return templates.update(id, request);
@@ -115,7 +134,10 @@ public class MissionTemplateController {
    */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(operationId = "deleteMissionTemplate", summary = "Delete a mission template")
+  @Operation(
+      operationId = "deleteMissionTemplate",
+      summary = "Delete a mission template",
+      description = "A stale revision returns 409 OPTIMISTIC_LOCK.")
   public void delete(@PathVariable UUID id, @RequestParam long version) {
     templates.delete(id, version);
   }

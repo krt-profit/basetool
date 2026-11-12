@@ -23,12 +23,12 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.withBackendStatus;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionTemplateBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionTemplateRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionTemplateRequest;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -55,12 +55,14 @@ public class MissionTemplateAjaxController {
    * Lists templates that the caller may apply in the mission's effective owner.
    *
    * @param owningOrgUnitId the optional picked owner
-   * @return the applicable templates
+   * @param page the zero-based page index
+   * @return the applicable templates and paging metadata
    */
   @GetMapping("/missions/template-choices")
-  public List<MissionTemplateSummaryDto> choices(
-      @RequestParam(required = false) UUID owningOrgUnitId) {
-    return withBackendStatus(() -> templates.choices(owningOrgUnitId));
+  public PageResponse<MissionTemplateSummaryDto> choices(
+      @RequestParam(required = false) UUID owningOrgUnitId,
+      @RequestParam(defaultValue = "0") int page) {
+    return withBackendStatus(() -> templates.choices(owningOrgUnitId, page));
   }
 
   /**

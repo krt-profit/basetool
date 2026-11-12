@@ -17,21 +17,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mission.internal;
+package de.greluc.krt.profit.basetool.backend.mission.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.DomainProblem;
 import org.springframework.http.HttpStatus;
 
 /** Refuses a selected template whose scoped revision is no longer available. */
-final class MissionTemplateStaleException extends DomainProblem {
+public final class MissionTemplateStaleException extends DomainProblem {
 
   private static final String MESSAGE = "The selected mission template revision is unavailable";
 
-  MissionTemplateStaleException() {
+  /** Signals that the selected template revision is unavailable in the mission scope. */
+  public MissionTemplateStaleException() {
     super(MESSAGE);
   }
 
-  MissionTemplateStaleException(Throwable cause) {
+  /**
+   * Signals that the selected template revision failed the version check.
+   *
+   * @param cause the version check failure
+   */
+  public MissionTemplateStaleException(Throwable cause) {
     super(MESSAGE, cause);
   }
 

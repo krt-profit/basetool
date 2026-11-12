@@ -42,7 +42,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantDto;
-import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateSubMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.JoinMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
@@ -688,10 +688,9 @@ class MissionControllerLifecycleTest {
   @Test
   void createSubMission_forwardsCreateRequestToServiceAndMapsResult() {
     UUID parentId = UUID.randomUUID();
-    CreateMissionRequest request =
-        new CreateMissionRequest(
-            "Sub", "desc", null, "PLANNED", null, null, null, false, null, null, null, null, null,
-            null, null);
+    CreateSubMissionRequest request =
+        new CreateSubMissionRequest(
+            "Sub", "desc", null, "PLANNED", null, null, null, false, null, null, null, null, null);
     Mission persistedParent = new Mission();
     MissionDto parentDto = fullMissionDto(parentId);
     when(missionService.addSubMission(parentId, request)).thenReturn(persistedParent);

@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateSubMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
@@ -204,7 +205,8 @@ public class MissionController {
   @PreAuthorize("@missionAccessPolicy.canManageMission(#id, authentication)")
   @Operation(summary = "Create a sub-mission")
   public MissionDto createSubMission(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull CreateMissionRequest request) {
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid @NotNull CreateSubMissionRequest request) {
     return projection.cleanupForPeer(
         missionMapper.toDto(missionService.addSubMission(id, request)));
   }

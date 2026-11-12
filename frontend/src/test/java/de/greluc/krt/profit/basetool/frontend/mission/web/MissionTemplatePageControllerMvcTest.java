@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionCrewDto;
@@ -65,6 +66,7 @@ class MissionTemplatePageControllerMvcTest {
   private static final UUID OWNER = UUID.fromString("11111111-2222-3333-4444-555555555555");
   private static final UUID ID = UUID.fromString("99999999-8888-7777-6666-555555555555");
   private static final String BASE = "/api/v1/mission-templates";
+  private static final String LIST = BASE + "?owningOrgUnitId={ownerId}&page={page}";
 
   @Autowired private WebApplicationContext context;
   @MockitoBean private BackendApiClient backendApiClient;
@@ -79,8 +81,26 @@ class MissionTemplatePageControllerMvcTest {
             new MeLayoutResponse(null, null, List.of(), LayoutResponses.missionManager(), 0L));
     when(backendApiClient.get(eq(BASE + "/owning-org-units"), anyTypeRef()))
         .thenReturn(List.of(new MissionTemplateOwnerDto(OWNER, "Unit A")));
-    when(backendApiClient.get(eq(BASE + "?owningOrgUnitId={ownerId}"), anyTypeRef(), eq(OWNER)))
-        .thenReturn(List.of(new MissionTemplateSummaryDto(ID, OWNER, "Patrol", 4L)));
+    when(backendApiClient.get(eq(LIST), anyTypeRef(), eq(OWNER), eq(0)))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(new MissionTemplateSummaryDto(ID, OWNER, "Patrol", 4L)),
+                0,
+                1,
+                2,
+                2,
+                List.of()));
+    when(backendApiClient.get(eq(LIST), anyTypeRef(), eq(OWNER), eq(1)))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(new MissionTemplateSummaryDto(ID, OWNER, "Recovery", 1L)),
+                1,
+                1,
+                2,
+                2,
+                List.of()));
+    when(backendApiClient.get(eq(LIST), anyTypeRef(), eq(OWNER), eq(2)))
+        .thenReturn(new PageResponse<>(List.of(), 2, 1, 2, 2, List.of()));
 
     var mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String page =
@@ -91,17 +111,32 @@ class MissionTemplatePageControllerMvcTest {
             .getContentAsString();
     assertThat(page)
         .contains("Mission templates", "Unit A", "Patrol", "Main goal")
+        .contains("/mission-templates/list?ownerId=" + OWNER + "&amp;page=1")
         .contains("id=\"mission-template-editor\"", "id=\"mission-template-list\"");
 
     String fragment =
-        mvc.perform(get("/mission-templates/list").param("ownerId", OWNER.toString()))
+        mvc.perform(
+                get("/mission-templates/list")
+                    .param("ownerId", OWNER.toString())
+                    .param("page", "1"))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
             .getContentAsString();
     assertThat(fragment)
-        .contains("Patrol")
-        .doesNotContain("id=\"mission-template-editor\"", "id=\"mission-template-list\"");
+        .contains("Recovery", "data-template-page=\"1\"")
+        .doesNotContain("Patrol", "id=\"mission-template-editor\"", "id=\"mission-template-list\"");
+
+    String afterDeletion =
+        mvc.perform(
+                get("/mission-templates/list")
+                    .param("ownerId", OWNER.toString())
+                    .param("page", "2"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(afterDeletion).contains("Recovery", "data-template-page=\"1\"");
   }
 
   @Test
@@ -148,8 +183,8 @@ class MissionTemplatePageControllerMvcTest {
             new MeLayoutResponse(null, null, List.of(), LayoutResponses.missionManager(), 0L));
     when(backendApiClient.get(eq(BASE + "/owning-org-units"), anyTypeRef()))
         .thenReturn(List.of(new MissionTemplateOwnerDto(OWNER, "Destination")));
-    when(backendApiClient.get(eq(BASE + "?owningOrgUnitId={ownerId}"), anyTypeRef(), eq(OWNER)))
-        .thenReturn(List.of());
+    when(backendApiClient.get(eq(LIST), anyTypeRef(), eq(OWNER), eq(0)))
+        .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 
     String page =
         MockMvcBuilders.webAppContextSetup(context)

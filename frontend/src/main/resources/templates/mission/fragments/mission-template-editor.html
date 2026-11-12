@@ -46,6 +46,7 @@
             </button>
         </fieldset>
 
+        <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
         <p class="mission-template-error" id="mission-template-editor-error" hidden role="alert"></p>
         <div class="mission-template-actions">
             <button type="button" class="btn btn-quiet-danger" data-template-delete hidden>
@@ -58,11 +59,11 @@
     </form>
 
     <template data-template-row="objectives">
-        <li class="mission-template-row">
+        <li class="mission-template-row" data-planning-row>
             <div class="mission-template-fields">
                 <label>
                     <span th:text="#{mission.objective.title.placeholder}">Zieltext</span>
-                    <input type="text" name="title" required maxlength="500">
+                    <input type="text" name="title" data-reorder-name-field th:attr="data-reorder-fallback=#{mission.objective.title.placeholder}" required maxlength="500">
                 </label>
                 <label>
                     <span th:text="#{mission.objective.kind.label}">Klassifizierung</span>
@@ -76,11 +77,11 @@
         </li>
     </template>
     <template data-template-row="steps">
-        <li class="mission-template-row">
+        <li class="mission-template-row" data-planning-row>
             <div class="mission-template-fields">
                 <label>
                     <span th:text="#{mission.step.title.placeholder}">Schritt</span>
-                    <input type="text" name="title" required maxlength="500">
+                    <input type="text" name="title" data-reorder-name-field th:attr="data-reorder-fallback=#{mission.step.title.placeholder}" required maxlength="500">
                 </label>
                 <label>
                     <span th:text="#{missionTemplate.step.hint}">Zeit oder Ort</span>
@@ -91,11 +92,11 @@
         </li>
     </template>
     <template data-template-row="units">
-        <li class="mission-template-row">
+        <li class="mission-template-row" data-planning-row>
             <div class="mission-template-fields">
                 <label>
                     <span th:text="#{mission.unit.display_name}">Anzeigename</span>
-                    <input type="text" name="name" required maxlength="255">
+                    <input type="text" name="name" data-reorder-name-field th:attr="data-reorder-fallback=#{mission.unit.display_name}" required maxlength="255">
                 </label>
                 <label>
                     <span th:text="#{mission.unit.shiptype}">Schiffstyp</span>
@@ -124,14 +125,7 @@
     </template>
 </section>
 <div th:fragment="rowActions" class="mission-template-actions">
-    <button type="button" class="btn btn-ghost btn-icon" data-template-row-action="up"
-            th:aria-label="#{missionTemplate.row.up}" th:title="#{missionTemplate.row.up}">
-        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-up"/></svg>
-    </button>
-    <button type="button" class="btn btn-ghost btn-icon" data-template-row-action="down"
-            th:aria-label="#{missionTemplate.row.down}" th:title="#{missionTemplate.row.down}">
-        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg>
-    </button>
+    <span th:replace="~{kernel/fragments/components :: reorderControls(itemName='{name}', first=false, last=false)}"></span>
     <button type="button" class="btn btn-quiet-danger btn-icon" data-template-row-action="remove"
             th:aria-label="#{missionTemplate.row.remove}" th:title="#{missionTemplate.row.remove}">
         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>

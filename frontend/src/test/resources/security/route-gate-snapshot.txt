@@ -416,7 +416,10 @@
 /mission-templates/{id} PUT -> MissionTemplateAjaxController#update gate=class:isAuthenticated() layout=no
 /missions GET -> MissionPageController#listMissions gate=class:isAuthenticated() layout=yes
 /missions POST -> MissionWriteController#createMission gate=class:isAuthenticated() layout=yes
+/missions/ajax POST -> MissionCreateAjaxController#createMissionAjax gate=class:isAuthenticated() layout=no
 /missions/new GET -> MissionPageController#createMissionForm gate=class:isAuthenticated() layout=yes
+/missions/template-choices GET -> MissionTemplateAjaxController#choices gate=class:isAuthenticated() layout=no
+/missions/template-preview/{id} GET -> MissionTemplateAjaxController#preview gate=class:isAuthenticated() layout=no
 /missions/{id} GET -> MissionPageController#missionDetail gate=class:isAuthenticated() layout=yes
 /missions/{id} POST -> MissionWriteController#updateMission gate=class:isAuthenticated() layout=yes
 /missions/{id} POST headers=[X-Requested-With=XMLHttpRequest] -> MissionWriteController#updateMissionAjax gate=class:isAuthenticated() layout=yes

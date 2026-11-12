@@ -28,16 +28,17 @@ Template names are trimmed and compared case-sensitively within the owning unit.
 enforces uniqueness when writes race. Duplicate names produce an inline error on the name field.
 The editor saves the whole template under one revision. Changes to any planning row advance it.
 Edit and delete check the caller's current permission and require the revision the editor read.
-A stale revision conflicts and leaves the latest saved template intact.
+A stale revision conflicts and leaves the latest saved template intact. Planning rows use the shared
+reorder controls and keyboard shortcuts (REQ-UI-031).
 
-The list updates in place after local writes and committed changes by peers authorized for the
-same unit. List refreshes preserve any open editor's inputs and the revision from which those
-inputs were derived (REQ-FE-001, REQ-FE-003, REQ-FE-015). Each successful create, update or delete
-records an event in the Missionen activity audit in the same transaction. Failed, stale and
-unauthorized writes record no lifecycle event (REQ-AUDIT-001, REQ-AUDIT-007).
+The list is paginated and updates in place after local writes and committed changes by peers
+authorized for the same unit. List refreshes preserve any open editor's inputs and the revision from which those
+inputs were derived (REQ-FE-001, REQ-FE-003, REQ-FE-015). Each create, update or delete that
+changes stored state records an event in the Missionen activity audit in the same transaction.
+Failed, stale and unauthorized writes record no lifecycle event (REQ-AUDIT-001, REQ-AUDIT-007).
 
 **API.** `/api/v1/mission-templates` lists summaries for the explicit `owningOrgUnitId` query
-parameter. `GET /owning-org-units` under that base path lists the units the caller may manage.
+parameter. It returns a bounded `PageResponse` ordered by name and ID (REQ-API-005). `GET /owning-org-units` under that base path lists the units the caller may manage.
 `POST` to the base path creates the template with an explicit `owningOrgUnitId`.
 `GET /{id}` reads the plan, `PUT /{id}` updates it with a body containing `version`, and
 `DELETE /{id}` requires the `version` query parameter. A duplicate-name 409 uses
@@ -87,11 +88,12 @@ Standalone and operation-linked missions share one optional template selector in
 Choices and previews use the mission's effective owning org unit under REQ-ORG-004, REQ-ORG-016
 and REQ-ORG-032. The usual create permission and resolved owner govern template use. The linked
 operation's owner has no effect on template scope. No choices are offered for an ownerless draft
-or while an owner pick is required.
+or while an owner pick is required. The selector loads further pages in the same scope on demand.
 
 Applying a template copies its goals, procedure steps and unit planning values into editable draft
 rows. Applying or reapplying requires confirmation when it would replace an existing row.
-Cancel leaves the draft as it was. Changing owners preserves all draft data and detaches the
+The draft planning rows use the shared reorder controls (REQ-UI-031). Cancel leaves the draft as
+it was. Changing owners preserves all draft data and detaches the
 selected revision. The selector reloads in the new scope and discards pending responses from the
 previous scope. Validation failures leave the form and its inputs open.
 
@@ -107,9 +109,10 @@ The copied rows use normal mission validation, visibility, permissions and audit
 (REQ-MISSION-015, REQ-AUDIT-001). Later template changes or deletion have no effect on saved
 missions. The create flow navigates to the new mission's management tab (REQ-FE-006).
 
-**API.** Under `/api/v1/missions`, `GET /template-choices` returns the scoped summaries and
-`GET /template-preview/{templateId}` returns the scoped planning data and revision. Both accept the
-optional `owningOrgUnitId` query parameter. A preview outside the resolved scope or with an
+**API.** Under `/api/v1/missions`, `GET /template-choices` returns a bounded `PageResponse` ordered
+by name and ID (REQ-API-005). `GET /template-preview/{templateId}` returns the scoped planning data
+and revision. Both accept the optional `owningOrgUnitId` query parameter and return
+`Cache-Control: private, no-store` (REQ-SEC-031). A preview outside the resolved scope or with an
 unknown template ID returns 404. `POST /api/v1/missions` accepts optional `units` planning rows and
 `templateSelection: {id, version}`. A stale, deleted or inaccessible selected revision returns
 `409 MISSION_TEMPLATE_STALE`. Callers may omit the selection and submit the rows as manual data.

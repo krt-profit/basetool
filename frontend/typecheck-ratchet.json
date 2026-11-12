@@ -222,6 +222,7 @@
       "mission/mission-presence.js",
       "mission/mission-create-rows.js",
       "mission/mission-create.js",
+      "mission/mission-planning-rows.js",
       "mission/mission-template-editor.js",
       "mission/mission-templates.js",
       "mission/missions.js"

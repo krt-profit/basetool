@@ -78,6 +78,7 @@ import org.springframework.web.context.WebApplicationContext;
 class MissionTemplateHttpTest {
 
   private static final String PATH = "/api/v1/mission-templates";
+  private static final String CHOICES = "/api/v1/missions/template-choices";
 
   @Autowired private WebApplicationContext context;
   @Autowired private OrgUnitRepository orgUnits;
@@ -115,7 +116,47 @@ class MissionTemplateHttpTest {
 
     mvc.perform(get(PATH).with(admin()).param("owningOrgUnitId", owner.toString()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].name").value("Recovery"));
+        .andExpect(jsonPath("$.content[0].name").value("Recovery"));
+  }
+
+  @Test
+  void managementAndApplicationListPagesUseTheEffectiveOwnerAndStableOrder() throws Exception {
+    UUID owner = createOwner();
+    UUID foreign = createOwner();
+    create(owner, "Recovery");
+    create(owner, "Patrol");
+    create(foreign, "Extraction");
+    JwtRequestPostProcessor planner = planner(owner);
+
+    mvc.perform(
+            get(PATH)
+                .with(admin())
+                .param("owningOrgUnitId", owner.toString())
+                .param("page", "0")
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[*].name").value(contains("Patrol")))
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.totalPages").value(2));
+    mvc.perform(
+            get(PATH)
+                .with(admin())
+                .param("owningOrgUnitId", owner.toString())
+                .param("page", "1")
+                .param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[*].name").value(contains("Recovery")))
+        .andExpect(jsonPath("$.page").value(1));
+    mvc.perform(get(CHOICES).with(planner).param("page", "1").param("size", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[*].name").value(contains("Recovery")))
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.totalPages").value(2));
+    mvc.perform(get(CHOICES).with(planner).param("page", "-1").param("size", "1001"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[*].name").value(contains("Patrol", "Recovery")))
+        .andExpect(jsonPath("$.page").value(0))
+        .andExpect(jsonPath("$.size").value(1000));
   }
 
   @Test
@@ -166,7 +207,7 @@ class MissionTemplateHttpTest {
     expectAuditCount(id, "MISSION_TEMPLATE_DELETED", 1);
     mvc.perform(get(PATH).with(admin()).param("owningOrgUnitId", owner.toString()))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$").isEmpty());
+        .andExpect(jsonPath("$.content").isEmpty());
   }
 
   @Test
@@ -176,24 +217,28 @@ class MissionTemplateHttpTest {
     MvcResult saved = create(owner, "Recovery");
     String id = JsonPath.read(saved.getResponse().getContentAsString(), "$.id");
     Number version = JsonPath.read(saved.getResponse().getContentAsString(), "$.version");
-    String choices = "/api/v1/missions/template-choices";
     String preview = "/api/v1/missions/template-preview/{id}";
 
     JwtRequestPostProcessor planner = planner(owner);
 
-    mvc.perform(get(choices).with(planner))
+    mvc.perform(get(CHOICES).with(planner).header("If-None-Match", "*"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[*].id").value(contains(id)));
-    mvc.perform(get(preview, id).with(planner))
+        .andExpect(header().string("Cache-Control", "private, no-store"))
+        .andExpect(header().doesNotExist("ETag"))
+        .andExpect(jsonPath("$.content[*].id").value(contains(id)));
+    mvc.perform(get(preview, id).with(planner).header("If-None-Match", "*"))
         .andExpect(status().isOk())
+        .andExpect(header().string("Cache-Control", "private, no-store"))
+        .andExpect(header().doesNotExist("ETag"))
         .andExpect(jsonPath("$.version").value(version.intValue()))
         .andExpect(jsonPath("$.units").isEmpty());
     mvc.perform(get(preview, id).with(planner(foreign))).andExpect(status().isNotFound());
     mvc.perform(get(PATH + "/{id}", id).with(planner)).andExpect(status().isNotFound());
     JwtRequestPostProcessor ownerless = planner(null);
-    mvc.perform(get(choices).with(ownerless))
+    mvc.perform(get(CHOICES).with(ownerless))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$").isEmpty());
+        .andExpect(jsonPath("$.content").isEmpty())
+        .andExpect(jsonPath("$.totalElements").value(0));
     mvc.perform(get(preview, id).with(ownerless)).andExpect(status().isNotFound());
   }
 
@@ -496,8 +541,9 @@ class MissionTemplateHttpTest {
         mvc.perform(get(PATH).with(admin()).param("owningOrgUnitId", owner.toString()))
             .andExpect(status().isOk())
             .andReturn();
-    List<String> ids = JsonPath.read(list.getResponse().getContentAsString(), "$[*].id");
-    List<Number> versions = JsonPath.read(list.getResponse().getContentAsString(), "$[*].version");
+    List<String> ids = JsonPath.read(list.getResponse().getContentAsString(), "$.content[*].id");
+    List<Number> versions =
+        JsonPath.read(list.getResponse().getContentAsString(), "$.content[*].version");
     for (int index = 0; index < ids.size(); index++) {
       mvc.perform(
               delete(PATH + "/{id}", ids.get(index))

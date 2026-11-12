@@ -17,22 +17,32 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.mission.internal;
+package de.greluc.krt.profit.basetool.backend.mission.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemCode;
 import org.springframework.http.HttpStatus;
 
-/** Machine-readable errors from mission planning. */
-enum MissionProblemCode implements ProblemCode {
+/** Stable problem codes returned by mission planning. */
+public enum MissionProblemCode implements ProblemCode {
 
   /** The selected template revision is unavailable to the mission draft. */
   MISSION_TEMPLATE_STALE;
 
+  /**
+   * Returns the wire code for a mission planning failure.
+   *
+   * @return the constant name sent as the problem code
+   */
   @Override
   public String code() {
     return name();
   }
 
+  /**
+   * Returns the conflict status for an unavailable template revision.
+   *
+   * @return the HTTP status carried by the problem
+   */
   @Override
   public HttpStatus status() {
     return HttpStatus.CONFLICT;

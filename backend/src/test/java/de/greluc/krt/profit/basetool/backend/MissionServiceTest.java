@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateSubMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionNotificationPublisher;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -603,9 +604,9 @@ class MissionServiceTest {
     Mission saved =
         missionService.addSubMission(
             parentId,
-            new de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest(
-                "Sub", null, null, "PLANNED", null, null, null, false, null, null, null, null, null,
-                null, null));
+            new CreateSubMissionRequest(
+                "Sub", null, null, "PLANNED", null, null, null, false, null, null, null, null,
+                null));
 
     assertEquals(parentSquadron, saved.getOwningOrgUnit());
     assertEquals(parent, saved.getParent());

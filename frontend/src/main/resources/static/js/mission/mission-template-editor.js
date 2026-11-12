@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { krtNumberInput } from '/js/kernel/krt-number-input.js';
+import { createMissionPlanningRows } from '/js/mission/mission-planning-rows.js';
 import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 
 /** @typedef {ApiDto<'MissionTemplateDto'>} MissionTemplate */
@@ -43,15 +43,28 @@ export function createMissionTemplateEditor(panel) {
         form.querySelector('[data-template-delete]')
     );
 
-    /**
-     * @param {PlanningSection} section the kind of planning row
-     * @returns {HTMLOListElement} the ordered container
-     */
-    function rows(section) {
-        return /** @type {HTMLOListElement} */ (
-            form.querySelector(`[data-template-rows="${section}"]`)
-        );
-    }
+    const liveRegion = /** @type {HTMLElement | null} */ (
+        form.querySelector('[data-reorder-live]')
+    );
+    const sections = /** @type {const} */ (['objectives', 'steps', 'units']);
+    const rows = Object.fromEntries(
+        sections.map((section) => [
+            section,
+            createMissionPlanningRows(
+                /** @type {HTMLElement} */ (
+                    panel.querySelector(`[data-template-rows="${section}"]`)
+                ),
+                /** @type {HTMLTemplateElement} */ (
+                    panel.querySelector(`template[data-template-row="${section}"]`)
+                ),
+                {
+                    liveRegion,
+                    hiddenShipType: panel.dataset.hiddenShipType || '',
+                    onMove: () => form.dispatchEvent(new Event('input', { bubbles: true })),
+                },
+            ),
+        ]),
+    );
 
     /**
      * @param {Element} row the row to read
@@ -62,63 +75,6 @@ export function createMissionTemplateEditor(panel) {
         return /** @type {HTMLInputElement | HTMLSelectElement} */ (
             row.querySelector(`[name="${field}"]`)
         );
-    }
-
-    /**
-     * Updates the available keyboard reorder actions.
-     *
-     * @param {Element} list the ordered rows
-     */
-    function updateOrderControls(list) {
-        const entries = Array.from(list.children);
-        entries.forEach((entry, index) => {
-            const up = /** @type {HTMLButtonElement} */ (
-                entry.querySelector('[data-template-row-action="up"]')
-            );
-            const down = /** @type {HTMLButtonElement} */ (
-                entry.querySelector('[data-template-row-action="down"]')
-            );
-            up.disabled = index === 0;
-            down.disabled = index === entries.length - 1;
-        });
-    }
-
-    /**
-     * Appends a reusable planning row.
-     *
-     * @param {PlanningSection} section the kind of row
-     * @param {Record<string, string | number | boolean | null | undefined>} [values] the initial values
-     * @returns {HTMLElement} the inserted row
-     */
-    function addRow(section, values = {}) {
-        const template = /** @type {HTMLTemplateElement} */ (
-            panel.querySelector(`template[data-template-row="${section}"]`)
-        );
-        const row = /** @type {HTMLElement} */ (
-            template.content.firstElementChild?.cloneNode(true)
-        );
-        krtNumberInput.enhanceWithin(row);
-        Object.entries(values).forEach(([field, value]) => {
-            const input = control(row, field);
-            if (input instanceof HTMLInputElement && input.type === 'checkbox') {
-                input.checked = value === true;
-            } else {
-                const text = value == null ? '' : String(value);
-                if (
-                    field === 'shipTypeId' &&
-                    text &&
-                    input instanceof HTMLSelectElement &&
-                    !Array.from(input.options).some((option) => option.value === text)
-                ) {
-                    input.add(new Option(panel.dataset.hiddenShipType || '', text));
-                }
-                input.value = text;
-            }
-        });
-        const list = rows(section);
-        list.append(row);
-        updateOrderControls(list);
-        return row;
     }
 
     /**
@@ -144,9 +100,7 @@ export function createMissionTemplateEditor(panel) {
      */
     function open(ownerId, template) {
         form.reset();
-        rows('objectives').replaceChildren();
-        rows('steps').replaceChildren();
-        rows('units').replaceChildren();
+
         owner.value = template?.owningOrgUnitId || ownerId;
         const editing = Boolean(template && 'id' in template && template.id);
         owner.disabled = editing;
@@ -155,9 +109,9 @@ export function createMissionTemplateEditor(panel) {
             ? panel.dataset.editTitle || ''
             : panel.dataset.createTitle || '';
         deleteButton.hidden = !editing;
-        template?.objectives?.forEach((row) => addRow('objectives', row));
-        template?.steps?.forEach((row) => addRow('steps', row));
-        template?.units?.forEach((row) => addRow('units', row));
+        rows.objectives.fill(template?.objectives || []);
+        rows.steps.fill(template?.steps || []);
+        rows.units.fill(template?.units || []);
         showError('');
         panel.hidden = false;
         name.focus();
@@ -177,17 +131,17 @@ export function createMissionTemplateEditor(panel) {
     function readPlan() {
         return {
             name: name.value,
-            objectives: Array.from(rows('objectives').children, (row) => ({
+            objectives: Array.from(rows.objectives.list.children, (row) => ({
                 title: control(row, 'title').value,
                 kind: /** @type {NonNullable<MissionTemplate['objectives']>[number]['kind']} */ (
                     control(row, 'kind').value
                 ),
             })),
-            steps: Array.from(rows('steps').children, (row) => ({
+            steps: Array.from(rows.steps.list.children, (row) => ({
                 title: control(row, 'title').value,
                 meta: control(row, 'meta').value || undefined,
             })),
-            units: Array.from(rows('units').children, (row) => {
+            units: Array.from(rows.units.list.children, (row) => {
                 const frequency = control(row, 'frequency').value;
                 return {
                     name: control(row, 'name').value,
@@ -206,52 +160,18 @@ export function createMissionTemplateEditor(panel) {
         if (!button) return;
         const section = /** @type {PlanningSection | undefined} */ (button.dataset.templateAdd);
         if (section) {
-            addRow(section).querySelector('input')?.focus();
-        } else if (!moveOrRemoveRow(button)) {
-            return;
+            rows[section].add().querySelector('input')?.focus();
+        } else {
+            if (button.dataset.templateRowAction !== 'remove') return;
+            const row = button.closest('[data-planning-row]');
+            if (!row) return;
+            const section = sections.find((key) => rows[key].list === row.parentElement);
+            if (!section) return;
+            rows[section].remove(row);
         }
         form.dispatchEvent(new Event('input', { bubbles: true }));
     });
     name.addEventListener('input', () => showError(''));
-
-    /**
-     * Applies a row action and preserves keyboard focus when the action changes the row order.
-     *
-     * @param {HTMLButtonElement} button the action button
-     * @returns {boolean} whether the action modified planning content
-     */
-    function moveOrRemoveRow(button) {
-        const row = button.closest('li');
-        const list = row?.parentElement;
-        if (!row || !list) return false;
-        const next = row.nextElementSibling;
-        const previous = row.previousElementSibling;
-        switch (button.dataset.templateRowAction) {
-            case 'up':
-                if (!previous) return false;
-                previous.before(row);
-                break;
-            case 'down':
-                if (!next) return false;
-                next.after(row);
-                break;
-            case 'remove':
-                row.remove();
-                break;
-            default:
-                return false;
-        }
-        updateOrderControls(list);
-        if (row.isConnected) {
-            (button.disabled ? row.querySelector('input') : button)?.focus();
-        } else {
-            const focusRow = next || previous;
-            (
-                focusRow?.querySelector('input') || list.parentElement?.querySelector('button')
-            )?.focus();
-        }
-        return true;
-    }
 
     return { form, owner, open, close, readPlan, showError };
 }

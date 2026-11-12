@@ -142,7 +142,22 @@ class MissionServiceOperationLinkTest {
     when(operationSummaryProvider.linkability(operationId))
         .thenReturn(OperationLinkability.NOT_LINKABLE);
 
-    assertThatThrownBy(() -> missionService.addSubMission(parent.getId(), request(operationId)))
+    CreateSubMissionRequest request =
+        new CreateSubMissionRequest(
+            "Einsatz",
+            null,
+            null,
+            "PLANNED",
+            null,
+            null,
+            null,
+            false,
+            operationId,
+            null,
+            null,
+            null,
+            null);
+    assertThatThrownBy(() -> missionService.addSubMission(parent.getId(), request))
         .isInstanceOf(AccessDeniedException.class);
     verify(missionRepository, never()).save(any(Mission.class));
     verifyNoInteractions(auditRecorder);

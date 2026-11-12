@@ -294,6 +294,7 @@ hierarchy (a sealed kernel of kinds plus one `ProblemCode` enum per module) land
   module's `ActingMemberFilter` answers), `inventory.api.InventoryProblemCode` (`OVER_ALLOCATION`),
   `joborder.api.JobOrderProblemCode` (`PRODUCTION_ALLOCATION`, `MONEY_PROVISION_REFUSED`),
   `refinery.api.RefineryProblemCode` (`MISSION_PARTICIPANT_REQUIRED`),
+  `mission.api.MissionProblemCode` (`MISSION_TEMPLATE_STALE`),
   `scope.api.ScopeProblemCode` (`OWNER_ORG_UNIT_REQUIRED`), `supply.api.SupplyProblemCode` (the
   `SUPPLY_*` codes), `purchasing.api.PurchasingProblemCode` (the `PURCHASING_*` codes),
   `orgunit.api.OrgUnitProblemCode` (`LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER`),

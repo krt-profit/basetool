@@ -2321,7 +2321,7 @@ family decides, so a sub-family can differ from its parent.
 | `no-store` | What makes it sensitive |
 | --- | --- |
 | `/api/v1/bank/**` (the org-unit slice `/api/v1/bank/org-units/**` included) | bank ledgers, balances and holder handles |
-| `/api/v1/mission-templates/**` | reusable planning content and owner options scoped to the caller |
+| `/api/v1/mission-templates/**`, `/api/v1/missions/template-choices`, `/api/v1/missions/template-preview/{templateId}` | reusable planning content scoped to the caller's management reach or effective mission owner |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
 | `/api/v1/navigation/**` | **new** — one member's own navigation preferences (REQ-UI-032) |
 | `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |

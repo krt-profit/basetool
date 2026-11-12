@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.mission.client;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionTemplateRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateOwnerDto;
@@ -42,8 +43,9 @@ public class MissionTemplateBackendClient {
   private static final String CHOICES = "/api/v1/missions/template-choices";
   private static final String PREVIEW = "/api/v1/missions/template-preview/{id}";
   private static final String OWNER_PARAM = "?owningOrgUnitId={ownerId}";
-  private static final ParameterizedTypeReference<List<MissionTemplateSummaryDto>> SUMMARIES =
-      new ParameterizedTypeReference<>() {};
+  private static final String PAGE_PARAM = "?page={page}";
+  private static final ParameterizedTypeReference<PageResponse<MissionTemplateSummaryDto>>
+      SUMMARIES = new ParameterizedTypeReference<>() {};
   private static final ParameterizedTypeReference<List<MissionTemplateOwnerDto>> OWNERS =
       new ParameterizedTypeReference<>() {};
 
@@ -53,12 +55,13 @@ public class MissionTemplateBackendClient {
    * Lists templates applicable to the effective owner of a new mission.
    *
    * @param ownerId the optional picked owner
-   * @return the applicable templates
+   * @param page the zero-based page index
+   * @return the applicable template summaries and paging metadata
    */
-  public List<MissionTemplateSummaryDto> choices(@Nullable UUID ownerId) {
+  public PageResponse<MissionTemplateSummaryDto> choices(@Nullable UUID ownerId, int page) {
     return ownerId == null
-        ? backend.get(CHOICES, SUMMARIES)
-        : backend.get(CHOICES + OWNER_PARAM, SUMMARIES, ownerId);
+        ? backend.get(CHOICES + PAGE_PARAM, SUMMARIES, page)
+        : backend.get(CHOICES + OWNER_PARAM + "&page={page}", SUMMARIES, ownerId, page);
   }
 
   /**
@@ -87,10 +90,11 @@ public class MissionTemplateBackendClient {
    * Lists templates for an eligible owner.
    *
    * @param ownerId the owning unit
-   * @return the template summaries
+   * @param page the zero-based page index
+   * @return the template summaries and paging metadata
    */
-  public List<MissionTemplateSummaryDto> list(UUID ownerId) {
-    return backend.get(TEMPLATES + "?owningOrgUnitId={ownerId}", SUMMARIES, ownerId);
+  public PageResponse<MissionTemplateSummaryDto> list(UUID ownerId, int page) {
+    return backend.get(TEMPLATES + OWNER_PARAM + "&page={page}", SUMMARIES, ownerId, page);
   }
 
   /**

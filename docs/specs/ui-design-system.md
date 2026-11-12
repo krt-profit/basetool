@@ -2325,7 +2325,10 @@ without a drag, and every such list uses the one kernel helper `krtReorder`
    (phones, tablets) the helper cancels a drag start, so a swipe scrolls instead of grabbing a row.
 
 The job-order priority queue (REQ-ORDERS-020) and the frequency types of the mission-data admin
-page use it; positions there count the reorderable rows of the rendered page.
+page use it; positions there count the reorderable rows of the rendered page. Mission create
+and mission template forms also use the helper for their ordered draft rows. Each move updates
+the form locally and announces the new position. The final form submission persists the draft
+order (REQ-MISSION-015, REQ-MISSION-035, REQ-MISSION-037).
 
 **Enforced by:** `:frontend:testReorderJs` (`scripts/krt-reorder.test.mjs`),
 `OrdersQueueReorderWithoutDragE2eTest`, `AdminFrequencyTypeReorderWithoutDragE2eTest` ·

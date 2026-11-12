@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.mission.api.MissionTemplateStaleException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
@@ -47,6 +48,8 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -63,6 +66,7 @@ public class MissionTemplateService {
   private static final String UNIQUE_OWNER_NAME = "uk_mission_template_owner_name";
 
   private final MissionTemplateRepository templates;
+  private final MissionTemplateMapper mapper;
   private final AuditRecorder auditRecorder;
   private final LiveSyncPublisher liveSync;
   private final OrgUnitRepository orgUnits;
@@ -74,11 +78,12 @@ public class MissionTemplateService {
    * Lists templates owned by the authorized target unit.
    *
    * @param owner the target org unit
-   * @return template summaries ordered by name
+   * @param pageable the requested page
+   * @return template summaries ordered by name and id
    */
-  public List<MissionTemplateSummaryDto> list(UUID owner) {
+  public Page<MissionTemplateSummaryDto> list(UUID owner, Pageable pageable) {
     requireOwner(owner);
-    return templates.list(owner);
+    return templates.list(owner, pageable);
   }
 
   /**
@@ -95,7 +100,7 @@ public class MissionTemplateService {
     templates.save(template);
     flush();
     recordChange(template, AuditEventType.MISSION_TEMPLATE_CREATED);
-    return template.detail();
+    return mapper.toDto(template);
   }
 
   /**
@@ -106,7 +111,7 @@ public class MissionTemplateService {
    */
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public MissionTemplateDto get(UUID id) {
-    return requireTemplate(templates.findById(id)).detail();
+    return mapper.toDto(requireTemplate(templates.findById(id)));
   }
 
   /**
@@ -126,7 +131,7 @@ public class MissionTemplateService {
       flush();
       recordChange(template, AuditEventType.MISSION_TEMPLATE_UPDATED);
     }
-    return template.detail();
+    return mapper.toDto(template);
   }
 
   /**
@@ -158,17 +163,19 @@ public class MissionTemplateService {
         .toList();
   }
 
-  List<MissionTemplateSummaryDto> choices(@Nullable OrgUnit owner) {
-    return owner == null || !owner.isActive() ? List.of() : templates.list(owner.getId());
+  Page<MissionTemplateSummaryDto> choices(@Nullable OrgUnit owner, Pageable pageable) {
+    return owner == null || !owner.isActive()
+        ? Page.empty(pageable)
+        : templates.list(owner.getId(), pageable);
   }
 
   MissionTemplateDto preview(@Nullable OrgUnit owner, UUID id) {
     if (owner == null || !owner.isActive()) {
       throw new NotFoundException(TEMPLATE_NOT_FOUND);
     }
-    return Entities.require(
-            templates.findByIdAndOwningOrgUnitId(id, owner.getId()), TEMPLATE_NOT_FOUND)
-        .detail();
+    return mapper.toDto(
+        Entities.require(
+            templates.findByIdAndOwningOrgUnitId(id, owner.getId()), TEMPLATE_NOT_FOUND));
   }
 
   void checkSelection(@Nullable OrgUnit owner, CreateMissionRequest.TemplateSelection selection) {

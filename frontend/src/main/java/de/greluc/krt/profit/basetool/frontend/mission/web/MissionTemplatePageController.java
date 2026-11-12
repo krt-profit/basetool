@@ -23,6 +23,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionTemplateBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionTemplateRequest;
@@ -30,6 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateOwnerDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplatePlan;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateSummaryDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
@@ -91,9 +93,9 @@ public class MissionTemplatePageController {
       model.addAttribute("templateDraft", jsonMapper.writeValueAsString(draft(owner, source)));
     }
     model.addAttribute("owners", owners);
-    model.addAttribute("ownerId", owner);
-    model.addAttribute(
-        "templates", owner == null ? List.of() : withBackendStatus(() -> templates.list(owner)));
+    if (owner != null) {
+      addListModel(owner, 0, model);
+    }
     var ships = owner == null ? null : missions.shipTypes();
     model.addAttribute(
         "shipTypes", ships == null || ships.content() == null ? List.of() : ships.content());
@@ -105,13 +107,29 @@ public class MissionTemplatePageController {
    * Renders the list fragment for an eligible owner without touching the editor.
    *
    * @param ownerId the selected owning unit
+   * @param page the zero-based page index
    * @param model the fragment view model
    * @return the list fragment
    */
   @GetMapping("/list")
-  public String list(@RequestParam UUID ownerId, Model model) {
-    model.addAttribute("templates", withBackendStatus(() -> templates.list(ownerId)));
+  public String list(
+      @RequestParam UUID ownerId, @RequestParam(defaultValue = "0") int page, Model model) {
+    addListModel(ownerId, page, model);
     return "mission/mission-templates :: list";
+  }
+
+  private void addListModel(UUID owner, int page, Model model) {
+    PageResponse<MissionTemplateSummaryDto> result =
+        withBackendStatus(() -> templates.list(owner, page));
+    if (result != null) {
+      int last = Math.max(0, result.totalPages() - 1);
+      if (result.page() > last) {
+        result = withBackendStatus(() -> templates.list(owner, last));
+      }
+    }
+    model.addAttribute("ownerId", owner);
+    model.addAttribute("templatePage", result);
+    model.addAttribute("templates", PageResponse.contentOf(result));
   }
 
   /**

@@ -400,14 +400,16 @@ public class MissionService implements MissionCommands {
    * Lists templates for the owner the mission create request would receive.
    *
    * @param owningOrgUnitId the optional owner pick
-   * @return available templates or an empty list while no owner is chosen or can be stamped
+   * @param pageable the requested page
+   * @return available templates or an empty page while no owner is chosen or can be stamped
    */
-  public List<MissionTemplateSummaryDto> templateChoices(@Nullable UUID owningOrgUnitId) {
+  public Page<MissionTemplateSummaryDto> templateChoices(
+      @Nullable UUID owningOrgUnitId, Pageable pageable) {
     try {
       return missionTemplateService.choices(
-          resolveCreateOwner(userService.getCurrentUser().orElse(null), owningOrgUnitId));
+          resolveCreateOwner(userService.getCurrentUser().orElse(null), owningOrgUnitId), pageable);
     } catch (OwnerOrgUnitRequiredException ignored) {
-      return List.of();
+      return Page.empty(pageable);
     }
   }
 
@@ -691,12 +693,13 @@ public class MissionService implements MissionCommands {
    * @throws AccessDeniedException when the caller may not link a mission to {@code operationId}
    */
   @Transactional
-  public Mission addSubMission(@NotNull UUID parentMissionId, CreateMissionRequest request) {
+  public Mission addSubMission(
+      @NotNull UUID parentMissionId, @NotNull CreateSubMissionRequest request) {
     Mission parent =
         Entities.require(missionRepository.findById(parentMissionId), "Parent mission not found");
 
     Mission subMission = new Mission();
-    applyCreatePayload(subMission, request);
+    applyCreatePayload(subMission, request.toMissionRequest());
     subMission.setParent(parent);
     subMission.setOwningOrgUnit(parent.getOwningOrgUnit());
     requireOwningOrgUnitForInternal(subMission.getIsInternal(), subMission.getOwningOrgUnit());

@@ -30,6 +30,7 @@ const workspace = document.getElementById('mission-template-workspace');
 const panel = document.getElementById('mission-template-editor');
 const scope = document.querySelector('#mission-template-scope');
 const createButton = document.querySelector('[data-testid="mission-template-create"]');
+const list = document.getElementById('mission-template-list');
 const listError = document.getElementById('mission-template-list-error');
 
 if (
@@ -37,9 +38,10 @@ if (
     panel &&
     scope instanceof HTMLSelectElement &&
     createButton instanceof HTMLButtonElement &&
+    list &&
     listError
 ) {
-    setup(workspace, panel, scope, createButton, listError);
+    setup(workspace, panel, scope, createButton, list, listError);
 }
 
 /**
@@ -49,9 +51,10 @@ if (
  * @param {HTMLElement} panel the editor panel
  * @param {HTMLSelectElement} scope the selected list scope
  * @param {HTMLButtonElement} createButton the blank editor action
+ * @param {HTMLElement} list the paginated list container
  * @param {HTMLElement} listError the workspace error message
  */
-function setup(workspace, panel, scope, createButton, listError) {
+function setup(workspace, panel, scope, createButton, list, listError) {
     const messages = workspace.dataset;
     const api = messages.templatesUrl || '';
     const editor = createMissionTemplateEditor(panel);
@@ -63,13 +66,16 @@ function setup(workspace, panel, scope, createButton, listError) {
     let renderedScope = scope.value;
     let pending = false;
     let listSequence = 0;
+    let requestedPage = 0;
+    let renderedPage = 0;
     const topic = () => `mission-templates:${scope.value}`;
 
     const sections = krtPageSections.create({
         topicClass: 'MISSION_TEMPLATES',
         sections: { list: { container: '#mission-template-list' } },
         topic,
-        pageUrl: () => `${messages.listUrl}?ownerId=${encodeURIComponent(scope.value)}`,
+        pageUrl: () =>
+            `${messages.listUrl}?ownerId=${encodeURIComponent(scope.value)}&page=${requestedPage}`,
         broadcast() {},
         receiver: {
             retargetable: true,
@@ -101,14 +107,23 @@ function setup(workspace, panel, scope, createButton, listError) {
     ) {
         const sequence = ++listSequence;
         const requestedScope = scope.value;
-        if (retarget) sections.receiver?.retarget(topic());
+        if (retarget) {
+            requestedPage = 0;
+            sections.receiver?.retarget(topic());
+        }
         showListError('');
         const [updated] = await refresh();
         if (sequence !== listSequence || requestedScope !== scope.value) return;
         if (updated) {
             renderedScope = requestedScope;
+            renderedPage =
+                Number(
+                    list.querySelector('[data-template-page]')?.getAttribute('data-template-page'),
+                ) || 0;
+            requestedPage = renderedPage;
         } else {
             scope.value = renderedScope;
+            requestedPage = renderedPage;
             sections.receiver?.retarget(topic());
             showListError(messages.listError || '');
         }
@@ -166,6 +181,22 @@ function setup(workspace, panel, scope, createButton, listError) {
     }
 
     scope.addEventListener('change', () => refreshList(true));
+    list.addEventListener(
+        'click',
+        async (event) => {
+            const link = /** @type {Element | null} */ (event.target)?.closest(
+                '.pagination a[href]',
+            );
+            if (!(link instanceof HTMLAnchorElement)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            requestedPage = Number(new URL(link.href).searchParams.get('page'));
+            const hadFocus = document.activeElement === link;
+            await refreshList(false);
+            if (hadFocus && document.activeElement === document.body) list.focus();
+        },
+        { capture: true },
+    );
     createButton.addEventListener('click', async () => {
         if (pending) return;
         setPending(true);

@@ -37,8 +37,8 @@
                             th:selected="${owner.id == ownerId}">Staffel</option>
                 </select>
             </div>
-            <div id="mission-template-list" aria-live="polite">
-                <th:block th:fragment="list">
+            <div id="mission-template-list" tabindex="-1" aria-live="polite">
+                <div th:fragment="list" th:attr="data-template-page=${templatePage != null ? templatePage.page() : 0}">
                 <table class="data-table" th:unless="${#lists.isEmpty(templates)}">
                     <thead>
                         <tr>
@@ -60,7 +60,9 @@
                     </tbody>
                 </table>
                 <p th:if="${#lists.isEmpty(templates)}" th:text="#{missionTemplate.empty}">Keine Missionsvorlagen</p>
-                </th:block>
+                <nav th:replace="~{kernel/fragments/pagination :: pagination(pageResponse=${templatePage},
+                        baseUrl=@{/mission-templates/list(ownerId=${ownerId})})}"></nav>
+                </div>
             </div>
             <p hidden role="alert" id="mission-template-list-error" class="mission-template-error"></p>
         </section>

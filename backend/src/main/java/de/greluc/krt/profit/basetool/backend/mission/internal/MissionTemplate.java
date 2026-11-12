@@ -35,7 +35,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OrderColumn;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -62,10 +61,12 @@ class MissionTemplate extends AbstractEntity<UUID> {
   private OrgUnit owningOrgUnit;
 
   /** The display name within the owner. */
+  @Getter
   @Column(nullable = false)
   private String name;
 
   /** The goals in editor order. */
+  @Getter
   @ElementCollection
   @CollectionTable(
       name = "mission_template_objective",
@@ -74,12 +75,14 @@ class MissionTemplate extends AbstractEntity<UUID> {
   private List<MissionTemplatePlan.Objective> objectives = new ArrayList<>();
 
   /** The procedure in editor order. */
+  @Getter
   @ElementCollection
   @CollectionTable(name = "mission_template_step", joinColumns = @JoinColumn(name = "template_id"))
   @OrderColumn(name = "order_index")
   private List<MissionTemplatePlan.Step> steps = new ArrayList<>();
 
   /** The units in editor order. */
+  @Getter
   @ElementCollection
   @CollectionTable(name = "mission_template_unit", joinColumns = @JoinColumn(name = "template_id"))
   @OrderColumn(name = "order_index")
@@ -109,16 +112,5 @@ class MissionTemplate extends AbstractEntity<UUID> {
     existing.clear();
     existing.addAll(replacement);
     return true;
-  }
-
-  MissionTemplateDto detail() {
-    return new MissionTemplateDto(
-        Objects.requireNonNull(id),
-        owningOrgUnit.getId(),
-        name,
-        getVersion(),
-        List.copyOf(objectives),
-        List.copyOf(steps),
-        List.copyOf(units));
   }
 }

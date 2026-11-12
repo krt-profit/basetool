@@ -24,14 +24,20 @@ import { resetUnsavedChanges } from '/js/kernel/unsaved-changes.js';
 import { createMissionDraftRows } from '/js/mission/mission-create-rows.js';
 
 /** @typedef {ApiDto<'MissionTemplateDto'>} MissionTemplate */
-/** @typedef {ApiDto<'MissionTemplateSummaryDto'>} TemplateChoice */
+/** @typedef {ApiDto<'PageResponseMissionTemplateSummaryDto'>} TemplateChoicePage */
 
 /** Binds the template preview and the editable planning rows of the mission create form. */
 function initMissionCreate() {
     const formElement = document.getElementById('mission-form');
     const selector = document.getElementById('mission-create-template-select');
-    if (!(formElement instanceof HTMLFormElement) || !(selector instanceof HTMLSelectElement))
+    const more = document.getElementById('mission-create-template-more');
+    if (
+        !(formElement instanceof HTMLFormElement) ||
+        !(selector instanceof HTMLSelectElement) ||
+        !(more instanceof HTMLButtonElement)
+    )
         return;
+    const loadMore = more;
     const form = formElement;
     const select = selector;
 
@@ -55,6 +61,9 @@ function initMissionCreate() {
     );
 
     const sections = /** @type {const} */ (['objective', 'step', 'unit']);
+    const liveRegion = /** @type {HTMLElement | null} */ (
+        form.querySelector('[data-reorder-live]')
+    );
     const rows = Object.fromEntries(
         sections.map((section) => [
             section,
@@ -68,22 +77,30 @@ function initMissionCreate() {
                 /** @type {HTMLInputElement} */ (
                     document.getElementById(`mission-${section}s-json`)
                 ),
-                labels.hiddenShipType || '',
+                {
+                    liveRegion,
+                    hiddenShipType: labels.hiddenShipType || '',
+                    onMove: () => form.dispatchEvent(new Event('input', { bubbles: true })),
+                },
             ),
         ]),
     );
 
     let choiceGeneration = 0;
+    let nextChoicePage = 0;
     /** @type {AbortController | null} */
     let preview = null;
     let submitting = false;
 
     /**
      * @param {string} path the same-origin template endpoint
+     * @param {URLSearchParams} [params] the additional query parameters
      * @returns {string} the path with the optional owner pick
      */
-    function scopedUrl(path) {
-        return owner?.value ? `${path}?owningOrgUnitId=${encodeURIComponent(owner.value)}` : path;
+    function scopedUrl(path, params = new URLSearchParams()) {
+        if (owner?.value) params.set('owningOrgUnitId', owner.value);
+        const query = params.toString();
+        return query ? `${path}?${query}` : path;
     }
 
     /** @param {string} message the localized error */
@@ -101,27 +118,87 @@ function initMissionCreate() {
         reapply.hidden = !hasChoice || !templateId.value;
     }
 
-    /** Refreshes choices without modifying the draft or its applied revision. */
-    async function loadChoices() {
-        const generation = ++choiceGeneration;
-        select.disabled = true;
-        try {
-            /** @type {TemplateChoice[]} */
-            const choices = await krtFetch.getJson(scopedUrl('/missions/template-choices'), {
-                key: 'mission-create-template-choices',
-            });
-            if (generation !== choiceGeneration) return;
-            select.length = 1;
-            choices.forEach(({ id, name }) => {
-                if (id && name) select.add(new Option(name, id));
-            });
-            select.disabled = select.length === 1;
-        } catch {
-            if (generation !== choiceGeneration) return;
-            select.length = 1;
-            showError(labels.readError || '');
+    /**
+     * Appends a template that the caller may apply.
+     *
+     * @param {string | undefined} id the template id
+     * @param {string | undefined} name the template name
+     */
+    function appendChoice(id, name) {
+        if (id && name && !Array.from(select.options).some((option) => option.value === id)) {
+            select.add(new Option(name, id));
         }
-        syncSelection();
+    }
+
+    /**
+     * Restores an applied selection outside the first page if it is still available.
+     *
+     * @param {number} generation the current choice request
+     */
+    async function restoreAppliedChoice(generation) {
+        const id = templateId.value;
+        try {
+            /** @type {MissionTemplate} */
+            const data = await krtFetch.getJson(
+                scopedUrl(`/missions/template-preview/${encodeURIComponent(id)}`),
+                { key: 'mission-create-template-current' },
+            );
+            if (generation !== choiceGeneration || templateId.value !== id) return;
+            appendChoice(data.id, data.name);
+            select.disabled = select.length === 1;
+            syncSelection();
+        } catch (failure) {
+            if (generation !== choiceGeneration || templateId.value !== id) return;
+            if (!(
+                failure &&
+                typeof failure === 'object' &&
+                'status' in failure &&
+                failure.status === 404
+            )) {
+                showError(labels.readError || '');
+            }
+        }
+    }
+
+    /**
+     * Loads a page of choices without modifying the draft or its applied revision.
+     *
+     * @param {number} [page] the zero-based page to append, or zero to refresh the scope
+     */
+    async function loadChoices(page = 0) {
+        const generation = ++choiceGeneration;
+        const hadFocus = document.activeElement === loadMore;
+        loadMore.disabled = true;
+        if (page === 0) {
+            select.length = 1;
+            select.disabled = true;
+            loadMore.hidden = true;
+            syncSelection();
+        }
+        try {
+            /** @type {TemplateChoicePage} */
+            const choices = await krtFetch.getJson(
+                scopedUrl(
+                    '/missions/template-choices',
+                    new URLSearchParams({ page: String(page) }),
+                ),
+                { key: 'mission-create-template-choices' },
+            );
+            if (generation !== choiceGeneration) return;
+            choices.content?.forEach(({ id, name }) => appendChoice(id, name));
+            nextChoicePage = page + 1;
+            loadMore.hidden = nextChoicePage >= (choices.totalPages ?? 0);
+            select.disabled = select.length === 1;
+            if (hadFocus && loadMore.hidden && !select.disabled) select.focus();
+            syncSelection();
+            if (page === 0 && templateId.value && !select.value) {
+                await restoreAppliedChoice(generation);
+            }
+        } catch {
+            if (generation === choiceGeneration) showError(labels.readError || '');
+        } finally {
+            if (generation === choiceGeneration) loadMore.disabled = false;
+        }
     }
 
     /** Detaches the applied revision and keeps the planning rows as manual entries. */
@@ -185,9 +262,12 @@ function initMissionCreate() {
             clearAssociation();
         }
     });
+    loadMore.addEventListener('click', () => {
+        showError('');
+        void loadChoices(nextChoicePage);
+    });
     owner?.addEventListener('change', () => {
         clearAssociation();
-        select.length = 1;
         showError('');
         void loadChoices();
     });
@@ -208,14 +288,13 @@ function initMissionCreate() {
         const editor = rows[section];
         if (action === 'add') {
             editor.add().querySelector('input')?.focus();
-        } else {
-            const row = button?.closest('.ae-row');
+        } else if (action === 'delete') {
+            const row = button?.closest('[data-planning-row]');
             if (!row) return;
-            if (action === 'delete') row.remove();
-            if (action === 'up') row.previousElementSibling?.before(row);
-            if (action === 'down') row.nextElementSibling?.after(row);
+            editor.remove(row);
+        } else {
+            return;
         }
-        editor.renumber();
         form.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
