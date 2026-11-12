@@ -478,7 +478,7 @@ export function bindMoneyMovement(root, recovery) {
             sync(true);
         } else if (section === 'order-money-results') {
             sync(true, true);
-            if (bank.enabled()) void playerBank.refresh();
+            if (bank.enabled()) void playerBank.refreshSelection();
         }
     });
     form.addEventListener('submit', async (event) => {

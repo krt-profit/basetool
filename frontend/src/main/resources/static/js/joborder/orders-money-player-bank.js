@@ -86,6 +86,8 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
                 : 'settlementDeposit';
     const accounts = bindBankAccounts(url, account, purpose, onChange, () => returnAccount);
     let previousPurpose = purpose();
+    let previousKind = kind.value;
+    let previousType = type();
 
     /**
      * Selects only custodians matching the already chosen Order participants.
@@ -101,6 +103,17 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
         if (returnAccount) account.disabled = true;
         showMovementField(custodian, enabled);
         const nextPurpose = purpose();
+        const nextType = type();
+        if (
+            kind.value !== previousKind ||
+            nextType !== previousType ||
+            returnAccount !== previousReturnAccount
+        ) {
+            previousKind = kind.value;
+            previousType = nextType;
+            custodian.value = '';
+            target.value = '';
+        }
         if (nextPurpose !== previousPurpose || returnAccount !== previousReturnAccount) {
             previousPurpose = nextPurpose;
             accounts.sync();
@@ -108,7 +121,8 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
         showMovementField(target, enabled && needsReceivingCustodian());
         showMovementField(payment, enabled && !samePlayer());
         showMovementField(justification, enabled && debit());
-        if (!enabled || !draft || draft.command === 'movements/reassignment') return;
+        if (accounts.loading() || !enabled || !draft || draft.command === 'movements/reassignment')
+            return;
         const terms = draft.terms;
         const holders = orderHolders();
         const sourceUser = holders.find(({ id }) => id === terms.sourceHolderId)?.userId;
@@ -137,6 +151,7 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
     const selection = () => {
         const accountId = accounts.selection()?.id;
         if (
+            accounts.loading() ||
             !custodian.value ||
             (!samePlayer() && !payment.checked) ||
             (needsReceivingCustodian() && !target.value)
@@ -162,6 +177,7 @@ export function bindPlayerBankMovement(form, kind, url, onChange) {
 
     return {
         refresh: accounts.load,
+        refreshSelection: accounts.refreshSelection,
         canReturnFromBank: (/** @type {string} */ id) => !!accounts.personalReturnAccount(id),
         sync,
         selection,

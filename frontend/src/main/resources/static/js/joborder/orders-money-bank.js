@@ -83,6 +83,7 @@ export function bindBankAccounts(url, select, purpose, onChange, fixedAccount = 
     /** @type {NonNullable<BankAccounts['personalReturnAccounts']>} */
     let personalReturnAccounts = {};
     let generation = 0;
+    let loading = false;
     let desired = '';
     let suggest = false;
 
@@ -118,6 +119,7 @@ export function bindBankAccounts(url, select, purpose, onChange, fixedAccount = 
         retainSelection = false,
     ) => {
         const request = ++generation;
+        loading = true;
         desired = restored;
         suggest = initial;
         if (!retainSelection) {
@@ -150,6 +152,7 @@ export function bindBankAccounts(url, select, purpose, onChange, fixedAccount = 
                 problem.hidden = false;
             }
         }
+        loading = false;
         sync();
         suggest = false;
         onChange();
@@ -163,6 +166,7 @@ export function bindBankAccounts(url, select, purpose, onChange, fixedAccount = 
         load,
         refreshSelection: () => load(select.value || desired, false, true),
         sync,
+        loading: () => loading,
         custodians: () => accounts.custodians || [],
         personalReturnAccount: (/** @type {string} */ id) => personalReturnAccounts[id],
         /** @returns {BankAccount | undefined} the selected eligible account */

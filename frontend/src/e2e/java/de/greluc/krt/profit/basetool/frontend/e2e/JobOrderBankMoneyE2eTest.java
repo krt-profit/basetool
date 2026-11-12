@@ -199,9 +199,18 @@ class JobOrderBankMoneyE2eTest {
     order.getByTestId("order-money-movement-amount").fill("300000");
     var handoverAccount = order.getByTestId("order-money-movement-bank-account");
     handoverAccount.selectOption(fixture.collectionAccount());
-    order.getByTestId("order-money-movement-bank-custodian").selectOption(payer);
-    order.getByTestId("order-money-movement-bank-target-custodian").selectOption(fixture.holderA());
+    var payingCustodian = order.getByTestId("order-money-movement-bank-custodian");
+    var receivingCustodian = order.getByTestId("order-money-movement-bank-target-custodian");
+    payingCustodian.selectOption(payer);
+    receivingCustodian.selectOption(fixture.holderA());
     order.getByTestId("order-money-movement-bank-payment").check();
+    try (var paused = new PausedBankOptions(order, money)) {
+      paused.refresh();
+      assertThat(handoverAccount).hasValue(fixture.collectionAccount());
+      assertThat(payingCustodian).hasValue(payer);
+      assertThat(receivingCustodian).hasValue(fixture.holderA());
+      assertThat(order.getByTestId("order-money-movement-save")).isDisabled();
+    }
     var handover = post(order, money + "/movements", "order-money-movement-save");
     assertEquals("POSTED", handover.get("state").getAsString());
     figure(staff, "order-money-handed-over", "9.300.000");
@@ -233,6 +242,12 @@ class JobOrderBankMoneyE2eTest {
     assertEquals(holder, returned.get("destinationHolderId").getAsString());
     figure(order, "order-money-handed-over", "9.200.000");
     var current = json(seeder.getBody(WRITER, password(WRITER), "/api/v1" + money));
+    assertEquals(
+        1,
+        current.getAsJsonArray("history").asList().stream()
+            .map(element -> element.getAsJsonObject().get("kind").getAsString())
+            .filter("HANDOVER"::equals)
+            .count());
     assertEquals(
         "9000000",
         current
@@ -394,23 +409,39 @@ class JobOrderBankMoneyE2eTest {
     order.getByTestId("order-money-recipient-mode").selectOption("bank");
     var accounts = order.getByTestId("order-money-recipient-bank-account");
     accounts.selectOption(account);
-    String options = "**" + money + "/bank-accounts";
-    List<Route> pending = new ArrayList<>();
-    order.route(options, pending::add);
-    try {
-      order
-          .locator("#order-money-results")
-          .evaluate(
-              "container => document.dispatchEvent("
-                  + "new CustomEvent('krt:swapped', { detail: { container } }))");
-      order.waitForCondition(() -> !pending.isEmpty());
+    try (var paused = new PausedBankOptions(order, money)) {
+      paused.refresh();
       assertThat(accounts).hasValue(account);
       String designation =
           post(order, money + "/recipients", "order-money-recipient-save").get("id").getAsString();
       assertThat(order.locator("[data-money-bank-recipient='" + designation + "']")).isAttached();
       return designation;
-    } finally {
-      order.unroute(options);
+    }
+  }
+
+  /** Pauses Bank options reads while the form responds to a money fragment update. */
+  private static final class PausedBankOptions implements AutoCloseable {
+    private final Page page;
+    private final String path;
+    private final List<Route> pending = new ArrayList<>();
+
+    private PausedBankOptions(Page page, String money) {
+      this.page = page;
+      path = "**" + money + "/bank-accounts";
+      page.route(path, pending::add);
+    }
+
+    private void refresh() {
+      page.locator("#order-money-results")
+          .evaluate(
+              "container => document.dispatchEvent("
+                  + "new CustomEvent('krt:swapped', { detail: { container } }))");
+      page.waitForCondition(() -> !pending.isEmpty());
+    }
+
+    @Override
+    public void close() {
+      page.unroute(path);
       pending.forEach(Route::resume);
     }
   }
