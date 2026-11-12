@@ -29,9 +29,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A need as the pages show it (REQ-SUP-003, REQ-SUP-006). The maximum unit price, the purchase
- * progress and the UEX reference price are left out of the response, not blanked, for a caller who
- * may not read them.
+ * A need as the pages show it (REQ-SUP-003, REQ-SUP-006, REQ-SUP-023). The maximum unit price, the
+ * purchase progress and the UEX reference price are left out of the response, not blanked, for a
+ * caller who may not read them; the job-order link and the linked order likewise for a caller who
+ * does not manage the raising unit.
  *
  * @param id the need
  * @param orgUnitId the raising unit
@@ -52,7 +53,8 @@ import org.jetbrains.annotations.Nullable;
  * @param maxUnitPrice the highest unit price a deal may pay, only for the purchase audience
  * @param purchasedAmount the part covered by accepted deliveries, only for the purchase audience
  * @param uexReferencePrice the average UEX buy price, only for the purchase audience
- * @param jobOrderId the job order the need feeds, or {@code null}
+ * @param jobOrderId the job order the need feeds, or {@code null} when it feeds none or the caller
+ *     does not manage the raising unit
  * @param jobOrder the linked order with its coverage of the need (REQ-SUP-023), only for a caller
  *     who manages the raising unit and only while the need is open or paused
  * @param canManage whether the caller manages the raising unit's needs
@@ -78,7 +80,7 @@ public record NeedDto(
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Long maxUnitPrice,
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Double purchasedAmount,
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable Double uexReferencePrice,
-    @Nullable UUID jobOrderId,
+    @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable UUID jobOrderId,
     @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable NeedOrderDto jobOrder,
     boolean canManage,
     Long version,

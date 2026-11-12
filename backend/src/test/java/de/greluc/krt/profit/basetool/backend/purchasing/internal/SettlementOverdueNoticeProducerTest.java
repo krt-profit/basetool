@@ -28,10 +28,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -46,7 +49,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Limit;
 
-/** The overdue-settlement notice, raised once per deal by an atomic marker (REQ-PUR-018). */
+/**
+ * The overdue-settlement notice, raised once per deal by an atomic marker, to the governing
+ * leadership that holds {@code KRT Member} (REQ-PUR-018).
+ */
 @ExtendWith(MockitoExtension.class)
 class SettlementOverdueNoticeProducerTest {
 
@@ -59,6 +65,7 @@ class SettlementOverdueNoticeProducerTest {
   @Mock private PurchasingDealRepository dealRepository;
   @Mock private PurchasingSettingsService settingsService;
   @Mock private OrgUnitMembershipRepository membershipRepository;
+  @Mock private UserRepository userRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   private SettlementOverdueNoticeProducer producer;
@@ -67,7 +74,11 @@ class SettlementOverdueNoticeProducerTest {
   void setUp() {
     producer =
         new SettlementOverdueNoticeProducer(
-            dealRepository, settingsService, membershipRepository, eventPublisher);
+            dealRepository,
+            settingsService,
+            membershipRepository,
+            new OrgUnitSeatEligibility(membershipRepository, userRepository),
+            eventPublisher);
   }
 
   @Test
@@ -92,12 +103,14 @@ class SettlementOverdueNoticeProducerTest {
     PurchasingDeal third = deal(9L);
     when(settingsService.isEnabled()).thenReturn(true);
     when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
-    when(membershipRepository.findUserIdsByOrgUnitIdsAndRole(
+    when(membershipRepository.findUserIdsByActiveOrgUnitIdsAndRole(
             List.of(AREA), MembershipRole.BEREICHSLEITER))
         .thenReturn(Set.of(LEADER));
-    when(membershipRepository.findUserIdsByOrgUnitIdsAndRole(
+    when(membershipRepository.findUserIdsByActiveOrgUnitIdsAndRole(
             List.of(AREA), MembershipRole.BEREICHSKOORDINATOR))
         .thenReturn(Set.of(COORDINATOR));
+    when(userRepository.findRoleHoldersAmong(Set.of(LEADER, COORDINATOR), Roles.KRT_MEMBER))
+        .thenReturn(Set.of(LEADER, COORDINATOR));
     when(dealRepository.findOverdueNotYetAnnouncedIds(eq(NOW), any(Limit.class)))
         .thenReturn(List.of(first.getId(), lost.getId(), third.getId()));
     when(dealRepository.markOverdueNotified(first.getId(), NOW)).thenReturn(1);
@@ -123,6 +136,32 @@ class SettlementOverdueNoticeProducerTest {
     assertThat(notice.contextRecipientUserIds())
         .containsExactlyInAnyOrder(DELEGATE, LEADER, COORDINATOR);
     assertThat(notice.renderParams()).containsEntry("deal", "7");
+  }
+
+  @Test
+  void aGoverningLeaderWithoutKrtMemberIsNotListed() {
+    PurchasingDeal deal = deal(4L);
+    when(settingsService.isEnabled()).thenReturn(true);
+    when(settingsService.governingAreaIds()).thenReturn(List.of(AREA));
+    when(membershipRepository.findUserIdsByActiveOrgUnitIdsAndRole(
+            List.of(AREA), MembershipRole.BEREICHSLEITER))
+        .thenReturn(Set.of(LEADER));
+    when(membershipRepository.findUserIdsByActiveOrgUnitIdsAndRole(
+            List.of(AREA), MembershipRole.BEREICHSKOORDINATOR))
+        .thenReturn(Set.of(COORDINATOR));
+    when(userRepository.findRoleHoldersAmong(Set.of(LEADER, COORDINATOR), Roles.KRT_MEMBER))
+        .thenReturn(Set.of(COORDINATOR));
+    when(dealRepository.findOverdueNotYetAnnouncedIds(eq(NOW), any(Limit.class)))
+        .thenReturn(List.of(deal.getId()));
+    when(dealRepository.markOverdueNotified(deal.getId(), NOW)).thenReturn(1);
+    when(dealRepository.findById(deal.getId())).thenReturn(Optional.of(deal));
+
+    assertThat(producer.produce(NOW, 5)).isEqualTo(1);
+
+    ArgumentCaptor<NoticeEvent> notice = ArgumentCaptor.forClass(NoticeEvent.class);
+    verify(eventPublisher).publishEvent(notice.capture());
+    assertThat(notice.getValue().contextRecipientUserIds())
+        .containsExactlyInAnyOrder(DELEGATE, COORDINATOR);
   }
 
   @Test
@@ -156,6 +195,7 @@ class SettlementOverdueNoticeProducerTest {
     verify(eventPublisher).publishEvent(notice.capture());
     assertThat(notice.getValue().contextRecipientUserIds()).containsExactly(DELEGATE);
     verifyNoInteractions(membershipRepository);
+    verifyNoInteractions(userRepository);
   }
 
   private static PurchasingDeal deal(long no) {

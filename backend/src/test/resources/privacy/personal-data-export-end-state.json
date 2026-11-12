@@ -688,6 +688,17 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "activeOrgUnitChoice",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "org_unit" : "IRIDIUM",
+      "shorthand" : "IRI",
+      "kind" : "SQUADRON",
+      "created_at" : "<instant>",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "supplyDonations",
     "legalBasis" : "ART_15_20",
     "rows" : [ {

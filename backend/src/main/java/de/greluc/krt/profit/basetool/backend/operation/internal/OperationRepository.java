@@ -109,21 +109,18 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
       Pageable pageable);
 
   /**
-   * Slim id + name projection of every operation visible to the caller, sorted by name, for the
-   * mission-detail operation picker.
+   * Slim id + name projection of every operation the caller may edit, sorted by name, for the
+   * mission's operation picker: the operations a mission may be linked to (REQ-MISSION-034).
    *
-   * <p>Uses the same scope predicate as {@link #findAllScoped}. {@code PLANNED} / {@code ACTIVE}
-   * operations are always returned, {@code COMPLETED} / {@code CANCELED} ones only when created on
-   * or after {@code cutoff}.
+   * <p>Uses {@link OperationAccessPolicy#OPERATION_EDIT_PREDICATE}, which carries no read escape.
+   * {@code PLANNED} / {@code ACTIVE} operations are always returned, {@code COMPLETED} / {@code
+   * CANCELED} ones only when created on or after {@code cutoff}.
    *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
-   * @param activeOrgUnitId the OrgUnit the caller is pinned to, or {@code null}
-   * @param memberOrgUnitIds the caller's OrgUnits (non-admin path); empty for admins and anonymous
-   *     callers
-   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member-or-above;
-   *     surfaces ownerless leadership operations
-   * @param viewerUserId the caller's user id, or {@code null}; surfaces operations the caller
-   *     participated in
+   * @param activeOrgUnitId the OrgUnit a pinned admin edits, or {@code null}
+   * @param editableOrgUnitIds the OrgUnits the caller's Mission Manager grants cover in the active
+   *     context (non-admin path); empty for admins
+   * @param ownerlessEditable {@code true} iff the caller may edit ownerless leadership operations
    * @param cutoff inclusive lower bound on {@code createdAt} for {@code COMPLETED} / {@code
    *     CANCELED} operations
    * @return slim reference DTOs, sorted by name ascending
@@ -136,14 +133,13 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
         OR (o.status IN ('COMPLETED', 'CANCELED') AND o.createdAt >= :cutoff)
       ) AND
       """
-          + OperationAccessPolicy.OPERATION_SCOPE_PREDICATE
+          + OperationAccessPolicy.OPERATION_EDIT_PREDICATE
           + " ORDER BY o.name ASC")
-  List<OperationReferenceDto> findAllReferenceScoped(
+  List<OperationReferenceDto> findAllEditableReference(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
-      @Param("viewerIsMemberOrAbove") boolean viewerIsMemberOrAbove,
-      @Param("viewerUserId") @Nullable UUID viewerUserId,
+      @Param("editableOrgUnitIds") Collection<UUID> editableOrgUnitIds,
+      @Param("ownerlessEditable") boolean ownerlessEditable,
       @Param("cutoff") Instant cutoff);
 
   /**

@@ -93,13 +93,18 @@ public class RefineryOrderService {
    *
    * @param userId owner id
    * @param order transient entity with shallow id-only references
-   * @param owningOrgUnitId the org unit to stamp, which must be one of the owner's memberships;
-   *     when {@code null}, the owner's single membership or none
+   * @param owningOrgUnitId the org unit to stamp: one of the owner's stampable units (an active
+   *     direct membership while the owner holds {@code KRT Member}) or a unit the caller may edit;
+   *     when {@code null}, the caller's honoured pin if it is one of the owner's stampable units,
+   *     else the owner's only stampable unit, else none (REQ-ORG-032)
    * @return the persisted order
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
    *     is unknown
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the location
-   *     hosts no refinery or the org unit is not a membership of the owner
+   *     hosts no refinery or the picked unit is neither one of the owner's stampable units nor a
+   *     unit the caller may edit
+   * @throws de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException when the
+   *     owner has several stampable units and neither a pick nor such a pin names one
    * @throws MissionParticipantRequiredException when the owner does not take part in the given
    *     mission (REQ-SEC-042)
    */
@@ -110,13 +115,17 @@ public class RefineryOrderService {
   }
 
   /**
-   * Like {@link #createRefineryOrder}, for another member's order: the caller must be Logistician
-   * of the stamped unit, an order without a unit is admin-only (REQ-SEC-005).
+   * Like {@link #createRefineryOrder}, for another member's order: without a pick the caller's
+   * honoured pin is stamped when it is one of the member's stampable units. The caller must be
+   * Logistician of the stamped unit, and an order without a unit is reserved to an admin without a
+   * pin (REQ-SEC-005, REQ-ORG-032).
    *
    * @param userId the member who will own the order
    * @param order transient entity with shallow id-only references
    * @param owningOrgUnitId the org unit to stamp, as for {@link #createRefineryOrder}
    * @return the persisted order
+   * @throws org.springframework.security.access.AccessDeniedException when the caller is no
+   *     Logistician of the stamped unit
    */
   @Transactional
   public RefineryOrder createRefineryOrderOnBehalf(

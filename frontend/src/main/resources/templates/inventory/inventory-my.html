@@ -283,7 +283,10 @@
                                     <span th:if="${stack.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                                           th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                                 </div>
-                                <div class="tree-cell"></div>
+                                <div class="tree-cell lager-cell-context" data-testid="my-stack-org-unit">
+                                    <span th:if="${stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">ALP</span>
+                                    <span th:if="${stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                                </div>
                                 <div class="tree-cell tree-cell--num">
                                     <span class="tree-gauge"><span class="tree-gauge-val" th:text="${stack.quality}">796</span><span class="tree-gauge-track"><span th:attr="data-krtm-width=${stack.quality != null ? stack.quality / 10 : 0}"></span></span></span>
                                 </div>
@@ -338,7 +341,10 @@
                                     <span th:if="${stack.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                                           th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
                                 </div>
-                                <div class="tree-cell"></div>
+                                <div class="tree-cell lager-cell-context" data-testid="my-stack-org-unit">
+                                    <span th:if="${stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">ALP</span>
+                                    <span th:if="${stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                                </div>
                                 <div class="tree-cell tree-cell--num tree-amount">
                                     <span><span th:text="${stack.totalAmount != null ? #numbers.formatInteger(stack.totalAmount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">St&uuml;ck</span></span>
                                 </div>

@@ -540,6 +540,52 @@ the persisted render (raw HTML escaped, unsafe link protocols stripped). No back
 permission change; every existing operation contract (save / delete AJAX twins, payout paid-out
 asymmetric authorization, missions pager) is preserved.
 
+### REQ-MISSION-034 — A mission's operation link follows the operation's rules
+
+A mission belongs to at most one operation (`Mission.operationId`). Who may set that link follows
+the operation's own rules (REQ-ORG-003), not the mission's. Linking moves money: the operation's payout pool takes in every linked mission, its participants and
+their expenses (REQ-SEC-042 holds the same for a refinery order's mission link).
+
+- **Linking needs the operation's edit right.** `POST /api/v1/missions`,
+  `POST /api/v1/missions/{id}/sub-missions` and `PATCH /api/v1/missions/{id}/core` link a mission to
+  an operation only when the caller may edit that operation
+  (`OperationAccessPolicy#canEditOperation`): a Mission Manager grant in its owning unit inside the
+  active context (REQ-ORG-032), for an ownerless operation one in an Organisationsleitung or Bereich
+  unit, an admin within their own scope. Reading the operation through a read escape (an ownerless
+  operation, a participation) is not enough. A refused link answers `403`, an unknown operation
+  `404`, and nothing is written. The core patch checks the link only when it changes: an unchanged
+  link is not re-checked, so a mission another unit's operation already holds stays editable, and
+  clearing the link is always allowed. The mission module asks through its read SPI
+  (`mission.api.OperationSummaryProvider#linkability`), which the operation module answers.
+- **The picker offers what may be linked.** `GET /api/v1/operations/lookup` lists exactly the
+  operations the caller may edit (`OperationAccessPolicy.OPERATION_EDIT_PREDICATE`), within the
+  status and recency bound of ADR-0081. The edit mode's operation select adds the mission's current
+  operation when it is not among them, so saving the core section keeps a link the editor could not
+  set.
+- **Everyone who sees the mission sees its operation.** The detail DTO and the list row embed the
+  linked operation whatever the caller may read of it, resolved for the whole page in one statement
+  (REQ-DATA-003). By owner decision the operation's name is part of the mission and cross-unit by
+  design (REQ-ORG-032); the operation's own page, finances and payouts keep their read gates.
+
+**Acceptance**
+
+- [x] Creating a mission, creating a sub-mission or changing the core section's operation to one the
+  caller may only read, or not read at all, is refused (`403`) and writes nothing.
+- [x] A Mission Manager of the operation's unit links a mission to it; an unknown operation is a
+  `404`.
+- [x] A core patch that keeps a link the caller could not set is not re-checked, and clearing a link
+  is allowed.
+- [x] The operation picker lists exactly the operations the caller may edit.
+- [x] The edit mode keeps the mission's current operation selected, with its name, when the caller
+  may not link to it, and lists a linkable current operation once.
+
+**Enforced by:** `MissionServiceOperationLinkTest`, `OperationSummaryReaderTest`,
+`OperationScopeParityTest`, `OperationModuleContractTest`, `MissionOperationReadNoNPlusOneTest`,
+`MissionDetailPatternRenderTest` · **Code:** `MissionService#requireLinkableOperation`,
+`OperationSummaryReader`, `OperationAccessPolicy`, `OperationService#findAllReference`,
+`MissionPageController` · **Related:** REQ-ORG-003, REQ-ORG-009, REQ-ORG-027, REQ-ORG-032,
+REQ-MISSION-004, REQ-MISSION-011, REQ-SEC-042
+
 ### REQ-MISSION-019 — Mission goals (Ziele) as classified, ordered children
 
 > **Renumbered 2026-09-22:** this requirement was `REQ-MISSION-012` until 2026-09-22; that id also named the home-page upcoming-missions tile grid in [`mission-next-banner.md`](mission-next-banner.md), which keeps it.

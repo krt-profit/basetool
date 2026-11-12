@@ -834,6 +834,7 @@ class MaterialContributionEffectsIntegrationTest extends MaterialContributionTes
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("material-coordinator-" + user.getId());
+    user.getRoles().add(roles.findByCode(Roles.KRT_MEMBER).orElseThrow());
     return activateAccount(user);
   }
 

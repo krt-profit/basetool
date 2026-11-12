@@ -54,12 +54,12 @@ import tools.jackson.databind.ObjectMapper;
  * changed} section keys out to the other sockets of a {@link LiveSyncTopic} room.
  *
  * <p>Only opaque, whitelisted section keys cross the socket; each peer re-fetches its own data.
- * Rooms are joined by authorized {@code subscribe} frames; publishing needs no subscription.
- * Changes and editor presence are relayed locally first, then across replicas via {@link
- * LiveSyncFanout} (ADR-0126). The handler dispatches the frames and owns the reaper; the socket
- * lifecycle lives in {@link LiveSyncSessionRegistry}, the subscribe flow in {@link
- * LiveSyncSubscriptions}, the rooms in {@link LiveSyncRooms} and the token buckets in {@link
- * LiveSyncRateLimiter}.
+ * Rooms are joined by authorized {@code subscribe} frames and authorized again while a socket holds
+ * them; publishing needs no subscription. Changes and editor presence are relayed locally first,
+ * then across replicas via {@link LiveSyncFanout} (ADR-0126). The handler dispatches the frames and
+ * owns the scheduled sweeps; the socket lifecycle lives in {@link LiveSyncSessionRegistry}, the
+ * subscribe flow and its re-authorization in {@link LiveSyncSubscriptions}, the rooms in {@link
+ * LiveSyncRooms} and the token buckets in {@link LiveSyncRateLimiter}.
  */
 @Slf4j
 public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
@@ -72,6 +72,12 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    * not close it.
    */
   public static final Duration KEEPALIVE_INTERVAL = Duration.ofSeconds(30);
+
+  /**
+   * Interval at which every socket is swept for a lapsed token and for held rooms due for their
+   * re-authorization (REQ-FE-015).
+   */
+  static final Duration REAUTHORIZE_SWEEP_INTERVAL = Duration.ofSeconds(10);
 
   /**
    * Maximum accepted length of a client-supplied presence {@code sectionKey}, also the truncation
@@ -150,8 +156,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Session-attribute key ({@link Instant}) holding the expiry of the access token captured at
-   * handshake. A subscribe on a socket whose token has lapsed closes the socket with {@link
-   * #TOKEN_EXPIRED}. Public so the interceptor can populate it.
+   * handshake. Once it has lapsed, a socket holding a room whose class needs a check is closed with
+   * {@link #TOKEN_EXPIRED} by the re-authorization sweep, and any other socket by its next
+   * subscribe to a topic it has not subscribed to. Public so the interceptor can populate it.
    */
   public static final String ATTR_TOKEN_EXPIRES_AT = "livesync.tokenExpiresAt";
 
@@ -180,7 +187,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Creates the handler, binds its live-sync gauges and socket-lifetime timer, and starts the
-   * presence reaper and keepalive sweep.
+   * presence reaper, the keepalive sweep and the re-authorization sweep.
    *
    * @param presenceService in-memory editor-presence store
    * @param fanout cross-replica fan-out seam (no-op when single-instance)
@@ -236,7 +243,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     this.sessions = new LiveSyncSessionRegistry(meterRegistry, nanoClock);
     this.subscriptions =
         new LiveSyncSubscriptions(
-            rooms, rateLimiter, authorizer, authExecutor, objectMapper, meterRegistry);
+            rooms, rateLimiter, authorizer, authExecutor, objectMapper, meterRegistry, nanoClock);
     this.reaper =
         Executors.newSingleThreadScheduledExecutor(r -> {
           Thread t = new Thread(r, "livesync-reaper");
@@ -253,11 +260,16 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         KEEPALIVE_INTERVAL.toSeconds(),
         KEEPALIVE_INTERVAL.toSeconds(),
         TimeUnit.SECONDS);
+    this.reaper.scheduleAtFixedRate(
+        this::tickReauthorize,
+        REAUTHORIZE_SWEEP_INTERVAL.toSeconds(),
+        REAUTHORIZE_SWEEP_INTERVAL.toSeconds(),
+        TimeUnit.SECONDS);
   }
 
   /**
-   * Shuts the shared scheduler thread down cleanly on application shutdown, stopping both the
-   * presence reaper and the keepalive sweep.
+   * Shuts the shared scheduler thread down cleanly on application shutdown, stopping the presence
+   * reaper, the keepalive sweep and the re-authorization sweep.
    */
   @PreDestroy
   public void shutdown() {
@@ -328,21 +340,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     }
     for (String canonical : List.copyOf(subs)) {
       LiveSyncTopic topic = LiveSyncTopic.parse(canonical);
-      if (topic == null) {
-        continue;
-      }
-      Set<WebSocketSession> mates = rooms.leave(decorated, canonical);
-      if (userId == null || !topic.topicClass().presenceEnabled()) {
-        continue;
-      }
-      boolean hasOtherSession =
-          mates != null
-              && mates.stream().anyMatch(s -> userId.equals(LiveSyncSessionRegistry.userId(s)));
-      if (!hasOtherSession) {
-        List<String> cleared = presenceService.clearAll(canonical, userId);
-        if (!cleared.isEmpty()) {
-          rooms.broadcastLocalPresenceChange(topic);
-        }
+      if (topic != null) {
+        rooms.depart(decorated, topic, userId);
       }
     }
   }
@@ -379,7 +378,8 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Handles a presence frame for a subscribed, presence-enabled room: {@code focus}/{@code
+   * Handles a presence frame for a presence-enabled room the socket holds, so a subscribe still
+   * being authorized or a room the socket was evicted from takes none: {@code focus}/{@code
    * heartbeat} touch the editor entry, {@code blur} clears it, and any change broadcasts a
    * snapshot.
    *
@@ -394,11 +394,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       @NotNull String type,
       @NotNull String userId) {
     LiveSyncTopic topic = LiveSyncTopic.parse(textValue(node, "topic"));
-    if (topic == null || !topic.topicClass().presenceEnabled()) {
-      return;
-    }
-    Set<String> subs = LiveSyncSessionRegistry.subscriptions(session);
-    if (subs == null || !subs.contains(topic.canonical())) {
+    if (topic == null
+        || !topic.topicClass().presenceEnabled()
+        || !rooms.holds(LiveSyncSessionRegistry.decorated(session), topic.canonical())) {
       return;
     }
     String sectionKey = textValue(node, "sectionKey");
@@ -574,6 +572,22 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   void tickKeepalive() {
     sessions.tickKeepalive();
+  }
+
+  /**
+   * Re-authorization sweep (REQ-FE-015): closes with {@link #TOKEN_EXPIRED} every socket whose
+   * captured token has lapsed while it holds a room whose class needs a check, and re-checks those
+   * rooms of every socket that is due. Exceptions are logged and swallowed.
+   */
+  void tickReauthorize() {
+    try {
+      long nowNanos = nanoClock.getAsLong();
+      for (WebSocketSession socket : sessions.sockets()) {
+        subscriptions.reauthorize(socket, nowNanos);
+      }
+    } catch (RuntimeException e) {
+      log.warn("Live-sync re-authorization sweep failed", e);
+    }
   }
 
   /**

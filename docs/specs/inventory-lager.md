@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-04.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0101, ADR-0104,
 > ADR-0120, ADR-0124, ADR-0302
 
@@ -408,6 +408,10 @@ There is no "keep home unit" placeholder: the picker always carries a concrete p
 
 ### REQ-INV-025 — Book-out validates the CheckoutType; a target-less TRANSFER is rejected
 
+> [!note] Amended 2026-11-12 (ADR-0269) — `ExternalContractTest` is gone
+> The exchange paragraph also said `ExternalContractTest` does not pin `CheckoutType`; the test went
+> with the app, and the clause with it.
+
 Book-out (`POST /api/v1/inventory/{id}/book-out`) resolves the `CheckoutType` before mutating the
 row. An **absent** `type` is inferred — `TRANSFER` when the request carries a target user or
 location, otherwise `DISCARD`. An **explicit** `type = TRANSFER` is *not* re-inferred, so a
@@ -427,8 +431,7 @@ audit event, consistent with the audit contract that only committed state mutati
 
 An exchange book-out (REQ-XCH-016) is this book-out with `CheckoutType.DISCARD`
 (`InventoryCheckoutService#bookOutForClient`), row by row; the Materialbörse offers it lowers or
-removes are audited with the reason `stock`. `CheckoutType` is not part of the exchange contract,
-and `ExternalContractTest` does not pin it.
+removes are audited with the reason `stock`. `CheckoutType` is not part of the exchange contract.
 
 **Acceptance**
 
@@ -578,8 +581,18 @@ their hints — renders **whole (no decimals) for a `PIECE` material** and to th
 
 A mission slice whose mission the caller may not read (the mission detail rule, REQ-MISSION-008)
 carries only `missionId` and `amount`; name and planned start are `null` and the chip shows the
-„unknown mission" label. The per-order linked-stock reads of REQ-ORDERS-029 apply this to every
-caller.
+„unknown mission" label. Every read applies this to every caller — the Lager lists and stacks,
+„Mein Lager", the answers of the earmark writes, the per-order linked-stock reads of
+REQ-ORDERS-029 and the exchange's org-stock entries — because the Lager's mapper builds every
+mission chip from what the mission module's earmark targets show the reader
+(`EarmarkTargets.Missions#shownMissions`, the only read that loads the missions, to apply the
+visibility rule). The write and undo paths look an earmark's mission up whoever the caller is
+(`EarmarkTargets.Missions#missions`, the JPQL projection `MissionRepository#findEarmarks`, which
+loads no mission entity): they check that it exists and label the audit event with its name without
+a request and without the caller's mission access, so the bulk undo of a connected application's
+writes (REQ-XCH-034) also sets back an earmark on an internal mission. The Lager's per-transaction
+memo (`InventoryEarmarkTargetCache`) keeps the two answers apart, so the answer of a write never
+shows what its own lookup read.
 
 **Assignment writes.** The earmarks are edited through dedicated per-allocation endpoints `POST` /
 `PATCH` / `DELETE /api/v1/inventory/{id}/allocation` (add / change amount / remove), each gated by
@@ -744,6 +757,11 @@ there is no separate income-attribution input.
   for a mission, also for a chip built in place after an allocation write; an unresolved mission
   shows the localized unknown-mission label, never its id (`InventoryPageControllerMvcTest`, e2e
   `InventoryOperationsE2eTest`).
+- [x] A mission slice the reader may not read carries only `missionId` and `amount` on every read,
+  while an earmark write labels its audit event with the mission's name and an admin's bulk undo of
+  a connected application's writes sets back an earmark on an internal mission
+  (`MissionEarmarkTargetsTest`, `InventoryEarmarkTargetCacheTest`,
+  `InventoryPoolEarmarkWithoutRequestIntegrationTest`).
 - [ ] A dimension with exactly one tag and no rest is prefilled with the deducted amount, locked and
   labelled as auto-filled: the modal is submittable without touching the picker, the field follows
   every later change of the amount, and the submitted plan deducts the full amount from that tag.
@@ -771,10 +789,14 @@ events; there the entry's version advances once per op, at the write, so the ops
 `InventoryItemServiceAllocationTest`, `InventoryCheckoutServiceAuditTest`, `InventoryStockMergeTest`, `JobOrderHandoverServiceTest`,
 `InventoryAllocationSoakDataTest`, `InventoryItemControllerTest`, `InventoryPageControllerMvcTest`,
 `DatabaseIndexMigrationTest`, `InventoryInputAjaxControllerTest` (single-target shorthand),
-e2e `InventoryOperationsE2eTest` (Herkunft picker gate + deduct-from; re-picking an
-already-allocated order edits its slice instead of posting a duplicate) ·
+`MissionEarmarkTargetsTest`, `InventoryEarmarkTargetCacheTest`,
+`InventoryPoolEarmarkWithoutRequestIntegrationTest` (the mission lookup of the writes and undos and
+the reader's view of a mission), e2e `InventoryOperationsE2eTest` (Herkunft picker gate +
+deduct-from; re-picking an already-allocated order edits its slice instead of posting a duplicate) ·
 **Code:** `InventoryJobOrderAllocation`, `InventoryMissionAllocation`,
 `inventory/internal/InventoryAllocations`, `InventoryItemController` (allocation endpoints),
+`inventory/api/EarmarkTargets`, `mission/internal/MissionEarmarkTargets`,
+`mission/api/MissionRepository#findEarmarks`, `inventory/internal/InventoryEarmarkTargetCache`,
 `InventoryItemService#createInventoryItem` / `#writeAllocationForPool`, `InventoryCheckoutService`
 (book-out / merge / SELL),
 `JobOrderStockReadService#getMaterialCollection`, `InventoryItemMapper`,
@@ -1438,6 +1460,10 @@ themselves are not yet pinned by a test · **Code:**
 
 ### REQ-INV-052 — A member can change the org unit of their own personal row afterwards
 
+> [!note] Amended 2026-11-12 (ADR-0268, ADR-0269) — two enforcers are gone
+> `ExternalContractTest` went with the app and `ApiVhostAnonymousSurfaceTest` with the API vhost,
+> so both leave the enforcer list.
+
 A member can set the owning org unit of one of their **own personal** rows to one of their direct
 memberships of any of the four kinds, or to **„Keine Einheit"**, after the booking — per row
 (`POST /api/v1/inventory/{id}/org-unit`, optimistic `version`) and for a selection from the bulk bar
@@ -1473,12 +1499,16 @@ and a `TRANSFER` may not change it alone (REQ-INV-025).
 
 **Enforced by:** `InventoryOrgUnitChangeServiceTest`, `InventoryItemControllerTest`,
 `InventoryOrgUnitChangeAjaxControllerTest`, `InventoryPageControllerMvcTest`,
-`InventoryOperationsE2eTest.changingAPersonalRowsOrgUnitWorksBothWaysInPlace`,
-`ExternalContractTest`, `ApiVhostAnonymousSurfaceTest` · **Code:** `InventoryOrgUnitChangeService`,
+`InventoryOperationsE2eTest.changingAPersonalRowsOrgUnitWorksBothWaysInPlace` · **Code:**
+`InventoryOrgUnitChangeService`,
 `InventoryItemController`, `InventoryOrgUnitChangeProxyController`, `inventory-my.js` · **Issues:** #2107
 (epic #2078).
 
 ### REQ-INV-053 — Stock can be marked „gestohlen", and the marker is part of its identity
+
+> [!note] Amended 2026-11-12 (ADR-0268, ADR-0269) — two enforcers are gone
+> `ExternalContractTest` went with the app and `ApiVhostAnonymousSurfaceTest` with the API vhost,
+> so both leave the enforcer list.
 
 Stolen cargo cannot be sold at ordinary terminals, so it is a property of a stack, not a note. Every
 Lager row — shared or personal, material or game item — carries a **„gestohlen" marker**
@@ -1539,8 +1569,7 @@ Lager row — shared or personal, material or game item — carries a **„gesto
 **Enforced by:** `InventoryStolenMarkServiceTest`, `InventoryStolenStockDataTest`,
 `InventoryStackKeyCoverageTest`, `InventoryItemServiceTest`, `InventoryItemServicePersonalRebookTest`,
 `MaterialExchangeRepositoryDataTest`, `JobOrderInventoryOwnerRedactorTest`, `MeControllerTest`,
-`InventoryItemControllerTest`, `ExternalContractTest`, `ApiVhostAnonymousSurfaceTest`,
-`InventoryStolenMarkAjaxControllerTest`, `InventoryStolenMarkerRenderTest`,
+`InventoryItemControllerTest`, `InventoryStolenMarkAjaxControllerTest`, `InventoryStolenMarkerRenderTest`,
 `MaterialboersePageControllerMvcTest`, `CapabilityFlagsAdviceTest`,
 `InventoryOperationsE2eTest.markingPartOfARowAsStolenSplitsItIntoItsOwnStackInPlace` · **Code:**
 `InventoryStolenMarkService`, `InventoryItemRepository`, `InventoryAggregationService`,
@@ -1671,9 +1700,10 @@ dialog offers the units of `GET /api/v1/inventory/{id}/pool-targets`, the amount
 default) and the merge opt-in.
 
 - **A Logistician of both units.** The caller holds the Logistician authority of the entry's unit and
-  of the receiving unit (contextual, `hasRoleInOrgUnit`; an admin passes); otherwise `403`. The
-  receiving unit must be a direct membership of the holder (`400`). Naming the entry's own pool
-  writes nothing.
+  of the receiving unit inside the active context (contextual, `hasRoleInOrgUnit`, REQ-ORG-032; an
+  admin passes within their own scope); otherwise `403`. Because a move spans two units, it needs
+  „Alle meine Org-Einheiten": with one unit selected no other pool is offered. The receiving unit
+  must be a direct membership of the holder (`400`). Naming the entry's own pool writes nothing.
 - **The whole entry** changes only its unit and keeps its job-order and mission earmarks and its
   Materialbörse offers; an entry with a donation pledge is not moved in full (REQ-INV-058, `422`).
 - **A part** is split off the free stock as a new shared entry of the receiving pool, with the
@@ -1874,8 +1904,9 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
 > the shortcuts, the audit events, the live update, the lifecycle, the notice and the widget are
 > built (ADR-0302).
 
-- **Who maintains.** A Logistician of the unit, the lead included (`hasRoleInOrgUnit(unit,
-  LOGISTICIAN)`, an admin passes); any other write answers `403`. **Who sees:** everyone who can see
+- **Who maintains.** A Logistician of the unit, the lead included, inside the active context
+  (`hasRoleInOrgUnit(unit, LOGISTICIAN)`, REQ-ORG-032: with a unit selected only that unit; an admin
+  passes within their own scope); any other write answers `403`. **Who sees:** everyone who can see
   the unit's pool, through the Lager's `ScopePredicate`. Levels of an inactive unit are not shown.
 - **API.** `GET /api/v1/inventory/stock-levels?orgUnitId=&lowOnly=&limit=` returns the levels in the
   caller's scope with the figures of REQ-INV-067, sorted by fill ratio, empty levels first; without

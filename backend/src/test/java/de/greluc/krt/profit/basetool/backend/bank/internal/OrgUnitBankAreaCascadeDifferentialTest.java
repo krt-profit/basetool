@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,7 +45,8 @@ import org.junit.jupiter.api.Test;
  * Compares the bank seam's {@code AREA_MEMBERS} cascade check (REQ-BANK-048) with the scope hub's
  * former {@code currentUserIsMemberOfAreaCascade} over the caller matrix of plan §5.4: admin pinned
  * and unpinned, anonymous, members of no unit, of the Bereich, of a child Staffel or
- * Spezialkommando, of a foreign Bereich or its child, and of two units, for every target unit.
+ * Spezialkommando, of a foreign Bereich or its child, and of two units, for every target unit. The
+ * callers hold {@code KRT Member}, without which no membership counts (REQ-SEC-015).
  */
 class OrgUnitBankAreaCascadeDifferentialTest {
 
@@ -163,11 +163,12 @@ class OrgUnitBankAreaCascadeDifferentialTest {
       HttpServletRequest request = mock(HttpServletRequest.class);
       when(authHelper.isAuthenticated()).thenReturn(authenticated);
       when(authHelper.isAdmin()).thenReturn(admin);
+      when(authHelper.holdsKrtMember()).thenReturn(true);
       when(authHelper.currentUserId())
           .thenReturn(authenticated ? Optional.of(CALLER) : Optional.empty());
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(pin == null ? null : pin.toString());
-      when(membershipRepository.findAllByIdUserId(CALLER)).thenReturn(rows);
+      when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(CALLER)).thenReturn(rows);
       when(orgUnits.findChildOrgUnitIds(any(UUID.class)))
           .thenAnswer(inv -> CHILDREN.get(inv.<UUID>getArgument(0)));
       RequestScopeResolver resolver =
@@ -176,7 +177,6 @@ class OrgUnitBankAreaCascadeDifferentialTest {
               membershipRepository,
               orgUnits,
               mock(OrgUnitCascadeService.class),
-              mock(StaffelMembershipResolver.class),
               request);
       return new Fixture(resolver, orgUnits, rows);
     }

@@ -84,10 +84,10 @@ public class MaterialRequestService {
   private final ExchangeItemSubjects itemSubjects;
 
   /**
-   * Resolves the acting member's active {@link
-   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit} to stamp on a request's squadron
-   * badge — a request has no source Lager row to copy from, so the badge is stamped from the
-   * requester (exactly as a free-stated item offer stamps its owner).
+   * Resolves the {@link de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit} of the acting
+   * member's active context, of any kind and none for several units, to stamp on a request's badge
+   * — a request has no source Lager row to copy from, so the badge is stamped from the requester
+   * (exactly as a free-stated item offer stamps its owner).
    */
   private final RequestScopeResolver requestScopeResolver;
 

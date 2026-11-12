@@ -50,13 +50,15 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
  * Prepares a multiplexed {@code /ws/sync} live-sync handshake (REQ-FE-015, ADR-0094).
  *
  * <p>Marks the future session {@linkplain LiveSyncWebSocketHandler#ATTR_MULTIPLEXED multiplexed}
- * and captures, on the servlet thread, what later subscribe authorization needs: the OAuth2 access
- * token, the active-org-unit pin ({@link ActiveSquadronContext}) and the caller's authorities. The
- * token is obtained through the single-flight authorized-client manager, so an expired one is
- * refreshed before it is captured (REQ-SEC-012). It also relays the consent gate's mark via {@link
- * #relayTermsGate}. A missing or already expired token never blocks the handshake and is not
- * captured; subscribes that need a backend probe then fail closed. The token's expiry is recorded
- * so the handler can end the socket once the token and authorities are stale.
+ * and captures, on the servlet thread, what the authorization of its subscribes and of the rooms it
+ * then holds needs: the OAuth2 access token, the active-org-unit pin ({@link
+ * ActiveSquadronContext}) and the caller's authorities. The token is obtained through the
+ * single-flight authorized-client manager, so an expired one is refreshed before it is captured
+ * (REQ-SEC-012). It also relays the consent gate's mark via {@link #relayTermsGate}. A missing or
+ * already expired token never blocks the handshake and is not captured; subscribes that need a
+ * backend probe then fail closed. The token's expiry is recorded: once it lapses, the handler
+ * closes a socket that holds a room whose class needs a check, and any other socket on its next
+ * subscribe to a topic it has not subscribed to.
  */
 @Slf4j
 @RequiredArgsConstructor

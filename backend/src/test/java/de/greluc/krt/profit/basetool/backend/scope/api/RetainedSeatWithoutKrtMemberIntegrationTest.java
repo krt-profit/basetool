@@ -59,9 +59,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * A leadership seat whose holder lost {@code KRT Member} confers no officer, Logistician or Mission
- * Manager reach, through the real converter, cascade, resolver and gates (REQ-SEC-015, ADR-0300);
- * the explicit grant flags stay in force.
+ * A membership whose holder lost {@code KRT Member} confers no officer, Logistician or Mission
+ * Manager reach, through the real converter, cascade, resolver and gates (REQ-SEC-015, ADR-0300):
+ * neither a leadership seat nor an explicit grant flag.
  */
 @SpringBootTest
 class RetainedSeatWithoutKrtMemberIntegrationTest {
@@ -135,19 +135,21 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
   }
 
   @Test
-  void explicitFlagsOnAPlainMembershipStayInForceWithoutKrtMember() {
+  void explicitFlagsOnAPlainMembershipConferNothingWithoutKrtMember() {
     User logistician = holder(squadron, MembershipRole.MEMBER, true, false);
     User missionManager = holder(squadron, MembershipRole.MEMBER, false, true);
 
-    assertThat(reachOf(logistician, false, squadron)).isEqualTo(new Reach(false, false, true));
-    assertThat(reachOf(missionManager, false, squadron)).isEqualTo(new Reach(false, true, false));
+    assertThat(reachOf(logistician, true, squadron)).isEqualTo(new Reach(false, false, true));
+    assertThat(reachOf(missionManager, true, squadron)).isEqualTo(new Reach(false, true, false));
+    assertThat(reachOf(logistician, false, squadron)).isEqualTo(new Reach(false, false, false));
+    assertThat(reachOf(missionManager, false, squadron)).isEqualTo(new Reach(false, false, false));
   }
 
   @Test
-  void explicitFlagsOnARetainedSeatStayInForceButTheRankAddsNothingWithoutKrtMember() {
+  void explicitFlagsOnARetainedSeatConferNothingWithoutKrtMember() {
     User holder = holder(squadron, MembershipRole.STAFFELLEITER, true, false);
 
-    assertThat(reachOf(holder, false, squadron)).isEqualTo(new Reach(false, false, true));
+    assertThat(reachOf(holder, false, squadron)).isEqualTo(new Reach(false, false, false));
   }
 
   @Test
@@ -171,12 +173,14 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
     User flagged = holder(squadron, MembershipRole.MEMBER, true, false);
 
     assertThat(membershipQueryService.findLogisticianOrgUnitIds(seat.getId())).isEmpty();
-    assertThat(membershipQueryService.findLogisticianOrgUnitIds(flagged.getId()))
-        .containsExactly(squadron.getId());
+    assertThat(membershipQueryService.findLogisticianOrgUnitIds(flagged.getId())).isEmpty();
 
     withStoredKrtMember(seat);
+    withStoredKrtMember(flagged);
     assertThat(membershipQueryService.findLogisticianOrgUnitIds(seat.getId()))
         .contains(bereich.getId(), squadron.getId());
+    assertThat(membershipQueryService.findLogisticianOrgUnitIds(flagged.getId()))
+        .containsExactly(squadron.getId());
   }
 
   private void withStoredKrtMember(User user) {

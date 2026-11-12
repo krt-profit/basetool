@@ -33,14 +33,26 @@ import org.jetbrains.annotations.Nullable;
 public interface InventoryEarmarkLookup {
 
   /**
-   * Returns a mission the Lager's stock is earmarked to; the first miss in a transaction loads
-   * every mission the loaded Lager rows are earmarked to in one read.
+   * Returns a mission the Lager's stock is earmarked to, whoever asks, for the write and undo
+   * paths' target checks and audit labels; the first miss in a transaction loads every mission the
+   * loaded Lager rows are earmarked to in one read.
    *
    * @param missionId the mission
-   * @return the mission, or {@code null} when it does not exist
+   * @return the mission with its name and planned start, or {@code null} when it does not exist
    */
   @Nullable
   MissionEarmark mission(@NotNull UUID missionId);
+
+  /**
+   * Returns what the current caller is shown of a mission the Lager's stock is earmarked to: its id
+   * alone when the caller may not read it (REQ-MISSION-008, REQ-INV-027); the first miss in a
+   * transaction loads every mission the loaded Lager rows are earmarked to in one read.
+   *
+   * @param missionId the mission
+   * @return the mission as the caller is shown it, or {@code null} when it does not exist
+   */
+  @Nullable
+  MissionEarmark shownMission(@NotNull UUID missionId);
 
   /**
    * Returns a job order the Lager's stock is earmarked to; the first miss in a transaction loads

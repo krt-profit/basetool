@@ -19,8 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
@@ -34,15 +32,12 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
-import java.util.Collection;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,8 +64,6 @@ public class MissionAccessPolicy implements MissionVisibility {
   private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final MissionRepository missionRepository;
-  private final UserService userService;
-  private final RoleHierarchy roleHierarchy;
   private final MissionParticipantRepository missionParticipantRepository;
   private final MissionFinanceEntryRepository missionFinanceEntryRepository;
 
@@ -125,8 +118,8 @@ public class MissionAccessPolicy implements MissionVisibility {
 
   /**
    * Checks whether the caller holds the Mission Manager grant for mission {@code missionId}: in the
-   * owning org unit, or for an ownerless mission in an Organisationsleitung or Bereich unit; admins
-   * pass (REQ-SEC-065).
+   * owning org unit, or for an ownerless mission in an Organisationsleitung or Bereich unit, inside
+   * the active context; an admin passes within their own scope (REQ-SEC-065, REQ-ORG-032).
    *
    * @param missionId the mission to inspect; never {@code null}
    * @return {@code true} iff the caller may manage the mission as Mission Manager
@@ -175,7 +168,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return false;
     }
 
-    UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID currentUserId = authHelper.currentUserId().orElse(null);
     if (currentUserId != null && p.getUser().getId().equals(currentUserId)) {
       return true;
     }
@@ -205,7 +198,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return true;
     }
 
-    UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID currentUserId = authHelper.currentUserId().orElse(null);
     if (currentUserId == null) {
       return false;
     }
@@ -217,9 +210,9 @@ public class MissionAccessPolicy implements MissionVisibility {
   }
 
   /**
-   * Authorizes editing or deleting a mission finance entry: ADMIN always, a caller with officer
-   * reach in the mission's owning unit, otherwise the entry's own user while still a participant of
-   * the mission (REQ-SEC-065).
+   * Authorizes editing or deleting a mission finance entry: a caller with officer reach in the
+   * mission's owning unit inside the active context (an admin within their own scope, REQ-ORG-032),
+   * otherwise the entry's own user while still a participant of the mission (REQ-SEC-065).
    *
    * @param entryId finance entry id
    * @param authentication current Spring Security authentication
@@ -236,20 +229,11 @@ public class MissionAccessPolicy implements MissionVisibility {
         Entities.require(
             missionFinanceEntryRepository.findById(entryId), "Finance entry not found");
 
-    Collection<? extends GrantedAuthority> reachable =
-        roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
-
-    boolean isAdmin =
-        reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()));
-    if (isAdmin) {
-      return true;
-    }
-
     if (hasOfficerReachInOwningUnit(entry.getMission())) {
       return true;
     }
 
-    UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID currentUserId = authHelper.currentUserId().orElse(null);
     if (currentUserId == null
         || entry.getParticipant().getUser() == null
         || !entry.getParticipant().getUser().getId().equals(currentUserId)) {
@@ -262,8 +246,9 @@ public class MissionAccessPolicy implements MissionVisibility {
   }
 
   /**
-   * Authorizes management actions on a mission: ADMIN, a Mission Manager grant for the mission's
-   * owning unit, or the mission's owner or a co-manager.
+   * Authorizes management actions on a mission: a Mission Manager grant for the mission's owning
+   * unit inside the active context (an admin within their own scope, REQ-ORG-032), or the mission's
+   * owner or a co-manager.
    *
    * @param missionId mission id
    * @param authentication current Spring Security authentication
@@ -278,11 +263,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return false;
     }
 
-    Collection<? extends GrantedAuthority> reachable =
-        roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
-    boolean isAdmin =
-        reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()));
-    if (isAdmin) {
+    if (accessGateService.isAdminWithoutPin()) {
       return true;
     }
 
@@ -294,9 +275,9 @@ public class MissionAccessPolicy implements MissionVisibility {
   }
 
   /**
-   * Authorizes changing a mission's owner: only the current owner, {@code ROLE_ADMIN} or a caller
-   * with officer reach in the mission's owning unit; co-managers and {@code ROLE_MISSION_MANAGER}
-   * may not (REQ-SEC-065).
+   * Authorizes changing a mission's owner: only the current owner or a caller with officer reach in
+   * the mission's owning unit inside the active context (an admin within their own scope,
+   * REQ-ORG-032); co-managers and {@code ROLE_MISSION_MANAGER} may not (REQ-SEC-065).
    *
    * @param missionId mission id
    * @param authentication current Spring Security authentication
@@ -309,14 +290,10 @@ public class MissionAccessPolicy implements MissionVisibility {
     if ("anonymousUser".equals(authentication.getPrincipal())) {
       return false;
     }
-
-    Collection<? extends GrantedAuthority> reachable =
-        roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
-    boolean isAdmin =
-        reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()));
-    if (isAdmin) {
+    if (accessGateService.isAdminWithoutPin()) {
       return true;
     }
+
     Mission mission = missionRepository.findByIdForAuthorization(missionId).orElse(null);
     if (mission == null) {
       return false;
@@ -325,7 +302,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return true;
     }
 
-    UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID userId = authHelper.currentUserId().orElse(null);
     return userId != null
         && mission.getOwner() != null
         && mission.getOwner().getId().equals(userId);
@@ -344,11 +321,6 @@ public class MissionAccessPolicy implements MissionVisibility {
     if (authentication == null || !authentication.isAuthenticated()) {
       return false;
     }
-    Collection<? extends GrantedAuthority> reachable =
-        roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
-    if (reachable.stream().anyMatch(a -> Roles.authority(Roles.ADMIN).equals(a.getAuthority()))) {
-      return true;
-    }
     return holdsMissionManagerGrant(mission) || isOwnerOrManager(mission, authentication);
   }
 
@@ -364,7 +336,7 @@ public class MissionAccessPolicy implements MissionVisibility {
       return false;
     }
 
-    UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+    UUID userId = authHelper.currentUserId().orElse(null);
     if (userId == null) {
       return false;
     }
@@ -382,8 +354,8 @@ public class MissionAccessPolicy implements MissionVisibility {
   }
 
   /**
-   * Whether the caller holds officer reach in the unit that owns {@code mission}; an ownerless
-   * mission is reserved to admins.
+   * Whether the caller holds officer reach in the unit that owns {@code mission} inside the active
+   * context; an ownerless mission is reserved to an admin without a pin.
    */
   private boolean hasOfficerReachInOwningUnit(@NotNull Mission mission) {
     return accessGateService.canActAsOfficerInOwner(OrgUnit.idOf(mission.getOwningOrgUnit()));

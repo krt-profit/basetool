@@ -87,6 +87,7 @@ class LogisticianRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("logistician_user");
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     userRepository.save(user);
     userRepository.flush();
     saveLogisticianMembership(userId, user, true);
@@ -115,6 +116,7 @@ class LogisticianRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("membership_logistician");
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     userRepository.save(user);
     userRepository.flush();
 
@@ -144,6 +146,7 @@ class LogisticianRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("not_logistician");
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     userRepository.save(user);
     userRepository.flush();
 
@@ -248,6 +251,7 @@ class LogisticianRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("test_logistician");
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     userRepository.save(user);
     userRepository.flush();
     saveLogisticianMembership(userId, user, true);

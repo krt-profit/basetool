@@ -96,6 +96,13 @@ public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities 
     }
     List<GrantedAuthority> reduced = new ArrayList<>();
     reduced.add(new SimpleGrantedAuthority(Roles.authority(Roles.EXCHANGE_MEMBER)));
+    boolean krtMember =
+        stored.stream()
+            .map(GrantedAuthority::getAuthority)
+            .anyMatch(Roles.authority(Roles.KRT_MEMBER)::equals);
+    if (krtMember) {
+      reduced.add(new SimpleGrantedAuthority(Roles.EXCHANGE_KRT_MEMBER_MARKER));
+    }
     capabilityScopes.stream()
         .distinct()
         .sorted()

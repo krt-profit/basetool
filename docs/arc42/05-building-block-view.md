@@ -186,7 +186,9 @@ per-transaction memo `MissionOperationSummaryCache`. The SPI's record `MissionOp
 the memo's interface `MissionOperationLookup` sit in `model.dto` and `mapper`, because the mapper
 reads them and a `mapper -> mission` edge would close a package cycle with the moved mission
 services (as `MissionViewerAccess` does). So a page of missions costs one statement
-for its operations whatever its size. `Operation.missions` is a read-only join-column view. Since
+for its operations whatever its size. The SPI also tells whether the caller may link a mission to
+an operation, by the operation's edit rule (REQ-MISSION-034). `Operation.missions` is a read-only
+join-column view. Since
 P4-4 the mission embeds the operation as its own record `MissionOperationDto` (the components of
 `OperationDto`, built by `MissionMapper` from the summary), so the `Operation` entity, its status,
 repository, mapper and DTOs sit in `operation.internal` and `OperationAccessPolicy` owns the JPQL
@@ -282,7 +284,9 @@ The scope kernel moved in part since P4-6 (plan §7.6). `scope.api` holds the re
 the scope hub: `RequestScopeResolver`, `ScopePredicate`, `OrgUnitStampingService`,
 the scope kernel's JPQL fragments no longer live here: each aggregate's fragment sits beside its repository in the module's `api` (`MissionScope`, `ShipScope`, `JobOrderScope`, `InventoryScope`) or in its access policy (refinery, operation), and `ScopeFragmentsGoldenTest` pins all six, `OwnerScopeService` (bean `ownerScopeService`) and `AccessGateService`,
 beside the problem codes. `scope.internal` holds `ScopeActiveOrgUnitProvider`, which implements the
-`platform.api.ActiveOrgUnitProvider` SPI for the logging MDC. `OrgUnitCascadeService` moved to
+`platform.api.ActiveOrgUnitProvider` SPI for the logging MDC, and the member's stored choice of the
+active org unit (`ActiveOrgUnitChoices`, table `member_active_org_unit`, REQ-ORG-031), which
+`scope.web.ActiveOrgUnitChoiceController` serves. `OrgUnitCascadeService` moved to
 `orgunit.api` as a prerequisite, because the scope kernel calls it. `CustomJwtGrantedAuthoritiesConverter`
 stays in `service` until the identity module takes `UserReconciliationService`, which the converter
 calls to reconcile the user behind each token.
@@ -299,8 +303,9 @@ membership services only through `identity.api.MembershipOperations`, which
 `orgunit.internal.OrgUnitMembershipOperations` implements as a pass-through (it also sets the initial flags of a
 new Spezialkommando member; the seam names no org-unit type and has no type parameter),
 `identity.api.AccountErasure` (the registration flow's deletion, implemented by the GDPR orchestrator) and
-`identity.api.SquadronVisibility` (the two scope questions of the user queries, implemented by
-`OwnerScopeService`). `CustomJwtGrantedAuthoritiesConverter` lies in `scope.api`, because the exchange calls it.
+`identity.api.CallerUserProjection` (what of a user the caller may see, implemented by
+`AdminOrSelfUserProjection`); the user queries themselves carry no unit scope, since the member
+directory is organisation-wide (REQ-ORG-017). `CustomJwtGrantedAuthoritiesConverter` lies in `scope.api`, because the exchange calls it.
 
 The org-unit module (rank 4) owns the Staffeln, Spezialkommandos, Bereiche, the Organisationsleitung, Kommandogruppen and the memberships:
 the entities, repositories, DTOs and services other modules call lie in `orgunit.api`, the departure notifier, the membership operations

@@ -170,6 +170,7 @@
                                 <tr>
                                     <th class="bank-expand-cell"></th>
                                     <th th:text="#{bank.request.col.type}">Typ</th>
+                                    <th th:text="#{bank.request.col.account}">Konto</th>
                                     <th class="text-right" th:text="#{bank.request.col.amount}">Betrag</th>
                                     <th th:text="#{bank.request.col.status}">Status</th>
                                     <th th:text="#{bank.request.col.holder}">Halter</th>
@@ -192,6 +193,11 @@
                                         </button>
                                     </td>
                                     <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
+                                    <td data-testid="org-unit-bank-request-account">
+                                        <span th:text="${r.accountName()}">Staffel ALPHA</span>
+                                        <span th:if="${r.orgUnitShorthand() != null}" class="squadron-badge"
+                                              th:title="${r.orgUnitName()}" th:text="${r.orgUnitShorthand()}">ALP</span>
+                                    </td>
                                     <td class="text-right bank-amount">
                                         <span th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
                                         <th:block th:replace="~{bank/fragments/bank-request-linked :: fee(${r})}"></th:block>
@@ -235,7 +241,7 @@
                                 </tr>
                                 <tr class="bank-booking-detail detail-row" th:if="${hasDetail}" th:id="${detailId}" hidden
                                     data-testid="org-unit-bank-request-detail">
-                                    <td colspan="7" class="bank-booking-detail-cell">
+                                    <td colspan="8" class="bank-booking-detail-cell">
                                         <div class="bank-booking-detail-body">
                                             <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
                                                 <span class="bank-detail-label"

@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -47,6 +48,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1529,6 +1531,241 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(timer == null ? 0L : timer.count()).isZero();
   }
 
+  @Test
+  void reauthorization_deniedRoom_evictsTheSocketWithTheTerminalDeniedFrame() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openSubscribedWithToken(topic, oidcUser("user-1", "Alice"), "token-alice");
+    FakeSession bob = openSubscribed(topic, oidcUser("user-2", "Bob"));
+    handler.handleTextMessage(alice, presenceFrame("focus", topic, "crew"));
+    handler.tickReauthorize();
+    when(authorizer.authorize(any(), eq("token-alice"), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    alice.sent.clear();
+    bob.sent.clear();
+
+    sweepAfterOneInterval();
+
+    JsonNode denied = lastBroadcast(alice);
+    assertThat(denied.get("type").asString()).isEqualTo("denied");
+    assertThat(denied.get("topic").asString()).isEqualTo(topic);
+    assertThat(denied.get("reason").asString()).isEqualTo(MetricNames.SUBSCRIBE_DENY_AUTHZ);
+    assertThat(service.get(topic, "crew", "user-1")).isNull();
+    assertThat(lastBroadcast(bob).get("sections").has("crew")).isFalse();
+    assertThat(reauthorizeCount(registry, MetricNames.REAUTHORIZE_EVICTED, "mission"))
+        .isEqualTo(1.0);
+    assertThat(reauthorizeCount(registry, MetricNames.OUTCOME_ALLOWED, "mission")).isEqualTo(1.0);
+
+    alice.sent.clear();
+    handler.handleTextMessage(bob, changedFrame(topic, "crew"));
+    assertThat(alice.sent).isEmpty();
+  }
+
+  @Test
+  void reauthorization_evictedRoom_ignoresPresenceAndProbesAResubscribe() throws Exception {
+    String topic = missionTopic();
+    FakeSession alice = openSubscribedWithToken(topic, oidcUser("user-1", "Alice"), "token-alice");
+    FakeSession bob = openSubscribed(topic, oidcUser("user-2", "Bob"));
+    handler.tickReauthorize();
+    when(authorizer.authorize(any(), eq("token-alice"), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    sweepAfterOneInterval();
+    bob.sent.clear();
+
+    handler.handleTextMessage(alice, presenceFrame("focus", topic, "steps"));
+
+    assertThat(service.get(topic, "steps", "user-1")).isNull();
+    assertThat(bob.sent).isEmpty();
+
+    subscribe(alice, topic);
+
+    assertThat(lastBroadcast(alice).get("type").asString()).isEqualTo("denied");
+    assertThat(subscribeCounter(MetricNames.OUTCOME_DENIED, "mission")).isEqualTo(1.0);
+  }
+
+  @Test
+  void reauthorization_allowedRoom_staysJoined() throws Exception {
+    String topic = operationTopic();
+    FakeSession alice = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    handler.tickReauthorize();
+    alice.sent.clear();
+
+    sweepAfterOneInterval();
+
+    verify(authorizer, times(2)).authorize(any(), any(), any(), any(), any());
+    assertThat(alice.sent).isEmpty();
+    assertThat(reauthorizeCount(registry, MetricNames.OUTCOME_ALLOWED, "operation")).isEqualTo(1.0);
+    handler.handleTextMessage(bob, changedFrame(topic, "overview"));
+    assertThat(sectionsOf(lastBroadcast(alice))).containsExactly("overview");
+  }
+
+  @Test
+  void reauthorization_checksAHeldRoomAtMostOncePerInterval() throws Exception {
+    openSubscribed(operationTopic(), oidcUser("user-1", "Alice"));
+    handler.tickReauthorize();
+    nanoClock.addAndGet(LiveSyncSubscriptions.REAUTHORIZE_INTERVAL.toNanos() - 1);
+    handler.tickReauthorize();
+
+    verify(authorizer, times(1)).authorize(any(), any(), any(), any(), any());
+
+    nanoClock.incrementAndGet();
+    handler.tickReauthorize();
+    handler.tickReauthorize();
+
+    verify(authorizer, times(2)).authorize(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void reauthorization_lapsedToken_closesTheSocketWith4401WithoutAProbe() throws Exception {
+    FakeSession alice = openSubscribed(operationTopic(), oidcUser("user-1", "Alice"));
+    alice.attributes.put(
+        LiveSyncWebSocketHandler.ATTR_TOKEN_EXPIRES_AT, Instant.now().minusSeconds(1));
+
+    handler.tickReauthorize();
+
+    assertThat(alice.closeStatus).isEqualTo(LiveSyncWebSocketHandler.TOKEN_EXPIRED);
+    verify(authorizer, times(1)).authorize(any(), any(), any(), any(), any());
+    assertThat(reauthorizeCount(registry, MetricNames.REAUTHORIZE_TOKEN_EXPIRED, "operation"))
+        .isEqualTo(1.0);
+  }
+
+  @Test
+  void reauthorization_leavesASocketWithoutACheckedRoomAlone() throws Exception {
+    FakeSession reader = openSubscribed("missions", oidcUser("user-1", "Alice"));
+    FakeSession roomless = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    for (FakeSession session : List.of(reader, roomless)) {
+      session.attributes.put(
+          LiveSyncWebSocketHandler.ATTR_TOKEN_EXPIRES_AT, Instant.now().minusSeconds(1));
+    }
+
+    handler.tickReauthorize();
+    sweepAfterOneInterval();
+
+    assertThat(reader.closeStatus).isNull();
+    assertThat(roomless.closeStatus).isNull();
+    verify(authorizer, times(1)).authorize(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void reauthorization_rejectedToken_closesTheSocketWith4401() throws Exception {
+    FakeSession alice = openSubscribed(operationTopic(), oidcUser("user-1", "Alice"));
+    handler.tickReauthorize();
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY_TOKEN_REJECTED);
+    alice.sent.clear();
+
+    sweepAfterOneInterval();
+
+    assertThat(alice.closeStatus).isEqualTo(LiveSyncWebSocketHandler.TOKEN_EXPIRED);
+    assertThat(alice.sent).isEmpty();
+    assertThat(reauthorizeCount(registry, MetricNames.REAUTHORIZE_TOKEN_EXPIRED, "operation"))
+        .isEqualTo(1.0);
+  }
+
+  @Test
+  void reauthorization_indeterminateVerdict_keepsTheRoom() throws Exception {
+    String topic = operationTopic();
+    FakeSession alice = openSubscribed(topic, oidcUser("user-1", "Alice"));
+    FakeSession bob = openMultiplexedSession(oidcUser("user-2", "Bob"));
+    handler.tickReauthorize();
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE);
+    alice.sent.clear();
+
+    sweepAfterOneInterval();
+
+    assertThat(alice.sent).isEmpty();
+    assertThat(alice.closeStatus).isNull();
+    assertThat(reauthorizeCount(registry, MetricNames.REAUTHORIZE_INDETERMINATE, "operation"))
+        .isEqualTo(1.0);
+    handler.handleTextMessage(bob, changedFrame(topic, "overview"));
+    assertThat(sectionsOf(lastBroadcast(alice))).containsExactly("overview");
+  }
+
+  @Test
+  void reauthorization_saturatedExecutor_keepsTheRoomUntilTheNextInterval() throws Exception {
+    SaturableExecutor executor = new SaturableExecutor();
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(
+            new LiveSyncPresenceService(reg),
+            fanout,
+            objectMapper,
+            reg,
+            authorizer,
+            executor,
+            nanoClock::get);
+    String topic = operationTopic();
+    FakeSession alice = multiplexedSession(oidcUser("user-1", "Alice"));
+    h.afterConnectionEstablished(alice);
+    h.handleTextMessage(alice, subscribeFrame(topic));
+    h.tickReauthorize();
+    executor.saturated = true;
+    nanoClock.addAndGet(LiveSyncSubscriptions.REAUTHORIZE_INTERVAL.toNanos());
+
+    h.tickReauthorize();
+    executor.saturated = false;
+    h.tickReauthorize();
+
+    verify(authorizer, times(1)).authorize(any(), any(), any(), any(), any());
+    assertThat(reauthorizeCount(reg, MetricNames.REAUTHORIZE_INDETERMINATE, "operation"))
+        .isEqualTo(1.0);
+    assertThat(alice.closeStatus).isNull();
+
+    nanoClock.addAndGet(LiveSyncSubscriptions.REAUTHORIZE_INTERVAL.toNanos());
+    h.tickReauthorize();
+
+    verify(authorizer, times(2)).authorize(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void reauthorization_evictionLapseAndIndeterminateVerdict_stayBelowWarn() throws Exception {
+    String topic = operationTopic();
+    openSubscribedWithToken(topic, oidcUser("user-1", "Alice"), "token-alice");
+    openSubscribed(topic, oidcUser("user-2", "Bob"));
+    FakeSession carol = openSubscribed(topic, oidcUser("user-3", "Carol"));
+    handler.tickReauthorize();
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE);
+    when(authorizer.authorize(any(), eq("token-alice"), any(), any(), any()))
+        .thenReturn(LiveSyncSubscriptionAuthorizer.Decision.DENY);
+    carol.attributes.put(
+        LiveSyncWebSocketHandler.ATTR_TOKEN_EXPIRES_AT, Instant.now().minusSeconds(1));
+    logAppender.list.clear();
+
+    sweepAfterOneInterval();
+
+    assertThat(reauthorizeCount(registry, MetricNames.REAUTHORIZE_EVICTED, "operation"))
+        .isEqualTo(1.0);
+    assertThat(reauthorizeCount(registry, MetricNames.REAUTHORIZE_INDETERMINATE, "operation"))
+        .isEqualTo(1.0);
+    assertThat(reauthorizeCount(registry, MetricNames.REAUTHORIZE_TOKEN_EXPIRED, "operation"))
+        .isEqualTo(1.0);
+    assertThat(logAppender.list).noneMatch(e -> e.getLevel().isGreaterOrEqual(Level.WARN));
+  }
+
+  @Test
+  void presenceFrame_whileTheSubscribeIsBeingAuthorized_isIgnored() throws Exception {
+    List<Runnable> deferred = new ArrayList<>();
+    SimpleMeterRegistry reg = new SimpleMeterRegistry();
+    LiveSyncPresenceService svc = new LiveSyncPresenceService(reg);
+    LiveSyncWebSocketHandler h =
+        new LiveSyncWebSocketHandler(svc, fanout, objectMapper, reg, authorizer, deferred::add);
+    String topic = missionTopic();
+    FakeSession alice = multiplexedSession(oidcUser("user-1", "Alice"));
+    h.afterConnectionEstablished(alice);
+    h.handleTextMessage(alice, subscribeFrame(topic));
+
+    h.handleTextMessage(alice, presenceFrame("focus", topic, "crew"));
+
+    assertThat(svc.get(topic, "crew", "user-1")).isNull();
+
+    deferred.get(0).run();
+    h.handleTextMessage(alice, presenceFrame("focus", topic, "crew"));
+
+    assertThat(svc.get(topic, "crew", "user-1")).isNotNull();
+  }
+
   private static String missionTopic() {
     return "mission:" + UUID.randomUUID();
   }
@@ -1587,6 +1824,30 @@ class LiveSyncWebSocketHandlerTest {
     FakeSession session = openMultiplexedSession(user);
     subscribe(session, topic);
     return session;
+  }
+
+  /**
+   * Opens a multiplexed socket whose handshake captured {@code token} and subscribes it to {@code
+   * topic}, so a stub can single out that socket's authorization by its token.
+   *
+   * @param topic the canonical topic to subscribe to
+   * @param user the socket owner
+   * @param token the access token the handshake captured
+   * @return the established, subscribed session
+   */
+  private FakeSession openSubscribedWithToken(String topic, OidcUser user, String token)
+      throws Exception {
+    FakeSession session = multiplexedSession(user);
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_ACCESS_TOKEN, token);
+    handler.afterConnectionEstablished(session);
+    subscribe(session, topic);
+    return session;
+  }
+
+  /** Lets one re-authorization interval pass on the frozen clock and runs the sweep. */
+  private void sweepAfterOneInterval() {
+    nanoClock.addAndGet(LiveSyncSubscriptions.REAUTHORIZE_INTERVAL.toNanos());
+    handler.tickReauthorize();
   }
 
   /**
@@ -1705,6 +1966,25 @@ class LiveSyncWebSocketHandlerTest {
     return counter == null ? 0.0 : counter.count();
   }
 
+  /**
+   * Reads the re-authorization counter for one {@code outcome} / {@code topic_class} pair.
+   *
+   * @param meters the registry the handler under test binds to
+   * @param outcome the {@code outcome} tag value
+   * @param topicClass the {@code topic_class} tag value
+   * @return the counter's value, or {@code 0.0} when that series was never registered
+   */
+  private static double reauthorizeCount(
+      SimpleMeterRegistry meters, String outcome, String topicClass) {
+    var counter =
+        meters
+            .find(MetricNames.LIVESYNC_REAUTHORIZE)
+            .tag(MetricNames.TAG_OUTCOME, outcome)
+            .tag(MetricNames.TAG_TOPIC_CLASS, topicClass)
+            .counter();
+    return counter == null ? 0.0 : counter.count();
+  }
+
   private static OidcUser oidcUser(String sub, String preferredUsername) {
     Map<String, Object> claims = new HashMap<>();
     claims.put("sub", sub);
@@ -1721,6 +2001,19 @@ class LiveSyncWebSocketHandlerTest {
     WebSocketMessage<?> last = sent.get(sent.size() - 1);
     assertThat(last).isInstanceOf(TextMessage.class);
     return objectMapper.readTree(((TextMessage) last).getPayload());
+  }
+
+  /** Runs a probe inline until it is saturated, then refuses it like a full auth executor. */
+  private static final class SaturableExecutor implements Executor {
+    boolean saturated;
+
+    @Override
+    public void execute(Runnable task) {
+      if (saturated) {
+        throw new RejectedExecutionException("auth executor full");
+      }
+      task.run();
+    }
   }
 
   /** Captures fan-out publishes so tests can assert the cross-replica hand-off. */

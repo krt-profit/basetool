@@ -13,7 +13,9 @@
     <div class="home-top">
         <div class="greeting home-head" data-testid="home-head" th:unless="${dashboard.mode().name() == 'ADMIN'}">
             <span class="page-eyebrow" data-testid="home-eyebrow"
-                  th:text="${activeOrgUnit != null} ? ${activeOrgUnit.orgUnitName()} + ' · ' + ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')} : ${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')}">ALPHA · Samstag, 03.10.</span>
+                  th:with="today=${#temporals.format(@relativeDays.today(), 'EEEE, dd.MM.')},
+                           context=${activeOrgUnit != null ? activeOrgUnit.orgUnitName() : (isAllMyOrgUnitsMode ? #messages.msg('orgUnit.switcher.allMine') : (isAllSquadronsMode ? #messages.msg('squadron.switcher.all') : null))}"
+                  th:text="${context != null} ? ${context} + ' · ' + ${today} : ${today}">ALPHA · Samstag, 03.10.</span>
             <h1 th:if="${username}" th:text="#{home.welcome(${currentUser != null ? currentUser.effectiveName : username})}">Willkommen, Pilot</h1>
             <h1 th:unless="${username}" th:text="#{home.welcome_generic}">Willkommen beim Profit Basetool!</h1>
         </div>

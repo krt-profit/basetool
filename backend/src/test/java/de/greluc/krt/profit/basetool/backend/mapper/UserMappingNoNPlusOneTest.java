@@ -22,10 +22,12 @@ package de.greluc.krt.profit.basetool.backend.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
@@ -40,7 +42,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
@@ -73,6 +77,7 @@ class UserMappingNoNPlusOneTest {
   @Autowired private UserMapper userMapper;
   @Autowired private MissionRepository missionRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private OrgUnitMembershipRepository membershipRepository;
   @Autowired private EntityManager entityManager;
@@ -212,11 +217,12 @@ class UserMappingNoNPlusOneTest {
     return missionRepository.save(mission).getId();
   }
 
-  /** A member of both test Staffeln, Logistician in the second. */
+  /** A {@code KRT Member} of both test Staffeln, Logistician in the second. */
   private User newMember(String username) {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername(username);
+    user.setRoles(new HashSet<>(Set.of(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow())));
     user = userRepository.save(user);
     addMembership(user, staffelA, false);
     addMembership(user, staffelB, true);

@@ -161,8 +161,9 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   }
 
   /**
-   * Resolves the squadron MDC value: an admin's active selection, else the home squadron; {@code
-   * all} for an admin without a selection, {@code none} when unauthenticated, unassigned or the
+   * Resolves the squadron MDC value: the one org unit the request's effective context covers (the
+   * honoured pin, or a member's only unit); {@code all} for an admin without a pin, the anonymous
+   * marker when unauthenticated, {@code none} when the context covers several units or none, or the
    * lookup fails.
    */
   @NotNull

@@ -1139,7 +1139,7 @@ class ProfitHierarchyNoticeIntegrationTest {
     if (audience == Audience.ADMIN) {
       user.getRoles().add(roles.findByCode("ADMIN").orElseThrow());
     }
-    if (!Set.of(Audience.AREA_WRITER, Audience.NONMEMBER_LEADER).contains(audience)) {
+    if (audience != Audience.NONMEMBER_LEADER) {
       user.getRoles().add(roles.findByCode("KRT_MEMBER").orElseThrow());
     }
     return users.saveAndFlush(user);

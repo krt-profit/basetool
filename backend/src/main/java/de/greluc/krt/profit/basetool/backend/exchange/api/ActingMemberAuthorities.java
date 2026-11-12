@@ -36,9 +36,11 @@ public interface ActingMemberAuthorities {
 
   /**
    * Assembles the reduced authorities an acting member holds on the exchange layer: {@code
-   * ROLE_EXCHANGE_MEMBER} and one capability authority per relayed scope, never the member's stored
-   * roles, permissions or contextual grants (REQ-XCH-009). A member refused by the approval or role
-   * gate keeps exactly the marker that makes those gates refuse.
+   * ROLE_EXCHANGE_MEMBER}, the non-role marker {@code XCH_KRT_MEMBER} when the member holds {@code
+   * KRT Member} (so their memberships confer their reach, REQ-SEC-015) and one capability authority
+   * per relayed scope, never the member's stored roles, permissions or contextual grants
+   * (REQ-XCH-009). A member refused by the approval or role gate keeps exactly the marker that
+   * makes those gates refuse.
    *
    * <p>Implementations fail closed: a subject with no local account is refused rather than created,
    * and a member the last roster sync no longer found in the identity provider is refused.

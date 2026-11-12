@@ -251,7 +251,7 @@ class SecurityTest {
 
   /**
    * Verifies that the Terms-of-Use wording is readable without a token, as the public {@code
-   * /terms} page and the Android app require (ADR-0138, REQ-SEC-028).
+   * /terms} page requires (ADR-0138, REQ-SEC-028).
    */
   @Test
   void termsDocumentIsReadableAnonymously() throws Exception {

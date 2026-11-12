@@ -111,6 +111,14 @@ ownership according to a documented matrix, the admin area is an explicit carve-
 and `orgUnitId` travels in the MDC and in a relay header so the active context is visible in logs
 and across the module boundary.
 
+The active context has one rule for every surface (REQ-ORG-032): the backend honours the relayed
+unit only when the caller may select it and reports the effective context (one unit, all of the
+member's units, every unit, or none), which is all the web displays. The member's choice is stored
+and restored at the next sign-in (REQ-ORG-031), and other tabs of the same browser follow a switch.
+Reads, writes, role powers and create-time stamping follow the context, an admin's included; a
+target without an owning unit passes a role gate only for an admin without a pin. Whether a
+membership confers anything rests on one check of `KRT Member` (`AuthHelperService`, REQ-SEC-015).
+
 A scoped aggregate says so in its own code: it carries `@TenantScoped`, naming its owning or
 responsible unit, and the tenancy guards select by that marker and by what a controller writes,
 never by class names, so a split or moved controller stays under the scope-gate rule (REQ-ORG-028).
@@ -187,10 +195,10 @@ Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every 
 reviewed catalogue lists opt out to 100 000), UTC everywhere, and a committed
 `openapi.json` per REST-serving module — generated with sorted keys by each module's
 `OpenApiGeneratorTest`, and CI fails a pull request whose committed document differs from the one
-its build generated. The backend's generator splits the exchange relay surface (`/api/v1/exchange/**`,
-tier T0) off into its own internal document, `exchange-relay.openapi.json`, with the same staleness
-check; `openapi.json` is what the app and the frontend read, the relay document is read only by the
-contract guards and served to no one (REQ-XCH-039, ADR-0216).
+its build generated. The backend's generator splits the exchange relay surface (`/api/v1/exchange/**`)
+off into its own internal document, `exchange-relay.openapi.json`, with the same staleness check;
+`openapi.json` is what the frontend reads, the relay document is read only by the contract guards
+and served to no one (REQ-XCH-039, ADR-0216).
 
 `/api/v1` is **evolvable in place**: an operation consumed solely by the in-repo frontend may change
 its response shape, because frontend and backend ship from one repository and promote as one digest

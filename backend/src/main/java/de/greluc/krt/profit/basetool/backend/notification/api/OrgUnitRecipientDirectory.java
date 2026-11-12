@@ -24,7 +24,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Resolves the per-membership appointments of an org unit as notification recipients.
+ * Resolves the per-membership appointments of an org unit as notification recipients. Every method
+ * returns only members who hold {@code KRT Member}, since without it no membership confers anything
+ * (REQ-NOTIF-024, REQ-SEC-015).
  *
  * <p>Owned by the notification module and implemented by the orgunit module.
  */
@@ -58,7 +60,7 @@ public interface OrgUnitRecipientDirectory {
   Set<UUID> missionManagersOf(@NotNull UUID orgUnitId);
 
   /**
-   * The members who hold a leadership seat in an org unit, whatever their global roles.
+   * The members who hold a leadership seat in an org unit.
    *
    * @param orgUnitId the org unit
    * @return their user subs; never {@code null}, possibly empty

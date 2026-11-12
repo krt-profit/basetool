@@ -14,6 +14,10 @@
      th:classappend="${'alert-' + type + (extraClass != null and extraClass != '' ? ' ' + extraClass : '')}"
      th:text="#{${msgKey}}">Alert message</div>
 
+<div th:fragment="allMyOrgUnitsNotice" th:if="${isAllMyOrgUnitsMode}" class="alert alert-info"
+     data-testid="all-my-org-units-notice"
+     th:text="#{orgUnit.context.allMine.notice}">You are seeing the data of all your org units.</div>
+
 <th:block th:fragment="emptyStateBody(titleKey, textKey, filterHintKey)">
   <span class="empty-title" th:text="#{${titleKey}}">Noch keine Eintr&auml;ge</span>
   <span class="empty-text" th:text="#{${textKey}}">Noch keine Eintr&auml;ge vorhanden.</span>

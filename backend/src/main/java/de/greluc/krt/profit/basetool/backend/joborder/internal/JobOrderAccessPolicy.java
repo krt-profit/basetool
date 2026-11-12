@@ -324,7 +324,8 @@ public class JobOrderAccessPolicy
   }
 
   /**
-   * The Logistician edit gate: a grant in the responsible unit, an order without one is admin's.
+   * The Logistician edit gate: a grant in the responsible unit inside the active context; an order
+   * without one is reserved to an admin without a pin.
    */
   private boolean canEditJobOrderRow(@NotNull JobOrder order) {
     if (responsibilityInvalid(order)) {

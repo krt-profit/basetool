@@ -30,6 +30,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -54,16 +55,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
  * MVC test for {@link SpecialCommandMembersPageController}: the admin/officer gate, the mapping of
- * a backend 403, the admin-versus-lead differences, the {@code membersResults} fragment
- * (REQ-FE-005) and the member writes' redirect and AJAX relay.
+ * a backend 403, the admin-versus-lead differences — a non-admin lead's own row and a lead's row
+ * render read-only (REQ-ROLE-004) — the {@code membersResults} fragment (REQ-FE-005) and the member
+ * writes' redirect and AJAX relay.
  */
 @SpringBootTest
 class SpecialCommandMembersPageControllerMvcTest {
@@ -91,21 +95,141 @@ class SpecialCommandMembersPageControllerMvcTest {
 
   /** Stubs the backend SK read and a one-member roster as the client decodes them. */
   private void stubSpecialCommandWithOneMember() {
-    SpecialCommandDto sc = new SpecialCommandDto(skId, "Detail SK", "DSK", "desc", true, 0L);
-    OrgUnitMembershipDto member =
+    stubSpecialCommandWith(
         new OrgUnitMembershipDto(
-            memberId, "Pilot", skId, OrgUnitKind.SPECIAL_COMMAND, false, false, false, null, 3L);
-    when(backendApiClient.get(
-            eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
-        .thenReturn(sc);
-    when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
-        .thenReturn(List.of(member));
+            memberId, "Pilot", skId, OrgUnitKind.SPECIAL_COMMAND, false, false, false, null, 3L));
   }
 
   /** Stubs the backend layout so the caller holds officer reach, which the page gate reads. */
   private void stubOfficerReach() {
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
         .thenReturn(LayoutResponses.officerReach(true));
+  }
+
+  /**
+   * Stubs the backend SK read and the given roster.
+   *
+   * @param roster the roster rows as the client decodes them
+   */
+  private void stubSpecialCommandWith(OrgUnitMembershipDto... roster) {
+    when(backendApiClient.get(
+            eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
+        .thenReturn(new SpecialCommandDto(skId, "Detail SK", "DSK", "desc", true, 0L));
+    when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
+        .thenReturn(List.of(roster));
+  }
+
+  /**
+   * A roster row of the SK.
+   *
+   * @param userId the member
+   * @param name the member's display name
+   * @param logistician the Logistiker flag
+   * @param missionManager the Einsatzleiter flag
+   * @param lead whether the member holds the SK lead seat
+   * @return the row
+   */
+  private OrgUnitMembershipDto row(
+      UUID userId, String name, boolean logistician, boolean missionManager, boolean lead) {
+    return new OrgUnitMembershipDto(
+        userId,
+        name,
+        skId,
+        OrgUnitKind.SPECIAL_COMMAND,
+        logistician,
+        missionManager,
+        lead,
+        null,
+        1L);
+  }
+
+  /**
+   * A signed-in member with the given account id and authority, so the page knows the caller's own
+   * row.
+   *
+   * @param userId the caller's account id
+   * @param authority the caller's authority
+   * @return the request post-processor carrying the OIDC login
+   */
+  private static RequestPostProcessor signedIn(UUID userId, String authority) {
+    return oidcLogin()
+        .idToken(token -> token.subject(userId.toString()))
+        .authorities(new SimpleGrantedAuthority(authority));
+  }
+
+  /**
+   * Renders the member page in German for the given caller and returns its roster table.
+   *
+   * @param caller the signed-in caller
+   * @return the markup of the roster table
+   * @throws Exception if the request fails
+   */
+  private String rosterFor(RequestPostProcessor caller) throws Exception {
+    String html =
+        mockMvc
+            .perform(
+                get("/organisation/special-commands/" + skId).locale(Locale.GERMAN).with(caller))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    int start = html.indexOf("data-testid=\"sk-roster\"");
+    assertThat(start).isNotNegative();
+    return html.substring(start, html.indexOf("</table>", start));
+  }
+
+  /**
+   * A non-admin lead may not write their own row nor a lead's row (REQ-ROLE-004): both render their
+   * set flags as chips, without a flag form and without „Entfernen", while a plain member's row
+   * keeps both.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void detail_lead_rendersTheirOwnAndACoLeadsRowReadOnly() throws Exception {
+    UUID leadId = UUID.randomUUID();
+    UUID coLeadId = UUID.randomUUID();
+    stubOfficerReach();
+    stubSpecialCommandWith(
+        row(leadId, "Lead", true, false, true),
+        row(coLeadId, "CoLead", false, true, true),
+        row(memberId, "Pilot", false, false, false));
+
+    String roster = rosterFor(signedIn(leadId, "ROLE_KRT_MEMBER"));
+
+    assertThat(roster.split("class=\"unit-flag-form\"", -1)).hasSize(3);
+    assertThat(roster.split("data-sk-action=\"remove\"", -1)).hasSize(2);
+    assertThat(roster)
+        .contains("/members/" + memberId + "/flags")
+        .contains("/members/" + memberId + "/delete")
+        .doesNotContain("/members/" + leadId + "/flags")
+        .doesNotContain("/members/" + leadId + "/delete")
+        .doesNotContain("/members/" + coLeadId + "/flags")
+        .doesNotContain("/members/" + coLeadId + "/delete")
+        .contains("<span class=\"chip\">Logistiker</span>")
+        .contains("<span class=\"chip\">Einsatzleiter</span>");
+  }
+
+  /**
+   * An admin writes every row, their own and a lead's included.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  void detail_admin_keepsTheirOwnAndALeadsRowWritable() throws Exception {
+    UUID adminId = UUID.randomUUID();
+    UUID leadId = UUID.randomUUID();
+    stubSpecialCommandWith(
+        row(adminId, "Admin", false, false, false), row(leadId, "Lead", true, false, true));
+
+    String roster = rosterFor(signedIn(adminId, "ROLE_ADMIN"));
+
+    assertThat(roster.split("class=\"unit-flag-form\"", -1)).hasSize(5);
+    assertThat(roster.split("data-sk-action=\"remove\"", -1)).hasSize(3);
+    assertThat(roster)
+        .contains("/members/" + adminId + "/flags")
+        .contains("/members/" + leadId + "/delete")
+        .doesNotContain("<span class=\"chip\">");
   }
 
   @Test

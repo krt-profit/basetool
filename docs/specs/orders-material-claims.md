@@ -151,7 +151,9 @@ that isolated physical correction with 409; attribution-only correction remains 
 is the existing production-reversal boundary, not a general prohibition on historical correction.
 
 **Authority and lifecycle.** The shared contextual writers, single participation, fixed Profit
-boundary and strict invalid-responsibility gate in REQ-ORDERS-050/-055 apply. A Staffel has at most
+boundary and strict invalid-responsibility gate in REQ-ORDERS-050/-055 apply. The writers follow
+the active org unit like every role power (REQ-ORG-032): an admin acts for the units their context
+covers, every unit unpinned and the pinned unit pinned. A Staffel has at most
 one active promise per bucket; repeated editing addresses that same promise with the required
 scoped version. Meaningful concurrent amount edits must not be silently retried as last-writer-wins.
 Terminal rejection/completion/cancellation, support withdrawal and ineligibility end open promises

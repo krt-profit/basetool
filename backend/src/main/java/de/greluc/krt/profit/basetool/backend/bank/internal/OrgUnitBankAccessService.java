@@ -96,15 +96,16 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * Lists every active account the caller may view on the org-unit bank page over their whole
-   * reach, ignoring the active-org-unit pin (REQ-BANK-064).
+   * Lists every active account the caller may view on the org-unit bank page under the pin, the
+   * same set as {@link #listOverseenOrgUnitBalances()} and the drill-in (REQ-BANK-064,
+   * REQ-ORG-032).
    *
    * @return the visible active accounts ordered by account number; empty when none
    */
   @NotNull
   @Transactional(readOnly = true)
   public List<BankAccount> listViewableActiveAccounts() {
-    return policy.viewable(actor(), null).stream()
+    return policy.viewable(actor(), pin()).stream()
         .map(BankAccessRules.ViewableAccount::account)
         .toList();
   }
@@ -352,13 +353,13 @@ public class OrgUnitBankAccessService {
   }
 
   /**
-   * The request's active-org-unit pin as sent; the policy decides what it narrows.
+   * The request's honoured active-org-unit pin (REQ-ORG-032); the policy decides what it narrows.
    *
    * @return the pinned org unit, or {@code null}
    */
   @Nullable
   UUID pin() {
-    return requestScopeResolver.readActiveSquadronFromHeader().orElse(null);
+    return requestScopeResolver.currentPin().orElse(null);
   }
 
   /**

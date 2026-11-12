@@ -100,7 +100,7 @@ class LeitungViewServiceTest {
   void setUp() {
     auth = org.mockito.Mockito.mock(Authentication.class);
     lenient().when(requestScopeResolver.narrowToPin(any())).thenAnswer(inv -> inv.getArgument(0));
-    lenient().when(authHelperService.hasReachableRole("ROLE_KRT_MEMBER")).thenReturn(true);
+    lenient().when(authHelperService.holdsKrtMember()).thenReturn(true);
   }
 
   private OrgUnit ol() {
@@ -170,7 +170,8 @@ class LeitungViewServiceTest {
   private void callerHolds(Set<UUID> cascade, OrgUnitMembership... seats) {
     when(authHelperService.isAdmin()).thenReturn(false);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of(seats));
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(callerId))
+        .thenReturn(List.of(seats));
     when(cascadeService.cascadedOfficerReach(anyList())).thenReturn(new LinkedHashSet<>(cascade));
   }
 
@@ -202,6 +203,23 @@ class LeitungViewServiceTest {
     verify(kommandoGroupRepository).findBySquadronIdInOrderBySortIndexAsc(any());
     verify(membershipRepository, never()).findAllByIdOrgUnitId(any());
     verify(kommandoGroupRepository, never()).findBySquadronIdOrderBySortIndexAsc(any());
+  }
+
+  @Test
+  void pinnedAdmin_seesThePinnedUnitOnly() {
+    when(authHelperService.isAdmin()).thenReturn(true);
+    when(requestScopeResolver.currentPin()).thenReturn(Optional.of(squadronId));
+    allUnitsExist();
+    when(membershipRepository.findAllByIdOrgUnitIdIn(List.of(squadronId))).thenReturn(List.of());
+    when(kommandoGroupRepository.findBySquadronIdInOrderBySortIndexAsc(List.of(squadronId)))
+        .thenReturn(List.of());
+
+    LeitungViewDto view = service.buildView(auth);
+
+    assertTrue(view.organisationsleitungen().isEmpty());
+    assertTrue(view.bereiche().isEmpty());
+    assertEquals(List.of(squadronId), view.squadrons().stream().map(LeitungUnitDto::id).toList());
+    assertTrue(view.specialCommands().isEmpty());
   }
 
   @Test
@@ -389,6 +407,22 @@ class LeitungViewServiceTest {
     LeitungUnitDto sk = view.specialCommands().getFirst();
     assertTrue(sk.canAppointLead());
     assertFalse(sk.canManageRoster(), "the roster cap follows canManageMembers, not the Bereich");
+  }
+
+  @Test
+  void bereichsleiterPinnedToTheBereich_seesTheBereichAloneWithoutItsUnits() {
+    allUnitsExist();
+    callerHolds(
+        Set.of(bereichId, squadronId, skId), seat(bereichId, MembershipRole.BEREICHSLEITER));
+    when(requestScopeResolver.narrowToPin(any())).thenReturn(Set.of(bereichId));
+
+    LeitungViewDto view = service.buildView(auth);
+
+    assertEquals(1, view.bereiche().size());
+    assertEquals(bereichId, view.bereiche().getFirst().id());
+    assertTrue(view.squadrons().isEmpty(), "a Bereich pin is the Bereich alone (REQ-ORG-032)");
+    assertTrue(view.specialCommands().isEmpty());
+    assertTrue(view.organisationsleitungen().isEmpty());
   }
 
   @Test

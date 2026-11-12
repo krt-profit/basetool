@@ -84,7 +84,9 @@ public class OrgUnitMembershipService {
   private final ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
   /**
-   * Adds the user as a member of the Spezialkommando.
+   * Adds the user as a member of the Spezialkommando. A user's first membership adopts their
+   * unowned shared Lager rows into the SK, unless the SK is deactivated, which takes no row
+   * (REQ-ORG-032).
    *
    * @param specialCommandId the SK to add the user to; never {@code null}.
    * @param userId the user to add; never {@code null}.
@@ -109,7 +111,7 @@ public class OrgUnitMembershipService {
     membership.setJoinedAt(Instant.now());
     OrgUnitMembership saved = membershipRepository.save(membership);
 
-    if (wasMembershipless) {
+    if (wasMembershipless && sc.isActive()) {
       firstMembershipObserver.onUserGainedFirstOrgUnit(userId, sc);
     }
     auditRecorder.record(
@@ -629,11 +631,11 @@ public class OrgUnitMembershipService {
     }
 
     if (membershipsBefore == 0 && !addedSquadrons.isEmpty()) {
-      Squadron primaryAdded =
-          addedSquadrons.stream()
-              .min(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
-              .orElseThrow();
-      firstMembershipObserver.onUserGainedFirstOrgUnit(user.getId(), primaryAdded);
+      addedSquadrons.stream()
+          .filter(Squadron::isActive)
+          .min(Comparator.comparing(Squadron::getName, String.CASE_INSENSITIVE_ORDER))
+          .ifPresent(primaryAdded ->
+              firstMembershipObserver.onUserGainedFirstOrgUnit(user.getId(), primaryAdded));
     } else if (membershipsBefore > 0 && membershipRepository.countByIdUserId(user.getId()) == 0) {
       firstMembershipObserver.onUserLostLastOrgUnit(user.getId());
     }

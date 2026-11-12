@@ -96,6 +96,9 @@ class StockLevelNoticeIntegrationTest {
     UUID seatHolder = data.user("seat");
     UUID member = data.user("member");
     UUID bereichLead = data.user("bereich-lead");
+    for (UUID krtMember : List.of(logistician, seatHolder, member, bereichLead)) {
+      data.holdsKrtMember(krtMember);
+    }
     data.joins(logistician, unit, "MEMBER", true);
     data.joins(seatHolder, unit, "STAFFELLEITER", false);
     data.joins(member, unit, "MEMBER", false);
@@ -116,9 +119,28 @@ class StockLevelNoticeIntegrationTest {
   }
 
   @Test
+  void aSeatHolderOrLogisticianWithoutKrtMemberIsNotTold() {
+    UUID logistician = data.user("logistician");
+    UUID formerLogistician = data.user("former-logistician");
+    UUID formerSeatHolder = data.user("former-seat");
+    data.holdsKrtMember(logistician);
+    data.joins(logistician, unit, "MEMBER", true);
+    data.joins(formerLogistician, unit, "MEMBER", true);
+    data.joins(formerSeatHolder, unit, "STAFFELLEITER", false);
+    stockOf(3.0);
+
+    produce();
+
+    assertThat(notificationCreationService.createFromEvent(onlyNotice()))
+        .containsExactly(logistician);
+  }
+
+  @Test
   void aMemberWhoMutedTheTypeIsNotTold() {
     UUID logistician = data.user("logistician");
     UUID muted = data.user("muted");
+    data.holdsKrtMember(logistician);
+    data.holdsKrtMember(muted);
     data.joins(logistician, unit, "MEMBER", true);
     data.joins(muted, unit, "MEMBER", true);
     muteService.setMuted(muted, NotificationType.INVENTORY_STOCK_LEVEL_LOW, true);

@@ -1074,7 +1074,7 @@ class ArchitectureTest {
             "Every REST controller class must declare at least one @PreAuthorize annotation (either"
                 + " on the class or on any method) so it cannot silently bypass authorisation."
                 + " Public endpoints must use @PreAuthorize(\"permitAll()\") and are limited to"
-                + " the four REQ-SEC-052 names.");
+                + " the three REQ-SEC-052 names.");
   }
 
   @Test
@@ -1103,7 +1103,7 @@ class ArchitectureTest {
         .that(CONTROLLER_CODE)
         .should(declarePermitAllOnlyOnTheAllowList(allowedMethods, allowedControllers))
         .because(
-            "REQ-SEC-052: only the two anonymous reads, the Keycloak SPI precheck and Spring's"
+            "REQ-SEC-052: only the anonymous terms read, the Keycloak SPI precheck and Spring's"
                 + " own /error dispatch may declare permitAll() -- the entries of"
                 + " PERMIT_ALL_ALLOWED_METHODS and PERMIT_ALL_ALLOWED_CONTROLLERS. A new one is a"
                 + " widening of the public surface and needs the requirement amended first.");

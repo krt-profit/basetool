@@ -195,6 +195,7 @@
       "kernel/nav-shortcuts.js",
       "kernel/nav-start-page.js",
       "kernel/nav-tabbar.js",
+      "kernel/org-unit-context-sync.js",
       "kernel/safe-url.js",
       "kernel/scu-decimal-input.js",
       "kernel/sidebar.js",

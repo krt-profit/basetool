@@ -269,7 +269,7 @@ class GrantCascadeAggregateAccessIntegrationTest {
   }
 
   @Test
-  void aSiblingGrantNoGrantOrAPinOutsideTheGrantFailsTheOnBehalfGates() {
+  void aSiblingGrantNoGrantOrAPinOnAnotherOwnUnitFailsTheOnBehalfGates() {
     assertThat(
             asCaller(
                 logisticianGrant(siblingId),
@@ -280,14 +280,15 @@ class GrantCascadeAggregateAccessIntegrationTest {
         .isFalse();
     assertThat(
             asCaller(
+                missionGrant(bereichId),
+                () -> inventoryAccessPolicy.canManageUserInventory(childMemberId)))
+        .isFalse();
+    alsoMemberOfTheSibling();
+    assertThat(
+            asCaller(
                 logisticianGrant(bereichId),
                 siblingId,
                 () -> refineryAccessPolicy.canViewUserRefineryOrders(childMemberId)))
-        .isFalse();
-    assertThat(
-            asCaller(
-                missionGrant(bereichId),
-                () -> inventoryAccessPolicy.canManageUserInventory(childMemberId)))
         .isFalse();
   }
 
@@ -309,19 +310,35 @@ class GrantCascadeAggregateAccessIntegrationTest {
   }
 
   @Test
-  void aPinOutsideTheGrantedSetRefusesTheCascade() {
-    assertThat(
-            asCaller(
-                logisticianGrant(bereichId),
-                siblingId,
-                () -> inventoryAccessPolicy.canEditInventoryItem(inventoryRowId)))
-        .isFalse();
+  void aPinTheCallerCannotSelectIsNoPinAndAPinOnAnotherOwnUnitRefusesTheCascade() {
     assertThat(
             asCaller(
                 logisticianGrant(bereichId),
                 childId,
                 () -> inventoryAccessPolicy.canEditInventoryItem(inventoryRowId)))
         .isTrue();
+    alsoMemberOfTheSibling();
+    assertThat(
+            asCaller(
+                logisticianGrant(bereichId),
+                siblingId,
+                () -> inventoryAccessPolicy.canEditInventoryItem(inventoryRowId)))
+        .isFalse();
+  }
+
+  /**
+   * Makes the caller a plain member of the sibling Staffel too, so a pin on it is one they may
+   * select (REQ-ORG-032).
+   */
+  private void alsoMemberOfTheSibling() {
+    transactionTemplate.executeWithoutResult(_ -> {
+      OrgUnitMembership membership = new OrgUnitMembership();
+      membership.setId(new OrgUnitMembershipId(callerId, siblingId));
+      membership.setUser(userRepository.getReferenceById(callerId));
+      membership.setKind(OrgUnitKind.SQUADRON);
+      membership.setJoinedAt(Instant.now());
+      orgUnitMembershipRepository.save(membership);
+    });
   }
 
   private List<UUID> inventoryListIds() {
@@ -363,15 +380,16 @@ class GrantCascadeAggregateAccessIntegrationTest {
   }
 
   @Test
-  void aPinNarrowsTheListsToTheGrantedPinnedUnit() {
-    assertThat(asCaller(logisticianGrant(bereichId), siblingId, this::inventoryListIds))
-        .doesNotContain(inventoryRowId);
+  void aPinOnAnotherOwnUnitNarrowsTheListsAwayFromTheCascade() {
     assertThat(asCaller(logisticianGrant(bereichId), childId, this::inventoryListIds))
         .contains(inventoryRowId);
-    assertThat(asCaller(logisticianGrant(bereichId), siblingId, this::refineryListIds))
-        .doesNotContain(refineryOrderId);
     assertThat(asCaller(logisticianGrant(bereichId), childId, this::refineryListIds))
         .contains(refineryOrderId);
+    alsoMemberOfTheSibling();
+    assertThat(asCaller(logisticianGrant(bereichId), siblingId, this::inventoryListIds))
+        .doesNotContain(inventoryRowId);
+    assertThat(asCaller(logisticianGrant(bereichId), siblingId, this::refineryListIds))
+        .doesNotContain(refineryOrderId);
   }
 
   @Test

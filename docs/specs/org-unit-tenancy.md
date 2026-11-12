@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -44,12 +44,13 @@ release.
 
 ### REQ-ORG-002 — Scope is enforced in the service layer
 
-Use [`RequestScopeResolver.currentOrgUnitId()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/RequestScopeResolver.java)
+Use [`RequestScopeResolver.currentScopePredicate()`](../../backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/RequestScopeResolver.java)
 for list-endpoint filters (three-component record `ScopePredicate`: `boolean adminAllScope`,
 `UUID activeOrgUnitId`, `Set<UUID> memberOrgUnitIds`) and `AccessGateService.canSee*` /
 `canEdit*` for `@PreAuthorize` SpEL on detail/write endpoints. Admins without an active pin
 get all-scope visibility; admins with a pin get the same restrictive view as a member;
-non-admins see the union of their memberships unless they pin one.
+non-admins see the union of their memberships unless they pin one. Only a pin that REQ-ORG-032
+honours counts; any other pin is no pin.
 
 ### REQ-ORG-003 — Aggregate scope kinds
 
@@ -89,11 +90,14 @@ non-admins see the union of their memberships unless they pin one.
   linked missions may see it (`viewerUserId` matches a `mission_participant.user_id` of a mission
   whose `operation_id` is this operation), so participants can view the operation and their payout
   regardless of owning Staffel. Both escapes are gated in the service layer and mirrored across the
-  three scoped queries (`findAllScoped`, `findAllReferenceScoped`, `searchOperations`) and
-  `canSeeOperation`. See REQ-ORG-009.
+  scoped read queries (`findAllScoped`, `searchOperations`) and `canSeeOperation`. They open
+  reading only: linking a mission to an operation needs `canEditOperation`, and the mission's
+  operation picker (`findAllEditableReference`) lists only the operations the caller may edit
+  (REQ-MISSION-034). See REQ-ORG-009.
 - **Cross-staffel with public escape:** `Mission` — visible to other OrgUnits iff
-  `is_internal = false`; editable only by the owning OrgUnit + admins (`searchMissions`
-  enforces `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false`). A mission may
+  `is_internal = false` (`searchMissions` enforces
+  `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false`); editable only by the owning
+  OrgUnit and by admins inside the active context (REQ-ORG-032). A mission may
   also be **ownerless** (`owning_org_unit_id IS NULL`, V144) — a leadership / "Bereichsleitung"
   mission created by a user who belongs to no OrgUnit; see REQ-ORG-009.
 - **Shared order readership with independent processing scope:** `JobOrder` and its order-owned
@@ -151,17 +155,30 @@ opens no private producer panel, unrelated Mission, Inventory or Bank object, an
 > For JobOrders, the following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance. Requirements for other aggregates remain binding.
 
 Stamp the OrgUnit via the central picker resolvers on `OrgUnitStampingService` — never read
-`user.getSquadron()` directly. Two variants share the §5.5.1 picker matrix (1 + no output →
-auto-stamp; 1 + valid → honoured; 1 + foreign → 400; >1 + no output → 400 (force choice); >1 +
-valid → honoured) and differ only on the **0-membership** row:
+`user.getSquadron()` directly. A new row's **stampable units** are its owner's (ship, Lager row,
+refinery order) or its creator's (mission, operation) direct memberships on active units, and none
+while that user lacks the stored role `KRT Member` (REQ-SEC-015); a deactivated unit never counts.
+The resolvers share the §5.5.1 picker matrix over that set (1 + no output → auto-stamp; valid
+pick → honoured; foreign pick → 400; >1 + no output → 400 (force choice)), where a pick is valid
+when it is a stampable unit or a unit the caller may edit (REQ-ORG-016). They differ on the pin
+and on the **0-unit** row:
 
-- `resolveOrgUnitForPickerOutput` (strict) → **400** for a membershipless user. Currently wired
-  to no aggregate — retained as the strict counterpart of the nullable resolver (`Operation`
-  moved off it in V145; `JobOrder` uses its own resolvers, see below).
-- `resolveOrgUnitForPickerOutputNullable` → **null** (ownerless) for a membershipless user who
-  supplied no picker output; a non-null *foreign* pick still 400s. Used by every aggregate that
-  may legitimately exist without an OrgUnit: `Ship`, `RefineryOrder`, `InventoryItem` (V132),
-  `Mission` (V144) and `Operation` (V145 — see REQ-ORG-009).
+- `resolveOrgUnitForPickerOutputNullable` — the personal aggregates that may exist without an
+  OrgUnit: `Ship`, `RefineryOrder`, `InventoryItem` (V132). Without a pick it stamps the honoured
+  pin only when the pin is one of the owner's stampable units (REQ-ORG-032); an owner without a
+  stampable unit gets **null** (ownerless), and a *foreign* pick still 400s.
+- `resolveOrgUnitForUnitOwnedAggregate` — `Mission` (V144) and `Operation` (V145, see
+  REQ-ORG-009). Without a pick it stamps the honoured pin, which is always a unit the creator may
+  edit (REQ-ORG-032); without a pin the creator's only stampable unit, and a creator without one
+  gets **null** (ownerless).
+- `resolveOrgUnitForAdminOnBehalf` (an admin's ship for a member, REQ-HANGAR-011),
+  `resolveOrgUnitForClientCreate` (a connected application, REQ-XCH-017) and
+  `resolveOrgUnitForImport` (a hangar import, REQ-HANGAR-014) read the member's stampable units as
+  well. The admin's own pin never decides an on-behalf row, and an on-behalf pick must be one of
+  the member's direct memberships.
+- `resolveOrgUnitForPickerOutput` and `resolveSquadronForPickerOutput` (strict) → **400** for a
+  user without a membership. Wired to no aggregate — retained as the strict counterparts
+  (`Operation` moved off them in V145; `JobOrder` uses its own resolvers, see below).
 
 **Refinery-store output stamping (#596).** Storing a refinery order creates one `InventoryItem`
 per output, owned by the receiving member (`RefineryOrderStoreItemDto.userId`, else the order
@@ -178,12 +195,15 @@ Job Order uses its own resolvers: `responsible_org_unit_id` is required and must
 
 **Personal Lager rows can be re-stamped by their owner** (REQ-INV-052): a member may move their own
 personal row onto one of their direct memberships or onto **no** unit after the booking.
-Re-stamping gives or takes access for that unit's editors, and the dialog says so.
+Re-stamping gives or takes access for that unit's editors, and the dialog says so. A ship's later
+„Einheit ändern" (REQ-HANGAR-009) validates against its owner's direct memberships too, not against
+the stampable units.
 
 **The exchange stamps on its own paths** (REQ-XCH-016/-017). A stock book-in through the exchange
 creates a personal row with **no** unit, outside the picker resolvers — REQ-INV-052 is how it gets
-one. A ship created through the exchange runs the Hangar's own create and so
-`resolveOrgUnitForPickerOutputNullable` with no picker output.
+one. A ship created through the exchange runs the Hangar's own create: without a named unit on
+`resolveOrgUnitForClientCreate` (the member's only stampable unit, else none), with one on the
+member's direct memberships (`resolveOwnerMembershipTarget`).
 
 > **Amended by epic #692 (REQ-ORG-016):** stamping **validation** widens to `(direct memberships ∪
 > oversight descendants)` so a Bereichsleitung/OL can create on behalf of a subordinate Staffel/SK and
@@ -195,6 +215,11 @@ one. A ship created through the exchange runs the Hangar's own create and so
 > (a separate resolver, `resolveReassignTargetOrgUnit`, with no auto-stamp / home-Staffel fallback).
 > Every other aggregate's owning OrgUnit remains create-time-only, except the owner's re-stamp of a
 > personal Lager row above (REQ-INV-052).
+>
+> **Amended by ADR-0374 (REQ-ORG-032):** the direct memberships of the auto-stamp are the stampable
+> units above, and a mission or operation created without a pick is stamped on the honoured pin
+> first, which may be a unit below a leader's own; a personal row keeps to its owner's stampable
+> units.
 
 ### REQ-ORG-005 — Admin area carve-outs
 
@@ -207,12 +232,17 @@ It is reversible via the activate endpoint, and `includeInactive=true` (ADMIN-on
 deactivated rows with a reactivate control. The list page's per-row trash button confirms
 through a KRT modal (no native `confirm()`, per [`ui-design-system.md`](ui-design-system.md))
 before POSTing the deactivate. SK **member management** is open to ADMIN
-or a `role = SK_LEAD` member of that SK (`SpecialCommandSecurityService.canManageMembers`; epic #800
-replaced the legacy `is_lead` flag with the unified rank, V187) — the member list, add / remove, the
-Logistiker / Einsatzmanager flags, and the SK read `GET /api/v1/special-commands/{id}` that heads the
-page. Because it is not admin-only, the web page for it lives **outside** the admin area, at
-`/organisation/special-commands/{id}` (frontend `SpecialCommandMembersPageController`,
-`ADMIN_OR_OFFICER` + the backend's per-SK verdict); `/admin/special-commands/{id}` only redirects
+or a `role = SK_LEAD` member of that SK who holds `KRT Member`
+(`SpecialCommandSecurityService.canManageMembers`; epic #800 replaced the legacy `is_lead` flag with
+the unified rank, V187) — the member list, add / remove, the Logistiker / Einsatzmanager flags, and
+the SK read `GET /api/v1/special-commands/{id}` that heads the page. A non-admin changes the flags
+of, or removes, neither their own row nor a row that holds `SK_LEAD`
+(`SpecialCommandSecurityService.canManageMember`, REQ-ROLE-004), and every one of these endpoints,
+the lead toggle included, acts only on an SK inside the active context, an admin's included
+(REQ-ORG-032). Because it is not admin-only, the web page for it lives **outside** the admin area, at
+`/organisation/special-commands/{id}` (frontend `SpecialCommandMembersPageController`, gated by
+`OfficerSurfaceGate.HAS_OFFICER_REACH` — the officer reach in the active context — plus the backend's
+per-SK verdict, which also requires the SK in the active context); `/admin/special-commands/{id}` only redirects
 there. An SK lead reaches it from the „Leitung" page, which lists every SK the caller may manage
 members of (`LeitungUnitDto.canManageRoster`). Setting the **lead** is never open to the SK lead
 itself (no self-escalation): it is ADMIN or the Bereichsleiter of the SK's parent Bereich
@@ -247,19 +277,23 @@ MDC alias was removed in the rename-soak cleanup release.)
 
 ### REQ-ORG-008 — Active-context relay
 
-The frontend sends `X-Active-Org-Unit-Id` on every outbound call; the backend reads it to scope
-staffel-scoped queries (an admin pin directly, a non-admin pin only when it matches a membership).
-The selection lives in the Redis-backed Spring Session under `basetool.activeOrgUnitId`, set via
-`POST /me/active-org-unit` and read back via `GET /api/v1/org-units/me/active`. (The pre-R5.e
+The frontend sends `X-Active-Org-Unit-Id` on every outbound call; the backend honours it under
+the one pin rule of REQ-ORG-032. The selection lives in the Redis-backed Spring Session under
+`basetool.activeOrgUnitId`, set via `POST /me/active-org-unit`, stored per member and restored at
+the start of a session (REQ-ORG-031). `GET /api/v1/org-units/me/active` (fields `context` and
+`orgUnitId`) and `GET /api/v1/me/layout` (fields `activeContext` and `activeOrgUnitId`) report the
+**effective** context the backend applies (`ORG_UNIT` with its unit, `ALL_MY_ORG_UNITS`,
+`ALL_ORG_UNITS` or `NONE`), never the raw session value. (The pre-R5.e
 `X-Active-Squadron-Id` header, the `basetool.activeSquadronId` session key, and the
 `/active-squadron` endpoints were removed in the rename-soak cleanup release.)
 
 ### REQ-ORG-009 — Ownerless leadership ("Bereichsleitung") missions & operations
 
 Organisation leadership sits above every Staffel and SK and belongs to no OrgUnit, yet must be
-able to plan org-wide missions. A mission created by such a membershipless user is stamped
-`owning_org_unit_id = NULL` (V144 relaxed the NOT NULL; the row stays attributable through
-`mission.owner_id`) instead of being rejected with 400. Visibility layers on top of the
+able to plan org-wide missions. A mission created without a pick by a user who has no stampable
+unit (REQ-ORG-004) and no honoured pin (REQ-ORG-032) is stamped `owning_org_unit_id = NULL` (V144
+relaxed the NOT NULL; the row stays attributable through `mission.owner_id`) instead of being
+rejected with 400. Visibility layers on top of the
 `owning_org_unit IS NULL` state, mirroring the Staffel-internal rule with the whole organisation
 as the owning scope:
 
@@ -272,14 +306,15 @@ as the owning scope:
   existing ownerless internal rows to organisation-wide).
 
 Editing follows the mission-management gate with the ownerless rule of REQ-SEC-005:
-`MissionAccessPolicy.canManageMission` admits the owner, co-managers, admins and a caller with a
-Mission Manager grant in an Organisationsleitung or Bereich unit; a squadron Mission Manager does
-not manage an ownerless mission. The list queries
+`MissionAccessPolicy.canManageMission` admits the owner, co-managers, an admin without a pin and a
+caller with a Mission Manager grant in an Organisationsleitung or Bereich unit of the active
+context; neither a squadron Mission Manager nor a pinned admin manages an ownerless mission
+(REQ-ORG-032). The list queries
 (`searchMissions`, `findAllActiveReference`) carry a `viewerIsMemberOrAbove` flag that guards the
 ownerless branch of the scope predicate.
 
 `Operation` gains the same carve-out (V145, #500) — `OperationService.createOperation` routes through
-`resolveOrgUnitForPickerOutputNullable` — with two differences, because an operation has no per-user
+`resolveOrgUnitForUnitOwnedAggregate` — with two differences, because an operation has no per-user
 creator column and no `is_internal` flag:
 
 - **Attribution.** An ownerless operation has no `owner_id` to point at; it is attributable only as
@@ -288,19 +323,19 @@ creator column and no `is_internal` flag:
   split: an ownerless operation is the org-wide analogue of a Staffel-internal operation — visible to
   organisation members-or-above (`AuthHelperService.isMemberOrAbove()`), so not to an account below
   member.
-  `canSeeOperation` defers to `isMemberOrAbove()` on the null-owner branch, and the three scoped
-  operation queries (`findAllScoped`, `findAllReferenceScoped`, `searchOperations`) carry a
-  `viewerIsMemberOrAbove` flag so the list and the per-row detail gate stay consistent. Editing
-  follows the same grant rule as an ownerless mission (REQ-SEC-005): `canEditOperation` admits a
-  Mission Manager grant in an Organisationsleitung or Bereich unit for an ownerless operation, and
-  deletion stays with admins.
+  `canSeeOperation` defers to `isMemberOrAbove()` on the null-owner branch, and the scoped
+  operation read queries (`findAllScoped`, `searchOperations`) carry a `viewerIsMemberOrAbove` flag
+  so the list and the per-row detail gate stay consistent. Editing
+  follows the same grant rule as an ownerless mission (REQ-SEC-005): `canEditOperation` admits, for
+  an ownerless operation, a Mission Manager grant in an Organisationsleitung or Bereich unit of the
+  active context and an admin without a pin, and deletion stays with admins.
 - **Participation — all operations (#500).** Independently of ownership, any member who
   participated in one of an operation's linked missions
   may see that operation — so participants can view the operation and their payout even when it is
   owned by another Staffel or is ownerless. Implemented as a `viewerUserId` EXISTS branch on the
-  three scoped queries plus a `canSeeOperation` participant check
+  scoped read queries plus a `canSeeOperation` participant check
   (`OperationRepository.existsParticipantUserInOperation`). This escape is view-only and never
-  grants edit.
+  grants edit or a mission link (REQ-MISSION-034).
 
 Only `Mission` and `Operation` gain this carve-out; `JobOrder` stays NOT NULL (org-owned by
 construction, no creator-owner fallback and no ownerless-leadership use case).
@@ -324,13 +359,30 @@ which renders in both the browser `<title>` tag and the sidebar brand logo text.
   kind — `SQUADRON` *or* `SPECIAL_COMMAND`. `appTitle` reads the merged `activeOrgUnit` catalogue,
   not the Squadron-only `activeSquadron`, so an SK pin shows in the title;
 - the localised "Alle Staffeln" label for an admin in all-OrgUnits mode (no pin);
+- the localised „Alle meine Org-Einheiten" label for a non-admin whose context is all of their
+  units (no honoured pin, several units in reach);
 - nothing (plain "Profit Basetool") when no context applies (a member with no org unit).
+
+The title, the switcher's selected entry and the owner pickers' preselection read the **effective**
+context the backend reports (REQ-ORG-008, REQ-ORG-032), never the raw session value, so they always
+name the context the data on the page was scoped by. In „Alle meine Org-Einheiten" the pooled lists
+that mix several units carry a notice: the Lager overview, the „Einheitslager" and the Hangar's unit
+overview that they hold the data of all of the member's units (`orgUnit.context.allMine.notice`,
+one shared fragment `components :: allMyOrgUnitsNotice`; „Mein Lager" does not follow the selection
+and carries none), the blueprint overview that it holds the
+blueprints of the members of every unit the viewer oversees
+(`blueprintOverview.overseen_orgunits_notice`). The lists of missions and operations show the
+owning unit of every row; with a unit selected the notices are gone.
 
 There is **no separate context chip**. An always-on top-right context chip used to render the same
 information (and was the only surface that distinguished/showed an SK pin); it was removed as
 redundant once `appTitle` carried the context for every kind. Do not reintroduce a parallel
 always-on context badge — the title is the single source. The Staffel-vs-SK *kind* distinction the
 chip carried is intentionally not reproduced in the title; the shorthand identifies the unit.
+
+**Enforced by:** `OrgUnitSwitcherLabelMvcTest`, `BlueprintOverviewPageControllerMvcTest`
+(`view_allMyOrgUnits_namesTheOverseenOrgUnits`), `LagerAllMyOrgUnitsNoticeRenderTest`,
+`ActiveOrgUnitContextE2eTest` (the Lager notice, a chosen SK staying selected)
 
 ### REQ-ORG-011 — Personal-aggregate owner retains see/edit across org-unit changes
 
@@ -472,8 +524,10 @@ Hard invariants:
 
 **Acceptance**
 
-- [ ] For a Bereichsleitung and the OL, list-query scope equals `permits()` for every descendant **and**
-  denies every non-descendant / foreign pin (foreign-pin-collapses-to-union preserved).
+- [ ] For a Bereichsleitung and the OL, list-query scope equals `permits()` for every descendant
+  **and** denies every non-descendant; a foreign pin counts as no pin (REQ-ORG-032).
+- [x] The cascade holds only while the leader holds `KRT Member`; without it no membership confers
+  reach, not even the direct memberships (ADR-0300, REQ-ORG-032).
 - [x] A Bereichsleitung is denied another Bereich's data in both lists and detail gates (strict silo).
 - [x] An OL/Bereich principal fails `isAdmin()` and every `hasRole('ADMIN')` carve-out.
 - [x] An SK-lead's reach is SK-only (no Bereich expansion).
@@ -532,6 +586,12 @@ extended:
   through the same `canSee*`/`canEdit*` gates and `IN :memberOrgUnitIds` list queries, which the Phase-3
   cascade already widens for the owning leadership and keeps closed for subordinates. The ownerless
   `NULL` leadership path (REQ-ORG-009) is **preserved unchanged** (no backfill). The REQ-ORG-011 owner-bypass stays ahead of the scope check.
+
+> **Amended by ADR-0374 (REQ-ORG-032):** the direct memberships here are the stampable units of
+> REQ-ORG-004 (active units, `KRT Member`), the units a caller may edit lie inside the active
+> context, and a mission or operation created without a pick is stamped on the honoured pin, so a
+> leader pinned to a unit below them creates it there; a personal row keeps to its owner's
+> stampable units.
 
 **Acceptance**
 
@@ -606,30 +666,36 @@ Staffel" and silently strip the member's memberships.
 Two-Staffel support is then honoured **project-wide** so a dual-Staffel member is never silently
 dropped to one:
 
-- **Active single Staffel** — `RequestScopeResolver.currentSquadronId()` / `readPersistentSquadronFromUser`
-  (the single value used for create-time auto-stamp and current-context surfaces) is pin-aware for
-  non-admins, mirroring `currentScopePredicate()`: an `X-Active-Org-Unit-Id` pin onto one of the
-  caller's Staffeln wins; otherwise it falls back to the deterministic **name-sorted primary** (the
-  same primary as `UserDto.squadron` / `UserMapper.resolveSquadron`) instead of an arbitrary row.
-  The single owner of the name-sorted-primary rule is `StaffelMembershipResolver` (ADR-0047); it
-  drops a dangling Staffel membership (one whose squadron no longer resolves) **identically whether
-  the user holds one Staffel or two**, so a corrupt row never leaks into one branch while being
-  filtered from the other.
-- **Union lists** — the admin user list and the `/lookup`+`/search` typeaheads scope by the caller's **Staffel set** (`currentUserListScopeSquadronIds()`):
-  unpinned, a two-Staffel officer sees the members of **both**; a pin narrows to the pinned one.
-- **Authorisation gates** OR across **all** of a target's Staffeln — the full-PII gate
-  (`UserService#isCrossSquadronForNonAdmin`, used by `UserDirectoryService#get`) grants when the caller
-  shares **any** of the target's Staffeln; an officer's own-Staffel **oversight scope** includes
-  every Staffel they belong to.
+- **Active context** — current-context surfaces show the effective context of REQ-ORG-032
+  (`RequestScopeResolver.currentActiveContext()`): the honoured pin, else the member's only unit in
+  reach, else „Alle meine Org-Einheiten". The create-time auto-stamp honours the same pin
+  (`currentPin()`) and otherwise follows "pin, else choose" below. The deterministic
+  **name-sorted primary** Staffel (`UserDto.squadron` /
+  `UserMapper.resolveSquadron`) describes the member and is never their active context. Its single
+  owner is `StaffelMembershipResolver` (ADR-0047); it drops a dangling Staffel membership (one whose
+  squadron no longer resolves) **identically whether the user holds one Staffel or two**, so a
+  corrupt row never leaks into one branch while being filtered from the other.
+- **Member directory** — the user list, the name searches and the `/lookup` typeahead
+  (`UserDirectoryService`, `UserReferenceSearchService`, `UserService#findAllReference`) cover
+  **every** member, whatever the caller's units or pin: anyone finds anyone, as the owner decided.
+  What a row shows is the caller's projection (`AdminOrSelfUserProjection`): the full record to an
+  admin and to the member themself, the peer shape of REQ-SEC-007 to everyone else.
+- **Oversight** covers the units of an officer's leadership seats and, for a Bereich or OL seat,
+  the units below it (`RequestScopeResolver.currentOversightScope()`, ADR-0300) — not every
+  Staffel the officer belongs to: a plain membership of a second Staffel adds no oversight there.
 - **Order-aligned audit** — a Job-Order handover's `executingSquadron` snapshot records the executor's
   Staffel that matches the order's responsible org unit, else their primary
   (`findExecutingStaffelForOrder`).
-- **Pin, else choose** at create time — the create-time owner-stamping matrix
-  (`resolveOrgUnitForPickerOutput` / `…Nullable` / `resolveSquadronForPickerOutput`, REQ-ORG-004 §5.5.1)
-  honours an active pin: a two-Staffel user with no explicit picker output but a pin onto one of their
-  own org units is stamped to the pinned unit; with no pin it still 400s "owningOrgUnitId is required"
-  so the create form forces an explicit choice (the owner picker lists **both** Staffeln, sourced from
-  `/api/v1/org-units/members/{id}/memberships` / `/me/pickable-org-units`). A single-stamp is never silent.
+- **Pin, else choose** at create time — the create-time owner-stamping matrix (REQ-ORG-004
+  §5.5.1) honours the active pin first, per entry point (REQ-ORG-032). A personal row
+  (`resolveOrgUnitForPickerOutputNullable`) is stamped on the honoured pin only when the pin is one
+  of its owner's stampable units, otherwise on the owner's only stampable unit. A mission or
+  operation (`resolveOrgUnitForUnitOwnedAggregate`) is stamped on the honoured pin, which its
+  creator may always edit — a membershipless admin's pin included —, otherwise on the creator's
+  only stampable unit. Several stampable units without such a pin still 400 "owningOrgUnitId is
+  required" so the create form forces an explicit choice (the owner picker lists **both** Staffeln,
+  sourced from `/api/v1/org-units/members/{id}/memberships` / `/me/pickable-org-units`). A
+  single-stamp is never silent.
 - The single-Staffel `PATCH /api/v1/users/{id}/squadron` admin endpoint (and its destructive
   `syncStaffelMembership`) were **removed** — it could silently drop a member's second Staffel; all
   Staffel assignment now flows through the additive membership-delta reconcile.
@@ -655,8 +721,8 @@ through the identity-owned `MembershipOperations` seam), `UserServiceMembershipS
 (the delta paths through the seam leave the same rows and audit entries and fail alike as the direct
 calls) and `OrgUnitMembershipOperationsTest` (the seam is a pass-through that also sets the initial flags),
 `MemberManagementControllerTest` (the member-edit two-slot fold and the detail-load wipe-guard),
-`UserScopedQueriesDataTest` (the union-list scope queries' null + two-Staffel binding against the
-real dialect) and `OrgHierarchyMigrationTest`
+`UserDirectoryQueriesDataTest` (the directory queries return the members of every Staffel and the
+users without one, against the real dialect) and `OrgHierarchyMigrationTest`
 (the ≤2-Staffel counting triggers on INSERT+UPDATE, the leader-excludes-Staffel trigger, and the
 `chk_org_unit_membership_bereich_flags_only_on_bereich` / `chk_org_unit_membership_ol_flag_only_on_ol`
 CHECKs — DB-side defence in depth) · **Issues:** #692, #695.
@@ -687,7 +753,9 @@ served by `MissionService.updateOwningOrgUnit` and recorded as the audited
 **Permission — two orthogonal gates.**
 
 1. Per-mission write gate `@missionAccessPolicy.canChangeOwner` — the same gate as the user-owner
-   change beside it: admin, a scope-officer who may edit the mission, or the mission owner.
+   change beside it: the mission owner, or officer reach in the mission's owning unit inside the
+   active context, which an admin holds within their own scope; a mission without a unit is left
+   to an admin without a pin (REQ-SEC-065, REQ-ORG-032).
 2. Target gate `OrgUnitStampingService.resolveReassignTargetOrgUnit` — an **admin** may assign to any
    OrgUnit or to ownerless; a **non-admin** may only pick a target that is one of their direct
    memberships or within their editable scope (`canEditOrgUnit`, the REQ-ORG-016 cascade), and may
@@ -790,7 +858,10 @@ predicate `canSeeOperationLedger` (the same two branches **minus** the participa
 - `GET /api/v1/operations/{id}/finances`, `/{id}/finances/{missionId}` and `/{id}/finance-summary`
   require `canSeeOperationLedger`. They are org-unit financial records with no per-caller
   projection, and `/finance-summary` additionally aggregates the operation's **internal** child
-  missions, which `canSeeMission` would refuse the same caller directly.
+  missions, which `canSeeMission` would refuse the same caller directly. The ledger lists the
+  refinery orders of every linked mission, those a participant of another unit filed included
+  (REQ-SEC-042): by owner decision this is an explicitly cross-unit part of the ledger
+  (ADR-0374 D9).
 - `GET /api/v1/operations/{id}/payouts` keeps `canSeeOperation`, and a caller who passes **only**
   through the escape receives **their own payout row and nothing else**. `totalDonations` is
   recomputed over the reduced list, so the operation-wide aggregate does not leak either.
@@ -808,6 +879,8 @@ key* — reasoning that assumes participation is granted rather than claimed.
 - [x] The same caller sees no other participant's payout row, and `totalDonations` reflects only
   what they can see.
 - [x] The same caller is refused `/finances`, `/finances/{missionId}` and `/finance-summary` (403).
+- [x] The same caller cannot link a mission to the operation and does not find it in the mission's
+  operation picker (REQ-MISSION-034).
 - [x] A caller inside the operation's scope is unaffected on all five endpoints.
 
 **Decided by:** ADR-0150. **Enforced by:** `OperationPayoutServiceTest`
@@ -859,6 +932,8 @@ client renders its own localized wording from that code. Concretely for this one
 **What the picker shows.** It names no outcome it cannot promise. When the active org unit of the
 sidebar (`activeSquadronId`) is one of its options and nothing else is selected, that unit is
 **preselected** and the empty choice is left out, so the stamp is the unit the sidebar shows.
+`activeSquadronId` is the unit of the effective context the backend reports (REQ-ORG-032), so in
+„Alle meine Org-Einheiten" nothing is preselected.
 Otherwise the empty choice reads „-- Bitte wählen --" / „-- Please choose --". *Amended 2026-10-02 by
 the owner: the empty choice read „-- Heimat-Staffel beibehalten --", although an empty pick resolves
 to the only direct membership or the pin, and is refused otherwise.* The rule lives in the shared
@@ -877,12 +952,22 @@ On the **refinery order create form** the picker is built for the order's owner 
 all four kinds, the set the backend counts. Built from Staffel and SK alone, a member of one Staffel
 and one Bereich got no picker and a refusal on every submit.
 
+On the **production book-in** of an item order (the „Herstellung erfassen" modal, REQ-ORDERS-025)
+`orders-detail-production.js` builds the picker from the owner's direct memberships
+(`GET /users/{id}/memberships?allKinds=true`) and reads the active org unit from the wrapper's
+`data-owner-picker-active`, as the shared fragment does. It preselects the active org unit when the
+owner is a direct member of it, else the owner's only membership; otherwise it leads with the empty
+choice and is required, because the list is the owner's direct set, as on the on-behalf book-in.
+The booking stays disabled until a unit is chosen and while the memberships load.
+
 **Acceptance**
 
 - [ ] With the active org unit among the options, the picker preselects it and offers no empty
   choice; without it, the empty choice reads „Bitte wählen".
 - [ ] On the on-behalf book-in, choosing a member replaces the options with that member's direct
   memberships and requires a pick when there are several and none is preselected.
+- [ ] On the production book-in, the picker preselects the active org unit when the owner belongs to
+  it, else the owner's only membership, and otherwise requires a pick before the booking.
 - [ ] A member of more than one org unit who submits a picker form with no choice and no pin gets a
   `400` whose problem `code` is `OWNER_ORG_UNIT_REQUIRED`, from **both** stamping entry points.
 - [ ] The member sees a localized instruction naming the control, in DE and EN — never the backend's
@@ -893,8 +978,10 @@ and one Bereich got no picker and a refusal on every submit.
 
 **Enforced by:** `OrgUnitStampingServiceOwnerRequiredTest` (both entry points, the status, and the
 pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidden on-behalf picker),
-`InventoryOperationsE2eTest#onBehalfOwnerPickerFollowsTheChosenMember` · **Code:**
-`kernel/fragments/owner-picker.html`, `inventory-input.js`, `OrgUnitStampingService#resolveStampedOrgUnit` /
+`InventoryOperationsE2eTest#onBehalfOwnerPickerFollowsTheChosenMember`,
+`orders-detail-production.test.mjs` (the production book-in's preselection and required pick) ·
+**Code:** `kernel/fragments/owner-picker.html`, `inventory-input.js`, `orders-detail-production.js`,
+`OrgUnitStampingService#resolveStampedOrgUnit` /
 `#resolveSquadronForPickerOutput`, `scope/api/OwnerOrgUnitRequiredException`, `ScopeProblemCode`,
 `krt-fetch.js#ownerOrgUnitRequiredMessage`, `kernel/fragments/head.html` ·
 **Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `AGENTS.md`
@@ -915,8 +1002,8 @@ Every entity whose rows belong to an owning or responsible org unit carries the 
   Other examples include the job order's customer unit, the executing unit of the two handovers, the material
   claim's claiming unit, the participant's affiliation, the Materialbörse's offer and request
   attribution (the board is organisation-wide), the bank account holder and the two bank
-  counterparties, the Kommandogruppe's Staffel, the hierarchy parent
-  and the membership key. A marker naming a field that is no org-unit reference, a reference both
+  counterparties, the Kommandogruppe's Staffel, the hierarchy parent, a member's stored choice of the
+  active context (REQ-ORG-031) and the membership key. A marker naming a field that is no org-unit reference, a reference both
   marked and listed, and a list entry that matches nothing fail the build too.
 - **Tenant data** is every marked entity and, transitively, every entity with a mandatory to-one
   association to one (an aggregate part: mission participants, job-order materials, refinery goods, …).
@@ -947,6 +1034,232 @@ can be retired once both rules are merged.
 
 **Enforced by:** `TenancyGuardTest`, `TenancyGuardRules`, `SpelScopeGate` · **Code:**
 `TenantScoped` · **Related:** REQ-ORG-002, REQ-ORG-003, REQ-ORG-006, REQ-SEC-077
+
+### REQ-ORG-031 — A member's choice of the active org unit is stored and restored
+
+A member who picks an org unit under **„Aktive Org-Einheit"** finds it again at the next login:
+every switch is stored per member, and a new session starts from the stored choice (ADR-0374).
+
+- **Storage.** The scope module's table `member_active_org_unit` holds one row per member (`user_id`
+  key, own `version`); `org_unit_id = NULL` is an explicit „Alle meine Org-Einheiten". Deleting the
+  account deletes the row; deleting the org unit clears the choice.
+- **API.** `GET /api/v1/org-units/me/active-choice` returns `{orgUnitId, version}`; a stored unit
+  the caller may no longer select under REQ-ORG-032 reads as `null`. `PUT` with `{orgUnitId,
+  version}` stores the choice: a unit the caller may not select is a `400`, a stale `version` a
+  `409`, and an unchanged choice writes nothing. The switcher sends no version, so the latest
+  switch wins: an attempt that loses a concurrent insert or update of the member's row is retried
+  in a fresh transaction, up to five attempts, and overlapping switches answer no `409`; only a
+  race that outlasts every attempt does.
+- **Counted, not audited.** A changed choice increments
+  `basetool_active_org_unit_choice_writes_total{target}` (`unit` or `all`, REQ-OBS-011) and writes
+  no audit entry, like the navigation preferences (REQ-AUDIT-001, „Deliberately not audited").
+- **Switch.** `POST /me/active-org-unit` stores the choice first and then sets the session to what
+  the backend stored. A refused choice leaves the session as it was and says so; when only the
+  store fails, the session still switches and a toast says the choice was not saved.
+- **Restore.** The first authenticated page request of a session reads the stored choice into the
+  session, once per session and principal (`ActiveOrgUnitRestore`, run by
+  `ActiveSquadronContextFilter`); requests for static assets, public documents and the pages of the
+  access gates (the terms consent page, the approval waiting page and its status poll) never
+  restore. A failed read leaves the session without a pin, which is all of the member's units, and
+  is retried after a minute; a session that already holds a pin and was never restored keeps it. An
+  access gate's refusal of the read (pending approval, terms not accepted, no role) and a lost
+  OAuth2 session are no failure: the session keeps its state, no wait starts, and a later request
+  reads again, so the first request after the gate clears restores the choice.
+- **Personal data.** The row is part of the member's data export (section `activeOrgUnitChoice`),
+  is erased with the account and stays with the source account when two accounts are merged
+  (REQ-DATA-021).
+
+**Acceptance**
+
+- [x] A switch stores the choice, and a new session starts in the stored unit.
+- [x] „Alle meine Org-Einheiten" is stored as `null`, and the session starts without a pin.
+- [x] A stored unit the member may no longer select reads as `null`.
+- [x] A unit the caller may not select is refused with `400`, and the session keeps its pin.
+- [x] An unchanged choice writes no row and counts nothing; a change is counted once and writes no
+  audit entry.
+- [x] A switch that loses a concurrent write of the same member is retried and the latest choice
+  wins; a race that outlasts every attempt answers `409` and counts nothing.
+- [x] A failed read of the stored choice starts the session without a pin and is retried later.
+- [x] A session that starts behind an access gate starts in the stored unit once the gate clears
+  (`ActiveOrgUnitRestoreTest`).
+
+**Enforced by:** `ActiveOrgUnitChoicesTest`, `ActiveOrgUnitChoiceMetricsTest`,
+`ActiveOrgUnitRestoreTest`, `MeFrontendControllerTest`, `ActiveOrgUnitContextE2eTest` · **Code:**
+`scope.internal.ActiveOrgUnitChoices`, `scope.internal.ActiveOrgUnitChoiceMetrics`,
+`scope.web.ActiveOrgUnitChoiceController`, `kernel.web.ActiveOrgUnitRestore`,
+`orgunit.web.MeFrontendController`, `V409__create_member_active_org_unit.sql` · **ADR:** ADR-0374 ·
+**Related:** REQ-ORG-008, REQ-ORG-032, REQ-AUDIT-001, REQ-DATA-021, REQ-OBS-011
+
+### REQ-ORG-032 — One pin rule for every surface
+
+A member's active org unit (the pin of REQ-ORG-008) means the same on every surface: the lists, the
+detail gates, create-time stamping, role powers and the oversight reach (ADR-0374).
+
+- **Honoured or no pin.** A pin counts when it names a unit the caller may select: for an admin an
+  existing active org unit, for everyone else a unit of their reach — direct memberships plus the
+  leadership cascade (REQ-ORG-015), the units the switcher lists. Any other pin — stale, foreign,
+  unknown, inactive or malformed — is **no pin**, on every surface alike.
+  `RequestScopeResolver.currentPin()` is the only reading of the pin. Outside an HTTP request, as
+  for background work run as a caller, there is no pin, so such work meets the same gates unpinned
+  (ADR-0236 §6; `RequestMemo#readable`).
+- **No membership right without `KRT Member`.** A member who does not hold `KRT Member` reaches no
+  unit: no reach, no pin, an empty switcher and owner picker, no seat or plain-membership right, no
+  explicit Logistiker or Einsatzleiter flag, no bank membership audience and no membership-derived
+  notification (ADR-0300, REQ-SEC-015, owner decision). Bank roles stay a separate axis. One check
+  answers it for the caller, `AuthHelperService#holdsKrtMember()`: the role, or the exchange marker
+  of an acting member who holds it (REQ-XCH-009); the scope resolver, the switcher list, the owner
+  picker, the Leitung page and the SK and org-role security services read it. The owner or creator
+  of a new row is judged by their stored role (REQ-ORG-004).
+- **A deactivated unit confers nothing.** A membership on a deactivated Staffel, SK, Bereich or OL
+  stays stored for the unit's reactivation and meanwhile confers nothing (owner decision): no reach,
+  so the unit's data leave „Alle meine Org-Einheiten"; no flat or contextual role from its flags or
+  seat; no leadership cascade into it or out of it, so neither its own seats nor a parent
+  Bereichsleiter or the OL appoint, change or clear a seat in it; no recipient of its unit notices,
+  its bank account's holder notices or the seat-holder broadcasts; and it takes no new or moved row,
+  a first membership's adoption of unowned Lager rows included. One read gives every access decision
+  the memberships on active units, `OrgUnitMembershipRepository#findAllOnActiveOrgUnitsByIdUserId`
+  (ids: `#findActiveOrgUnitIdsByUserId`); the cascade reads the active units only, and the recipient
+  queries skip a deactivated unit. Nothing is written by the rule: an admin without a pin still sees
+  the unit's data, its owners keep their personal rows (REQ-ORG-011), the administration's member
+  and roster views show the stored memberships, and the bank's responsible-holder audit compares the
+  stored seats (REQ-BANK-034).
+- **The effective context.** `RequestScopeResolver.currentActiveContext()` names what a request
+  covers: the honoured pin (`ORG_UNIT`); else for an admin every unit (`ALL_ORG_UNITS`); else the
+  member's only unit in reach, all of their units when they reach several (`ALL_MY_ORG_UNITS`), or
+  none (`NONE`). `/me/layout` and `/org-units/me/active` report it, and the web renders the
+  switcher, the title, the owner-picker preselection and the context notices from it alone
+  (REQ-ORG-024).
+- **A pin is exactly its unit.** A pinned request is scoped to the pinned unit, a Bereich or OL pin
+  included; no pin is the caller's whole reach. The named cross-unit escapes of REQ-ORG-003 and the
+  cross-unit features listed below stay.
+- **Everything follows the context.** Reads, writes, role powers (Logistician, Mission Manager,
+  officer, supply and purchasing managers, oversight, the Leitung page and its rank, seat, roster
+  and Kommandogruppe writes, the bank's view grants and its account holders' rights and approvals)
+  and create-time stamping without an explicit owner pick act only in the pinned unit, and without
+  a pin in all of the caller's units. Out of context is nothing, never a fall back to the union.
+  The supply and purchasing tab flags are the one exception (below).
+- **Admins act within their own scope** — every unit unpinned, the pinned unit pinned — on the same
+  surfaces: managing a mission (core, roster, schedule, structure, check-in, sub-missions),
+  changing its owner and editing its finance entries (`MissionAccessPolicy`); managing a unit's
+  supply (needs, incoming donations, the need form's job-order options and every manage flag, the
+  admin page's included — the page itself lists and changes every unit, REQ-SUP-002); and the
+  balance target, view grants and approval limits of an org-unit or Bereich account, like its view
+  (REQ-BANK-064). The Bankleitung's approval-limit right does not read the pin. A mission's owner
+  and co-managers keep their personal rights under any pin, and a participant keeps editing their
+  own finance entry.
+- **The supply and purchasing tabs stay.** The flags of „Eingehende Spenden", „Statistik" and
+  „Bericht" do not depend on the pin, because a flag that reads false deletes the member's stored
+  favourite, phone slot and start page of that tab (ADR-0329, REQ-UI-032): they count the units a
+  caller leads or is a Logistician of in any context (`SupplyAccessPolicy#managedUnitsInAnyContext`,
+  `PurchasingAccessPolicy#canReadReport`), every unit for an admin. Every manage flag, list and
+  write of a unit's managers in both modules follows the context (`SupplyAccessPolicy#managedUnits`,
+  REQ-SUP-003, REQ-PUR-021), so a manager pinned to a unit they do not manage keeps the tabs, whose
+  pages then list nothing of their units.
+- **Targets without an owning unit.** An officer, Logistician or Mission Manager gate on a target
+  that has no owning unit passes only an admin without a pin (`AccessGateService`), like an
+  ownerless personal row; a Mission Manager grant in an Organisationsleitung or Bereich unit of the
+  active context still manages a mission or operation without a unit (REQ-SEC-005).
+- **Stamping without a pick.** A mission or operation is stamped on the honoured pin — every
+  honoured pin is a unit its creator may edit —, else on the creator's only stampable unit
+  (`OrgUnitStampingService#resolveOrgUnitForUnitOwnedAggregate`, REQ-ORG-004); with several and no
+  pick the create answers `400 OWNER_ORG_UNIT_REQUIRED` (REQ-ORG-023). A personal row — ship, Lager
+  row, refinery order — is stamped on the pin only when the pin is one of its owner's stampable
+  units, otherwise on the owner's only stampable unit, so it never lands in a unit its owner does
+  not belong to (REQ-HANGAR-009, REQ-INV-052). The stampable units are the direct memberships on
+  active units of an owner or creator who holds the stored role `KRT Member`; an admin's row for a
+  member uses the member's units, never the admin's pin.
+- **Earmarks on missions.** A Lager row's earmark names its mission only to a reader who may see
+  the mission (REQ-MISSION-008); to anyone else — an internal mission of another unit, for a pinned
+  admin as well — it reads „Unbekannter Einsatz" (REQ-INV-027). The earmark writes and undos look
+  the mission up through the JPQL projection `MissionRepository#findEarmarks`, which does not depend
+  on the caller and loads no mission entity, so neither a write nor a connected application's bulk
+  undo fails on an earmark the caller cannot see; only `EarmarkTargets.Missions#shownMissions` loads
+  the missions, to apply the visibility rule to what a reader sees.
+- **Cross-unit by design.** These features do not follow the pin, as decided by the owner: the
+  member directory (REQ-ORG-017); the personal notification inbox (REQ-NOTIF-004); the bank's KRT,
+  cartel bank and Sonderkonto accounts, the transfer targets and deposits into any active account
+  (REQ-BANK-037, REQ-BANK-040, REQ-BANK-042) and the whole bank-staff side (REQ-BANK-008); the
+  operation a mission shows to everyone who may see the mission (REQ-MISSION-034); the refinery
+  orders of every linked mission in an operation's ledger (REQ-ORG-027); connected applications,
+  which carry no active context and act on the member's whole reach (REQ-BXCH-001, REQ-XCH-009);
+  and the administration tools of admins (audit logs, member management, person search, data
+  export, account merge and the admin views of one member's hangar, inventory and blueprints).
+- **Personal views are not narrowed.** „Mein Lager", „Mein Hangar", the own refinery orders and the
+  own bank requests list every own row under any pin, each marked with its unit (REQ-ORG-011,
+  REQ-BANK-022).
+- **Other tabs follow.** Every page announces its effective context on the `BroadcastChannel`
+  `krt-active-org-unit`. A tab of the same browser that shows another context reloads
+  (REQ-FE-001); when it holds unsaved input, a KRT dialog asks first. A page that a followed reload
+  rendered ignores the followed announcements of the context it reloaded for, which ends a reload
+  loop between two tabs that disagree; the announcement of a switch always reloads.
+
+**Acceptance**
+
+- [x] A stale, foreign, unknown or malformed pin behaves as no pin on the list scope, the detail
+  gates, the stamping, the grants, the officer reach and the bank's pin narrowing.
+- [x] An admin's pin on an existing active unit is honoured; on an unknown or inactive unit it is no
+  pin.
+- [x] An unpinned member of several units gets `ALL_MY_ORG_UNITS`: the switcher selects „Alle meine
+  Org-Einheiten" and the title says so.
+- [x] Picking a unit shows it selected and narrows the Lager to that unit's rows.
+- [x] Another tab of the same browser reloads after a switch and asks first when it holds unsaved
+  input (`org-unit-context-sync.test.mjs`, `ActiveOrgUnitContextE2eTest`).
+- [x] A page that a followed reload rendered does not reload again on a followed announcement of the
+  same context, while a later switch to that context still reloads it
+  (`org-unit-context-sync.test.mjs`).
+- [x] Without `KRT Member` a member reaches no unit, gets an empty switcher, and no membership —
+  seat, plain membership or explicit flag — confers an authority or a bank right.
+- [x] A membership on a deactivated unit confers no reach, no authority, no cascade and no notice,
+  and its SK lead manages no roster (`DeactivatedOrgUnitConfersNothingIntegrationTest`,
+  `ScopeKernelTest#member_seesNothingOfAUnitThatIsDeactivated`,
+  `SpecialCommandSecurityServiceTest`).
+- [x] A personal row created without a pick lands in the pin only when it is one of its owner's
+  stampable units; a mission or operation lands in the honoured pin. A deactivated unit is no
+  stampable unit, and an owner without `KRT Member` keeps a new personal row without a unit.
+- [x] Role powers act only in the pinned unit.
+- [x] A pinned admin manages, re-owns and edits the finance entries of only the pinned unit's
+  missions and of no mission without a unit, an unpinned admin of every mission; a mission's
+  owner and co-managers keep their rights under any pin (`MissionAccessPolicyPinnedAdminTest`,
+  `MissionAccessPolicyGateTest`).
+- [x] An officer, Logistician or Mission Manager gate on a target without an owning unit passes
+  only an admin without a pin (`ScopeKernelTest#pinnedAdmin_passesNoOwnerlessTarget`,
+  `LogisticianPerUnitSurfacesTest`, `MissionAccessPolicyPinnedAdminTest`).
+- [x] A pinned admin reads and changes the balance target, view grants and approval limits only of
+  the pinned unit's accounts, and manages only the pinned unit's supply (`BankAccessRulesTest`,
+  `SupplyAccessPolicyTest`, `SupplyMapperTest`, `SupplyNeedServiceTest`,
+  `SupplyUnitSettingServiceTest`).
+- [x] A lead or Logistician pinned to a unit they do not manage, and a pinned admin, keep the tabs
+  „Eingehende Spenden", „Statistik" and „Bericht" (`SupplyTabAccessServiceTest`,
+  `SupplyAccessPolicyTest`, `PurchasingAccessPolicyTest`).
+- [x] An earmark on a mission the reader may not see reads „Unbekannter Einsatz", and no write or
+  undo fails on it (`MissionEarmarkTargetsTest`, `InventoryEarmarkTargetCacheTest`,
+  `InventoryPoolEarmarkWithoutRequestIntegrationTest`).
+- [x] A Bereich or OL pin narrows the Leitung page to that unit.
+- [x] „Mein Lager", „Mein Hangar" and the own refinery orders list every own row under any pin,
+  each marked with its unit (the Lager on every stack row).
+
+**Enforced by:** `RequestScopeResolverPinRuleTest`, `ScopeKernelTest`, `RequestMemoTest`,
+`MeControllerTest`, `MemberMembershipControllerTest`, `CustomJwtGrantedAuthoritiesConverterTest`,
+`RetainedSeatWithoutKrtMemberIntegrationTest`, `DeactivatedOrgUnitConfersNothingIntegrationTest`,
+`SpecialCommandSecurityServiceTest`, `BankAccessRulesTest`, `GrantCascadeTest`,
+`LeitungViewServiceTest`, `DelegatedAppointmentControllerSecurityTest`,
+`SpecialCommandRosterGateIntegrationTest`, `OrgUnitStampingStampableUnitsTest`, `MissionAccessPolicyPinnedAdminTest`,
+`MissionAccessPolicyGateTest`, `LogisticianPerUnitSurfacesTest`, `AuthHelperServiceTest`,
+`SupplyAccessPolicyTest`, `SupplyMapperTest`, `SupplyNeedServiceTest`,
+`SupplyUnitSettingServiceTest`, `SupplyTabAccessServiceTest`, `PurchasingAccessPolicyTest`,
+`MissionEarmarkTargetsTest`, `InventoryEarmarkTargetCacheTest`,
+`InventoryPoolEarmarkWithoutRequestIntegrationTest`,
+`OrgUnitContextAdviceTest`, `OrgUnitSwitcherLabelMvcTest`, `org-unit-context-sync.test.mjs`
+(`:frontend:testOrgUnitContextSyncJs`), `ActiveOrgUnitContextE2eTest` ·
+**Code:** `scope.api.RequestScopeResolver`, `scope.api.ActiveOrgUnitContext`,
+`scope.api.AccessGateService`, `scope.api.OrgUnitStampingService`,
+`scope.api.CustomJwtGrantedAuthoritiesConverter`, `platform.api.AuthHelperService#holdsKrtMember`,
+`mission.internal.MissionAccessPolicy`, `supply.internal.SupplyAccessPolicy`,
+`purchasing.internal.PurchasingAccessPolicy`, `mission.api.MissionRepository#findEarmarks`,
+`inventory.api.EarmarkTargets`, `kernel.layout.OrgUnitContextAdvice`,
+`static/js/kernel/org-unit-context-sync.js` · **ADR:** ADR-0374, ADR-0329 · **Related:**
+REQ-ORG-002, REQ-ORG-008, REQ-ORG-017, REQ-ORG-024, REQ-ORG-031, REQ-SEC-005, REQ-SEC-015,
+REQ-SEC-065, REQ-INV-027, REQ-SUP-003, REQ-PUR-023, REQ-UI-026, REQ-FE-001
 
 ### JobOrder hierarchy foundation
 

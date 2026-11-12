@@ -132,7 +132,7 @@ public class ExchangeDemandService {
       return ExchangeOrgDemandDto.withheld(
           ExchangeOrgDemandDto.Reason.NOT_PERMITTED, clock.instant());
     }
-    Set<UUID> units = membershipRepository.findOrgUnitIdsByUserId(member);
+    Set<UUID> units = membershipRepository.findActiveOrgUnitIdsByUserId(member);
     Set<UUID> logisticianUnits = new HashSet<>();
     if (details && !units.isEmpty()) {
       logisticianUnits.addAll(orgUnitService.logisticianUnits(member));

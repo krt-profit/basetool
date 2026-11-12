@@ -89,14 +89,24 @@ params), the `onlyMine` toggle and the search `q` — and the pagination control
 - [ ] `ready=true` keeps an order whose end is exactly now and drops one whose end is later.
 - [ ] A `?size=` outside {10,50,100} falls back to 50; a negative `?page=` clamps to 0.
 - [ ] Every list row carries `canEdit`, the verdict of `RefineryAccessPolicy.canEditRefineryOrder` for
-  the caller: the owner, or a Logistician whose grant covers the order's unit (cascade included).
-  The list shows the store action only on an open row with `canEdit`; a row without it shows none.
+  the caller, the same rule that gates the order's update, cancel and store (`PUT` and `DELETE` on
+  `/api/v1/refinery-orders/{id}`, `POST /api/v1/refinery-orders/{id}/store`): the owner, a
+  Logistician whose grant covers the order's unit in the active context (cascade included), or an
+  admin whose scope covers that unit; an order without a unit is its owner's and an unpinned
+  admin's. A plain member of the order's unit, or a Logistician of another unit, lists it with
+  `canEdit = false` and is refused on every write. The list shows the store action only on an open
+  row with `canEdit`; a row without it shows none.
+- [x] Every row shows its owning unit — the unit's shorthand badge, or a muted dash for an order
+  without a unit — so the own orders, which no active-unit pin narrows, say where each belongs
+  (REQ-ORG-032, `RefineryOrdersListPatternRenderTest#marksEveryRowWithItsUnit`).
 
 **Enforced by:** `RefineryOrderPaginationMvcTest`, `RefineryOrdersListPatternRenderTest`,
 `RefineryOrderListViewResolutionTest`, `RefineryOrderDurationTest` (`testViewOrders_*`),
 `RefineryOrderRepositoryListFilterTest`, `RefineryOrderControllerTest` (`ListFilterTests`),
 `RefineryOrderQueryServiceTest`, `RefineryOrderMapperTest`, `RefineryProgressTest`,
-`GrantCascadeAggregateAccessIntegrationTest` · **Code:** `RefineryOrderPageController.viewOrders` /
+`GrantCascadeAggregateAccessIntegrationTest`, `RefineryModuleContractTest`,
+`RefineryAccessPolicyDifferentialTest`, `LogisticianPerUnitSurfacesTest` · **Code:**
+`RefineryOrderPageController.viewOrders` /
 `RefineryListRow`, `RefineryOrderMapper.toListDto`, `RefineryAccessPolicy.canEditRefineryOrder`,
 `segmentQuery` / `orderPageUri` / `buildPaginationBaseUrl`, `templates/refinery/refinery-orders-index.html`,
 `templates/kernel/fragments/pagination.html`, `RefineryOrderController` (`/all`, `/my-orders`),

@@ -84,6 +84,13 @@ public final class Roles {
   public static final String EXCHANGE_CAPABILITY_PREFIX = "XCH_CAPABILITY:";
 
   /**
+   * The marker authority an acting member carries on the exchange layer when their stored roles
+   * include {@link #KRT_MEMBER}, so their memberships confer their reach there too (REQ-SEC-015,
+   * REQ-XCH-009). It is not a role: no {@code hasRole(...)} gate matches it.
+   */
+  public static final String EXCHANGE_KRT_MEMBER_MARKER = "XCH_KRT_MEMBER";
+
+  /**
    * Returns the {@code ROLE_}-prefixed Spring-authority form of a bare role code, for call sites
    * that cannot use the {@code hasRole(...)} shorthand.
    *

@@ -33,7 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintOverviewEntryDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.IntStream;
@@ -165,6 +167,28 @@ class BlueprintOverviewPageControllerMvcTest {
         .andExpect(content().string(not(containsString("class=\"greeting"))))
         .andExpect(content().string(not(containsString("bp-filter"))))
         .andExpect(content().string(not(containsString("<details"))));
+  }
+
+  /**
+   * In „Alle meine Org-Einheiten" the notice says the list covers the org units the viewer
+   * oversees, which is what the page aggregates, not all of the viewer's org units.
+   */
+  @Test
+  @WithMockUser
+  void view_allMyOrgUnits_namesTheOverseenOrgUnits() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(page(0, 50, 3));
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(
+            LayoutResponses.context(
+                LayoutContextLoader.ContextKind.ALL_MY_ORG_UNITS, null, List.of()));
+
+    mockMvc
+        .perform(get("/blueprint-overview").locale(Locale.GERMAN))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-testid=\"bp-overview-overseen-units\"")))
+        .andExpect(content().string(containsString("Org-Einheiten, die du beaufsichtigst")))
+        .andExpect(content().string(not(containsString("aller deiner Org-Einheiten"))));
   }
 
   /** An empty list shows the shared empty state instead of a table row spanning the columns. */

@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.kernel;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.support.UnboundRequestProxy;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -128,6 +130,35 @@ class RequestMemoTest {
 
     assertThat(memo).isNull();
     assertThat(calls).hasValue(0);
+  }
+
+  @Test
+  void aRequestObjectIsReadableWithoutABoundRequest() {
+    assertThat(RequestMemo.readable(new MockHttpServletRequest())).isTrue();
+  }
+
+  @Test
+  void theInjectedRequestProxyIsReadableOnlyWhileARequestIsBound() {
+    HttpServletRequest proxy = UnboundRequestProxy.create();
+
+    assertThat(RequestMemo.readable(proxy)).isFalse();
+
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+
+    assertThat(RequestMemo.readable(proxy)).isTrue();
+  }
+
+  @Test
+  void outsideARequestTheValueIsComputedOnEveryCall() {
+    HttpServletRequest proxy = UnboundRequestProxy.create();
+    AtomicInteger calls = new AtomicInteger();
+
+    RequestMemo.get(proxy, FLAG, () -> calls.incrementAndGet() > 0);
+    boolean second = RequestMemo.get(proxy, FLAG, () -> calls.incrementAndGet() > 0);
+
+    assertThat(second).isTrue();
+    assertThat(calls).hasValue(2);
   }
 
   private static Optional<String> emptyCounting(AtomicInteger calls) {

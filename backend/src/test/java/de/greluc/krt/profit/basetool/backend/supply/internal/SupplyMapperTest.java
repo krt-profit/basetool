@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
@@ -47,15 +49,20 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The redaction of the purchase fields of a need and of the donor of a donation (REQ-SUP-006,
- * REQ-SUP-012).
+ * The redaction of the purchase fields and the job-order link of a need and of the donor of a
+ * donation, and the manage flags inside the active context (REQ-SUP-003, REQ-SUP-006, REQ-SUP-012,
+ * REQ-SUP-023).
  */
 class SupplyMapperTest {
 
   private static final UUID DONOR = UUID.randomUUID();
   private static final UUID OTHER = UUID.randomUUID();
+  private static final UUID ANOTHER_UNIT = UUID.randomUUID();
+  private static final JsonMapper JSON = JsonMapper.builder().build();
 
   private SupplyMapper mapper;
   private Squadron unit;
@@ -101,9 +108,13 @@ class SupplyMapperTest {
   }
 
   private SupplyMapper.NeedContext needContext(
-      boolean admin, boolean leadership, Set<UUID> managed, boolean delegate) {
+      boolean everyUnit, boolean leadership, Set<UUID> managed, boolean delegate) {
     return new SupplyMapper.NeedContext(
-        Map.of(unit.getId(), unit), admin, leadership, managed, delegate, Map.of());
+        Map.of(unit.getId(), unit),
+        leadership,
+        new SupplyManagedUnits(everyUnit, managed),
+        delegate,
+        Map.of());
   }
 
   private SupplyNeed linkedNeed(UUID orderId, QualityTier tier) {
@@ -115,13 +126,76 @@ class SupplyMapperTest {
 
   private SupplyMapper.NeedContext linkedContext(Set<UUID> managed, OrderCoverage order) {
     return new SupplyMapper.NeedContext(
-        Map.of(unit.getId(), unit), false, false, managed, false, Map.of(order.id(), order));
+        Map.of(unit.getId(), unit),
+        false,
+        new SupplyManagedUnits(false, managed),
+        false,
+        Map.of(order.id(), order));
+  }
+
+  /**
+   * A mapper that decides by the real manage rule for the given caller.
+   *
+   * @param policy the caller's policy
+   * @param coverage the coverage of the linked orders
+   * @return the mapper
+   */
+  private static SupplyMapper mapperFor(
+      SupplyAccessPolicy policy, JobOrderMaterialCoverage coverage) {
+    return new SupplyMapper(
+        policy,
+        mock(OrgUnitRepository.class),
+        mock(UserRepository.class),
+        mock(AuthHelperService.class),
+        coverage);
+  }
+
+  private static QualityTier goodTier() {
+    QualityTier good = new QualityTier();
+    good.setId(UUID.randomUUID());
+    return good;
+  }
+
+  @Test
+  void anAdminPinnedToAnotherUnitGetsNeitherTheManageFlagNorTheOrderLinkOfANeed() {
+    UUID orderId = UUID.randomUUID();
+    SupplyNeed need = linkedNeed(orderId, goodTier());
+    JobOrderMaterialCoverage coverage = mock(JobOrderMaterialCoverage.class);
+    SupplyMapper pinned = mapperFor(SupplyAccessPolicies.admin(ANOTHER_UNIT), coverage);
+
+    NeedDto dto = pinned.toDto(need, pinned.needContext(List.of(need)));
+
+    assertThat(dto.canManage()).isFalse();
+    assertThat(dto.jobOrderId()).isNull();
+    assertThat(dto.jobOrder()).isNull();
+    assertThat(dto.maxUnitPrice()).isEqualTo(5000L);
+    verify(coverage).coverageOf(Set.of());
+  }
+
+  @Test
+  void anAdminWithoutAPinOrPinnedToTheRaisingUnitManagesTheNeed() {
+    UUID orderId = UUID.randomUUID();
+    SupplyNeed need = linkedNeed(orderId, goodTier());
+    JobOrderMaterialCoverage coverage = mock(JobOrderMaterialCoverage.class);
+    when(coverage.coverageOf(Set.of(orderId)))
+        .thenReturn(
+            Map.of(orderId, new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of())));
+    SupplyMapper unpinned = mapperFor(SupplyAccessPolicies.admin(null), coverage);
+    SupplyMapper pinned = mapperFor(SupplyAccessPolicies.admin(unit.getId()), coverage);
+
+    NeedDto everyUnit = unpinned.toDto(need, unpinned.needContext(List.of(need)));
+    NeedDto pinnedUnit = pinned.toDto(need, pinned.needContext(List.of(need)));
+
+    assertThat(everyUnit.canManage()).isTrue();
+    assertThat(everyUnit.jobOrder()).isNotNull();
+    assertThat(pinnedUnit.canManage()).isTrue();
+    assertThat(pinnedUnit.jobOrderId()).isEqualTo(orderId);
+    assertThat(pinnedUnit.jobOrder()).isNotNull();
   }
 
   @Test
   void theUnitsManagerSeesHowFarTheLinkedOrderCoversTheNeed() {
-    QualityTier good = new QualityTier();
-    good.setId(UUID.randomUUID());
+    QualityTier good = goodTier();
     UUID orderId = UUID.randomUUID();
     OrderCoverage order =
         new OrderCoverage(
@@ -133,14 +207,14 @@ class SupplyMapperTest {
     NeedDto dto =
         mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(unit.getId()), order));
 
+    assertThat(dto.jobOrderId()).isEqualTo(orderId);
     assertThat(dto.jobOrder())
         .isEqualTo(new NeedOrderDto(orderId, 42, JobOrderStatus.IN_PROGRESS, 12.4, 12.4));
   }
 
   @Test
   void aLinkedOrderWithoutTheNeedsBucketCarriesNoCoverage() {
-    QualityTier good = new QualityTier();
-    good.setId(UUID.randomUUID());
+    QualityTier good = goodTier();
     UUID orderId = UUID.randomUUID();
     OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
 
@@ -154,17 +228,54 @@ class SupplyMapperTest {
 
   @Test
   void aMemberWhoDoesNotManageTheUnitAndAClosedNeedGetNoLinkedOrder() {
-    QualityTier good = new QualityTier();
-    good.setId(UUID.randomUUID());
+    QualityTier good = goodTier();
     UUID orderId = UUID.randomUUID();
     OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
     SupplyNeed fulfilled = linkedNeed(orderId, good);
     fulfilled.setStatus(NeedStatus.FULFILLED);
 
-    assertThat(mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(), order)).jobOrder())
-        .isNull();
+    NeedDto foreign = mapper.toDto(linkedNeed(orderId, good), linkedContext(Set.of(), order));
+
+    assertThat(foreign.jobOrder()).isNull();
+    assertThat(foreign.jobOrderId()).isNull();
     assertThat(mapper.toDto(fulfilled, linkedContext(Set.of(unit.getId()), order)).jobOrder())
         .isNull();
+  }
+
+  private static JsonNode onTheWire(NeedDto dto) {
+    return JSON.readTree(JSON.writeValueAsString(dto));
+  }
+
+  @Test
+  void theResponseCarriesTheOrderLinkOnlyForAManagerOfTheUnit() {
+    QualityTier good = goodTier();
+    UUID orderId = UUID.randomUUID();
+    OrderCoverage order = new OrderCoverage(orderId, 42, JobOrderStatus.OPEN, List.of());
+    SupplyNeed need = linkedNeed(orderId, good);
+
+    JsonNode foreign = onTheWire(mapper.toDto(need, linkedContext(Set.of(), order)));
+    JsonNode managed = onTheWire(mapper.toDto(need, linkedContext(Set.of(unit.getId()), order)));
+
+    assertThat(foreign.has("jobOrderId")).isFalse();
+    assertThat(foreign.has("jobOrder")).isFalse();
+    assertThat(managed.get("jobOrderId").asString()).isEqualTo(orderId.toString());
+  }
+
+  @Test
+  void anUnpinnedAdminReceivesTheOrderLinkButTheLeadershipAndADelegateWithoutManagingDoNot() {
+    QualityTier good = goodTier();
+    UUID orderId = UUID.randomUUID();
+    SupplyNeed need = linkedNeed(orderId, good);
+
+    NeedDto admin = mapper.toDto(need, needContext(true, false, Set.of(), false));
+    NeedDto leadership = mapper.toDto(need, needContext(false, true, Set.of(), false));
+    NeedDto delegate = mapper.toDto(need, needContext(false, false, Set.of(), true));
+
+    assertThat(admin.jobOrderId()).isEqualTo(orderId);
+    assertThat(leadership.maxUnitPrice()).isEqualTo(5000L);
+    assertThat(leadership.jobOrderId()).isNull();
+    assertThat(delegate.maxUnitPrice()).isEqualTo(5000L);
+    assertThat(delegate.jobOrderId()).isNull();
   }
 
   @Test
@@ -228,7 +339,27 @@ class SupplyMapperTest {
   private SupplyMapper.DonationContext donationContext(
       UUID caller, boolean admin, boolean leadership, Set<UUID> managed) {
     return new SupplyMapper.DonationContext(
-        Map.of(unit.getId(), unit), Map.of(DONOR, donor), caller, admin, leadership, managed);
+        Map.of(unit.getId(), unit),
+        Map.of(DONOR, donor),
+        caller,
+        admin,
+        leadership,
+        new SupplyManagedUnits(false, managed));
+  }
+
+  @Test
+  void anAdminConfirmsOnlyThePledgesOfThePinnedUnit() {
+    SupplyDonation pledge = donation(DonationStatus.PLEDGED);
+    SupplyMapper foreign =
+        mapperFor(SupplyAccessPolicies.admin(ANOTHER_UNIT), mock(JobOrderMaterialCoverage.class));
+    SupplyMapper own =
+        mapperFor(SupplyAccessPolicies.admin(unit.getId()), mock(JobOrderMaterialCoverage.class));
+
+    DonationDto elsewhere = foreign.toDto(pledge, foreign.donationContext(List.of(pledge)));
+    DonationDto pinned = own.toDto(pledge, own.donationContext(List.of(pledge)));
+
+    assertThat(elsewhere.canReceive()).isFalse();
+    assertThat(pinned.canReceive()).isTrue();
   }
 
   @Test

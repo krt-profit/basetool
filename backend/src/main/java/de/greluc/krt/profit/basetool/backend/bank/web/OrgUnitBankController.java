@@ -120,8 +120,8 @@ public class OrgUnitBankController {
   }
 
   /**
-   * Pages over every org-unit account the caller may view on the org-unit bank page, regardless of
-   * the active-org-unit pin, in the fixed backend order of REQ-BANK-064.
+   * Pages over the org-unit accounts the caller may view on the org-unit bank page under the
+   * active-org-unit pin, in the fixed backend order of REQ-BANK-064.
    *
    * @param page zero-based page index
    * @param size page size
@@ -132,12 +132,13 @@ public class OrgUnitBankController {
   @Operation(
       summary = "Page over the org-unit accounts the caller may view",
       description =
-          "Returns the accounts the authenticated member may view on the org-unit bank page, over"
-              + " their whole reach and not narrowed by the active org-unit pin: the KRT account"
-              + " first, then the accounts of the active context, then the rest, each by account"
-              + " number with id as tiebreaker. The order is fixed; no sort parameter. Each account"
-              + " carries its balance, balance target and 30-day trend; no holders, custody,"
-              + " history or capabilities.")
+          "Returns the accounts the authenticated member may view on the org-unit bank page,"
+              + " narrowed by the active org-unit pin: pinned, the org-unit and Bereich accounts"
+              + " of the pinned unit only beside the organisation-wide accounts; unpinned, their"
+              + " whole reach. The KRT account comes first, then the accounts of the active"
+              + " context, then the rest, each by account number with id as tiebreaker. The order"
+              + " is fixed; no sort parameter. Each account carries its balance, balance target"
+              + " and 30-day trend; no holders, custody, history or capabilities.")
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "One page of viewable accounts")})
   public PageResponse<OrgUnitBankVisibleAccountDto> listVisibleAccounts(

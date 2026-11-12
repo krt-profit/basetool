@@ -64,7 +64,7 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
       @Nullable QueueKey openAfter,
       @Nullable QueueKey toApproveAfter,
       int limit) {
-    BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(actor);
+    BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(actor, null);
     BankStaffRights rights = scope.rights();
     if (!servesAnything(scope)) {
       return Optional.empty();

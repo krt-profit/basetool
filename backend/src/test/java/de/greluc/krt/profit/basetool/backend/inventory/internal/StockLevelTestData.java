@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -71,6 +72,14 @@ final class StockLevelTestData {
     user.setId(UUID.randomUUID());
     user.setUsername(prefix + "-" + UUID.randomUUID());
     return userRepository.saveAndFlush(user).getId();
+  }
+
+  /** Gives a user the stored {@code KRT Member} role; without it a membership confers nothing. */
+  void holdsKrtMember(@NotNull UUID user) {
+    jdbc.update(
+        "INSERT INTO user_roles (user_id, role_id) SELECT ?, id FROM role WHERE code = ?",
+        user,
+        Roles.KRT_MEMBER);
   }
 
   /** Inserts an SCU raw material. */

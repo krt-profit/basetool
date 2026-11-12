@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.orgunit.client;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.ActiveOrgUnitChoiceRequest;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.ActiveOrgUnitChoiceResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipFlagsPatchRequest;
@@ -43,8 +45,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Typed backend client of the org-unit domain: the org hierarchy (REQ-ORG-014), the admin
- * Spezialkommando lifecycle, the SK member roster (REQ-ORG-005) and current Profit responsibility,
- * over {@link BackendApiClient} (plan §5.9, ADR-0032). Catalogue evictions stay with the caller.
+ * Spezialkommando lifecycle, the SK member roster (REQ-ORG-005), the admin squadron and SK toggles,
+ * current Profit responsibility and the caller's stored active org unit (REQ-ORG-031), over {@link
+ * BackendApiClient} (plan §5.9, ADR-0032). Catalogue evictions stay with the caller.
  */
 @Service
 @RequiredArgsConstructor
@@ -61,6 +64,9 @@ public class OrgUnitBackendClient {
   /** The backend's single SK membership resource. */
   private static final String SPECIAL_COMMAND_MEMBER =
       "/api/v1/special-commands/{id}/members/{userId}";
+
+  /** The caller's stored choice of the active org unit. */
+  private static final String ACTIVE_ORG_UNIT_CHOICE = "/api/v1/org-units/me/active-choice";
 
   private static final ParameterizedTypeReference<List<OrgUnitNodeDto>> NODE_LIST =
       new ParameterizedTypeReference<>() {};
@@ -85,6 +91,31 @@ public class OrgUnitBackendClient {
   @Nullable
   public List<OrgUnitNodeDto> orgUnitNodes() {
     return backendApiClient.get("/api/v1/org-units", NODE_LIST);
+  }
+
+  /**
+   * Reads the caller's stored choice of the active org unit (REQ-ORG-031).
+   *
+   * @return the stored choice, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ActiveOrgUnitChoiceResponse activeOrgUnitChoice() {
+    return backendApiClient.get(ACTIVE_ORG_UNIT_CHOICE, ActiveOrgUnitChoiceResponse.class);
+  }
+
+  /**
+   * Stores the caller's choice of the active org unit without a version, so the latest choice wins
+   * (REQ-ORG-031).
+   *
+   * @param orgUnitId the chosen org unit, or {@code null} for all of the caller's org units
+   * @return the stored choice, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ActiveOrgUnitChoiceResponse storeActiveOrgUnitChoice(@Nullable UUID orgUnitId) {
+    return backendApiClient.put(
+        ACTIVE_ORG_UNIT_CHOICE,
+        new ActiveOrgUnitChoiceRequest(orgUnitId, null),
+        ActiveOrgUnitChoiceResponse.class);
   }
 
   /**

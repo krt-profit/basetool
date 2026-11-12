@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipDeltaRequest.StaffelChange;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
-import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
 import de.greluc.krt.profit.basetool.backend.identity.api.StaffelAssignment;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -85,7 +84,6 @@ class UserServiceMembershipDeltaTest {
   @Mock private MissionParticipantRepository missionParticipantRepository;
   @Mock private SquadronRepository squadronRepository;
   @Mock private AuthHelperService authHelperService;
-  @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
 
   @InjectMocks private UserService userService;

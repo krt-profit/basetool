@@ -38,7 +38,6 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +47,6 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.security.core.Authentication;
@@ -58,7 +56,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Manages the local {@code app_user} mirror of Keycloak users: the caller-identity seam, the
- * squadron-scoped user reads, the self-service profile edits and the membership-delta orchestrator.
+ * member-directory reads, the self-service profile edits and the membership-delta orchestrator.
  *
  * <p>{@link #getUserIdFromJwt(Jwt)} and {@link #getCurrentUser()} are the canonical source of the
  * caller's id; subject parsing is fail-closed and rejects a missing or non-UUID {@code sub}.
@@ -83,7 +81,6 @@ public class UserService {
 
   private final UserRepository userRepository;
   private final AuthHelperService authHelperService;
-  private final SquadronVisibility squadronVisibility;
   private final MembershipOperations membershipOperations;
   private final CallerUserProjection callerUserProjection;
   private final AuditRecorder auditRecorder;
@@ -284,81 +281,49 @@ public class UserService {
   }
 
   /**
-   * Returns the users in the caller's squadron scope (REQ-ORG-017), sorted case-insensitively by
-   * username; admins in "all squadrons" mode get every user.
-   *
-   * @return scoped user list, sorted by username
-   */
-  public List<User> findAll() {
-    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.findAllScopedList(
-        scope, Sort.by(Sort.Order.asc("username").ignoreCase()));
-  }
-
-  /**
-   * Returns paged user list, squadron-scoped (see {@link #findAll()}).
+   * Pages through the member directory, which covers every user whatever the caller's units
+   * (REQ-ORG-017).
    *
    * @param pageable page request
-   * @return scoped paged user list
+   * @return one page of users
    */
   public Page<User> findAll(@NotNull Pageable pageable) {
-    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.findAllScoped(scope, pageable);
+    return userRepository.findAll(pageable);
   }
 
   /**
-   * Returns lightweight reference projection used by typeaheads (id + username + displayName).
-   * Squadron-scoped via {@link SquadronVisibility#currentUserListScopeSquadronIds()} — a non-admin
-   * sees the members of every Staffel they belong to in pickers (REQ-ORG-017).
+   * Returns every user's reference for the typeaheads, as the caller may see it (REQ-ORG-017,
+   * REQ-SEC-007).
    *
-   * @return lightweight reference projection used by typeaheads
+   * @return the references of every user, ordered by display name
    */
   public List<UserReferenceDto> findAllReference() {
-    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.findAllReferenceScoped(scope).stream()
-        .map(callerUserProjection::forCaller)
-        .toList();
+    return userRepository.findAllReference().stream().map(callerUserProjection::forCaller).toList();
   }
 
   /**
-   * Unpaged username/displayName substring search, squadron-scoped (the union of the caller's
-   * Staffeln, REQ-ORG-017).
+   * Paged username/displayName substring search over the member directory (REQ-ORG-017).
    *
-   * @param query free-text filter
-   * @return matching users in the caller's squadron context
-   */
-  public List<User> searchByUsername(@NotNull String query) {
-    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.searchScopedList(LikePatterns.escapeNullable(query), scope);
-  }
-
-  /**
-   * Paged username/displayName substring search, squadron-scoped (the union of the caller's
-   * Staffeln, REQ-ORG-017).
-   *
-   * @param query free-text filter
+   * @param query free-text filter; blank matches every user
    * @param pageable page request
-   * @return matching users in the caller's squadron context
+   * @return one page of matching users
    */
   public Page<User> searchByUsername(@NotNull String query, @NotNull Pageable pageable) {
-    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
-    return userRepository.searchScoped(LikePatterns.escapeNullable(query), scope, pageable);
+    return userRepository.searchByName(LikePatterns.escapeNullable(query), pageable);
   }
 
   /**
-   * Squadron-scoped substring search projected to {@link
-   * de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto}s for the user pickers,
-   * without loading entities.
+   * Paged substring search projected to the references the caller may see, for the user pickers
+   * (REQ-ORG-017, REQ-SEC-007).
    *
-   * @param query free-text filter; blank matches every user in scope
+   * @param query free-text filter; blank matches every user
    * @param pageable page request
-   * @return matching user references in the caller's squadron context
+   * @return one page of matching user references
    */
   public Page<UserReferenceDto> searchReferencesByUsername(
       @NotNull String query, @NotNull Pageable pageable) {
-    Set<UUID> scope = squadronVisibility.currentUserListScopeSquadronIds();
     return userRepository
-        .searchScopedReferences(LikePatterns.escapeNullable(query), scope, pageable)
+        .searchReferencesByName(LikePatterns.escapeNullable(query), pageable)
         .map(callerUserProjection::forCaller);
   }
 

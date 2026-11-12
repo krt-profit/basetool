@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,13 @@ class BankAccessRulesTest {
 
   private static final BigDecimal T1 = new BigDecimal("1000");
   private static final BigDecimal T2 = new BigDecimal("10000");
+
+  /** The org-unit settings rights of REQ-BANK-035, REQ-BANK-036 and REQ-BANK-041. */
+  private static final Set<BankAccountRight> SETTINGS_RIGHTS =
+      Set.of(
+          BankAccountRight.SET_TARGET,
+          BankAccountRight.CONFIGURE_VISIBILITY,
+          BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
 
   @Mock private BankAccountRepository accountRepository;
   @Mock private BankAccountViewGrantRepository viewGrantRepository;
@@ -164,6 +172,26 @@ class BankAccessRulesTest {
   }
 
   @Test
+  void accessTo_pinOnAnotherOwnUnit_hidesTheAccountOfTheOverseenUnit() {
+    stubFind(staffelAccount);
+    UUID otherOwnUnit = UUID.randomUUID();
+    BankActor overseer =
+        TestBankActor.member(UUID.randomUUID())
+            .seat(otherOwnUnit, MembershipRole.MEMBER)
+            .reach(staffelId)
+            .build();
+
+    assertThat(
+            policy
+                .accessTo(overseer, staffelAccount.getId(), otherOwnUnit)
+                .has(BankAccountRight.VIEW))
+        .isFalse();
+    assertThat(
+            policy.accessTo(overseer, staffelAccount.getId(), staffelId).has(BankAccountRight.VIEW))
+        .isTrue();
+  }
+
+  @Test
   void accessTo_seatsWithoutKrtMember_overseeAndHoldNothing() {
     stubFind(staffelAccount);
     BankActor formerMember =
@@ -238,16 +266,130 @@ class BankAccessRulesTest {
             .build();
     BankActor member = TestBankActor.member(UUID.randomUUID()).build();
 
-    assertThat(policy.approves(lead, request)).isTrue();
-    assertThat(policy.approves(member, request)).isFalse();
+    assertThat(policy.approves(lead, request, null)).isTrue();
+    assertThat(policy.approves(member, request, null)).isFalse();
     assertThat(
             policy.approves(
                 TestBankActor.member(request.getRequestedBy())
                     .seat(staffelId, MembershipRole.STAFFELLEITER)
                     .build(),
-                request))
+                request,
+                null))
         .isFalse();
     verify(accountRepository, never()).findAllByOrderByAccountNoAsc();
+  }
+
+  @Test
+  void holderRights_pinOnAnotherOwnUnit_leaveTheAccountOutOfContext() {
+    stubFind(staffelAccount);
+    BankActor lead =
+        TestBankActor.member(UUID.randomUUID())
+            .seat(staffelId, MembershipRole.STAFFELLEITER)
+            .seat(otherStaffelId, MembershipRole.MEMBER)
+            .reach(staffelId)
+            .build();
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(staffelAccount);
+    request.setRequestedBy(UUID.randomUUID());
+    request.setRequiredApprover(BankRequestApprover.RESPONSIBLE_HOLDER);
+
+    assertThat(policy.accessTo(lead, staffelAccount.getId(), otherStaffelId))
+        .isSameAs(BankAccountAccess.Hidden.INSTANCE);
+    assertThat(policy.approves(lead, request, otherStaffelId)).isFalse();
+    assertThat(policy.mayApprove(lead, request, otherStaffelId)).isFalse();
+    assertThat(policy.mayApprove(lead, request, staffelId)).isTrue();
+    assertThat(policy.mayApprove(lead, request, null)).isTrue();
+  }
+
+  @Test
+  void settingsRights_pinnedAdmin_reachOnlyTheAccountsOfTheActiveContext() {
+    BankAccount otherAccount =
+        account(BankAccountType.ORG_UNIT, staffel(otherStaffelId), BankAccountStatus.ACTIVE);
+    stubFind(staffelAccount);
+    stubFind(otherAccount);
+    stubFind(cartelAccount);
+    BankActor admin = TestBankActor.of(UUID.randomUUID()).admin().build();
+
+    BankAccountAccess outside = policy.accessTo(admin, otherAccount.getId(), staffelId);
+    BankAccountAccess inside = policy.accessTo(admin, staffelAccount.getId(), staffelId);
+    BankAccountAccess organisation = policy.accessTo(admin, cartelAccount.getId(), staffelId);
+    BankAccountAccess unpinned = policy.accessTo(admin, otherAccount.getId(), null);
+
+    assertThat(SETTINGS_RIGHTS).noneMatch(outside::has);
+    assertThat(outside.has(BankAccountRight.VIEW)).isFalse();
+    assertThat(outside.has(BankAccountRight.STAFF_VIEW)).isTrue();
+    assertThat(SETTINGS_RIGHTS).allMatch(inside::has);
+    assertThat(organisation.has(BankAccountRight.SET_TARGET)).isTrue();
+    assertThat(SETTINGS_RIGHTS).allMatch(unpinned::has);
+  }
+
+  /**
+   * A legacy Bereich account named only by its area has no owning unit, so it lies in the active
+   * context only without a pin (REQ-ORG-032).
+   */
+  @Test
+  void aLegacyBereichAccountWithoutAnOwningUnitIsOutOfContextUnderAnyPin() {
+    BankAccount legacyArea = account(BankAccountType.AREA, null, BankAccountStatus.ACTIVE);
+    stubFind(legacyArea);
+    BankActor admin = TestBankActor.of(UUID.randomUUID()).admin().build();
+
+    BankAccountAccess pinned = policy.accessTo(admin, legacyArea.getId(), staffelId);
+    BankAccountAccess unpinned = policy.accessTo(admin, legacyArea.getId(), null);
+
+    assertThat(pinned.has(BankAccountRight.VIEW)).isFalse();
+    assertThat(SETTINGS_RIGHTS).noneMatch(pinned::has);
+    assertThat(unpinned.has(BankAccountRight.VIEW)).isTrue();
+    assertThat(SETTINGS_RIGHTS).allMatch(unpinned::has);
+  }
+
+  @Test
+  void settingsRights_pinnedBankleitung_keepTheApprovalLimitRightOutsideThePin() {
+    BankAccount otherAccount =
+        account(BankAccountType.ORG_UNIT, staffel(otherStaffelId), BankAccountStatus.ACTIVE);
+    stubFind(otherAccount);
+    BankActor management =
+        TestBankActor.member(UUID.randomUUID())
+            .bankManagement()
+            .seat(staffelId, MembershipRole.MEMBER)
+            .build();
+
+    BankAccountAccess outside = policy.accessTo(management, otherAccount.getId(), staffelId);
+
+    assertThat(outside.has(BankAccountRight.CONFIGURE_APPROVAL_LIMITS)).isTrue();
+    assertThat(outside.has(BankAccountRight.VIEW)).isFalse();
+  }
+
+  @Test
+  void foreignRequestScope_pinnedAdmin_readsTheRequestsOfThePinnedUnitAndTheOrganisationAccounts() {
+    BankAccount otherAccount =
+        account(BankAccountType.ORG_UNIT, staffel(otherStaffelId), BankAccountStatus.ACTIVE);
+    when(accountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(List.of(staffelAccount, otherAccount, cartelAccount));
+    BankActor admin = TestBankActor.of(UUID.randomUUID()).admin().build();
+
+    BankAccessRules.ForeignRequestScope pinned = policy.foreignRequestScope(admin, staffelId);
+    BankAccessRules.ForeignRequestScope unpinned = policy.foreignRequestScope(admin, null);
+
+    assertThat(pinned.candidateAccountIds())
+        .containsExactlyInAnyOrder(staffelAccount.getId(), cartelAccount.getId());
+    assertThat(unpinned.candidateAccountIds())
+        .containsExactlyInAnyOrder(
+            staffelAccount.getId(), otherAccount.getId(), cartelAccount.getId());
+  }
+
+  @Test
+  void allMembersGrant_withoutKrtMember_admitsNoFormerMember() {
+    BankActor formerMember =
+        TestBankActor.of(UUID.randomUUID())
+            .roles("BANK_EMPLOYEE")
+            .seat(staffelId, MembershipRole.MEMBER)
+            .build();
+    BankAccountViewGrant allMembers = new BankAccountViewGrant();
+    allMembers.setGranteeKind(BankAccountViewGranteeKind.ALL_MEMBERS);
+    when(viewGrantRepository.findByAccountId(staffelAccount.getId()))
+        .thenReturn(List.of(allMembers));
+
+    assertThat(policy.canView(formerMember, staffelAccount, null)).isFalse();
   }
 
   @Test

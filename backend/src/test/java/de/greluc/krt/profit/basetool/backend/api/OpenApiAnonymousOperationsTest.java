@@ -42,7 +42,7 @@ class OpenApiAnonymousOperationsTest {
   /**
    * The operations REQ-SEC-052 serves without a token, spelled {@code METHOD path}.
    *
-   * <p>Exactly two, and the list is the requirement rather than a description of it: an operation
+   * <p>Exactly one, and the list is the requirement rather than a description of it: an operation
    * that gains an empty {@code security} list without appearing here is a widening of the public
    * surface that nobody wrote down.
    */
@@ -110,8 +110,8 @@ class OpenApiAnonymousOperationsTest {
   }
 
   @Test
-  @DisplayName("exactly the two anonymous reads declare an empty security list")
-  void onlyTheTwoAnonymousReadsAreDocumentedAsPublic() {
+  @DisplayName("only the anonymous terms read declares an empty security list")
+  void onlyTheAnonymousReadIsDocumentedAsPublic() {
     JsonNode document = openapi();
     Set<String> declaredPublic = new LinkedHashSet<>();
     JsonNode paths = document.path("paths");
@@ -130,10 +130,10 @@ class OpenApiAnonymousOperationsTest {
 
     assertThat(declaredPublic)
         .as(
-            "REQ-SEC-052 names exactly two operations that answer without a token. An empty"
-                + " security list on a third is a public endpoint nobody decided on; a missing one"
-                + " on either of these two makes a generated client attach a bearer on the calls it"
-                + " makes before it can have one.")
+            "REQ-SEC-052 names exactly one operation that answers without a token. An empty"
+                + " security list on another is a public endpoint nobody decided on; a missing one"
+                + " on this one makes a generated client attach a bearer on the call it makes"
+                + " before it can have one.")
         .containsExactlyInAnyOrderElementsOf(ANONYMOUS_OPERATIONS);
   }
 }

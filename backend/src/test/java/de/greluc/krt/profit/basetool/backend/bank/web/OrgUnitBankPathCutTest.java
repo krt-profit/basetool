@@ -48,9 +48,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * Holds wave 4 of the REST API cut (the org-unit bank prefix) to the running application: the
- * controller serves exactly the new paths of the map, no handler answers the old prefix any more,
- * the new paths demand authentication, and the old ones answer {@code 404} (frozen operations) or
- * {@code 404} (the five that were never frozen).
+ * controller serves exactly the new paths of the map, no handler answers the old prefix, the new
+ * paths demand authentication, and every old path answers {@code 404}.
  */
 @SpringBootTest
 class OrgUnitBankPathCutTest {
@@ -68,8 +67,8 @@ class OrgUnitBankPathCutTest {
           "GET " + NEW_PREFIX + "/requests/page",
           "GET " + NEW_PREFIX + "/requests/{id}");
 
-  /** One wave-4 line of the map: verb, old path, new path, whether the operation is frozen. */
-  private record Moved(String verb, String oldPath, String newPath, boolean frozen) {}
+  /** One wave-4 line of the map: verb, old path, new path. */
+  private record Moved(String verb, String oldPath, String newPath) {}
 
   @Autowired private WebApplicationContext context;
 
@@ -132,7 +131,7 @@ class OrgUnitBankPathCutTest {
   }
 
   @Test
-  @DisplayName("every old path is gone, frozen or not")
+  @DisplayName("every old path is gone")
   void theOldPathsAreGone() throws Exception {
     for (Moved m : wave4()) {
       HttpMethod method = HttpMethod.valueOf(m.verb());
@@ -182,7 +181,7 @@ class OrgUnitBankPathCutTest {
         if (f.length == 6 && "4".equals(f[0])) {
           assertThat(f[2]).startsWith(OLD_PREFIX);
           assertThat(f[3]).startsWith(NEW_PREFIX);
-          moved.add(new Moved(f[1], f[2], f[3], "T1".equals(f[4])));
+          moved.add(new Moved(f[1], f[2], f[3]));
         }
       }
     }

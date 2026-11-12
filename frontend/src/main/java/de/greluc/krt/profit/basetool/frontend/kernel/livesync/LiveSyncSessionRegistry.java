@@ -36,6 +36,7 @@ import java.util.function.LongSupplier;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.socket.CloseStatus;
@@ -193,7 +194,7 @@ final class LiveSyncSessionRegistry {
    * Pings every open socket; a socket whose write fails is dropped, and closed sockets are skipped.
    */
   void tickKeepalive() {
-    for (WebSocketSession session : List.copyOf(liveSessions)) {
+    for (WebSocketSession session : sockets()) {
       try {
         if (!session.isOpen()) {
           liveSessions.remove(session);
@@ -205,6 +206,19 @@ final class LiveSyncSessionRegistry {
         log.debug("Live-sync keepalive ping failed; dropping socket from the sweep", e);
       }
     }
+  }
+
+  /**
+   * Returns a snapshot of the admitted sockets' decorators, for a sweep that must not iterate the
+   * live set while sockets come and go.
+   *
+   * @return the decorators of every socket admitted and not yet booked out or dropped by the
+   *     keepalive sweep
+   */
+  @NotNull
+  @Unmodifiable
+  List<WebSocketSession> sockets() {
+    return List.copyOf(liveSessions);
   }
 
   /**

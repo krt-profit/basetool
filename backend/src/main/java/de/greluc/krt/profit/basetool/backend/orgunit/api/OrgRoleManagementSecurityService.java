@@ -39,9 +39,11 @@ import org.springframework.transaction.annotation.Transactional;
  * or revoke a rank on an org unit (REQ-ROLE-004).
  *
  * <p>Granting a rank requires a strictly higher rank, decided only from the caller's own
- * memberships; the parent Bereich of a Staffel or SK is always read from its persisted edge. A
- * delegated write never targets the caller's own seat ({@link #targetsAnotherUser}). Admin access
- * is decided at the endpoint, never here.
+ * memberships, which count only while the caller holds {@code KRT Member} (REQ-SEC-015); the parent
+ * Bereich of a Staffel or SK is always read from its persisted edge. A delegated write never
+ * targets the caller's own seat ({@link #targetsAnotherUser}) or a deactivated unit, which neither
+ * a seat on it nor one above it reaches (REQ-ORG-032). Admin access and the active context are
+ * decided at the endpoint, never here.
  */
 @Service("orgRoleManagementSecurityService")
 @RequiredArgsConstructor
@@ -158,7 +160,7 @@ public class OrgRoleManagementSecurityService {
       return false;
     }
     return switch (role) {
-      case LEITER -> callerIsPureOlMember();
+      case LEITER -> callerIsPureOlMember() && orgUnitRepository.existsByIdAndActiveTrue(bereichId);
       case KOORDINATOR, OPERATOR -> callerHasRoleOnUnit(bereichId, MembershipRole.BEREICHSLEITER);
     };
   }
@@ -179,7 +181,7 @@ public class OrgRoleManagementSecurityService {
     }
     MembershipRole target = roleOf(userId, bereichId);
     if (target == MembershipRole.BEREICHSLEITER) {
-      return callerIsPureOlMember();
+      return callerIsPureOlMember() && orgUnitRepository.existsByIdAndActiveTrue(bereichId);
     }
     if (target != null && target.isAreaRank()) {
       return callerHasRoleOnUnit(bereichId, MembershipRole.BEREICHSLEITER);
@@ -255,36 +257,39 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * The caller's membership rows, read once per HTTP request (REQ-DATA-003); read directly outside
-   * a request.
+   * The caller's membership rows on active org units, none unless the caller holds {@code KRT
+   * Member}, without which a seat confers nothing (REQ-SEC-015); a seat on a deactivated unit
+   * confers nothing either (REQ-ORG-032). Read once per HTTP request (REQ-DATA-003) and directly
+   * outside a request.
    *
-   * @return the caller's membership rows; empty for an anonymous caller
+   * @return the caller's membership rows on active units; empty for an anonymous caller and for one
+   *     without {@code KRT Member}
    */
   @NotNull
   private List<OrgUnitMembership> callerMemberships() {
     UUID callerId = authHelperService.currentUserId().orElse(null);
-    if (callerId == null) {
+    if (callerId == null || !authHelperService.holdsKrtMember()) {
       return List.of();
     }
     Map<UUID, List<OrgUnitMembership>> memo =
         RequestMemo.getIfBound(CALLER_MEMBERSHIPS, HashMap::new);
     if (memo == null) {
-      return membershipRepository.findAllByIdUserId(callerId);
+      return membershipRepository.findAllOnActiveOrgUnitsByIdUserId(callerId);
     }
     return memo.computeIfAbsent(
-        callerId, id -> List.copyOf(membershipRepository.findAllByIdUserId(id)));
+        callerId, id -> List.copyOf(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(id)));
   }
 
   /**
-   * Whether the caller is the {@link MembershipRole#BEREICHSLEITER} of the leaf unit's persisted
-   * parent Bereich.
+   * Whether the caller is the {@link MembershipRole#BEREICHSLEITER} of the active leaf unit's
+   * persisted parent Bereich; the parent's seat reaches no deactivated unit (REQ-ORG-032).
    *
    * @param leafUnitId the Staffel or SK whose parent Bereich gates the appointment
-   * @return {@code true} iff the caller leads the leaf unit's parent Bereich
+   * @return {@code true} iff the leaf unit is active and the caller leads its parent Bereich
    */
   private boolean callerIsBereichsleiterOfParent(@NotNull UUID leafUnitId) {
     OrgUnit leaf = orgUnitRepository.findById(leafUnitId).orElse(null);
-    if (leaf == null || leaf.getParent() == null) {
+    if (leaf == null || !leaf.isActive() || leaf.getParent() == null) {
       return false;
     }
     OrgUnit parent = leaf.getParent();

@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
@@ -92,6 +93,7 @@ class JobOrderMoneyIntegrationTest {
   @Autowired private OrgUnitRepository units;
   @Autowired private SquadronRepository squadrons;
   @Autowired private UserRepository users;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private JobOrderRepository orders;
   @Autowired private MaterialRepository materials;
@@ -3055,6 +3057,7 @@ class JobOrderMoneyIntegrationTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername(name);
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     return users.saveAndFlush(user);
   }
 

@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.leadership.web;
 
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitKind;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,11 +57,12 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Security tests for {@link LeitungPageController} (REQ-ROLE-004): the page and its write proxies
- * admit only {@code ADMIN} and {@code OFFICER}, and {@code LOGISTICIAN} / {@code MISSION_MANAGER}
- * are forbidden.
+ * admit only an admin and a caller with officer reach, and {@code LOGISTICIAN} / {@code
+ * MISSION_MANAGER} are forbidden.
  *
- * <p>Also pins that the Spezialkommando pane renders the roster and lead caps independently, and
- * that rank and group save on change without a per-row save button.
+ * <p>Also pins that the Spezialkommando pane renders the roster and lead caps independently, that
+ * an SK lead's own row and a co-lead's row are read-only, and that rank and group save on change
+ * without a per-row save button.
  */
 @SpringBootTest
 class LeitungPageControllerMvcTest {
@@ -153,6 +156,90 @@ class LeitungPageControllerMvcTest {
                 .string(containsString("data-remove-url=\"/organisation/special-commands/" + skId)))
         .andExpect(content().string(not(containsString("toggle-lead"))))
         .andExpect(content().string(not(containsString("/lead/ajax"))));
+  }
+
+  /**
+   * One row of the SK roster read that carries the role flags.
+   *
+   * @param skId the SK
+   * @param userId the member
+   * @param logistician the Logistiker flag
+   * @param missionManager the Einsatzleiter flag
+   * @param lead whether the member holds the SK lead seat
+   * @return the row as the client decodes it
+   */
+  private static OrgUnitMembershipDto skRow(
+      UUID skId, UUID userId, boolean logistician, boolean missionManager, boolean lead) {
+    return new OrgUnitMembershipDto(
+        userId,
+        null,
+        skId,
+        OrgUnitKind.SPECIAL_COMMAND,
+        logistician,
+        missionManager,
+        lead,
+        null,
+        1L);
+  }
+
+  /**
+   * An SK lead may write neither their own roster row nor a co-lead's (REQ-ROLE-004): both render
+   * their set flags as chips, without a flag form and without „Entfernen", while a plain member's
+   * row keeps both.
+   *
+   * @throws Exception if the request fails
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void page_skLead_writesNeitherTheirOwnNorACoLeadsRow() throws Exception {
+    stubOfficerReach();
+    UUID skId = UUID.randomUUID();
+    UUID selfId = UUID.randomUUID();
+    UUID coLeadId = UUID.randomUUID();
+    UUID memberId = UUID.randomUUID();
+    LeitungUnitDto sk =
+        new LeitungUnitDto(
+            skId,
+            "Alpha SK",
+            "ASK",
+            OrgUnitKind.SPECIAL_COMMAND,
+            false,
+            true,
+            List.of(
+                new LeitungMemberDto(selfId, "Lead", "SK_LEAD", null, 1L, true),
+                new LeitungMemberDto(coLeadId, "CoLead", "SK_LEAD", null, 2L, false),
+                new LeitungMemberDto(memberId, "Pilot", "MEMBER", null, 3L, false)),
+            List.of(),
+            null,
+            null,
+            null);
+    when(backendApiClient.get("/api/v1/leadership", LeitungViewDto.class))
+        .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of(sk)));
+    when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
+        .thenReturn(
+            List.of(
+                skRow(skId, selfId, true, false, true),
+                skRow(skId, coLeadId, false, true, true),
+                skRow(skId, memberId, false, false, false)));
+
+    String html =
+        mockMvc
+            .perform(get("/organisation/leitung").locale(Locale.GERMAN))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertEquals(2, count(html, "class=\"unit-flag-form\""), "only the plain member's flags");
+    assertEquals(1, count(html, "data-sk-action=\"remove\""), "only the plain member's removal");
+    assertEquals(
+        2,
+        count(html, "/members/" + memberId + "/delete\""),
+        "the plain member's remove URL and its no-script form");
+    assertEquals(0, count(html, "/members/" + selfId + "/"));
+    assertEquals(0, count(html, "/members/" + coLeadId + "/"));
+    assertEquals(1, count(html, "<span class=\"chip\">Logistiker</span>"));
+    assertEquals(1, count(html, "<span class=\"chip\">Einsatzleiter</span>"));
   }
 
   @Test

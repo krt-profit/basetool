@@ -20,16 +20,19 @@
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import java.util.Collection;
@@ -48,12 +51,13 @@ import org.springframework.security.core.GrantedAuthority;
 /**
  * The Logistician and Mission Manager grant cascade (REQ-SEC-005) over the real scope chain: a
  * grant in a Bereich covers the Bereich and the Staffeln and Spezialkommandos below it, a grant in
- * the Organisationsleitung covers every unit, a grant in a Staffel covers that Staffel, and a pin
- * must lie in the covered set. The grants are the contextual authorities the JWT converter mints
- * for a direct flag, which name the granting unit alone.
+ * the Organisationsleitung covers every unit, a grant in a Staffel covers that Staffel, and an
+ * honoured pin must lie in the covered set (REQ-ORG-032). The grants are the contextual authorities
+ * the JWT converter mints for a direct flag, which name the granting unit alone.
  */
 class GrantCascadeTest {
 
+  private static final UUID CALLER = UUID.randomUUID();
   private static final UUID OL = UUID.randomUUID();
   private static final UUID BEREICH_X = UUID.randomUUID();
   private static final UUID STAFFEL_X1 = UUID.randomUUID();
@@ -77,9 +81,15 @@ class GrantCascadeTest {
     final AccessGateService accessGateService;
 
     Chain(String role, Set<UUID> grants, boolean admin, UUID pin) {
+      this(role, grants, admin, pin, Set.of());
+    }
+
+    Chain(String role, Set<UUID> grants, boolean admin, UUID pin, Set<UUID> memberOf) {
       AuthHelperService authHelper = mock(AuthHelperService.class);
       when(authHelper.isAdmin()).thenReturn(admin);
       when(authHelper.isAuthenticated()).thenReturn(true);
+      when(authHelper.holdsKrtMember()).thenReturn(true);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER));
       List<GrantedAuthority> authorities =
           grants.stream()
               .<GrantedAuthority>map(unit -> new OrgUnitContextualAuthority(role, unit))
@@ -89,11 +99,12 @@ class GrantCascadeTest {
               Optional.of(new UsernamePasswordAuthenticationToken("caller", "n/a", authorities)));
 
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
+      when(orgUnits.existsByIdAndActiveTrue(any())).thenReturn(true);
       when(orgUnits.findOrganisationsleitungIdsAmong(anyCollection()))
           .thenAnswer(
               call -> call.<Collection<UUID>>getArgument(0).stream().filter(OL::equals).toList());
-      when(orgUnits.findAllOrgUnitIds()).thenReturn(ALL);
-      when(orgUnits.findChildOrgUnitIdsIn(anyCollection()))
+      when(orgUnits.findAllActiveOrgUnitIds()).thenReturn(ALL);
+      when(orgUnits.findActiveChildOrgUnitIdsIn(anyCollection()))
           .thenAnswer(call ->
               call.<Collection<UUID>>getArgument(0).stream()
                   .flatMap(parent -> CHILDREN.getOrDefault(parent, List.of()).stream())
@@ -104,18 +115,17 @@ class GrantCascadeTest {
                   .filter(id -> id.equals(OL) || id.equals(BEREICH_X) || id.equals(BEREICH_Y))
                   .toList());
 
+      OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);
+      when(memberships.findAllOnActiveOrgUnitsByIdUserId(CALLER))
+          .thenReturn(memberOf.stream().map(GrantCascadeTest::plainMembership).toList());
+
       MockHttpServletRequest request = new MockHttpServletRequest();
       if (pin != null) {
         request.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, pin.toString());
       }
       RequestScopeResolver resolver =
           new RequestScopeResolver(
-              authHelper,
-              mock(OrgUnitMembershipRepository.class),
-              orgUnits,
-              new OrgUnitCascadeService(orgUnits),
-              new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
-              request);
+              authHelper, memberships, orgUnits, new OrgUnitCascadeService(orgUnits), request);
       requestScopeResolver = resolver;
       accessGateService = new AccessGateService(resolver, authHelper);
     }
@@ -123,6 +133,24 @@ class GrantCascadeTest {
 
   private static Set<UUID> unitsWhere(Predicate<UUID> gate) {
     return ALL.stream().filter(gate).collect(java.util.stream.Collectors.toSet());
+  }
+
+  private static OrgUnitMembership plainMembership(UUID orgUnitId) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(CALLER, orgUnitId));
+    membership.setKind(kindOf(orgUnitId));
+    membership.setRole(MembershipRole.MEMBER);
+    return membership;
+  }
+
+  private static OrgUnitKind kindOf(UUID orgUnitId) {
+    if (orgUnitId.equals(OL)) {
+      return OrgUnitKind.ORGANISATIONSLEITUNG;
+    }
+    if (CHILDREN.containsKey(orgUnitId)) {
+      return OrgUnitKind.BEREICH;
+    }
+    return orgUnitId.equals(SK_X2) ? OrgUnitKind.SPECIAL_COMMAND : OrgUnitKind.SQUADRON;
   }
 
   @ParameterizedTest
@@ -175,32 +203,71 @@ class GrantCascadeTest {
 
   @Test
   void pinnedToAUnitBelowTheGrantTheLogisticianActsThereOnly() {
-    Chain chain = new Chain(Roles.LOGISTICIAN, Set.of(BEREICH_X), false, SK_X2);
+    Chain chain =
+        new Chain(Roles.LOGISTICIAN, Set.of(BEREICH_X), false, SK_X2, Set.of(BEREICH_X, SK_X2));
 
     assertThat(unitsWhere(chain.accessGateService::canActAsLogisticianIn)).containsExactly(SK_X2);
     assertThat(chain.accessGateService.currentLogisticianOrgUnitIds()).containsExactly(SK_X2);
   }
 
   @Test
-  void pinnedOutsideTheGrantTheLogisticianActsNowhere() {
-    Chain chain = new Chain(Roles.LOGISTICIAN, Set.of(BEREICH_X), false, STAFFEL_Y1);
+  void pinnedToAnOwnUnitOutsideTheGrantTheLogisticianActsNowhere() {
+    Chain chain =
+        new Chain(
+            Roles.LOGISTICIAN, Set.of(BEREICH_X), false, STAFFEL_Y1, Set.of(BEREICH_X, STAFFEL_Y1));
 
     assertThat(unitsWhere(chain.accessGateService::canActAsLogisticianIn)).isEmpty();
     assertThat(chain.accessGateService.currentLogisticianOrgUnitIds()).isEmpty();
   }
 
   @Test
-  void theMissionManagerFlagFollowsThePinThroughTheCascade() {
+  void aBereichPinIsTheBereichAloneNotTheUnitsBelowIt() {
+    Chain chain =
+        new Chain(Roles.LOGISTICIAN, Set.of(BEREICH_X), false, BEREICH_X, Set.of(BEREICH_X));
+
+    assertThat(unitsWhere(chain.accessGateService::canActAsLogisticianIn))
+        .containsExactly(BEREICH_X);
     assertThat(
-            new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, STAFFEL_X1)
+            unitsWhere(unit -> chain.accessGateService.hasRoleInOrgUnit(unit, Roles.LOGISTICIAN)))
+        .containsExactly(BEREICH_X);
+  }
+
+  @Test
+  void aPinnedAdminActsInThePinnedUnitOnly() {
+    Chain chain = new Chain(Roles.MISSION_MANAGER, Set.of(), true, STAFFEL_X1);
+
+    assertThat(
+            unitsWhere(
+                unit -> chain.accessGateService.hasRoleInOrgUnit(unit, Roles.MISSION_MANAGER)))
+        .containsExactly(STAFFEL_X1);
+    assertThat(chain.accessGateService.canManageMissionsOf(STAFFEL_Y1)).isFalse();
+    assertThat(chain.accessGateService.canManageMissionsOf(null)).isFalse();
+  }
+
+  @Test
+  void aPinOutsideTheCallersUnitsIsNoPinAndTheGrantCoversItsWholeCascade() {
+    Chain chain =
+        new Chain(Roles.LOGISTICIAN, Set.of(BEREICH_X), false, STAFFEL_Y1, Set.of(BEREICH_X));
+
+    assertThat(unitsWhere(chain.accessGateService::canActAsLogisticianIn))
+        .containsExactlyInAnyOrder(BEREICH_X, STAFFEL_X1, SK_X2);
+    assertThat(chain.accessGateService.currentLogisticianOrgUnitIds())
+        .containsExactlyInAnyOrder(BEREICH_X, STAFFEL_X1, SK_X2);
+  }
+
+  @Test
+  void theMissionManagerFlagFollowsThePinThroughTheCascade() {
+    Set<UUID> memberOf = Set.of(BEREICH_X, STAFFEL_X1, STAFFEL_Y1);
+    assertThat(
+            new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, STAFFEL_X1, memberOf)
                 .requestScopeResolver.canActAsMissionManagerInActiveContext())
         .isTrue();
     assertThat(
-            new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, STAFFEL_Y1)
+            new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, STAFFEL_Y1, memberOf)
                 .requestScopeResolver.canActAsMissionManagerInActiveContext())
         .isFalse();
     assertThat(
-            new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, null)
+            new Chain(Roles.MISSION_MANAGER, Set.of(BEREICH_X), false, null, memberOf)
                 .requestScopeResolver.canActAsMissionManagerInActiveContext())
         .isTrue();
   }

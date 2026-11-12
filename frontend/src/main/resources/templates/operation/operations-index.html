@@ -63,7 +63,7 @@
                     <tr>
                         <th th:text="#{operation.name}">Name</th>
                         <th class="cell-status" th:text="#{operation.status}">Status</th>
-                        <th th:if="${isAllSquadronsMode}" th:text="#{mission.owning_squadron}">Staffel</th>
+                        <th th:text="#{mission.owning_squadron}">Staffel</th>
                         <th th:text="#{general.created}">Erstellt</th>
                         <th class="cell-actions"><span class="visually-hidden" th:text="#{general.action}">Action</span></th>
                     </tr>
@@ -81,7 +81,7 @@
                             <span class="status-pill" th:classappend="${'status-' + #strings.toLowerCase(op.status)}"
                                   th:text="#{__${'operation.status.' + #strings.toLowerCase(op.status)}__}">Status</span>
                         </td>
-                        <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{mission.owning_squadron}">
+                        <td th:attr="data-label=#{mission.owning_squadron}">
                             <span th:if="${op.owningSquadron != null}" class="squadron-badge"
                                   th:title="${op.owningSquadron.name()}"
                                   th:text="${op.owningSquadron.shorthand()}">ALP</span>

@@ -90,8 +90,8 @@ class BankAccessPolicyRulesTest {
   private static final Set<String> ROLE_CHECKS =
       Set.of("isAdmin", "hasReachableRole", "isMemberOrAbove", "isLogisticianOrAbove");
 
-  /** The one {@link RequestScopeResolver} read a bank adapter may make: the pin as sent. */
-  private static final Set<String> PIN_READS = Set.of("readActiveSquadronFromHeader");
+  /** The one {@link RequestScopeResolver} read a bank adapter may make: the honoured pin. */
+  private static final Set<String> PIN_READS = Set.of("currentPin");
 
   /** The exchange module, which reaches the bank on behalf of a connected application. */
   private static final String EXCHANGE = ROOT + ".exchange";

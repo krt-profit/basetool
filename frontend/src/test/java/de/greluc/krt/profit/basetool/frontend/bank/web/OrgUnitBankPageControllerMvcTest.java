@@ -188,6 +188,27 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("org-unit-bank-cancel-btn")));
   }
 
+  /**
+   * Own requests do not follow the active unit, so every row names its account and the account's
+   * unit (REQ-ORG-032).
+   */
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void orgUnitBank_ownRequestNamesItsAccountAndUnit() throws Exception {
+    stubData(UUID.randomUUID());
+
+    mockMvc
+        .perform(get("/org-unit-bank"))
+        .andExpect(status().isOk())
+        .andExpect(
+            content()
+                .string(
+                    Matchers.matchesPattern(
+                        "(?s).*data-testid=\"org-unit-bank-request-account\">\\s*"
+                            + "<span>Staffel ALPHA</span>\\s*"
+                            + "<span class=\"squadron-badge\"\\s+title=\"ALPHA\">ALP</span>.*")));
+  }
+
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void orgUnitBank_rendersAccountNameFilterOverKontenList() throws Exception {
@@ -950,7 +971,7 @@ class OrgUnitBankPageControllerMvcTest {
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-detail")))
         .andExpect(content().string(Matchers.containsString("Missionsfreigabe")))
         .andExpect(content().string(Matchers.containsString("Missionsertrag")))
-        .andExpect(content().string(Matchers.containsString("colspan=\"7\"")))
+        .andExpect(content().string(Matchers.containsString("colspan=\"8\"")))
         .andExpect(content().string(Matchers.containsString("ou-own-req-")));
   }
 

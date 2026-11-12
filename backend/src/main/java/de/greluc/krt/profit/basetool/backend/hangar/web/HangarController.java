@@ -38,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -101,7 +100,6 @@ public class HangarController {
   private final HangarImportService hangarImportService;
   private final UserService userService;
   private final ShipMapper shipMapper;
-  private final UserMapper userMapper;
   private final HangarAccessPolicy hangarAccessPolicy;
 
   /**
@@ -141,26 +139,6 @@ public class HangarController {
   @Transactional(readOnly = true)
   public ShipReadinessDto getMyReadiness(@AuthenticationPrincipal Jwt jwt) {
     return hangarService.getMyReadiness(userService.getUserIdFromJwt(jwt));
-  }
-
-  /**
-   * Lists ships across all users. Requires the {@code HANGAR_READ} authority.
-   *
-   * @return paged ship DTOs
-   */
-  @GetMapping("/ships")
-  @PreAuthorize("hasAuthority('" + Permissions.HANGAR_READ + "')")
-  @Transactional(readOnly = true)
-  public PageResponse<ShipDto> getAllShips(
-      @RequestParam(required = false) Integer page,
-      @RequestParam(required = false) Integer size,
-      @RequestParam(required = false) String sort) {
-    Pageable pageable =
-        PaginationUtil.createPageRequest(
-            page, size, sort, Set.of("name", "insurance", "fitted", "id"), "name");
-    Page<Ship> p = hangarService.getAllShips(pageable);
-    userMapper.primeStaffelMemberships(p.getContent().stream().map(Ship::getOwner).toList());
-    return PageResponse.of(p.map(shipMapper::toDto));
   }
 
   /**

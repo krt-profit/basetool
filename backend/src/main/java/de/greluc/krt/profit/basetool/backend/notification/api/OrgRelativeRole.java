@@ -23,8 +23,11 @@ package de.greluc.krt.profit.basetool.backend.notification.api;
  * A role evaluated relative to an org unit carried by an event (used by {@link
  * SelectorKind#ORG_RELATIVE_ROLE}).
  *
- * <p>{@link #OFFICER} and {@link #UNIT_LEADERSHIP} resolve direct seat holders. {@link
- * #UNIT_WRITER} uses current functional authority, including leadership and Logistician reach.
+ * <p>{@link #OFFICER} and {@link #UNIT_LEADERSHIP} resolve to the seat holders directly in the
+ * context org unit, and {@link #UNIT_WRITER} uses current functional authority, including
+ * leadership and Logistician reach; the others read the corresponding per-membership flag of that
+ * unit. Every role resolves only members who hold {@code KRT Member}, and only from active units
+ * (REQ-NOTIF-024, REQ-ORG-032).
  */
 public enum OrgRelativeRole {
 

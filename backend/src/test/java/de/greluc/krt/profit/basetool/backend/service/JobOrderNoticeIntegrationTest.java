@@ -22,10 +22,13 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
@@ -39,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,8 +56,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The job-order notices end to end against Postgres (REQ-ORDERS-041…044): the seeded rules reach
- * the leadership of the right unit, an assignment is cleared for the one member only, and the
- * closed order's earlier creation notices go. Runs in a rolled-back transaction.
+ * the leadership of the right unit, a member only while they hold {@code KRT Member}; an assignment
+ * is cleared for the one member only, and the closed order's earlier creation notices go. Runs in a
+ * rolled-back transaction.
  */
 @SpringBootTest
 @Transactional
@@ -62,6 +67,8 @@ class JobOrderNoticeIntegrationTest {
   private static final UUID LOGISTICIAN = UUID.fromString("44444444-4444-4444-4444-4444444470c1");
   private static final UUID ACTOR = UUID.fromString("44444444-4444-4444-4444-4444444470c2");
   private static final UUID ASSIGNEE = UUID.fromString("44444444-4444-4444-4444-4444444470c3");
+  private static final UUID FORMER_LOGISTICIAN =
+      UUID.fromString("44444444-4444-4444-4444-4444444470c4");
   private static final ActorRef ACTING = new ActorRef(ACTOR, "Ada");
   private static final OrgUnitRef IRIDIUM =
       new OrgUnitRef(Squadron.IRIDIUM_ID, OrgUnitKind.SQUADRON);
@@ -69,6 +76,7 @@ class JobOrderNoticeIntegrationTest {
   @Autowired private NotificationCreationService creationService;
   @Autowired private NotificationRepository notificationRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private OrgUnitMembershipRepository membershipRepository;
 
   private UUID orderId;
@@ -76,24 +84,30 @@ class JobOrderNoticeIntegrationTest {
   @BeforeEach
   void seed() {
     orderId = UUID.randomUUID();
-    User logistician = user(LOGISTICIAN, "orders-logistician");
-    user(ACTOR, "orders-actor");
-    user(ASSIGNEE, "orders-assignee");
-    OrgUnitMembership membership = new OrgUnitMembership();
-    membership.setId(new OrgUnitMembershipId(LOGISTICIAN, Squadron.IRIDIUM_ID));
-    membership.setUser(logistician);
-    membership.setLogistician(true);
-    membership.setJoinedAt(Instant.now());
-    membershipRepository.saveAndFlush(membership);
+    Role krtMember = roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow();
+    flaggedLogistician(user(LOGISTICIAN, "orders-logistician", Set.of(krtMember)));
+    flaggedLogistician(user(FORMER_LOGISTICIAN, "orders-former-logistician", Set.of()));
+    user(ACTOR, "orders-actor", Set.of());
+    user(ASSIGNEE, "orders-assignee", Set.of());
   }
 
-  private User user(UUID id, String name) {
+  private User user(UUID id, String name, Set<Role> roles) {
     User user = new User();
     user.setId(id);
     user.setUsername(name);
     user.setApprovalStatus(ApprovalStatus.ACTIVE);
     user.setInKeycloak(true);
+    user.setRoles(new HashSet<>(roles));
     return userRepository.saveAndFlush(user);
+  }
+
+  private void flaggedLogistician(User user) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(user.getId(), Squadron.IRIDIUM_ID));
+    membership.setUser(user);
+    membership.setLogistician(true);
+    membership.setJoinedAt(Instant.now());
+    membershipRepository.saveAndFlush(membership);
   }
 
   private List<NotificationType> inbox(UUID member) {
@@ -118,6 +132,23 @@ class JobOrderNoticeIntegrationTest {
 
     assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_FINISHED);
     assertThat(inbox(ACTOR)).isEmpty();
+  }
+
+  @Test
+  void aFlaggedLogisticianWithoutKrtMemberIsNotTold() {
+    creationService.createFromEvent(
+        JobOrderNotices.finished(
+            orderId,
+            12,
+            "Ada",
+            Map.of(NotificationContextRole.REQUESTING, IRIDIUM),
+            "IRI",
+            "COMPLETED",
+            Set.of(),
+            ACTOR));
+
+    assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_FINISHED);
+    assertThat(inbox(FORMER_LOGISTICIAN)).isEmpty();
   }
 
   @Test

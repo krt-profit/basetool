@@ -43,8 +43,9 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface for Kommandogruppen, the named sub-structures of a Staffel (REQ-ROLE-003).
  *
  * <p>Reads are open to any authenticated user. Writes are allowed to admins and to the
- * Staffelleiter of the group's squadron; update and delete resolve that squadron from the persisted
- * group, not from the path.
+ * Staffelleiter of the group's squadron, and only for a squadron inside the active context
+ * (REQ-ORG-032); update and delete resolve the Staffelleiter's squadron from the persisted group
+ * and refuse a group of another squadron than the path's.
  */
 @RestController
 @RequiredArgsConstructor
@@ -74,10 +75,10 @@ public class KommandoGroupController {
    */
   @PostMapping("/api/v1/squadrons/{squadronId}/kommando-groups")
   @PreAuthorize(
-      "hasRole('"
+      "(hasRole('"
           + Roles.ADMIN
           + "') or @orgRoleManagementSecurityService.canManageKommandoGroups(#squadronId,"
-          + " authentication)")
+          + " authentication)) and @requestScopeResolver.isInActiveContext(#squadronId)")
   @Operation(summary = "Create a Kommandogruppe (admin or the squadron's Staffelleiter)")
   public KommandoGroupDto create(
       @PathVariable @NotNull UUID squadronId,
@@ -96,10 +97,10 @@ public class KommandoGroupController {
    */
   @PutMapping("/api/v1/squadrons/{squadronId}/kommando-groups/{groupId}")
   @PreAuthorize(
-      "hasRole('"
+      "(hasRole('"
           + Roles.ADMIN
           + "') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId,"
-          + " authentication)")
+          + " authentication)) and @requestScopeResolver.isInActiveContext(#squadronId)")
   @Operation(summary = "Rename / reorder a Kommandogruppe (admin or the squadron's Staffelleiter)")
   public KommandoGroupDto update(
       @PathVariable @NotNull UUID squadronId,
@@ -119,10 +120,10 @@ public class KommandoGroupController {
    */
   @DeleteMapping("/api/v1/squadrons/{squadronId}/kommando-groups/{groupId}")
   @PreAuthorize(
-      "hasRole('"
+      "(hasRole('"
           + Roles.ADMIN
           + "') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId,"
-          + " authentication)")
+          + " authentication)) and @requestScopeResolver.isInActiveContext(#squadronId)")
   @Operation(summary = "Delete a Kommandogruppe (admin or the squadron's Staffelleiter)")
   public void delete(@PathVariable @NotNull UUID squadronId, @PathVariable @NotNull UUID groupId) {
     kommandoGroupService.requireGroupOf(squadronId, groupId);

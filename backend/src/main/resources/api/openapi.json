@@ -5156,7 +5156,7 @@
     },
     "/api/v1/bank/org-units/accounts/visible" : {
       "get" : {
-        "description" : "Returns the accounts the authenticated member may view on the org-unit bank page, over their whole reach and not narrowed by the active org-unit pin: the KRT account first, then the accounts of the active context, then the rest, each by account number with id as tiebreaker. The order is fixed; no sort parameter. Each account carries its balance, balance target and 30-day trend; no holders, custody, history or capabilities.",
+        "description" : "Returns the accounts the authenticated member may view on the org-unit bank page, narrowed by the active org-unit pin: pinned, the org-unit and Bereich accounts of the pinned unit only beside the organisation-wide accounts; unpinned, their whole reach. The KRT account comes first, then the accounts of the active context, then the rest, each by account number with id as tiebreaker. The order is fixed; no sort parameter. Each account carries its balance, balance target and 30-day trend; no holders, custody, history or capabilities.",
         "operationId" : "listVisibleAccounts",
         "parameters" : [ {
           "in" : "query",
@@ -20841,139 +20841,6 @@
           }
         },
         "summary" : "Delete all own ships",
-        "tags" : [ "hangar" ],
-        "x-domain" : "hangar"
-      },
-      "get" : {
-        "operationId" : "getAllShips",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }, {
-          "in" : "query",
-          "name" : "size",
-          "required" : false,
-          "schema" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }, {
-          "in" : "query",
-          "name" : "sort",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PageResponseShipDto"
-                }
-              }
-            },
-            "description" : "OK",
-            "headers" : {
-              "Cache-Control" : {
-                "description" : "Caching policy: private, no-store",
-                "schema" : {
-                  "type" : "string"
-                }
-              }
-            }
-          },
-          "400" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Bad Request"
-          },
-          "401" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Unauthorized"
-          },
-          "403" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Forbidden"
-          },
-          "404" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Not Found"
-          },
-          "409" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Conflict"
-          },
-          "429" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
-            "headers" : {
-              "Retry-After" : {
-                "$ref" : "#/components/headers/Retry-After"
-              },
-              "X-Rate-Limit-Limit" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
-              },
-              "X-Rate-Limit-Remaining" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
-              },
-              "X-Rate-Limit-Retry-After-Seconds" : {
-                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
-              }
-            }
-          },
-          "500" : {
-            "content" : {
-              "application/problem+json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ProblemDetail"
-                }
-              }
-            },
-            "description" : "Internal Server Error"
-          }
-        },
         "tags" : [ "hangar" ],
         "x-domain" : "hangar"
       },
@@ -46053,7 +45920,7 @@
     },
     "/api/v1/operations/lookup" : {
       "get" : {
-        "description" : "Returns a slim id + name reference list of every operation in the caller's squadron scope, sorted by name. Designed for dropdowns and typeaheads where the full OperationDto payload is overkill.",
+        "description" : "Returns a slim id + name reference list of the operations the caller may link a mission to, sorted by name: those they may edit (a Mission Manager grant in the owning unit inside the active context; for an ownerless operation one in an Organisationsleitung or Bereich unit; for an admin every operation of their own scope). Designed for the mission's operation picker, where the full OperationDto payload is overkill.",
         "operationId" : "lookupOperations",
         "responses" : {
           "200" : {
@@ -58486,7 +58353,7 @@
     },
     "/api/v1/org-units/bereiche/{id}/members" : {
       "post" : {
-        "description" : "Grants a Leiter/Koordinator/Operator role on the Bereich. Admin, or — delegated (REQ-ROLE-004) — a pure OL member for the Leiter rung and the Bereich's Bereichsleiter for the Koordinator/Operator rungs.",
+        "description" : "Grants a Leiter/Koordinator/Operator role on the Bereich. Admin, or — delegated (REQ-ROLE-004) — a pure OL member for the Leiter rung and the Bereich's Bereichsleiter for the Koordinator/Operator rungs; only for a Bereich inside the active context.",
         "operationId" : "addBereichLeader",
         "parameters" : [ {
           "in" : "path",
@@ -58610,7 +58477,7 @@
     },
     "/api/v1/org-units/bereiche/{id}/members/{userId}" : {
       "delete" : {
-        "description" : "Removes the user's Bereichsleitung membership. Admin, or — delegated (REQ-ROLE-004) — a pure OL member when removing a Bereichsleiter and the Bereich's Bereichsleiter when removing a Koordinator/Operator.",
+        "description" : "Removes the user's Bereichsleitung membership. Admin, or — delegated (REQ-ROLE-004) — a pure OL member when removing a Bereichsleiter and the Bereich's Bereichsleiter when removing a Koordinator/Operator; only for a Bereich inside the active context.",
         "operationId" : "removeBereichLeader",
         "parameters" : [ {
           "in" : "path",
@@ -58830,6 +58697,230 @@
             "description" : "Internal Server Error"
           }
         },
+        "tags" : [ "identity" ],
+        "x-domain" : "identity"
+      }
+    },
+    "/api/v1/org-units/me/active-choice" : {
+      "get" : {
+        "operationId" : "getActiveChoice",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActiveOrgUnitChoiceResponse"
+                }
+              }
+            },
+            "description" : "The stored choice",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "The caller's stored choice of the active org unit",
+        "tags" : [ "identity" ],
+        "x-domain" : "identity"
+      },
+      "put" : {
+        "operationId" : "putActiveChoice",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ActiveOrgUnitChoiceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActiveOrgUnitChoiceResponse"
+                }
+              }
+            },
+            "description" : "The stored choice"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Store the caller's choice of the active org unit",
         "tags" : [ "identity" ],
         "x-domain" : "identity"
       }
@@ -59189,7 +59280,7 @@
     },
     "/api/v1/org-units/me/switchable" : {
       "get" : {
-        "description" : "Admins get every active org unit of all four kinds; everyone else gets the units they belong to or reach through a Bereich/OL seat. Encapsulates the branch both clients would otherwise duplicate.",
+        "description" : "Admins get every active org unit of all four kinds; everyone else, while holding KRT Member, gets the active units they belong to or reach through a Bereich/OL seat, and no unit without it. Encapsulates the branch both clients would otherwise duplicate.",
         "operationId" : "getPinnableOrgUnits",
         "responses" : {
           "200" : {
@@ -74649,7 +74740,7 @@
     },
     "/api/v1/special-commands/{id}/members/{userId}" : {
       "delete" : {
-        "description" : "Removes the given user's membership row. ADMIN or Lead-of-this-SK only.",
+        "description" : "Removes the given user's membership row. ADMIN, or the Lead of this SK for another member's row that holds no lead seat.",
         "operationId" : "removeMember",
         "parameters" : [ {
           "in" : "path",
@@ -74762,7 +74853,7 @@
         "x-domain" : "orgunit"
       },
       "patch" : {
-        "description" : "Flips is_logistician and / or is_mission_manager on the membership row. ADMIN or Lead-of-this-SK only. is_lead is NOT patchable through this endpoint — see the dedicated /lead endpoint.",
+        "description" : "Flips is_logistician and / or is_mission_manager on the membership row. ADMIN, or the Lead of this SK for another member's row that holds no lead seat. is_lead is NOT patchable through this endpoint — see the dedicated /lead endpoint.",
         "operationId" : "patchFlags",
         "parameters" : [ {
           "in" : "path",
@@ -86135,9 +86226,39 @@
         },
         "required" : [ "acceptedAmount", "rejectedAmount", "version" ]
       },
+      "ActiveOrgUnitChoiceRequest" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "ActiveOrgUnitChoiceResponse" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
       "ActiveOrgUnitResponse" : {
         "type" : "object",
         "properties" : {
+          "context" : {
+            "type" : "string",
+            "enum" : [ "ORG_UNIT", "ALL_MY_ORG_UNITS", "ALL_ORG_UNITS", "NONE" ]
+          },
           "orgUnitId" : {
             "type" : "string",
             "format" : "uuid"
@@ -93868,6 +93989,10 @@
       "LayoutResponse" : {
         "type" : "object",
         "properties" : {
+          "activeContext" : {
+            "type" : "string",
+            "enum" : [ "ORG_UNIT", "ALL_MY_ORG_UNITS", "ALL_ORG_UNITS", "NONE" ]
+          },
           "activeOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"

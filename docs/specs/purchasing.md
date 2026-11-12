@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-14.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** PUR · **Related ADRs:** [ADR-0253](../adr/0253-material-supply-and-purchasing-are-two-modules.md),
 > [ADR-0254](../adr/0254-a-bank-booking-request-may-carry-an-opaque-purpose.md),
 > [ADR-0255](../adr/0255-trade-delegates-are-an-in-app-appointment.md)
@@ -195,10 +195,11 @@ A deal whose settlement is not recorded within the configured days after its del
 marked on every deal list and in the report, counted by the gauge
 `basetool_purchasing_settlements_overdue`, and announced once per deal to the HB, the governing
 leadership and the bank management (N7) by a `TimedNoticeProducer` that marks the deal with an atomic
-update that leaves its version alone.
+update that leaves its version alone. A Bereichsleiter or Bereichskoordinator is told only while
+they hold `KRT Member` (REQ-NOTIF-024).
 
-**Enforced by:** `SettlementOverdueNoticeProducerTest`, `PurchasingDealAssemblerTest` · **Code:**
-`purchasing/internal/SettlementOverdueNoticeProducer`
+**Enforced by:** `SettlementOverdueNoticeProducerTest`, `SettlementOverdueNoticeIntegrationTest`,
+`PurchasingDealAssemblerTest` · **Code:** `purchasing/internal/SettlementOverdueNoticeProducer`
 
 ### REQ-PUR-019 — Pause
 
@@ -225,6 +226,12 @@ lead and Logisticians and an admin; nobody else. The partner notes are returned 
 governing leadership only, never to bank staff or the raising unit. The maximum price and the purchase
 progress of a need are readable by active HBs through `NeedPriceAudience`.
 
+The raising unit's lead and Logisticians act inside the active org unit (REQ-ORG-032): with a unit
+selected, only for that unit; under „Alle meine Org-Einheiten" for every unit they lead or manage.
+This covers the unit's deal reads, the report's included, its delivery decisions (REQ-PUR-016) and
+its pause (REQ-PUR-019); the report's gate and its „Bericht" tab do not follow it (REQ-PUR-023).
+The HBs, the governing leadership and bank staff read independently of the pin.
+
 **Enforced by:** `PurchasingAccessPolicyTest`, `PurchasingDealAssemblerTest` · **Code:**
 `purchasing/internal/PurchasingAccessPolicy`, `purchasing/internal/PurchasingDealAssembler`
 
@@ -243,13 +250,20 @@ per need — deals, amount bought, money funded, returned and spent, loss, overd
 unit price against the UEX reference. It is also a CSV file with one line per deal and a forum-safe text
 block. No figure, line or text names a member or a partner. A caller sees the deals they may read.
 
+Whether the leads and Logisticians of a raising unit read the report does not depend on the
+selected org unit: `PurchasingAccessPolicy#canReadReport` counts the managers of every unit, so the
+„Bericht" tab stays offered under any selection (ADR-0329, REQ-UI-026). The deals the report lists
+follow the active org unit like every deal read of the raising unit (REQ-PUR-021).
+
 The CSV uses UTF-8, semicolon-separated fields and doubled quotes inside quoted cells. Delimiters,
 quotes and CR/LF in catalogue text round-trip without replacement. It is a lossless data export:
 formula-like prefixes remain literal source text, with no added apostrophe or tab. Spreadsheet users
 import the entry column as text and disable automatic formula interpretation; double-click opening
 with automatic type detection is outside the supported import workflow.
 
-**Enforced by:** `PurchasingReportServiceTest` · **Code:** `purchasing/internal/PurchasingReportService`,
+**Enforced by:** `PurchasingReportServiceTest`, `PurchasingAccessPolicyTest`,
+`PurchasingTabAccessServiceTest` · **Code:** `purchasing/internal/PurchasingReportService`,
+`purchasing/internal/PurchasingAccessPolicy#canReadReport`,
 `purchasing/web/PurchasingReportController`
 
 ### REQ-PUR-024 — Notifications

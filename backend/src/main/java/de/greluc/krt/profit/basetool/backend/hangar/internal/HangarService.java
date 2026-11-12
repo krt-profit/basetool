@@ -105,29 +105,19 @@ public class HangarService {
   private final HangarUnitLiveSync unitLiveSync;
 
   /**
-   * Returns the paged ship list in the caller's squadron scope; an admin without an active squadron
-   * pin sees every ship.
-   *
-   * @param pageable page request
-   * @return paged list of ships in the caller's squadron context
-   */
-  public Page<Ship> getAllShips(@NotNull Pageable pageable) {
-    ScopePredicate scope = requestScopeResolver.currentScopePredicate();
-    return shipRepository.findAllScoped(
-        scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds(), pageable);
-  }
-
-  /**
-   * Adds a ship to a user's hangar, stamping the owning org unit from the user's membership or the
-   * picker output at creation; later membership changes do not move it. A user without membership
-   * gets an ownerless personal ship visible only to them.
+   * Adds a ship to a user's hangar, stamping the owning org unit from the user's stampable unit (an
+   * active direct membership while they hold {@code KRT Member}) or the picker output at creation;
+   * later membership changes do not move it. A user without a stampable unit gets an ownerless
+   * personal ship visible only to them.
    *
    * @param userId owning user's id
    * @param dto ship payload (name, type, insurance, fitted, location)
    * @return the persisted ship
    * @throws NotFoundException when the user id does not resolve
-   * @throws BadRequestException when the ship type or location id is missing/invalid, or the picker
-   *     output references an org unit the user does not belong to
+   * @throws BadRequestException when the ship type or location id is missing or invalid, or the
+   *     picked unit is neither one of the user's stampable units nor a unit the caller may edit
+   * @throws de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException when the
+   *     user has several stampable units and neither a pick nor a pin on one of them names one
    */
   @Transactional
   public Ship addShip(@NotNull UUID userId, @NotNull ShipRequestDto dto) {
@@ -140,8 +130,9 @@ public class HangarService {
 
   /**
    * Adds a ship a connected application creates for the member without naming a unit (REQ-XCH-017):
-   * stamped with the member's only org unit, or none when the member has none or several; otherwise
-   * as {@link #addShip(UUID, ShipRequestDto)}.
+   * stamped with the member's only stampable unit (an active direct membership while the member
+   * holds {@code KRT Member}), or none when the member has none or several; otherwise as {@link
+   * #addShip(UUID, ShipRequestDto)}.
    *
    * @param userId owning user's id
    * @param dto ship payload (name, type, insurance, fitted, location); its org unit is ignored
@@ -753,15 +744,28 @@ public class HangarService {
   }
 
   /**
-   * Adds a ship to a member's hangar on an admin's behalf and tells the member (REQ-HANGAR-008).
+   * Adds a ship to a member's hangar on an admin's behalf and tells the member (REQ-HANGAR-008). A
+   * pick must be one of the member's direct memberships; without one, the member's only stampable
+   * unit (an active direct membership while the member holds {@code KRT Member}) is stamped, or
+   * none. The admin's own active unit never decides it (REQ-HANGAR-011).
    *
    * @param memberId the hangar's owner
    * @param dto the new ship
    * @return the saved ship
+   * @throws NotFoundException when the member id does not resolve
+   * @throws BadRequestException when the picked unit is not a direct membership of the member, or
+   *     the ship type or location id is missing or invalid
+   * @throws de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException when the
+   *     member has several stampable units and no unit is picked
    */
   @Transactional
   public Ship addShipByAdmin(@NotNull UUID memberId, @NotNull ShipRequestDto dto) {
-    Ship ship = addShip(memberId, dto);
+    User member = Entities.require(userRepository.findPlainById(memberId), "User not found");
+    Ship ship =
+        create(
+            member,
+            dto,
+            orgUnitStampingService.resolveOrgUnitForAdminOnBehalf(member, dto.owningOrgUnitId()));
     announceByAdmin(memberId, "ADDED", ship);
     return ship;
   }

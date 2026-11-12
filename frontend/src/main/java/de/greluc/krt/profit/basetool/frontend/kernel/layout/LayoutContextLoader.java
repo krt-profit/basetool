@@ -151,6 +151,7 @@ public class LayoutContextLoader {
       }
       return new LayoutContext(
           response.activeOrgUnitId(),
+          response.activeContext() != null ? response.activeContext() : ContextKind.NONE,
           response.orgUnits() != null ? List.copyOf(response.orgUnits()) : List.of(),
           response.capabilities() != null ? response.capabilities() : CapabilitiesResponse.NONE,
           response.unreadNotifications());
@@ -204,16 +205,37 @@ public class LayoutContextLoader {
   }
 
   /**
+   * What the caller's active org-unit context covers (REQ-ORG-024), mirroring the backend's {@code
+   * ActiveOrgUnitContext.Kind}.
+   */
+  public enum ContextKind {
+
+    /** Exactly one org unit: the pinned one, or the only one the caller belongs to. */
+    ORG_UNIT,
+
+    /** Every org unit the non-admin caller belongs to: „Alle meine Org-Einheiten". */
+    ALL_MY_ORG_UNITS,
+
+    /** Every org unit: an admin without a pin. */
+    ALL_ORG_UNITS,
+
+    /** No org unit, or a context that could not be read. */
+    NONE
+  }
+
+  /**
    * The caller's layout context as the advices consume it.
    *
-   * @param activeOrgUnitId the effective org-unit context the backend resolved, or {@code null} for
-   *     an admin in all-org-units mode, a member with no home Staffel, or {@link #NONE}
+   * @param activeOrgUnitId the one org unit the backend's effective context covers, or {@code null}
+   *     when it covers several, none, or {@link #NONE}
+   * @param activeContext what the effective context covers; never {@code null}
    * @param orgUnits the org units the caller may pin; never {@code null}, possibly empty
    * @param capabilities the caller's capability flags; never {@code null}, all off in {@link #NONE}
    * @param unreadNotifications the caller's unread-notification count, {@code 0} in {@link #NONE}
    */
   public record LayoutContext(
       @Nullable UUID activeOrgUnitId,
+      @NotNull ContextKind activeContext,
       @NotNull List<OrgUnitMembershipOptionDto> orgUnits,
       @NotNull CapabilitiesResponse capabilities,
       long unreadNotifications) {
@@ -223,19 +245,21 @@ public class LayoutContextLoader {
      * backend read all receive. No org unit, nothing to pin, every capability off, no badge.
      */
     public static final LayoutContext NONE =
-        new LayoutContext(null, List.of(), CapabilitiesResponse.NONE, 0L);
+        new LayoutContext(null, ContextKind.NONE, List.of(), CapabilitiesResponse.NONE, 0L);
   }
 
   /**
    * Wire-shape mirror of the backend's {@code MeController.LayoutResponse}.
    *
-   * @param activeOrgUnitId the effective org-unit context, or {@code null}
+   * @param activeOrgUnitId the one org unit the effective context covers, or {@code null}
+   * @param activeContext what the effective context covers; {@code null} only on a malformed answer
    * @param orgUnits the org units the caller may pin; {@code null} only on a malformed answer
    * @param capabilities the caller's capability flags; {@code null} only on a malformed answer
    * @param unreadNotifications the caller's unread-notification count
    */
   public record MeLayoutResponse(
       @Nullable UUID activeOrgUnitId,
+      @Nullable ContextKind activeContext,
       @Nullable List<OrgUnitMembershipOptionDto> orgUnits,
       @Nullable CapabilitiesResponse capabilities,
       long unreadNotifications) {}

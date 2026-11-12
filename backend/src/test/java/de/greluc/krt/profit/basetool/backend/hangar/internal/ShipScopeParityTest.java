@@ -40,14 +40,14 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Parity of the ship list query and the ship read gate (REQ-DATA-010, plan section 5.4): over the
+ * Parity of the scoped ship query and the ship read gate (REQ-DATA-010, plan section 5.4): over the
  * caller matrix of the access-policy differential tests and ships of every owner and unit, {@code
- * ShipRepository#findAllScoped} never lists a ship {@link HangarAccessPolicy#canSeeShip} refuses,
- * and the two agree on every ship that another member owns in a unit.
+ * ShipRepository#findByShipTypeInScoped}, the unit overview's drill-down over {@code
+ * ShipScope#TRIPLE}, never lists a ship {@link HangarAccessPolicy#canSeeShip} refuses, and the two
+ * agree on every ship that another member owns in a unit.
  */
 @SpringBootTest
 @Transactional
@@ -87,11 +87,11 @@ class ShipScopeParityTest {
         rows,
         wired ->
             shipRepository
-                .findAllScoped(
+                .findByShipTypeInScoped(
+                    List.of(type),
                     wired.predicate().adminAllScope(),
                     wired.predicate().activeOrgUnitId(),
-                    wired.predicate().memberOrgUnitIds(),
-                    PageRequest.of(0, 500))
+                    wired.predicate().memberOrgUnitIds())
                 .stream()
                 .map(Ship::getId)
                 .collect(Collectors.toSet()),

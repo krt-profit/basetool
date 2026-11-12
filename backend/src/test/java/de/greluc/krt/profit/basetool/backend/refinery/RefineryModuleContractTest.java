@@ -36,13 +36,16 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.Arrays;
@@ -66,8 +69,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pins the refinery module's externally visible contract: each order command records its audit
- * event in the command's transaction (REQ-AUDIT-001), and every per-order and on-behalf entry point
- * refuses a caller outside the order's org unit (REQ-ORG-011).
+ * event in the command's transaction (REQ-AUDIT-001), every per-order and on-behalf entry point
+ * refuses a caller outside the order's org unit (REQ-ORG-011), and only the owner and a Logistician
+ * of the order's unit write the order, as the list's {@code canEdit} says (REQ-REFINERY-019).
  */
 @SpringBootTest
 @Transactional
@@ -81,6 +85,7 @@ class RefineryModuleContractTest {
 
   @Autowired private WebApplicationContext context;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Autowired private CityRepository cityRepository;
@@ -91,6 +96,10 @@ class RefineryModuleContractTest {
   @Autowired private EntityManager entityManager;
 
   private MockMvc mockMvc;
+
+  private Squadron home;
+
+  private Squadron foreign;
 
   private User owner;
 
@@ -104,8 +113,10 @@ class RefineryModuleContractTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String tag = UUID.randomUUID().toString().substring(0, 6);
-    owner = member("ref-owner", squadron("RefHome-" + tag, "R" + tag));
-    outsider = member("ref-outsider", squadron("RefForeign-" + tag, "Q" + tag));
+    home = squadron("RefHome-" + tag, "R" + tag);
+    foreign = squadron("RefForeign-" + tag, "Q" + tag);
+    owner = member("ref-owner", home);
+    outsider = member("ref-outsider", foreign);
 
     City city = new City();
     city.setName("Refinery City " + tag);
@@ -147,25 +158,38 @@ class RefineryModuleContractTest {
   @Test
   void aForeignMemberIsRefusedOnEveryPerOrderEntryPoint() throws Exception {
     JsonNode created = create();
-    String order = ORDERS + "/" + created.get("id").asString();
     RequestPostProcessor caller = as(outsider, MEMBER);
 
-    mockMvc.perform(get(order).with(caller)).andExpect(status().isForbidden());
     mockMvc
-        .perform(
-            put(order)
-                .with(caller)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body(created.get("gameDataVersion").asLong(), 90)))
+        .perform(get(ORDERS + "/" + created.get("id").asString()).with(caller))
         .andExpect(status().isForbidden());
-    mockMvc.perform(delete(order).with(caller)).andExpect(status().isForbidden());
-    mockMvc
-        .perform(
-            post(order + "/store")
-                .with(caller)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(storeBody()))
-        .andExpect(status().isForbidden());
+    assertEveryWriteIsRefused(created, caller);
+  }
+
+  @Test
+  void aPlainMemberOfTheOrdersUnitReadsItButMayNotWriteIt() throws Exception {
+    JsonNode created = create();
+    String id = created.get("id").asString();
+    RequestPostProcessor caller = as(member("ref-colleague", home), MEMBER);
+
+    mockMvc.perform(get(ORDERS + "/" + id).with(caller)).andExpect(status().isOk());
+    assertThat(listedCanEdit(id, caller)).isFalse();
+    assertEveryWriteIsRefused(created, caller);
+  }
+
+  @Test
+  void theOwnerAndALogisticianOfTheOrdersUnitListItEditable() throws Exception {
+    String id = create().get("id").asString();
+
+    assertThat(listedCanEdit(id, as(owner, MEMBER))).isTrue();
+    assertThat(listedCanEdit(id, asLogistician(member("ref-logistician", home), home))).isTrue();
+  }
+
+  @Test
+  void aLogisticianOfAnotherUnitListsTheOrderReadOnly() throws Exception {
+    String id = create().get("id").asString();
+
+    assertThat(listedCanEdit(id, asLogistician(member("ref-colleague", home), foreign))).isFalse();
   }
 
   @Test
@@ -214,6 +238,42 @@ class RefineryModuleContractTest {
     return objectMapper.readTree(response);
   }
 
+  private void assertEveryWriteIsRefused(JsonNode created, RequestPostProcessor caller)
+      throws Exception {
+    String order = ORDERS + "/" + created.get("id").asString();
+    mockMvc
+        .perform(
+            put(order)
+                .with(caller)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(created.get("gameDataVersion").asLong(), 90)))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(delete(order).with(caller)).andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post(order + "/store")
+                .with(caller)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(storeBody()))
+        .andExpect(status().isForbidden());
+  }
+
+  private boolean listedCanEdit(String id, RequestPostProcessor caller) throws Exception {
+    String response =
+        mockMvc
+            .perform(get(ORDERS + "/all").with(caller))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    for (JsonNode row : objectMapper.readTree(response).get("content")) {
+      if (row.get("id").asString().equals(id)) {
+        return row.get("canEdit").asBoolean();
+      }
+    }
+    throw new AssertionError("the caller's order list does not hold order " + id);
+  }
+
   private String body(Long gameDataVersion, long durationMinutes) {
     return """
     {"location":{"id":"%s","name":"%s"},"durationMinutes":%d,%s
@@ -257,6 +317,7 @@ class RefineryModuleContractTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername(username + "-" + UUID.randomUUID().toString().substring(0, 6));
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     user = userRepository.save(user);
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(user.getId(), unit.getId()));
@@ -266,10 +327,22 @@ class RefineryModuleContractTest {
     return user;
   }
 
+  private static RequestPostProcessor asLogistician(User user, Squadron unit) {
+    return as(
+        user,
+        List.of(
+            new SimpleGrantedAuthority(MEMBER),
+            new SimpleGrantedAuthority(LOGISTICIAN),
+            new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unit.getId())));
+  }
+
   private static RequestPostProcessor as(User user, String... authorities) {
-    return jwt()
-        .jwt(builder -> builder.subject(user.getId().toString()))
-        .authorities(
-            Arrays.stream(authorities).<GrantedAuthority>map(SimpleGrantedAuthority::new).toList());
+    return as(
+        user,
+        Arrays.stream(authorities).<GrantedAuthority>map(SimpleGrantedAuthority::new).toList());
+  }
+
+  private static RequestPostProcessor as(User user, List<GrantedAuthority> authorities) {
+    return jwt().jwt(builder -> builder.subject(user.getId().toString())).authorities(authorities);
   }
 }

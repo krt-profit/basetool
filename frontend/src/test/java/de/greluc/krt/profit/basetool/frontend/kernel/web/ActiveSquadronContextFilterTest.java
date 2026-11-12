@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import jakarta.servlet.DispatcherType;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -38,7 +39,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
  */
 class ActiveSquadronContextFilterTest {
 
-  private final ActiveSquadronContextFilter filter = new ActiveSquadronContextFilter();
+  private final ActiveSquadronContextFilter filter =
+      new ActiveSquadronContextFilter(new ActiveOrgUnitRestore(Optional::empty));
 
   @AfterEach
   void cleanUp() {

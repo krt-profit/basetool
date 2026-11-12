@@ -302,7 +302,9 @@ Fine-grained bank permissions are **app-managed grants**, not Keycloak roles
 (ADR-0011): a `bank_account_grant` row per (user, account) with three independent
 capability flags — `can_deposit`, `can_withdraw`, `can_transfer`. The **existence** of a
 grant row gives **view access** to that account (a row with all flags false is
-view-only). This expresses every required combination: deposit-only, withdraw-only,
+view-only). A grant of a user who holds neither `Bank Employee` nor a role above it is inert: it
+gives no view, no capability and no notification (ADR-0011, REQ-NOTIF-007). This expresses every
+required combination: deposit-only, withdraw-only,
 both, and rebooking permission. Grants are managed by bank management and admins; every
 grant change (create, flag change, revoke) is audited (REQ-BANK-012). Grants can only be
 **created** for users holding the `Bank Employee` role; whether the grantee belongs to
@@ -838,6 +840,18 @@ This is the sole, owner-approved relaxation of REQ-BANK-008's "members see nothi
 and it is mediated entirely by a non-`Bank*` seam so `BankSecurityService` stays
 org-unit-blind.
 
+> **Amendment (REQ-ORG-032, active context):** the org-unit side follows the active org unit. With
+> a pin, an org-unit or Bereich account is viewed only when the pinned unit owns it — by its
+> overseers, its grantees and an admin alike — and the oversight scope is the pinned unit when the
+> caller oversees it, otherwise nothing; a Bereich or OL pin is that unit alone. An admin's
+> settings rights follow the pin like the view: pinned, an admin reads and changes the balance
+> target, the view grants and the approval limits of the pinned unit's org-unit or Bereich account
+> only (REQ-BANK-035, -036, -041, -066). A legacy Bereich account that names its area but no owning
+> unit lies in the active context only without a pin. The KRT account, the cartel bank account and the
+> Sonderkonten keep their organisation-wide audiences. The Kartellbank's staff side (`/bank`, `BankSecurityService`, the
+> staff grants and the Bankleitung), the Bankleitung's approval-limit right and the bank reads of
+> connected applications never read the pin.
+
 > **Amendment (REQ-BANK-028):** the page lists **only active accounts** (a `CLOSED` account is
 > filtered out), and a Bereich/OL overseer (or admin) additionally sees the cartel-wide **special
 > accounts** (Sonderkonten) **view-only**.
@@ -952,7 +966,8 @@ the balance does not change until a bank employee confirms it (REQ-BANK-023). Th
 chooses **no holder** (that is recorded at confirmation). A requester sees the status of
 their **own** requests only (per-user isolation) and may **cancel** an own request while it
 is still `PENDING` (`BOOKING_REQUEST_CANCELLED`) or **correct** it while it is still pending
-*and* unapproved (REQ-BANK-056). The requester endpoints live under
+*and* unapproved (REQ-BANK-056). „Meine Anträge" is a personal view: it lists every own request
+whatever org unit is selected (REQ-ORG-032), and each row names its account and the account's unit. The requester endpoints live under
 `/api/v1/bank/org-units/requests/**`, scope-checked by the same seam (create requires the
 caller to oversee the org unit; cancel requires owning the request). A request cannot be
 raised against a `CLOSED` account. `GET /api/v1/bank/org-units/requests/page` reads the same
@@ -1203,7 +1218,8 @@ the data-driven notification engine (REQ-NOTIF-007, ADR-0015) rather than hardco
 - **On creation**, the **bank management** and the **employees granted on the target account** are
   notified. A `BANK_BOOKING_REQUEST_CREATED` event drives a seeded default rule (V160) with a
   `ROLE` selector (`BANK_MANAGEMENT`) and a new **`ACCOUNT_GRANT`** selector that resolves the
-  employees holding a `bank_account_grant` on the account carried by the event.
+  grantees of the account carried by the event who hold `Bank Employee` or a role above it; the
+  inert grant of a member who lost the role notifies nobody (REQ-BANK-009, REQ-NOTIF-007).
 - **On confirmation/rejection**, the **requesting officer/lead** is notified of the outcome (the
   rejection reason is rendered in the text). `BANK_BOOKING_REQUEST_CONFIRMED` /
   `BANK_BOOKING_REQUEST_REJECTED` events drive seeded rules (V161) with a new **`EVENT_RECIPIENT`**
@@ -1225,8 +1241,9 @@ admin-editable at runtime.
 **Acceptance**
 
 - [x] Creating a request fires `BANK_BOOKING_REQUEST_CREATED` after commit; the seeded rule
-  resolves bank management + the account's grant holders, excluding the requester
-  (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
+  resolves bank management + the account's grant holders who hold `Bank Employee` or a role
+  above it, excluding the requester (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`,
+  `RecipientDirectoriesTest`, `ApprovalNeededNoticeIntegrationTest`).
 - [x] Confirming/rejecting a request fires `BANK_BOOKING_REQUEST_CONFIRMED` /
   `BANK_BOOKING_REQUEST_REJECTED` after commit; the seeded rules notify the requester via the
   `EVENT_RECIPIENT` selector, excluding the deciding employee
@@ -1666,14 +1683,26 @@ the bank surface stays org-unit-blind (REQ-BANK-008, ADR-0011). Naming note: the
 A seat confers the holder's rights only while its holder holds `KRT Member` (REQ-SEC-015): a
 Staffelleiter, SK lead, Bereichsleiter or OL member who loses it keeps the seat row but holds no
 account, is no longer approval-exempt, may approve nothing and configures nothing, on the web and on
-the exchange (`BankAccessRulesTest`, `*WithoutKrtMember*`).
+the exchange (`BankAccessRulesTest`, `*WithoutKrtMember*`). Nor is such a holder told of the
+account's requests, approvals or debits: `ACCOUNT_RESPONSIBLE`, `REQUEST_RESPONSIBLE` and
+`REQUIRED_APPROVER` resolve a seat holder only while they hold `KRT Member` (REQ-NOTIF-024,
+`RecipientDirectoriesTest`).
+
+On the web the holder rights of a Staffel, SK or Bereich account follow the active context like
+every other role power (REQ-ORG-032): pinned to another of their units, the holder holds no right on
+that account — no view, no approval exemption, no approval in „Anträge an unsere Konten", no
+settings — until they pick its unit or „Alle meine Org-Einheiten". The KRT, cartel bank and
+Sonderkonto accounts belong to the whole organisation and are not narrowed by the pin; neither is
+the exchange, which has no active context (REQ-BXCH-001)
+(`BankAccessRulesTest#holderRights_pinOnAnotherOwnUnit_leaveTheAccountOutOfContext`).
 
 > **Amended by REQ-BANK-047 (middle band corrected to the Bankleitung by ADR-0109):** for **request
 > approval** the KRT account (`CARTEL`) no longer routes to the OL collegium alone — the amount-tiered
 > ladder inserts the **Bankleitung** (`BANK_MANAGEMENT`) as the middle band's approver between the bank
 > employee and the OL (ADR-0066, corrected from the Bereichsleiter Profit by ADR-0109). This is an
 > approval-routing refinement only; the OL stays the KRT account's balance-target/visibility owner. So
-> `resolveResponsibleHolderUserIds(CARTEL)` — used only to *notify* — returns **all `OL_MEMBER`s**; the
+> `resolveResponsibleHolderUserIds(CARTEL)` returns **all `OL_MEMBER`s**, of whom the notification
+> selectors keep those holding `KRT Member` (REQ-NOTIF-024); the
 > middle-band Bankleitung is a `BANK_MANAGEMENT` Keycloak role (not an org-unit membership) so it is not
 > notified via this seam but picks the request up in its bank-staff queue (ADR-0109). Each approver
 > still sees only its own band in „Anträge an unsere Konten" (the org-unit bank tab called „Fremde
@@ -1713,8 +1742,16 @@ the exchange (`BankAccessRulesTest`, `*WithoutKrtMember*`).
 > former holder loses it unless the bank management or an account grant still reaches them, and every
 > other recipient is left alone. A holder change with no added holder (only a departure) tells nobody
 > and only reconciles.
+>
+> **Deactivated units (REQ-ORG-032, ADR-0374 D10):** the audit diff and the hand-over compare the
+> **stored** seats (`resolveResponsibleHolderUserIds`), whether the owning unit is active or not, so
+> a holder change on a deactivated unit is recorded like any other. A **notice** addresses only the
+> seats on active units (`resolveNotifiedResponsibleHolderUserIds`, behind
+> `OrgUnitBankRecipientDirectory#responsibleHoldersOf`): the account of a deactivated unit notifies
+> none of its seat holders, and the `CARTEL_BANK` notifies only the Bereichsleiter of active Profit
+> Bereiche.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit + assignment and reconcile events), `NotificationCreationServiceTest` (reconcile), `NotificationRuleEngineIntegrationTest` (V269 rule), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `orgunit/api/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `privacy/api/UserDeletionService#deleteUser`, `orgunit/api/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
+**Enforced by:** `OrgUnitBankAccessServiceTest` / `OrgUnitBankResponsibilityServiceTest` (holder resolution per type incl. CARTEL_BANK→PROFIT-Bereichsleiter, OL collegial; stored vs notified holders of a deactivated unit; `snapshotResponsibleHolders` / `…ForUser` / `recordResponsibleHolderChanges` diff + audit + assignment and reconcile events), `NotificationCreationServiceTest` (reconcile), `NotificationRuleEngineIntegrationTest` (V269 rule), `OrgUnitMembershipServiceTest` (leadership + removal brackets), `UserDeletionServiceTest` / `UserDeletionForeignKeyIntegrityTest` (deletion bracket + flush) · **Code:** `bank/internal/OrgUnitBankResponsibilityService` (`resolveResponsibleHolderUserIds` / `snapshotResponsibleHolders(ForUser)` / `recordResponsibleHolderChanges`), `orgunit/api/OrgUnitMembershipService` (leadership + `removeMember` + `reconcileStaffelMemberships` brackets), `privacy/api/UserDeletionService#deleteUser`, `orgunit/api/BereichRepository#findByDepartment`, `bank/internal/BankAccountRepository#findFirstByType` · **ADR:** [ADR-0043](../adr/0043-bank-account-responsibility-and-visibility.md), [ADR-0070](../adr/0070-bank-responsible-holder-change-audit.md) · **Issues:** #556
 
 ### REQ-BANK-035 — Configurable balance visibility
 
@@ -1754,8 +1791,15 @@ distinct from the bank-staff capability `bank_account_grant`. Toggling a grant i
 insert/delete and is audited (REQ-BANK-012). The org-unit bank page is reachable by any KRT member; the
 seam scopes the visible accounts per caller.
 
+The membership audiences (the sub-rank buckets, all members of the unit, the Bereich cascade) admit
+a member only while they hold `KRT Member`, like every other membership right (REQ-SEC-015); a
+named-user grant is a personal grant and stays (`BankAccessRulesTest#allMembersGrant_withoutKrtMember_admitsNoFormerMember`).
+
 **Admin override:** an admin may configure the visibility of **every** account whose visibility is
-configurable (Staffel/SK/Bereich/Sonderkonto), without being the responsible holder. The fixed `CARTEL`
+configurable (Staffel/SK/Bereich/Sonderkonto), without being the responsible holder. Pinned to a unit,
+an admin configures only that unit's Staffel, SK or Bereich account and the Sonderkonten
+(REQ-ORG-032); every other Staffel, SK or Bereich account answers like an unknown one
+(REQ-BANK-066). The fixed `CARTEL`
 (always all-members) and `CARTEL_BANK` (internal) audiences stay fixed (REQ-BANK-037) — there is nothing
 to configure there, not even for an admin.
 
@@ -1766,8 +1810,10 @@ to configure there, not even for an admin.
 An account may carry an optional **balance target** (`bank_account.balance_target`, V189) — an
 aspirational fill goal shown with progress to everyone who may view the balance. It is settable by the
 account's responsible holder (REQ-BANK-034) **and** by bank staff with access to the account (and by an
-admin on any account); for a Sonderkonto the target is bank-staff-only for non-admins. Setting/clearing
-it echoes the account's `@Version` (the
+admin on any account); for a Sonderkonto the target is bank-staff-only for non-admins. On the org-unit
+side an admin pinned to a unit sets the target only of that unit's Staffel, SK or Bereich account and
+of the KRT, cartel bank and Sonderkonto accounts (REQ-ORG-032); the bank-staff write does not read
+the pin. Setting/clearing it echoes the account's `@Version` (the
 target shares the row's optimistic lock with rename/close — both infrequent) and is audited
 (`BALANCE_TARGET_SET` / `BALANCE_TARGET_CLEARED`). The target enforces nothing; it is a display goal.
 
@@ -2052,7 +2098,10 @@ grantee set.) The result is **snapshotted** onto the request
 boolean.
 
 **Who configures limits — and where:** the account's responsible holder (REQ-BANK-034), **bank
-management** and **admin** — never a plain bank employee. Configuration happens **exclusively on the
+management** and **admin** — never a plain bank employee. The Bankleitung's right does not read the
+active-org-unit pin; an admin's does, although the role hierarchy makes every admin a Bankleitung:
+pinned to a unit, an admin configures the limits of that unit's account only (REQ-ORG-032).
+Configuration happens **exclusively on the
 org-unit bank settings surface** (the *Ziel & Sichtbarkeit* tab — *Verantwortung & Sichtbarkeit*
 until 2026-10-03 — of the org-unit account-detail page, alongside the visibility settings). The **bank-staff account-detail page**
 (`/bank/accounts/{id}`) shows limits **read-only to every viewer**, including management/admin — it
@@ -3341,9 +3390,10 @@ widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal acc
 - **Who sees what.** The same rule as the org-unit bank page: `BankAccessJudgement#canView`
   over the active accounts (REQ-BANK-021, -035, -037). The bank-staff view (`/bank`) does not count.
   Every member sees at least the KRT (`CARTEL`) account, so the result is never empty for a member.
-- **Context-free set.** The set is computed for the caller's whole reach and does not follow the
-  active org-unit pin (`BankAccessPolicy#viewableAccounts` without a pin; an admin sees every
-  active account); only the order below uses the active context.
+- **The active context's set.** The set follows the active org-unit pin like the page, its balances
+  and the drill-in (REQ-ORG-032): pinned, the org-unit and Bereich accounts of the pinned unit only;
+  unpinned, the caller's whole reach (an admin every active account). The KRT account, the cartel
+  bank account and the Sonderkonten do not depend on the pin.
 - **Paged and sorted in the backend.** The read takes the standard `page` / `size` and answers a
   `PageResponse` (REQ-API-005) with the true `totalElements`; visibility is decided in Java, so the
   page is cut in memory and only its accounts' figures are loaded. The order is fixed by the backend
@@ -3364,22 +3414,23 @@ widget (REQ-UI-034) shows. It adds no visibility rule; there are no personal acc
 
 **Acceptance**
 
-- [x] The read returns exactly the accounts the org-unit bank page lists for the same caller,
-  unpinned, with balance, target and the 30-day series.
-- [x] A plain member gets the KRT account; a pin does not change the set.
+- [x] The read returns exactly the accounts the org-unit bank page lists for the same caller and
+  pin, with balance, target and the 30-day series.
+- [x] A plain member gets the KRT account; a pin narrows the org-unit and Bereich accounts to the
+  pinned unit's.
 - [x] The KRT account comes first, the active context's accounts next, the rest by account number;
   page 0 with `size` 3 returns the first three of that order and the true `totalElements`.
 - [x] The response carries no holder or custody data.
 
-**Enforced by:** `OrgUnitBankAccessServiceTest` (visible set equals the page's set unpinned, pin
-ignored for the set, KRT for a plain member, active context), `OrgUnitBankVisibleAccountsQueryTest`
+**Enforced by:** `OrgUnitBankAccessServiceTest` (visible set equals the page's set, the pin narrows
+the set, KRT for a plain member, active context), `OrgUnitBankVisibleAccountsQueryTest`
 (backend order, paging, figures), `OrgUnitBankControllerTest` (route, member gate, `page` / `size`
 binding, no sort), `OrgUnitBankVisibleAccountDtoTest` (no holder field), `ScopeKernelTest`
 (pin-free oversight scope), `AuthorizationMatrixTest`, `NoStoreApiScopesTest` · **Code:**
 `bank/internal/OrgUnitBankAccessService#listViewableActiveAccounts`,
 `bank/internal/OrgUnitBankVisibleAccountsQuery`, `bank/internal/OrgUnitBankVisibleAccountDto`,
 `bank/web/OrgUnitBankController#listVisibleAccounts` · **Related:** REQ-BANK-021, REQ-BANK-035,
-REQ-BANK-037, REQ-API-005, REQ-UI-034, ADR-0299
+REQ-BANK-037, REQ-API-005, REQ-UI-034, REQ-ORG-032, ADR-0299
 
 ### REQ-BANK-065 — A deposit shows what the depositor transfers with the in-game fee
 
@@ -3431,8 +3482,11 @@ ids cannot be probed by comparing the two answers.
 - **Settings routes** — `/settings`, `/balance-target`, `/visibility/…`, `/approval-limit/…`: hidden
   means the caller may neither view the account nor set its target, configure its visibility or
   configure its approval limits. A disclosed account whose control the caller lacks still answers
-  `403` (REQ-BANK-035, -036, -041), and a responsible holder whose account the active-org-unit pin
-  hides from the view scope still reaches its settings.
+  `403` (REQ-BANK-035, -036, -041). The holder and admin rights follow the active context like every
+  other role power (REQ-ORG-032): a responsible holder pinned to another of their units and an admin
+  pinned to another unit hold no right on an org-unit or Bereich account outside the pin, so its
+  settings answer like an unknown account. The Bankleitung's approval-limit right does not read the
+  pin.
 - **Not covered:** the staff side (`/api/v1/bank/accounts/{id}`) already denies both alike, and a
   deposit request may target any active account by design (REQ-BANK-042).
 
@@ -3440,18 +3494,21 @@ ids cannot be probed by comparing the two answers.
 
 - [x] Each listed route answers an unknown and a hidden id with a `NotFoundException` of the same
   detail and touches no ledger, statement or audit code.
-- [x] A viewer without a settings control gets `403` on the settings routes; a holder outside the
-  view scope gets the settings.
+- [x] A viewer without a settings control gets `403` on the settings routes; a holder pinned to
+  another of their units and an admin pinned to another unit get the `404` of an unknown account.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest`
 (`accountRoutes_answerHiddenAndUnknownAccountsWithTheSameNotFound`,
-`getAccountSettings_byHolderOutsideTheViewScope_returnsTheSnapshot`, `*_byPlainViewer_*`),
-`OrgUnitBankVisibilityMatrixE2eTest` (the drill-in of a hidden Sonderkonto and Staffel account
-answers `404` like an unknown id, through the real token chain) ·
-**Code:** `bank/internal/OrgUnitBankAccessService#requireViewableAccount`,
+`getAccountSettings_byHolderPinnedToAnotherUnit_answersLikeAnUnknownAccount`,
+`accountRoutes_byAdminPinnedToAnotherUnit_answerLikeAnUnknownAccount`, `*_byPlainViewer_*`),
+`BankAccessRulesTest` (`settingsRights_pinned*`), `BankAccessCharacterisationTest` (the settings
+routes under every pin), `OrgUnitBankVisibilityMatrixE2eTest` (the drill-in of a hidden Sonderkonto
+and Staffel account answers `404` like an unknown id, through the real token chain) ·
+**Code:** `bank/internal/BankAccessJudgement#access`,
+`bank/internal/OrgUnitBankAccessService#requireAccess`,
 `bank/internal/OrgUnitBankAccessService#requireDisclosedAccount`,
 `bank/internal/OrgUnitBankSettingsService` · **Related:** REQ-BANK-021, REQ-BANK-035,
-REQ-BANK-038, REQ-BANK-056
+REQ-BANK-038, REQ-BANK-056, REQ-ORG-032
 
 ### REQ-BANK-067 — A request raised through a connected application shows where it came from
 
@@ -3496,7 +3553,8 @@ and the backend decides what it shows.
 
 - **Who sees it.** `GET /api/v1/bank/org-units/requests/{id}` answers for the requester
   (REQ-BANK-022), the bank staff who see the request's account (REQ-BANK-009, REQ-BANK-023) and its
-  approvers (REQ-BANK-041, REQ-BANK-046); four-eyes keeps the requester out of the approvers
+  approvers (REQ-BANK-041, REQ-BANK-046), the approvers judged in the active context like their
+  approval itself (REQ-BANK-034, REQ-ORG-032); four-eyes keeps the requester out of the approvers
   (REQ-BANK-062). Anyone else and an unknown id get the same `404`, and the page shows "Antrag nicht
   gefunden". A requester who is neither staff nor approver reads it without the staff note
   (REQ-BANK-054), as in their own list.
@@ -3542,7 +3600,7 @@ rule against Postgres, through the real endpoints and the real token chain, with
   staff queue; raising each type, correcting, cancelling, confirming by type, rejecting, approving,
   four-eyes; configuring visibility, target, limits and the KRT tiers; staff direct bookings) ×
   3 amount bands (below `T1`, between `T1` and `T2` and over the member limits, above `T2`) ×
-  3 active-org-unit pins (none, own Staffel, own Bereich) where they matter: 4,354 cases.
+  3 active-org-unit pins (none, own Staffel, own Bereich) where they matter: 5,362 cases.
 - **Expected outcomes:** `src/test/resources/bank/bank-access-matrix.tsv`, one line per case with
   the status and the problem code or the access-relevant fields of the answer. A run writes what
   it observed to `backend/build/bank-access-matrix/bank-access-matrix.tsv`; an intended change of

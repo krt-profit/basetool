@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-20.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md), [ADR-0295](../adr/0295-a-hangar-import-matches-ships-by-pledge-and-keeps-pledge-data-private.md)
 
 # Personal hangar overview — pagination & server-side sort/filter
@@ -238,9 +238,12 @@ An admin MUST be able to list, add, edit and delete the ships of one member on
 - **Writes.** Add, edit and delete use the ship dialog of „Meine Schiffe" (design system: one CTA in
   the page head and one in the dialog, icon-only edit per row, quiet-danger delete behind a danger
   confirm). An added ship takes the unit picked from the member's direct memberships; with more than
-  one, the pick is required and starts empty, never preset from the admin's own active unit. With
-  one or none the ship is stamped as for the member's own add. An edit echoes the ship's `version` and
-  never changes the unit; a stale version is a 409 with the conflict dialog.
+  one, the pick is required and starts empty, never preset from the admin's own active unit.
+  Without a pick the backend stamps the member's only stampable unit — a direct membership on an
+  active unit, while the member holds the stored role `KRT Member` (REQ-ORG-032) —, refuses a member
+  with several (`400 OWNER_ORG_UNIT_REQUIRED`) and leaves the ship without a unit for a member with
+  none; the admin's own pin never decides it. An edit echoes the ship's `version` and never changes
+  the unit; a stale version is a 409 with the conflict dialog.
 - **Live update.** Every write swaps the list and the count in place (REQ-FE-001) and tells the
   member's open „Meine Schiffe" pages through `hangar:{memberId}`; the page listens on the same room
   and re-pulls its list when the member, another admin or a connected application changes the hangar
@@ -252,10 +255,17 @@ An admin MUST be able to list, add, edit and delete the ships of one member on
   writes.
 - [x] Add, edit and delete go to the member's admin paths and update the list in place.
 - [x] An edit carries the version and no unit; an add carries the picked unit and no version.
+- [x] The backend takes the added ship's unit from the member's direct memberships only: a pick
+  outside them is a `400`; without a pick the member's only stampable unit is stamped, several need
+  a pick, and none — a member without `KRT Member` included — leaves the ship without a unit; the
+  admin's own active unit never decides it.
 
 **Enforced by:** `MemberHangarPageControllerTest`, `HangarBackendClientTest`,
 `MemberEditPageRenderTest`, `RouteGateSnapshotTest`, `HangarIntegrationTest`,
-`HangarNoticeIntegrationTest` · **Code:** `MemberHangarPageController`, `HangarBackendClient`,
+`HangarNoticeIntegrationTest`, `HangarServiceTest`, `ScopeKernelTest`
+(`resolveOrgUnitForAdminOnBehalf_*`), `OrgUnitStampingStampableUnitsTest` · **Code:**
+`MemberHangarPageController`, `HangarBackendClient`,
+`OrgUnitStampingService#resolveOrgUnitForAdminOnBehalf`,
 `hangar/member-hangar.html`, `hangar/member-hangar.js`, `identity/member-edit.html` · **Issues:**
 #2597 (epic #2595, #2581).
 
@@ -308,23 +318,27 @@ REQ-HANGAR-009 and REQ-HANGAR-010 applied to the **member**.
 ### REQ-HANGAR-014 — An import never fails on the member's org units
 
 „Schiffsliste importieren" offers no unit picker, so the import MUST NOT refuse a member who belongs
-to several org units. The ships it creates go to the member's only direct membership, else to the
-active org unit of the sidebar when it is one of the member's direct memberships, else to no unit;
-the member assigns them afterwards with „Einheit ändern" (REQ-HANGAR-009 / -010). This is the rule
-of a connected application's create (REQ-XCH-017) plus the pin, and an exception to REQ-ORG-017's
-„pin, else choose", which needs a picker the import does not have.
+to several org units. The ships it creates go to the active org unit of the sidebar (the honoured
+pin of REQ-ORG-032) when it is one of the member's stampable units, else to the member's only
+stampable unit, else to no unit; the member assigns them afterwards with „Einheit ändern"
+(REQ-HANGAR-009 / -010). The stampable units are the member's direct memberships on active units,
+and none while the member lacks the stored role `KRT Member` (REQ-ORG-032). This is the rule of a
+connected application's create (REQ-XCH-017) plus the pin, and an exception to REQ-ORG-017's „pin,
+else choose", which needs a picker the import does not have.
 
 **Acceptance**
 
-- [x] A member of several units with „Alle Staffeln" active imports successfully; the ships carry no
-  unit.
-- [x] With an active org unit among the member's memberships, the ships carry that unit.
+- [x] A member of several units with „Alle meine Org-Einheiten" active imports successfully; the
+  ships carry no unit.
+- [x] With an active org unit among the member's stampable units, the ships carry that unit.
 - [x] A member of exactly one unit, or of none, imports as before.
+- [x] A deactivated unit is no stampable unit, and a member without `KRT Member` imports ships
+  without a unit (`OrgUnitStampingStampableUnitsTest`).
 
 **Enforced by:** `ScopeKernelTest` (`resolveOrgUnitForImport_*`),
 `HangarImportIntegrationTest#importFleetview_memberOfSeveralUnitsWithoutPin_importsShipsWithoutUnit`,
-`HangarImportServiceTest` · **Code:** `OrgUnitStampingService#resolveOrgUnitForImport`,
-`HangarImportService#importShips`.
+`HangarImportServiceTest`, `OrgUnitStampingStampableUnitsTest` · **Code:**
+`OrgUnitStampingService#resolveOrgUnitForImport`, `HangarImportService#importShips`.
 ### REQ-HANGAR-015 — The Hangar Extension export imports status and pledge data
 
 „Schiffsliste importieren" MUST also accept the two exports of the browser extension „Star Citizen:
@@ -363,8 +377,8 @@ format is detected from the payload, like the other formats (REQ-HANGAR-014 keep
   imported data.
 - **Privacy.** Pledge data are the owner's purchase data. They leave the backend only on the
   owner's own hangar endpoints (`/my-ships`, the owner's add / edit / unit change) and on the
-  admin member hangar; `/ships`, the mission views and every other `ShipDto` carry `pledge = null`.
-  The production status is shown wherever the ship is.
+  admin member hangar; the mission views and every other `ShipDto` carry `pledge = null`. The
+  production status is shown wherever the ship is.
 - **Result.** The result dialog shows „Importiert", „Aktualisiert", „Bereits im Hangar" and
   „Nicht erkannt"; the list refreshes in place when ships were created or updated. The audit event
   `HANGAR_IMPORTED` (REQ-HANGAR-004) is recorded when ships were created or updated, with the
@@ -376,8 +390,7 @@ format is detected from the payload, like the other formats (REQ-HANGAR-014 keep
   per `Ship` / `Included Ship` row with its pledge data, and nothing for the other rows.
 - [x] A re-import, and the CSV after the JSON, creates no ship and fills the existing ones; a
   re-import that changes nothing records no event.
-- [x] Pledge data appear on „Meine Schiffe" and the admin member hangar, never in `/ships` or a
-  mission.
+- [x] Pledge data appear on „Meine Schiffe" and the admin member hangar, never in a mission.
 - [x] An import does not change a ship's `version`.
 
 **Enforced by:** `HangarImportServiceTest` (`importShips_hangarExtension*`),

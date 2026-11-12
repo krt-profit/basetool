@@ -657,7 +657,8 @@ public class MaterialClaimService implements ClaimBucketSource {
   }
 
   /**
-   * Requires current responsible-unit or contributing-Staffel authority.
+   * Requires current responsible-unit or contributing-Staffel authority in the active context
+   * (REQ-ORG-032), admins included.
    *
    * @param order the concrete order
    * @param claimingOrgUnitId the contributing Staffel
