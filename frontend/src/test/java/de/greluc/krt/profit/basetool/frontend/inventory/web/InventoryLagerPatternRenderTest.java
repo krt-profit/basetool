@@ -402,6 +402,88 @@ class InventoryLagerPatternRenderTest {
   }
 
   /**
+   * Both Lager trees, in both views, toggle every group row and stack header through a collapsed
+   * chevron button that names its level and controls the container it shows (REQ-INV-002).
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void lagerTreesToggleEveryLevelThroughADisclosureButton() throws Exception {
+    String my =
+        main(render("/inventory?storage=my", "/inventory/my-inventory/grouped", materialGroups()));
+    String myItems =
+        main(
+            render(
+                "/inventory?storage=my&view=items",
+                "/inventory/my-inventory/grouped",
+                itemGroups()));
+    String all = main(render("/inventory?storage=all", "/inventory/all/grouped", materialGroups()));
+    String allItems =
+        main(render("/inventory?storage=all&view=items", "/inventory/all/grouped", itemGroups()));
+
+    assertDisclosure(my, MATERIAL_ID, "Stacks von Quantanium", "Einträge in ARC-L1");
+    assertDisclosure(myItems, SHIELD_ID, "Stacks von FR-66", "Einträge in ARC-L1");
+    assertDisclosure(
+        all, MATERIAL_ID, "Stacks von Quantanium", "Einträge von Lager Owner in ARC-L1");
+    assertDisclosure(allItems, SHIELD_ID, "Stacks von FR-66", "Einträge von Lager Owner in ARC-L1");
+    for (String tree : List.of(my, myItems, all, allItems)) {
+      assertThat(occurrences(tree, "<button type=\"button\" class=\"tree-chevron\""))
+          .isEqualTo(occurrences(tree, "tree-row--group") + occurrences(tree, "stack-header"))
+          .isPositive();
+      assertThat(tree).doesNotContain("toggle-icon").doesNotContain("<span class=\"tree-chevron");
+    }
+  }
+
+  /**
+   * Asserts the chevron buttons of a group and of its first stack, and the collapsed containers
+   * their {@code aria-controls} name.
+   *
+   * @param tree the rendered {@code <main>}
+   * @param groupId the material or game item of the group
+   * @param groupLabel the expected accessible name of the group's button
+   * @param stackLabel the expected accessible name of the first stack's button
+   */
+  private static void assertDisclosure(
+      @NotNull String tree,
+      @NotNull UUID groupId,
+      @NotNull String groupLabel,
+      @NotNull String stackLabel) {
+    String items = "lager-group-" + groupId;
+    String entries = items + "-stack-0";
+    assertThat(tree)
+        .containsPattern(chevron(items, groupLabel))
+        .containsPattern(chevron(entries, stackLabel))
+        .containsPattern("id=\"" + items + "\" class=\"tree-group-items\"\\s+hidden")
+        .containsPattern("id=\"" + entries + "\" class=\"tree-stack-entries\"\\s+hidden");
+  }
+
+  /**
+   * The markup of a collapsed chevron button.
+   *
+   * @param controls the id its {@code aria-controls} names
+   * @param label its {@code aria-label}
+   * @return the pattern matching the button
+   */
+  private static @NotNull Pattern chevron(@NotNull String controls, @NotNull String label) {
+    return Pattern.compile(
+        "<button type=\"button\" class=\"tree-chevron\" aria-expanded=\"false\"\\s+aria-controls=\""
+            + Pattern.quote(controls)
+            + "\"\\s+aria-label=\""
+            + Pattern.quote(label)
+            + "\">▶</button>");
+  }
+
+  /**
+   * Counts the non-overlapping occurrences of a text.
+   *
+   * @param html the text to search
+   * @param needle the text to count
+   * @return the number of occurrences
+   */
+  private static int occurrences(@NotNull String html, @NotNull String needle) {
+    return html.split(Pattern.quote(needle), -1).length - 1;
+  }
+
+  /**
    * Three item groups: a size-1 grade-A military shield, a paint carrying a meaningless grade, and
    * a cooler without size and grade whose class has no label.
    *

@@ -261,7 +261,7 @@ icon; DS-1 (REQ-UI-027) gave them the tint as well, so there is no exception lef
 
 **Enforced by:** `AccessibleTextTintTest` (no stylesheet sets `color` to the danger, info, success or Grau 2
 hue, and no script writes one into `style.color`; its selector exemption list for decorative
-glyphs is empty) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
+glyphs is empty) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on six pages; its report now names every
 failing node with its colours and ratio)
 
 ### REQ-UI-007 — Visual style: sci-fi HUD with radii by role
@@ -956,6 +956,10 @@ design-system walk of every page on all six device classes):
   picker, `select`, `textarea`) renders its text below 16px.
 - [ ] A checkbox or radio keeps its small square or disc on every class; its label, not the box,
   reaches the 44px floor.
+- [ ] A tree table's chevron is a disclosure button with the 2px orange focus ring. On the touch
+  classes its 14px glyph keeps its box and a centred `--touch-target` square `::before` carries the
+  hit area, in a row that is itself at least `--touch-target` tall, so the overlay never reaches
+  into the neighbouring row.
 - [ ] No floating element (toast, live-sync pill) overlaps the phone tab bar.
 - [ ] **A hidden overlay takes no room.** A hidden tooltip bubble still counts toward the page's
   scrollable width, and on a phone it widens the layout viewport: the hidden `.scu-hint__bubble`
@@ -973,9 +977,10 @@ page and class and a per-page `patterns:` line in the report) ·
 `PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
 `PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
-in `check`, not in the stack-bound `e2e` suite) + code/design
+in `check`, not in the stack-bound `e2e` suite) · `LagerTreeDisclosureE2eTest` (the tree
+chevron's overlay and row height on the tablet and phone class, and its focus ring) + code/design
 review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
-`--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
+`.tree-chevron`, `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
 `static/css/bank/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personalinventory/personal-inventory.css`
 (`.master-row`), `static/js/kernel/sidebar.js`
 (`--krt-footer-height`).

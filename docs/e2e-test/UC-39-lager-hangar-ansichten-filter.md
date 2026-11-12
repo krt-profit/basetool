@@ -4,8 +4,8 @@
 |----------------|--------|
 | **ID**         | UC-39  |
 | **Tag**        | `e2e`  |
-| **Testklasse** | [`InventoryStackViewE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventoryStackViewE2eTest.java) · [`InventoryFilterPanelCollapseE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventoryFilterPanelCollapseE2eTest.java) · [`LagerLocationFilterE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/LagerLocationFilterE2eTest.java) · [`InventorySharedLagerLiveSyncE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventorySharedLagerLiveSyncE2eTest.java) · [`FilterPersistenceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/FilterPersistenceE2eTest.java) · [`HangarPaginationE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/HangarPaginationE2eTest.java) |
-| **Spec**       | [`inventory-lager.md`](../specs/inventory-lager.md) (REQ-INV-002/-037/-040) · [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-017) · [`personal-hangar-overview.md`](../specs/personal-hangar-overview.md) (REQ-HANGAR-002) · [ADR-0003](../adr/0003-inventory-append-only-group-on-read.md) · [ADR-0120](../adr/0120-per-browser-filter-selection-persistence.md) |
+| **Testklasse** | [`InventoryStackViewE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventoryStackViewE2eTest.java) · [`InventoryFilterPanelCollapseE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventoryFilterPanelCollapseE2eTest.java) · [`LagerLocationFilterE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/LagerLocationFilterE2eTest.java) · [`InventorySharedLagerLiveSyncE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/InventorySharedLagerLiveSyncE2eTest.java) · [`FilterPersistenceE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/FilterPersistenceE2eTest.java) · [`HangarPaginationE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/HangarPaginationE2eTest.java) · [`LagerTreeDisclosureE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/LagerTreeDisclosureE2eTest.java) |
+| **Spec**       | [`inventory-lager.md`](../specs/inventory-lager.md) (REQ-INV-002/-037/-040) · [`ui-design-system.md`](../specs/ui-design-system.md) (REQ-UI-009/-017) · [`personal-hangar-overview.md`](../specs/personal-hangar-overview.md) (REQ-HANGAR-002) · [ADR-0003](../adr/0003-inventory-append-only-group-on-read.md) · [ADR-0120](../adr/0120-per-browser-filter-selection-persistence.md) |
 
 ## Akteur
 
@@ -17,6 +17,7 @@
 - **Ortsfilter:** Bestand an zwei geseedeten Orten.
 - **Live-Sync:** eine geteilte, auftragsfähige Zeile über 100 SCU und ein Auftrag.
 - **Hangar:** so viele Schiffe, dass mehr als eine Seite entsteht.
+- **Aufklappen per Tastatur:** ein geteilter Lagereintrag eines eigenen Materials an einem eigenen Ort.
 - Filterpanel- und Filter-Persistenz-Tests brauchen keinen Seed: die Widgets rendern auch auf leerem Stand.
 
 ## Auslöser
@@ -32,6 +33,7 @@ Der Nutzer öffnet die Lager-Ansichten oder den Hangar und filtert, klappt, blä
 5. **Live-Sync des geteilten Lagers** (#1307): beide Kontexte klappen denselben Stack auf `/inventory/all` auf; B wartet, bis `window.krtLiveSync.subscribedTopics()` `inventory` enthält. A fügt über „+ Zuordnen" einen Auftrags-Chip hinzu (`POST /inventory/{id}/allocation`); B lädt nie neu.
 6. **Filter-Persistenz** (REQ-UI-017, ADR-0120): auf `/refinery-orders` das Segment „Abgeschlossen" wählen und den Schalter „Meine Aufträge" setzen; auf `/missions` `showPast` einschalten; auf `/materialboerse` die Sortierung ändern — jeweils neu laden.
 7. **Hangar** (REQ-HANGAR-002): `/hangar?size=10` laden, eine Seite weiter blättern, dann eine Suche ohne Treffer eingeben.
+8. **Aufklappen per Tastatur** (REQ-INV-002): auf `/inventory?storage=my` vom Gruppen-Haken mit Shift+Tab auf den Pfeil der Materialgruppe gehen, mit Enter die Gruppe und mit der Leertaste ihren Stack öffnen, die Gruppen- und Stack-Zeilen des offenen Baums mit axe scannen, neu laden, dann beide Ebenen per Tastatur wieder schließen; auf 810×1080 und 375×812 die Pfeile von Gruppe und Stack vermessen.
 
 ## Erwartetes Ergebnis
 
@@ -41,6 +43,7 @@ Der Nutzer öffnet die Lager-Ansichten oder den Hangar und filtert, klappt, blä
 - B zeigt den neuen Chip **in place**, allein durch das Signal `inventory/[stock]`.
 - Alle drei Filterwahlen sind nach dem Reload wiederhergestellt und wirken (der `showPast`-Zustand treibt den Neuabruf der Ergebnisse).
 - Der Hangar zeigt höchstens 10 Zeilen, Paginierung und Seitengrößen-Auswahl; Blättern und Suchen tauschen die Tabelle ohne Reload, die Seitenanzeige rückt vor, die Suche ohne Treffer leert die Tabelle.
+- Der Pfeil ist eine fokussierbare Schaltfläche mit dem orangen 2-px-Fokusrahmen, deren `aria-controls` den Container nennt; `aria-expanded` folgt jedem Auf- und Zuklappen, der erste Aufruf des Stacks lädt seine Einträge, nach dem Reload sind beide Ebenen wieder offen, und axe meldet in den Gruppen- und Stack-Zeilen nichts der Stufen `critical` oder `serious` (die nachgeladenen Einträge scannt der Test nicht). Auf beiden Touch-Klassen trägt jeder Pfeil eine 44 px große Trefferfläche in einer mindestens 44 px hohen Zeile, und der Name bleibt neben ihm.
 
 ## Sonderfälle & Lehren
 

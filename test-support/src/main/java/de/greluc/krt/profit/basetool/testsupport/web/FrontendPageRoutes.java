@@ -279,7 +279,7 @@ public final class FrontendPageRoutes {
    * {@link #PAGES}, because a scan is expensive per route.
    */
   public static final @Unmodifiable List<String> A11Y_SMOKE =
-      List.of("/", "/missions", "/orders", "/refinery-orders", "/hangar");
+      List.of("/", "/missions", "/orders", "/refinery-orders", "/hangar", "/inventory/my");
 
   /**
    * The list routes that own a {@code /{id}} detail view; the touch sweep reports, without failing,
