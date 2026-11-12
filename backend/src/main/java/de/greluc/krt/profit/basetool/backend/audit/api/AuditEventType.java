@@ -722,6 +722,8 @@ public enum AuditEventType {
   CATALOGUE_STARMAP_LINK_RELEASED(AuditDomain.CATALOGUE),
   /** An admin set a starmap object visible or hidden, or back to the rule (REQ-P4K-038). */
   CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN(AuditDomain.CATALOGUE),
+  /** An admin hid a game item as not obtainable in the game, or offered it again (REQ-P4K-048). */
+  CATALOGUE_GAME_ITEM_OBTAINABILITY_CHANGED(AuditDomain.CATALOGUE),
   /** An admin linked a P4K shop to a UEX terminal by hand (REQ-P4K-043). */
   CATALOGUE_SHOP_LINK_SET(AuditDomain.CATALOGUE),
   /** An admin unlinked a P4K shop from its UEX terminal by hand (REQ-P4K-043). */

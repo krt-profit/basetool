@@ -451,6 +451,25 @@ class StockLevelIntegrationTest {
   }
 
   @Test
+  void aGameItemAnAdminHidAsUnobtainableKeepsItsLevelListed_butIsRefusedOnCreateAndEdit()
+      throws Exception {
+    String body = createItemLevel(1.0, null).andReturn().getResponse().getContentAsString();
+    UUID id = UUID.fromString(json.readTree(body).get("id").asString());
+    jdbc.update("UPDATE game_item SET unobtainable_since = now() WHERE id = ?", item);
+    entityManager.clear();
+
+    assertThat(listed()).as("the existing level stays listed").isEqualTo(1);
+    update(logistician, id, new StockLevelUpdateRequest(null, 2.0, null, 0L))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("CATALOGUE_ITEM_RETIRED"))
+        .andExpect(jsonPath("$.gameItemId").value(item.toString()));
+    createItemLevel(3.0, null)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("CATALOGUE_ITEM_RETIRED"));
+    assertThat(itemAudit("MIN_STOCK_LEVEL_CHANGED")).isEmpty();
+  }
+
+  @Test
   void aGameItemStillLiveAtOneSourceIsNotHidden() throws Exception {
     createItemLevel(1.0, null).andExpect(status().isCreated());
 

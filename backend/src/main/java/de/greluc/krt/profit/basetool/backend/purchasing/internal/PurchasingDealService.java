@@ -167,7 +167,7 @@ public class PurchasingDealService {
    * @param request the deal
    * @return the created draft
    * @throws AccessDeniedException when the caller is no active delegate
-   * @throws RetiredGameItemException when the P4K retired the need's game item
+   * @throws RetiredGameItemException when the need's game item is retired or unobtainable
    */
   @NotNull
   @Transactional
@@ -210,7 +210,7 @@ public class PurchasingDealService {
    * @return the updated draft
    * @throws PurchasingProblemException with {@code PURCHASING_DEAL_STATE} unless the deal is a
    *     draft
-   * @throws RetiredGameItemException when the P4K retired the need's game item
+   * @throws RetiredGameItemException when the need's game item is retired or unobtainable
    */
   @NotNull
   @Transactional

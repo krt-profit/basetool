@@ -28,9 +28,10 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Tells the open admin starmap, shops and P4K import pages that what they list changed (REQ-FE-010,
- * REQ-FE-015): after the commit, one frame to the global {@link LiveSyncTopicClass#CATALOGUE_ADMIN}
- * room naming the page's section, never for a rolled-back write.
+ * Tells the open admin starmap, shops, items and P4K import pages that what they list changed
+ * (REQ-FE-010, REQ-FE-015): after the commit, one frame to the global {@link
+ * LiveSyncTopicClass#CATALOGUE_ADMIN} room naming the page's section, never for a rolled-back
+ * write.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,6 +42,9 @@ public class CatalogueAdminLiveSync {
 
   /** Section of the admin shops page: the shops and their terminal links. */
   public static final String SHOPS = "shops";
+
+  /** Section of the admin items page: the game items and their obtainability (REQ-P4K-048). */
+  public static final String ITEMS = "items";
 
   /** Section of the P4K import page: the applied runs and the import-due banner. */
   public static final String RUNS = "runs";
@@ -58,6 +62,11 @@ public class CatalogueAdminLiveSync {
   /** Announces that a shop's terminal link changed. */
   public void shopsChanged() {
     announce(List.of(SHOPS));
+  }
+
+  /** Announces that an admin hid a game item as not obtainable or offered it again. */
+  public void itemsChanged() {
+    announce(List.of(ITEMS));
   }
 
   /** Announces that a review case was resolved. */

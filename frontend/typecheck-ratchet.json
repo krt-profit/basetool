@@ -36,6 +36,7 @@
       "blueprint/blueprint-overview.js"
     ],
     "catalogue": [
+      "catalogue/admin-items.js",
       "catalogue/admin-material-aliases.js",
       "catalogue/admin-materials.js",
       "catalogue/admin-quality-tiers.js",

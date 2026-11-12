@@ -26,7 +26,10 @@ package de.greluc.krt.profit.basetool.backend.catalogue.api;
  */
 public final class P4kRetirementJpql {
 
-  /** The game item aliased {@code gi} is neither swept nor hidden. */
+  /**
+   * The game item aliased {@code gi} is neither swept nor hidden through a review case; the item
+   * pickers use {@link SelectableGameItemJpql#SELECTABLE_ITEM}.
+   */
   public static final String LISTED_ITEM = " gi.p4kDeletedAt IS NULL AND gi.p4kHiddenAt IS NULL ";
 
   /** The blueprint aliased {@code b} is neither swept nor hidden. */

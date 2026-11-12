@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportDueServ
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportRunRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kReviewCaseRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kStampedRows;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UnobtainableItemBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -135,7 +136,8 @@ class BusinessMetricsCollectorTest {
                     new P4kCatalogueRevision()),
                 new MaterialExchangeBusinessGauges(
                     materialExchangeOfferRepository, materialExchangeRequestRepository),
-                new CatalogueStatBusinessGauges(gameItemStatRepository)),
+                new CatalogueStatBusinessGauges(gameItemStatRepository),
+                new UnobtainableItemBusinessGauges(gameItemRepository)),
             new TaskMetrics(registry));
     collector.registerGauges();
   }

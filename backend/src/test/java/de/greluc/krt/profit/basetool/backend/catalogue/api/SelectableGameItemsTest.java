@@ -34,7 +34,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
-/** The shared lookup that refuses a P4K-retired game item on a write (REQ-P4K-013). */
+/**
+ * The shared lookup that refuses a P4K-retired or an unobtainable game item on a write
+ * (REQ-P4K-013, REQ-P4K-048).
+ */
 @ExtendWith(MockitoExtension.class)
 class SelectableGameItemsTest {
 
@@ -86,6 +89,31 @@ class SelectableGameItemsTest {
 
     assertThatThrownBy(() -> lookup.requireSelectable(item))
         .isInstanceOf(RetiredGameItemException.class);
+  }
+
+  @Test
+  void anItemAnAdminHidAsUnobtainableIsRefusedLikeARetiredOne() {
+    GameItem item = item();
+    item.setUnobtainableSince(Instant.now());
+    when(gameItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
+
+    assertThatThrownBy(() -> lookup.require(item.getId()))
+        .isInstanceOfSatisfying(
+            RetiredGameItemException.class,
+            e -> {
+              assertThat(e.code()).isEqualTo("CATALOGUE_ITEM_RETIRED");
+              assertThat(e.extraProperties()).containsEntry("gameItemId", item.getId().toString());
+            });
+    assertThat(item.isP4kRetired()).as("the hide is no P4K retirement").isFalse();
+  }
+
+  @Test
+  void anItemOfferedAgainIsSelectable() {
+    GameItem item = item();
+    item.setUnobtainableSince(Instant.now());
+    item.setUnobtainableSince(null);
+
+    assertThat(lookup.requireSelectable(item)).isSameAs(item);
   }
 
   private static GameItem item() {

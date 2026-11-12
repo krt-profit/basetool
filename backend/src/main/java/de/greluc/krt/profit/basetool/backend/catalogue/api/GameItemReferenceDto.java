@@ -38,8 +38,9 @@ import org.jetbrains.annotations.Nullable;
  * @param grade the component grade, or {@code null} when unknown or no component
  * @param itemClass the {@code ShipComponentClass} name, or {@code null} when unknown or no
  *     component
- * @param noLongerInGame whether the P4K stamped the item as gone from the game or an admin hid it;
- *     the reference then shows the "no longer in the game" notice (REQ-P4K-013)
+ * @param noLongerInGame whether the P4K stamped the item as gone from the game or an admin hid it
+ *     through a review case; the reference then shows the "no longer in the game" notice
+ *     (REQ-P4K-013). An item hidden as not obtainable shows none (REQ-P4K-048).
  * @param nameDe the item's German name, or {@code null} (REQ-P4K-023)
  */
 public record GameItemReferenceDto(
