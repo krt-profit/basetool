@@ -287,7 +287,8 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
    `P4kImportReportService` and `P4kReviewService`; resolving a case as keep, hide or an assignment
    (a resource group, or the material of a resource that joins no single commodity) is audited, and
    a hide stamps `p4k_hidden_at`, which the pickers filter like the sweep's stamp (REQ-P4K-013,
-   REQ-P4K-016).
+   REQ-P4K-016). The grouped workspace checks source proposals and selected case versions under
+   the import lock. A queued ship repair waits for an eligible complete APPLY (REQ-P4K-049).
 
 ## 6.12 Material provision and a connected correction
 

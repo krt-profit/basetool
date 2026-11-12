@@ -96,8 +96,7 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
   Instant findOldestCreatedAtByStatus(@Param("status") P4kReviewStatus status);
 
   /**
-   * Reads the keys of the cases an admin closed, as keep, hide or assign; a case a run closed by
-   * itself ({@code RESOLVED}) is not among them, since a later run reopens it.
+   * Reads the keys of cases an administrator closed. A case closed by a run can reopen.
    *
    * @return the keys of the admin-closed cases
    */
@@ -111,6 +110,27 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
   Set<P4kReviewKey> findAdminClosedKeys();
 
   /**
+   * Finds other open cases whose catalogue references follow a retired row in a merge.
+   *
+   * @param kind the review kind that owns the reference
+   * @param retiredId the catalogue row being retired
+   * @param activeCaseId the case whose proposal is being applied
+   * @return the open cases that reference the retired row
+   */
+  @Query(
+      """
+      SELECT c FROM P4kReviewCase c
+      WHERE c.kind = :kind
+        AND c.status = de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kReviewStatus.OPEN
+        AND c.id <> :activeCaseId
+        AND (c.rowId = :retiredId OR c.otherRowId = :retiredId)
+      """)
+  List<P4kReviewCase> findOpenReferences(
+      @Param("kind") P4kKind kind,
+      @Param("retiredId") UUID retiredId,
+      @Param("activeCaseId") UUID activeCaseId);
+
+  /**
    * Finds the cases of one kind and set of reasons, whatever their status.
    *
    * @param kind the kind
@@ -118,4 +138,19 @@ public interface P4kReviewCaseRepository extends JpaRepository<P4kReviewCase, UU
    * @return the cases
    */
   List<P4kReviewCase> findByKindAndReasonIn(P4kKind kind, Collection<P4kReviewReason> reasons);
+
+  /**
+   * Reads the ship corrections waiting for a compatible source import.
+   *
+   * @return the pending corrections
+   */
+  List<P4kReviewCase> findByShipRepairRowIdIsNotNull();
+
+  /**
+   * Checks whether another confirmed repair already targets a ship.
+   *
+   * @param shipRepairRowId the ship
+   * @return whether a repair is pending for the ship
+   */
+  boolean existsByShipRepairRowId(UUID shipRepairRowId);
 }

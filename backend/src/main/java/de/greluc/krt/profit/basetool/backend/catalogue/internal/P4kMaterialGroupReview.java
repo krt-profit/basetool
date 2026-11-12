@@ -77,9 +77,13 @@ public class P4kMaterialGroupReview {
    */
   public int review(
       @NotNull P4kCommodityReconciler.Outcome outcome, @NotNull P4kImportContext context) {
+    Set<UUID> vanished =
+        context.isApply() ? Set.of() : context.getReport().vanishedGuids(P4kKind.COMMODITY);
     List<Material> ungrouped = new ArrayList<>();
     for (Material material : entityManager.createQuery(UNGROUPED, Material.class).getResultList()) {
-      if (!outcome.grouped().contains(material.getId())) {
+      UUID guid = material.getP4kUuid();
+      if (!outcome.grouped().contains(material.getId())
+          && (guid == null || !vanished.contains(guid))) {
         ungrouped.add(material);
       }
     }

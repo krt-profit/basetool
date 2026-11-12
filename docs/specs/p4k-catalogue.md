@@ -1748,3 +1748,31 @@ the share of the catalogue's items without `itemClass` (`p4k_import_run.item_cla
   the map view are designed there.
 - **Features on top of loadouts and paints** (hangar configuration, Erkul import, VerseKit sync;
   #2822, #2820, #2821).
+
+### REQ-P4K-049 — the review workspace presents evidence and records explicit catalogue decisions
+
+The admin workspace lists open findings in groups. Logo and generic asset findings can share a
+group when their source records share a family and the cases carry no competing linked row.
+Reciprocal identity conflicts share a card, with both cases retained. The admin can inspect the
+record class, source path and current P4K, UEX and SC Wiki identity evidence in place. The queue
+orders groups by the next available action and supports filtering by readiness, kind and reason.
+
+An available proposal names the target, its identity evidence and its current version. The admin
+confirms a single proposal or explicitly selects versioned members of a compatible group. Name
+matches alone qualify a record for inspection. Identity writes recheck the candidate and case
+under the import and synchronization lock. One stale member rejects the entire selected group.
+The case records the resolution and the audit log records the action. Review changes update peers
+through the catalogue admin room (REQ-FE-015).
+
+Manufacturer branding records do not supply canonical company fields. Confirmed manufacturer
+aliases survive later imports. Manufacturer and item merges retain source identities and catalogue
+references. Ship variant links preserve the distinct identity of the variant and its base. A confirmed base
+repair stays open and waits for a compatible complete import that can rebuild the stored source
+data and its dependent catalogue relationships. The administrator can withdraw a pending repair
+and review the case again.
+UEX place and terminal proposals use the resolved place hierarchy. Confirming a parent link updates
+candidate eligibility for its children and shops. Resource grouping reviews use the live catalogue
+after the P4K sweep.
+
+**Code:** `P4kReviewWorkspaceService`, `P4kReviewActionProvider`,
+`AdminP4kReviewWorkspaceController`. **ADR:** [ADR-0377](../adr/0377-review-actions-validate-current-source-identities.md). **Audit:** REQ-P4K-046, REQ-AUDIT-001.

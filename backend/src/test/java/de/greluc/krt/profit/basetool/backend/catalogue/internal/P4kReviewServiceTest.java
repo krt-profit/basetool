@@ -26,6 +26,9 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDomain;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventDto;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemSourceSystem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
@@ -42,6 +45,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +71,8 @@ class P4kReviewServiceTest {
 
   @Autowired private P4kImportService importService;
   @Autowired private P4kReviewService reviewService;
+  @Autowired private P4kReviewWorkspaceService workspace;
+  @Autowired private GameItemRepository gameItems;
   @Autowired private P4kImportJobRepository jobRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private P4kReviewCaseRepository caseRepository;
@@ -367,5 +373,142 @@ class P4kReviewServiceTest {
             reviewService.resolve(
                 reviewCase.getId(), P4kReviewResolution.HIDE, null, null, kept.version(), ADMIN))
         .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
+  void attachesExactWikiItemAndRejectsAnOutdatedCandidate() {
+    UUID run = runs.apply(P4kTestCatalogues.fixtureBytes(), false).runId();
+    UUID guid = UUID.randomUUID();
+    GameItem item = new GameItem();
+    item.setName("Review optic");
+    item.setClassName("Review_Optic_01");
+    item.setExternalUuid(guid);
+    item.setScwikiSlug("review-optic");
+    item.setKind(GameItemKind.GENERIC);
+    item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    gameItems.saveAndFlush(item);
+    P4kReviewCase review =
+        openWorkspaceCase(
+            run,
+            guid,
+            item.getId(),
+            "Review optic",
+            "Review_Optic_01",
+            "game/optics/review_optic_01");
+
+    P4kReviewCandidate candidate =
+        workspace.detail(review.getId()).options().candidates().stream()
+            .filter(option -> option.action() == P4kReviewAction.ATTACH_P4K)
+            .findFirst()
+            .orElseThrow();
+
+    var stale =
+        new P4kReviewApplyRequest(
+            candidate.action(),
+            candidate.targetId(),
+            candidate.targetVersion() + 1,
+            candidate.subjectVersion(),
+            review.getVersion());
+    assertThatThrownBy(() -> workspace.applyWithinLock(review.getId(), stale, ADMIN))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+    assertThat(item.getP4kUuid()).isNull();
+  }
+
+  @Test
+  void appliesExactWikiItemIdentityAndAuditsTheDecision() {
+    UUID run = runs.apply(P4kTestCatalogues.fixtureBytes(), false).runId();
+    UUID guid = UUID.randomUUID();
+    GameItem item = new GameItem();
+    item.setName("Review compass");
+    item.setClassName("Review_Compass_01");
+    item.setExternalUuid(guid);
+    item.setScwikiSlug("review-compass");
+    item.setKind(GameItemKind.GENERIC);
+    item.setSourceSystems(GameItemSourceSystem.WIKI_ONLY);
+    gameItems.saveAndFlush(item);
+    P4kReviewCase review =
+        openWorkspaceCase(
+            run,
+            guid,
+            item.getId(),
+            "Review compass",
+            "Review_Compass_01",
+            "game/optics/review_compass_01");
+    P4kReviewCandidate candidate =
+        workspace.detail(review.getId()).options().candidates().stream()
+            .filter(option -> option.action() == P4kReviewAction.ATTACH_P4K)
+            .findFirst()
+            .orElseThrow();
+
+    P4kReviewCaseDto applied =
+        workspace.apply(
+            review.getId(),
+            new P4kReviewApplyRequest(
+                candidate.action(),
+                candidate.targetId(),
+                candidate.targetVersion(),
+                candidate.subjectVersion(),
+                review.getVersion()),
+            ADMIN);
+
+    assertThat(applied.status()).isEqualTo(P4kReviewStatus.REVIEWED);
+    assertThat(applied.resolution()).isEqualTo(P4kReviewResolution.APPLIED);
+    assertThat(item.getP4kUuid()).isEqualTo(guid);
+    assertThat(item.getScwikiSlug()).isEqualTo("review-compass");
+    assertThat(events(AuditEventType.CATALOGUE_P4K_REVIEW_APPLIED))
+        .anySatisfy(event -> assertThat(event.subjectId()).isEqualTo(review.getId()));
+  }
+
+  @Test
+  void aBatchReviewsOnlyTheSelectedMembers() {
+    UUID run = runs.apply(P4kTestCatalogues.fixtureBytes(), false).runId();
+    P4kReviewCase first =
+        openWorkspaceCase(
+            run, UUID.randomUUID(), null, "Door", "Review_Door_01", "game/doors/first");
+    P4kReviewCase second =
+        openWorkspaceCase(
+            run, UUID.randomUUID(), null, "Door", "Review_Door_02", "game/doors/second");
+    P4kReviewGroupDto group =
+        workspace
+            .groups(P4kKind.ITEM, P4kReviewReason.GUID_CONFLICT, null, PageRequest.of(0, 20))
+            .getContent()
+            .stream()
+            .filter(entry -> entry.name().equals("Door"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(group.batchable()).isTrue();
+
+    workspace.resolveBatch(
+        group.id(),
+        new P4kReviewBatchRequest(
+            P4kReviewResolution.KEEP,
+            List.of(new P4kReviewBatchMember(first.getId(), first.getVersion()))),
+        ADMIN);
+
+    assertThat(first.getStatus()).isEqualTo(P4kReviewStatus.REVIEWED);
+    assertThat(second.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+  }
+
+  private P4kReviewCase openWorkspaceCase(
+      UUID run, UUID guid, @Nullable UUID rowId, String name, String className, String recordPath) {
+    P4kImportChange change = new P4kImportChange();
+    change.setRunId(run);
+    change.setKind(P4kKind.ITEM);
+    change.setGuid(guid);
+    change.setChangeType(P4kChangeType.REVIEW);
+    change.setFieldName(P4kReviewReason.GUID_CONFLICT.name());
+    change.setNameEn(name);
+    change.setClassName(className);
+    change.setRecordPath(recordPath);
+    changeRepository.saveAndFlush(change);
+
+    P4kReviewCase review = new P4kReviewCase();
+    review.setKind(P4kKind.ITEM);
+    review.setGuid(guid);
+    review.setRowId(rowId);
+    review.setReason(P4kReviewReason.GUID_CONFLICT);
+    review.setFirstRunId(run);
+    review.setLastRunId(run);
+    return caseRepository.saveAndFlush(review);
   }
 }

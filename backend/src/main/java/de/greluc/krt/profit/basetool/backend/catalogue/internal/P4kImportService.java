@@ -128,10 +128,11 @@ public class P4kImportService {
     P4kImportContext context =
         P4kImportContext.forPreview(
             catalogue, Instant.now(), reviewCaseRepository.findAdminClosedKeys());
-    int ingredientsResolved = reconcile(payload, catalogue, context);
-    sweepAndFollow(catalogue, context, false);
+    P4kReconcilers.Outcome reconciled = reconcile(payload, catalogue, context);
+    sweepAndFollow(catalogue, context, reconciled, false);
     return new P4kPreview(
-        result(catalogue, build, context, ingredientsResolved), context.getReport().changes());
+        result(catalogue, build, context, reconciled.ingredientsResolved()),
+        context.getReport().changes());
   }
 
   /**
@@ -163,11 +164,12 @@ public class P4kImportService {
             run.getId(),
             request.createItemsAndShips(),
             reviewCaseRepository.findAdminClosedKeys());
-    int ingredientsResolved = reconcile(payload, catalogue, context);
-    List<P4kKind> overridden = sweepAndFollow(catalogue, context, request.overrideMassGuard());
+    P4kReconcilers.Outcome reconciled = reconcile(payload, catalogue, context);
+    List<P4kKind> overridden =
+        sweepAndFollow(catalogue, context, reconciled, request.overrideMassGuard());
     run.setKinds(kinds(catalogue.head(), context.getReport()));
     recorder.record(run.getId(), context.getReport());
-    P4kImportResultDto result = result(catalogue, build, context, ingredientsResolved);
+    P4kImportResultDto result = result(catalogue, build, context, reconciled.ingredientsResolved());
     overridden.forEach(kind -> auditOverride(run, context.getReport().sweepResult(kind)));
     syncReportService.logP4kRunSummary(run.getId(), summary(result, context.getReport()));
     auditRecorder.record(
@@ -176,7 +178,8 @@ public class P4kImportService {
         run.getBuildVersion(),
         null,
         auditDetails(run, result)
-            .with("adminCategoriesRetired", context.getAdminCategoriesRetired()));
+            .with("adminCategoriesRetired", context.getAdminCategoriesRetired())
+            .with("shipBaseRepairs", reconciled.shipBaseRepairs()));
     syncReportService.pruneRuns(SyncSourceSystem.P4K);
     revision.changed();
     log.info("P4K import applied (run {}): {}", run.getId(), summary(result, context.getReport()));
@@ -184,11 +187,12 @@ public class P4kImportService {
   }
 
   /**
-   * Sweeps the complete kinds, then hands the blueprints' produced-item GUIDs to the modules keyed
-   * by them (REQ-P4K-029).
+   * Sweeps the complete kinds, reviews the remaining materials and hands the blueprints'
+   * produced-item GUIDs to the modules keyed by them (REQ-P4K-029).
    *
    * @param catalogue the catalogue
    * @param context the run
+   * @param reconciled the outcome of reconciliation
    * @param overrideMassGuard whether a kind is swept past the mass guard
    * @return the kinds swept only because of the override
    */
@@ -196,8 +200,10 @@ public class P4kImportService {
   private List<P4kKind> sweepAndFollow(
       @NotNull P4kCatalogue catalogue,
       @NotNull P4kImportContext context,
+      @NotNull P4kReconcilers.Outcome reconciled,
       boolean overrideMassGuard) {
     List<P4kKind> overridden = sweeper.sweep(catalogue, context, overrideMassGuard);
+    reconcilers.reviewMaterialGroups(reconciled, context);
     productKeyReview.follow(context, context.getNow());
     return overridden;
   }
@@ -208,9 +214,9 @@ public class P4kImportService {
    * @param payload the stored upload, streamed again for the loadouts
    * @param catalogue the catalogue
    * @param context the run
-   * @return the ingredient lines the blueprints resolved
+   * @return the reconciliation inputs for review and reporting
    */
-  private int reconcile(
+  private P4kReconcilers.Outcome reconcile(
       byte @NotNull [] payload,
       @NotNull P4kCatalogue catalogue,
       @NotNull P4kImportContext context) {

@@ -79,6 +79,7 @@ jurisdiction catalogue
 kommando_group orgunit
 location catalogue
 manufacturer catalogue
+manufacturer_p4k_alias catalogue
 manufacturer_scwiki_identity catalogue
 manufacturer_uex_company catalogue
 material catalogue

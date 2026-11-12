@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -384,6 +385,22 @@ public final class P4kImportReport {
     Tally t = tally(kind);
     return new P4kImportResultDto.Sweep(
         kind, t.sweep, t.known, t.toStamp, t.vanished, t.reappeared);
+  }
+
+  /**
+   * Finds the P4K GUIDs that the sweep marked as vanished.
+   *
+   * @param kind the kind whose final live set is needed
+   * @return the vanished GUIDs
+   */
+  @NotNull
+  @Unmodifiable
+  Set<UUID> vanishedGuids(@NotNull P4kKind kind) {
+    return changes.stream()
+        .filter(
+            change -> change.getKind() == kind && change.getChangeType() == P4kChangeType.VANISHED)
+        .map(P4kImportChange::getGuid)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**

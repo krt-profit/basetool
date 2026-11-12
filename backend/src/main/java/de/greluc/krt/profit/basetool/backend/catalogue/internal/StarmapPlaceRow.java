@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -53,6 +55,19 @@ public record StarmapPlaceRow(
     @Nullable String outpost,
     @Nullable UUID starmapObjectId,
     boolean manual) {
+
+  /**
+   * Names the location in the UEX hierarchy with the parent names supplied by UEX.
+   *
+   * @return its path from the star system to this row
+   */
+  @NotNull
+  String reviewPath() {
+    return Stream.of(starSystem, orbit, planet, moon, city, spaceStation, outpost, name)
+        .filter(value -> value != null && !value.isBlank())
+        .distinct()
+        .collect(Collectors.joining(" / "));
+  }
 
   /**
    * Returns the name of one of the row's parents.

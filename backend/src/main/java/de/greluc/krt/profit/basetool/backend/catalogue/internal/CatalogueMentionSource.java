@@ -113,6 +113,7 @@ public class CatalogueMentionSource implements PersonMentionSource {
         "game_item_stat",
         "jurisdiction",
         "manufacturer",
+        "manufacturer_p4k_alias",
         "manufacturer_scwiki_identity",
         "material",
         "moon",

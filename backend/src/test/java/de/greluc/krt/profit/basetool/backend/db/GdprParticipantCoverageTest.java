@@ -171,7 +171,10 @@ class GdprParticipantCoverageTest {
               + " of a never-pruned import run (REQ-P4K-005).",
           "p4k_review_case.resolved_by",
           "The id of the admin who resolved a P4K review case, a pseudonymous record of an act"
-              + " on the organisation's catalogue that is never pruned (REQ-P4K-016).");
+              + " on the organisation's catalogue that is never pruned (REQ-P4K-016).",
+          "p4k_review_case.ship_repair_by",
+          "The reviewer of a pending catalogue repair; the actor remains attributed until"
+              + " completion (REQ-P4K-016).");
 
   /** Member references no export section selects, each with the reason. */
   static final Map<String, String> NOT_EXPORTED =
@@ -256,7 +259,10 @@ class GdprParticipantCoverageTest {
               "The admin who applied a catalogue import; an act on the organisation's catalogue."),
           Map.entry(
               "p4k_review_case.resolved_by",
-              "The admin who resolved a review case; an act on the organisation's catalogue."));
+              "The admin who resolved a review case; an act on the organisation's catalogue."),
+          Map.entry(
+              "p4k_review_case.ship_repair_by",
+              "The reviewer who confirmed a pending repair on the organisation's catalogue."));
 
   /** Member references the account merge does not classify, each with the reason. */
   static final Map<String, String> NOT_MERGED =
@@ -269,7 +275,9 @@ class GdprParticipantCoverageTest {
               + " subject of a merge.",
           "p4k_review_case.resolved_by",
           "The admin who resolved a review case; it stays with the act and is never the subject"
-              + " of a merge.");
+              + " of a merge.",
+          "p4k_review_case.ship_repair_by",
+          "The reviewer who confirmed the repair; the identity remains attributed to the act.");
 
   @MockitoBean private RoleRepository roleRepository;
 

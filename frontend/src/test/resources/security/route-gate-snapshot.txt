@@ -114,6 +114,11 @@
 /admin/p4k-import/resource-groups GET -> AdminP4kReportController#resourceGroups gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/review-cases GET -> AdminP4kReportController#openReviewCases gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/review-cases/{id}/resolve POST -> AdminP4kReportController#resolve gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-workspace GET -> AdminP4kReviewWorkspaceController#groups gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-workspace/groups/{id} GET -> AdminP4kReviewWorkspaceController#groupMembers gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-workspace/groups/{id}/resolve POST -> AdminP4kReviewWorkspaceController#resolveGroup gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-workspace/{caseId} GET -> AdminP4kReviewWorkspaceController#detail gate=class:hasRole('ADMIN') layout=no
+/admin/p4k-import/review-workspace/{caseId}/apply POST -> AdminP4kReviewWorkspaceController#apply gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/runs GET -> AdminP4kReportController#runs gate=class:hasRole('ADMIN') layout=no
 /admin/p4k-import/runs/{id}/changes GET -> AdminP4kReportController#runChanges gate=class:hasRole('ADMIN') layout=no
 /admin/person-search GET -> AdminPersonSearchPageController#page gate=method:hasRole('ADMIN') layout=yes

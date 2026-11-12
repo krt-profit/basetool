@@ -4209,7 +4209,7 @@ alerts never carry `source="P4K"`.
     the last run's share minus the previous run's, `0` when either is unknown.
   - `basetool_p4k_catalogue_stamped_rows{kind}`: the P4K-known rows a sweep stamped as gone and no
     later run matched again.
-  - `basetool_p4k_review_cases_open{kind}` and `basetool_p4k_review_case_open_oldest_age_seconds`.
+  - `basetool_p4k_review_cases_open{kind}` and `basetool_p4k_review_case_open_oldest_age_seconds` count underlying open cases, including grouped cases and pending repairs (REQ-P4K-049).
 
   The starmap kind is `kind="STARMAP_OBJECT"` in these gauges: its `matched`, `added` and
   `changed` rows count the starmap objects, its `unmatched` rows the UEX location rows the run left

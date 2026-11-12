@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kCatalogue;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -60,31 +61,57 @@ class P4kReconcilers {
    * @param catalogue the catalogue
    * @param loadouts streams the catalogue's loadouts, which it does not hold in memory
    * @param context the run
-   * @return the ingredient lines the blueprints resolved
+   * @return the reconciliation inputs for review and reporting
    */
-  int reconcile(
+  Outcome reconcile(
       @NotNull P4kCatalogue catalogue,
       @NotNull P4kLoadoutReconciler.LoadoutStream loadouts,
       @NotNull P4kImportContext context) {
     manufacturerReconciler.reconcile(catalogue.manufacturers(), context);
     itemReconciler.reconcile(catalogue.items(), context);
     itemStatReconciler.reconcile(catalogue, context);
-    shipReconciler.reconcile(catalogue, context);
+    final List<P4kShipBaseRepairs.Repair> shipRepairs =
+        shipReconciler.reconcile(catalogue, loadouts, context);
     manufacturerReconciler.finish(context);
     resourceGroupReconciler.reconcile(catalogue, context);
-    context.setAdminCategoriesRetired(
-        materialGroupReview.review(commodityReconciler.reconcile(catalogue, context), context));
+    final P4kCommodityReconciler.Outcome commodities =
+        commodityReconciler.reconcile(catalogue, context);
     blueprintCategoryReconciler.reconcile(catalogue.blueprintCategories(), context);
     final int ingredientsResolved = blueprintReconciler.reconcile(catalogue, context);
     paintReconciler.reconcile(
         catalogue.paints(), catalogue.head().isComplete(P4kCatalogue.PAINTS), context);
     loadoutReconciler.reconcile(loadouts, catalogue, context);
+    if (context.isApply()) {
+      shipRepairs.forEach(repair -> repair.selection().finishShipRepair(context.getNow()));
+    }
     if (!catalogue.starmapObjects().isEmpty()) {
       starmapLinker.link(starmapReconciler.reconcile(catalogue.starmapObjects(), context), context);
     }
     if (!catalogue.shops().isEmpty()) {
       shopLinker.link(shopReconciler.reconcile(catalogue.shops(), context), context);
     }
-    return ingredientsResolved;
+    return new Outcome(ingredientsResolved, commodities, shipRepairs.size());
   }
+
+  /**
+   * Opens or settles resource-group cases for the materials left live after the sweep.
+   *
+   * @param outcome the commodities and their assigned groups
+   * @param context the run
+   */
+  void reviewMaterialGroups(@NotNull Outcome outcome, @NotNull P4kImportContext context) {
+    context.setAdminCategoriesRetired(materialGroupReview.review(outcome.commodities(), context));
+  }
+
+  /**
+   * Reconciliation data used to finish review and reporting.
+   *
+   * @param ingredientsResolved the ingredient lines the blueprints resolved
+   * @param commodities the resource groups assigned to commodities
+   * @param shipBaseRepairs the confirmed ship repairs the run can finish
+   */
+  record Outcome(
+      int ingredientsResolved,
+      @NotNull P4kCommodityReconciler.Outcome commodities,
+      int shipBaseRepairs) {}
 }

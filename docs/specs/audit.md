@@ -550,7 +550,9 @@ The coverage list holds the **Katalog** area
     resolution of a review case, `CATALOGUE_P4K_REVIEW_KEPT`, `CATALOGUE_P4K_REVIEW_HIDDEN` or, for a
     material without a resource group, `CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED` (with `groupId`,
     REQ-P4K-025), or, for a resource that joins no single commodity,
-    `CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED` (REQ-P4K-024), one event per case; the APPLY event carries `adminCategoriesRetired`. The types exist; the sweep and review flows of REQ-P4K-012 and REQ-P4K-016
+    `CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED` (REQ-P4K-024), and
+    `CATALOGUE_P4K_REVIEW_APPLIED` and
+    `CATALOGUE_P4K_REVIEW_REPAIR_QUEUED` and `CATALOGUE_P4K_REVIEW_REPAIR_CANCELLED` (REQ-P4K-049), one event per decision; the APPLY event carries `adminCategoriesRetired`. The types exist; the sweep and review flows of REQ-P4K-012 and REQ-P4K-016
     record them;
   - the starmap ([ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md),
     REQ-P4K-035…038): `CATALOGUE_STARMAP_LINK_SET`, `CATALOGUE_STARMAP_LINK_CLEARED` and

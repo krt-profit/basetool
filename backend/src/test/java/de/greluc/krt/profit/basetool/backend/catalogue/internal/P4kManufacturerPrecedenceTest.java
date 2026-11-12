@@ -21,10 +21,15 @@ package de.greluc.krt.profit.basetool.backend.catalogue.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Manufacturer;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
+import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +65,12 @@ class P4kManufacturerPrecedenceTest {
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private P4kReviewCaseRepository reviewCaseRepository;
   @Autowired private P4kImportChangeRepository changeRepository;
+  @Autowired private P4kManufacturerReviewActions manufacturerActions;
+  @Autowired private ManufacturerP4kAliasRepository p4kAliases;
+  @Autowired private ManufacturerUexCompanyRepository uexCompanies;
+  @Autowired private ManufacturerScwikiIdentityRepository wikiIdentities;
+  @Autowired private GameItemRepository items;
+  @Autowired private EntityManager entityManager;
 
   private P4kImportRuns runs;
 
@@ -225,5 +236,228 @@ class P4kManufacturerPrecedenceTest {
 
     assertThat(manufacturerRepository.findByP4kUuid(AEGIS)).isEmpty();
     assertThat(applied.manufacturers().created()).isZero();
+  }
+
+  @Test
+  void auxiliaryRecordsPreserveKnownShipBrandsAndDoNotClaimCanonicalNames() {
+    Manufacturer aegis = manufacturer("Known Aegis Brand", "AEG");
+    aegis.setP4kUuid(AEGIS);
+    Manufacturer gorgon = manufacturer("Canonical Gorgon Brand", "GODI");
+    GameItem shield = new GameItem();
+    shield.setName("Shield With Known Manufacturer");
+    shield.setP4kUuid(P4kTestCatalogues.SHIELD);
+    shield.setManufacturer(gorgon);
+    shield.setP4kManufacturer(gorgon);
+    items.save(shield);
+    ObjectNode root = P4kTestCatalogues.tree();
+    P4kTestCatalogues.record(root, "items", P4kTestCatalogues.SHIELD)
+        .put("manufacturerGuid", ANVIL.toString());
+    named(root, GORGON, gorgon.getName(), gorgon.getName());
+    named(root, AEGIS, gorgon.getName(), gorgon.getName())
+        .put("recordPath", "libs/foundry/records/scitemmanufacturer/paintcolorlogos/known_logo");
+    named(root, ANVIL, gorgon.getName(), gorgon.getName())
+        .put("recordPath", "libs/foundry/records/scitemmanufacturer/shop/shopkiosk/new_shop");
+
+    P4kImportResultDto applied = runs.apply(P4kTestCatalogues.bytes(root), true);
+
+    assertThat(aegis.getName()).isEqualTo("Known Aegis Brand");
+    assertThat(aegis.getP4kSeenRunId()).isEqualTo(applied.runId());
+    assertThat(gorgon.getP4kUuid()).isEqualTo(GORGON);
+    assertThat(shield.getManufacturer()).isSameAs(gorgon);
+    assertThat(shield.getP4kManufacturer()).isSameAs(gorgon);
+    assertThat(manufacturerRepository.findByP4kUuid(ANVIL)).isEmpty();
+    assertThat(shipTypeRepository.findByP4kUuid(P4kTestCatalogues.PLAYER_SHIP))
+        .hasValueSatisfying(ship -> assertThat(ship.getManufacturer()).isSameAs(aegis));
+    assertThat(P4kImportRuns.report(changeRepository, applied.runId()))
+        .filteredOn(change -> change.getKind() == P4kKind.MANUFACTURER)
+        .satisfies(rows -> {
+          assertThat(rows)
+              .filteredOn(change -> change.getChangeType() == P4kChangeType.REVIEW)
+              .extracting(P4kImportChange::getGuid)
+              .doesNotContain(AEGIS, ANVIL, GORGON);
+          assertThat(rows)
+              .filteredOn(change -> change.getChangeType() == P4kChangeType.UNMATCHED)
+              .extracting(P4kImportChange::getGuid)
+              .contains(ANVIL);
+        });
+  }
+
+  @Test
+  void aConfirmedWikiGuidAliasSuppliesTheShipManufacturerWithoutLeadingTheBrandFields() {
+    Manufacturer brand = manufacturer("Known Aegis Brand", "AEG");
+    brand.setP4kUuid(GORGON);
+    brand.setScwikiUuid(AEGIS);
+    manufacturerRepository.flush();
+    P4kReviewCaseDto review =
+        manufacturerReview(UUID.randomUUID(), brand, AEGIS, "Untrusted name", "AEGS");
+    String path = "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.aegs";
+    P4kReviewOptions options = manufacturerActions.options(review, path);
+    assertThat(options.readiness()).isEqualTo(P4kReviewReadiness.ACTIONABLE);
+    P4kReviewCandidate candidate =
+        options.candidates().stream()
+            .filter(option -> option.action() == P4kReviewAction.ATTACH_MANUFACTURER_ALIAS)
+            .findFirst()
+            .orElseThrow();
+    assertThat(candidate.evidence())
+        .contains(P4kReviewEvidence.EXACT_SCWIKI_UUID, P4kReviewEvidence.OTHER_P4K_GUID);
+    manufacturerActions.apply(review, path, candidate, UUID.randomUUID());
+
+    ObjectNode root = P4kTestCatalogues.tree();
+    named(root, GORGON, brand.getName(), brand.getName());
+    named(root, AEGIS, "Untrusted name", "Untrusted name");
+    runs.apply(P4kTestCatalogues.bytes(root), true);
+
+    assertThat(brand.getName()).isEqualTo("Known Aegis Brand");
+    assertThat(brand.getP4kUuid()).isEqualTo(GORGON);
+    assertThat(p4kAliases.findById(AEGIS))
+        .hasValueSatisfying(alias -> assertThat(alias.getManufacturer()).isSameAs(brand));
+    assertThat(shipTypeRepository.findByP4kUuid(P4kTestCatalogues.PLAYER_SHIP))
+        .hasValueSatisfying(ship -> assertThat(ship.getManufacturer()).isSameAs(brand));
+  }
+
+  @Test
+  void applyClosesAnOpenAuxiliaryConflictOnlyAfterSeeingItsRecord() {
+    Manufacturer aegis = manufacturer("Canonical Aegis Brand", "AEG");
+    aegis.setP4kUuid(AEGIS);
+    ObjectNode root = P4kTestCatalogues.tree();
+    named(root, AEGIS, aegis.getName(), aegis.getName());
+    named(root, ANVIL, aegis.getName(), aegis.getName());
+    UUID firstRun = runs.apply(P4kTestCatalogues.bytes(root), false).runId();
+    P4kReviewCase open =
+        reviewCaseRepository
+            .findByKindAndGuidAndReason(P4kKind.MANUFACTURER, ANVIL, P4kReviewReason.GUID_CONFLICT)
+            .orElseThrow();
+    assertThat(open.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+    named(root, ANVIL, aegis.getName(), aegis.getName())
+        .put("recordPath", "libs/foundry/records/scitemmanufacturer/paintcolorlogos/anvil_logo");
+    byte[] catalogue = P4kTestCatalogues.bytes(root);
+
+    runs.preview(catalogue);
+    assertThat(open.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+    runs.apply(catalogue, false);
+
+    assertThat(open.getStatus()).isEqualTo(P4kReviewStatus.REVIEWED);
+    assertThat(open.getResolution()).isEqualTo(P4kReviewResolution.RESOLVED);
+    assertThat(open.getLastRunId()).isEqualTo(firstRun);
+  }
+
+  @Test
+  void aVerifiedUexDuplicateMergeKeepsTheP4kBrandAndRepointsBothItemRolesAndShips() {
+    UUID run = runs.apply(P4kTestCatalogues.fixtureBytes(), false).runId();
+    UUID reviewedGuid = UUID.randomUUID();
+    Manufacturer survivor = manufacturer("Test Musashi & Starflight", "MIS");
+    survivor.setP4kUuid(UUID.randomUUID());
+    survivor.setScwikiUuid(reviewedGuid);
+    survivor.setScwikiCode("MISC");
+    Manufacturer duplicate = manufacturer("Test Musashi and Starflight", "MISC");
+    duplicate.setUexCompanyId(17991);
+    uexCompanies.save(new ManufacturerUexCompany(17991, duplicate));
+    wikiIdentities.save(
+        new ManufacturerScwikiIdentity(
+            reviewedGuid, survivor, survivor.getName(), "MISC", Instant.now()));
+    GameItem item = new GameItem();
+    item.setName("Manufacturer Merge Item");
+    item.setManufacturer(duplicate);
+    item.setP4kManufacturer(duplicate);
+    UUID itemId = items.saveAndFlush(item).getId();
+    ShipType ship = new ShipType();
+    ship.setName("Manufacturer Merge Ship");
+    ship.setManufacturer(duplicate);
+    UUID shipId = shipTypeRepository.saveAndFlush(ship).getId();
+    UUID survivorId = survivor.getId();
+    UUID duplicateId = duplicate.getId();
+    UUID activeId =
+        reviewCaseRepository
+            .save(manufacturerCase(run, reviewedGuid, survivorId, duplicateId))
+            .getId();
+    UUID otherId =
+        reviewCaseRepository
+            .save(manufacturerCase(run, UUID.randomUUID(), duplicateId, survivorId))
+            .getId();
+    P4kReviewCase historical = manufacturerCase(run, UUID.randomUUID(), duplicateId, survivorId);
+    historical.setStatus(P4kReviewStatus.REVIEWED);
+    historical.setResolution(P4kReviewResolution.KEEP);
+    historical.setResolvedAt(Instant.now());
+    historical.setResolvedBy(P4kImportRuns.ADMIN);
+    UUID historicalId = reviewCaseRepository.saveAndFlush(historical).getId();
+    entityManager.clear();
+    P4kReviewCaseDto review =
+        manufacturerReview(activeId, survivor, reviewedGuid, survivor.getName(), "MISC");
+    String path = "libs/foundry/records/scitemmanufacturer/scitemmanufacturer.misc";
+    P4kReviewOptions options = manufacturerActions.options(review, path);
+    assertThat(options.readiness()).isEqualTo(P4kReviewReadiness.CHECK_REQUIRED);
+    assertThat(options.candidates())
+        .extracting(P4kReviewCandidate::action)
+        .contains(P4kReviewAction.ATTACH_MANUFACTURER_ALIAS, P4kReviewAction.MERGE_MANUFACTURER);
+    P4kReviewCandidate candidate =
+        options.candidates().stream()
+            .filter(option -> option.action() == P4kReviewAction.MERGE_MANUFACTURER)
+            .findFirst()
+            .orElseThrow();
+    assertThat(candidate.targetId()).isEqualTo(duplicateId);
+    assertThat(candidate.uexIds()).containsExactly(17991);
+
+    manufacturerActions.apply(review, path, candidate, UUID.randomUUID());
+    entityManager.flush();
+    entityManager.clear();
+
+    assertThat(manufacturerRepository.findById(duplicateId)).isEmpty();
+    assertThat(uexCompanies.findManufacturerByUexCompanyId(17991))
+        .hasValueSatisfying(brand -> assertThat(brand.getId()).isEqualTo(survivorId));
+    assertThat(p4kAliases.findById(reviewedGuid))
+        .hasValueSatisfying(
+            alias -> assertThat(alias.getManufacturer().getId()).isEqualTo(survivorId));
+    assertThat(items.findById(itemId))
+        .hasValueSatisfying(saved -> {
+          assertThat(saved.getManufacturer().getId()).isEqualTo(survivorId);
+          assertThat(saved.getP4kManufacturer().getId()).isEqualTo(survivorId);
+        });
+    assertThat(shipTypeRepository.findById(shipId))
+        .hasValueSatisfying(
+            saved -> assertThat(saved.getManufacturer().getId()).isEqualTo(survivorId));
+    assertThat(reviewCaseRepository.findById(otherId))
+        .hasValueSatisfying(saved -> {
+          assertThat(saved.getRowId()).isEqualTo(survivorId);
+          assertThat(saved.getOtherRowId()).isNull();
+          assertThat(saved.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+        });
+    assertThat(reviewCaseRepository.findById(activeId))
+        .hasValueSatisfying(saved -> assertThat(saved.getOtherRowId()).isEqualTo(duplicateId));
+    assertThat(reviewCaseRepository.findById(historicalId))
+        .hasValueSatisfying(saved -> assertThat(saved.getRowId()).isEqualTo(duplicateId));
+  }
+
+  private static P4kReviewCaseDto manufacturerReview(
+      UUID id, Manufacturer row, UUID guid, String name, String className) {
+    UUID run = UUID.randomUUID();
+    return new P4kReviewCaseDto(
+        id,
+        0,
+        P4kKind.MANUFACTURER,
+        guid,
+        P4kReviewReason.GUID_CONFLICT,
+        P4kReviewStatus.OPEN,
+        className,
+        name,
+        row.getId(),
+        row.getName(),
+        null,
+        run,
+        run,
+        Instant.now(),
+        null,
+        null);
+  }
+
+  private static P4kReviewCase manufacturerCase(UUID run, UUID guid, UUID row, UUID other) {
+    P4kReviewCase review = new P4kReviewCase();
+    review.setKind(P4kKind.MANUFACTURER);
+    review.setGuid(guid);
+    review.setReason(P4kReviewReason.GUID_CONFLICT);
+    review.setFirstRunId(run);
+    review.setLastRunId(run);
+    review.setRowId(row);
+    review.setOtherRowId(other);
+    return review;
   }
 }

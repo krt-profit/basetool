@@ -1,5 +1,3 @@
-import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
-import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { refreshDueBanner } from '/js/catalogue/p4k-due.js';
@@ -11,10 +9,10 @@ import {
 } from '/js/catalogue/catalogue-pager.js';
 import { byId as $, dictionaryLabels, jsonReader } from '/js/catalogue/catalogue-link-admin.js';
 import { formatTimestamp } from '/js/catalogue/catalogue-time.js';
+import { createReviewWorkspace } from '/js/catalogue/p4k-review.js';
 
 /** @typedef {ApiDto<'P4kImportRunDto'>} P4kRun */
 /** @typedef {ApiDto<'P4kImportChangeDto'>} P4kChange */
-/** @typedef {ApiDto<'P4kReviewCaseDto'>} P4kCase */
 /** @typedef {{ runs: ApiPage<'P4kImportRunDto'>, adminNames: Record<string, string> }} P4kRunsView */
 /** @typedef {{ source: 'runs' | 'jobs', id: string, title: string }} P4kReportTarget */
 
@@ -49,7 +47,6 @@ const TYPES = [
 let reportTarget = null;
 let reportPage = 0;
 let runsPage = 0;
-let casesPage = 0;
 
 /** Reads one label of the page's dictionary. */
 const t = dictionaryLabels(() => window.krtP4kImportI18n, 'krtP4kImportI18n');
@@ -60,7 +57,7 @@ const t = dictionaryLabels(() => window.krtP4kImportI18n, 'krtP4kImportI18n');
  * the run history, the import-due banner and the options the cases offer, since an APPLY can create
  * resource groups and materials.
  */
-krtPageSections.create({
+const sections = krtPageSections.create({
     topicClass: 'CATALOGUE_ADMIN',
     topic: 'catalogue-admin',
     sections: { runs: { container: '#krt-p4k-runs' }, review: { container: '#krt-p4k-cases' } },
@@ -70,9 +67,9 @@ krtPageSections.create({
             if (keys.includes('runs')) {
                 refreshDueBanner();
                 loadRuns(runsPage);
-                loadCasesWithOptions(casesPage);
+                reviewWorkspace.refresh(true);
             } else if (keys.includes('review')) {
-                loadCases(casesPage);
+                reviewWorkspace.refresh();
             }
         },
     },
@@ -91,6 +88,17 @@ function pageUrl(path) {
 
 /** Reads a JSON answer for one render target, or null after the error toast or a newer read. */
 const readJson = jsonReader(() => t('error'));
+
+const reviewWorkspace = createReviewWorkspace({
+    pageUrl,
+    readJson,
+    t,
+    sections,
+    kinds: KINDS,
+    reasons: Object.keys(window.krtP4kImportI18n || {})
+        .filter((key) => key.startsWith('reason.'))
+        .map((key) => key.slice('reason.'.length)),
+});
 
 /**
  * Summarises one run's counts across the kinds.
@@ -262,187 +270,6 @@ function valueChange(row) {
     return `${row.oldValue == null ? '∅' : row.oldValue} → ${row.newValue == null ? '∅' : row.newValue}`;
 }
 
-/**
- * Loads one page of the open review cases.
- *
- * @param {number} page the zero-based page
- */
-function loadCases(page) {
-    readJson(pageUrl(`/review-cases?page=${page}`), 'p4k-cases').then(
-        (/** @type {ApiPage<'P4kReviewCaseDto'> | null} */ result) => {
-            if (!result) return;
-            if (reloadedBeyondEnd(page, result, loadCases)) return;
-            casesPage = page;
-            renderCases(result.content || []);
-            renderPager($('krt-p4k-cases-pager'), result, pagerLabels(t));
-        },
-    );
-}
-
-/**
- * Renders the open review cases.
- *
- * @param {P4kCase[]} cases the cases of the page
- */
-function renderCases(cases) {
-    const body = $('krt-p4k-cases');
-    const empty = $('krt-p4k-cases-empty');
-    if (empty) empty.hidden = cases.length > 0;
-    if (!body) return;
-    krtHtml.set(
-        body,
-        cases.map(
-            (c) =>
-                krtHtml`<tr data-testid="p4k-case-row" data-case-id="${c.id}" data-case-version="${String(
-                    c.version,
-                )}"><td>${t(`kind.${c.kind}`)}</td><td>${t(`reason.${c.reason}`)}</td><td><span class="cell-title">${
-                    c.nameEn || c.className || c.guid
-                }</span><span class="cell-sub data-value--mono">${c.guid}</span></td><td>${
-                    c.rowName || t('noRow')
-                }</td><td>${formatTimestamp(c.createdAt)}</td><td class="cell-actions">${caseActions(c)}</td></tr>`,
-        ),
-    );
-}
-
-/**
- * The options of the group picker of a missing-group case (REQ-P4K-025), built once per load.
- *
- * @type {KrtHtml[]}
- */
-let groupOptions = [];
-
-/**
- * The options of the material picker of a resource-join case (REQ-P4K-024), built once per load.
- *
- * @type {KrtHtml[]}
- */
-let materialOptions = [];
-
-/**
- * Loads a list of assignable entries as select options.
- *
- * @param {string} path the list's path below the page
- * @param {string} target the render target of the read
- * @returns {Promise<KrtHtml[] | null>} the options, or null when the list could not be read
- */
-function loadOptions(path, target) {
-    return readJson(pageUrl(path), target).then(
-        (/** @type {{ id: string, name: string }[] | null} */ result) =>
-            Array.isArray(result)
-                ? result.map((o) => krtHtml`<option value="${o.id}">${o.name}</option>`)
-                : null,
-    );
-}
-
-/**
- * Reloads the resource groups and materials the cases can assign, then one page of the cases, so a
- * case an APPLY opened offers the groups and materials it created (REQ-P4K-024, REQ-P4K-025).
- *
- * @param {number} page the zero-based page
- */
-function loadCasesWithOptions(page) {
-    Promise.all([
-        loadOptions('/resource-groups', 'p4k-resource-groups'),
-        loadOptions('/materials', 'p4k-materials'),
-    ]).then(([groups, mats]) => {
-        if (groups) groupOptions = groups;
-        if (mats) materialOptions = mats;
-        loadCases(page);
-    });
-}
-
-/** The reasons of a resource that joins no single commodity, resolved by assigning a material. */
-const RESOURCE_JOIN_REASONS = ['RESOURCE_JOIN_NONE', 'RESOURCE_JOIN_SEVERAL'];
-
-/**
- * The action cell of a case: a group picker for a missing resource group, a material picker and
- * keep for a resource without a single commodity, keep and hide otherwise.
- *
- * @param {P4kCase} c the case
- * @returns {ReturnType<typeof krtHtml>} the cell content
- */
-function caseActions(c) {
-    if (RESOURCE_JOIN_REASONS.includes(c.reason || '')) {
-        return krtHtml`<select class="form-input" data-material-pick aria-label="${t(
-            'pickMaterial',
-        )}"><option value="">${t('pickMaterial')}</option>${materialOptions}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
-            'actionAssign',
-        )}</button> <button type="button" class="btn btn-ghost btn-xs" data-resolution="KEEP">${t(
-            'actionKeep',
-        )}</button>`;
-    }
-    if (c.reason === 'NO_RESOURCE_GROUP') {
-        return krtHtml`<select class="form-input" data-group-pick aria-label="${t('pickGroup')}"><option value="">${t(
-            'pickGroup',
-        )}</option>${groupOptions}</select> <button type="button" class="btn btn-ghost btn-xs" data-resolution="ASSIGN">${t(
-            'actionAssign',
-        )}</button>`;
-    }
-    return krtHtml`<button type="button" class="btn btn-ghost btn-xs" data-resolution="KEEP">${t(
-        'actionKeep',
-    )}</button> <button type="button" class="btn btn-quiet-danger btn-xs" data-resolution="HIDE">${t(
-        'actionHide',
-    )}</button>`;
-}
-
-/**
- * The toast of a resolution.
- *
- * @param {string} resolution the resolution sent
- * @returns {string} the message
- */
-function resolvedToast(resolution) {
-    if (resolution === 'HIDE') return t('toastHidden');
-    if (resolution === 'ASSIGN') return t('toastAssigned');
-    return t('toastKept');
-}
-
-/**
- * Resolves the case of a clicked keep, hide or assign button and removes its row in place.
- *
- * @param {MouseEvent} e the click
- */
-function onCasesClick(e) {
-    const target = /** @type {Element | null} */ (e.target);
-    const btn = target && target.closest ? target.closest('button[data-resolution]') : null;
-    const row = btn ? btn.closest('tr[data-case-id]') : null;
-    if (!(btn instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) return;
-    const caseId = row.dataset.caseId || '';
-    const resolution = btn.dataset.resolution || '';
-    const pick = row.querySelector('select[data-group-pick]');
-    const categoryId = pick instanceof HTMLSelectElement ? pick.value : '';
-    const materialPick = row.querySelector('select[data-material-pick]');
-    const materialId = materialPick instanceof HTMLSelectElement ? materialPick.value : '';
-    if (resolution === 'ASSIGN' && !categoryId && !materialId) {
-        const focus = pick || materialPick;
-        if (focus instanceof HTMLSelectElement) focus.focus();
-        return;
-    }
-    krtFetch
-        .write({
-            method: 'POST',
-            url: pageUrl(`/review-cases/${encodeURIComponent(caseId)}/resolve`),
-            payload: {
-                resolution,
-                categoryId: categoryId || null,
-                materialId: materialId || null,
-                version: Number(row.dataset.caseVersion),
-            },
-            submitter: btn,
-            toast: false,
-            onConflict() {
-                showFrontendErrorToast(t('conflict'));
-                loadCases(casesPage);
-                return true;
-            },
-        })
-        .then((result) => {
-            if (!result.ok) return;
-            showFrontendSuccessToast(resolvedToast(resolution));
-            loadCases(casesPage);
-        });
-}
-
 function init() {
     const kind = $('krt-p4k-report-kind');
     const type = $('krt-p4k-report-type');
@@ -466,7 +293,6 @@ function init() {
     }
     bindPager($('krt-p4k-runs-pager'), loadRuns);
     bindPager($('krt-p4k-report-pager'), loadReport);
-    bindPager($('krt-p4k-cases-pager'), loadCases);
     const close = $('krt-p4k-report-close');
     if (close) {
         close.addEventListener('click', () => {
@@ -475,10 +301,8 @@ function init() {
             reportTarget = null;
         });
     }
-    const cases = $('krt-p4k-cases');
-    if (cases) cases.addEventListener('click', onCasesClick);
     loadRuns(0);
-    loadCasesWithOptions(0);
+    reviewWorkspace.init();
     refreshDueBanner();
 }
 
@@ -488,7 +312,7 @@ function init() {
 export function refreshAfterApply() {
     refreshDueBanner();
     loadRuns(runsPage);
-    loadCasesWithOptions(casesPage);
+    reviewWorkspace.refresh(true);
     if (reportTarget) loadReport(reportPage);
 }
 
