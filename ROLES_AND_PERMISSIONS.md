@@ -1123,7 +1123,7 @@ craftable item (one an active blueprint produces), where the member states the q
 REQ-MARKET-012). The whole board — reads and writes — is class-gated on `hasRole('KRT_MEMBER')`
 (`MaterialExchangeController`, `MaterialRequestController`, `MaterialboersePageController`). The role
 hierarchy does **not** imply `KRT_MEMBER` from `OFFICER` or `ADMIN`, so the Officer and Admin columns
-below hold for an account that carries the `KRT Member` realm role as well, which is the operational
+below hold for an account that holds the `KRT Member` role as well, which is the operational
 norm; an account without it gets `403`. Within that gate every write is **owner-scoped** in
 `MaterialExchangeService` (not by role). Interessenten
 names are disclosed only to the offer's owner; every other viewer sees only the count. The item's

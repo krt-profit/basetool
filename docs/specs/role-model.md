@@ -122,8 +122,8 @@ the officer standing they stood next to is no longer a Keycloak role.
   every officer check.
 - **No manual grant.** There is no per-membership flag and no global override. Bank management
   confers no reach; a bank manager with a seat has reach there like anyone else.
-- **`KRT Member` is required for every seat.** Appointing a member without the Keycloak role
-  `KRT Member` is refused. A seat whose holder loses the role later stays in place and
+- **`KRT Member` is required for every seat.** Appointing a member without the Basetool role
+  `KRT Member` (ADR-0355) is refused. A seat whose holder loses the role later stays in place and
   confers no reach until the role is back (REQ-ORG-029).
 - **Gates read the target's owning unit.** An officer check asks for reach in the owning unit of the
   mission, job order, ship or other target; lists are filtered to the caller's
