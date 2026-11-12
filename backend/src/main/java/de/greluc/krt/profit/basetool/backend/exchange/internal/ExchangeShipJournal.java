@@ -132,10 +132,10 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
 
   /**
    * Removes, updates or recreates a ship to match its earlier state, including its earlier org unit
-   * while the member still directly belongs to it; a recreated ship gets a new id and does not
+   * while it is one of the member's stampable units; a recreated ship gets a new id and does not
    * rejoin mission units, and one whose unit is not restored is stamped like a client's create.
    *
-   * @param scope the member and the member's memberships
+   * @param scope the member and the member's stampable units
    * @param rawId the ship's id
    * @param before the state before the client's first write, or {@code null} when it was absent
    * @return whether the ship could be restored
@@ -172,7 +172,7 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
             ship.map(Ship::getVersion).orElse(null),
             null);
     RecordedOrgUnit unit = before.orgUnit();
-    if (unit != null && unit.id() != null && !scope.memberships().get().contains(unit.id())) {
+    if (unit != null && unit.id() != null && !scope.stampableUnits().get().contains(unit.id())) {
       unit = null;
     }
     if (ship.isEmpty()) {

@@ -22,7 +22,16 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
+import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestNoticesReconciledEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountType;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
@@ -65,6 +74,8 @@ class BankNoticeIntegrationTest {
   @Autowired private NotificationRepository notificationRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private RoleRepository roleRepository;
+  @Autowired private BankAccountRepository bankAccountRepository;
+  @Autowired private BankBookingRequestRepository bankBookingRequestRepository;
 
   private UUID accountId;
   private UUID entityId;
@@ -110,6 +121,47 @@ class BankNoticeIntegrationTest {
             "KB-0003",
             "Ada",
             ACTOR));
+  }
+
+  @Test
+  void aDelayedReconciliationDoesNotBringBackACancelledRequestsNotice() {
+    BankAccount account = new BankAccount();
+    account.setAccountNo(String.format("KB-%04d", bankAccountRepository.nextAccountNoValue()));
+    account.setName("Reconciliation fixture");
+    account.setType(BankAccountType.SPECIAL);
+    account.setStatus(BankAccountStatus.ACTIVE);
+    account = bankAccountRepository.saveAndFlush(account);
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(account);
+    request.setType(BankBookingRequestType.DEPOSIT);
+    request.setAmount(BigDecimal.TEN);
+    request.setRequestedBy(REQUESTER);
+    request.setRequesterHandle("Bank requester");
+    request = bankBookingRequestRepository.saveAndFlush(request);
+
+    var reconciliation =
+        new BankBookingRequestNoticesReconciledEvent(
+            request.getId(),
+            account.getId(),
+            request.getType(),
+            request.getAmount(),
+            account.getAccountNo(),
+            request.getRequesterHandle(),
+            null,
+            REQUESTER,
+            Set.of(MANAGER));
+
+    assertThat(creationService.createFromEvent(reconciliation)).containsExactly(MANAGER);
+    assertThat(inbox(MANAGER)).containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+
+    request.setStatus(BankBookingRequestStatus.CANCELLED);
+    bankBookingRequestRepository.saveAndFlush(request);
+    creationService.createFromEvent(
+        new BankBookingRequestCancelledEvent(request.getId(), account.getId(), REQUESTER));
+    assertThat(inbox(MANAGER)).doesNotContain(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+
+    assertThat(creationService.createFromEvent(reconciliation)).isEmpty();
+    assertThat(inbox(MANAGER)).doesNotContain(NotificationType.BANK_BOOKING_REQUEST_CREATED);
   }
 
   @Test

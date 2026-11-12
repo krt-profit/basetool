@@ -9,7 +9,7 @@
 
 ## Akteure
 
-- **Officer der Staffel B** (profit-eligible) — `test-officer`, in eine frische profit-eligible Staffel B gehomed.
+- **Staffelleiter der Staffel B** (profit-eligible) — `test-officer` hat die Basetool-Rolle `KRT Member` und erhält seinen Leitungssitz über den Seeder.
 - **Mitglied der Staffel C** (non-profit) — `test-member`, in eine frische non-profit Staffel C gehomed.
 
 ## Vorbedingungen
@@ -33,7 +33,7 @@ Officer bzw. Member rufen die Auftragsliste `/orders` bzw. eine Detailseite `/or
 ## Sonderfälle & Lehren
 
 - **Sichtbarkeit über `responsibleOrgUnit.kind` (REQ-ORG-003):** Responsible = SK → **öffentlich** für alle profit-eligible Mitglieder (geteilte SK-Warteschlange); Responsible = Staffel → **privat** für diese Staffel + Admins. Die SK-Public-Escape ist `TYPE(responsibleOrgUnit) = SpecialCommand` in `findScopedJobOrders`. `requestingOrgUnit` (Auftraggeber) gewährt **keine** Sichtbarkeit.
-- **Officer-Rolle ≠ Cross-Staffel-Sicht:** Die Officer-Realm-Rolle gibt Bearbeitungs-Capability (Rollen-Gate), aber **keine** staffel-übergreifende Sichtbarkeit — der Scope bleibt mitgliedschaftsbasiert. SK-Auftrags-*Edits* laufen über das Rollen-Gate (LOGISTICIAN+), nicht über den Staffel-Scope.
+- **Der Leitungssitz begrenzt die Reichweite.** Die Rechte von `test-officer` folgen seinem Staffelleiter-Sitz und der gespeicherten Rolle `KRT Member`. Die allgemeine Warteschlange enthält öffentliche SK-Aufträge sowie private Aufträge der Einheiten in seiner Reichweite (REQ-ORG-003, REQ-ORG-015).
 - **Profit-Gate vor Per-Order, aber Requester-Escape daneben:** `canViewJobOrders` (Admin, oder mindestens eine profit-eligible Mitgliedschaft) schließt die allgemeine **Warteschlange** kurz; ein non-profit Member sieht dort selbst SK-öffentliche Aufträge nicht. Über den **Requester-Escape** (REQ-ORDERS-023, ADR-0091) sieht es jedoch die von der eigenen Einheit **gestellten** Aufträge in reduzierter Form („Meine Aufträge") und darf sie — solange noch nichts geliefert wurde — eingeschränkt bearbeiten; fremde Aufträge bleiben `403`.
 - **Shared-DB-robust:** Die Assertions prüfen je Auftrag die eigene `data-id`, sodass von Geschwistertests akkumulierte Aufträge die Erwartung nicht verfälschen.
 - **Ergänzung zur Schreib-Matrix:** Wer welche Aktions-Controls (Bearbeiten/Löschen/Handover) auf einem **sichtbaren** Auftrag sieht, deckt [`RolePermissionsE2eTest`](../../frontend/src/e2e/java/de/greluc/krt/profit/basetool/frontend/e2e/RolePermissionsE2eTest.java) ab (Edit = LOGISTICIAN, Löschen = ADMIN, Handover = LOGISTICIAN/OFFICER/ADMIN).

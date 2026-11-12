@@ -993,7 +993,9 @@ processes the event in reconcile mode instead of the normal one:
 account's responsible holders change, names the members who became or stopped being holders and is
 evaluated against the `BANK_BOOKING_REQUEST_CREATED` rules: the new holder gets the request's notice,
 a former holder loses it unless another selector (bank management, an account grant) still reaches
-them, and the bank staff keep theirs untouched.
+them, and the bank staff keep theirs untouched. Delivery checks that the request is still pending
+under the same request lock as settlement. A delayed reconciliation for a settled or cancelled
+request does not recreate its open notice.
 
 **Acceptance**
 

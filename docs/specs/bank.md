@@ -229,9 +229,10 @@ coverage; `BANK_HOLDER_OVERDRAFT` is retired.
 
 **Enforced by:** `BankLedgerServiceTest` (account overdraft code + concurrency tests, holder-may-go-negative) · **Code:** `bank/internal/BankLedgerService` (pessimistic account lock + account-only coverage guard) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 
-### REQ-BANK-007 — Keycloak roles & hierarchy
+### REQ-BANK-007 — Bank roles & hierarchy
 
-Bank access is anchored on two **Keycloak realm roles**:
+Bank access is anchored on two **Basetool application roles** stored in `user_roles` (REQ-SEC-088,
+ADR-0355):
 
 - `Bank Employee` → `ROLE_BANK_EMPLOYEE` — may use the bank area within the limits of
   their per-account grants (REQ-BANK-009).
@@ -239,11 +240,11 @@ Bank access is anchored on two **Keycloak realm roles**:
   **all** accounts, holders and grants.
 
 Role hierarchy (both `SecurityConfig` beans, kept in sync):
-`ROLE_ADMIN > ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE`. Admins therefore pass every
-bank gate (REQ-BANK-010); bank management passes every employee gate. The roles are
-seeded in `DataInitializer` (matched by code `BANK_EMPLOYEE` / `BANK_MANAGEMENT`),
-documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
-(`frontend/src/e2e/resources/realm-export.e2e.json`).
+`ROLE_ADMIN > ROLE_BANK_MANAGEMENT > ROLE_BANK_EMPLOYEE`. Admins pass the bank role gates
+(REQ-BANK-010), and bank management passes the employee role gate. `DataInitializer` seeds the
+role definitions by code (`BANK_EMPLOYEE` / `BANK_MANAGEMENT`), and the E2E stack seeds account
+assignments in `user_roles`. Admins manage both roles on the member page. Bank management can
+assign and withdraw `Bank Employee` from the bank grant-management view.
 
 **Acceptance**
 
@@ -257,7 +258,7 @@ documented in `ROLES_AND_PERMISSIONS.md`, and added to the E2E realm export
 ### REQ-BANK-008 — Bank membership is independent of org-unit membership
 
 Working in the bank — as employee or management — requires only a basetool account and
-the respective Keycloak role (REQ-BANK-007) plus grants (REQ-BANK-009). It is **fully
+the applicable Basetool role (REQ-BANK-007) plus grants (REQ-BANK-009). It is **fully
 independent of org-unit membership**: a bank employee or bank manager may, but need
 not, also be a member of a Staffel, Spezialkommando or any other org unit. Org-unit
 memberships neither qualify nor disqualify anyone for the bank, and joining or leaving
@@ -301,8 +302,8 @@ the grant table.
 Withdrawing a role that removes bank staff eligibility clears any notices delivered only through
 the now-inert grant (REQ-NOTIF-024). An independent recipient path keeps the notice.
 
-Fine-grained bank permissions are **app-managed grants**, not Keycloak roles
-(ADR-0011): a `bank_account_grant` row per (user, account) with three independent
+Fine-grained bank permissions are **per-account grants** (ADR-0011): a
+`bank_account_grant` row per (user, account) with three independent
 capability flags — `can_deposit`, `can_withdraw`, `can_transfer`. The **existence** of a
 grant row gives **view access** to that account (a row with all flags false is
 view-only). A grant of a user who holds neither `Bank Employee` nor a role above it is inert: it
@@ -437,10 +438,9 @@ survive user deletion), event type, affected account/transaction/target-user ref
 a compact details payload, and — since V238 — the bounded **originating client**
 ([REQ-AUDIT-005](audit.md), [ADR-0153](../adr/0153-the-bank-trail-records-the-client-through-the-same-seam.md)):
 which client software the mutation came through, recorded through the same `ClientAttribution`
-seam and vocabulary as the shared trail, because the bank realm roles have sat on the mobile
-client's Keycloak scope since it was provisioned and the actor alone therefore never identified
-the origin here. Rows predating V238 carry `NULL`, which means **not recorded** and must not be
-read as "the web frontend". The audit log is readable **only by admins**
+seam and vocabulary as the shared trail. The client identifies the software that sent the
+request, independently of the actor's stored roles (REQ-SEC-088). Rows predating V238 carry
+`NULL`, which means **not recorded**, because the origin cannot be inferred from the actor. The audit log is readable **only by admins**
 (`hasRole('ADMIN')` on URL **and** method gate), paginated and filterable (period, actor,
 event type, client; the API additionally accepts an `accountId` filter the viewer does not offer).
 It is read on the Bank tab of the unified viewer ([REQ-AUDIT-002](audit.md)). Audit rows are never
@@ -3643,7 +3643,7 @@ read out of the rest of the bank.
 
 ## Open questions
 
-1. ~~**Final role naming**~~ — **Resolved:** the realm roles are `Bank Employee` /
+1. ~~**Final role naming**~~ — **Resolved:** the Basetool roles are `Bank Employee` /
    `Bank Management`, seeded as `BANK_EMPLOYEE` / `BANK_MANAGEMENT` (REQ-BANK-007).
 2. ~~**Transfer destination rule**~~ — **Resolved:** a direct transfer needs the destination to be
    visible to the employee (REQ-BANK-011); a transfer *request* may target any active account and its

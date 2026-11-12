@@ -77,6 +77,7 @@ public class OrgUnitMembershipService {
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
   private final OrgUnitSeatNotifier seatNotifier;
   private final OrgUnitSeatEligibility seatEligibility;
+  private final OrgRoleManagementSecurityService roleManagementSecurity;
 
   /**
    * Lazily resolved seam that audits changes to the accounts' responsible holders around each
@@ -190,6 +191,7 @@ public class OrgUnitMembershipService {
     OrgUnitMembership m =
         membershipRepository.findById(new OrgUnitMembershipId(userId, bereichId)).orElse(null);
     final MembershipRole previousRole = m != null ? m.getRole() : null;
+    roleManagementSecurity.requireBereichAppointment(bereichId, userId, previousRole, role);
     if (role == BereichLeadershipRole.LEITER
         && previousRole != MembershipRole.BEREICHSLEITER
         && membershipRepository.existsByIdOrgUnitIdAndRole(
@@ -242,6 +244,7 @@ public class OrgUnitMembershipService {
     OrgUnitMembership m =
         Entities.require(membershipRepository.findById(id), "Bereichsleitung membership not found");
     final MembershipRole previousRole = m.getRole();
+    roleManagementSecurity.requireBereichRemoval(bereichId, userId, previousRole);
     final Map<UUID, Set<UUID>> responsibleBefore =
         responsibleHolderTrackerProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);

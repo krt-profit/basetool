@@ -785,13 +785,9 @@ that guesses is no longer evidence. But a reader must not treat the two alike:
 - **`audit_event`** (pre-V237): the nulls are **unambiguous anyway**. While those rows were written,
   the authority they record could come from one client only, so the row's own domain implies the
   answer.
-- **`bank_audit_event`** (pre-V238): the nulls mean **not recorded**, and nothing more. `Bank
-  Employee` and `Bank Management` have been on the mobile client's Keycloak scope since it was
-  provisioned — REQ-SEC-035's role list named them from its first revision — so a bank row has been
-  reachable from two clients for as long as that client has existed, independent of whether a
-  shipped app screen ever exercised it, because the authority rides on the token and a replayed
-  token carries it. **A null client on a pre-V238 bank row must never be read as "the web
-  frontend".**
+- **`bank_audit_event`** (pre-V238): the nulls mean **not recorded**. During that period, the
+  mobile client's tokens could carry the bank roles, so two clients could reach the same bank
+  mutations. The actor cannot identify the originating client on those rows.
 
 Each migration states its own case in a `COMMENT ON COLUMN`, so the distinction survives without
 this document. New rows on both tables always carry a value; `none` is an answer, not an absence.

@@ -30,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,8 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
  * memberships, which count only while the caller holds {@code KRT Member} (REQ-SEC-015); the parent
  * Bereich of a Staffel or SK is always read from its persisted edge. A delegated write never
  * targets the caller's own seat ({@link #targetsAnotherUser}) or a deactivated unit, which neither
- * a seat on it nor one above it reaches (REQ-ORG-032). Admin access and the active context are
- * decided at the endpoint, never here.
+ * a seat on it nor one above it reaches (REQ-ORG-032). Write checks honor the administrator bypass
+ * and read the acting member's authority directly. The endpoint checks the active context.
  */
 @Service("orgRoleManagementSecurityService")
 @RequiredArgsConstructor
@@ -159,10 +160,7 @@ public class OrgRoleManagementSecurityService {
     if (denyUnauthenticated(authentication) || role == null) {
       return false;
     }
-    return switch (role) {
-      case LEITER -> callerIsPureOlMember() && orgUnitRepository.existsByIdAndActiveTrue(bereichId);
-      case KOORDINATOR, OPERATOR -> callerHasRoleOnUnit(bereichId, MembershipRole.BEREICHSLEITER);
-    };
+    return canManageBereichRole(bereichId, bereichAppointmentAuthority(null, role));
   }
 
   /**
@@ -182,12 +180,8 @@ public class OrgRoleManagementSecurityService {
     if (denyUnauthenticated(authentication) || role == null) {
       return false;
     }
-    return canAppointBereichRole(
-        bereichId,
-        roleOf(userId, bereichId) == MembershipRole.BEREICHSLEITER
-            ? BereichLeadershipRole.LEITER
-            : role,
-        authentication);
+    return canManageBereichRole(
+        bereichId, bereichAppointmentAuthority(roleOf(userId, bereichId), role));
   }
 
   /**
@@ -204,14 +198,82 @@ public class OrgRoleManagementSecurityService {
     if (denyUnauthenticated(authentication)) {
       return false;
     }
-    MembershipRole target = roleOf(userId, bereichId);
-    if (target == MembershipRole.BEREICHSLEITER) {
+    return canManageBereichRole(bereichId, bereichRemovalAuthority(roleOf(userId, bereichId)));
+  }
+
+  /**
+   * Checks the authority to appoint against the membership loaded for the write.
+   *
+   * @param bereichId the Bereich
+   * @param userId the target member
+   * @param currentRole the target's stored rank, or {@code null} if no membership exists
+   * @param requestedRole the rank to assign
+   * @throws AccessDeniedException if the caller lacks the required authority
+   */
+  void requireBereichAppointment(
+      @NotNull UUID bereichId,
+      @NotNull UUID userId,
+      @Nullable MembershipRole currentRole,
+      @NotNull BereichLeadershipRole requestedRole) {
+    requireBereichWriteAuthority(
+        bereichId, userId, bereichAppointmentAuthority(currentRole, requestedRole));
+  }
+
+  /**
+   * Checks the authority to remove against the membership loaded for the write.
+   *
+   * @param bereichId the Bereich
+   * @param userId the target member
+   * @param currentRole the target's stored rank
+   * @throws AccessDeniedException if the caller lacks the required authority
+   */
+  void requireBereichRemoval(
+      @NotNull UUID bereichId, @NotNull UUID userId, @NotNull MembershipRole currentRole) {
+    requireBereichWriteAuthority(bereichId, userId, bereichRemovalAuthority(currentRole));
+  }
+
+  private static MembershipRole bereichAppointmentAuthority(
+      @Nullable MembershipRole currentRole, @NotNull BereichLeadershipRole requestedRole) {
+    return switch (requestedRole) {
+      case LEITER -> MembershipRole.OL_MEMBER;
+      case KOORDINATOR, OPERATOR ->
+          currentRole == MembershipRole.BEREICHSLEITER
+              ? MembershipRole.OL_MEMBER
+              : MembershipRole.BEREICHSLEITER;
+    };
+  }
+
+  private static @Nullable MembershipRole bereichRemovalAuthority(
+      @Nullable MembershipRole currentRole) {
+    if (currentRole == MembershipRole.BEREICHSLEITER) {
+      return MembershipRole.OL_MEMBER;
+    }
+    return currentRole != null && currentRole.isAreaRank() ? MembershipRole.BEREICHSLEITER : null;
+  }
+
+  private boolean canManageBereichRole(
+      @NotNull UUID bereichId, @Nullable MembershipRole authority) {
+    if (authority == MembershipRole.OL_MEMBER) {
       return callerIsPureOlMember() && orgUnitRepository.existsByIdAndActiveTrue(bereichId);
     }
-    if (target != null && target.isAreaRank()) {
-      return callerHasRoleOnUnit(bereichId, MembershipRole.BEREICHSLEITER);
+    return authority != null && callerHasRoleOnUnit(bereichId, authority);
+  }
+
+  private void requireBereichWriteAuthority(
+      @NotNull UUID bereichId, @NotNull UUID userId, @Nullable MembershipRole authority) {
+    if (authHelperService.isAdmin()) {
+      return;
     }
-    return false;
+    UUID actorId = authHelperService.currentUserId().orElse(null);
+    if (authority == null
+        || actorId == null
+        || actorId.equals(userId)
+        || !authHelperService.holdsKrtMember()
+        || !orgUnitRepository.existsByIdAndActiveTrue(bereichId)
+        || !membershipRepository.existsActiveRoleForBereichManagement(
+            actorId, bereichId, authority, authority == MembershipRole.OL_MEMBER)) {
+      throw new AccessDeniedException("The current Bereich role assignment is not permitted");
+    }
   }
 
   /**

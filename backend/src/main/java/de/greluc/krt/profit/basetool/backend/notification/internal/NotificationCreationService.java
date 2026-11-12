@@ -60,6 +60,9 @@ public class NotificationCreationService {
    */
   @Transactional
   public @NotNull Set<UUID> createFromEvent(@NotNull NotificationEvent event) {
+    if (!event.reconcileRecipients().isEmpty() && !isCurrent(event)) {
+      return Set.of();
+    }
     var candidate = eventPreparation.resolve(event);
     var prepared =
         eventPreparation.prepare(candidate, eventPreparation.lockRoles(List.of(candidate)));
@@ -112,10 +115,11 @@ public class NotificationCreationService {
   }
 
   private List<NotificationEventPreparation.Candidate> candidates(List<NotificationEvent> events) {
-    return events.stream()
-        .filter(event -> causeGuards.stream().allMatch(guard -> guard.isCurrent(event)))
-        .map(eventPreparation::resolve)
-        .toList();
+    return events.stream().filter(this::isCurrent).map(eventPreparation::resolve).toList();
+  }
+
+  private boolean isCurrent(NotificationEvent event) {
+    return causeGuards.stream().allMatch(guard -> guard.isCurrent(event));
   }
 
   private void select(

@@ -199,8 +199,10 @@ R you must hold a strictly-higher rank, which you cannot grant to yourself) — 
 property the ADMIN-only `is_lead` toggle used to provide, now held at every tier (the SK lead itself is
 appointed by the Bereichsleiter of the SK's parent Bereich, `canAppointSkLead`). The delegated verdict is
 computed from the caller's own membership ranks only, and only while the caller holds `KRT Member`,
-without which a seat confers nothing (REQ-SEC-015) — never from the pin, contextual authorities, or
-`isAdmin()` inside the verdict; admin short-circuits only at the `@PreAuthorize` layer. Every
+without which a seat confers nothing (REQ-SEC-015). The delegated verdict uses the same ladder for
+each active context. The transactional Bereich write checks the target's loaded rank and freshly
+reads the acting member's active authority before changing the row. Admins retain their bypass
+within the active context. Every
 Leitung verdict — the appointments and Kommandogruppen of `OrgRoleManagementSecurityService`, the
 SK roster of `SpecialCommandSecurityService` and the units `LeitungViewService` lists — asks the
 one `KRT Member` check, `AuthHelperService#holdsKrtMember()` (REQ-SEC-015, REQ-ORG-032).

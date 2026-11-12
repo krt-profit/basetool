@@ -176,7 +176,7 @@ public interface RefineryExchangeWriter {
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when the location, the
    *     method or a material is gone
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when a material may
-   *     not be refined or the unit is no direct membership of the member
+   *     not be refined or the unit is outside the member's stampable units
    */
   @NotNull
   RefineryExchangeOrder restore(@NotNull UUID owner, @NotNull RefineryExchangeRestore restore);

@@ -10,9 +10,8 @@
 ## Akteure
 
 - **Drittanbieter-Client** `e2e-exchange-client`, gespielt von `ExchangeTestClient` wie in [UC-46](UC-46-austausch-rundlauf.md); jede Installation hat ihren eigenen P-256-Schlüssel.
-- **Mitglieder**, je Klasse ein eigener Realm-Nutzer mit Standardrollen und `KRT Member`, über den Seeder in der IRIDIUM-Staffel und sonst von keinem Test verwendet: `test-exchange-2` (`ExchangeConnectionsE2eTest`), `test-exchange-3` (`ExchangeSyncE2eTest`), `test-exchange-departed` (`ExchangeDepartureE2eTest`).
-- **Admin** `test-admin` — registriert den Client, schaltet den Austausch ein und sperrt den Client auf der Registerseite.
-- **Keycloak-Administrator** des Stacks (Master-Realm, Wegwerf-Passwort aus `E2eStackExtension`) — entzieht dem austretenden Mitglied seine Rollen.
+- **Mitglieder**, je Klasse ein eigener Testnutzer mit der gespeicherten Basetool-Rolle `KRT Member`, über den Seeder in der IRIDIUM-Staffel und sonst von keinem Test verwendet: `test-exchange-2` (`ExchangeConnectionsE2eTest`), `test-exchange-3` (`ExchangeSyncE2eTest`), `test-exchange-departed` (`ExchangeDepartureE2eTest`).
+- **Admin** `test-admin` — registriert den Client, schaltet den Austausch ein, sperrt den Client auf der Registerseite und entzieht dem austretenden Mitglied die gespeicherte Rolle `KRT Member`.
 
 ## Vorbedingungen
 
@@ -69,15 +68,13 @@ Nur im ephemeren Modus (`assumeTrue(STACK.managesStack())`). Jede Klasse ruft `E
 ### Austritt (`aDepartedMemberIsRefusedOnTheNextRequest`)
 
 1. Device-Login; ein Aufruf wird beantwortet.
-2. Der Keycloak-Administrator entfernt die direkten Realm-Rollen des Mitglieds (`KRT Member` und `default-roles-basetool`, die `KRT Member` ebenfalls enthält).
-3. Das Mitglied meldet sich per Passwort-Grant am Backend an; der Login-Abgleich erkennt den Rollenverlust (`MemberDepartedEvent`), und `ExchangeDepartureService` beendet die Verbindung.
-4. Der Client ruft das Gateway erneut auf.
+2. Der Basetool-Admin liest die Rollenversion und entzieht `KRT Member` per `PUT /api/v1/users/{id}/roles/KRT_MEMBER` mit `assigned: false`. Nach dem Speichern löst `MemberDepartedEvent` den Widerruf der Verbindung durch `ExchangeDepartureService` aus.
+3. Der Client ruft das Gateway erneut auf.
 
 **Erwartet:** `401 CLIENT_REVOKED` beim nächsten Aufruf.
 
 ## Sonderfälle & Lehren
 
-- **Login- statt Roster-Abgleich.** Der Austritt läuft über den Login-Abgleich. Der Roster-Abgleich („Jetzt synchronisieren") gleicht jedes Konto des gemeinsamen Stacks ab und würde Zustand anderer Klassen verändern; sein Auslöser ist in `UserReconciliationServiceTest` abgedeckt.
-- **`KRT Member` steckt auch in der Standardrolle.** Wer nur `KRT Member` entzieht, lässt die Rolle über `default-roles-basetool` bestehen; der Test entzieht beide.
+- **Der Rollenentzug wirkt nach dem Speichern.** Der nächste Gateway-Aufruf verwendet dieselbe Installation. Die Anwendung liest Rollen aus `user_roles` (REQ-SEC-088).
 - **Die Massenänderung zählt Lose, keine Blaupausen.** Bei Blaupausen zählt der aktuelle Bestand die Standard-Blaupausen mit, deren Zahl von anderen Klassen abhängt; die fünf Lose eines sonst unbenutzten Mitglieds machen die Schwelle (mindestens 5 und mehr als ein Fünftel) unabhängig davon.
 - **Gemeinsame Schritte** (Device-Login, Registrierung, Warten auf den Registerspiegel, Änderungssätze) liegen in `ExchangeE2eSupport`, den auch [UC-46](UC-46-austausch-rundlauf.md) nutzt.

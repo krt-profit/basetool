@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -78,6 +79,7 @@ class AccountConsolidationServiceTest {
 
   @BeforeEach
   void setUp() {
+    lenient().when(userRepository.tryLockAccountForConsolidation(any(UUID.class))).thenReturn(true);
     service =
         new AccountConsolidationService(
             userRepository,
@@ -121,7 +123,11 @@ class AccountConsolidationServiceTest {
 
     User result = service.consolidate(DUPLICATE_ID, TARGET_ID, 0L, ADMIN_ID);
 
-    InOrder order = inOrder(keycloakService, userAccountMergeService, userDeletionService);
+    InOrder order =
+        inOrder(userRepository, keycloakService, userAccountMergeService, userDeletionService);
+    order.verify(userRepository).tryLockAccountForConsolidation(DUPLICATE_ID);
+    order.verify(userRepository).tryLockAccountForConsolidation(TARGET_ID);
+    order.verify(userRepository).findById(DUPLICATE_ID);
     order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "duplicate");
     order.verify(userAccountMergeService).merge(DUPLICATE_ID, TARGET_ID, ADMIN_ID);
     order

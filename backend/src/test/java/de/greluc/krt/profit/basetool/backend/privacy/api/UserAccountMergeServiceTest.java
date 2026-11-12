@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +38,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Real-Postgres tests for the admin account merge (REQ-SEC-045), catching unique-constraint and
@@ -50,6 +53,8 @@ class UserAccountMergeServiceTest {
   @MockitoBean private SquadronRepository squadronRepository;
 
   @Autowired private UserAccountMergeService mergeService;
+  @Autowired private AccountConsolidationService consolidationService;
+  @Autowired private PlatformTransactionManager transactionManager;
 
   @Autowired private UserRepository userRepository;
 
@@ -60,6 +65,26 @@ class UserAccountMergeServiceTest {
   @BeforeEach
   void setUp() {
     jdbc = new JdbcTemplate(dataSource);
+  }
+
+  @Test
+  @DisplayName("a consolidation refuses an overlapping reservation and can retry after release")
+  void consolidate_conflictsWhileEitherAccountIsReserved() {
+    UUID source = UUID.randomUUID();
+    UUID target = UUID.randomUUID();
+    UUID admin = UUID.randomUUID();
+    TransactionTemplate reservation = new TransactionTemplate(transactionManager);
+    reservation.setReadOnly(true);
+    for (UUID lockedAccount : List.of(source, target)) {
+      reservation.executeWithoutResult(_ -> {
+        assertThat(userRepository.tryLockAccountForConsolidation(lockedAccount)).isTrue();
+        assertThatThrownBy(() -> consolidationService.consolidate(source, target, null, admin))
+            .isInstanceOf(BusinessConflictException.class)
+            .hasMessage("An account is already being consolidated");
+      });
+    }
+    assertThatThrownBy(() -> consolidationService.consolidate(source, target, null, admin))
+        .isInstanceOf(NotFoundException.class);
   }
 
   /**

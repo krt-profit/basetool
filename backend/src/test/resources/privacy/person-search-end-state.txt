@@ -65,6 +65,7 @@ MISSION|mission|meeting_point|MISSION|Vor ZzzMentionZzz nach
 MISSION|mission|name|MISSION|Vor ZzzMentionZzz nach
 MISSION|mission|party_lead_guest_name|MISSION|Vor ZzzMentionZzz nach
 NOTIFICATION|notification_rule|description|null|Vor ZzzMentionZzz nach
+NOTIFICATION|notification|org_unit_name|null|Vor ZzzMentionZzz nach
 OPERATION|operation|description|OPERATION|Vor ZzzMentionZzz nach
 OPERATION|operation|name|OPERATION|Vor ZzzMentionZzz nach
 ORG|kommando_group|name|ORG|Vor ZzzMentionZzz nach

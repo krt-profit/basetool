@@ -123,3 +123,11 @@ marked the row absent is not in the middle of disposing of it.
   that has already moved the account's identity away and will delete its Keycloak user when the
   transaction commits; the enum name is the documentation, and `UserDeletionServiceTest` pins both
   halves.
+
+## Amendment — Reserve accounts through consolidation
+
+A read-only transaction reserves the source and survivor by account ID before preflight. A
+concurrent consolidation sharing either ID receives HTTP 409. The reservations stay held while a
+separate transaction commits the database changes, through the final Keycloak deletion on success,
+and through compensation of a newly created link on rollback. This prevents another consolidation
+from reusing a link that a failed attempt is about to remove. See REQ-SEC-055.

@@ -76,6 +76,27 @@ public interface OrgUnitMembershipRepository
   List<OrgUnitMembership> findAllOnActiveOrgUnitsByIdUserId(@Param("userId") UUID userId);
 
   /**
+   * Checks the current stored authority on active units without resolving managed entities.
+   *
+   * @param userId the acting member
+   * @param bereichId the Bereich whose ranks are managed
+   * @param role the required membership role
+   * @param orgWide whether the role can be held on any active unit
+   * @return whether the member holds the required role
+   */
+  @Query(
+      """
+      SELECT COUNT(m) > 0 FROM OrgUnitMembership m
+      WHERE m.id.userId = :userId AND m.role = :role AND m.id.orgUnitId IN
+        (SELECT o.id FROM OrgUnit o WHERE o.active = true AND (:orgWide = true OR o.id = :bereichId))
+      """)
+  boolean existsActiveRoleForBereichManagement(
+      @Param("userId") UUID userId,
+      @Param("bereichId") UUID bereichId,
+      @Param("role") MembershipRole role,
+      @Param("orgWide") boolean orgWide);
+
+  /**
    * Reads the memberships that confer reach on active units for a set of members.
    *
    * @param userIds candidate member ids

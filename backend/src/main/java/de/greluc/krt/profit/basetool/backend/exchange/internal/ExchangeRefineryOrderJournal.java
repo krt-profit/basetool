@@ -171,8 +171,8 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
   /**
    * Recreates an order the client deleted under its former ids and key: each section the client's
    * earlier writes touched as it was before the client's first write to it, every other part as it
-   * was when deleted, with its client marker, the unit while the member still belongs to it
-   * directly and the mission while it exists, without the pickup marker when the client's writes
+   * was when deleted, with its client marker, the unit while it is one of the member's stampable
+   * units and the mission while it exists, without the pickup marker when the client's writes
    * include its pickup, and without the ready marker when the run differs from the deleted one. An
    * order the client also created stays gone.
    *
@@ -232,7 +232,7 @@ public class ExchangeRefineryOrderJournal implements ExchangeEntryRestorer {
             new RefineryExchangeOrigin(
                 origin.createdAt(),
                 origin.createdClient(),
-                unit != null && scope.memberships().get().contains(unit) ? unit : null,
+                unit != null && scope.stampableUnits().get().contains(unit) ? unit : null,
                 origin.missionId(),
                 pickedUp ? null : origin.pickedUpAt(),
                 pickedUp ? null : origin.pickedUpClient(),

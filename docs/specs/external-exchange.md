@@ -1708,8 +1708,8 @@ still govern every retained operation. A ship also goes back to the org unit its
 earlier state names (`orgUnit`, none included): one that still exists moves there through the
 Hangar's unit change behind its current unit counter (REQ-HANGAR-009, ADR-0258, audited
 `HANGAR_SHIP_ORG_UNIT_CHANGED`, its `version` untouched), and a recreated one is created in it. An
-earlier unit the member no longer directly belongs to is not restored — the ship keeps its current
-unit — and the entry still counts as restored. A recreated ship whose unit is not restored, or whose
+earlier unit outside the member's stampable units leaves an existing ship in its current unit and
+the entry still counts as restored (REQ-ORG-004). A recreated ship whose unit is not restored, or whose
 journaled state has no `orgUnit` key, is stamped like a client's create (REQ-XCH-017): the member's
 only stampable unit, or none for a member with none or several; an existing ship whose state has no
 `orgUnit` key keeps its unit. Links the client made are taken back, and a
@@ -3733,7 +3733,8 @@ restore it as follows:
 
 - **`delete`** — the order is recreated under its old id, its goods under their old ids, with its
   `clientKey`, client marker and every field; the mission link only while that mission still
-  exists, the owning unit only while the member is still a direct member of it (else none). Both
+  exists, the owning unit only while it is one of the member's stampable units (REQ-ORG-004).
+  Otherwise the order is recreated without an owning unit. Both
   counters come back one above the deleted order's, so a client's stale echo is refused. Sections
   the client's earlier writes in the span touched go back under the counter check above, also when
   those writes are in the delete's own change set; an order the client also created in the span

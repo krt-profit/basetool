@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +64,8 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 /**
  * Unit tests for {@link OrgUnitMembershipService}: SK member listing, add and remove including the
@@ -81,6 +84,7 @@ class OrgUnitMembershipServiceTest {
   @Mock private FirstMembershipObserver firstMembershipObserver;
   @Mock private AuditService auditService;
   @Mock private OrgUnitSeatNotifier seatNotifier;
+  @Mock private AuthHelperService authHelperService;
 
   @Mock private ObjectProvider<ResponsibleHolderTracker> responsibleHolderTrackerProvider;
 
@@ -91,6 +95,7 @@ class OrgUnitMembershipServiceTest {
       Mappers.getMapper(OrgUnitMembershipMapper.class);
 
   private OrgUnitMembershipService membershipService;
+  private OrgRoleManagementSecurityService roleManagementSecurity;
 
   private SpecialCommand sc;
   private UUID scId;
@@ -100,6 +105,9 @@ class OrgUnitMembershipServiceTest {
 
   @BeforeEach
   void setUp() {
+    roleManagementSecurity =
+        new OrgRoleManagementSecurityService(
+            authHelperService, membershipRepository, orgUnitRepository, kommandoGroupRepository);
     membershipService =
         new OrgUnitMembershipService(
             membershipRepository,
@@ -113,7 +121,9 @@ class OrgUnitMembershipServiceTest {
             orgUnitMembershipMapper,
             seatNotifier,
             new OrgUnitSeatEligibility(membershipRepository, userRepository),
+            roleManagementSecurity,
             responsibleHolderTrackerProvider);
+    lenient().when(authHelperService.isAdmin()).thenReturn(true);
     scId = UUID.randomUUID();
     sc = new SpecialCommand();
     sc.setId(scId);
@@ -777,6 +787,100 @@ class OrgUnitMembershipServiceTest {
 
     verify(auditService)
         .record(eq(AuditEventType.ROLE_CHANGED), eq(bereichId), any(), eq(userId), any());
+  }
+
+  @Test
+  void addBereichLeader_deniesChangingATargetPromotedAfterAuthorization() {
+    UUID bereichId = UUID.randomUUID();
+    UUID actorId = stubDelegatedBereichAuthorization(bereichId);
+    stubTargetPromotion(bereichId);
+    Bereich bereich = new Bereich();
+    bereich.setId(bereichId);
+    when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(bereich));
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    var authentication = UsernamePasswordAuthenticationToken.authenticated(actorId, "", List.of());
+
+    assertTrue(
+        roleManagementSecurity.canAppointBereichRole(
+            bereichId, userId, BereichLeadershipRole.KOORDINATOR, authentication));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () ->
+            membershipService.addBereichLeader(
+                bereichId, userId, BereichLeadershipRole.KOORDINATOR));
+    verify(membershipRepository)
+        .existsActiveRoleForBereichManagement(actorId, bereichId, MembershipRole.OL_MEMBER, true);
+    verify(membershipRepository, never()).saveAndFlush(any());
+    verifyNoInteractions(auditService, seatNotifier);
+  }
+
+  @Test
+  void removeBereichLeader_deniesRemovingATargetPromotedAfterAuthorization() {
+    UUID bereichId = UUID.randomUUID();
+    UUID actorId = stubDelegatedBereichAuthorization(bereichId);
+    stubTargetPromotion(bereichId);
+    var authentication = UsernamePasswordAuthenticationToken.authenticated(actorId, "", List.of());
+
+    assertTrue(roleManagementSecurity.canRemoveBereichRole(bereichId, userId, authentication));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () -> membershipService.removeBereichLeader(bereichId, userId));
+    verify(membershipRepository)
+        .existsActiveRoleForBereichManagement(actorId, bereichId, MembershipRole.OL_MEMBER, true);
+    verify(membershipRepository, never()).delete(any());
+    verifyNoInteractions(auditService, seatNotifier);
+  }
+
+  @Test
+  void removeBereichLeader_deniesAFormerLeaderEvenWithAValidLowerTargetRank() {
+    UUID bereichId = UUID.randomUUID();
+    UUID actorId = stubDelegatedBereichAuthorization(bereichId);
+    OrgUnitMembership coordinator =
+        areaMembership(bereichId, userId, MembershipRole.BEREICHSKOORDINATOR);
+    when(membershipRepository.findById(coordinator.getId())).thenReturn(Optional.of(coordinator));
+    var authentication = UsernamePasswordAuthenticationToken.authenticated(actorId, "", List.of());
+
+    assertTrue(roleManagementSecurity.canRemoveBereichRole(bereichId, userId, authentication));
+
+    assertThrows(
+        AccessDeniedException.class,
+        () -> membershipService.removeBereichLeader(bereichId, userId));
+    verify(membershipRepository)
+        .existsActiveRoleForBereichManagement(
+            actorId, bereichId, MembershipRole.BEREICHSLEITER, false);
+    verify(membershipRepository, never()).delete(any());
+    verifyNoInteractions(auditService, seatNotifier);
+  }
+
+  private UUID stubDelegatedBereichAuthorization(UUID bereichId) {
+    UUID actorId = UUID.randomUUID();
+    OrgUnitMembership leader = areaMembership(bereichId, actorId, MembershipRole.BEREICHSLEITER);
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(actorId));
+    when(authHelperService.holdsKrtMember()).thenReturn(true);
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(actorId))
+        .thenReturn(List.of(leader));
+    when(orgUnitRepository.existsByIdAndActiveTrue(bereichId)).thenReturn(true);
+    return actorId;
+  }
+
+  private void stubTargetPromotion(UUID bereichId) {
+    OrgUnitMembership before =
+        areaMembership(bereichId, userId, MembershipRole.BEREICHSKOORDINATOR);
+    OrgUnitMembership after = areaMembership(bereichId, userId, MembershipRole.BEREICHSLEITER);
+    when(membershipRepository.findById(before.getId()))
+        .thenReturn(Optional.of(before), Optional.of(after));
+  }
+
+  private static OrgUnitMembership areaMembership(
+      UUID bereichId, UUID memberId, MembershipRole role) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(memberId, bereichId));
+    membership.setKind(OrgUnitKind.BEREICH);
+    membership.setRole(role);
+    return membership;
   }
 
   @Test

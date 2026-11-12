@@ -45,10 +45,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Folds an approved duplicate account into the account the member keeps (REQ-SEC-055): moves its
  * belongings and its Discord identity, then removes it.
  *
- * <p>Composes {@link UserAccountMergeService#merge}, {@link KeycloakService} and {@link
- * UserDeletionService}. Runs outside a transaction; the database work commits through {@link
- * #completeConsolidationTransactionally}, and the duplicate's Keycloak user is deleted last so a
- * retry is safe.
+ * <p>Reserves both account IDs through the Keycloak writes and any compensation. The merge commits
+ * in a separate transaction through {@link #completeConsolidationTransactionally} before the
+ * duplicate's Keycloak user is deleted.
  */
 @Service
 @RequiredArgsConstructor
@@ -79,12 +78,12 @@ public class AccountConsolidationService {
    * @param adminId the acting admin's id, recorded in the audit
    * @return the surviving account
    * @throws NotFoundException when either account is unknown
-   * @throws BusinessConflictException when the ids are equal, the duplicate is the admin's own
-   *     account, the target is inactive or carries a different Discord identity, or both accounts
-   *     hold a bank ledger
+   * @throws BusinessConflictException when either account is already being consolidated, the ids
+   *     are equal, the duplicate is the admin's own account, the target is inactive or carries a
+   *     different Discord identity, or both accounts hold a bank ledger
    * @throws org.springframework.dao.OptimisticLockingFailureException when the version is stale
    */
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
   @NotNull
   public User consolidate(
       @NotNull UUID duplicateId,
@@ -94,6 +93,7 @@ public class AccountConsolidationService {
     if (duplicateId.equals(targetUserId)) {
       throw new BusinessConflictException("An account cannot be consolidated into itself");
     }
+    reserveAccounts(duplicateId, targetUserId);
     User duplicate =
         Entities.require(userRepository.findById(duplicateId), "Duplicate account not found");
     OptimisticLock.checkOptionalClient(duplicate.getVersion(), version, User.class, duplicateId);
@@ -137,6 +137,22 @@ public class AccountConsolidationService {
     }
     keycloakService.deleteUser(duplicateId);
     return result;
+  }
+
+  /**
+   * Reserves both accounts in a stable order for the entire consolidation.
+   *
+   * @param duplicateId the account to dissolve
+   * @param targetUserId the surviving account
+   * @throws BusinessConflictException if either account is already reserved
+   */
+  private void reserveAccounts(UUID duplicateId, UUID targetUserId) {
+    boolean duplicateFirst = duplicateId.compareTo(targetUserId) < 0;
+    if (!userRepository.tryLockAccountForConsolidation(duplicateFirst ? duplicateId : targetUserId)
+        || !userRepository.tryLockAccountForConsolidation(
+            duplicateFirst ? targetUserId : duplicateId)) {
+      throw new BusinessConflictException("An account is already being consolidated");
+    }
   }
 
   /**
@@ -225,7 +241,7 @@ public class AccountConsolidationService {
    * @return the surviving account
    * @throws NotFoundException when the target account is unknown
    */
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   @NotNull
   public User completeConsolidationTransactionally(
       @NotNull UUID duplicateId,

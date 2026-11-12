@@ -4676,10 +4676,11 @@ in the member list, so the URL names the row they clicked.
 It composes rather than reimplements. `UserAccountMergeService#merge` (`REQ-SEC-046`) decides which
 rows follow the member and which stay with the act, and refuses two bank ledgers rather than guessing;
 `KeycloakService` moves the federated identity and removes the duplicate's realm user;
-`UserDeletionService` purges the emptied row. The orchestrator is **non-transactional**, mirroring
-`REQ-SEC-026`: the Keycloak writes cannot roll back with the database, so the identity is linked
-first, the database half commits through a self-proxied method, and the duplicate's Keycloak user is
-deleted **last** — a rolled-back database half then leaves it intact for a clean re-read on retry.
+`UserDeletionService` purges the emptied row. A read-only transaction reserves both account IDs
+before preflight. A concurrent consolidation that shares either account returns `409` before any
+Keycloak call. The identity is linked after preflight, the database half commits in a separate
+transaction, and the duplicate's Keycloak user is deleted last. The reservations also cover
+compensation of a link created by a failed attempt.
 
 **The ordering inside the transaction is not free choice.** `app_user.discord_user_id` is UNIQUE
 (V172), so the duplicate's row must be gone before the survivor can claim the snowflake: belongings
@@ -4706,6 +4707,7 @@ optimistic-lock version. Each is a `409`.
   no longer there.
 - [x] Self / own-account / non-active target / different-identity target / stale version are each
   refused with `409` before anything is written.
+- [x] Concurrent consolidations sharing a source or target return `409` before calling Keycloak.
 - [x] A `LINKED` `UserApprovalEvent` is recorded against the survivor, and `merge` records its own
   `USER_MERGED` audit event (`REQ-AUDIT-001`). No PII in either.
 - [x] The roster updates in place via `krtFetch`, with no full-page reload (`REQ-FE-001`), and the

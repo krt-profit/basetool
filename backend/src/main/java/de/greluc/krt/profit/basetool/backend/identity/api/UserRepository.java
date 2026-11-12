@@ -35,6 +35,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Spring Data repository for {@link User}.
@@ -57,6 +59,20 @@ public interface UserRepository
       value = "SELECT id FROM app_user WHERE id IN (:accountIds) ORDER BY id FOR UPDATE",
       nativeQuery = true)
   List<UUID> lockAccountsForMerge(@Param("accountIds") Collection<UUID> accountIds);
+
+  /**
+   * Tries to reserve an account until the surrounding consolidation transaction ends.
+   *
+   * @param accountId the source or surviving account
+   * @return whether this transaction holds the reservation
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Query(
+      value =
+          "SELECT pg_try_advisory_xact_lock("
+              + "hashtextextended('account-consolidation:' || CAST(:accountId AS text), 0))",
+      nativeQuery = true)
+  boolean tryLockAccountForConsolidation(@Param("accountId") UUID accountId);
 
   /**
    * Reads only the names needed to scrub personal-data exports.
