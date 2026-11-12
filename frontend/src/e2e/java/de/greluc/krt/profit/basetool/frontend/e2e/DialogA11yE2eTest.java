@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
@@ -149,8 +151,23 @@ class DialogA11yE2eTest {
           itemOrderId,
           seeder.createLocation(USERNAME, PASSWORD, "E2E Dialog Loc " + UUID.randomUUID()));
       SEEDED_DETAILS.add("/orders/" + itemOrderId);
+      JsonObject money = new JsonObject();
+      money.addProperty("responsibleOrgUnitId", IRIDIUM_ID);
+      money.addProperty("requestingOrgUnitId", IRIDIUM_ID);
+      money.addProperty("handle", "E2E Dialog aUEC Order");
+      money.addProperty("target", "100");
+      String moneyOrder =
+          seeder.postBody(USERNAME, PASSWORD, "/api/v1/orders/auec", money.toString());
+      SEEDED_DETAILS.add(
+          "/orders/"
+              + JsonParser.parseString(moneyOrder).getAsJsonObject().get("id").getAsString());
       String specialCommandId =
           seeder.createSpecialCommand(USERNAME, PASSWORD, "E2E Dialog SK", "EDSK");
+      seeder.moveOrgUnitToProfit(USERNAME, PASSWORD, specialCommandId);
+      String skOrderId =
+          seeder.createJobOrder(
+              USERNAME, PASSWORD, specialCommandId, "E2E Dialog SK Order", jobMaterial, 650, 100.0);
+      SEEDED_DETAILS.add("/orders/" + skOrderId);
       SEEDED_DETAILS.add("/organisation/special-commands/" + specialCommandId);
       String orgUnitAccountId =
           seeder.ensureOrgUnitBankAccount(USERNAME, PASSWORD, "E2E Dialog OU Account", IRIDIUM_ID);

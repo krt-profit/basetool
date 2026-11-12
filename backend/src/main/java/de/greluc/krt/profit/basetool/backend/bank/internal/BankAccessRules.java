@@ -227,7 +227,7 @@ public class BankAccessRules implements BankAccessPolicy {
   BankAdmission.Admitted routeCorrection(
       @NotNull BankActor actor, @NotNull BankBookingRequest request, @NotNull BigDecimal amount) {
     BankAccount account = request.getAccount();
-    if (request.getType() == BankBookingRequestType.DEPOSIT) {
+    if (account == null || request.getType() == BankBookingRequestType.DEPOSIT) {
       return BankAdmission.Admitted.UNROUTED;
     }
     if (request.getPurposeKind() != null) {
@@ -366,10 +366,11 @@ public class BankAccessRules implements BankAccessPolicy {
    * @return {@code true} iff the actor acts on its approval
    */
   boolean mayApprove(@NotNull BankActor actor, @NotNull BankBookingRequest request) {
-    return staffRights(actor)
-        .mayApprove(
-            request.getRequiredApprover(),
-            judgement(actor, null).isResponsibleHolder(request.getAccount()));
+    BankAccount account = request.getAccount();
+    return account != null
+        && staffRights(actor)
+            .mayApprove(
+                request.getRequiredApprover(), judgement(actor, null).isResponsibleHolder(account));
   }
 
   /**
@@ -454,6 +455,9 @@ public class BankAccessRules implements BankAccessPolicy {
   boolean approves(@NotNull BankActor actor, @NotNull BankBookingRequest request) {
     BankStaffRights rights = staffRights(actor);
     BankAccount account = request.getAccount();
+    if (account == null) {
+      return false;
+    }
     boolean holds = rights.admin() || judgement(actor, null).isResponsibleHolder(account);
     return !rights.boundByFourEyes(request.getRequestedBy())
         && isForeignRequestCandidate(rights, account, holds)
@@ -539,8 +543,9 @@ public class BankAccessRules implements BankAccessPolicy {
      * @return {@code true} iff the actor is one of the request's approvers
      */
     boolean approves(@NotNull BankBookingRequest request) {
-      UUID accountId = request.getAccount().getId();
-      return !rights.boundByFourEyes(request.getRequestedBy())
+      UUID accountId = request.accountId();
+      return accountId != null
+          && !rights.boundByFourEyes(request.getRequestedBy())
           && candidateAccountIds.contains(accountId)
           && shows(request.getRequiredApprover(), accountId);
     }

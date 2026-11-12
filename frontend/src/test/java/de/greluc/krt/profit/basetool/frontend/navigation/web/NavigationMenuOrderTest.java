@@ -39,7 +39,8 @@ class NavigationMenuOrderTest {
   private static final NavigationRegistry REGISTRY = new NavigationRegistry();
 
   private static final NavigationAccess MEMBER =
-      new NavigationAccess(Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
+      new NavigationAccess(
+          Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.ORDER_WORKSPACE));
 
   private static NavigationMenu menu(Set<String> hidden, NavigationOrder.Mode member) {
     return NavigationMenu.resolve(

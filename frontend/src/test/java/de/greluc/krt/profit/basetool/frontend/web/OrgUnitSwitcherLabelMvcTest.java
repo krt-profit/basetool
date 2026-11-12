@@ -68,10 +68,9 @@ class OrgUnitSwitcherLabelMvcTest {
         .thenReturn(
             LayoutResponses.orgUnits(
                 List.of(
+                    new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON"),
                     new OrgUnitMembershipOptionDto(
-                        UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON", true),
-                    new OrgUnitMembershipOptionDto(
-                        UUID.randomUUID(), "VANGUARD", "VGD", "SQUADRON", true))));
+                        UUID.randomUUID(), "VANGUARD", "VGD", "SQUADRON"))));
   }
 
   @Test

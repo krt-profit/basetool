@@ -45,9 +45,11 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
@@ -84,7 +86,10 @@ import org.springframework.security.access.AccessDeniedException;
  * lookups, assignee resolution, one new inventory row per output, note normalisation, output
  * quantity conversion and the transition to {@link RefineryOrderStatus#COMPLETED}.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class RefineryOrderStoreServiceTest {
 
   @Mock private RefineryOrderRepository refineryOrderRepository;
@@ -134,6 +139,9 @@ class RefineryOrderStoreServiceTest {
   void setUpEntities() {
     StockCommands stockCommands =
         new InventoryStockCommands(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             userRepository,
             null,
@@ -246,7 +254,7 @@ class RefineryOrderStoreServiceTest {
         new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     jobOrder.setId(JOB_ORDER_ID);
     when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderVisibility.canSeeJobOrderInScope(jobOrder)).thenReturn(true);
+    when(jobOrderVisibility.canSeeJobOrder(jobOrder)).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(jobOrder)).thenReturn(Set.of(UUID.randomUUID()));
 
     assertThrows(
@@ -272,7 +280,7 @@ class RefineryOrderStoreServiceTest {
         new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder();
     jobOrder.setId(JOB_ORDER_ID);
     when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(jobOrder));
-    when(jobOrderVisibility.canSeeJobOrderInScope(jobOrder)).thenReturn(false);
+    when(jobOrderVisibility.canSeeJobOrder(jobOrder)).thenReturn(false);
 
     NotFoundException ex =
         assertThrows(

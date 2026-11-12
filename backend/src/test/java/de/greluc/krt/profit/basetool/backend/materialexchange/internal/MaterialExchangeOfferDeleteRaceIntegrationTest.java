@@ -98,7 +98,6 @@ class MaterialExchangeOfferDeleteRaceIntegrationTest {
     Squadron unit = new Squadron();
     unit.setName("Race " + tag);
     unit.setShorthand("R" + tag.substring(0, 4));
-    unit.setProfitEligible(true);
     unitId = squadronRepository.save(unit).getId();
     Material material = new Material();
     material.setName("Race ore " + tag);

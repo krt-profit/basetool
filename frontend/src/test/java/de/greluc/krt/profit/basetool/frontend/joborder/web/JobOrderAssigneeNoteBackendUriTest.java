@@ -25,7 +25,6 @@ import static org.mockito.Mockito.mock;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AssigneeNoteRequest;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.MutationResponseHelper;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
@@ -60,9 +59,9 @@ class JobOrderAssigneeNoteBackendUriTest {
     controller =
         new JobOrderWriteController(
             new JobOrderBackendClient(RealBackendApiClient.over(webClient)),
-            mock(LogisticianGate.class),
             mock(MutationResponseHelper.class),
-            mock(LiveSyncLocalBus.class));
+            mock(LiveSyncLocalBus.class),
+            mock(JobOrderCreation.class));
   }
 
   @AfterEach

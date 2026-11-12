@@ -319,6 +319,88 @@ class DataExportParticipantSectionsIntegrationTest {
   }
 
   @Test
+  void linkedRequestsExportOnlyTheMembersOwnCustodyRolesAcrossDecisions() {
+    UUID ownHolder = holder(subject, "ZzzExportSubjectZzz");
+    UUID otherHolder = holder(other, OTHER_HANDLE);
+    UUID foreignHolder = holder(user("ZzzExportForeignZzz"), "ZzzExportForeignZzz");
+    linkedHolderTransfer(ownHolder, otherHolder, "PENDING");
+    linkedHolderTransfer(otherHolder, ownHolder, "REJECTED");
+    linkedHolderTransfer(otherHolder, foreignHolder, "PENDING");
+
+    List<Map<String, Object>> rows = rows("bankRequestsAsCustodian");
+
+    assertThat(rows)
+        .hasSize(2)
+        .allSatisfy(row ->
+            assertThat(row.keySet())
+                .containsExactlyInAnyOrder(
+                    "type",
+                    "amount",
+                    "status",
+                    "created_at",
+                    "decided_at",
+                    "member_is_source_custodian",
+                    "member_is_destination_custodian",
+                    "member_is_funding_custodian"));
+    assertThat(rows)
+        .filteredOn(row -> "PENDING".equals(row.get("status")))
+        .singleElement()
+        .satisfies(row ->
+            assertThat(row)
+                .containsEntry("type", "HOLDER_TRANSFER")
+                .containsEntry("member_is_source_custodian", true)
+                .containsEntry("member_is_destination_custodian", false)
+                .containsEntry("member_is_funding_custodian", false));
+    assertThat(rows)
+        .filteredOn(row -> "REJECTED".equals(row.get("status")))
+        .singleElement()
+        .satisfies(row ->
+            assertThat(row)
+                .containsEntry("type", "HOLDER_TRANSFER")
+                .containsEntry("member_is_source_custodian", false)
+                .containsEntry("member_is_destination_custodian", true)
+                .containsEntry("member_is_funding_custodian", false));
+  }
+
+  private @NotNull UUID holder(@NotNull UUID member, @NotNull String handle) {
+    UUID id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO bank_holder (id, user_id, handle) VALUES (?, ?, ?)", id, member, handle);
+    return id;
+  }
+
+  private void linkedHolderTransfer(
+      @NotNull UUID source, @NotNull UUID destination, @NotNull String status) {
+    UUID attempt = UUID.randomUUID();
+    UUID purpose = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO bank_linked_attempt (id, purpose_kind, purpose_ref, fee_rate, fee)
+        VALUES (?, 'AUEC_ORDER', ?, 0.005, 25)
+        """,
+        attempt,
+        purpose);
+    jdbc.update(
+        """
+        INSERT INTO bank_booking_request (id, type, amount, status, requested_by,
+                                          requester_handle, purpose_kind, purpose_ref,
+                                          linked_attempt_id, requested_holder_id,
+                                          requested_target_holder_id, note, staff_note)
+        VALUES (?, 'HOLDER_TRANSFER', 5000, ?, ?, ?, 'AUEC_ORDER', ?, ?, ?, ?, ?, ?)
+        """,
+        UUID.randomUUID(),
+        status,
+        other,
+        OTHER_HANDLE,
+        purpose,
+        attempt,
+        source,
+        destination,
+        EXTERNAL_CONTACT,
+        EXTERNAL_CONTACT);
+  }
+
+  @Test
   void aRequestNamingTheMemberAsCounterpartyHidesTheRequesterAndScrubsTheirText() {
     UUID account = bankAccount("Zzz Anfragekonto");
     bookingRequest(account, other, subject);

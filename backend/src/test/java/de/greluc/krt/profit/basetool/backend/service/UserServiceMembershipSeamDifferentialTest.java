@@ -421,7 +421,6 @@ class UserServiceMembershipSeamDifferentialTest {
     Squadron s = new Squadron();
     s.setName(name);
     s.setShorthand(shorthand);
-    s.setProfitEligible(true);
     return squadronRepository.save(s);
   }
 
@@ -429,7 +428,6 @@ class UserServiceMembershipSeamDifferentialTest {
     SpecialCommand sc = new SpecialCommand();
     sc.setName(name);
     sc.setShorthand(shorthand);
-    sc.setProfitEligible(true);
     return specialCommandRepository.save(sc);
   }
 }

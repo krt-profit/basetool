@@ -62,8 +62,8 @@ public class JobOrderNumberLookupController {
   @Operation(
       summary = "Find job orders by number",
       description =
-          "Returns the orders whose number starts with the given digits that the caller may open:"
-              + " the scoped order list and the orders the caller is an assignee of.")
+          "Returns orders whose number starts with the given digits and that the caller may open"
+              + " through scoped access, an assignment, or a linked money holding.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public @NotNull List<JobOrderNumberHitDto> findByNumber(

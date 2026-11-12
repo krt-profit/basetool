@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -39,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -73,6 +76,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @RecordApplicationEvents
 class UserAccountMergeEndStateTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   /** The followed columns in the order the merge reports them, with the rows each moves. */
   private static final Map<String, Integer> EXPECTED_MOVED = new LinkedHashMap<>();
@@ -364,7 +369,7 @@ class UserAccountMergeEndStateTest {
     SpecialCommand sk = new SpecialCommand();
     sk.setName("Merge-SK-" + tag);
     sk.setShorthand("M" + tag);
-    sk.setProfitEligible(true);
+    withinProfit(sk, persistedProfitArea(orgUnitRepository));
     skUnit = specialCommandRepository.save(sk).getId();
     rule = jdbc.queryForObject("SELECT id FROM notification_rule LIMIT 1", UUID.class);
     exchangeClient = UUID.randomUUID();

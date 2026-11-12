@@ -45,8 +45,10 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockReads;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -63,7 +65,9 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -92,10 +96,18 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  * Unit tests for the list, page and reference getters of {@link JobOrderService} and for {@code
  * addAssignee} / {@code removeAssignee}.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderServiceAssigneeAndListTest {
 
+  @Mock private ProfitHierarchyService profitHierarchy;
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
+  @Mock private LiveSyncPublisher liveSyncPublisher;
+
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderItemFulfillmentGuard itemFulfillment;
   @Mock private MaterialRepository materialRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private OrderLinkedStockRows orderLinkedStockRows;
@@ -108,6 +120,7 @@ class JobOrderServiceAssigneeAndListTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @Mock private JobOrderItemService jobOrderItemService;
   @Mock private MaterialClaimService materialClaimService;
+  @Mock private JobOrderChangeEffects effects;
 
   @Mock private AuditService auditService;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -128,6 +141,7 @@ class JobOrderServiceAssigneeAndListTest {
     jobOrderAssigneeService =
         new JobOrderAssigneeService(
             jobOrderRepository,
+            responsibilityGuard,
             userRepository,
             orgUnitMembershipRepository,
             auditService,
@@ -137,38 +151,80 @@ class JobOrderServiceAssigneeAndListTest {
     service =
         new JobOrderService(
             jobOrderRepository,
-            materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
+            itemFulfillment,
+            profitHierarchy,
+            responsibilityGuard,
+            jobOrderAccessPolicy,
+            new JobOrderMaterialLines(materialRepository, null),
+            new InventoryStockReads(
+                inventoryItemRepository,
+                inventoryItemMapper,
+                null,
+                null,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.internal
+                        .InventoryStockPlanningReads.class)),
             new InventoryStockCommands(
-                inventoryItemRepository, null, null, null, null, null, null, null),
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                inventoryItemRepository,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
             jobOrderAssigneeService,
             null,
             null,
             null,
-            null,
+            effects,
             materialClaimService,
             auditService,
             jobOrderItemService,
+            new JobOrderItemReconciliation(jobOrderItemService),
             jobOrderStockProjectionService,
             null,
-            null,
-            null,
-            actingUserService(),
             new JobOrderEditor(
                 jobOrderRepository,
+                profitHierarchy,
+                org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.class),
+                org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class),
+                responsibilityGuard,
                 jobOrderAccessPolicy,
                 auditService,
+                effects,
+                jobOrderStockProjectionService,
                 org.mockito.Mockito.mock(
-                    org.springframework.context.ApplicationEventPublisher.class),
-                jobOrderStockProjectionService));
+                    de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory
+                        .class)),
+            liveSyncPublisher,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderUnitHistory.class),
+            org.mockito.Mockito.mock(JobOrderParticipationCommands.class),
+            org.mockito.Mockito.mock(JobOrderMoneyLifecycle.class));
     lenient().when(jobOrderAccessPolicy.canEdit(any(), any())).thenReturn(true);
     queryService =
         new JobOrderQueryService(
             jobOrderRepository,
             materialRepository,
-            new InventoryStockReads(inventoryItemRepository, inventoryItemMapper, null, null),
+            new InventoryStockReads(
+                inventoryItemRepository,
+                inventoryItemMapper,
+                null,
+                null,
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess.class),
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.internal
+                        .InventoryStockPlanningReads.class)),
             requestScopeResolver,
-            jobOrderAccessPolicy,
             jobOrderMapper,
             squadronMapper,
             jobOrderItemService,
@@ -177,7 +233,7 @@ class JobOrderServiceAssigneeAndListTest {
             org.mockito.Mockito.mock(
                 de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     lenient()
-        .when(jobOrderMapper.toDto(any(JobOrder.class)))
+        .when(jobOrderMapper.toDtoWithAuthority(any(JobOrder.class), any()))
         .thenAnswer(inv -> {
           JobOrder o = inv.getArgument(0);
           return new JobOrderDto(
@@ -201,7 +257,14 @@ class JobOrderServiceAssigneeAndListTest {
               o.getVersion(),
               null,
               null,
-              false);
+              false,
+              false,
+              null,
+              false,
+              false,
+              false,
+              0L,
+              0L);
         });
     lenient().when(orderLinkedStockRows.materialStockOfOrders(any())).thenReturn(List.of());
     lenient().when(materialClaimService.getClaimBucketsForOrders(any())).thenReturn(Map.of());
@@ -237,6 +300,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -254,6 +318,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable);
     }
 
@@ -270,6 +335,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -286,6 +352,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable);
     }
 
@@ -302,6 +369,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -318,6 +386,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable);
     }
 
@@ -335,6 +404,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -351,6 +421,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable);
     }
 
@@ -368,6 +439,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -384,6 +456,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable);
     }
 
@@ -401,10 +474,11 @@ class JobOrderServiceAssigneeAndListTest {
               Set.of(new UUID(0L, 0L)),
               false,
               Set.of(new UUID(0L, 0L)),
-              false,
+              true,
               null,
               union,
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -417,34 +491,34 @@ class JobOrderServiceAssigneeAndListTest {
               Set.of(new UUID(0L, 0L)),
               false,
               Set.of(new UUID(0L, 0L)),
-              false,
+              true,
               null,
               union,
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable);
     }
 
     @Test
-    void toProcess_unpinned_forwardsTheDirectMembershipsAsProcessingUnits() {
+    void toProcess_unpinnedIncludesCurrentLeadershipAndContextualUnitReach() {
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       UUID staffel = UUID.randomUUID();
       UUID sk = UUID.randomUUID();
       UUID cascaded = UUID.randomUUID();
       Set<UUID> union = Set.of(staffel, sk, cascaded);
-      Set<UUID> direct = Set.of(staffel, sk);
       when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, null, union));
-      when(requestScopeResolver.currentDirectMembershipOrgUnitIds()).thenReturn(direct);
       when(jobOrderRepository.findScopedJobOrders(
               allStatuses,
               true,
               Set.of(new UUID(0L, 0L)),
               true,
-              direct,
-              false,
+              union,
+              true,
               null,
               union,
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -457,11 +531,12 @@ class JobOrderServiceAssigneeAndListTest {
               true,
               Set.of(new UUID(0L, 0L)),
               true,
-              direct,
-              false,
+              union,
+              true,
               null,
               union,
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable);
     }
 
@@ -471,18 +546,17 @@ class JobOrderServiceAssigneeAndListTest {
       UUID pinned = UUID.randomUUID();
       when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, pinned, Set.of()));
-      when(requestScopeResolver.currentScopePredicate())
-          .thenReturn(new ScopePredicate(false, pinned, Set.of()));
       when(jobOrderRepository.findScopedJobOrders(
               allStatuses,
               true,
               Set.of(new UUID(0L, 0L)),
               true,
               Set.of(pinned),
-              false,
+              true,
               pinned,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -495,10 +569,11 @@ class JobOrderServiceAssigneeAndListTest {
               Set.of(new UUID(0L, 0L)),
               true,
               Set.of(pinned),
-              false,
+              true,
               pinned,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable);
     }
 
@@ -510,17 +585,17 @@ class JobOrderServiceAssigneeAndListTest {
       Set<UUID> union = Set.of(staffel, sk);
       when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
           .thenReturn(new ScopePredicate(false, null, union));
-      when(requestScopeResolver.currentDirectMembershipOrgUnitIds()).thenReturn(union);
       when(jobOrderRepository.findScopedJobOrders(
               allStatuses,
               true,
               Set.of(new UUID(0L, 0L)),
               true,
               Set.of(sk),
-              false,
+              true,
               null,
               union,
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -531,8 +606,8 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void toProcess_withAProcessingUnitOutsideTheMemberships_returnsAnEmptyPageWithoutQuerying() {
-      when(requestScopeResolver.currentDirectMembershipOrgUnitIds())
-          .thenReturn(Set.of(UUID.randomUUID()));
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+          .thenReturn(new ScopePredicate(false, null, Set.of(UUID.randomUUID())));
 
       Page<JobOrderDto> result =
           queryService.getAllJobOrders(null, null, true, UUID.randomUUID(), pageable);
@@ -543,7 +618,8 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void toProcess_withoutAnyUnit_returnsAnEmptyPageWithoutQuerying() {
-      when(requestScopeResolver.currentDirectMembershipOrgUnitIds()).thenReturn(Set.of());
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+          .thenReturn(new ScopePredicate(false, null, Set.of()));
 
       Page<JobOrderDto> result = queryService.getAllJobOrders(null, null, true, pageable);
 
@@ -552,13 +628,31 @@ class JobOrderServiceAssigneeAndListTest {
     }
 
     @Test
-    void toProcess_withoutTheProfitGate_returnsAnEmptyPage() {
+    void toProcessWithoutGlobalProfitReadKeepsItsCurrentUnitWork() {
       when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+      Set<UUID> unitIds = Set.of(PROCESSING_UNIT_ID);
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+          .thenReturn(new ScopePredicate(false, null, unitIds));
+      JobOrder order = newJobOrder(JobOrderStatus.OPEN);
+      order.setResponsibleOrgUnit(processingUnit());
+      when(jobOrderRepository.findScopedJobOrders(
+              allStatuses,
+              true,
+              Set.of(new UUID(0L, 0L)),
+              true,
+              unitIds,
+              false,
+              null,
+              unitIds,
+              new UUID(0L, 0L),
+              List.of(JobOrderType.values()),
+              pageable))
+          .thenReturn(new PageImpl<>(List.of(order)));
 
       Page<JobOrderDto> result = queryService.getAllJobOrders(null, null, true, pageable);
 
-      assertEquals(0, result.getTotalElements());
-      verifyNoInteractions(jobOrderRepository);
+      assertEquals(1, result.getTotalElements());
+      assertEquals(JOB_ORDER_ID, result.getContent().getFirst().id());
     }
 
     @Test
@@ -576,6 +670,7 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(page);
 
@@ -601,9 +696,10 @@ class JobOrderServiceAssigneeAndListTest {
               null,
               Set.of(),
               new UUID(0L, 0L),
+              java.util.List.of(JobOrderType.values()),
               pageable))
           .thenReturn(new PageImpl<>(List.of(order)));
-      when(jobOrderMapper.toDto(order))
+      when(jobOrderMapper.toDtoWithAuthority(eq(order), any()))
           .thenReturn(
               jobOrderDtoWithMaterials(
                   order,
@@ -641,30 +737,47 @@ class JobOrderServiceAssigneeAndListTest {
   @Nested
   class FindAllActiveReferenceTests {
 
+    @BeforeEach
+    void currentUnitReadScope() {
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+          .thenReturn(new ScopePredicate(false, null, Set.of(PROCESSING_UNIT_ID)));
+    }
+
     @Test
     void emptyRepositoryResult_returnsEmptyList() {
       when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
-      when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of());
+      when(jobOrderRepository.findReadableActiveWithMaterials(
+              true, null, Set.of(PROCESSING_UNIT_ID), new UUID(0L, 0L)))
+          .thenReturn(List.of());
 
       assertTrue(queryService.findAllActiveReference(false).isEmpty());
     }
 
     @Test
-    void nonProfitMember_getsEmptyListWithoutQueryingRepository() {
+    void callerWithoutConcreteReadGetsNoReferenceHits() {
       when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+      when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+          .thenReturn(new ScopePredicate(false, null, Set.of()));
+      when(jobOrderRepository.findReadableActiveWithMaterials(
+              false, null, Set.of(), new UUID(0L, 0L)))
+          .thenReturn(List.of());
 
       assertTrue(queryService.findAllActiveReference(false).isEmpty());
-      verify(jobOrderRepository, never()).findAllActiveWithMaterials();
+      verify(jobOrderRepository)
+          .findReadableActiveWithMaterials(false, null, Set.of(), new UUID(0L, 0L));
     }
 
     @Test
-    void ordersOutOfScope_areFilteredOut() {
-      JobOrder o = newJobOrder(JobOrderStatus.OPEN);
-      when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
-      when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(false);
-      when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
+    void theReferenceLookupUsesOnlyDatabaseAdmittedRows() {
+      when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+      when(jobOrderRepository.findReadableActiveWithMaterials(
+              false, null, Set.of(PROCESSING_UNIT_ID), new UUID(0L, 0L)))
+          .thenReturn(List.of());
 
       assertTrue(queryService.findAllActiveReference(false).isEmpty());
+      verify(jobOrderRepository)
+          .findReadableActiveWithMaterials(
+              false, null, Set.of(PROCESSING_UNIT_ID), new UUID(0L, 0L));
     }
 
     @Test
@@ -672,8 +785,9 @@ class JobOrderServiceAssigneeAndListTest {
       JobOrder o = newJobOrder(JobOrderStatus.OPEN);
       o.setMaterials(null);
       when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
-      when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(true);
-      when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
+      when(jobOrderRepository.findReadableActiveWithMaterials(
+              true, null, Set.of(PROCESSING_UNIT_ID), new UUID(0L, 0L)))
+          .thenReturn(List.of(o));
 
       List<JobOrderReferenceDto> result = queryService.findAllActiveReference(false);
 
@@ -691,8 +805,9 @@ class JobOrderServiceAssigneeAndListTest {
       mat.setMaterial(new de.greluc.krt.profit.basetool.backend.catalogue.api.Material());
       o.setMaterials(new HashSet<>(Set.of(mat)));
       when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
-      when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class))).thenReturn(true);
-      when(jobOrderRepository.findAllActiveWithMaterials()).thenReturn(List.of(o));
+      when(jobOrderRepository.findReadableActiveWithMaterials(
+              true, null, Set.of(PROCESSING_UNIT_ID), new UUID(0L, 0L)))
+          .thenReturn(List.of(o));
       when(jobOrderMapper.toDto(mat))
           .thenReturn(
               new de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto(
@@ -1088,7 +1203,14 @@ class JobOrderServiceAssigneeAndListTest {
         order.getVersion(),
         null,
         null,
-        false);
+        false,
+        false,
+        null,
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   private Squadron processingUnit() {

@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -27,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClient;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRepository;
@@ -39,9 +43,19 @@ import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragments;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityProvenance;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteService;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -50,9 +64,14 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +80,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
@@ -68,6 +88,9 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.UnexpectedRollbackException;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
@@ -77,6 +100,8 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @SpringBootTest
 class ExchangeOrgStockUndoControllerTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final String CHANGES = "/api/v1/exchange/org-stock/changes";
   private static final String MEMBERS = "/api/v1/exchange/org-stock/members";
@@ -91,6 +116,13 @@ class ExchangeOrgStockUndoControllerTest {
   @Autowired private ExchangeSettingsRepository settingsRepository;
   @Autowired private KnownExchangeClients knownClients;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private NotificationMuteService mutes;
+  @Autowired private StockReads stock;
+  @Autowired private StockQuantityProvenance provenance;
+  @Autowired private StockLotWritePlans lotPlans;
+  @Autowired private TransactionTemplate transactions;
+  @Autowired private MaterialRepository materialRepository;
+  @Autowired private LocationRepository locationRepository;
 
   private final List<UUID> users = new ArrayList<>();
   private final List<UUID> orgUnits = new ArrayList<>();
@@ -98,6 +130,7 @@ class ExchangeOrgStockUndoControllerTest {
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> missions = new ArrayList<>();
   private final List<UUID> jobOrders = new ArrayList<>();
+  private final Map<UUID, String> additionalClients = new TreeMap<>();
 
   private MockMvc mockMvc;
   private UUID writer;
@@ -114,19 +147,9 @@ class ExchangeOrgStockUndoControllerTest {
             .build();
     writer = user("undo-writer", Roles.KRT_MEMBER);
     holder = user("undo-holder", Roles.KRT_MEMBER);
-    client = "vk-" + UUID.randomUUID().toString().substring(0, 8);
-    ExchangeClient registered = new ExchangeClient();
-    registered.setClientId(client);
-    registered.setDisplayName("VerseKit");
-    registered.setStatus(ExchangeClientStatus.ACTIVE);
-    registered.setCapabilities(
-        EnumSet.of(
-            ExchangeCapability.CONNECT,
-            ExchangeCapability.ORGSTOCK_READ,
-            ExchangeCapability.ORGSTOCK_DETAILS,
-            ExchangeCapability.ORGSTOCK_WRITE));
-    registryId = clientRepository.saveAndFlush(registered).getId();
-    knownClients.invalidate();
+    ExchangeClient registered = registerClient();
+    client = registered.getClientId();
+    registryId = registered.getId();
     ExchangeSettings settings =
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     wasEnabled = settings.isEnabled();
@@ -138,6 +161,10 @@ class ExchangeOrgStockUndoControllerTest {
   void tearDown() {
     jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", registryId);
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
+    additionalClients.forEach((id, name) -> {
+      jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", id);
+      jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", name);
+    });
     for (UUID id : users) {
       jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", id);
       jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
@@ -274,6 +301,312 @@ class ExchangeOrgStockUndoControllerTest {
   }
 
   @Test
+  void concurrentUndosCannotRecreateTheSameOriginalQuantityAtBothHistoricalLocations()
+      throws Exception {
+    // Inbox inserts also need a foreign-key lock on the holder row.
+    mutes.setMuted(holder, NotificationType.INVENTORY_BOOKED_OUT_BY_OTHER, true);
+    ExchangeClient movingClient = registerClient();
+    ExchangeClient consumingClient = registerClient();
+    additionalClients.put(movingClient.getId(), movingClient.getClientId());
+    additionalClients.put(consumingClient.getId(), consumingClient.getClientId());
+    String secondClient = movingClient.getClientId();
+    String thirdClient = consumingClient.getClientId();
+    UUID pool = orgUnit();
+    UUID secondWriter = user("undo-second-writer", Roles.KRT_MEMBER);
+    UUID thirdWriter = user("undo-third-writer", Roles.KRT_MEMBER);
+    joins(writer, pool, true);
+    joins(secondWriter, pool, true);
+    joins(thirdWriter, pool, true);
+    joins(holder, pool, false);
+    UUID material = material("SCU");
+    UUID firstPlace = location();
+    UUID secondPlace = location();
+    UUID thirdPlace = location();
+    UUID original = stock(holder, material, firstPlace, 2.0, pool);
+    UUID collateral = stock(holder, material("SCU"), location(), 10.0, pool);
+    StockLot firstLot =
+        new StockLot(
+            materialRepository.findById(material).orElseThrow(),
+            null,
+            locationRepository.findById(firstPlace).orElseThrow(),
+            1,
+            false);
+    StockLot secondLot =
+        new StockLot(
+            materialRepository.findById(material).orElseThrow(),
+            null,
+            locationRepository.findById(secondPlace).orElseThrow(),
+            1,
+            false);
+    StockLot thirdLot =
+        new StockLot(
+            materialRepository.findById(material).orElseThrow(),
+            null,
+            locationRepository.findById(thirdPlace).orElseThrow(),
+            1,
+            false);
+    List<StockLot> allLots = List.of(firstLot, secondLot, thirdLot);
+    List<StockQuantityFragment> before = transactions.execute(_ -> provenance.quantityOf(original));
+    assertThat(StockQuantityFragments.total(before)).isEqualTo(2000L);
+    clientWrite(
+            ops(
+                entryOp(
+                    "move-location",
+                    pool,
+                    original,
+                    0,
+                    quantity("2") + ",\"location\":{\"name\":\"Undo " + secondPlace + "\"}")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+    var moved = stock.lotRows(holder, List.of(secondLot)).get(secondLot.key()).getFirst();
+    assertThat(stock.findRow(original)).isEmpty();
+    List<StockQuantityFragment> movedQuantity =
+        transactions.execute(_ -> provenance.quantityOf(moved.getId()));
+    assertThat(movedQuantity).containsExactlyElementsOf(before);
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), secondWriter, secondClient)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp(
+                            "move-location",
+                            pool,
+                            moved.getId(),
+                            moved.getVersion(),
+                            quantity("2")
+                                + ",\"location\":{\"name\":\"Undo "
+                                + thirdPlace
+                                + "\"}"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+    var movedAgain = stock.lotRows(holder, List.of(thirdLot)).get(thirdLot.key()).getFirst();
+    assertThat(stock.findRow(moved.getId())).isEmpty();
+    List<StockQuantityFragment> movedAgainQuantity =
+        transactions.execute(_ -> provenance.quantityOf(movedAgain.getId()));
+    assertThat(movedAgainQuantity).containsExactlyElementsOf(before);
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), thirdWriter, thirdClient)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp(
+                            "book-out",
+                            pool,
+                            movedAgain.getId(),
+                            movedAgain.getVersion(),
+                            quantity("2")))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+    assertThat(stock.lotRows(holder, allLots).values().stream().flatMap(List::stream)).isEmpty();
+    List<String> waiters =
+        List.of("undo-first-" + UUID.randomUUID(), "undo-second-" + UUID.randomUUID());
+    List<Future<MockHttpServletResponse>> responses = new ArrayList<>();
+    TransactionTemplate lotLockTransaction =
+        new TransactionTemplate(Objects.requireNonNull(transactions.getTransactionManager()));
+    lotLockTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+      transactions.executeWithoutResult(_ -> {
+        jdbc.queryForObject("SELECT id FROM app_user WHERE id = ? FOR UPDATE", UUID.class, holder);
+        lotLockTransaction.executeWithoutResult(_ -> {
+          lotPlans.prepareLotBatch(holder, allLots, List.of(), List.of(), List.of());
+          for (int index = 0; index < waiters.size(); index++) {
+            String name = waiters.get(index);
+            UUID actor = index == 0 ? writer : thirdWriter;
+            String actorClient = index == 0 ? client : thirdClient;
+            responses.add(
+                workers.submit(() -> {
+                  AtomicReference<MockHttpServletResponse> response = new AtomicReference<>();
+                  try {
+                    transactions.executeWithoutResult(_ -> {
+                      jdbc.queryForObject(
+                          "SELECT set_config('application_name', ?, true)", String.class, name);
+                      try {
+                        response.set(undo(actor, actorClient).andReturn().getResponse());
+                      } catch (Exception failure) {
+                        throw new AssertionError(failure);
+                      }
+                    });
+                  } catch (UnexpectedRollbackException expected) {
+                    assertThat(Objects.requireNonNull(response.get()).getStatus()).isEqualTo(409);
+                  }
+                  return Objects.requireNonNull(response.get());
+                }));
+          }
+          await()
+              .atMost(Duration.ofSeconds(10))
+              .until(() ->
+                  waiters.stream()
+                      .allMatch(name ->
+                          jdbc.queryForObject(
+                                  "SELECT count(*) FROM pg_stat_activity WHERE application_name = ?"
+                                      + " AND wait_event_type = 'Lock' AND wait_event = 'advisory'",
+                                  Integer.class,
+                                  name)
+                              > 0));
+        });
+        await()
+            .atMost(Duration.ofSeconds(10))
+            .until(() ->
+                waiters.stream()
+                        .allMatch(name ->
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM pg_stat_activity WHERE application_name ="
+                                        + " ? AND wait_event_type = 'Lock' AND wait_event IN"
+                                        + " ('advisory', 'transactionid', 'tuple')",
+                                    Integer.class,
+                                    name)
+                                > 0)
+                    && waiters.stream()
+                        .anyMatch(name ->
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM pg_stat_activity WHERE application_name ="
+                                        + " ? AND wait_event_type = 'Lock' AND wait_event ="
+                                        + " 'transactionid' AND query ILIKE '%insert into"
+                                        + " inventory_item%'",
+                                    Integer.class, name)
+                                > 0));
+      });
+      for (Future<MockHttpServletResponse> response : responses) {
+        var result = response.get(15, TimeUnit.SECONDS);
+        assertThat(result.getStatus()).as(result.getContentAsString()).isIn(200, 409);
+      }
+    }
+    transactions.executeWithoutResult(_ -> {
+      var retained =
+          stock.lotRows(holder, allLots).values().stream().flatMap(List::stream).toList();
+      assertThat(retained.stream().mapToDouble(row -> row.getAmount()).sum()).isEqualTo(2.0);
+      var quantity =
+          retained.stream().flatMap(row -> provenance.quantityOf(row.getId()).stream()).toList();
+      assertThat(StockQuantityFragments.total(quantity)).isEqualTo(2000L);
+      assertThat(StockQuantityFragments.subtract(before, quantity)).isEmpty();
+      assertThat(StockQuantityFragments.subtract(quantity, before)).isEmpty();
+      assertThat(stock.findRow(collateral).orElseThrow().getAmount()).isEqualTo(10.0);
+    });
+  }
+
+  @Test
+  void undoingAnAllocationAdvancesTheExposedStockVersion() throws Exception {
+    UUID pool = orgUnit();
+    reachesTheJobOrderQueue(pool);
+    joins(writer, pool, true);
+    joins(holder, pool, false);
+    UUID material = material("SCU");
+    UUID order = jobOrder(pool, material);
+    UUID row = stock(holder, material, location(), 5.0, pool);
+    List<StockQuantityFragment> original = transactions.execute(_ -> provenance.quantityOf(row));
+    clientWrite(
+            ops(
+                entryOp(
+                    "allocation-add",
+                    pool,
+                    row,
+                    0,
+                    ",\"jobOrder\":\"" + order + "\"" + quantity("4"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+    long observed =
+        Objects.requireNonNull(
+            transactions.execute(_ -> {
+              var changed = stock.findRow(row).orElseThrow();
+              assertThat(changed.jobOrderSliceAmount(order)).isEqualTo(4.0);
+              return changed.getVersion();
+            }));
+    assertThat(observed).isPositive();
+
+    undo(writer)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+    transactions.executeWithoutResult(_ -> {
+      var restored = stock.findRow(row).orElseThrow();
+      assertThat(restored.getAmount()).isEqualTo(5.0);
+      assertThat(restored.jobOrderSliceAmount(order)).isZero();
+      assertThat(restored.getVersion()).isGreaterThan(observed);
+      assertThat(provenance.quantityOf(row)).containsExactlyElementsOf(original);
+    });
+    clientWrite(ops(entryOp("note", pool, row, observed, ",\"note\":\"stale\"")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].reason").value("VERSION_CONFLICT"));
+  }
+
+  @Test
+  void anOlderOrgSnapshotRestoresAllocatedQuantityWithoutInventingEligiblePhysicalOrigins()
+      throws Exception {
+    UUID pool = orgUnit();
+    reachesTheJobOrderQueue(pool);
+    joins(writer, pool, true);
+    joins(holder, pool, false);
+    UUID material = material("SCU");
+    UUID place = location();
+    UUID order = jobOrder(pool, material);
+    UUID original = stock(holder, material, place, 5.0, pool);
+    jdbc.update(
+        """
+        INSERT INTO inventory_item_job_order_allocation
+            (id, inventory_item_id, job_order_id, amount, delivered, version, created_at, updated_at)
+        VALUES (?, ?, ?, 5, false, 0, now(), now())
+        """,
+        UUID.randomUUID(),
+        original,
+        order);
+    String taken =
+        quantity("5")
+            + ",\"fromJobOrders\":[{\"jobOrder\":\""
+            + order
+            + "\",\"quantity\":{\"amount\":5,\"unit\":\"SCU\"}}]";
+    clientWrite(ops(entryOp("book-out", pool, original, 0, taken)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+    assertThat(stock.findRow(original)).isEmpty();
+    assertThat(
+            jdbc.update(
+                "UPDATE exchange_journal SET before_state = CAST((CAST(before_state AS jsonb)"
+                    + " - 'quantityProvenance' - 'completeQuantity') AS text)"
+                    + " WHERE user_id = ? AND client_id = ? AND entity_key = ?",
+                writer,
+                client,
+                original.toString()))
+        .isEqualTo(1);
+
+    undo(writer)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+    transactions.executeWithoutResult(_ -> {
+      var restored = stock.findRow(original).orElseThrow();
+      assertThat(restored.getAmount()).isEqualTo(5.0);
+      assertThat(restored.jobOrderSliceAmount(order)).isEqualTo(5.0);
+      assertThat(provenance.quantityOf(original)).isEmpty();
+    });
+
+    clientWrite(ops(bookIn(pool, ref(pool, holder), material, place, "1")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
+    var materialEntity = materialRepository.findById(material).orElseThrow();
+    var placeEntity = locationRepository.findById(place).orElseThrow();
+    List<StockLot> bothQualities =
+        List.of(
+            new StockLot(materialEntity, null, placeEntity, 1, false),
+            new StockLot(materialEntity, null, placeEntity, 500, false));
+    transactions.executeWithoutResult(_ -> {
+      var current =
+          stock.lotRows(holder, bothQualities).values().stream().flatMap(List::stream).toList();
+      assertThat(current.stream().mapToDouble(row -> row.getAmount()).sum()).isEqualTo(6.0);
+      assertThat(
+              StockQuantityFragments.total(
+                  current.stream()
+                      .flatMap(row -> provenance.quantityOf(row.getId()).stream())
+                      .toList()))
+          .isEqualTo(1000L);
+      assertThat(stock.findRow(original).orElseThrow().jobOrderSliceAmount(order)).isEqualTo(5.0);
+      assertThat(provenance.quantityOf(original)).isEmpty();
+    });
+  }
+
+  @Test
   void anEntryChangedSinceIsRefusedAsAConflictAndTheOthersAreStillRestored() throws Exception {
     UUID pool = orgUnit();
     joins(writer, pool, true);
@@ -286,7 +619,22 @@ class ExchangeOrgStockUndoControllerTest {
                 entryOp("book-out", pool, first, 0, quantity("4")),
                 entryOp("book-out", pool, second, 0, quantity("4"))))
         .andExpect(jsonPath("$.applied").value(2));
-    jdbc.update("UPDATE inventory_item SET amount = 5, version = version + 1 WHERE id = ?", first);
+    ExchangeClient otherClient = registerClient();
+    additionalClients.put(otherClient.getId(), otherClient.getClientId());
+    mockMvc
+        .perform(
+            relayed(post(CHANGES), writer, otherClient.getClientId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    ops(
+                        entryOp(
+                            "book-out",
+                            pool,
+                            first,
+                            stock.findRow(first).orElseThrow().getVersion(),
+                            quantity("1")))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(1));
 
     undo(writer)
         .andExpect(status().isOk())
@@ -493,14 +841,37 @@ class ExchangeOrgStockUndoControllerTest {
     return rows;
   }
 
+  /** Registers one real client with the existing org-stock fixture capabilities. */
+  private ExchangeClient registerClient() {
+    ExchangeClient registered = new ExchangeClient();
+    registered.setClientId("vk-" + UUID.randomUUID().toString().substring(0, 8));
+    registered.setDisplayName("VerseKit");
+    registered.setStatus(ExchangeClientStatus.ACTIVE);
+    registered.setCapabilities(
+        EnumSet.of(
+            ExchangeCapability.CONNECT,
+            ExchangeCapability.ORGSTOCK_READ,
+            ExchangeCapability.ORGSTOCK_DETAILS,
+            ExchangeCapability.ORGSTOCK_WRITE));
+    ExchangeClient saved = clientRepository.saveAndFlush(registered);
+    knownClients.invalidate();
+    return saved;
+  }
+
   private ResultActions clientWrite(@NotNull String changeSet) throws Exception {
     return mockMvc.perform(
         relayed(post(CHANGES), writer).contentType(MediaType.APPLICATION_JSON).content(changeSet));
   }
 
   private ResultActions undo(@NotNull UUID member) throws Exception {
+    return undo(member, client);
+  }
+
+  /** Sends the complete public Undo request for one real member/client pair. */
+  private ResultActions undo(@NotNull UUID member, @NotNull String registeredClient)
+      throws Exception {
     return mockMvc.perform(
-        post("/api/v1/connected-apps/" + client + "/undo")
+        post("/api/v1/connected-apps/" + registeredClient + "/undo")
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"since\":\"" + hourAgo() + "\"}")
             .with(browser(member)));
@@ -777,13 +1148,15 @@ class ExchangeOrgStockUndoControllerTest {
   }
 
   /**
-   * Makes a unit profit-eligible, so its members reach the job-order queue and see its orders
-   * (REQ-ORG-003).
+   * Parents a unit to the designated Profit area for the job-order queue (REQ-ORG-003).
    *
    * @param unit the unit
    */
   private void reachesTheJobOrderQueue(@NotNull UUID unit) {
-    jdbc.update("UPDATE org_unit SET is_profit_eligible = TRUE WHERE id = ?", unit);
+    jdbc.update(
+        "UPDATE org_unit SET parent_org_unit_id = ? WHERE id = ?",
+        persistedProfitArea(orgUnitRepository).getId(),
+        unit);
   }
 
   private void joins(@NotNull UUID user, @NotNull UUID orgUnit, boolean logistician) {
@@ -813,10 +1186,18 @@ class ExchangeOrgStockUndoControllerTest {
 
   private @NotNull MockHttpServletRequestBuilder relayed(
       @NotNull MockHttpServletRequestBuilder request, @NotNull UUID member) {
+    return relayed(request, member, client);
+  }
+
+  /** Uses the same trusted relay fixture for an explicit registered member/client pair. */
+  private @NotNull MockHttpServletRequestBuilder relayed(
+      @NotNull MockHttpServletRequestBuilder request,
+      @NotNull UUID member,
+      @NotNull String registeredClient) {
     return request
         .with(jwt().jwt(t -> t.subject(GATEWAY).claim("azp", "test-ingest-gateway")))
         .header(ActingMemberHeader.ON_BEHALF_OF_HEADER, member.toString())
-        .header(ActingMemberHeader.EXCHANGE_CLIENT_HEADER, client)
+        .header(ActingMemberHeader.EXCHANGE_CLIENT_HEADER, registeredClient)
         .header(ActingMemberHeader.EXCHANGE_CAPABILITIES_HEADER, WRITE)
         .header(ActingMemberHeader.EXCHANGE_INSTALLATION_HEADER, KEY);
   }

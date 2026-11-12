@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -48,6 +49,16 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
 public class BankPostingWriter {
+
+  /** PostgreSQL compares the UUID bytes as unsigned. */
+  static final Comparator<UUID> ACCOUNT_ID_ORDER =
+      (left, right) -> {
+        int high =
+            Long.compareUnsigned(left.getMostSignificantBits(), right.getMostSignificantBits());
+        return high == 0
+            ? Long.compareUnsigned(left.getLeastSignificantBits(), right.getLeastSignificantBits())
+            : high;
+      };
 
   private final BankAccountRepository accountRepository;
   private final BankHolderRepository holderRepository;

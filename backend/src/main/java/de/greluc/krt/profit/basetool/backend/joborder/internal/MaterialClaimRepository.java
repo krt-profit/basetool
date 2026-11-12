@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -42,7 +44,14 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @param jobOrderId the order whose claims to load.
    * @return claims on the order, never {@code null}.
    */
-  @EntityGraph(attributePaths = {"material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
+  @EntityGraph(
+      attributePaths = {
+        "material",
+        "qualityTier",
+        "claimingOrgUnit",
+        "claimedByUser",
+        "participation"
+      })
   List<MaterialClaim> findByJobOrderIdOrderByCreatedAtDesc(UUID jobOrderId);
 
   /**
@@ -53,7 +62,14 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
    * @param jobOrderIds the orders whose claims to load; an empty collection yields an empty list.
    * @return claims across the given orders, never {@code null}.
    */
-  @EntityGraph(attributePaths = {"material", "qualityTier", "claimingOrgUnit", "claimedByUser"})
+  @EntityGraph(
+      attributePaths = {
+        "material",
+        "qualityTier",
+        "claimingOrgUnit",
+        "claimedByUser",
+        "participation"
+      })
   List<MaterialClaim> findByJobOrderIdInOrderByCreatedAtDesc(Collection<UUID> jobOrderIds);
 
   /**
@@ -83,12 +99,146 @@ public interface MaterialClaimRepository extends JpaRepository<MaterialClaim, UU
       UUID jobOrderId, UUID materialId, UUID qualityTierId);
 
   /**
-   * Clears the {@code claimedByUser} audit reference on every claim stamped by the given user, so
-   * the user can be deleted without an FK violation; the claims themselves remain.
+   * Loads the open promises tied to the Staffel participation.
    *
-   * @param userId the user whose audit stamp is cleared from every claim
+   * @param participationId the durable participation
+   * @return open promise rows in stable order
+   */
+  @EntityGraph(attributePaths = {"material", "qualityTier", "claimingOrgUnit", "participation"})
+  List<MaterialClaim> findByParticipationIdOrderById(UUID participationId);
+
+  /**
+   * Loads one bounded page of active promises of the affected ineligible units.
+   *
+   * @param unitIds the ineligible claiming units
+   * @param pageable the bounded page
+   * @return active promises with notice facts fetched
+   */
+  @EntityGraph(
+      attributePaths = {
+        "jobOrder",
+        "material",
+        "qualityTier",
+        "claimingOrgUnit",
+        "claimedByUser",
+        "participation"
+      })
+  List<MaterialClaim> findByClaimingOrgUnitIdInOrderById(
+      Collection<UUID> unitIds, Pageable pageable);
+
+  /**
+   * Lists a bounded keyset page of orders with active support or promises for reconciliation.
+   *
+   * @param afterOrderId the last order inspected, or null for the first page
+   * @param pageable the bounded page
+   * @return distinct order identities in identity order
+   */
+  @Query(
+      "SELECT o.id FROM JobOrder o WHERE (:afterOrderId IS NULL OR o.id > :afterOrderId) AND"
+          + " (EXISTS (SELECT c.id FROM MaterialClaim c WHERE c.jobOrder = o) OR EXISTS (SELECT"
+          + " p.id FROM JobOrderParticipation p WHERE p.jobOrder = o AND p.active = true) OR EXISTS"
+          + " (SELECT m.id FROM JobOrderMoneyCommitment m WHERE m.order = o AND m.endedAt IS NULL))"
+          + " ORDER BY o.id")
+  List<UUID> findContributionMaintenanceOrderIdsAfter(
+      @Param("afterOrderId") @Nullable UUID afterOrderId, Pageable pageable);
+
+  /**
+   * Loads a bounded page of one order's active promises outside current eligible units.
+   *
+   * @param orderId the order being reconciled
+   * @param eligibleIds the current eligible unit identities
+   * @param pageable the bounded page
+   * @return ineligible active promises with audit and notice facts fetched
+   */
+  @EntityGraph(
+      attributePaths = {
+        "jobOrder",
+        "material",
+        "qualityTier",
+        "claimingOrgUnit",
+        "claimedByUser",
+        "participation"
+      })
+  @Query(
+      "SELECT c FROM MaterialClaim c WHERE c.jobOrder.id = :orderId"
+          + " AND c.claimingOrgUnit.id NOT IN :eligibleIds ORDER BY c.id")
+  List<MaterialClaim> findIneligibleActivePromisesByOrder(
+      @Param("orderId") UUID orderId,
+      @Param("eligibleIds") Collection<UUID> eligibleIds,
+      Pageable pageable);
+
+  /**
+   * Loads a bounded page of active and ended promises for explicit whole-order deletion.
+   *
+   * @param orderId the order being deleted by its owning service
+   * @param pageable the bounded page
+   * @return managed dependent rows including history
+   */
+  @Query(
+      value = "SELECT c.* FROM material_claim c WHERE c.job_order_id = :orderId ORDER BY c.id",
+      nativeQuery = true)
+  List<MaterialClaim> findForOrderIncludingHistory(
+      @Param("orderId") UUID orderId, Pageable pageable);
+
+  /**
+   * Reads a retained contribution's material without caching mutable contribution state.
+   *
+   * @param orderId the concrete order being written
+   * @param claimId the active or ended contribution
+   * @return its material identity, absent when the contribution is not on that order
+   */
+  @Query(
+      value =
+          "SELECT material_id FROM material_claim WHERE job_order_id = :orderId"
+              + " AND id = :claimId",
+      nativeQuery = true)
+  Optional<UUID> materialIdOf(@Param("orderId") UUID orderId, @Param("claimId") UUID claimId);
+
+  /**
+   * Reads one retained contribution even when its open promise ended.
+   *
+   * @param id the contribution identity
+   * @return the historical contribution, if retained
+   */
+  @Query(value = "SELECT c.* FROM material_claim c WHERE c.id = :id", nativeQuery = true)
+  Optional<MaterialClaim> findHistoricalById(@Param("id") UUID id);
+
+  /**
+   * Clears the audit-user reference so the user can be deleted while claims remain.
+   *
+   * @param userId the user whose claim audit reference is cleared
    */
   @Modifying
-  @Query("UPDATE MaterialClaim mc SET mc.claimedByUser = null WHERE mc.claimedByUser.id = :userId")
+  @Query(
+      value =
+          "UPDATE material_claim SET claimed_by_user_id = null WHERE claimed_by_user_id = :userId",
+      nativeQuery = true)
   void unlinkClaimedByUser(@Param("userId") UUID userId);
+
+  /**
+   * Batch-reads active and ended connected contribution facts.
+   *
+   * @param ids affected contribution identities
+   * @return retained contribution rows
+   */
+  @Query(value = "SELECT c.* FROM material_claim c WHERE c.id IN :ids", nativeQuery = true)
+  List<MaterialClaim> findHistoricalByIdIn(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Reads a retained contribution's database version independently of a managed preread.
+   *
+   * @param id contribution identity
+   * @return current version, if retained
+   */
+  @Query(value = "SELECT version FROM material_claim WHERE id = :id", nativeQuery = true)
+  Optional<Long> currentHistoricalVersion(@Param("id") UUID id);
+
+  /**
+   * Batch-reads current versions without resolving managed entity prereads.
+   *
+   * @param ids retained fact identities
+   * @return current database identities and versions
+   */
+  @Query(value = "SELECT id, version FROM material_claim WHERE id IN :ids", nativeQuery = true)
+  List<MaterialFactVersion> currentVersions(@Param("ids") Collection<UUID> ids);
 }

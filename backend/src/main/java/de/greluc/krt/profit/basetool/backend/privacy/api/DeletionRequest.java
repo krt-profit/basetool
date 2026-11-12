@@ -30,6 +30,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -56,7 +57,8 @@ public class DeletionRequest extends AbstractEntity<UUID> {
   private UUID id;
 
   /** The member asking to be erased. FK to {@code app_user(id)}, {@code ON DELETE CASCADE}. */
-  @Column(name = "user_id", nullable = false)
+  @Column(name = "user_id", nullable = false, updatable = false)
+  @Setter(AccessLevel.NONE)
   private UUID userId;
 
   /**

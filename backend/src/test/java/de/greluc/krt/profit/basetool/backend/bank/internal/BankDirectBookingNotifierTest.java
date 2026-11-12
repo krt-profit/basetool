@@ -62,6 +62,7 @@ class BankDirectBookingNotifierTest {
   @Mock private BankPostingRepository postingRepository;
   @Mock private BankActorResolver actors;
   @Mock private ApplicationEventPublisher eventPublisher;
+  @Mock private BankLinkedAttemptRepository linkedAttempts;
 
   @InjectMocks private BankDirectBookingNotifier notifier;
 
@@ -164,7 +165,7 @@ class BankDirectBookingNotifierTest {
                 new BankCounterLeg(
                     TX, UUID.randomUUID(), other, "KB-0004", "Rücklage", new BigDecimal("700"))));
 
-    notifier.reversalBooked(booked);
+    notifier.reversalBooked(UUID.randomUUID(), booked);
 
     List<NoticeEvent> sent = published(2);
     assertThat(sent.get(0).contextAccountId()).isEqualTo(ACCOUNT);

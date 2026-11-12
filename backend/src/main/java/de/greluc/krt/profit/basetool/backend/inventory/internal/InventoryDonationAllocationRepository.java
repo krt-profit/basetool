@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
@@ -33,10 +36,17 @@ public interface InventoryDonationAllocationRepository
     extends JpaRepository<InventoryDonationAllocation, UUID> {
 
   /**
-   * Finds the slices of one donation.
+   * Loads a donation's slices only on its already prepared physical rows.
    *
-   * @param donationId the donation
-   * @return its slices, at most one per row
+   * @param donationId the allocation target
+   * @param rowIds the complete nonempty prepared carrier set
+   * @return the current slices in deterministic physical row order
    */
-  List<InventoryDonationAllocation> findByDonationId(UUID donationId);
+  @Query(
+      """
+      SELECT a FROM InventoryDonationAllocation a JOIN FETCH a.inventoryItem i
+      WHERE a.donationId = :donationId AND i.id IN :rowIds ORDER BY i.id
+      """)
+  List<InventoryDonationAllocation> findSlicesByDonationIdAndRowIds(
+      @Param("donationId") UUID donationId, @Param("rowIds") Collection<UUID> rowIds);
 }

@@ -1,6 +1,6 @@
 # ADR-0091 — Requesting-owner redacted view + limited edit of job orders
 
-- **Status:** Accepted
+- **Status:** Accepted — implemented baseline; amended by [ADR-0356](0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md) (accepted planned, not implemented). The rationale below records the baseline decision.
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
 - **Related:** `AccessGateService.canSeeJobOrderAsRequester` / `canEditJobOrderAsRequester` · `RequestScopeResolver.isOrderRequester` / `currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders` · `JobOrderService.updateJobOrderAsRequester` / `updateItemJobOrderAsRequester` / `getRequestedJobOrders` / `replaceMaterialsWithinTransaction` · `JobOrderController` (`GET /requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`, `cleanupJobOrderForRequester`) · `JobOrderUpdatedByRequesterEvent` · V214 · REQ-ORDERS-023 · REQ-NOTIF-017 · REQ-ORG-003 · REQ-SEC-009 · ADR-0029 · #1186

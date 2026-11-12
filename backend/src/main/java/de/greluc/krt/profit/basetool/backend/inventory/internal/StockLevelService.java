@@ -66,6 +66,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class StockLevelService {
 
+  private final InventoryOrderWrites orderWrites;
+
   private static final String ITEM_HAS_NO_TIER = "A game item level has no tier";
 
   /** Emptiest first; the stable sort keeps the unit, material and tier order among equals. */
@@ -186,6 +188,7 @@ public class StockLevelService {
    */
   @Transactional
   public @NotNull StockLevelDto create(@NotNull StockLevelCreateRequest request) {
+    orderWrites.lockEligibility();
     OrgUnit unit =
         Entities.require(
             orgUnitRepository.findById(request.orgUnitId()).filter(OrgUnit::isActive),
@@ -239,6 +242,7 @@ public class StockLevelService {
    */
   @Transactional
   public @NotNull StockLevelDto update(@NotNull UUID id, @NotNull StockLevelUpdateRequest request) {
+    orderWrites.lockEligibility();
     StockLevel level = requireVersioned(id, request.version());
     if (level.getGameItem() != null) {
       selectableGameItems.requireSelectable(level.getGameItem());
@@ -291,6 +295,7 @@ public class StockLevelService {
    */
   @Transactional
   public void delete(@NotNull UUID id, long version) {
+    orderWrites.lockEligibility();
     StockLevel level = requireVersioned(id, version);
     auditRecorder.record(
         AuditEventType.MIN_STOCK_LEVEL_REMOVED,

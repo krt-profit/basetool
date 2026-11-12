@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestC
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationCauseCollector;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
@@ -100,13 +102,21 @@ class BankPurposeBoundRequestServiceTest {
             approvalLimitRepository,
             bereichRepository,
             orgUnitRepository);
+    var creation =
+        new BankRequestCreation(
+            requestRepository,
+            bankAuditService,
+            userRepository,
+            eventPublisher,
+            mock(BankLinkedRequestLiveSync.class));
     service =
         new BankBookingRequestService(
             requestRepository,
             accountRepository,
             holderRepository,
             transactionRepository,
-            bankLedgerService,
+            creation,
+            new BankRequestPostings(bankLedgerService, orgUnitMembershipQueryService),
             bankCaller,
             policy,
             bankAuditService,
@@ -115,7 +125,12 @@ class BankPurposeBoundRequestServiceTest {
             orgUnitMembershipQueryService,
             eventPublisher,
             purposeObservers,
-            new BankRequestClientNames(clientDirectory));
+            new BankRequestClientNames(clientDirectory),
+            mock(BankLinkedDecisions.class),
+            mock(BankLinkedBookings.class),
+            mock(BankLinkedRequestLiveSync.class),
+            mock(NotificationCauseCollector.class),
+            new BankRequestConfirmation(creation, bankAuditService));
   }
 
   @BeforeEach

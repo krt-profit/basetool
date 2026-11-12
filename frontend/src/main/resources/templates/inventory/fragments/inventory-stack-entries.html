@@ -22,7 +22,7 @@
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
                         <div class="assoc-split"
                              th:data-entry-id="${entry.id}"
-                             data-assoc-field="JOB_ORDER"
+                             data-assoc-field="JOB_ORDER" th:data-provision-material-id="${entry.material != null ? entry.material.id : null}" th:data-provision-quality="${entry.quality}"
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
@@ -57,6 +57,7 @@
                                         </select>
                                     </div>
                                     <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
+                                        <th:block th:replace="~{inventory/fragments/provision-picker :: picker}"></th:block>
                                         <label th:text="#{inventory.assoc.amount}">Menge</label>
                                         <div class="assoc-menge-row">
                                             <input type="text" data-number-input min="0" step="0.001"
@@ -262,7 +263,7 @@
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
                         <div class="assoc-split"
                              th:data-entry-id="${entry.id}"
-                             data-assoc-field="JOB_ORDER"
+                             data-assoc-field="JOB_ORDER" th:data-provision-material-id="${entry.material != null ? entry.material.id : null}" th:data-provision-quality="${entry.quality}"
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              data-piece="true">
@@ -297,6 +298,7 @@
                                         </select>
                                     </div>
                                     <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
+                                        <th:block th:replace="~{inventory/fragments/provision-picker :: picker}"></th:block>
                                         <label th:text="#{inventory.assoc.amount}">Menge</label>
                                         <div class="assoc-menge-row">
                                             <input type="text" data-number-input min="0" step="1"
@@ -456,7 +458,7 @@
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
                         <div class="assoc-split"
                              th:data-entry-id="${entry.id}"
-                             data-assoc-field="JOB_ORDER"
+                             data-assoc-field="JOB_ORDER" th:data-provision-material-id="${entry.material != null ? entry.material.id : null}" th:data-provision-quality="${entry.quality}"
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
@@ -492,6 +494,7 @@
                                             </select>
                                         </div>
                                         <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
+                                        <th:block th:replace="~{inventory/fragments/provision-picker :: picker}"></th:block>
                                             <label th:text="#{inventory.assoc.amount}">Menge</label>
                                             <div class="assoc-menge-row">
                                                 <input type="text" data-number-input min="0" step="0.001"
@@ -679,7 +682,7 @@
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
                         <div class="assoc-split"
                              th:data-entry-id="${entry.id}"
-                             data-assoc-field="JOB_ORDER"
+                             data-assoc-field="JOB_ORDER" th:data-provision-material-id="${entry.material != null ? entry.material.id : null}" th:data-provision-quality="${entry.quality}"
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              data-piece="true">
@@ -715,6 +718,7 @@
                                             </select>
                                         </div>
                                         <div class="assoc-pop__menge" hidden data-assoc-pop-amount>
+                                        <th:block th:replace="~{inventory/fragments/provision-picker :: picker}"></th:block>
                                             <label th:text="#{inventory.assoc.amount}">Menge</label>
                                             <div class="assoc-menge-row">
                                                 <input type="text" data-number-input min="0" step="1"

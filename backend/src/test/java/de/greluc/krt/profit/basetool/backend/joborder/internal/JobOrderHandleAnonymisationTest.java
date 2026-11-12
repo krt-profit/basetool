@@ -44,19 +44,27 @@ class JobOrderHandleAnonymisationTest {
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
+  @Mock private JobOrderMoneyPrivacy moneyPrivacy;
 
   @InjectMocks private JobOrderHandleAnonymisation participant;
 
   private final UUID userId = UUID.randomUUID();
 
   @Test
-  void runsLastAndRewritesTheThreeTextMatchedColumns() {
+  void runsLastAndDeclaresTheRedactedColumns() {
     assertThat(participant.position()).isEqualTo(30);
     assertThat(participant.columns())
         .containsExactly(
             "job_order.handle",
             "job_order_handover.recipient_handle",
-            "job_order_item_handover.recipient_handle");
+            "job_order_item_handover.recipient_handle",
+            "job_order_money_holder.accountless_name",
+            "job_order_money_holder_change.previous_name",
+            "job_order_money_holder_change.name",
+            "job_order_money_recipient.accountless_name",
+            "job_order_money_operation.selected_accountless_name",
+            "job_order_linked_money_attempt.selected_accountless_name",
+            "job_order_linked_money_attempt.counterparty_name");
   }
 
   @Test
@@ -77,7 +85,7 @@ class JobOrderHandleAnonymisationTest {
   }
 
   @Test
-  void touchesNothingWhenNoSpellingIsKnown() {
+  void skipsLegacyTextMatchesWhenNoSpellingIsKnown() {
     assertThat(participant.anonymise(userId, List.of()))
         .containsExactlyInAnyOrderEntriesOf(
             Map.of(

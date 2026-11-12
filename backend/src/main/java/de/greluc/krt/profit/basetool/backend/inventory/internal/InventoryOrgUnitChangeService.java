@@ -53,6 +53,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class InventoryOrgUnitChangeService {
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitMembershipQueryService membershipQueryService;
@@ -79,9 +80,12 @@ public class InventoryOrgUnitChangeService {
   @Transactional
   public @NotNull InventoryItemDto changeOrgUnit(
       @NotNull UUID itemId, @NotNull InventoryItemOrgUnitChangeDto dto, @NotNull UUID callerId) {
+    orderWrites.lockEligibility();
+    orderWrites.lockTransformRows(List.of(itemId), List.of());
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.lockById(itemId), () -> "Inventory item not found: " + itemId);
+    orderWrites.validateRows(List.of(itemId));
     OptimisticLock.checkOptionalClient(
         item.getVersion(), dto.version(), InventoryItem.class, itemId);
     requireOwnPersonalRow(item, callerId);
@@ -91,6 +95,7 @@ public class InventoryOrgUnitChangeService {
     }
     OrgUnit previous = item.getOwningOrgUnit();
     item.setOwningOrgUnit(target);
+    orderWrites.assertRow(item);
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditRecorder.record(
         AuditEventType.INVENTORY_ORG_UNIT_CHANGED,
@@ -122,6 +127,8 @@ public class InventoryOrgUnitChangeService {
   @Transactional
   public @NotNull BulkOrgUnitChangeResultDto bulkChangeOrgUnit(
       @NotNull BulkOrgUnitChangeRequest request, @NotNull UUID callerId) {
+    orderWrites.lockEligibility();
+    orderWrites.lockTransformRows(request.itemIds(), List.of());
     List<UUID> orderedIds = request.itemIds().stream().distinct().sorted().toList();
     List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
     for (UUID itemId : orderedIds) {
@@ -129,6 +136,7 @@ public class InventoryOrgUnitChangeService {
           Entities.require(
               inventoryItemRepository.lockById(itemId),
               () -> "Inventory item not found: " + itemId);
+      orderWrites.validateRows(List.of(itemId));
       requireOwnPersonalRow(item, callerId);
       rows.add(item);
     }
@@ -141,6 +149,7 @@ public class InventoryOrgUnitChangeService {
         continue;
       }
       row.setOwningOrgUnit(target);
+      orderWrites.assertRow(row);
       InventoryItem saved = inventoryItemRepository.saveAndFlush(row);
       inventoryCheckoutService.mergeStockIfRequested(saved, mergeStock);
       changed++;

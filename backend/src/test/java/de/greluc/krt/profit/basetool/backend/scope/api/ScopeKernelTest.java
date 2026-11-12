@@ -43,8 +43,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRep
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderResponsibilityGuard;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -54,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolic
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -96,12 +96,12 @@ import org.springframework.security.core.GrantedAuthority;
 @ExtendWith(MockitoExtension.class)
 class ScopeKernelTest {
 
+  @Mock private JobOrderResponsibilityGuard responsibilityGuard;
+
   @Mock private AuthHelperService authHelper;
   @Mock private SquadronRepository squadronRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
-  @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
-  @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private OperationRepository operationRepository;
@@ -224,8 +224,13 @@ class ScopeKernelTest {
             accessGateService,
             authHelper,
             jobOrderRepository,
-            jobOrderHandoverRepository,
-            jobOrderItemHandoverRepository);
+            responsibilityGuard,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderUnitReadHistoryRepository.class),
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.joborder.internal
+                    .JobOrderParticipationRepository.class));
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -867,13 +872,13 @@ class ScopeKernelTest {
     }
 
     @Test
-    void squadronResponsibleOrder_invisibleToForeignSquadronMember() {
+    void profitMemberReadsAResponsibleOrderAcrossSquadrons() {
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
       stubMemberInSquadronA();
 
-      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -910,8 +915,8 @@ class ScopeKernelTest {
 
   /**
    * REQ-ORDERS-023: the requester escape — a member of an order's requesting org unit may read it
-   * and (while it is still fully undelivered) edit it within limits, independent of the profit gate
-   * that blocks the normal {@code canSeeJobOrder}/{@code canEditJobOrder} paths.
+   * and its current contextual writer may edit it while fully undelivered, independent of the
+   * profit gate that blocks the normal {@code canSeeJobOrder}/{@code canEditJobOrder} paths.
    */
   @Nested
   class RequesterEscapeGateTests {
@@ -924,8 +929,7 @@ class ScopeKernelTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
-      assertTrue(jobOrderPolicy.canSeeJobOrderAsRequester(orderId));
+      assertTrue(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
@@ -936,35 +940,26 @@ class ScopeKernelTest {
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
 
-      assertFalse(jobOrderPolicy.canSeeJobOrderAsRequester(orderId));
+      assertFalse(jobOrderPolicy.canSeeJobOrder(orderId));
     }
 
     @Test
-    void nonProfitRequester_canEditOwnUndeliveredOrder() {
+    void nonProfitRequesterWriter_canEditOwnOrder() {
+      when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
       order.setRequestingOrgUnit(squadronA);
       when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
       stubNonProfitMember();
+      stubLogisticianGrantIn(SQUADRON_A_ID);
 
       assertFalse(jobOrderPolicy.canEditJobOrder(orderId));
       assertTrue(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
     }
 
     @Test
-    void requester_cannotEditOwnOrder_onceDelivered() {
-      UUID orderId = UUID.randomUUID();
-      var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
-      order.setRequestingOrgUnit(squadronA);
-      when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
-      stubNonProfitMember();
-      when(jobOrderHandoverRepository.existsByJobOrderId(orderId)).thenReturn(true);
-
-      assertFalse(jobOrderPolicy.canEditJobOrderAsRequester(orderId));
-    }
-
-    @Test
     void nonProfitMember_cannotEditForeignRequestedOrder() {
+      when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
       order.setRequestingOrgUnit(squadronB);
@@ -980,6 +975,7 @@ class ScopeKernelTest {
 
     @Test
     void skResponsibleOrder_notEditableWithoutALogisticianGrantInTheSpecialCommand() {
+      when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
@@ -991,6 +987,7 @@ class ScopeKernelTest {
 
     @Test
     void skResponsibleOrder_notEditableByNonProfitMember() {
+      when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
@@ -1001,6 +998,7 @@ class ScopeKernelTest {
 
     @Test
     void skResponsibleOrder_editableByAdmin() {
+      when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
@@ -1011,6 +1009,7 @@ class ScopeKernelTest {
 
     @Test
     void squadronResponsibleOrder_editableByALogisticianOfThatSquadron() {
+      when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
@@ -1022,6 +1021,7 @@ class ScopeKernelTest {
 
     @Test
     void squadronResponsibleOrder_notEditableByAPlainMemberOfThatSquadron() {
+      when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronA)));
@@ -1032,6 +1032,7 @@ class ScopeKernelTest {
 
     @Test
     void squadronResponsibleOrder_notEditableByForeignSquadronMember() {
+      when(responsibilityGuard.isValid(any())).thenReturn(true);
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, squadronB)));
@@ -1621,7 +1622,7 @@ class ScopeKernelTest {
       assertTrue(requestScopeResolver.canViewJobOrders());
       assertTrue(requestScopeResolver.canViewJobOrders());
 
-      verify(orgUnitRepository, times(1)).countProfitEligibleByIdIn(any());
+      verify(orgUnitRepository, times(1)).countInActiveProfitHierarchyByIdIn(any());
     }
   }
 
@@ -2627,7 +2628,7 @@ class ScopeKernelTest {
     lenient()
         .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
         .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-    lenient().when(orgUnitRepository.countProfitEligibleByIdIn(any())).thenReturn(1L);
+    lenient().when(orgUnitRepository.countInActiveProfitHierarchyByIdIn(any())).thenReturn(1L);
   }
 
   /**
@@ -2641,7 +2642,7 @@ class ScopeKernelTest {
     lenient()
         .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
         .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-    lenient().when(orgUnitRepository.countProfitEligibleByIdIn(any())).thenReturn(0L);
+    lenient().when(orgUnitRepository.countInActiveProfitHierarchyByIdIn(any())).thenReturn(0L);
   }
 
   /**
@@ -2736,9 +2737,8 @@ class ScopeKernelTest {
     private static final UUID DESCENDANT_STAFFEL_ID = UUID.randomUUID();
     private static final UUID OL_ID = UUID.randomUUID();
 
-    private de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich newBereich() {
-      de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich b =
-          new de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich();
+    private Bereich newBereich() {
+      Bereich b = new Bereich();
       b.setId(BEREICH_ID);
       b.setShorthand("PRF");
       return b;
@@ -2763,7 +2763,7 @@ class ScopeKernelTest {
     void leaderStampsOwnBereich_resolvesToBereichOrgUnit() {
       User leader = new User();
       leader.setId(UUID.randomUUID());
-      de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich bereich = newBereich();
+      Bereich bereich = newBereich();
       when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
           .thenReturn(List.of(bereichLeadMembership(leader.getId())));
       when(orgUnitRepository.findById(BEREICH_ID)).thenReturn(Optional.of(bereich));

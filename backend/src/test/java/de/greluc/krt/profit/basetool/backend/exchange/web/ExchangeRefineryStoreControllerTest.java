@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
@@ -49,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -93,6 +95,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  */
 @SpringBootTest
 class ExchangeRefineryStoreControllerTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final String CHANGES = "/api/v1/exchange/me/refinery-orders/changes";
   private static final String RECEIVERS = "/api/v1/exchange/me/store-choices/receivers";
@@ -251,7 +255,7 @@ class ExchangeRefineryStoreControllerTest {
 
   @Test
   void theJobOrderReadListsTheVisibleActiveOrdersThatNeedTheMaterial() throws Exception {
-    profitEligible();
+    withinProfitHierarchy();
     UUID visible = jobOrder(unit, "OPEN", refined);
     UUID done = jobOrder(unit, "COMPLETED", refined);
     UUID foreign = jobOrder(foreignUnit, "OPEN", refined);
@@ -335,7 +339,7 @@ class ExchangeRefineryStoreControllerTest {
   @Test
   void aLogisticianBooksOntoAMateInTheirUnitAndOntoAJobOrder() throws Exception {
     logistician();
-    profitEligible();
+    withinProfitHierarchy();
     UUID jobOrder = jobOrder(unit, "OPEN", refined);
     UUID order = order("OPEN");
 
@@ -366,7 +370,7 @@ class ExchangeRefineryStoreControllerTest {
 
   @Test
   void aRefusedLineRefusesTheWholePickupWithItsReasonAndBooksNothing() throws Exception {
-    profitEligible();
+    withinProfitHierarchy();
     UUID foreignJob = jobOrder(foreignUnit, "OPEN", refined);
     UUID notOutput = order("OPEN");
     UUID foreignReceiver = order("OPEN");
@@ -493,7 +497,7 @@ class ExchangeRefineryStoreControllerTest {
   @Test
   void aConfirmedSetDecidesItsJobOrdersAsTheRelayDoesNotAsTheBrowsersAdminSession()
       throws Exception {
-    profitEligible();
+    withinProfitHierarchy();
     jdbc.update(
         "INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
         member,
@@ -696,9 +700,12 @@ class ExchangeRefineryStoreControllerTest {
         unit);
   }
 
-  /** Makes the member's unit profit-eligible, which opens the job orders to its members. */
-  private void profitEligible() {
-    jdbc.update("UPDATE org_unit SET is_profit_eligible = TRUE WHERE id = ?", unit);
+  /** Parents the member's unit to the designated Profit area for job-order access. */
+  private void withinProfitHierarchy() {
+    jdbc.update(
+        "UPDATE org_unit SET parent_org_unit_id = ? WHERE id = ?",
+        persistedProfitArea(orgUnitRepository).getId(),
+        unit);
   }
 
   /**

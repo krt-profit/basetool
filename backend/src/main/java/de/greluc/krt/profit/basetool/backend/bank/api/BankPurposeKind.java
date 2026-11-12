@@ -26,5 +26,8 @@ package de.greluc.krt.profit.basetool.backend.bank.api;
 public enum BankPurposeKind {
 
   /** A tranche or the returned remainder of a trade deal of the purchasing module. */
-  PURCHASING_DEAL
+  PURCHASING_DEAL,
+
+  /** An opaque aUEC order payment attempt handled through the required linked effects contract. */
+  AUEC_ORDER
 }

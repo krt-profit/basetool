@@ -56,6 +56,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandServiceTest {
 
+  @Mock private ProfitHierarchyService profitHierarchy;
+  @Mock private OrgUnitEligibilityMaintenance eligibilityMaintenance;
+
   @Mock private SpecialCommandRepository specialCommandRepository;
   @Mock private OrgStructureAuditor orgStructureAuditor;
 
@@ -169,7 +172,7 @@ class SpecialCommandServiceTest {
   @Test
   void updateSpecialCommand_uniqueName_persists() {
     SpecialCommandDto dto =
-        new SpecialCommandDto(alphaId, "Alpha Renamed", "ALR", "New desc", true, false, 0L);
+        new SpecialCommandDto(alphaId, "Alpha Renamed", "ALR", "New desc", true, 0L);
     when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Alpha Renamed", alphaId))
         .thenReturn(false);
     when(specialCommandRepository.findById(alphaId)).thenReturn(Optional.of(alpha));
@@ -187,8 +190,7 @@ class SpecialCommandServiceTest {
 
   @Test
   void updateSpecialCommand_duplicateName_throwsDuplicate() {
-    SpecialCommandDto dto =
-        new SpecialCommandDto(alphaId, "Existing Name", "EXN", null, true, false, 0L);
+    SpecialCommandDto dto = new SpecialCommandDto(alphaId, "Existing Name", "EXN", null, true, 0L);
     when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Existing Name", alphaId))
         .thenReturn(true);
 
@@ -203,7 +205,7 @@ class SpecialCommandServiceTest {
 
   @Test
   void updateSpecialCommand_staleVersion_throwsOptimisticLock() {
-    SpecialCommandDto dto = new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, false, 0L);
+    SpecialCommandDto dto = new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, 0L);
     alpha.setVersion(5L);
     when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Alpha", alphaId))
         .thenReturn(false);
@@ -217,35 +219,13 @@ class SpecialCommandServiceTest {
 
   @Test
   void updateSpecialCommand_missingId_throwsNotFound() {
-    SpecialCommandDto dto = new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, false, 0L);
+    SpecialCommandDto dto = new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, 0L);
     when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Alpha", alphaId))
         .thenReturn(false);
     when(specialCommandRepository.findById(alphaId)).thenReturn(Optional.empty());
 
     assertThrows(
         NotFoundException.class, () -> specialCommandService.updateSpecialCommand(alphaId, dto));
-  }
-
-  @Test
-  void setProfitEligible_flipsFlagAndPersists() {
-    alpha.setProfitEligible(false);
-    when(specialCommandRepository.findById(alphaId)).thenReturn(Optional.of(alpha));
-    when(specialCommandRepository.save(alpha)).thenReturn(alpha);
-
-    SpecialCommand updated = specialCommandService.setProfitEligible(alphaId, true);
-
-    assertTrue(updated.isProfitEligible(), "Toggle must flip the flag on");
-    verify(specialCommandRepository).save(alpha);
-    verify(orgStructureAuditor).profitEligibilityChanged(alpha, false);
-  }
-
-  @Test
-  void setProfitEligible_missingId_throwsNotFound() {
-    when(specialCommandRepository.findById(alphaId)).thenReturn(Optional.empty());
-
-    assertThrows(
-        NotFoundException.class, () -> specialCommandService.setProfitEligible(alphaId, true));
-    verify(specialCommandRepository, never()).save(any());
   }
 
   @Test

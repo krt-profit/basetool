@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto.LinkedBankRequestDetails;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestViewDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import java.math.BigDecimal;
@@ -36,6 +37,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -154,6 +156,23 @@ class BankRequestPageControllerMvcTest {
         .andExpect(content().string(Matchers.not(Matchers.containsString("bank-request-page\""))));
   }
 
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER"})
+  void distinguishesSuccessfulAuthorisationFromABooking() throws Exception {
+    LinkedBankRequestDetails authorised =
+        new LinkedBankRequestDetails(null, null, BigDecimal.ZERO, UUID.randomUUID());
+    stub(new BankBookingRequestViewDto(request(false, null, authorised), true, false, false));
+
+    mockMvc
+        .perform(get("/bank/requests/" + ID).param("fragment", "requestDetail"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString(">Autorisiert</span>")))
+        .andExpect(content().string(Matchers.containsString("custodian-north")))
+        .andExpect(
+            content()
+                .string(Matchers.not(Matchers.containsString("bank-request-page-open-queue"))));
+  }
+
   /**
    * Answers the single-request read.
    *
@@ -171,6 +190,11 @@ class BankRequestPageControllerMvcTest {
    * @return the request
    */
   private static @NotNull BankBookingRequestDto request(boolean approvalOpen, Boolean mayConfirm) {
+    return request(approvalOpen, mayConfirm, null);
+  }
+
+  private static @NotNull BankBookingRequestDto request(
+      boolean approvalOpen, Boolean mayConfirm, @Nullable LinkedBankRequestDetails linked) {
     return new BankBookingRequestDto(
         ID,
         UUID.randomUUID(),
@@ -179,15 +203,15 @@ class BankRequestPageControllerMvcTest {
         UUID.randomUUID(),
         "Staffel Nord",
         "NORD",
-        "WITHDRAWAL",
+        linked == null ? "WITHDRAWAL" : "AUTHORISATION",
         new BigDecimal("2500"),
         null,
         "Fuel for the convoy",
         null,
-        "PENDING",
+        linked == null ? "PENDING" : "CONFIRMED",
         "nova",
-        null,
-        null,
+        linked == null ? null : UUID.randomUUID(),
+        linked == null ? null : "custodian-north",
         null,
         null,
         null,
@@ -210,6 +234,7 @@ class BankRequestPageControllerMvcTest {
         null,
         null,
         0L,
-        mayConfirm);
+        mayConfirm,
+        linked);
   }
 }

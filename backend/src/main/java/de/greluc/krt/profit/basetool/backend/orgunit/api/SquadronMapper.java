@@ -31,7 +31,7 @@ import org.mapstruct.Mapping;
 @Mapper(config = CentralMapperConfig.class)
 public interface SquadronMapper {
   /**
-   * Maps a {@link Squadron} to its full DTO, including the {@code isProfitEligible} flag.
+   * Maps a {@link Squadron} to its full DTO, with its current version.
    *
    * @param entity the squadron to project; {@code null} maps to {@code null}
    * @return the squadron DTO
@@ -54,7 +54,6 @@ public interface SquadronMapper {
         entity.getShorthand(),
         entity.getDescription(),
         entity.isActive(),
-        entity.isProfitEligible(),
         entity.getVersion());
   }
 
@@ -86,12 +85,10 @@ public interface SquadronMapper {
   /**
    * Builds a new {@link Squadron} entity from the DTO.
    *
-   * <p>Ignores timestamps, the {@code profitEligible} flag (changed only through its dedicated
-   * endpoints) and the {@code parent} hierarchy link.
+   * <p>Ignores timestamps and the {@code parent} hierarchy link.
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
-  @Mapping(target = "profitEligible", ignore = true)
   @Mapping(target = "parent", ignore = true)
   @Mapping(target = "department", ignore = true)
   Squadron toEntity(SquadronDto dto);

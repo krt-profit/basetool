@@ -19,67 +19,19 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintReferenceDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection.LineDemand;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredBlueprintException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableBlueprints;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Derives, snapshots, aggregates and maps the material side of {@code ITEM} job orders from the
- * SC-Wiki blueprint graph ({@link Blueprint} + {@link BlueprintIngredient}).
- *
- * <p>At create time a blueprint's RESOURCE ingredients are scaled by the amount, given the
- * requester's quality choice and snapshotted onto the order. A craftable ITEM ingredient becomes an
- * adoptable sub-assembly; a non-craftable one that exists in the {@code material} catalogue is
- * bridged to that material.
- */
-@Service
-@RequiredArgsConstructor
-@Slf4j
-@Transactional(readOnly = true)
-public class JobOrderItemService {
-
-  private final BlueprintRepository blueprintRepository;
-  private final SelectableGameItems selectableGameItems;
-  private final SelectableBlueprints selectableBlueprints;
-  private final MaterialRepository materialRepository;
-  private final MaterialMapper materialMapper;
-  private final QualityTierService qualityTierService;
-  private final QualityTierMapper qualityTierMapper;
+/** Defines ITEM recipe snapshots and derived material views for owning module callers. */
+public interface JobOrderItemService {
 
   /**
    * Builds one new, detached ordered-item line with its derived material snapshot; the caller
@@ -94,11 +46,16 @@ public class JobOrderItemService {
    * @throws RetiredBlueprintException when the P4K retired the chosen blueprint
    */
   @NotNull
-  public JobOrderItem buildItemLine(@NotNull CreateJobOrderItemLineDto line) {
-    JobOrderItem item = JobOrderItem.builder().build();
-    applyItemLine(item, line);
-    return item;
-  }
+  JobOrderItem buildItemLine(@NotNull CreateJobOrderItemLineDto line);
+
+  /**
+   * Builds one detached line from already validated immutable requirements.
+   *
+   * @param prepared the exact frozen line to build
+   * @return the detached item with its prepared material snapshot
+   */
+  @NotNull
+  JobOrderItem buildItemLine(@NotNull JobOrderItemPlan.Line prepared);
 
   /**
    * Re-derives {@code item} from the payload in place, replacing its {@link JobOrderItemMaterial}
@@ -116,63 +73,44 @@ public class JobOrderItemService {
    * @throws RetiredBlueprintException when the P4K retired the chosen blueprint, also on a line
    *     that keeps it
    */
-  public void applyItemLine(JobOrderItem item, @NotNull CreateJobOrderItemLineDto line) {
-    GameItem gameItem = selectableGameItems.require(line.gameItemId());
-    Blueprint blueprint = selectableBlueprints.require(line.blueprintId());
+  void applyItemLine(JobOrderItem item, @NotNull CreateJobOrderItemLineDto line);
 
-    if (blueprint.getOutputItem() == null
-        || !gameItem.getId().equals(blueprint.getOutputItem().getId())) {
-      throw new BadRequestException(
-          "Blueprint " + line.blueprintId() + " does not produce game item " + line.gameItemId());
-    }
+  /**
+   * Applies one already validated prepared line while preserving its identity and booked counters.
+   *
+   * @param item the existing or detached line
+   * @param prepared its exact frozen requirements
+   */
+  void applyItemLine(@NotNull JobOrderItem item, @NotNull JobOrderItemPlan.Line prepared);
 
-    Set<UUID> keptTierIds = new LinkedHashSet<>();
-    for (JobOrderItemMaterial existing : item.getMaterials()) {
-      if (existing.getQualityTier() != null) {
-        keptTierIds.add(existing.getQualityTier().getId());
-      }
-    }
-    final Map<UUID, String> qualityChoices = qualityChoicesByMaterial(line.materials());
+  /**
+   * Prepares the exact selected requirements before an action takes its complete resource guards.
+   *
+   * @param lines the desired item lines in payload order
+   * @param keptItems the current order's existing lines
+   * @return immutable requirements and the current scalar facts they depend on
+   * @throws IllegalArgumentException when a selected quantity cannot be represented exactly
+   */
+  @NotNull
+  JobOrderItemPlan prepareItemLines(
+      @NotNull List<CreateJobOrderItemLineDto> lines, @NotNull Collection<JobOrderItem> keptItems);
 
-    item.setGameItem(gameItem);
-    item.setBlueprint(blueprint);
-    item.setAmount(line.amount());
-    item.getMaterials().clear();
+  /**
+   * Refuses a prepared action whose source facts changed while it waited for resource guards.
+   *
+   * @param prepared the original immutable preparation
+   * @throws de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException when a current
+   *     recipe, quality, identity or kept-line fact differs
+   */
+  void validateItemPlan(@NotNull JobOrderItemPlan prepared);
 
-    for (BlueprintIngredient ingredient : countedLines(blueprint)) {
-      Material material;
-      double rawQuantity;
-      if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
-        material = ingredient.getMaterial();
-        if (material == null) {
-          continue;
-        }
-        double perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
-        rawQuantity = perUnit * line.amount();
-      } else {
-        material = bridgedMaterial(ingredient);
-        if (material == null) {
-          continue;
-        }
-        int perUnit = ingredient.getQuantityUnits() == null ? 0 : ingredient.getQuantityUnits();
-        rawQuantity = (double) perUnit * line.amount();
-      }
-
-      double required = QuantityTypeRounding.roundForQuantityType(rawQuantity, material);
-      String choice = qualityChoices.get(material.getId());
-      QualityTier tier =
-          choice == null || choice.isBlank()
-              ? qualityTierService.defaultForIngredient(ingredient.getMinQuality())
-              : qualityTierService.resolveForRequirement(choice, null, keptTierIds);
-
-      item.addMaterial(
-          JobOrderItemMaterial.builder()
-              .material(material)
-              .requiredQuantity(required)
-              .qualityTier(tier)
-              .build());
-    }
-  }
+  /**
+   * Applies the original prepared requirements without choosing another recipe after a lock wait.
+   *
+   * @param targets existing or detached item lines in the prepared payload order
+   * @param prepared the immutable preparation already validated under the action's resource guards
+   */
+  void applyItemLines(@NotNull List<JobOrderItem> targets, @NotNull JobOrderItemPlan prepared);
 
   /**
    * Maps an item order's ordered lines to DTOs, sorted by item name then id for a stable table.
@@ -181,16 +119,7 @@ public class JobOrderItemService {
    * @return the ordered-item line DTOs; empty for a material order
    */
   @NotNull
-  public List<JobOrderItemDto> toItemDtos(@NotNull JobOrder order) {
-    return order.getItems().stream()
-        .sorted(
-            Comparator.<JobOrderItem, String>comparing(
-                    i -> i.getGameItem() != null ? i.getGameItem().getName() : "",
-                    String.CASE_INSENSITIVE_ORDER)
-                .thenComparing(i -> i.getId().toString()))
-        .map(this::toItemDto)
-        .toList();
-  }
+  List<JobOrderItemDto> toItemDtos(@NotNull JobOrder order);
 
   /**
    * Aggregates the outstanding material demand of all ordered lines into one row per {@code
@@ -201,54 +130,7 @@ public class JobOrderItemService {
    * @return the outstanding-material rows; empty for a material order
    */
   @NotNull
-  public List<AggregatedMaterialDto> aggregateMaterials(@NotNull JobOrder order) {
-    record Key(UUID materialId, UUID tierId) {}
-
-    Map<Key, Double> sums = new LinkedHashMap<>();
-    Map<UUID, Material> materials = new LinkedHashMap<>();
-    Map<UUID, QualityTier> tiers = new LinkedHashMap<>();
-    for (JobOrderItem item : order.getItems()) {
-      int lineAmount = item.getAmount() != null ? item.getAmount() : 0;
-      int manufactured = item.getManufacturedAmount() != null ? item.getManufacturedAmount() : 0;
-      int remaining = Math.max(0, lineAmount - manufactured);
-      for (JobOrderItemMaterial req : item.getMaterials()) {
-        Material material = req.getMaterial();
-        QualityTier tier = req.getQualityTier();
-        Key key = new Key(material.getId(), tier.getId());
-        double reqTotal = req.getRequiredQuantity() == null ? 0.0 : req.getRequiredQuantity();
-        double outstanding = lineAmount > 0 ? reqTotal * remaining / lineAmount : 0.0;
-        sums.merge(key, outstanding, Double::sum);
-        materials.putIfAbsent(material.getId(), material);
-        tiers.putIfAbsent(tier.getId(), tier);
-      }
-    }
-    return sums.entrySet().stream()
-        .map(e -> {
-          Material material = Objects.requireNonNull(materials.get(e.getKey().materialId()));
-          QualityTier tier = Objects.requireNonNull(tiers.get(e.getKey().tierId()));
-          return new AggregatedMaterialDto(
-              materialMapper.toDto(material),
-              tier.getCode(),
-              qualityTierMapper.toDto(tier),
-              QuantityTypeRounding.roundForQuantityType(e.getValue(), material),
-              null,
-              List.of(),
-              null);
-        })
-        .sorted(
-            Comparator.<AggregatedMaterialDto, Integer>comparing(a ->
-                    a.material() != null && "SCU".equalsIgnoreCase(a.material().quantityType())
-                        ? 0
-                        : 1)
-                .thenComparing(
-                    a ->
-                        a.material() != null && a.material().name() != null
-                            ? a.material().name()
-                            : "",
-                    String.CASE_INSENSITIVE_ORDER)
-                .thenComparingInt(a -> -a.qualityTier().minQuality()))
-        .toList();
-  }
+  List<AggregatedMaterialDto> aggregateMaterials(@NotNull JobOrder order);
 
   /**
    * Collects the distinct material ids an order requires: the snapshotted item materials of an
@@ -261,25 +143,7 @@ public class JobOrderItemService {
    * @return the required material ids in insertion order; never {@code null}, possibly empty.
    */
   @NotNull
-  public Set<UUID> requiredMaterialIds(@NotNull JobOrder order) {
-    Set<UUID> ids = new LinkedHashSet<>();
-    if (order.getType() == JobOrderType.ITEM) {
-      for (JobOrderItem item : order.getItems()) {
-        for (JobOrderItemMaterial req : item.getMaterials()) {
-          if (req.getMaterial() != null) {
-            ids.add(req.getMaterial().getId());
-          }
-        }
-      }
-    } else {
-      for (JobOrderMaterial mat : order.getMaterials()) {
-        if (mat.getMaterial() != null) {
-          ids.add(mat.getMaterial().getId());
-        }
-      }
-    }
-    return ids;
-  }
+  Set<UUID> requiredMaterialIds(@NotNull JobOrder order);
 
   /**
    * Collects the distinct game-item ids an {@code ITEM} order requests; empty for a {@code
@@ -292,98 +156,7 @@ public class JobOrderItemService {
    * @return the requested game-item ids in insertion order; never {@code null}.
    */
   @NotNull
-  public Set<UUID> requiredGameItemIds(@NotNull JobOrder order) {
-    Set<UUID> ids = new LinkedHashSet<>();
-    if (order.getType() == JobOrderType.ITEM) {
-      for (JobOrderItem item : order.getItems()) {
-        if (item.getGameItem() != null) {
-          ids.add(item.getGameItem().getId());
-        }
-      }
-    }
-    return ids;
-  }
-
-  @NotNull
-  private JobOrderItemDto toItemDto(@NotNull JobOrderItem item) {
-    List<JobOrderItemMaterialDto> materials =
-        item.getMaterials().stream()
-            .sorted(
-                Comparator.comparing(
-                    m -> m.getMaterial() != null ? m.getMaterial().getName() : "",
-                    String.CASE_INSENSITIVE_ORDER))
-            .map(m ->
-                new JobOrderItemMaterialDto(
-                    m.getId(),
-                    materialMapper.toDto(m.getMaterial()),
-                    m.getRequiredQuantity(),
-                    m.getQualityTier().getCode(),
-                    qualityTierMapper.toDto(m.getQualityTier()),
-                    m.getVersion()))
-            .toList();
-    GameItem gameItem = item.getGameItem();
-    Blueprint blueprint = item.getBlueprint();
-    return new JobOrderItemDto(
-        item.getId(),
-        gameItem == null ? null : GameItemReferenceDto.of(gameItem),
-        blueprint == null ? null : blueprintRef(blueprint),
-        item.getAmount(),
-        item.getManufacturedAmount(),
-        item.getDeliveredAmount(),
-        item.getParentItem() == null ? null : item.getParentItem().getId(),
-        materials,
-        isBlueprintStale(item),
-        item.getVersion());
-  }
-
-  /**
-   * Whether this line's blueprint no longer produces the ordered game item, e.g. after a Wiki sync
-   * re-pointed it (REQ-ORDERS-033).
-   *
-   * @param item the ordered-item line to check
-   * @return {@code true} when the blueprint's output item is absent or differs from the line's game
-   *     item
-   */
-  private static boolean isBlueprintStale(@NotNull JobOrderItem item) {
-    Blueprint blueprint = item.getBlueprint();
-    GameItem gameItem = item.getGameItem();
-    if (blueprint == null || gameItem == null) {
-      return false;
-    }
-    GameItem output = blueprint.getOutputItem();
-    return output == null || !gameItem.getId().equals(output.getId());
-  }
-
-  @NotNull
-  private static Map<UUID, String> qualityChoicesByMaterial(
-      List<CreateJobOrderItemMaterialDto> choices) {
-    Map<UUID, String> map = new LinkedHashMap<>();
-    if (choices != null) {
-      for (CreateJobOrderItemMaterialDto choice : choices) {
-        map.put(choice.materialId(), choice.quality());
-      }
-    }
-    return map;
-  }
-
-  /**
-   * Builds the preview row of one derived material with its default quality tier.
-   *
-   * @param material the derived material
-   * @param quantity the scaled quantity
-   * @param ingredientMinQuality the ingredient's minimum quality, or {@code null}
-   * @return the preview row
-   */
-  @NotNull
-  private DerivedMaterialDto derived(
-      @NotNull Material material, double quantity, @Nullable Integer ingredientMinQuality) {
-    QualityTier tier = qualityTierService.defaultForIngredient(ingredientMinQuality);
-    return new DerivedMaterialDto(
-        materialMapper.toDto(material),
-        QuantityTypeRounding.roundForQuantityType(quantity, material),
-        tier.getCode(),
-        qualityTierMapper.toDto(tier));
-  }
+  Set<UUID> requiredGameItemIds(@NotNull JobOrder order);
 
   /**
    * Resolves the available blueprint references for a game item, by output name. Exposed for the
@@ -393,15 +166,7 @@ public class JobOrderItemService {
    * @return blueprint references producing that item; empty when none exist
    */
   @NotNull
-  public List<BlueprintReferenceDto> blueprintsForItem(@NotNull UUID gameItemId) {
-    return blueprintRepository.findByOutputItemId(gameItemId).stream()
-        .map(this::blueprintRef)
-        .sorted(
-            Comparator.comparing(
-                (BlueprintReferenceDto b) -> b.outputName() != null ? b.outputName() : "",
-                String.CASE_INSENSITIVE_ORDER))
-        .toList();
-  }
+  List<BlueprintReferenceDto> blueprintsForItem(@NotNull UUID gameItemId);
 
   /**
    * Previews the material derivation for a chosen blueprint at a given amount: the resolved
@@ -412,138 +177,8 @@ public class JobOrderItemService {
    * @param amount the whole-unit amount to scale by (clamped to at least 1)
    * @return the derivation preview
    * @throws NotFoundException when the blueprint id is unknown
+   * @throws IllegalArgumentException when a selected quantity or unit count is unrepresentable
    */
   @NotNull
-  public ItemDerivationDto deriveForPreview(@NotNull UUID blueprintId, int amount) {
-    Blueprint blueprint =
-        Entities.require(
-            blueprintRepository.findById(blueprintId), () -> "Blueprint not found: " + blueprintId);
-    int scaledBy = Math.max(1, amount);
-
-    List<DerivedMaterialDto> materials = new ArrayList<>();
-    List<SubAssemblySuggestionDto> subAssemblies = new ArrayList<>();
-    List<String> unresolved = new ArrayList<>();
-
-    for (BlueprintIngredient ingredient : countedLines(blueprint)) {
-      if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
-        Material material = ingredient.getMaterial();
-        if (material == null) {
-          unresolved.add(unresolvedLabel(ingredient));
-          continue;
-        }
-        double perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
-        materials.add(derived(material, perUnit * scaledBy, ingredient.getMinQuality()));
-      } else {
-        GameItem subItem = ingredient.getGameItem();
-        if (subItem == null) {
-          unresolved.add(unresolvedLabel(ingredient));
-          continue;
-        }
-        int perUnit = ingredient.getQuantityUnits() == null ? 0 : ingredient.getQuantityUnits();
-        List<BlueprintReferenceDto> subBlueprints = blueprintsForItem(subItem.getId());
-        if (subBlueprints.isEmpty()) {
-          Material material = resolveItemMaterial(subItem, ingredient);
-          if (material != null) {
-            materials.add(
-                derived(material, (double) perUnit * scaledBy, ingredient.getMinQuality()));
-            continue;
-          }
-        }
-        subAssemblies.add(
-            new SubAssemblySuggestionDto(
-                GameItemReferenceDto.of(subItem), perUnit * scaledBy, subBlueprints));
-      }
-    }
-    return new ItemDerivationDto(
-        blueprintRef(blueprint), scaledBy, materials, subAssemblies, unresolved);
-  }
-
-  /**
-   * The lines one ordered unit consumes (REQ-P4K-027): no optional cost, and of a choose-n recipe
-   * the option groups {@link RecipeGroupSelection} picks. An order can link only the materials it
-   * snapshots, so the selection is measured against no stock: the groups with the smallest demand
-   * for one craft, equal ones in recipe order.
-   *
-   * @param blueprint the ordered recipe
-   * @return the counted lines in recipe order
-   */
-  @NotNull
-  private List<BlueprintIngredient> countedLines(@NotNull Blueprint blueprint) {
-    return RecipeGroupSelection.countedLines(
-        blueprint, this::lineDemand, RecipeGroupSelection.NO_STOCK);
-  }
-
-  /**
-   * Returns what one ordered unit needs of a line's material.
-   *
-   * @param ingredient the line
-   * @return the demand, or {@code null} for an unresolved line or a craftable sub-assembly
-   */
-  @Nullable
-  private LineDemand lineDemand(@NotNull BlueprintIngredient ingredient) {
-    boolean resource = ingredient.getKind() == BlueprintIngredientKind.RESOURCE;
-    Material material = resource ? ingredient.getMaterial() : bridgedMaterial(ingredient);
-    if (material == null || material.getId() == null) {
-      return null;
-    }
-    double perUnit;
-    if (resource) {
-      perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
-    } else {
-      perUnit = ingredient.getQuantityUnits() == null ? 0.0 : ingredient.getQuantityUnits();
-    }
-    return new LineDemand(
-        material.getId(), QuantityTypeRounding.roundForQuantityType(perUnit, material), 0);
-  }
-
-  @NotNull
-  private BlueprintReferenceDto blueprintRef(@NotNull Blueprint blueprint) {
-    return new BlueprintReferenceDto(
-        blueprint.getId(), blueprint.getOutputName(), blueprint.getScwikiKey());
-  }
-
-  private static String unresolvedLabel(@NotNull BlueprintIngredient ingredient) {
-    return ingredient.getWikiNameSnapshot() != null
-        ? ingredient.getWikiNameSnapshot()
-        : "(unresolved ingredient)";
-  }
-
-  /**
-   * Bridges a non-craftable ITEM ingredient to the {@code material} catalogue by name.
-   *
-   * @param ingredient the blueprint ingredient to examine
-   * @return the bridged material, or {@code null} for RESOURCE lines, craftable items and items
-   *     without a matching material
-   */
-  @Nullable
-  private Material bridgedMaterial(BlueprintIngredient ingredient) {
-    if (ingredient.getKind() != BlueprintIngredientKind.ITEM) {
-      return null;
-    }
-    GameItem subItem = ingredient.getGameItem();
-    if (subItem == null) {
-      return null;
-    }
-    if (!blueprintRepository.findByOutputItemId(subItem.getId()).isEmpty()) {
-      return null;
-    }
-    return resolveItemMaterial(subItem, ingredient);
-  }
-
-  /**
-   * Resolves an ITEM ingredient's component to a material by name, preferring the game item's name
-   * and falling back to the Wiki name snapshot.
-   *
-   * @param subItem the resolved game item of the ingredient
-   * @param ingredient the owning ingredient, for the Wiki-name fallback
-   * @return the matching material, or {@code null} when none exists
-   */
-  @Nullable
-  private Material resolveItemMaterial(@NotNull GameItem subItem, BlueprintIngredient ingredient) {
-    String name = subItem.getName() != null ? subItem.getName() : ingredient.getWikiNameSnapshot();
-    if (name == null || name.isBlank()) {
-      return null;
-    }
-    return materialRepository.findByNameIgnoreCase(name).orElse(null);
-  }
+  ItemDerivationDto deriveForPreview(@NotNull UUID blueprintId, int amount);
 }

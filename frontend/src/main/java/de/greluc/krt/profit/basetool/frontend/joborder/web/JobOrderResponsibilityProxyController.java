@@ -1,0 +1,140 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.joborder.web;
+
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.WriteMoneyCommitmentDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Relays changes to the order's responsible and supporting units. */
+@RestController
+@RequestMapping("/orders")
+@PreAuthorize("isAuthenticated()")
+@RequiredArgsConstructor
+@Slf4j
+public class JobOrderResponsibilityProxyController {
+
+  private static final List<String> ORDERS_QUEUE_SECTION = List.of("queue");
+
+  private final JobOrderBackendClient jobOrderClient;
+  private final LiveSyncLocalBus liveSyncLocalBus;
+
+  /**
+   * Relays a responsibility transfer under the backend's current writer or recovery authority.
+   *
+   * @param id the order
+   * @param request the valid target unit
+   * @return the updated order or the backend error
+   */
+  @PatchMapping("/{id}/responsible-org-unit")
+  public ResponseEntity<Object> transferResponsibility(
+      @PathVariable UUID id, @RequestBody @Valid ReassignResponsibleOrgUnitRequest request) {
+    return relay(
+        log,
+        "transfer order responsibility",
+        () -> {
+          JobOrderDto order = jobOrderClient.transferResponsibility(id, request);
+          liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
+          return ResponseEntity.ok(order);
+        });
+  }
+
+  /**
+   * Relays enrollment under the backend's current supporting or responsible writer authority.
+   *
+   * @param id the order
+   * @param unitId the supporting Staffel
+   * @return 204 on success or the backend refusal
+   */
+  @PutMapping("/{id}/participations/{unitId}")
+  public ResponseEntity<Object> enrollSupport(@PathVariable UUID id, @PathVariable UUID unitId) {
+    return relay(
+        log,
+        "enroll order support",
+        () -> {
+          jobOrderClient.enrollSupport(id, unitId);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Relays an outstanding unit aUEC commitment at its observed version.
+   *
+   * @param id the supported order
+   * @param unitId the contributing unit
+   * @param input the amount and observed commitment occurrence
+   * @return 204 on success or the backend refusal
+   */
+  @PutMapping("/{id}/participations/{unitId}/money-commitment")
+  public ResponseEntity<Object> putMoneyCommitment(
+      @PathVariable UUID id,
+      @PathVariable UUID unitId,
+      @RequestBody @Valid WriteMoneyCommitmentDto input) {
+    return relay(
+        log,
+        "record order money commitment",
+        () -> {
+          jobOrderClient.putMoneyCommitment(id, unitId, input);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Relays withdrawal of Staffel support and its open promises.
+   *
+   * @param id the order
+   * @param unitId the supporting Staffel
+   * @param version the observed participation version
+   * @return 204 on success or the backend refusal
+   */
+  @DeleteMapping("/{id}/participations/{unitId}")
+  public ResponseEntity<Object> withdrawSupport(
+      @PathVariable UUID id,
+      @PathVariable UUID unitId,
+      @RequestParam(required = false) @Nullable Long version) {
+    return relay(
+        log,
+        "withdraw order support",
+        () -> {
+          jobOrderClient.withdrawSupport(id, unitId, version);
+          return ResponseEntity.noContent().build();
+        });
+  }
+}

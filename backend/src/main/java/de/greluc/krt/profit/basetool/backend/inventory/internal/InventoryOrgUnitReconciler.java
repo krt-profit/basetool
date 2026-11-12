@@ -51,6 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class InventoryOrgUnitReconciler implements FirstMembershipObserver {
 
+  private final InventoryOrderWrites orderWrites;
+
   private final InventoryItemRepository inventoryItemRepository;
   private final AuditRecorder auditRecorder;
 
@@ -64,6 +66,7 @@ public class InventoryOrgUnitReconciler implements FirstMembershipObserver {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void onUserGainedFirstOrgUnit(@NotNull UUID userId, @NotNull OrgUnit firstOrgUnit) {
+    orderWrites.lockEligibility();
     int restamped = restamp(userId, firstOrgUnit, false);
     if (restamped > 0) {
       auditRecorder.record(
@@ -86,6 +89,7 @@ public class InventoryOrgUnitReconciler implements FirstMembershipObserver {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public void onUserLostLastOrgUnit(@NotNull UUID userId) {
+    orderWrites.lockEligibility();
     int restamped = restamp(userId, null, true);
     if (restamped > 0) {
       auditRecorder.record(
@@ -108,27 +112,23 @@ public class InventoryOrgUnitReconciler implements FirstMembershipObserver {
    */
   private int restamp(
       UUID userId, @Nullable OrgUnit newOrgForOwnerlessRows, boolean demoteAllToNull) {
-    List<InventoryItem> rows = inventoryItemRepository.findByUserIdAndPersonalFalse(userId);
+    List<InventoryItem> rows =
+        inventoryItemRepository.findByUserIdAndPersonalFalse(userId).stream()
+            .filter(row ->
+                demoteAllToNull ? row.getOwningOrgUnit() != null : row.getOwningOrgUnit() == null)
+            .toList();
     if (rows.isEmpty()) {
       return 0;
     }
 
-    int restamped = 0;
+    List<UUID> rowIds = rows.stream().map(InventoryItem::getId).toList();
+    orderWrites.prepareWrites(rowIds, List.of(), List.of());
     for (InventoryItem row : rows) {
-      if (demoteAllToNull) {
-        if (row.getOwningOrgUnit() != null) {
-          row.setOwningOrgUnit(null);
-          restamped++;
-        }
-      } else if (row.getOwningOrgUnit() == null) {
-        row.setOwningOrgUnit(newOrgForOwnerlessRows);
-        restamped++;
-      }
+      row.setOwningOrgUnit(demoteAllToNull ? null : newOrgForOwnerlessRows);
     }
-    if (restamped > 0) {
-      log.info(
-          "Reconciled inventory org stamp for user {}: {} row(s) re-stamped", userId, restamped);
-    }
-    return restamped;
+    orderWrites.assertRows(rowIds);
+    log.info(
+        "Reconciled inventory org stamp for user {}: {} row(s) re-stamped", userId, rows.size());
+    return rows.size();
   }
 }

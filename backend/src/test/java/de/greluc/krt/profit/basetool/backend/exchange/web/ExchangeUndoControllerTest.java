@@ -39,6 +39,12 @@ import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragments;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityProvenance;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -66,6 +72,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
@@ -90,6 +97,10 @@ class ExchangeUndoControllerTest {
   @Autowired private BlueprintNameNormalizer normalizer;
   @Autowired private KnownExchangeClients knownClients;
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private StockReads stock;
+  @Autowired private StockCommands commands;
+  @Autowired private StockQuantityProvenance provenance;
+  @Autowired private TransactionTemplate transactions;
 
   private MockMvc mockMvc;
   private UUID member;
@@ -101,6 +112,7 @@ class ExchangeUndoControllerTest {
   private final List<UUID> locations = new ArrayList<>();
   private final List<UUID> shipTypes = new ArrayList<>();
   private final List<UUID> orgUnits = new ArrayList<>();
+  private final List<UUID> linkedOrders = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
@@ -148,6 +160,7 @@ class ExchangeUndoControllerTest {
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", client);
     jdbc.update("DELETE FROM personal_blueprint WHERE owner_user_id = ?", member);
     jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", member);
+    linkedOrders.forEach(id -> jdbc.update("DELETE FROM job_order WHERE id = ?", id));
     for (UUID id : List.of(member, other)) {
       jdbc.update("DELETE FROM ship WHERE owner_id = ?", id);
       jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
@@ -163,6 +176,188 @@ class ExchangeUndoControllerTest {
         settingsRepository.findById(ExchangeSettings.SINGLETON_ID).orElseThrow();
     settings.setEnabled(wasEnabled);
     settingsRepository.saveAndFlush(settings);
+  }
+
+  @Test
+  void undoingANewQuantityPreservesTheOlderOriginalPhysicalIntervals() throws Exception {
+    UUID material = material("Original Undo quantity");
+    UUID place = location();
+    UUID originalRow = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality,"
+            + " amount, personal, stolen, version, created_at, updated_at)"
+            + " VALUES (?, ?, ?, ?, 500, 2, true, false, 0, now() - interval '2 days', now())",
+        originalRow,
+        member,
+        material,
+        place);
+    List<StockQuantityFragment> original = provenance.quantityOf(originalRow);
+    assertThat(original).containsExactly(new StockQuantityFragment(originalRow, 0L, 2000L));
+    StockLot physical =
+        transactions.execute(_ -> {
+          var row = stock.findRow(originalRow).orElseThrow();
+          return new StockLot(row.getMaterial(), null, row.getLocation(), row.getQuality(), false);
+        });
+    write("stock", "{\"ops\":[" + lot(material, locationName(place), "3", "2") + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+    assertThat(total(material)).isEqualTo(3.0);
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    List<StockQuantityFragment> after =
+        transactions.execute(_ ->
+            stock.lotRows(member, List.of(physical)).get(physical.key()).stream()
+                .flatMap(row -> provenance.quantityOf(row.getId()).stream())
+                .toList());
+    assertThat(total(material)).isEqualTo(2.0);
+    assertThat(StockQuantityFragments.total(after)).isEqualTo(2000L);
+    assertThat(StockQuantityFragments.subtract(original, after)).isEmpty();
+    assertThat(StockQuantityFragments.subtract(after, original)).isEmpty();
+  }
+
+  @Test
+  void multipleSameLotWritesUndoToTheFirstAdmittedStepDespiteJournalUuidTies() throws Exception {
+    UUID material = material("Ordered Undo quantity");
+    UUID place = location();
+    UUID originalRow = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality,"
+            + " amount, personal, stolen, version, created_at, updated_at)"
+            + " VALUES (?, ?, ?, ?, 500, 2, true, false, 0, now() - interval '2 days', now())",
+        originalRow,
+        member,
+        material,
+        place);
+    List<StockQuantityFragment> original = provenance.quantityOf(originalRow);
+    assertThat(original).containsExactly(new StockQuantityFragment(originalRow, 0L, 2000L));
+    StockLot physical =
+        transactions.execute(_ -> {
+          var row = stock.findRow(originalRow).orElseThrow();
+          return new StockLot(row.getMaterial(), null, row.getLocation(), row.getQuality(), false);
+        });
+    write(
+            "stock",
+            "{\"ops\":["
+                + lot(material, locationName(place), "3", "2")
+                + ","
+                + lot(material, locationName(place), "4", "3")
+                + "]}")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(2));
+    assertThat(total(material)).isEqualTo(4.0);
+    var admittedQuantity =
+        transactions.execute(_ ->
+            stock.lotRows(member, List.of(physical)).get(physical.key()).stream()
+                .flatMap(row -> provenance.quantityOf(row.getId()).stream())
+                .toList());
+    assertThat(StockQuantityFragments.total(admittedQuantity)).isEqualTo(4000L);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(DISTINCT (tx, recorded_at)) FROM exchange_journal"
+                    + " WHERE user_id = ? AND client_id = ? AND resource = 'STOCK'",
+                Integer.class,
+                member,
+                client))
+        .isEqualTo(1);
+    UUID journalFamily = UUID.randomUUID();
+    UUID firstStepJournal = new UUID(journalFamily.getMostSignificantBits(), 2L);
+    UUID secondStepJournal = new UUID(journalFamily.getMostSignificantBits(), 1L);
+    assertThat(
+            jdbc.update(
+                "UPDATE exchange_journal SET id = ? WHERE user_id = ? AND client_id = ? AND"
+                    + " resource = 'STOCK' AND (CAST(before_state AS jsonb)->>'quantity')::numeric"
+                    + " = 2",
+                firstStepJournal,
+                member,
+                client))
+        .isEqualTo(1);
+    assertThat(
+            jdbc.update(
+                "UPDATE exchange_journal SET id = ? WHERE user_id = ? AND client_id = ? AND"
+                    + " resource = 'STOCK' AND (CAST(before_state AS jsonb)->>'quantity')::numeric"
+                    + " = 3",
+                secondStepJournal,
+                member,
+                client))
+        .isEqualTo(1);
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+    assertThat(total(material)).isEqualTo(2.0);
+    var after =
+        transactions.execute(_ ->
+            stock.lotRows(member, List.of(physical)).get(physical.key()).stream()
+                .flatMap(row -> provenance.quantityOf(row.getId()).stream())
+                .toList());
+    assertThat(StockQuantityFragments.total(after)).isEqualTo(2000L);
+    assertThat(StockQuantityFragments.subtract(original, after)).isEmpty();
+    assertThat(StockQuantityFragments.subtract(after, original)).isEmpty();
+  }
+
+  @Test
+  void anIndependentScuUndoLeavesAnUnmutatedInvalidOrdersStockAlone() throws Exception {
+    UUID material = material("Independent undo");
+    UUID place = location();
+    UUID unit = orgUnit("SPECIAL_COMMAND");
+    UUID order = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order (id, priority, version, status, requesting_org_unit_id,"
+            + " responsible_org_unit_id, type, created_at, updated_at)"
+            + " VALUES (?, 1, 0, 'OPEN', ?, ?, 'MATERIAL', now(), now())",
+        order,
+        unit,
+        unit);
+    linkedOrders.add(order);
+    UUID unrelated = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO inventory_item (id, user_id, material_id, location_id, quality,"
+            + " amount, personal, stolen, owning_org_unit_id, version, created_at, updated_at)"
+            + " VALUES (?, ?, ?, ?, 500, 2, false, false, ?, 0, now(), now())",
+        unrelated,
+        member,
+        material,
+        place,
+        unit);
+    jdbc.update(
+        "INSERT INTO inventory_item_job_order_allocation (id, inventory_item_id, job_order_id,"
+            + " amount, delivered, version, created_at, updated_at)"
+            + " VALUES (?, ?, ?, 2, false, 0, now(), now())",
+        UUID.randomUUID(),
+        unrelated,
+        order);
+    String rise = lot(material, locationName(place), "5", "2");
+    write("stock", "{\"ops\":[" + rise + "]}").andExpect(jsonPath("$.applied").value(1));
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(result ->
+            assertThat(result.getResponse().getStatus())
+                .as(result.getResponse().getContentAsString())
+                .isEqualTo(200))
+        .andExpect(jsonPath("$.restored").value(1))
+        .andExpect(jsonPath("$.skipped.length()").value(0));
+
+    assertThat(total(material)).isEqualTo(2.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT amount FROM inventory_item WHERE id = ?", Double.class, unrelated))
+        .isEqualTo(2.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT version FROM inventory_item WHERE id = ?", Long.class, unrelated))
+        .isZero();
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT amount FROM inventory_item_job_order_allocation"
+                    + " WHERE inventory_item_id = ? AND job_order_id = ?",
+                Double.class,
+                unrelated,
+                order))
+        .isEqualTo(2.0);
   }
 
   @Test
@@ -206,10 +401,20 @@ class ExchangeUndoControllerTest {
             "stock",
             "{\"ops\":[" + lot(laranite, place, "5") + "," + lot(agricium, place, "3") + "]}")
         .andExpect(jsonPath("$.applied").value(2));
-    jdbc.update(
-        "UPDATE inventory_item SET amount = 7 WHERE user_id = ? AND material_id = ?",
-        member,
-        agricium);
+    transactions.executeWithoutResult(_ -> {
+      UUID rowId =
+          jdbc.queryForObject(
+              "SELECT id FROM inventory_item WHERE user_id = ? AND material_id = ?",
+              UUID.class,
+              member,
+              agricium);
+      var row = stock.findRow(Objects.requireNonNull(rowId)).orElseThrow();
+      commands.bookIn(
+          member,
+          new StockLot(
+              row.getMaterial(), null, row.getLocation(), row.getQuality(), row.getStolen()),
+          4.0);
+    });
 
     undo(Instant.now().minus(1, ChronoUnit.HOURS))
         .andExpect(jsonPath("$.restored").value(1))
@@ -436,6 +641,45 @@ class ExchangeUndoControllerTest {
                 member,
                 moved))
         .containsExactly(command);
+  }
+
+  @Test
+  void aShareWhoseRetainedJournalOmitsItsPoolIsGoneWithoutChangingStock() throws Exception {
+    UUID material = material("Missing pool");
+    UUID place = location();
+    UUID pool = orgUnit("SQUADRON");
+    joins(pool);
+    personalRow(material, place, 10.0);
+    write("stock", "{\"ops\":[" + share(material, locationName(place), pool, "4", "10") + "]}")
+        .andExpect(jsonPath("$.applied").value(1));
+    assertThat(total(material)).isEqualTo(10.0);
+    assertThat(pooled(pool)).isEqualTo(4.0);
+    assertThat(
+            jdbc.update(
+                "UPDATE exchange_journal SET after_state = CAST((CAST(after_state AS jsonb) -"
+                    + " 'orgUnit') AS text) WHERE user_id = ? AND client_id = ? AND action ="
+                    + " 'STOCK_SHARE'",
+                member,
+                client))
+        .isEqualTo(1);
+
+    undo(Instant.now().minus(1, ChronoUnit.HOURS))
+        .andExpect(jsonPath("$.restored").value(0))
+        .andExpect(jsonPath("$.skipped.length()").value(1))
+        .andExpect(jsonPath("$.skipped[0].resource").value("STOCK"))
+        .andExpect(jsonPath("$.skipped[0].reason").value("GONE"));
+
+    assertThat(total(material)).isEqualTo(10.0);
+    assertThat(pooled(pool)).isEqualTo(4.0);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COALESCE(SUM(amount), 0) FROM inventory_item"
+                    + " WHERE user_id = ? AND material_id = ? AND location_id = ? AND personal",
+                Double.class,
+                member,
+                material,
+                place))
+        .isEqualTo(6.0);
   }
 
   @Test

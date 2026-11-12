@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -64,10 +65,13 @@ import org.springframework.context.ApplicationEventPublisher;
  * {@link InventoryJobOrderAllocation} and mission slices, summing per target and OR-combining the
  * delivered marker.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryStockMergeTest {
 
-  @org.junit.jupiter.api.BeforeEach
+  @BeforeEach
   void wireCheckoutGraph() {
     service =
         InventoryCheckoutFixtures.create(

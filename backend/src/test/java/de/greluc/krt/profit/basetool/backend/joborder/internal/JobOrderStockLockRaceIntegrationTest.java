@@ -45,8 +45,14 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.LockRace;
 import de.greluc.krt.profit.basetool.backend.support.LockRace.Caller;
 import de.greluc.krt.profit.basetool.backend.support.LockRace.Held;
@@ -54,9 +60,11 @@ import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,6 +72,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -85,6 +95,8 @@ class JobOrderStockLockRaceIntegrationTest {
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private SquadronRepository squadronRepository;
+  @Autowired private OrgUnitRepository orgUnitRepository;
+  @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private LocationRepository locationRepository;
   @Autowired private QualityTierRepository qualityTierRepository;
@@ -97,6 +109,8 @@ class JobOrderStockLockRaceIntegrationTest {
   private LockRace race;
   private User logistician;
   private UUID unitId;
+  private UUID profitRootId;
+  private boolean createdProfitRoot;
   private UUID materialId;
   private UUID locationId;
   private UUID gameItemId;
@@ -118,10 +132,20 @@ class JobOrderStockLockRaceIntegrationTest {
     user.setId(UUID.randomUUID());
     user.setUsername("order-lock-" + tag);
     logistician = userRepository.save(user);
+    createdProfitRoot = orgUnitRepository.findActiveProfitRootIds().isEmpty();
+    var profit = ProfitHierarchyFixtures.persistedProfitArea(orgUnitRepository);
+    profitRootId = profit.getId();
     Squadron unit = new Squadron();
     unit.setName("Order lock " + tag);
     unit.setShorthand("O" + tag.substring(0, 4));
+    ProfitHierarchyFixtures.withinProfit(unit, profit);
     unitId = squadronRepository.save(unit).getId();
+    var membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(logistician.getId(), unitId));
+    membership.setUser(logistician);
+    membership.setLogistician(true);
+    membership.setJoinedAt(Instant.now());
+    memberships.saveAndFlush(membership);
     Material material = new Material();
     material.setName("Order lock ore " + tag);
     material.setType(MaterialType.RAW);
@@ -152,7 +176,11 @@ class JobOrderStockLockRaceIntegrationTest {
     jdbc.update("DELETE FROM audit_event WHERE actor_user_id = ?", logistician.getId());
     jdbc.update("DELETE FROM blueprint WHERE id = ?", blueprintId);
     jdbc.update("DELETE FROM game_item WHERE id = ?", gameItemId);
+    memberships.deleteById(new OrgUnitMembershipId(logistician.getId(), unitId));
     squadronRepository.deleteById(unitId);
+    if (createdProfitRoot) {
+      orgUnitRepository.deleteById(profitRootId);
+    }
     materialRepository.deleteById(materialId);
     UUID cityId =
         jdbc.queryForObject("SELECT city_id FROM location WHERE id = ?", UUID.class, locationId);
@@ -168,16 +196,14 @@ class JobOrderStockLockRaceIntegrationTest {
     Held<Integer> delete = race.hold(null, () -> deleteRow(row));
 
     Future<JobOrderHandoverDto> handover =
-        race.startWaiting(
-            asLogistician(),
-            () ->
-                handoverService.createHandover(
-                    order,
-                    new JobOrderHandoverCreateDto(
-                        Instant.now(),
-                        "race",
-                        "KARTELL",
-                        List.of(new JobOrderHandoverItemCreateDto(row, REQUIRED, null, null)))));
+        startWaitingAsLogistician(() ->
+            handoverService.createHandover(
+                order,
+                new JobOrderHandoverCreateDto(
+                    Instant.now(),
+                    "race",
+                    "KARTELL",
+                    List.of(new JobOrderHandoverItemCreateDto(row, REQUIRED, null, null)))));
 
     assertThat(delete.commit()).isOne();
     assertThatThrownBy(() -> LockRace.finish(handover))
@@ -192,21 +218,18 @@ class JobOrderStockLockRaceIntegrationTest {
     Held<Integer> delete = race.hold(null, () -> deleteRow(row));
 
     Future<JobOrderItemDto> production =
-        race.startWaiting(
-            asLogistician(),
-            () ->
-                productionService.bookProduction(
-                    order.orderId(),
-                    order.lineId(),
-                    new JobOrderItemProductionCreateDto(
-                        1,
-                        0L,
-                        List.of(
-                            new JobOrderItemProductionConsumptionDto(
-                                row, materialId, REQUIRED, 0L)),
-                        List.of(),
-                        new JobOrderItemProductionCreateDto.BookInDto(
-                            locationId, logistician.getId(), unitId, false, true))));
+        startWaitingAsLogistician(() ->
+            productionService.bookProduction(
+                order.orderId(),
+                order.lineId(),
+                new JobOrderItemProductionCreateDto(
+                    1,
+                    0L,
+                    List.of(
+                        new JobOrderItemProductionConsumptionDto(row, materialId, REQUIRED, 0L)),
+                    List.of(),
+                    new JobOrderItemProductionCreateDto.BookInDto(
+                        locationId, logistician.getId(), unitId, false, true))));
 
     assertThat(delete.commit()).isOne();
     assertThatThrownBy(() -> LockRace.finish(production))
@@ -277,6 +300,7 @@ class JobOrderStockLockRaceIntegrationTest {
     return JobOrder.builder()
         .responsibleOrgUnit(unit)
         .requestingOrgUnit(unit)
+        .originalProfitOrgUnitId(profitRootId)
         .handle("order-lock")
         .type(type)
         .build();
@@ -313,12 +337,22 @@ class JobOrderStockLockRaceIntegrationTest {
     return jdbc.update("DELETE FROM inventory_item WHERE id = ?", row);
   }
 
-  /**
-   * The fixture's member, signed in as a Logistician.
-   *
-   * @return the caller
-   */
-  private @NotNull Caller asLogistician() {
-    return Caller.of(logistician.getId(), Roles.LOGISTICIAN);
+  private <T> @NotNull Future<T> startWaitingAsLogistician(@NotNull Supplier<T> step)
+      throws Exception {
+    return race.startWaiting(
+        new Caller(logistician.getId(), Roles.LOGISTICIAN, unitId),
+        () -> {
+          var context = SecurityContextHolder.getContext();
+          var original =
+              (JwtAuthenticationToken) Objects.requireNonNull(context.getAuthentication());
+          var authorities = new ArrayList<>(original.getAuthorities());
+          authorities.add(new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitId));
+          context.setAuthentication(new JwtAuthenticationToken(original.getToken(), authorities));
+          try {
+            return step.get();
+          } finally {
+            context.setAuthentication(original);
+          }
+        });
   }
 }

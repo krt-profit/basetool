@@ -62,7 +62,7 @@ public record ExchangeOrgDemandDto(
   /** Why a demand is withheld. */
   public enum Reason {
 
-    /** The member may not see job orders: no unit of theirs is profit-eligible. */
+    /** The member may not see job orders: no unit of theirs is active Profit-hierarchy. */
     NOT_PERMITTED
   }
 }

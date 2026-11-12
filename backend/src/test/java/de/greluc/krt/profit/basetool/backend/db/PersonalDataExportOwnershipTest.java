@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
@@ -82,7 +83,10 @@ class PersonalDataExportOwnershipTest {
             "planted",
             LegalBasis.ART_15,
             "A planted section that filters a bank table from the mission module.",
-            "SELECT note FROM bank_booking_request WHERE requested_by = :userId");
+            """
+            SELECT b.note FROM mission m CROSS JOIN bank_booking_request b
+            WHERE m.owner_id = :userId OR b.requested_by = :userId
+            """);
 
     assertThat(mismatches(ownership(), DomainMap.load(), Map.of(PLANTED_CLASS, List.of(foreign))))
         .hasSize(1)
@@ -112,20 +116,25 @@ class PersonalDataExportOwnershipTest {
     byClass.forEach((className, sections) -> {
       String module = domainMap.ruleFor(className).map(DomainMap.Rule::module).orElse("?");
       for (Section section : sections) {
-        String key = GdprParticipantCoverageTest.exportKey(section.sql(), owners.keySet());
-        String table = key == null ? null : key.substring(0, key.indexOf('.'));
-        String owner = table == null ? null : owners.get(table);
-        if (owner == null || !owner.equals(module)) {
-          out.add(
-              section.key()
-                  + " filters "
-                  + table
-                  + " (owner "
-                  + owner
-                  + ") but "
-                  + className
-                  + " is in "
-                  + module);
+        Set<String> keys = GdprParticipantCoverageTest.exportKeys(section.sql(), owners.keySet());
+        if (keys.isEmpty()) {
+          out.add(section.key() + " in " + className + " has no :userId key");
+        }
+        for (String key : keys) {
+          String table = key.substring(0, key.indexOf('.'));
+          String owner = owners.get(table);
+          if (!module.equals(owner)) {
+            out.add(
+                section.key()
+                    + " filters "
+                    + table
+                    + " (owner "
+                    + owner
+                    + ") but "
+                    + className
+                    + " is in "
+                    + module);
+          }
         }
       }
     });

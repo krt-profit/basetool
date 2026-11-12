@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.internal;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
@@ -31,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import jakarta.persistence.EntityManagerFactory;
@@ -60,6 +63,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest
 class MissionOperationReadNoNPlusOneTest {
 
+  @Autowired private OrgUnitRepository orgUnitRepository;
+
   private static final int FEW = 3;
 
   private static final int MANY = 25;
@@ -86,7 +91,7 @@ class MissionOperationReadNoNPlusOneTest {
     Squadron squadron = new Squadron();
     squadron.setName("Embed Unit " + tag);
     squadron.setShorthand("M" + tag);
-    squadron.setProfitEligible(true);
+    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
     unit = squadronRepository.save(squadron);
     SecurityContextHolder.getContext()
         .setAuthentication(

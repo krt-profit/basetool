@@ -30,8 +30,8 @@ import org.jetbrains.annotations.Nullable;
  * Create / update payload for a material job order.
  *
  * <ul>
- *   <li>{@code responsibleOrgUnitId} — the processing org unit; required and profit-eligible,
- *       otherwise 400. Ignored on update; changed only via {@code PATCH
+ *   <li>{@code responsibleOrgUnitId} — the processing org unit; required and active
+ *       Profit-hierarchy, otherwise 400. Ignored on update; changed only via {@code PATCH
  *       /api/v1/orders/{id}/responsible-org-unit}.
  *   <li>{@code requestingOrgUnitId} — the customer org unit; any squadron or Spezialkommando;
  *       mandatory.

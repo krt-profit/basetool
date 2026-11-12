@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationExcepti
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeEffects;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.util.List;
@@ -102,16 +103,8 @@ final class LotRows {
    */
   static @NotNull InventoryItem split(
       @NotNull InventoryItem source, double amount, @NotNull Placement placement) {
-    InventoryItem part = new InventoryItem();
-    part.setUser(placement.user());
-    part.setOwningOrgUnit(placement.owningOrgUnit());
-    part.setMaterial(source.getMaterial());
-    part.setGameItem(source.getGameItem());
-    part.setLocation(placement.location());
-    part.setQuality(source.getQuality());
-    part.setAmount(ScuAmounts.roundToScuScale(amount));
-    part.setPersonal(placement.personal());
-    part.setStolen(placement.stolen());
+    InventoryItem part = metadata(source, placement);
+    source.moveQuantityTo(part, amount);
     return part;
   }
 
@@ -147,5 +140,71 @@ final class LotRows {
     InventoryItem saved = repository.saveAndFlush(row);
     int reduced = observer.lower(row.getId(), remaining, reason);
     return new Lowered(saved, false, new StockChangeEffects(reduced, 0));
+  }
+
+  /**
+   * Sets exact surviving evidence while preserving ordinary stock, donation and offer effects.
+   *
+   * @param repository owning stock repository
+   * @param observer owning stock-change observer
+   * @param row the locked row with its already reduced slices
+   * @param remaining physical amount of the exact surviving composition
+   * @param quantity complete surviving physical and journal-reference evidence
+   * @param reason the owning stock change
+   * @return retained or deleted row and offer effects
+   */
+  static @NotNull Lowered lowerExactQuantity(
+      @NotNull InventoryItemRepository repository,
+      @NotNull StockChangeObserver observer,
+      @NotNull InventoryItem row,
+      double remaining,
+      @NotNull StockQuantityComposition quantity,
+      @NotNull StockChangeReason reason) {
+    if (quantity.totalQuanta() != ScuAmounts.toQuanta(remaining)) {
+      throw new IllegalArgumentException(
+          "The surviving evidence must describe the physical amount");
+    }
+    if (remaining <= DEPLETED_BELOW) {
+      return lower(repository, observer, row, remaining, reason);
+    }
+    row.replaceQuantity(remaining, quantity);
+    if (!InventoryAllocations.fits(row)) {
+      throw new OverAllocationException();
+    }
+    InventoryItem saved = repository.saveAndFlush(row);
+    int reduced = observer.lower(row.getId(), remaining, reason);
+    return new Lowered(saved, false, new StockChangeEffects(reduced, 0));
+  }
+
+  /**
+   * Builds an exact unsaved part without changing the source amount or its evidence.
+   *
+   * @param source the current physical row
+   * @param quantity the exact complete evidence assigned to the part
+   * @param placement where the part goes
+   * @return the new row with its truthful quantity already assigned
+   */
+  static @NotNull InventoryItem exactPart(
+      @NotNull InventoryItem source,
+      @NotNull StockQuantityComposition quantity,
+      @NotNull Placement placement) {
+    InventoryItem part = metadata(source, placement);
+    part.replaceQuantity(ScuAmounts.fromQuanta(quantity.totalQuanta()), quantity);
+    return part;
+  }
+
+  /** Copies only the physical identity and requested placement to an unsaved row. */
+  private static @NotNull InventoryItem metadata(
+      @NotNull InventoryItem source, @NotNull Placement placement) {
+    InventoryItem part = new InventoryItem();
+    part.setUser(placement.user());
+    part.setOwningOrgUnit(placement.owningOrgUnit());
+    part.setMaterial(source.getMaterial());
+    part.setGameItem(source.getGameItem());
+    part.setLocation(placement.location());
+    part.setQuality(source.getQuality());
+    part.setPersonal(placement.personal());
+    part.setStolen(placement.stolen());
+    return part;
   }
 }

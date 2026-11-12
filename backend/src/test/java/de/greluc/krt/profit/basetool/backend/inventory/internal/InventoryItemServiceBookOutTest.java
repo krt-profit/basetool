@@ -92,7 +92,10 @@ import org.springframework.security.access.AccessDeniedException;
  * TRANSFER / SELL), partial versus full deletion, and the {@code MissionFinanceEntry} side effect
  * of a SELL.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemServiceBookOutTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;

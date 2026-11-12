@@ -21,6 +21,8 @@ package de.greluc.krt.profit.basetool.backend.materialexchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,28 @@ import org.springframework.stereotype.Component;
 public class MaterialExchangeStockOfferLookup implements StockOfferLookup {
 
   private final MaterialExchangeOfferRepository offerRepository;
+
+  @Override
+  public @NotNull Map<UUID, StockOfferFact> offerFacts(@NotNull Collection<UUID> inventoryItemIds) {
+    if (inventoryItemIds.isEmpty()) {
+      return Map.of();
+    }
+    Map<UUID, StockOfferFact> facts = new HashMap<>();
+    for (MaterialExchangeOfferRepository.StockPlanningFact offer :
+        offerRepository.findStockPlanningFacts(inventoryItemIds)) {
+      double active = 0.0;
+      if (offer.getStatus() == MaterialExchangeOfferStatus.ACTIVE) {
+        active =
+            offer.getOfferedAmount() != null
+                ? offer.getOfferedAmount()
+                : offer.getItemQuantity() == null ? 0.0 : offer.getItemQuantity();
+      }
+      StockOfferFact previous = facts.getOrDefault(offer.getInventoryItemId(), StockOfferFact.NONE);
+      facts.put(
+          offer.getInventoryItemId(), new StockOfferFact(true, previous.activeAmount() + active));
+    }
+    return Map.copyOf(facts);
+  }
 
   @Override
   public boolean isOffered(@NotNull UUID inventoryItemId) {

@@ -21,13 +21,45 @@
   OR (:activeOrgUnitId IS NULL AND i.owningOrgUnit.id IN :memberOrgUnitIds)
  )
 === end
-=== JOB_ORDER_SCOPE_PREDICATE
+=== JOB_ORDER_READ_PREDICATE
 (
   :isAdminAllScope = true
-  OR TYPE(o.responsibleOrgUnit) = SpecialCommand
-  OR (:activeOrgUnitId IS NOT NULL AND o.responsibleOrgUnit.id = :activeOrgUnitId)
-  OR (:activeOrgUnitId IS NULL AND o.responsibleOrgUnit.id IN :memberOrgUnitIds)
- )
+  OR (:activeOrgUnitId IS NOT NULL AND (o.responsibleOrgUnit.id = :activeOrgUnitId
+    OR o.requestingOrgUnit.id = :activeOrgUnitId))
+  OR (:activeOrgUnitId IS NULL AND (o.responsibleOrgUnit.id IN :memberOrgUnitIds
+    OR o.requestingOrgUnit.id IN :memberOrgUnitIds))
+  OR EXISTS (SELECT h.id FROM JobOrderUnitReadHistory h WHERE h.jobOrder = o
+    AND ((:activeOrgUnitId IS NOT NULL AND h.orgUnit.id = :activeOrgUnitId)
+      OR (:activeOrgUnitId IS NULL AND h.orgUnit.id IN :memberOrgUnitIds)))
+  OR EXISTS (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o
+    AND ((:activeOrgUnitId IS NOT NULL AND p.claimingOrgUnit.id = :activeOrgUnitId)
+      OR (:activeOrgUnitId IS NULL AND p.claimingOrgUnit.id IN :memberOrgUnitIds)))
+  OR EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o
+    AND a.user.id = :callerId)
+  OR
+(o.type = 'AUEC' AND (
+  EXISTS (SELECT h.id FROM JobOrderMoneyHolder h WHERE h.orderId = o.id AND h.userId = :callerId)
+  OR EXISTS (SELECT r.id FROM JobOrderMoneyRecipient r WHERE r.orderId = o.id
+    AND r.correctedIntoId IS NULL
+    AND (r.active = true OR EXISTS (SELECT m.id FROM JobOrderMoneyOperation m
+      WHERE m.orderId = o.id AND (m.recipientId = r.id OR EXISTS (
+        SELECT prior.id FROM JobOrderMoneyRecipient prior
+        WHERE prior.orderId = o.id AND prior.id = m.recipientId AND prior.correctedIntoId = r.id))
+      AND NOT EXISTS (SELECT c.id FROM JobOrderMoneyCorrectionEntry c
+        WHERE c.orderId = o.id AND c.originalOperationId = m.operationId AND c.amount = 0
+          AND NOT EXISTS (SELECT later.id FROM JobOrderMoneyCorrectionEntry later
+            WHERE later.orderId = c.orderId AND later.originalOperationId = c.originalOperationId
+              AND later.id > c.id))))
+    AND (r.userId = :callerId OR EXISTS (SELECT h.id FROM JobOrderMoneyHolder h
+      WHERE h.orderId = o.id AND h.userId = :callerId AND
+        (h.id = r.holderId OR EXISTS (SELECT alias.id FROM JobOrderMoneyHolder alias
+          WHERE alias.id = r.holderId AND alias.mergedIntoId = h.id)))))
+) AND
+EXISTS (SELECT u.id FROM User u WHERE u.id = :callerId
+  AND u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
+  AND u.inKeycloak = true AND u.enabledInKeycloak = true)
+)
+)
 === end
 === REFINERY_ORDER_SCOPE_TRIPLE
 (

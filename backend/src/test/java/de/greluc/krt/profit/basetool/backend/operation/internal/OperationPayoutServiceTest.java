@@ -35,6 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
+import de.greluc.krt.profit.basetool.backend.admin.internal.ConfiguredTransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
@@ -63,7 +64,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -92,7 +92,24 @@ class OperationPayoutServiceTest {
 
   @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
-  @InjectMocks private OperationPayoutService operationPayoutService;
+  private OperationPayoutService operationPayoutService;
+
+  @BeforeEach
+  void wireConfiguredPolicy() {
+    operationPayoutService =
+        new OperationPayoutService(
+            operationRepository,
+            financeEntryRepository,
+            refineryOrderFinanceReader,
+            payoutStatusRepository,
+            userService,
+            operationAccessPolicy,
+            authHelperService,
+            new ConfiguredTransferFeePolicy(systemSettings),
+            auditService,
+            eventPublisher,
+            self);
+  }
 
   /**
    * Branch tests of the payout calculation.

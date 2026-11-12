@@ -43,9 +43,13 @@ row. ADR-0362 already locks the Materialbörse offer writes this way (`lockById`
 2. **A row deleted while the lock waited reads as absent.** Each write answers what it answers for
    an unknown row: `404 Inventory item not found`, `Stock row not found` for a pledge, the pool
    refusal `NOT_PERMITTED` for an org-stock entry command.
-3. **A receipt whose source row is gone books into the pool.** A donation receipt whose earmarked
-   row was deleted while its lock waited books the received amount with `bookIntoPool`, as it does
-   for a source row that was gone before the receipt started (REQ-SUP-009).
+3. **A receipt uses its live earmark carrier or books into the pool after verified absence.** If the
+   captured carrier disappears during the lock wait, the first transaction rolls back and the
+   receipt retries once in a fresh transaction. It rechecks the current manager grant, pledge
+   status and version, and that neither the captured row nor a replacement carrier exists before
+   booking with the original pledge facts. If the original source row was already gone at the
+   start, the receipt books into the pool once it verifies there is no live earmark carrier
+   (REQ-SUP-009).
 4. **A held row is locked and version-checked.** A write that read its row before it locks it
    holds the lock afterwards. When a newer version was committed meanwhile, the lock raises the
    optimistic-lock conflict, as the follow-on path did.

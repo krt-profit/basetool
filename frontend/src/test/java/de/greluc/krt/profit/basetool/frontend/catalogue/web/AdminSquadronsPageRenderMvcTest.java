@@ -49,8 +49,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the Staffeln tab of the organisation structure: the tab bar, the squadron rows with the
- * per-squadron switch for job-order processing, and the empty state (REQ-UI-026).
+ * Renders the Staffeln tab of the organisation structure: the tab bar, the squadron rows with their
+ * lifecycle actions, and the empty state (REQ-UI-026).
  */
 @SpringBootTest
 class AdminSquadronsPageRenderMvcTest {
@@ -77,11 +77,11 @@ class AdminSquadronsPageRenderMvcTest {
         .getContentAsString();
   }
 
-  /** A squadron row carries the job-order switch in its stored state and the row actions. */
+  /** A squadron row carries lifecycle actions without a separate eligibility switch. */
   @Test
   @WithMockUser(roles = "ADMIN")
-  void rendersTheRowsWithTheJobOrderSwitch() throws Exception {
-    SquadronDto alpha = new SquadronDto(UUID.randomUUID(), "ALPHA", "ALP", "", true, false, 0L);
+  void rendersTheRowsWithLifecycleActions() throws Exception {
+    SquadronDto alpha = new SquadronDto(UUID.randomUUID(), "ALPHA", "ALP", "", true, 0L);
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef(), any(Object[].class)))
         .thenReturn(new PageResponse<>(List.of(alpha), 0, 1000, 1, 1, List.of()));
 
@@ -91,9 +91,7 @@ class AdminSquadronsPageRenderMvcTest {
         .contains("data-testid=\"page-tabs\"")
         .containsPattern("class=\"tab active\"[^>]*data-entry-key=\"admin.squadrons\"")
         .contains("data-entry-key=\"admin.specialcommands\"")
-        .containsPattern(
-            "class=\"squadron-profit-toggle\"[^>]*aria-label=\"Auftragsbearbeitung: ALP\"")
-        .doesNotContainPattern("class=\"squadron-profit-toggle\"[^>]*checked")
+        .doesNotContain("squadron-profit-toggle")
         .contains("edit-squadron-btn")
         .contains("id=\"squadron-modal\"")
         .contains("/js/catalogue/admin-squadrons.js");

@@ -29,12 +29,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A Lager row as the other modules see it: a read-only live view of the managed row, so a read
- * after one of the Lager's commands sees what that command wrote (plan section 7.6, P4-1 part 3).
+ * A Lager row as the other modules see it, either a managed live view or a stable planning
+ * snapshot.
  *
- * <p>The view is the managed instance, not a copy: the locks, the persistence context and the
- * optimistic version are the row's own. It has no setter; the Lager changes a row only through
- * {@link StockCommands}, which take the row's id.
+ * <p>The ordinary row reads return the managed instance, so a later read sees the owning command's
+ * changes. Lot planning exposes immutable scalar snapshots. Neither view grants stock authority;
+ * mutations use the owning commands and the actual row's locks and version.
  */
 public interface StockRow {
 
@@ -46,7 +46,7 @@ public interface StockRow {
   UUID getId();
 
   /**
-   * Returns the row's optimistic-lock version as the persistence context holds it now.
+   * Returns the optimistic-lock version represented by this live view or planning snapshot.
    *
    * @return the version
    */

@@ -1,0 +1,129 @@
+# ADR-0360 — Material promises track uncovered demand and explicit provision
+
+- **Status:** Accepted — S04 implementation under review
+- **Date:** 2026-11-09
+- **Deciders:** Repository owner (@greluc)
+- **Related:** [REQ-ORDERS-024](../specs/orders-material-claims.md) · REQ-ORDERS-025/-036/-037/-046 · [ADR-0356](0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md) · amendment to ADR-0092 · issues #3207, #3202, #3203
+
+## Context
+
+The implemented MaterialClaim stores an intent amount and does not record fulfilled contribution.
+Its aggregate lock guards claim totals against the required amount, while ITEM intentionally
+retains its full original material denominator. Inventory quality coverage is recalculated from current stock and
+does not prove historical provision by a unit. The accepted model needs distinct outstanding
+promises, current stock and true historical credit without a new enrollment or settlement process.
+
+## Decision
+
+REQ-ORDERS-024 is the canonical quantity contract. A promise is still outstanding contribution.
+Capacity is current remaining material demand minus matching earmarked stock, floored at zero;
+ITEM demand covers not-yet-manufactured items. Preserve current quality allocation with each
+physical quantity used at most once.
+
+Fulfill a matching promise once through explicit unit-attributed suitable provision/allocation
+by an authorized responsible or own-Staffel writer with inventory rights. Neither stock owner nor
+executing Staffel infers attribution. Credit first, then atomically reduce remaining promises only
+as necessary. Reductions are cancelled need, not fulfillment. Use exact largest-remainder
+apportionment in whole PIECE/0.001 SCU quanta with immutable participation-identity tie breaks.
+Derived reductions need no additional Staffel approval; meaningful edits retain scoped versions.
+
+True historical contribution survives consumption, release, relinking and loss. Increased need
+does not revive/grow promises. False credit requires connected correction within current capacity,
+without reviving ended promises. Migrate historical credit only from verifiable unit attribution.
+
+Replace ADR-0092's whole-order claim lock as a prescribed new-model boundary with an invariant
+guard at order-plus-material scope across all quality buckets. Every related demand, stock,
+promise, attribution and correction mutation joins it, including initially empty sets. Preserve
+Inventory/JobOrder ownership through narrow synchronous APIs and one deterministic common lock
+protocol. Exact SQL, tables and classes remain implementation choices, with real-database race
+evidence required. No implementation is authorized by this accepted planning record.
+
+### Durable quantity and connected correction
+
+Storage-row and allocation UUIDs do not identify physical quantity across split, merge, depletion
+or journal restore. Inventory retains exact origin intervals through those transforms; JobOrder
+retains globally processed intervals independently of deletable order/claim rows. A required
+PostgreSQL exclusion constraint prevents overlapping credit for the same origin, while adjacent
+or unrelated intervals remain independent. This is narrow known-quantity provenance, not a
+performance ledger or a workflow to verify quantities inside the game.
+
+Older exchange journals without recoverable physical composition retain their ordinary quantity
+undo under REQ-XCH-022. Restored unknown portions still cover demand but cannot create new Staffel
+credit. Inventory distinguishes that ineligibility from known restored composition and genuine new
+manual provision; it does not invent a new origin eligible for attribution. This introduces no
+additional user action and does not reject an otherwise valid legacy undo.
+
+A receipt separates its known actual composition from its clipped current attribution and its
+immutable processed-once evidence. Excess is not fictitious fulfillment. Connected downward
+correction adjusts every exact intersecting retained fact atomically under current authority;
+upward correction admits only the explicitly declared delta on the selected retained row.
+Attribution-only correction needs JobOrder grants for the affected original and target units or
+responsible coordination; Inventory grants apply when retained stock is actually changed.
+Existing ended targets can receive historical correction without open-quantity revival.
+A physical inverse requiring fully consumed quantity or production reversal conflicts409 under
+the existing out-of-scope boundary. Known relocated/merged quantity remains correctable.
+The same correction action accepts a false original supplied quality, retaining the prior known
+value or unknown status and the corrected declaration. Historical credit and prescribed promise
+consequences use the corrected original fact; genuine later quality changes stay distinct.
+Current stock is not evidence of original quality. Connected retained stock may be changed only
+with its current Inventory authority, versions and sufficient known facts to preserve later
+changes. Historical quality/credit correction survives consumption without reversing production;
+unknown historical quantity/composition remains unknown. This decision adds no correction of
+original material or other provision fields.
+
+The same action distinguishes the historical declaration from an explicit declaration that a
+selected current portion is also recorded at the wrong quality. Inventory changes only the known
+receipt intersection of that selected row, preserving unrelated full quantity evidence and other
+receipts. It reports the affected quantity and checks current authority and selected versions.
+Empty selection leaves current stock alone. Current equality and other historical receipts do
+not establish a quality timeline. Existing fungible allocation, donation coverage and mandatory
+PIECE merge rules still govern the physical action.
+
+Planning declares the full sorted order/material set before any stock lot/row lock, then locks all
+physical resources in the common deterministic order. Post-lock changes to source placement,
+allocation targets, merge candidates or connected receipt intersections conflict rather than
+acquire a late guard. Every capacity calculation observes the completed demand/stock action;
+intermediate states cannot proportionally cancel promises. Independently scoped client versions
+remain meaningful for each deliberately edited contribution and current Inventory resource.
+
+ITEM completion additionally has a per-order fulfillment section guard, acquired after hierarchy
+stabilization and before completion snapshots, material guards, stock and the priority sequence.
+Handover, item replacement and ITEM administrative deletion share it. Queue-affecting writes take
+the existing sorted priority sequence after complete physical preparation and before dirtying
+their order or children. Ordinary material planning closes its first nonempty complete set.
+Sequential independent order plans during hierarchy maintenance require proof from the owning
+service that this transaction acquired the exclusive hierarchy lock first. A later lock upgrade
+does not qualify. Every ordinary stock writer takes the shared hierarchy prerequisite before any
+lot or row, including an unlinked lot, so maintenance holds that resource order for its full run.
+
+Historical restoration uses the order hierarchy, complete material set, complete sorted restoration
+evidence guards, fresh global presence/placement validation, complete sorted physical lots and
+deterministic rows, in that order. Typed known-origin and real legacy-journal-reference identities
+remain separate from their deduplicated hashed advisory keys. Declare every possible accepted
+addition before the first guard; confirmation may narrow it but cannot add another identity.
+Even an empty closed set belongs to the originating transaction synchronization. A handle cannot
+be reused by a suspended or nested transaction. Recheck global evidence after guard/lot waits and
+validate final uniqueness; the guard alone does not prove absence. Every historical reintroduction
+writer joins this protocol. Ordinary atomic transforms retain their existing complete source and
+destination locks and preserve evidence. Genuine new manual provision adds no restoration identity.
+
+Migration distinguishes observed actual receipt facts from a legacy credited subset and its
+known quality lower bound. Unknown total or original quality stays unknown. Immutable applied
+migrations and an additive follow-up preserve that evidence status; a fresh complete migration
+chain and partial-checkpoint upgrades are separate verification cases.
+
+## Consequences
+
+Promise and stock views can explain actual progress without double credit. History must retain
+attribution independently of changing stock projections. Relevant inventory and demand writes must
+maintain capacity atomically, while unrelated sections/materials keep narrow client versions.
+Legacy coarse-lock tests are baseline only; the new credit, cross-quality races, corrections,
+rounding, lifecycle and migration acceptance remains unchecked.
+
+## Alternatives considered
+
+- Keep the full original ITEM denominator: rejected; promises represent remaining uncovered need.
+- Fulfill on manufacture or final delivery: rejected; provision is credited once at explicit allocation.
+- Derive historical credit from current stock/owner/executor: rejected; those do not prove contribution.
+- Restore promises after genuine loss: rejected; new obligations require a deliberate permitted action.
+- Keep a whole-order lock or only lock one tier: rejected as the prescribed target; use the actual shared material invariant.

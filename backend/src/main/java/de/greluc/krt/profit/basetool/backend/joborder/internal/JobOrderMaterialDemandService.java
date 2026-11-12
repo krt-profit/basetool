@@ -30,11 +30,11 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStockProjectionService.OrderLinkedStockIndex;
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.ArrayList;
@@ -59,6 +59,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class JobOrderMaterialDemandService {
+
+  private static final UUID NIL_ID = new UUID(0L, 0L);
 
   /**
    * The statuses the overview aggregates: an order still being worked. Terminal orders ({@code
@@ -86,6 +88,8 @@ public class JobOrderMaterialDemandService {
   /** Maps the responsible OrgUnit to the badge reference the grouping is rendered with. */
   private final SquadronMapper squadronMapper;
 
+  private final AuthHelperService authHelper;
+
   /**
    * Aggregates the caller's visible, non-terminal job orders into the per-org-unit material demand.
    * All lookups are batched for the whole result (REQ-DATA-003).
@@ -96,16 +100,16 @@ public class JobOrderMaterialDemandService {
   @NotNull
   @Transactional(readOnly = true)
   public MaterialDemandOverviewDto getMaterialDemandOverview() {
-    if (!requestScopeResolver.canViewJobOrders()) {
-      return new MaterialDemandOverviewDto(List.of());
-    }
     ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    UUID callerId = authHelper.currentUserId().orElse(NIL_ID);
     List<JobOrder> orders =
         jobOrderRepository.findScopedOrdersWithMaterialRequirements(
             NON_TERMINAL_STATUSES,
-            scope.adminAllScope(),
+            scope.adminAllScope()
+                || (!authHelper.isAdmin() && requestScopeResolver.canViewJobOrders()),
             scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds());
+            scope.memberOrgUnitIds(),
+            callerId);
     if (orders.isEmpty()) {
       return new MaterialDemandOverviewDto(List.of());
     }
@@ -114,10 +118,7 @@ public class JobOrderMaterialDemandService {
         jobOrderStockProjectionService.loadOrderLinkedStockIndex(
             orders.stream().map(JobOrder::getId).toList());
     Map<UUID, List<ClaimBucketDto>> claimsByOrder =
-        materialClaimService.getClaimBucketsForOrders(
-            orders.stream()
-                .filter(JobOrderMaterialDemandService::isSpecialCommandResponsible)
-                .toList());
+        materialClaimService.getClaimBucketsForOrders(orders);
 
     Map<UUID, GroupAccumulator> groups = new LinkedHashMap<>();
     for (JobOrder order : orders) {
@@ -241,18 +242,6 @@ public class JobOrderMaterialDemandService {
   @Nullable
   private SquadronReferenceDto referenceOf(@Nullable OrgUnit orgUnit) {
     return orgUnit == null ? null : squadronMapper.orgUnitToReferenceDto(orgUnit);
-  }
-
-  /**
-   * {@code true} iff the order is responsible to a Spezialkommando — the only orders that carry
-   * material claims, so only those are handed to the batched claim lookup.
-   *
-   * @param jobOrder the order.
-   * @return whether the order is a public SK order.
-   */
-  private static boolean isSpecialCommandResponsible(@NotNull JobOrder jobOrder) {
-    return jobOrder.getResponsibleOrgUnit() != null
-        && jobOrder.getResponsibleOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND;
   }
 
   /**

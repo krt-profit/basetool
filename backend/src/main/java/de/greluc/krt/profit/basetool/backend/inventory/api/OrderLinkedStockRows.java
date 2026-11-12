@@ -40,4 +40,14 @@ public interface OrderLinkedStockRows {
    */
   @NotNull
   List<JobOrderMaterialStockRow> materialStockOfOrders(@NotNull Collection<UUID> jobOrderIds);
+
+  /**
+   * Reads every material scope on physical rows shared with any of the given orders.
+   *
+   * @param jobOrderIds the orders whose physical stock rows may change
+   * @return all affected order-material scopes, including neighboring allocations
+   */
+  @NotNull
+  List<OrderMaterialScope> materialScopesSharingRowsWithOrders(
+      @NotNull Collection<UUID> jobOrderIds);
 }

@@ -21,7 +21,13 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Mission planning** — plan, brief and review squadron missions with role-aware access, a live procedure-step checklist and per-mission radio frequencies. Non-internal missions are visible to every member of the organisation, not only to the owning unit.
 - **Operations & payouts** — group missions under an *Operation*, track per-participant finances and confirm payouts behind an asymmetric mark/clear gate.
 - **Members only** — the landing page and the legal pages are the whole public surface (ADR-0159). Everything else needs a login, and every account holds at least member rights. A person without an account can still take part in an Einsatz: the mission leadership records them as an external participant.
-- **Job orders & cross-order material demand** — a prioritised queue of material and item orders, plus a *Materialbedarf* overview that folds every open / in-progress order into what each responsible unit still has to gather per material, showing booked stock and signed-up claims side by side. A Logistician of an order may enter any active account as an editor (Bearbeiter), who then reads that one order in full even outside their unit (ADR-0301) and finds it under „Ich bearbeite“ in the order overview — without profit access that segment is the whole list.
+- **Job orders & cross-order material demand** — a prioritised queue of material and item orders with one complete permitted workspace and remembered filters. Current unit writers can transfer Profit responsibility, coordinate Staffel participation, and cancel or reopen work on the central order page. Requesters can safely adjust remaining need after partial delivery. The *Materialbedarf* overview shows remaining material need, earmarked stock and outstanding Staffel promises separately. Explicitly attributed provision credits a promise once; its contribution history remains distinct from current stock coverage. An authorised editor (Bearbeiter) can read their concrete order and maintain their own note outside their unit, without general Profit access (ADR-0301).
+  [aUEC orders](docs/specs/orders-auec.md) track reported holdings, unit commitments, exact fees
+  and net handovers. Each new money action starts with [Kartellbank selected](docs/specs/orders-auec-bank.md)
+  and offers an explicit Bank-free choice. With a collection and designated requester account,
+  the same forms record deposit and account-to-account delivery without a personal order holder.
+  Bank staff confirm deposits in their existing queue. Waiting and failed attempts are visible
+  in order history, with recovery and authorised repair under the same payment identity.
 - **Hangar & inventory** — track ships and personal inventories per member, with a server-paginated org-unit fleet overview and personal hangar; admins keep a member's hangar from the member's page.
 - **Lager (warehouse)** — org-scoped, append-only stock tracking: book stock in/out, transfer it (Umbuchen) — individually or for a whole marked selection at once — earmark slices to job orders and missions, and track both materials (with quality) and game items — every craftable item plus weapons, armour, ship components and ordnance, mining and salvage modules, storage containers and loot. Each unit's Logisticians set minimum and target levels per material and quality tier, or per game item, in the „Mindestbestände“ tab, which shows the free stock allocated to each level from the top tier down and the amount already requested. A low level marks its material or game item „niedrig“ in the global Lager, offers a prefilled job order and need, and tells the direct Logisticians and seat holders once, until the target is reached again.
 - **Refinery & materials** — refinery job orders, material handovers and a planet-aware materials matrix; new orders can be pre-filled from a desktop-extractor screenshot JSON.
@@ -75,7 +81,7 @@ The drawing shows the request path. Beside it, the frontend, backend and ingest 
 
 - **Edge** — a host-level haproxy forwards TCP to the rootless nginx `edge` with a PROXY v2 header (ADR-0187). nginx terminates TLS for `profit-base.online` (with Keycloak under `/auth`), `ingest.` and `grafana.profit-base.online`, and applies per-vhost rate limits and deny-by-default rules. There is no `api.` vhost: the backend is internal-only (ADR-0268). An `acme` (lego) container renews the certificates.
 - **Frontend** — the Thymeleaf-rendered UI. It calls the backend via a centrally-configured, Resilience4j-wrapped WebClient with the member's bearer token and keeps its sessions in Redis. Live updates reach the browser over `/ws/sync` and an SSE stream. No business logic of its own, and no direct database or Keycloak Admin API access.
-- **Backend** — REST API only (`/api/v1/...`), Spring Boot on Java 25, JPA / Flyway / PostgreSQL. It never serves HTML and is the only component with the domain database. It fetches game data from [UEX](https://uexcorp.space/) and the Star Citizen wiki. **It has no internet path**: the frontend, the ingest gateway and the Keycloak SPI reach it over container networks, and nothing else does (ADR-0268). The ingest gateway is the system's single public API entry point.
+- **Backend** — REST API only (`/api/v1/...`), Spring Boot on Java 25, JPA / Flyway / PostgreSQL. It never serves HTML and is the only component with the domain database. It fetches game data from [UEX](https://uexcorp.space/) and the Star Citizen wiki. **It has no internet path**: the frontend, the ingest gateway and the Keycloak SPI reach it over container networks, and nothing else does (ADR-0268). The ingest gateway is the system's single public API entry point. The existing admin module owns the shared transfer-fee parser and immutable rate snapshots ([ADR-0358](docs/adr/0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)); Bank keeps its own payer and fee-mode rules.
 - **Ingest** — the internet-facing gateway for approved client software, the SC Extractor included: the exchange API `/exchange/v1/**` with reads, writes and drafts ([`docs/specs/external-exchange.md`](docs/specs/external-exchange.md)). The extractor's former `/v1` routes were removed on 2026-09-28. The gateway owns no database. It relays token-authenticated requests to the backend over the internal network under its own service identity, so no client ever reaches the backend itself. **Restricted interface:** only client software explicitly approved by the basetool developer (@greluc) may use it. This is enforced technically through the client registry at the gateway (`REQ-XCH-002/-003`) and binds users through section 4 of the Terms of Use (`REQ-SEC-027`, [`docs/specs/security-and-access.md`](docs/specs/security-and-access.md)). The approved clients are listed in [`docs/legal/approved-clients.md`](docs/legal/approved-clients.md).
 - **Keycloak** — the OAuth2 / OIDC identity provider, with its own PostgreSQL, the KRT theme and a `keycloak-spi` provider JAR. The SPI provides the Discord login and its guild/role gate, the `basetool-exchange` admin extension that ends one client inside shared sessions (ADR-0226), and the `krt-freemarker` login forms that show the device code on the consent page (ADR-0228). Exchange clients sign in with the device grant, per-capability consent and DPoP-bound tokens.
 - **Redis** — Spring Session store (sessions survive frontend restarts), the live-sync and notification pub/sub, the ingest handoffs, the exchange registry mirror and the gateway's byte-bounded exchange partition (ADR-0221). One instance serves frontend, backend and ingest, each with its own ACL user.
@@ -87,6 +93,30 @@ The tenant unit is the **OrgUnit** — a Staffel (`SQUADRON`), Spezialkommando (
 ---
 
 ## Documentation
+
+MATERIAL and ITEM responsibility now follows the active, uniquely designated Profit area and its
+active Staffel/SK children. A current writer of either proposed unit may commission an order;
+responsible-unit writers can transfer it immediately. An invalid responsible unit leaves the order
+readable and recoverable by transfer, while processing and coupled stock changes wait. Legacy
+original boundaries remain explicitly unknown when no reliable provenance exists.
+
+All three order kinds share the queue, count, number lookup and detail. The workspace remembers
+scopes and kind filters and defaults to All. Former unit relationships can preserve read access
+through current unit reach. The named producer panel, unreadable missions, unrelated stock, Bank
+and reduced Exchange keep their independent gates.
+
+Staffeln maintain their participation through the shared order workspace. The
+[material contribution contract](docs/specs/orders-material-claims.md) governs promises and
+explicit provision credit.
+Outstanding promises follow uncovered demand; capacity reductions are not fulfilled contributions.
+The ordinary provision picker renders backend-authorized matching open promises with their current versions.
+Connected quantity, attribution and original-quality corrections retain their recorded facts.
+A quality correction changes current stock only for explicitly selected retained portions, with
+current Inventory write rights and row versions. Historical-only correction remains available
+after stock consumption. Legacy history states only its verifiable credited subset rather than
+inventing full original quantities or quality.
+
+> **Implementation and acceptance scope:** MATERIAL, ITEM and aUEC use the shared JobOrder workspace. The specifications record the requirements and verification for [shared access and lifecycle](docs/specs/orders-core.md), [material contributions](docs/specs/orders-material-claims.md), [aUEC procurement](docs/specs/orders-auec.md) and [Kartellbank handling](docs/specs/orders-auec-bank.md).
 
 The README is the overview; everything else lives in dedicated, versioned docs:
 

@@ -67,6 +67,11 @@ public class HandleAnonymisationService {
    * @param jobOrders rows rewritten in {@code job_order}
    * @param materialHandovers rows rewritten in {@code job_order_handover}
    * @param itemHandovers rows rewritten in {@code job_order_item_handover}
+   * @param orderMoneyHolders rows rewritten in {@code job_order_money_holder}
+   * @param orderMoneyOperations rows rewritten in {@code job_order_money_operation}
+   * @param orderMoneyRecipients rows rewritten in {@code job_order_money_recipient}
+   * @param orderMoneyHolderChanges rows rewritten in {@code job_order_money_holder_change}
+   * @param orderLinkedMoneyAttempts rows rewritten in {@code job_order_linked_money_attempt}
    */
   public record AnonymisationResult(
       int activityAudit,
@@ -76,7 +81,12 @@ public class HandleAnonymisationService {
       int bankHolders,
       int jobOrders,
       int materialHandovers,
-      int itemHandovers) {
+      int itemHandovers,
+      int orderMoneyHolders,
+      int orderMoneyOperations,
+      int orderMoneyRecipients,
+      int orderMoneyHolderChanges,
+      int orderLinkedMoneyAttempts) {
 
     /**
      * The total number of rows rewritten across every column.
@@ -91,7 +101,12 @@ public class HandleAnonymisationService {
           + bankHolders
           + jobOrders
           + materialHandovers
-          + itemHandovers;
+          + itemHandovers
+          + orderMoneyHolders
+          + orderMoneyOperations
+          + orderMoneyRecipients
+          + orderMoneyHolderChanges
+          + orderLinkedMoneyAttempts;
     }
   }
 
@@ -129,7 +144,12 @@ public class HandleAnonymisationService {
             rewritten.getOrDefault(Rewritten.BANK_HOLDERS, 0),
             rewritten.getOrDefault(Rewritten.JOB_ORDERS, 0),
             rewritten.getOrDefault(Rewritten.MATERIAL_HANDOVERS, 0),
-            rewritten.getOrDefault(Rewritten.ITEM_HANDOVERS, 0));
+            rewritten.getOrDefault(Rewritten.ITEM_HANDOVERS, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_HOLDERS, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_OPERATIONS, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_RECIPIENTS, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_MONEY_HOLDER_CHANGES, 0),
+            rewritten.getOrDefault(Rewritten.ORDER_LINKED_MONEY_ATTEMPTS, 0));
 
     auditRecorder.record(
         AuditEventType.HANDLE_SNAPSHOTS_ANONYMISED,
@@ -144,6 +164,11 @@ public class HandleAnonymisationService {
             .with("jobOrders", result.jobOrders())
             .with("materialHandovers", result.materialHandovers())
             .with("itemHandovers", result.itemHandovers())
+            .with("orderMoneyHolders", result.orderMoneyHolders())
+            .with("orderMoneyOperations", result.orderMoneyOperations())
+            .with("orderMoneyRecipients", result.orderMoneyRecipients())
+            .with("orderMoneyHolderChanges", result.orderMoneyHolderChanges())
+            .with("orderLinkedMoneyAttempts", result.orderLinkedMoneyAttempts())
             .with("spellings", names.size()));
 
     for (HandleAnonymisationParticipant participant : ordered) {

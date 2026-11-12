@@ -43,6 +43,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryInputPageCo
 import de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryListPageController;
 import de.greluc.krt.profit.basetool.frontend.inventory.web.InventoryWriteController;
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderCreation;
 import de.greluc.krt.profit.basetool.frontend.joborder.web.JobOrderWriteController;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -52,7 +53,6 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.MissionManagerGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.OrgUnitContextAdvice;
 import de.greluc.krt.profit.basetool.frontend.kernel.livesync.LiveSyncLocalBus;
@@ -200,9 +200,9 @@ class BackendFallbackReauthenticationTest {
             () ->
                 new JobOrderWriteController(
                         rejecting(JobOrderBackendClient.class, failure),
-                        mock(LogisticianGate.class),
                         new MutationResponseHelper(),
-                        mock(LiveSyncLocalBus.class))
+                        mock(LiveSyncLocalBus.class),
+                        mock(JobOrderCreation.class))
                     .unlinkMaterial(ID, ID, attributes);
         case MISSION ->
             () ->

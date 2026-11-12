@@ -55,10 +55,22 @@ public final class MemberRoleCodes {
     if (!user.isApproved()) {
       return Set.of();
     }
-    Set<String> codes = new LinkedHashSet<>();
-    for (Role role : user.getRoles()) {
-      codes.add(codeOf(role));
-    }
+    return fromStoredRoles(
+        user.getRoles().stream().map(MemberRoleCodes::codeOf).toList(), memberships);
+  }
+
+  /**
+   * Combines the stored roles of an approved member with their membership authorities.
+   *
+   * @param storedRoles the member's stored role codes
+   * @param memberships the member's membership rows
+   * @return the role codes without the {@code ROLE_} prefix
+   */
+  @NotNull
+  @Unmodifiable
+  public static Set<String> fromStoredRoles(
+      @NotNull Collection<String> storedRoles, @NotNull Collection<OrgUnitMembership> memberships) {
+    Set<String> codes = new LinkedHashSet<>(storedRoles);
     codes.addAll(derivedFromMemberships(memberships, codes.contains(Roles.KRT_MEMBER)));
     return Set.copyOf(codes);
   }

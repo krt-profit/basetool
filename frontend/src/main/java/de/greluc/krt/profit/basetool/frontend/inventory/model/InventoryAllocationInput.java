@@ -28,6 +28,8 @@ import java.util.UUID;
  *
  * @param targetId the job order / mission to earmark part of the new entry to.
  * @param amount the SCU to earmark to {@code targetId}.
+ * @param provision an explicitly selected matching unit promise, or null for unattributed stock
  */
 @DtoMirror
-public record InventoryAllocationInput(UUID targetId, Double amount) {}
+public record InventoryAllocationInput(
+    UUID targetId, Double amount, MaterialProvisionSelection provision) {}

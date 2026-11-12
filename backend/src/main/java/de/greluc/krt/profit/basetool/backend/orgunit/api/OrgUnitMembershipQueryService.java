@@ -63,6 +63,19 @@ public class OrgUnitMembershipQueryService {
   private final StaffelMembershipResolver staffelMembershipResolver;
   private final OrgUnitMembershipMapper orgUnitMembershipMapper;
   private final UserRepository userRepository;
+  private final ProfitHierarchyService profitHierarchy;
+
+  /**
+   * Lists current eligible responsibility targets, including the Profit area itself.
+   *
+   * @return active targets from the unique Profit hierarchy
+   */
+  public List<OrgUnitMembershipOptionDto> listProfitResponsibleOptions() {
+    java.util.Set<UUID> eligibleIds = profitHierarchy.eligibleUnitIds();
+    return listAllActiveOrgUnitOptionsAllKinds().stream()
+        .filter(option -> eligibleIds.contains(option.orgUnitId()))
+        .toList();
+  }
 
   /**
    * Lists every active Staffel and Spezialkommando as picker options, independent of memberships;
@@ -76,20 +89,12 @@ public class OrgUnitMembershipQueryService {
     for (Squadron s : squadronRepository.findAllByActiveTrue()) {
       options.add(
           new OrgUnitMembershipOptionDto(
-              s.getId(),
-              s.getName(),
-              s.getShorthand(),
-              OrgUnitKind.SQUADRON,
-              s.isProfitEligible()));
+              s.getId(), s.getName(), s.getShorthand(), OrgUnitKind.SQUADRON));
     }
     for (SpecialCommand sc : specialCommandRepository.findAllByActiveTrue()) {
       options.add(
           new OrgUnitMembershipOptionDto(
-              sc.getId(),
-              sc.getName(),
-              sc.getShorthand(),
-              OrgUnitKind.SPECIAL_COMMAND,
-              sc.isProfitEligible()));
+              sc.getId(), sc.getName(), sc.getShorthand(), OrgUnitKind.SPECIAL_COMMAND));
     }
     options.sort(
         Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(
@@ -104,8 +109,7 @@ public class OrgUnitMembershipQueryService {
    * Lists every active org unit of all four kinds as picker options, ordered Staffel, SK, Bereich,
    * OL and alphabetically within each (REQ-ORG-019).
    *
-   * <p>Bereich and OL options carry {@code isProfitEligible = false}; consumers filter by {@link
-   * OrgUnitMembershipOptionDto#kind()}.
+   * <p>Consumers group options by {@link OrgUnitMembershipOptionDto#kind()}.
    *
    * @return active org-unit options across all four kinds; never {@code null}, possibly empty.
    */
@@ -117,7 +121,7 @@ public class OrgUnitMembershipQueryService {
         .forEach(b ->
             options.add(
                 new OrgUnitMembershipOptionDto(
-                    b.getId(), b.getName(), b.getShorthand(), OrgUnitKind.BEREICH, false)));
+                    b.getId(), b.getName(), b.getShorthand(), OrgUnitKind.BEREICH)));
     orgUnitRepository.findActiveOrganisationsleitung().stream()
         .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
         .forEach(ol ->
@@ -126,8 +130,7 @@ public class OrgUnitMembershipQueryService {
                     ol.getId(),
                     ol.getName(),
                     ol.getShorthand(),
-                    OrgUnitKind.ORGANISATIONSLEITUNG,
-                    false)));
+                    OrgUnitKind.ORGANISATIONSLEITUNG)));
     return options;
   }
 
@@ -171,11 +174,7 @@ public class OrgUnitMembershipQueryService {
       }
       options.add(
           new OrgUnitMembershipOptionDto(
-              unit.getId(),
-              unit.getName(),
-              unit.getShorthand(),
-              row.getKind(),
-              unit.isProfitEligible()));
+              unit.getId(), unit.getName(), unit.getShorthand(), row.getKind()));
     }
     options.sort(
         Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(
@@ -303,11 +302,7 @@ public class OrgUnitMembershipQueryService {
     for (OrgUnit orgUnit : orgUnitRepository.findAllById(ids)) {
       options.add(
           new OrgUnitMembershipOptionDto(
-              orgUnit.getId(),
-              orgUnit.getName(),
-              orgUnit.getShorthand(),
-              orgUnit.getKind(),
-              orgUnit.isProfitEligible()));
+              orgUnit.getId(), orgUnit.getName(), orgUnit.getShorthand(), orgUnit.getKind()));
     }
     options.sort(pickerOrder());
     return options;
@@ -350,11 +345,7 @@ public class OrgUnitMembershipQueryService {
    */
   private static OrgUnitMembershipOptionDto toOption(@NotNull OrgUnit orgUnit) {
     return new OrgUnitMembershipOptionDto(
-        orgUnit.getId(),
-        orgUnit.getName(),
-        orgUnit.getShorthand(),
-        orgUnit.getKind(),
-        orgUnit.isProfitEligible());
+        orgUnit.getId(), orgUnit.getName(), orgUnit.getShorthand(), orgUnit.getKind());
   }
 
   /**
@@ -380,11 +371,7 @@ public class OrgUnitMembershipQueryService {
     for (OrgUnit orgUnit : orgUnitRepository.findAllById(reach)) {
       options.add(
           new OrgUnitMembershipOptionDto(
-              orgUnit.getId(),
-              orgUnit.getName(),
-              orgUnit.getShorthand(),
-              orgUnit.getKind(),
-              orgUnit.isProfitEligible()));
+              orgUnit.getId(), orgUnit.getName(), orgUnit.getShorthand(), orgUnit.getKind()));
     }
     options.sort(
         Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(o -> pickerKindOrder(o.kind()))

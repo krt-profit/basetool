@@ -53,6 +53,10 @@ non-admins see the union of their memberships unless they pin one.
 
 ### REQ-ORG-003 — Aggregate scope kinds
 
+> **Approved planned JobOrder amendment (not implemented):** For all three JobOrder kinds, [orders-core.md](orders-core.md) replaces the independent eligibility flag, private-Staffel/SK-public distinction and requester redaction with the agreed complete order read set. Actual active Profit members, requesting/responsible/supporting units, relevant leadership and personal Bearbeiter qualify as specified there; aUEC adds properly linked holders/payees. Linked stock owner/location is visible, while blueprint ownership, unreadable missions, unrelated inventory and private bank data keep their separate gates. The external exchange retains reduced direct-membership scope; web-wide readability is not a gateway expansion.
+>
+> For JobOrders, the following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance. Requirements for other aggregates remain binding.
+
 > The JPQL implementing every scope-predicate triple/escape below is centralised in
 > the owning module's `api` (`MissionScope`, `ShipScope`, `JobOrderScope`, `InventoryScope`; the refinery's and the operation's sit in their access policies; one compile-time-constant fragment per aggregate) rather than
 > hand-copied per query — see [`data-persistence.md`](data-persistence.md) REQ-DATA-010. This is an
@@ -92,25 +96,21 @@ non-admins see the union of their memberships unless they pin one.
   enforces `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false`). A mission may
   also be **ownerless** (`owning_org_unit_id IS NULL`, V144) — a leadership / "Bereichsleitung"
   mission created by a user who belongs to no OrgUnit; see REQ-ORG-009.
-- **Conditionally staffel-scoped** (visibility driven by the responsible OrgUnit's `kind`,
-  #343): `JobOrder` + linked `JobOrderMaterial` + `JobOrderHandover`. Job Order carries
+- **Shared order readership with independent processing scope:** `JobOrder` and its order-owned
+  material, item, handover and participation reads follow [orders-core.md](orders-core.md),
+  REQ-ORDERS-052. Actual current Profit members read the permitted MATERIAL/ITEM workspace across
+  responsible-unit kinds. Current requesting/responsible units, personal Bearbeiter entries and
+  verifiable retained unit relations add concrete order reads through current legitimate membership,
+  leadership or contextual unit reach. Former individual membership grants nothing.
+  `JobOrderScope.READ_PREDICATE` is shared by SQL list/count, number lookup, active reference and
+  material-demand queries; the Java detail gate decides the same current readership. Display
+  filters never widen it. Responsible and requester writes remain distinct current-writer gates,
+  and requester edits retain the delivery restriction until the requester-workflow conversion.
+  Blueprint producers, Mission details, unrelated Inventory, Bank and Exchange remain independently
+  authorized. The narrow general Profit capability used by external consumers is unchanged.
 
-  `responsible_org_unit_id` (the **processing** unit — a profit-eligible squadron or SK;
-  governs visibility; mutable only via `PATCH /api/v1/orders/{id}/responsible-org-unit`) and
-  `requesting_org_unit_id` (the **customer**; any active OrgUnit; does NOT grant the general-queue
-  visibility — but see the requesting-owner escape below).
-  Responsible = SK → public to all squadrons (shared SK queue); responsible = Squadron →
-  private to that squadron + admins. `findScopedJobOrders` adds the SK-public escape
-  `TYPE(responsibleOrgUnit) = SpecialCommand`. SK-order *edits* are governed by the role gate
-  (LOGISTICIAN+), not by squadron scope. **Requesting-owner escape (REQ-ORDERS-023, ADR-0091):** a
-  direct member of the `requesting_org_unit` may additionally view (redacted — no Bearbeiter, no
-  materials summary) and, while the order is still fully undelivered, limitedly edit their own placed
-  order via dedicated non-LOGISTICIAN endpoints (`GET /orders/requested`, `PUT /orders/{id}/requested`,
-  `PUT /orders/{id}/items/requested`), even when they fail the profit gate; this never widens the
-  responsible-scoped queue (`findRequestedOrders` matches purely on the requesting side, keyed on the
-  caller's direct memberships). Inventory items linked via `job_order_id` surface
-  cross-OrgUnit inside the order UI but NEVER leak into a foreign Lager-View
-  (`findGlobalByFilters` is gated, `findByJobOrderIdOrdered` is not).
+  Stock linked to the concrete order is readable inside its order UI without opening a foreign
+  Lager view or unrelated stock rows.
 - **Membership-only, anonymised:** the exchange's org-demand feed (`GET /exchange/v1/me/org-demand`,
   REQ-XCH-018, ADR-0220) sums the open and in-progress `JobOrder`s whose responsible unit is one of
   the member's **direct memberships** — never a unit the member merely oversees through the
@@ -125,44 +125,30 @@ non-admins see the union of their memberships unless they pin one.
 > lets a higher level see/edit its subordinate units' rows; a subordinate never sees the level above
 > (strict silo).
 
-#### Exception: a job-order assignee sees the order (ADR-0301)
+#### Concrete personal assignment read (ADR-0301)
 
-Being an **assignee** of a `JobOrder` (a `JobOrderAssignee` entry, „Bearbeiter") grants read
-visibility of that order, whatever its responsible unit, the profit gate, the caller's memberships
-or the pin (REQ-ORDERS-047). It is the third named widener beside the REQ-ORG-011 owner escape and
-the job-order link above, and a deliberate exception to org-unit tenancy.
+A `JobOrderAssignee` entry grants its current account holder the complete permitted order facts,
+independent of membership, the general Profit capability or the pin (REQ-ORDERS-047). It contributes
+to Alle and Ich bearbeite, including reference and material representations of that same order;
+it does not create a current unit-work relationship for Zu bearbeiten. A removed personal entry
+ends this grant. Account erasure removes the entries through `JobOrderMemberUnlink`.
 
-- **Keyed on the person.** The grant matches the caller's own user id against the order's assignee
-  entries, like the REQ-ORG-011 owner escape; never an authority, a pin or the admin all-scope.
-- **What it opens.** The order in full — materials, progress, assignees — on its detail page and in
-  the overview's „Alle" list and its „Ich bearbeite" segment (REQ-ORDERS-040). „Zu bearbeiten"
-  keeps the normal tenancy scope. `canSeeJobOrder` checks
-  the entry before the scope gate, and the queue list `findScopedJobOrders` adds the same entry as a
-  disjunct beside `JOB_ORDER_SCOPE_PREDICATE` (`JobOrderScope`), so the list never returns an order
-  the detail gate would deny. The shared fragment itself stays unwidened, because the material
-  board reuses it.
-- **What it does not open.** No write beyond the assignee's own note and removing themselves.
-  Status, lines, materials and handovers stay with the processing unit under its role-and-scope
-  gates (`canEditJobOrder`, `canSeeJobOrderInScope`), and so does assigning someone else. It never
-  widens the Lager view, the reference lookup of the Lager pickers, the material board or the
-  org-demand feed (the membership-only, anonymised bullet above), it opens no owner panel, and it
-  grants no other order of the same unit.
-- **How long it lasts.** As long as the assignee entry exists, whatever the order's status; leaving
-  the unit does not end it. Erasing the account removes the entries (`JobOrderMemberUnlink`), and
-  with them the grant.
-- **Who creates it.** A Logistician of the order may assign any active account, including a member
-  of a unit that is not profit-eligible (REQ-ORDERS-047). An assignee who is not a direct member of
-  the responsible unit is audited as such (`JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `_REMOVED`,
-  REQ-AUDIT-001).
+An existing entry permits its holder to maintain their own note and remove themselves while the
+order permits those commands. Enrollment, including self-enrollment, requires the current
+responsible-unit writer (`canManageAssignees`); read access alone never creates another entry.
+Other processing and requester commands retain their independent authorities. An assignee grant
+opens no private producer panel, unrelated Mission, Inventory or Bank object, and no Exchange feed.
 
-**Enforced by:** `JobOrderScopeQueryIntegrationTest` (`assigneeGrant_*`: an assignee outside the
-responsible unit lists the order, never in the processing queue, a unit-mate without an entry does
-not, a removed entry ends it), `JobOrderAccessPolicyTest` (`assigneeGrant_*`: the grant is keyed on
-the caller and opens no write, no owner panel and no assignee management),
-`JobOrderAssigneeGrantIntegrationTest` (two units over HTTP) · **Related:** REQ-ORDERS-047,
-REQ-ORDERS-040, REQ-ORG-011, ADR-0301
+**Enforced by:** `JobOrderAssigneeGrantIntegrationTest`,
+`JobOrderHierarchyAuthorityIntegrationTest`, `JobOrderScopeQueryIntegrationTest`,
+`JobOrderLinkedStockMissionAllocationIntegrationTest`.
+**Related:** REQ-ORDERS-040, REQ-ORDERS-047, REQ-ORDERS-052, REQ-ORG-011, ADR-0301.
 
 ### REQ-ORG-004 — Create-time OrgUnit stamping
+
+> **Implemented JobOrder authority:** JobOrder creation requires a contextual writer of either the requesting unit or proposed responsible Profit unit. Valid responsibilities are the unique active Profit Bereich and its active subordinate Staffeln/SK. Any permitted requester kind remains distinct from that responsible set. Do not copy generic aggregate stamping or the old authentication-only/flag-only intake into this approved replacement; see [orders-core.md](orders-core.md).
+>
+> For JobOrders, the following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance. Requirements for other aggregates remain binding.
 
 Stamp the OrgUnit via the central picker resolvers on `OrgUnitStampingService` — never read
 `user.getSquadron()` directly. Two variants share the §5.5.1 picker matrix (1 + no output →
@@ -389,6 +375,10 @@ shared pools. A **non-owner** stays bound by the strict `owning_org_unit_id` sco
 
 ### REQ-ORG-014 — Three-tier org hierarchy (Organisationsleitung > Bereich > Staffel/SK)
 
+> **Approved planned JobOrder amendment (not implemented):** For planned JobOrders, the existing Bereich designation Department.PROFIT identifies exactly one root, independent of name/shorthand. Prevent a second designation and treat missing/contradictory root data as a prerequisite to resolve, not a first-match fallback. Active hierarchy determines eligibility; retire the independent Staffel/SK processing flag. See [orders-core.md](orders-core.md) and [ADR-0356](../adr/0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md).
+>
+> For JobOrders, the following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance. Requirements for other aggregates remain binding.
+
 The org unit world gains two levels **above** Staffel and SK, modelled on the existing single-table
 `org_unit` (ADR-0025): two new `OrgUnitKind` values `BEREICH` (area/division, e.g. Profit, Sub-Radar,
 Raumüberlegenheit) and `ORGANISATIONSLEITUNG` (OL), plus a nullable self-referential
@@ -499,6 +489,10 @@ data) · **ADR:** [ADR-0026](../adr/0026-cascading-scope-without-admin.md) · al
 [REQ-SEC-015](security-and-access.md) · **Issues:** #692, #696.
 
 ### REQ-ORG-016 — Bereich/OL as direct owners of org-unit-scoped aggregates
+
+> **Approved planned JobOrder amendment (not implemented):** The approved [JobOrder contract](orders-core.md) admits direct Profit-Bereich responsibility for MATERIAL, ITEM and aUEC and immediate transfer by current responsible-unit writers to another eligible unit, without target acceptance or automatic stock/money movement. Invalid legacy or later ineligible responsibility permits only reading/transfer before any processing, correction, settlement or coupled posting. Preserve real history; do not reparent units automatically. End ineligible support/open promises immediately, with history retained; automatic eligibility maintenance is separate from the blocked user writes. Other aggregates keep their existing ownership rules.
+>
+> For JobOrders, the following existing clauses, exclusions and test references are the current implementation baseline; they do not override the approved planned replacement or prove its acceptance. Requirements for other aggregates remain binding.
 
 A Bereich and the OL **own their own data** — `owning_org_unit_id` may reference a `BEREICH` or
 `ORGANISATIONSLEITUNG` org_unit — in addition to overseeing subordinate units (ADR-0027). Leadership may
@@ -915,8 +909,10 @@ Every entity whose rows belong to an owning or responsible org unit carries the 
 - **Every org-unit reference is classified.** Every persistent field of an entity that refers to an
   org unit — an association to `OrgUnit` or a subtype, a collection of them, or a `UUID` column
   named `…org_unit_id` / `…squadron_id`, embedded keys included — is either named by the entity's
-  marker or listed, with its reason, as no tenancy boundary. The list holds fourteen references
-  today: the job order's customer unit, the executing unit of the two handovers, the material
+  marker or listed, with its reason, as no tenancy boundary. Order-scoped participation units,
+  observed unit-read history and retained provision-credit units are relationships within the order,
+  not aggregate ownership; reads still follow the order's current access policy.
+  Other examples include the job order's customer unit, the executing unit of the two handovers, the material
   claim's claiming unit, the participant's affiliation, the Materialbörse's offer and request
   attribution (the board is organisation-wide), the bank account holder and the two bank
   counterparties, the Kommandogruppe's Staffel, the hierarchy parent
@@ -951,3 +947,15 @@ can be retired once both rules are merged.
 
 **Enforced by:** `TenancyGuardTest`, `TenancyGuardRules`, `SpelScopeGate` · **Code:**
 `TenantScoped` · **Related:** REQ-ORG-002, REQ-ORG-003, REQ-ORG-006, REQ-SEC-077
+
+### JobOrder hierarchy foundation
+
+REQ-ORG-003/-004/-014/-016 use the unique `Department.PROFIT` area and its current active
+Staffel/SK children for JobOrder responsibility and general Profit capability. The independent
+processing switch and its internal projections/admin mutations are retired. Creation requires a
+current contextual writer of either proposed side. Invalid current responsibility retains concrete
+authorised reading and current-unit recovery transfer; all other order and coupled stock writes
+wait for valid responsibility. Legacy unknown original boundaries remain visible as unknown without
+requiring a transfer when current responsibility is valid. The shared/exclusive transaction protocol
+and preserved promise endings implement REQ-ORDERS-050/-053/-055; subsequent shared workflow
+amendments remain governed by [orders-core.md](orders-core.md).

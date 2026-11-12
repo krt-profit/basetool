@@ -310,8 +310,12 @@ public class DeletionRequestService {
   @Transactional
   public @NotNull UUID executeDatabaseHalf(
       @NotNull UUID requestId, boolean grantHistoryErasure, @Nullable Long clientVersion) {
+    UUID userId =
+        Entities.require(
+            deletionRequestRepository.findSubjectId(requestId),
+            () -> "Deletion request not found: " + requestId);
+    userDeletionService.prepareErasure(userId);
     DeletionRequest request = pendingOrThrow(requestId, clientVersion);
-    UUID userId = request.getUserId();
     User user =
         Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
 

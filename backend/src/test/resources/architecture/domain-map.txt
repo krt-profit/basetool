@@ -34,6 +34,7 @@ allow joborder materialexchange
 allow refinery joborder
 
 class AppMetricNames app composition root (plan 5.1 rank 14)
+class AuecBankComposition app coordinates the public JobOrder and Bank ports (ADR-0357)
 class BackendApplication app composition root (plan 5.1 rank 14)
 class BusinessMetricsCollector app composition root (plan 5.1 rank 14)
 class DataInitializer app composition root (plan 5.1 rank 14)

@@ -1,0 +1,881 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.inventory.internal;
+
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialProvision;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocationTarget;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.StockBookInScope;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
+import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+/** Applies the target-owned prerequisite to every affected order slice of a stock write. */
+@Service
+@RequiredArgsConstructor
+@Transactional(propagation = Propagation.MANDATORY)
+public class InventoryOrderWrites {
+
+  private static final int MAX_IDS_PER_QUERY = 4_096;
+
+  private final InventoryItemRepository rows;
+  private final OrderLinkedStockWriteObserver observer;
+
+  /**
+   * Applies explicit provision attribution through the mandatory target-owned observer.
+   *
+   * @param provision the real provision and its selected matching participation
+   */
+  public void recordProvision(@NotNull MaterialProvision provision) {
+    observer.recordMaterialProvision(provision);
+  }
+
+  /** Takes the shared eligibility lock before any Inventory lot or row lock. */
+  public void lockEligibility() {
+    observer.beforeOrderLinkedStockWrite(List.of());
+  }
+
+  /**
+   * Validates the order slices currently attached to a managed entry.
+   *
+   * @param row the stock entry about to change
+   */
+  public void assertRow(@NotNull InventoryItem row) {
+    List<UUID> orders =
+        row.getJobOrderAllocations().stream()
+            .map(InventoryJobOrderAllocation::getJobOrderId)
+            .toList();
+    Planning plan = planning();
+    if (row.getId() == null) {
+      plan.created.add(row);
+    }
+    plan.stockPhase = true;
+    assertOrders(orders);
+    observer.assertOrderLinkedMaterialWrite(
+        row.getMaterial() == null
+            ? List.of()
+            : orders.stream()
+                .map(order -> new OrderMaterialScope(order, row.getMaterial().getId()))
+                .toList());
+  }
+
+  /**
+   * Locks all current material scopes of stock rows before their stock locks.
+   *
+   * @param rowIds the rows about to change
+   */
+  public void lockRows(@NotNull Collection<UUID> rowIds) {
+    lockRowsAndTargets(rowIds, List.of(), List.of());
+  }
+
+  /**
+   * Locks existing and newly requested allocation scopes together before loading a writable row.
+   *
+   * @param rowId the current row
+   * @param targetOrder the requested job order, or null for another allocation dimension
+   */
+  public void lockAllocation(@NotNull UUID rowId, @Nullable UUID targetOrder) {
+    lockRowsAndTargets(
+        List.of(rowId),
+        List.of(),
+        targetOrder == null ? List.of() : List.of(new PoolAllocationTarget(rowId, targetOrder)));
+  }
+
+  /**
+   * Stabilizes the planned order targets after stock locks.
+   *
+   * @param orderIds the complete current attachment targets
+   */
+  void lockEarmarkTargets(Collection<UUID> orderIds) {
+    if (orderIds.isEmpty()) {
+      return;
+    }
+    Set<UUID> locked = planning().earmarkTargets;
+    Set<UUID> pending = new HashSet<>(orderIds);
+    pending.removeAll(locked);
+    if (!pending.isEmpty()) {
+      observer.lockOrderEarmarkTargets(pending);
+      locked.addAll(pending);
+    }
+  }
+
+  /**
+   * Locks initial allocation scopes on a material that has no stock row yet.
+   *
+   * @param materialId the material being provided
+   * @param orderIds every requested target order
+   */
+  public void lockMaterialOrders(@NotNull UUID materialId, @NotNull Collection<UUID> orderIds) {
+    observer.beforeOrderLinkedMaterialWrite(
+        orderIds.stream().map(order -> new OrderMaterialScope(order, materialId)).toList());
+  }
+
+  /**
+   * Locks current stock scopes and all batch targets in one globally ordered material pass.
+   *
+   * @param rowIds every source and merge destination row
+   * @param requestedScopes initial book-in scopes
+   * @param allocationTargets allocation targets resolved against current row materials
+   */
+  public void lockRowsAndTargets(
+      @NotNull Collection<UUID> rowIds,
+      @NotNull Collection<OrderMaterialScope> requestedScopes,
+      @NotNull Collection<PoolAllocationTarget> allocationTargets) {
+    lockEligibility();
+    Planning plan = planning();
+    if (!plan.stockPhase) {
+      readSnapshots(rowIds).forEach(plan.rows::putIfAbsent);
+    }
+    List<UUID> orderIds = new ArrayList<>();
+    List<OrderMaterialScope> scopes = new ArrayList<>(requestedScopes);
+    if (!rowIds.isEmpty()) {
+      orderIds.addAll(readBatches(rowIds, rows::findAllocatedOrderIds));
+      scopes.addAll(readBatches(rowIds, rows::findAllocatedMaterialScopes));
+    }
+    if (!allocationTargets.isEmpty()) {
+      Map<UUID, InventoryOrderAllocationQueries.RowLot> targets =
+          rows
+              .findRowLots(
+                  allocationTargets.stream().map(PoolAllocationTarget::entryId).distinct().toList())
+              .stream()
+              .collect(
+                  Collectors.toMap(
+                      InventoryOrderAllocationQueries.RowLot::getId, Function.identity()));
+      for (PoolAllocationTarget target : allocationTargets) {
+        InventoryOrderAllocationQueries.RowLot row = targets.get(target.entryId());
+        if (row != null && row.getMaterialId() != null) {
+          scopes.add(new OrderMaterialScope(target.orderId(), row.getMaterialId()));
+        }
+      }
+    }
+    assertOrders(orderIds);
+    observer.beforeOrderLinkedMaterialWrite(scopes.stream().distinct().toList());
+  }
+
+  /**
+   * Prepares one new stock destination with its exact placement and merge policy.
+   *
+   * @param booking the new stock and every initial order target
+   */
+  public void lockBookIn(@NotNull StockBookInScope booking) {
+    prepareWrites(List.of(), List.of(booking), List.of());
+  }
+
+  /**
+   * Closes actual material resources and restoration evidence before the complete lot plan.
+   *
+   * @param rowIds every physical mutation resource, including declared absent historical rows
+   * @param requiredScopes every actual historical material target
+   * @param evidence every typed existing identity the accepted program can add
+   */
+  void prepareRestorationResources(
+      Collection<UUID> rowIds,
+      Collection<OrderMaterialScope> requiredScopes,
+      Set<InventoryQuantityEvidenceLockRepository.Identity> evidence) {
+    lockEligibility();
+    Planning plan = planning();
+    boolean initial = !plan.stockPhase && !plan.restorationClosed;
+    if (initial) {
+      readSnapshots(rowIds).forEach(plan.rows::putIfAbsent);
+      plan.restorationRows.addAll(rowIds);
+    } else {
+      if (!plan.restorationEvidence.containsAll(evidence)) {
+        throw new BusinessConflictException("error.inventory.concurrent_scope_changed");
+      }
+      Set<UUID> admitted = new HashSet<>(plan.restorationRows);
+      if (!plan.restorationClosed) {
+        admitted.addAll(plan.rows.keySet());
+        admitted.addAll(plan.validated);
+        plan.created.stream()
+            .map(InventoryItem::getId)
+            .filter(Objects::nonNull)
+            .forEach(admitted::add);
+      }
+      if (!admitted.containsAll(rowIds)) {
+        throw new BusinessConflictException("error.inventory.concurrent_scope_changed");
+      }
+      plan.restorationRows.addAll(rowIds);
+    }
+    observedScopes(rowIds, requiredScopes);
+    observer.assertOrderLinkedMaterialWrite(List.of());
+    plan.restorationClosed = true;
+    if (initial) {
+      plan.restorationEvidence.addAll(evidence);
+      Set<Long> keys = new TreeSet<>();
+      evidence.stream()
+          .map(InventoryQuantityEvidenceLockRepository::advisoryKey)
+          .forEach(keys::add);
+      for (long key : keys) {
+        rows.lockRestorationEvidence(key);
+        plan.restorationKeys.add(key);
+      }
+    }
+  }
+
+  /** Requires typed restoration additions from the complete originating-transaction plan. */
+  void requireRestorationEvidence(Set<InventoryQuantityEvidenceLockRepository.Identity> evidence) {
+    Planning plan = planning();
+    if (!plan.restorationClosed
+        || !plan.stockPhase
+        || !plan.restorationEvidence.containsAll(evidence)
+        || evidence.stream()
+            .map(InventoryQuantityEvidenceLockRepository::advisoryKey)
+            .anyMatch(key -> !plan.restorationKeys.contains(key))) {
+      throw new BusinessConflictException("error.inventory.concurrent_scope_changed");
+    }
+  }
+
+  /**
+   * Validates current named placement and actual scopes within an already closed physical plan.
+   *
+   * @param rowIds current actual mutation resources already admitted by the owning simulation
+   * @param lotKeys current named observation and destination lots
+   * @param requiredScopes current actual historical targets
+   */
+  void revalidateObservedResources(
+      Collection<UUID> rowIds,
+      Collection<Long> lotKeys,
+      Collection<OrderMaterialScope> requiredScopes) {
+    Planning plan = planning();
+    if (!plan.stockPhase || !plan.lots.containsAll(lotKeys)) {
+      throw new ObjectOptimisticLockingFailureException(InventoryItem.class, rowIds);
+    }
+    observedScopes(rowIds, requiredScopes);
+  }
+
+  /** Checks responsibility and material eligibility only for confirmed actual target writes. */
+  void assertObservedTargets(
+      Collection<UUID> orderIds, Collection<OrderMaterialScope> materialScopes) {
+    assertOrders(orderIds);
+    observer.assertOrderLinkedMaterialWrite(materialScopes);
+  }
+
+  /** Requests the complete initial scope union or validates a held subset after closure. */
+  private void observedScopes(
+      Collection<UUID> rowIds, Collection<OrderMaterialScope> requiredScopes) {
+    List<OrderMaterialScope> scopes = new ArrayList<>(requiredScopes);
+    if (!rowIds.isEmpty()) {
+      scopes.addAll(readBatches(rowIds, rows::findAllocatedMaterialScopes));
+    }
+    observer.beforeOrderLinkedMaterialWrite(scopes);
+  }
+
+  /**
+   * Locks read observations without treating them as actual order-linked mutations.
+   *
+   * @param rowIds every current physical row of the declared lots
+   */
+  void lockObservedRows(Collection<UUID> rowIds) {
+    if (!rowIds.isEmpty()) {
+      rows.lockAllByIdOrderById(rowIds);
+    }
+  }
+
+  /**
+   * Locks a complete physical action after planning every current and requested material scope.
+   *
+   * @param sourceRowIds every existing row the action changes
+   * @param bookings every new stock destination
+   * @param requiredScopes additional caller-owned material scopes
+   */
+  public void prepareWrites(
+      @NotNull Collection<UUID> sourceRowIds,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes) {
+    prepareWrites(sourceRowIds, bookings, requiredScopes, List.of(), List.of());
+  }
+
+  /**
+   * Prepares a complete batch with explicit allocation targets and additional physical lots.
+   *
+   * @param sourceRowIds every existing row the action changes
+   * @param bookings every exact initial stock destination
+   * @param requiredScopes additional caller-owned material scopes
+   * @param allocationTargets new allocations on existing physical rows
+   * @param additionalLots further physical lot keys in the complete batch
+   */
+  public void prepareWrites(
+      @NotNull Collection<UUID> sourceRowIds,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes,
+      @NotNull Collection<PoolAllocationTarget> allocationTargets,
+      @NotNull Collection<Long> additionalLots) {
+    prepareWrites(sourceRowIds, bookings, requiredScopes, allocationTargets, additionalLots, null);
+  }
+
+  /** Plans and validates every source, destination, material and physical lot in one pass. */
+  private void prepareWrites(
+      @NotNull Collection<UUID> sourceRowIds,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes,
+      @NotNull Collection<PoolAllocationTarget> allocationTargets,
+      @NotNull Collection<Long> additionalLots,
+      @Nullable RowLockCheck rowLockCheck) {
+    lockEligibility();
+    Map<StockBookInScope, Set<UUID>> destinations = new HashMap<>();
+    Set<UUID> affected = new HashSet<>(sourceRowIds);
+    List<OrderMaterialScope> scopes = new ArrayList<>(requiredScopes);
+    Set<Long> lotKeys = new TreeSet<>(additionalLots);
+    Map<UUID, RowSnapshot> sources = readSnapshots(sourceRowIds);
+    if (!planning().stockPhase) {
+      sources.forEach(planning().rows::putIfAbsent);
+    }
+    for (RowSnapshot row : sources.values()) {
+      lotKeys.add(
+          InventoryLotLockRepository.lotKey(
+              row.holder(),
+              StockLot.key(
+                  row.material(), row.gameItem(), row.location(), row.quality(), row.stolen())));
+    }
+    for (StockBookInScope booking : bookings) {
+      Set<UUID> candidates = mergeCandidates(booking);
+      destinations.put(booking, candidates);
+      affected.addAll(candidates);
+      lotKeys.add(InventoryLotLockRepository.lotKey(booking.holder(), booking.lot().key()));
+      if (booking.lot().material() != null) {
+        booking
+            .orderIds()
+            .forEach(order ->
+                scopes.add(new OrderMaterialScope(order, booking.lot().material().getId())));
+      }
+    }
+    lockRowsAndTargets(affected, scopes, allocationTargets);
+    lockStockLots(lotKeys);
+    Set<UUID> vanished = Set.of();
+    if (!affected.isEmpty()) {
+      if (rowLockCheck == null) {
+        rows.lockAllByIdOrderById(affected);
+      } else {
+        List<UUID> locked = rows.lockRowIdsOrderById(affected);
+        if (!rowLockCheck.requiredSources().isEmpty()
+            && !Set.copyOf(locked).containsAll(rowLockCheck.requiredSources())) {
+          throw new NotFoundException("Inventory item not found");
+        }
+        vanished = new HashSet<>(rowLockCheck.dispensableSources());
+        vanished.removeAll(locked);
+        vanished.forEach(planning().rows::remove);
+        if (rowLockCheck.refreshableSource() != null) {
+          refreshSourceSnapshot(rowLockCheck.refreshableSource());
+        }
+        if (rowLockCheck.authority() != null) {
+          rowLockCheck.authority().accept(readBatches(affected, rows::findRowLots));
+        }
+      }
+      validateRows(affected);
+    }
+    for (var destination : destinations.entrySet()) {
+      Set<UUID> expected = destination.getValue();
+      if (!Collections.disjoint(expected, vanished)) {
+        expected = new HashSet<>(expected);
+        expected.removeAll(vanished);
+      }
+      if (!expected.equals(mergeCandidates(destination.getKey()))) {
+        throw new ObjectOptimisticLockingFailureException(
+            InventoryItem.class, destination.getKey().holder());
+      }
+    }
+    lockEarmarkTargets(
+        Stream.concat(
+                bookings.stream().flatMap(booking -> booking.orderIds().stream()),
+                allocationTargets.stream().map(PoolAllocationTarget::orderId))
+            .toList());
+  }
+
+  /**
+   * Rechecks current source authority after all physical locks and before version validation.
+   *
+   * @param sourceRowIds selected existing physical sources
+   * @param bookings complete exact destinations with their actual merge policy
+   * @param requiredScopes additional calling-domain material scopes
+   * @param verifier current scalar authority and source-fact checks, without writes or locks
+   */
+  void prepareWritesWithAuthority(
+      @NotNull Collection<UUID> sourceRowIds,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes,
+      @NotNull Consumer<List<InventoryOrderAllocationQueries.RowLot>> verifier) {
+    prepareWrites(
+        sourceRowIds,
+        bookings,
+        requiredScopes,
+        List.of(),
+        List.of(),
+        new RowLockCheck(verifier, Set.of(), null, Set.of()));
+  }
+
+  /**
+   * Resolves explicitly named sources after locking the complete write plan.
+   *
+   * @param selected the source rows that must still exist
+   * @param additional further affected stock rows
+   * @param bookings every new destination with its actual merge policy
+   * @param requiredScopes the calling domain's material scopes
+   */
+  void prepareWritesRequiringSources(
+      @NotNull Collection<UUID> selected,
+      @NotNull Collection<UUID> additional,
+      @NotNull Collection<StockBookInScope> bookings,
+      @NotNull Collection<OrderMaterialScope> requiredScopes) {
+    Set<UUID> sources = new HashSet<>(selected);
+    sources.addAll(additional);
+    prepareWrites(
+        sources,
+        bookings,
+        requiredScopes,
+        List.of(),
+        List.of(),
+        new RowLockCheck(null, Set.of(), null, selected));
+  }
+
+  /**
+   * Plans one named source whose deletion may be handled by its caller.
+   *
+   * @param sourceRowId the carrier that may be absent after the wait
+   * @param destinations the exact destinations the action can write
+   * @param readCurrent whether this path accepts a fresh amount and version in the same scope
+   */
+  void prepareSingleRowWrite(
+      @NotNull UUID sourceRowId,
+      @NotNull List<StockBookInScope> destinations,
+      boolean readCurrent) {
+    UUID refreshable = readCurrent && !planning().stockPhase ? sourceRowId : null;
+    prepareWrites(
+        List.of(sourceRowId),
+        destinations,
+        List.of(),
+        List.of(),
+        List.of(),
+        new RowLockCheck(null, Set.of(sourceRowId), refreshable, Set.of()));
+  }
+
+  /**
+   * Plans the selected rows while leaving absence handling to the caller.
+   *
+   * @param rowIds the named rows that the caller must resolve after locking
+   */
+  void prepareSelectedRowWrites(@NotNull Collection<UUID> rowIds) {
+    prepareWrites(
+        rowIds,
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        new RowLockCheck(null, Set.copyOf(rowIds), null, Set.of()));
+  }
+
+  /**
+   * Plans every row of a global wipe and locks their ids in one ordered statement.
+   *
+   * @param rowIds the initial finite set of in-scope rows
+   */
+  void prepareWipe(@NotNull Collection<UUID> rowIds) {
+    prepareWrites(
+        rowIds,
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of(),
+        new RowLockCheck(null, Set.copyOf(rowIds), null, Set.of()));
+  }
+
+  /** Selects scalar locking and optional checks for a complete physical plan. */
+  private record RowLockCheck(
+      @Nullable Consumer<List<InventoryOrderAllocationQueries.RowLot>> authority,
+      Set<UUID> dispensableSources,
+      @Nullable UUID refreshableSource,
+      Collection<UUID> requiredSources) {}
+
+  private void refreshSourceSnapshot(UUID source) {
+    RowSnapshot planned = planning().rows.get(source);
+    RowSnapshot locked = readSnapshots(List.of(source)).get(source);
+    if (planned != null && locked != null && planned.sameResourcesAs(locked)) {
+      planning().rows.put(source, locked);
+    }
+  }
+
+  private Set<UUID> mergeCandidates(@NotNull StockBookInScope booking) {
+    if (!booking.merge()) {
+      return Set.of();
+    }
+    StockLot lot = booking.lot();
+    return Set.copyOf(
+        rows.findMergeCandidateIds(
+            booking.holder(),
+            lot.material() == null ? null : lot.material().getId(),
+            lot.gameItem() == null ? null : lot.gameItem().getId(),
+            lot.location().getId(),
+            lot.material() == null ? null : lot.quality() == null ? 0 : lot.quality(),
+            booking.personal(),
+            lot.stolen(),
+            booking.owningOrgUnitId()));
+  }
+
+  /**
+   * Takes all physical lot locks after material planning and forbids later unplanned lots.
+   *
+   * @param lotKeys every physical lot key of the completed plan
+   */
+  public void lockStockLots(@NotNull Collection<Long> lotKeys) {
+    Planning plan = planning();
+    if (plan.stockPhase && !plan.lots.containsAll(lotKeys)) {
+      throw new de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException(
+          "error.inventory.concurrent_scope_changed");
+    }
+    observer.assertOrderLinkedMaterialWrite(List.of());
+    plan.stockPhase = true;
+    for (long key : new TreeSet<>(lotKeys)) {
+      if (plan.lots.add(key)) {
+        rows.lockExchangeLot(key);
+      }
+    }
+  }
+
+  /**
+   * Locks source and destination merge scopes of a transformation in one material pass.
+   *
+   * @param rowIds every source row
+   * @param relocations requested holder, location or stolen-marker changes
+   */
+  public void lockTransformRows(
+      @NotNull Collection<UUID> rowIds, @NotNull Collection<PoolRelocation> relocations) {
+    lockEligibility();
+    Map<UUID, Set<String>> holderLots = new HashMap<>();
+    Map<UUID, InventoryOrderAllocationQueries.RowLot> sources =
+        rows.findRowLots(rowIds).stream()
+            .collect(
+                Collectors.toMap(
+                    InventoryOrderAllocationQueries.RowLot::getId, Function.identity()));
+    for (InventoryOrderAllocationQueries.RowLot row : sources.values()) {
+      addHolderLot(holderLots, row, null);
+    }
+    for (PoolRelocation relocation : relocations) {
+      InventoryOrderAllocationQueries.RowLot row = sources.get(relocation.entryId());
+      if (row != null) {
+        addHolderLot(holderLots, row, relocation);
+      }
+    }
+    Set<Long> lotKeys = new TreeSet<>();
+    holderLots.forEach((holder, lots) ->
+        lots.forEach(lot -> lotKeys.add(InventoryLotLockRepository.lotKey(holder, lot))));
+    if (planning().stockPhase) {
+      lockStockLots(lotKeys);
+      validateRows(rowIds);
+      return;
+    }
+    Set<UUID> affected = new HashSet<>(rowIds);
+    holderLots.forEach((holder, holderLotKeys) ->
+        affected.addAll(rows.findRowsInHolderLots(holder, holderLotKeys)));
+    prepareWrites(
+        affected,
+        List.of(),
+        List.of(),
+        List.of(),
+        lotKeys,
+        new RowLockCheck(null, Set.copyOf(rowIds), null, Set.of()));
+  }
+
+  /**
+   * Adds a current or requested physical holder lot without locking a stock row.
+   *
+   * @param holderLots the accumulated lots
+   * @param row the current scalar row placement
+   * @param relocation the requested placement, or null for the current one
+   */
+  private static void addHolderLot(
+      @NotNull Map<UUID, Set<String>> holderLots,
+      @NotNull InventoryOrderAllocationQueries.RowLot row,
+      @Nullable PoolRelocation relocation) {
+    UUID holder =
+        relocation != null && relocation.holder() != null ? relocation.holder() : row.getHolderId();
+    UUID location =
+        relocation != null && relocation.locationId() != null
+            ? relocation.locationId()
+            : row.getLocationId();
+    boolean stolen =
+        (relocation != null && relocation.stolen() != null)
+            ? relocation.stolen()
+            : Boolean.TRUE.equals(row.getStolen());
+    holderLots
+        .computeIfAbsent(holder, _ -> new HashSet<>())
+        .add(
+            StockLot.key(
+                row.getMaterialId(), row.getGameItemId(), location, row.getQuality(), stolen));
+  }
+
+  /**
+   * Validates existing slices before a bulk deletion or rewrite.
+   *
+   * @param rowIds the stock rows about to change
+   */
+  public void assertRows(@NotNull Collection<UUID> rowIds) {
+    if (!rowIds.isEmpty()) {
+      validateRows(rowIds);
+      assertOrders(readBatches(rowIds, rows::findAllocatedOrderIds));
+    }
+  }
+
+  /**
+   * Revalidates planned existing row facts after actual lot or row locks without adding guards.
+   *
+   * @param rowIds every existing row now locked for the action
+   */
+  public void validateRows(@NotNull Collection<UUID> rowIds) {
+    Planning plan = planning();
+    Map<UUID, RowSnapshot> actual = readSnapshots(rowIds);
+    for (UUID id : rowIds) {
+      if (plan.validated.contains(id)
+          || plan.created.stream().anyMatch(row -> id.equals(row.getId()))) {
+        continue;
+      }
+      RowSnapshot expected = plan.rows.get(id);
+      RowSnapshot current = actual.get(id);
+      if (!Objects.equals(expected, current)) {
+        throw new ObjectOptimisticLockingFailureException(InventoryItem.class, id);
+      }
+      plan.mutationBaselines.putIfAbsent(id, Optional.ofNullable(current));
+      plan.validated.add(id);
+    }
+    plan.stockPhase = true;
+    List<OrderMaterialScope> scopes =
+        actual.values().stream()
+            .filter(row -> row.material() != null)
+            .flatMap(row ->
+                row.allocations().stream()
+                    .map(allocation ->
+                        new OrderMaterialScope(
+                            allocation.order(), Objects.requireNonNull(row.material()))))
+            .distinct()
+            .toList();
+    visitBatches(scopes, observer::assertOrderLinkedMaterialWrite);
+  }
+
+  private static <T> List<T> readBatches(
+      Collection<UUID> ids, Function<Collection<UUID>, List<T>> query) {
+    if (ids.size() <= MAX_IDS_PER_QUERY) {
+      return query.apply(ids);
+    }
+    List<T> rows = new ArrayList<>();
+    for (List<UUID> batch : batches(ids)) {
+      rows.addAll(query.apply(batch));
+    }
+    return rows;
+  }
+
+  private static <T> void visitBatches(Collection<T> values, Consumer<Collection<T>> visitor) {
+    if (values.size() <= MAX_IDS_PER_QUERY) {
+      visitor.accept(values);
+      return;
+    }
+    batches(values).forEach(visitor);
+  }
+
+  private static <T> List<List<T>> batches(Collection<T> values) {
+    List<T> list = List.copyOf(values);
+    List<List<T>> batches = new ArrayList<>();
+    for (int start = 0; start < list.size(); start += MAX_IDS_PER_QUERY) {
+      batches.add(list.subList(start, Math.min(start + MAX_IDS_PER_QUERY, list.size())));
+    }
+    return batches;
+  }
+
+  private Map<UUID, RowSnapshot> readSnapshots(@NotNull Collection<UUID> rowIds) {
+    if (rowIds.isEmpty()) {
+      return Map.of();
+    }
+    Map<UUID, Set<AllocationSnapshot>> allocations = new HashMap<>();
+    for (InventoryOrderAllocationQueries.OrderAllocationFact fact :
+        readBatches(rowIds, rows::findOrderAllocationFacts)) {
+      allocations
+          .computeIfAbsent(fact.getRowId(), _ -> new HashSet<>())
+          .add(new AllocationSnapshot(fact.getOrderId(), ScuAmounts.toQuanta(fact.getAmount())));
+    }
+    Map<UUID, RowSnapshot> result = new HashMap<>();
+    for (InventoryOrderAllocationQueries.RowLot row : readBatches(rowIds, rows::findRowLots)) {
+      result.put(
+          row.getId(),
+          new RowSnapshot(
+              row.getHolderId(),
+              row.getMaterialId(),
+              row.getGameItemId(),
+              row.getLocationId(),
+              row.getQuality(),
+              Boolean.TRUE.equals(row.getStolen()),
+              Boolean.TRUE.equals(row.getPersonal()),
+              row.getOwningOrgUnitId(),
+              row.getVersion(),
+              ScuAmounts.toQuanta(row.getAmount()),
+              Set.copyOf(allocations.getOrDefault(row.getId(), Set.of()))));
+    }
+    return result;
+  }
+
+  private Planning planning() {
+    for (TransactionSynchronization synchronization :
+        TransactionSynchronizationManager.getSynchronizations()) {
+      if (synchronization instanceof Planning current) {
+        return current;
+      }
+    }
+    Planning current = new Planning(this);
+    TransactionSynchronizationManager.registerSynchronization(current);
+    return current;
+  }
+
+  /** A current allocation fact independent of managed entity collection state. */
+  private record AllocationSnapshot(UUID order, long amount) {}
+
+  /** The physical and allocation facts used to plan stock resource guards. */
+  private record RowSnapshot(
+      UUID holder,
+      @Nullable UUID material,
+      @Nullable UUID gameItem,
+      UUID location,
+      @Nullable Integer quality,
+      boolean stolen,
+      boolean personal,
+      @Nullable UUID owningUnit,
+      @Nullable Long version,
+      long amount,
+      Set<AllocationSnapshot> allocations) {
+    private boolean sameResourcesAs(RowSnapshot current) {
+      return holder.equals(current.holder)
+          && Objects.equals(material, current.material)
+          && Objects.equals(gameItem, current.gameItem)
+          && location.equals(current.location)
+          && Objects.equals(quality, current.quality)
+          && stolen == current.stolen
+          && personal == current.personal
+          && Objects.equals(owningUnit, current.owningUnit)
+          && allocations.equals(current.allocations);
+    }
+  }
+
+  /** The stock plan and revalidated rows owned exclusively by one transaction. */
+  @RequiredArgsConstructor
+  private static final class Planning implements TransactionSynchronization {
+    private final InventoryOrderWrites owner;
+    private final Map<UUID, RowSnapshot> rows = new HashMap<>();
+    private final Map<UUID, Optional<RowSnapshot>> mutationBaselines = new HashMap<>();
+    private final Set<UUID> validated = new HashSet<>();
+    private final Set<Long> lots = new HashSet<>();
+    private final Set<UUID> earmarkTargets = new HashSet<>();
+    private final Set<UUID> restorationRows = new HashSet<>();
+    private final Set<InventoryQuantityEvidenceLockRepository.Identity> restorationEvidence =
+        new HashSet<>();
+    private final Set<Long> restorationKeys = new HashSet<>();
+    private final Set<InventoryItem> created = Collections.newSetFromMap(new IdentityHashMap<>());
+    private boolean stockPhase;
+    private boolean restorationClosed;
+
+    @Override
+    public int getOrder() {
+      return 0;
+    }
+
+    @Override
+    public void beforeCommit(boolean readOnly) {
+      if (!readOnly) {
+        owner.publishLinkedStockChanges(this);
+      }
+    }
+  }
+
+  /**
+   * Publishes only this action's net row and allocation changes from post-lock mutation baselines.
+   */
+  private void publishLinkedStockChanges(Planning plan) {
+    Set<UUID> ids = new HashSet<>(plan.mutationBaselines.keySet());
+    plan.created.stream().map(InventoryItem::getId).filter(Objects::nonNull).forEach(ids::add);
+    if (ids.isEmpty()) {
+      return;
+    }
+    rows.flush();
+    Map<UUID, RowSnapshot> after = readSnapshots(ids);
+    Set<OrderMaterialScope> changed = new HashSet<>();
+    Set<UUID> orderIds = new HashSet<>();
+    for (UUID id : ids) {
+      RowSnapshot before = plan.mutationBaselines.getOrDefault(id, Optional.empty()).orElse(null);
+      RowSnapshot current = after.get(id);
+      if (!Objects.equals(before, current)) {
+        addMaterialScopes(changed, before);
+        addMaterialScopes(changed, current);
+        addOrderIds(orderIds, before);
+        addOrderIds(orderIds, current);
+      }
+    }
+    if (!orderIds.isEmpty()) {
+      observer.orderLinkedStockChanged(orderIds, changed);
+    }
+  }
+
+  /** Adds every allocation target of an initial or final material or game-item stock row. */
+  private static void addOrderIds(Set<UUID> orderIds, @Nullable RowSnapshot row) {
+    if (row != null) {
+      row.allocations().forEach(allocation -> orderIds.add(allocation.order()));
+    }
+  }
+
+  /** Adds every material scope attached to one initial or final physical row snapshot. */
+  private static void addMaterialScopes(Set<OrderMaterialScope> scopes, @Nullable RowSnapshot row) {
+    if (row != null && row.material() != null) {
+      UUID material = Objects.requireNonNull(row.material());
+      row.allocations()
+          .forEach(allocation -> scopes.add(new OrderMaterialScope(allocation.order(), material)));
+    }
+  }
+
+  /**
+   * Validates explicitly added or removed target identities.
+   *
+   * @param orderIds the affected target orders
+   */
+  public void assertOrders(@NotNull Collection<UUID> orderIds) {
+    visitBatches(orderIds, observer::beforeOrderLinkedStockWrite);
+  }
+}

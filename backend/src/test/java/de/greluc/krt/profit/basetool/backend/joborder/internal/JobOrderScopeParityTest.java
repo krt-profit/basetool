@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopeParityCallers;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -50,8 +49,6 @@ import org.springframework.transaction.annotation.Transactional;
 class JobOrderScopeParityTest {
 
   @Autowired private JobOrderRepository jobOrderRepository;
-  @Autowired private JobOrderHandoverRepository jobOrderHandoverRepository;
-  @Autowired private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private UserRepository userRepository;
@@ -77,26 +74,37 @@ class JobOrderScopeParityTest {
         callerId,
         true,
         rows,
-        wired ->
-            wired.resolver().canViewJobOrders()
-                ? jobOrderRepository
-                    .findScopedOrdersWithMaterialRequirements(
-                        List.of(JobOrderStatus.OPEN),
-                        wired.predicate().adminAllScope(),
-                        wired.predicate().activeOrgUnitId(),
-                        wired.predicate().memberOrgUnitIds())
-                    .stream()
-                    .map(JobOrder::getId)
-                    .collect(Collectors.toSet())
-                : Collections.<UUID>emptySet(),
+        wired -> {
+          var scope =
+              wired
+                  .resolver()
+                  .currentScopePredicateGranting(
+                      de.greluc.krt.profit.basetool.backend.kernel.Roles.LOGISTICIAN);
+          return jobOrderRepository
+              .findScopedOrdersWithMaterialRequirements(
+                  List.of(JobOrderStatus.OPEN),
+                  scope.adminAllScope()
+                      || (!wired.authHelper().isAdmin() && wired.resolver().canViewJobOrders()),
+                  scope.activeOrgUnitId(),
+                  scope.memberOrgUnitIds(),
+                  callerId)
+              .stream()
+              .map(JobOrder::getId)
+              .collect(Collectors.toSet());
+        },
         (wired, id) ->
             new JobOrderAccessPolicy(
                     wired.resolver(),
                     wired.gate(),
                     wired.authHelper(),
                     jobOrderRepository,
-                    jobOrderHandoverRepository,
-                    jobOrderItemHandoverRepository)
+                    org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class),
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.joborder.internal
+                            .JobOrderUnitReadHistoryRepository.class),
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.joborder.internal
+                            .JobOrderParticipationRepository.class))
                 .canSeeJobOrder(id));
   }
 

@@ -89,10 +89,20 @@ final class NotificationTargets {
       Map.ofEntries(
           Map.entry("JOB_ORDER_CREATED", detail(JOB_ORDER, ORDERS)),
           Map.entry("JOB_ORDER_UPDATED_BY_REQUESTER", detail(JOB_ORDER, ORDERS)),
+          Map.entry("JOB_ORDER_UPDATED_BY_RESPONSIBLE", detail(JOB_ORDER, ORDERS)),
           Map.entry("JOB_ORDER_REASSIGNED", detail(JOB_ORDER, ORDERS)),
           Map.entry("JOB_ORDER_FINISHED", detail(JOB_ORDER, ORDERS)),
+          Map.entry("JOB_ORDER_REOPENED", detail(JOB_ORDER, ORDERS)),
+          Map.entry("JOB_ORDER_CLARIFICATION_REQUIRED", detail(JOB_ORDER, ORDERS)),
+          Map.entry("JOB_ORDER_PARTICIPATION_CHANGED", detail(JOB_ORDER, ORDERS)),
+          Map.entry("JOB_ORDER_MONEY_PROVISIONED", detail(JOB_ORDER, ORDERS)),
+          Map.entry("JOB_ORDER_MONEY_MOVED", detail(JOB_ORDER, ORDERS)),
+          Map.entry("JOB_ORDER_MONEY_COMMITMENT_CHANGED", detail(JOB_ORDER, ORDERS)),
           Map.entry("JOB_ORDER_ASSIGNED", detailTab(JOB_ORDER, ORDERS, "assignees")),
           Map.entry("JOB_ORDER_CLAIM_WITHDRAWN", detailTab(JOB_ORDER, ORDERS, "materials")),
+          Map.entry(
+              "JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED",
+              detailTab(JOB_ORDER, ORDERS, "materials")),
           Map.entry("BANK_BOOKING_REQUEST_CREATED", bankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_UPDATED", bankRequest(TAB_FOREIGN_REQUESTS)),
           Map.entry("BANK_BOOKING_REQUEST_APPROVED", bankRequest(TAB_OWN_REQUESTS)),
@@ -111,6 +121,7 @@ final class NotificationTargets {
               detail("BANK_ACCOUNT", "/org-unit-bank/accounts/")),
           Map.entry("BANK_GRANT_CHANGED", detail("BANK_ACCOUNT_GRANT", "/bank/accounts/")),
           Map.entry("BANK_ACCOUNT_DEBITED", page("/org-unit-bank")),
+          Map.entry("BANK_FUNDS_AUTHORISED", page("/org-unit-bank")),
           Map.entry(
               "BANK_HOLDER_DEACTIVATED_WITH_BALANCE", detail("BANK_HOLDER", "/bank/holders/")),
           Map.entry(

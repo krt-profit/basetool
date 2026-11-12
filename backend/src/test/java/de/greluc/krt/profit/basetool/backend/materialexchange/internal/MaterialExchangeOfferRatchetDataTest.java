@@ -45,12 +45,16 @@ import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Verifies against PostgreSQL that the Lager's own book-outs and its wipe audit the Materialbörse
@@ -74,6 +78,16 @@ class MaterialExchangeOfferRatchetDataTest {
   @Autowired private JdbcTemplate jdbc;
 
   @PersistenceContext private EntityManager entityManager;
+
+  private Squadron fixtureUnit;
+
+  @BeforeEach
+  void createFixtureUnit() {
+    fixtureUnit = new Squadron();
+    fixtureUnit.setName("Offer scope " + UUID.randomUUID());
+    fixtureUnit.setShorthand("OF" + UUID.randomUUID().toString().substring(0, 6));
+    fixtureUnit = squadronRepository.save(fixtureUnit);
+  }
 
   @Test
   void aPartialDiscardLowersTheOfferAndAuditsItAsReduced() {
@@ -132,7 +146,15 @@ class MaterialExchangeOfferRatchetDataTest {
     MaterialExchangeOffer personal = offer(20.0, 5.0, true);
     detach(shared);
 
-    checkoutService.deleteAllGlobalInventory();
+    var previousRequest = RequestContextHolder.getRequestAttributes();
+    var request = new MockHttpServletRequest();
+    request.addHeader("X-Active-Org-Unit-Id", fixtureUnit.getId());
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    try {
+      checkoutService.deleteAllGlobalInventory();
+    } finally {
+      RequestContextHolder.setRequestAttributes(previousRequest);
+    }
     entityManager.flush();
 
     assertThat(details("MARKET_OFFER_REMOVED", shared.getId()))
@@ -211,7 +233,7 @@ class MaterialExchangeOfferRatchetDataTest {
     user.setUsername("u-" + UUID.randomUUID());
     userRepository.save(user);
 
-    OrgUnit orgUnit = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
+    OrgUnit orgUnit = fixtureUnit;
 
     Location location = new Location();
     location.setName("Hub-" + UUID.randomUUID());

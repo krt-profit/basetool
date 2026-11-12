@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemLineDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
@@ -74,6 +75,14 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
   }
 
   private JobOrderDto order(UUID id, String type, List<JobOrderItemHandoverDto> itemHandovers) {
+    return order(id, type, itemHandovers, false);
+  }
+
+  private JobOrderDto order(
+      UUID id,
+      String type,
+      List<JobOrderItemHandoverDto> itemHandovers,
+      boolean canEditAsRequester) {
     return new JobOrderDto(
         id,
         7,
@@ -95,7 +104,77 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
         1L,
         null,
         null,
-        false);
+        false,
+        false,
+        null,
+        canEditAsRequester,
+        false,
+        false,
+        0L,
+        0L);
+  }
+
+  /** A requesting writer edits item need after delivery through the restricted update. */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void requesterEditsAnItemOrderWithARecordedHandover() throws Exception {
+    UUID id = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    UUID gameItemId = UUID.randomUUID();
+    UUID blueprintId = UUID.randomUUID();
+    JobOrderItemHandoverDto handover =
+        new JobOrderItemHandoverDto(
+            UUID.randomUUID(), id, Instant.now(), "R", null, null, List.of(), 1L);
+    JobOrderDto order = order(id, "ITEM", List.of(handover), true);
+    when(reader.readItemEdit(id))
+        .thenReturn(JobOrderPageStubs.editable(order, List.of(), List.of()));
+    String editUrl = "/orders/" + id + "/items/edit";
+    String updateUrl = "/orders/" + id + "/items/update";
+
+    String html =
+        mockMvc
+            .perform(get(editUrl))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .containsPattern("name=\"version\"[^>]*value=\"1\"")
+        .containsPattern("name=\"requesterEdit\"[^>]*value=\"true\"")
+        .doesNotContain("id=\"item-handle\"", "id=\"item-requestingOrgUnitId\"");
+
+    var expected =
+        new CreateJobOrderItemRequestDto(
+            null,
+            null,
+            null,
+            "Updated need",
+            List.of(
+                new CreateJobOrderItemLineDto(
+                    itemId, gameItemId, blueprintId, 4, List.of(), null, null)),
+            1L);
+    when(backendApiClient.put(
+            eq("/api/v1/orders/{id}/items/requested"), eq(expected), eq(JobOrderDto.class), eq(id)))
+        .thenReturn(order);
+
+    mockMvc
+        .perform(
+            post(updateUrl)
+                .with(csrf())
+                .header("X-Requested-With", "XMLHttpRequest")
+                .param("requesterEdit", "true")
+                .param("handle", "ignored")
+                .param("comment", "Updated need")
+                .param("version", "1")
+                .param("items[0].id", itemId.toString())
+                .param("items[0].gameItemId", gameItemId.toString())
+                .param("items[0].blueprintId", blueprintId.toString())
+                .param("items[0].amount", "4"))
+        .andExpect(status().isOk())
+        .andExpect(content().json("{\"targetUrl\":\"/orders/" + id + "\"}"));
+    verify(backendApiClient)
+        .put(
+            eq("/api/v1/orders/{id}/items/requested"), eq(expected), eq(JobOrderDto.class), eq(id));
   }
 
   @Test
@@ -144,17 +223,29 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     when(reader.readItemEdit(id))
         .thenReturn(
-            JobOrderPageStubs.editable(
-                order,
+            new JobOrderPageReader.ItemEditPage(
+                JobOrderPageReader.ItemEditAccess.EDITABLE,
+                java.util.Optional.of(order),
+                List.of(),
+                true,
                 List.of(),
                 List.of(
                     new OrgUnitMembershipOptionDto(
-                        responsibleId, "ARGON", "ARG", "SPECIAL_COMMAND", true),
+                        responsibleId, "ARGON", "ARG", "SPECIAL_COMMAND"),
+                    new OrgUnitMembershipOptionDto(requestingId, "CERBERUS", "CER", "SQUADRON")),
+                List.of(
                     new OrgUnitMembershipOptionDto(
-                        requestingId, "CERBERUS", "CER", "SQUADRON", true))));
+                        responsibleId, "ARGON", "ARG", "SPECIAL_COMMAND"))));
 
     String html =
         mockMvc
@@ -308,7 +399,14 @@ class JobOrderPageControllerItemEditMvcTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     when(reader.readItemEdit(id))
         .thenReturn(JobOrderPageStubs.editable(order, List.of(), List.of()));
 

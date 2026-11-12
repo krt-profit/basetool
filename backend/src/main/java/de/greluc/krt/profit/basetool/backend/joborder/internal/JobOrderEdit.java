@@ -27,10 +27,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * What a job-order mutation reports back to {@link JobOrderEditor}: the order to project, the audit
- * event it caused and the notices to publish (REQ-AUDIT-001).
+ * The affected order, declared audit event and notices of an authorized mutation (REQ-AUDIT-001).
  *
- * @param order the managed order after the mutation, possibly a re-fetched instance
+ * @param order the affected aggregate; deletion uses only its cached scalar audit facts
  * @param type the audit event type, or {@code null} when nothing changed
  * @param details the compact audit payload without user free text, or {@code null}
  * @param notices the events to publish after the audit event, in order
@@ -44,7 +43,7 @@ public record JobOrderEdit(
   /**
    * An audited edit without notices.
    *
-   * @param order the managed order after the mutation
+   * @param order the affected aggregate
    * @param type the audit event type
    * @param details the audit payload
    * @return the edit outcome

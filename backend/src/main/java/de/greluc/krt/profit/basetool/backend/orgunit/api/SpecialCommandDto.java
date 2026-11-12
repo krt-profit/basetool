@@ -35,8 +35,6 @@ import java.util.UUID;
  *     chars
  * @param description free-form text; nullable
  * @param active soft-delete flag; {@code null} on requests means no change
- * @param isProfitEligible whether the SK may process job orders; changed only through {@code
- *     /api/v1/special-commands/{id}/profit-eligible}
  * @param version optimistic-lock counter; required on update
  */
 public record SpecialCommandDto(
@@ -45,5 +43,4 @@ public record SpecialCommandDto(
     @NotBlank @Size(max = 255) String shorthand,
     @Size(max = 65_535) String description,
     Boolean active,
-    Boolean isProfitEligible,
     Long version) {}

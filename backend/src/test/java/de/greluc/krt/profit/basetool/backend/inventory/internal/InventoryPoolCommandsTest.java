@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockBookingReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
@@ -51,7 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -60,7 +60,10 @@ import org.springframework.context.ApplicationEventPublisher;
  * The pool and donation commands of the Lager (REQ-INV-057, REQ-INV-058): book-in and transfer into
  * an org unit's pool, the donation earmark and the protection it gives a row.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryPoolCommandsTest {
 
   private static final UUID DONOR = UUID.randomUUID();
@@ -74,7 +77,7 @@ class InventoryPoolCommandsTest {
   @Mock private AuditRecorder auditRecorder;
   @Mock private StockChangeObserver stockChangeObserver;
 
-  @InjectMocks private InventoryStockCommands commands;
+  private InventoryStockCommands commands;
 
   private Material material;
   private Location location;
@@ -84,6 +87,18 @@ class InventoryPoolCommandsTest {
 
   @BeforeEach
   void setUp() {
+    commands =
+        new InventoryStockCommands(
+            new InventoryOrderWrites(
+                inventoryRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            inventoryRepository,
+            userRepository,
+            checkoutService,
+            stolenMarkService,
+            auditRecorder,
+            null,
+            stockChangeObserver,
+            donationAllocationRepository);
     material = new Material();
     material.setId(UUID.randomUUID());
     material.setName("Quantainium");
@@ -293,7 +308,11 @@ class InventoryPoolCommandsTest {
     InventoryItem row = donorRow(10.0);
     UUID donationId = UUID.randomUUID();
     InventoryDonationAllocation slice = InventoryAllocations.addDonation(row, donationId, 6.0);
-    when(donationAllocationRepository.findByDonationId(donationId)).thenReturn(List.of(slice));
+    when(inventoryRepository.findDonationAllocationRowIds(donationId))
+        .thenReturn(List.of(row.getId()));
+    when(donationAllocationRepository.findSlicesByDonationIdAndRowIds(
+            donationId, List.of(row.getId())))
+        .thenReturn(List.of(slice));
 
     commands.releaseDonationEarmark(donationId);
 

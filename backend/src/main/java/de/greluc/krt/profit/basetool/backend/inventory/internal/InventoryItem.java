@@ -19,11 +19,15 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityEvidence;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
 import de.greluc.krt.profit.basetool.backend.kernel.QualityValue;
@@ -43,6 +47,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Transient;
 import jakarta.validation.constraints.Min;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,6 +60,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
@@ -129,8 +136,112 @@ public class InventoryItem extends AbstractEntity<UUID> implements StockRow {
   @Getter(onMethod_ = @__(@Override))
   @Min(0)
   @Column(nullable = false)
-  @Setter(onParam_ = @__(@Nullable))
+  @Setter(AccessLevel.NONE)
   private Double amount;
+
+  /** Complete ordered quantity evidence, including unverifiable restored quantity. */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "quantity_provenance", nullable = false, columnDefinition = "jsonb")
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
+  private List<StockQuantityEvidence> quantityProvenance = List.of();
+
+  /** Keeps deliberately moved-out quantity empty until the owning amount write completes. */
+  @Transient
+  @Getter(AccessLevel.NONE)
+  @Setter(AccessLevel.NONE)
+  @ToString.Exclude
+  private boolean quantityAssigned;
+
+  /**
+   * Changes physical amount while retaining complete quantity evidence through reductions.
+   *
+   * @param amount the resulting physical amount
+   */
+  public void setAmount(@NotNull Double amount) {
+    quantityProvenance =
+        InventoryQuantityComposition.resized(getQuantityComposition(), ScuAmounts.toQuanta(amount))
+            .parts();
+    quantityAssigned = true;
+    this.amount = amount;
+  }
+
+  /**
+   * Returns only proved physical intervals eligible for an actual new contribution budget.
+   *
+   * @return known intervals without unverifiable restored quantity
+   */
+  public @NotNull List<StockQuantityFragment> getQuantityProvenance() {
+    return getQuantityComposition().knownPhysical();
+  }
+
+  /**
+   * Returns the complete ordered composition independently of earmarks and placement.
+   *
+   * @return all physical quantity evidence, including retained journal references
+   */
+  @JsonIgnore
+  public @NotNull StockQuantityComposition getQuantityComposition() {
+    if (!quantityAssigned
+        && quantityProvenance.isEmpty()
+        && amount != null
+        && ScuAmounts.toQuanta(amount) > 0L) {
+      StockQuantityComposition normalized =
+          StockQuantityComposition.known(
+              List.of(
+                  new StockQuantityFragment(
+                      id == null ? UUID.randomUUID() : id, 0L, ScuAmounts.toQuanta(amount))));
+      if (id == null) {
+        quantityProvenance = normalized.parts();
+        quantityAssigned = true;
+      }
+      return normalized;
+    }
+    return new StockQuantityComposition(quantityProvenance);
+  }
+
+  /**
+   * Assigns amount and complete proof without classifying the quantity as a new physical fact.
+   *
+   * @param amount the exact physical amount of the supplied evidence
+   * @param quantity complete actual physical or journal-reference intervals
+   */
+  void replaceQuantity(double amount, @NotNull StockQuantityComposition quantity) {
+    if (ScuAmounts.toQuanta(amount) != quantity.totalQuanta()) {
+      throw new IllegalArgumentException(
+          "Complete quantity evidence must match its physical amount");
+    }
+    quantityProvenance = InventoryQuantityComposition.validated(quantity).parts();
+    this.amount = ScuAmounts.roundToScuScale(amount);
+    quantityAssigned = true;
+  }
+
+  /**
+   * Moves the deterministic leading quantity into an unsaved split row.
+   *
+   * @param target the split row
+   * @param amount the quantity moved
+   */
+  void moveQuantityTo(@NotNull InventoryItem target, double amount) {
+    InventoryQuantityComposition.Partition partition =
+        InventoryQuantityComposition.partition(
+            getQuantityComposition(), ScuAmounts.toQuanta(amount));
+    quantityProvenance = partition.remaining().parts();
+    quantityAssigned = true;
+    target.replaceQuantity(amount, partition.taken());
+  }
+
+  /**
+   * Retains a merge victim's physical quantity intervals on this surviving row.
+   *
+   * @param victim the row that will be removed
+   */
+  void mergeQuantityFrom(@NotNull InventoryItem victim) {
+    List<StockQuantityEvidence> combined = new ArrayList<>(getQuantityComposition().parts());
+    combined.addAll(victim.getQuantityComposition().parts());
+    quantityProvenance = InventoryQuantityComposition.canonical(combined).parts();
+    quantityAssigned = true;
+  }
 
   @Getter(onMethod_ = @__(@Override))
   @Column(nullable = false)

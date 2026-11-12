@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialRequir
 import de.greluc.krt.profit.basetool.backend.joborder.api.QualityBucketAllocator.Allocation;
 import de.greluc.krt.profit.basetool.backend.joborder.api.QualityBucketAllocator.Demand;
 import de.greluc.krt.profit.basetool.backend.joborder.api.QualityBucketAllocator.Supply;
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -76,11 +75,12 @@ public class JobOrderStockProjectionService {
     return assembleDto(
         jobOrder,
         loadOrderLinkedStockIndex(List.of(jobOrder.getId())),
-        claimBucketSource::getClaimBucketsForOrder);
+        claimBucketSource::getClaimBucketsForOrder,
+        jobOrderMapper.authorityFor(List.of(jobOrder)));
   }
 
   /**
-   * Projects a page of orders, loading all linked stock and all SK claims in one query each
+   * Projects a page of orders, loading all linked stock and material promises in one query each
    * (REQ-DATA-003).
    *
    * @param page the scoped page of managed orders
@@ -91,13 +91,11 @@ public class JobOrderStockProjectionService {
     OrderLinkedStockIndex stockIndex =
         loadOrderLinkedStockIndex(orders.stream().map(JobOrder::getId).toList());
     Map<UUID, List<ClaimBucketDto>> claimsByOrder =
-        claimBucketSource.getClaimBucketsForOrders(
-            orders.stream()
-                .filter(JobOrderStockProjectionService::isSpecialCommandResponsible)
-                .toList());
+        claimBucketSource.getClaimBucketsForOrders(orders);
     ClaimResolver claimResolver = order -> claimsByOrder.getOrDefault(order.getId(), List.of());
     jobOrderMapper.primeAssignees(orders);
-    return page.map(o -> assembleDto(o, stockIndex, claimResolver));
+    Map<UUID, JobOrderAuthorityFlags> authority = jobOrderMapper.authorityFor(orders);
+    return page.map(o -> assembleDto(o, stockIndex, claimResolver, authority));
   }
 
   /**
@@ -179,21 +177,22 @@ public class JobOrderStockProjectionService {
    *
    * @param jobOrder the managed order to project
    * @param stockIndex the order-linked stock of at least this order
-   * @param claimResolver resolves the SK claim view of one order ({@code List.of()} for non-SK)
-   * @return the order DTO with per-bucket stock and, for SK orders, claims
+   * @param claimResolver resolves the claim view of one order
+   * @param authority the page authority from one current hierarchy snapshot
+   * @return the order DTO with per-bucket stock and material promises
    */
   @NotNull
   private JobOrderDto assembleDto(
-      JobOrder jobOrder, OrderLinkedStockIndex stockIndex, ClaimResolver claimResolver) {
-    JobOrderDto baseDto = jobOrderMapper.toDto(jobOrder);
+      JobOrder jobOrder,
+      OrderLinkedStockIndex stockIndex,
+      ClaimResolver claimResolver,
+      Map<UUID, JobOrderAuthorityFlags> authority) {
+    JobOrderDto baseDto = jobOrderMapper.toDtoWithAuthority(jobOrder, authority);
 
     Map<String, ClaimBucketDto> claimByBucket =
-        isSpecialCommandResponsible(jobOrder)
-            ? claimResolver.claimsFor(jobOrder).stream()
-                .collect(
-                    Collectors.toMap(
-                        b -> bucketKey(b.material().id(), b.qualityTier().id()), b -> b))
-            : Map.of();
+        claimResolver.claimsFor(jobOrder).stream()
+            .collect(
+                Collectors.toMap(b -> bucketKey(b.material().id(), b.qualityTier().id()), b -> b));
 
     List<JobOrderMaterialDto> baseMaterials = baseDto.materials();
     double[] booked =
@@ -252,16 +251,22 @@ public class JobOrderStockProjectionService {
         baseDto.version(),
         baseDto.canEdit(),
         baseDto.canManageAssignees(),
-        false);
+        baseDto.responsibilityInvalid(),
+        baseDto.originalProfitBoundaryUnknown(),
+        baseDto.canTransferResponsibility(),
+        baseDto.canEditAsRequester(),
+        baseDto.canCancel(),
+        baseDto.canReopen(),
+        baseDto.lifecycleVersion(),
+        baseDto.responsibilityVersion());
   }
 
   /**
-   * Enriches the item order's aggregated-material rows with the stock attributed to each bucket
-   * and, for SK orders, with claims and open amount; non-SK rows keep empty claims and a {@code
-   * null} open amount.
+   * Enriches the item order's aggregated-material rows with the stock attributed to each bucket and
+   * with outstanding promises and available capacity.
    *
    * @param jobOrder the item order
-   * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders
+   * @param claimByBucket the claim view keyed by {@link #bucketKey}
    * @param stockIndex the order-linked stock of at least this order
    * @return the stock- and claim-enriched rows
    */
@@ -390,32 +395,16 @@ public class JobOrderStockProjectionService {
     }
   }
 
-  /**
-   * Resolves the SK claim view of one order. The single-order path backs it with the per-order
-   * claim query; the paged list backs it with the page-batched claim lookup (REQ-DATA-003). Only
-   * invoked for SK-responsible orders.
-   */
+  /** Resolves one order's material promises from a direct or batched lookup. */
   @FunctionalInterface
   private interface ClaimResolver {
     /**
      * Returns the per-bucket claim view of {@code order}.
      *
-     * @param order the SK order whose claim buckets to return.
+     * @param order the order whose claim buckets to return.
      * @return the claim buckets, never {@code null}.
      */
     List<ClaimBucketDto> claimsFor(JobOrder order);
-  }
-
-  /**
-   * Returns whether the order is responsible to a Spezialkommando, the only orders with material
-   * claims.
-   *
-   * @param jobOrder the order
-   * @return whether the order is a public SK order
-   */
-  private static boolean isSpecialCommandResponsible(@NotNull JobOrder jobOrder) {
-    return jobOrder.getResponsibleOrgUnit() != null
-        && jobOrder.getResponsibleOrgUnit().getKind() == OrgUnitKind.SPECIAL_COMMAND;
   }
 
   /**

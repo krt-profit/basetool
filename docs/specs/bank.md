@@ -1,14 +1,13 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** BANK · **Related ADRs:** ADR-0009, ADR-0010, ADR-0011 (foundation); ADR-0020,
 > ADR-0028, ADR-0043 (org-unit seam, responsibility, visibility); ADR-0021, ADR-0022, ADR-0133
 > (booking requests); ADR-0039, ADR-0040 (holders); ADR-0041, ADR-0052 (transfer fee); ADR-0054
 > (counterparty); ADR-0045, ADR-0066, ADR-0109, ADR-0123 (approval limits and the KRT ladder);
 > ADR-0070 (responsible-holder audit); ADR-0106 (account search); ADR-0153 (client attribution);
 > ADR-0156 (app direct booking); ADR-0179 (audit retention); ADR-0251 (four-eyes); ADR-0254 (purpose reference and observer) — all under [`docs/adr/`](../adr/README.md)
-> **Status:** Implemented — epic
-> [#556](https://github.com/krt-profit/basetool/issues/556) delivered (Phases 1–5). The
-> acceptance boxes are ticked and the `Enforced by` links point at the shipped code and
-> tests; subsequent behaviour changes keep this spec in sync in the same PR.
+> **Status:** The Bank-owned aUEC commands and staff workflow are implemented here (ADR-0357/0358).
+> The application composition and public Order journey remain pending in
+> [orders-auec-bank.md](orders-auec-bank.md). The acceptance checks identify verified behavior.
 > **On the exchange:** the bank's route family for connected applications, its switch, limits and
 > refusal codes live in [`bank-exchange.md`](bank-exchange.md) (`REQ-BXCH-*`, ADR-0354).
 
@@ -398,6 +397,16 @@ is the global holder→holder Umbuchung (REQ-BANK-031), not a transfer.
 
 ### REQ-BANK-012 — Immutable, complete, admin-only audit log
 
+> **Linked Bank contract** — the Bank trail also covers no-ledger
+> authorisation, linked holder-transfer requests, direct linked outcomes and reversal decisions.
+> Required Bank and order audit share the business transaction; refusal of the coupled effect rolls
+> the Bank decision/audit back. New integration details use safe IDs/enums/amounts, not private
+> staff notes or approval content. Bank audit retention does not erase order-owned financial history.
+
+**Target acceptance**
+
+- [ ] New decisions are audited once with operation/attempt linkage and actual actor; replay adds no mutation event.
+
 Every bank mutation writes exactly one row to an **insert-only** audit table
 (`bank_audit_event`, modeled after `external_sync_report` — no `@Version`; the only in-place update
 is the Art. 17 handle anonymisation of REQ-SEC-062, and rows leave only through the admin purge and
@@ -713,6 +722,11 @@ user-visible string lives in `messages.properties` / `_de` / `_en` under new `ba
 
 ### REQ-BANK-018 — API & persistence conventions
 
+> **Linked Bank contract** — the published internal command/outcome contract keeps
+> explicit actors, actual parties, immutable terms, operation/attempt identity and posting-versus-
+> authorisation results typed and distinct. Pending HTTP acceptance is not booked success. Update
+> internal DTO/OpenAPI mirrors and truthful conflict codes; the frozen Bank exchange is unchanged.
+
 Bank endpoints live under `/api/v1/bank/**` (the org-unit-facing slice at
 `/api/v1/bank/org-units/**`, REQ-BANK-021) and follow
 `docs/specs/api-conventions.md` (DTO-only boundaries, MapStruct, `@Valid`, RFC 7807,
@@ -742,6 +756,17 @@ bank mutation came through is recorded on the trail (REQ-BANK-012, REQ-AUDIT-005
 
 ### REQ-BANK-019 — Season independence
 
+> **Approved aUEC target - not implemented (ADR-0357):** allow the explicit optional aUEC connection
+> through the application-composition adapter and public Bank API. This is the scoped exception to
+> the automated-order exclusion below. Bank code still imports no order aggregate, repository or
+> internal service; progress/completion never implicitly books money. The complete order flow is
+> Bank-independent. Other mission/operation/profit integrations remain excluded. The order meaning
+> lives only in [orders-auec-bank.md](orders-auec-bank.md).
+
+**Target acceptance**
+
+- [ ] Explicit linked actions work without implicit progress-to-ledger flows or weakened Bank independence.
+
 The bank has **no coupling** to seasons, price lines, mission finance entries, operation
 payouts or job-order profit flows. No bank code reads or writes those aggregates; no
 automated flow books into the bank in v1 (all bookings are manual by bank staff).
@@ -756,6 +781,12 @@ require a spec change.
 **Enforced by:** `ArchitectureTest` (`bankClassesMustStaySeasonAndProfitIndependent`) · **Code:** every class of the bank domain (`ArchitectureTest.BANK_CLASSES` and a future `bank` module package, REQ-SEC-073) — the rule forbids any season/profit dependency · **Issues:** #556
 
 ### REQ-BANK-020 — Storage, performance & integrity
+
+> **Linked Bank contract** — authorisations without posting change no ledger or
+> custody balance and are excluded from monetary ledger reconciliation. Existing posting/overdraft/
+> reversal integrity remains. Authorisation creates no Bank reservation or sum check of other orders'
+> allocations. Integrity detection reports duplicated effects or mismatched outcomes without
+> inventing an automatic financial repair.
 
 PostgreSQL remains the **single datastore** for the bank (ADR-0009) — no additional
 database, cache layer or event store is introduced. Balance reads are SQL aggregates
@@ -892,6 +923,23 @@ org-unit-blind.
 
 ### REQ-BANK-022 — Confirm-before-post booking requests: create & cancel
 
+> **Linked Bank contract** — extend the ordinary flow for linked
+> DEPOSIT, WITHDRAWAL, TRANSFER, HOLDER_TRANSFER and authorisation without account/custody movement.
+> Keep immutable submitted economics and traceable operation/attempt identity. Naming an order
+> grants no Bank authority. REQ-BANK-031 owns holder-transfer submission; account actions retain
+> the one explicit-actor policy, limits, exemptions and four-eyes (ADR-0352/0353).
+>
+> Authorisation-only provision requires the eligibility, account permissions, limits and approvals
+> of its corresponding debit. Final Bank confirmation or permitted direct action must check the
+> individual active funding account covers the amount. Pending account-owner approval alone is
+> insufficient. Do not fabricate a withdrawal, fee, custody movement or reservation. Do not sum other
+> orders' allocations. The booking-only baseline below continues to apply to actual-posting requests.
+
+**Target acceptance**
+
+- [ ] New internal meanings use the existing Bank flow without another approval workflow.
+- [ ] Final no-ledger authorisation applies debit-equivalent authority and single-account coverage without any monetary posting.
+
 > **Amended by REQ-BANK-039/-040/-041:** request eligibility is now **view-based** (anyone who may
 > view a request-capable account may request, not just own-level oversight), the movement kinds now
 > include **`TRANSFER`** (REQ-BANK-040), and an over-limit request is flagged for the responsible
@@ -930,6 +978,26 @@ dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
 **Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `bank/internal/OrgUnitBankAccessService`, `bank/internal/BankBookingRequestService`, `bank/internal/BankBookingRequest`, `db/migration/V159`, frontend `bank/web/OrgUnitBankProxyController`, `templates/bank/org-unit-bank.html`, `static/js/bank/bank.js` · **Issues:** #666, #670, #672
 
 ### REQ-BANK-023 — Booking-request confirmation/rejection by bank staff
+
+> **Linked Bank contract** — Bank completes the linked decision and its required handler in the
+> same transaction. A successful authorisation stores its own outcome. Account-owner approval
+> remains pending until final Bank confirmation with ADR-0353's attestation.
+>
+> The owning order command checks current valid responsibility, active attempt, frozen terms and
+> permitted lifecycle effect. Refusal, including invalid responsibility or audit failure, rolls back
+> the Bank decision/posting. Direct authorised outcomes use the same contract; a direct-to-pending
+> result stays pending. Real game payments remain facts that a database rollback cannot undo.
+>
+> Linked game transfers require the known actual-payment fact. One request has no partial execution
+> or confirmation. A smaller actual payment needs a coherent corrected/replacement attempt for that
+> payment, not a partial larger confirmation or an automatic request for the rest. Superseded
+> attempts cannot later book.
+
+**Target acceptance**
+
+- [ ] Linked posting/authorisation, order effects and audit commit once together or remain monetarily unchanged.
+- [ ] No request, account-owner approval or pending accepted result alone credits the order.
+- [ ] A smaller actual payment cannot confirm a larger request.
 
 > **Amended by REQ-BANK-040/-041:** confirmation also books a **`TRANSFER`** (recording source +
 > destination holders, via `bookTransfer`), and an **over-limit** request additionally requires the
@@ -1043,6 +1111,18 @@ row is pessimistically locked and `@Version`-guarded so two decisions cannot dou
 
 ### REQ-BANK-024 — Off-ledger requests: audit & ledger-integrity isolation
 
+> **Linked Bank contract** — the unconditional confirmed-transaction
+> requirement below is narrowed to actual-posting requests. Their confirmed outcome retains holder
+> and linked transaction. A successful authorisation-only request instead retains an auditable
+> authorisation outcome, funding account, actual custodian and amount, without a transaction/posting.
+> Its contract distinguishes authorised funds from booked money; placeholder transactions or IDs
+> are forbidden. Pending/rejected/cancelled attempts have no ledger effect. All request and
+> authorisation mutations remain versioned and audited.
+
+**Target acceptance**
+
+- [ ] Persistence/outcome constraints distinguish confirmed posting and no-ledger authorisation without weakening ledger integrity.
+
 The `bank_booking_request` table is **mutable** (`@Version`) and **off the append-only
 ledger** (ADR-0021): a `PENDING`/`REJECTED`/`CANCELLED` request never has a posting, and a
 `CONFIRMED` request has exactly one linked transaction whose postings reconcile normally
@@ -1066,6 +1146,10 @@ sweep.
 
 ### REQ-BANK-025 — Close-account guard & org-unit-feature role matrix
 
+> **Linked Bank contract** — the existing pending-account guard also covers an
+> authorisation-only request against that funding account. An internal order entry point grants no
+> additional account view, holder access or staff capability.
+
 An account with an open (`PENDING`) booking request **cannot be closed** — it is rejected
 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`, alongside the existing zero-balance rule (REQ-BANK-002):
 the requests must be confirmed, rejected or cancelled first. The org-unit features extend the
@@ -1087,6 +1171,12 @@ confirm/reject/queue surface; the audit log stays admin-only.
 **Enforced by:** `BankAccountServiceTest`, `BankBookingRequestServiceTest`, frontend `OrgUnitBankPageControllerMvcTest` / `BankRequestQueuePageControllerMvcTest`, e2e `BankOrgUnitRequestsE2eTest` · **Code:** `bank/internal/BankAccountService#closeAccount`, `exception/BankConflictException` · **Issues:** #666, #673
 
 ### REQ-BANK-026 — Notifications on booking-request lifecycle
+
+> **Approved aUEC target - not implemented:** linked/no-ledger causes follow REQ-BANK-057/-059 in
+> [bank-notifications.md](bank-notifications.md). Preserve approval tasks, allowed attestation,
+> current recipients, muting and priority. Publish after successful commit and group the same
+> logical cause across Bank/order roles. Rollback emits no success; no private note enters an order
+> notice.
 
 > **Amended 2026-10-10 (#2413):** a requester's correction (REQ-BANK-056) replaces the open notices
 > with `BANK_BOOKING_REQUEST_UPDATED` for the same recipients, so the decision events now clear both
@@ -1335,6 +1425,21 @@ Bank **employees** reach the bank-administration page (`/bank/manage`) and its s
 
 ### REQ-BANK-031 — Holder→holder Umbuchung (reconciliation)
 
+> **Linked Bank contract** — an actor authorised for the corresponding
+> order action may request its linked HOLDER_TRANSFER. Bank staff confirm under existing
+> holder-transfer execution authority, without another account-owner/KRT approval tier or account
+> grant. Request four-eyes and the existing Admin exception apply; direct execution stays
+> Bank-staff-only. Both custodians retain the registered Bank-holder prerequisite.
+>
+> Keep the KRT fee rule below: source custody loses principal plus fee, destination gains principal,
+> and CARTEL pays the fee under its active-account/coverage guards. Order accounting records that
+> external funding without a second fee/provision. Global custody and negative-holder rules remain.
+
+**Target acceptance**
+
+- [ ] An eligible order actor may request, but not self-confirm an ordinary holder transfer; staff execution authority/Admin exception remain.
+- [ ] The fee is charged once to CARTEL and global source custody, without another order-stock debit.
+
 The bank books a **`HOLDER_TRANSFER`** transaction that moves custody between two holders —
 two holder legs summing to zero, **no account leg** (ADR-0039) — so the bank staff can
 redistribute the physically-held money among themselves and bring negative custodians back to
@@ -1430,6 +1535,33 @@ Buchungen". Behaviour and gate unchanged.
 
 ### REQ-BANK-033 — In-game transfer fee on holder-initiated transfers
 
+> **Shared policy implemented (ADR-0358):** central rate resolution/validation and exact
+> whole-aUEC HALF_UP calculation have one narrow policy in the existing configuration-owning admin
+> module. It returns an immutable rate snapshot and computes from that snapshot. It owns no
+> custody, approval or payer decision. Preserve the setting/default, validation and unrelated
+> input/fee-mode semantics below. `admin.api.TransferFeePolicy` publishes `snapshot()` and
+> `feeOn(amount, basis)`; `RateSnapshot` normalizes numerically equivalent rates. Bank resolves
+> the basis once for each fee-bearing booking, including its gross debit.
+>
+> **Linked Bank fee contract**
+>
+> Coupled submissions retain rate/fee through waiting and ordinary replay. Bank and order use the
+> same basis. Historical correction uses its historical basis; a genuinely new payment uses its
+> new applicable rate. There is no user-entered fee/rate override. HOLDER_TRANSFER retains
+> REQ-BANK-031's KRT funding.
+>
+> A true same-player purpose change without a game transfer is also fee-free when represented as a
+> linked withdrawal. Debit principal only from account/custody and retain debit permissions and
+> approvals. Establish actual identity/absence of transfer, not a matching name. Same-custodian
+> account transfers remain fee-free. Other actual transfers retain their funding rules; this is the
+> scoped exception to the general withdrawal-fee rule below.
+
+**Target acceptance**
+
+- [ ] Waiting/replay preserves the submitted shared rate basis after a configuration change.
+- [ ] Genuine same-player no-transfer withdrawal charges zero and retains account authority/approvals.
+- [ ] KRT reconciliation, order-funded costs and unrelated fee-inclusive modes retain distinct semantics.
+
 Star Citizen charges an in-game fee on every aUEC transfer a holder actively initiates, so the
 bank factors that fee in wherever a holder physically sends money — and **only** there — so the
 bank staff are never out of pocket and the requested amount still arrives in full (ADR-0052,
@@ -1459,10 +1591,9 @@ superseding the carve-out model of ADR-0041):
 - **Ledger consequence (amends REQ-BANK-020):** a fee-bearing holder-changing `TRANSFER` no longer
   nets to zero across its legs — it nets to **`−transfer_fee`** (real money lost to the game), so
   the integrity sweep expects `SUM(legs) = −transfer_fee` for it (source `−(amount + fee)`,
-  destination `+amount`). The fee-free `HOLDER_TRANSFER` carries `transfer_fee = 0` and nets to zero
-  as before — the same `SUM(legs) = −transfer_fee` check holds with a zero fee, so no integrity
-  change is needed. The `REVERSAL` mirror invariant is unchanged (a reversal negates the actual
-  recorded legs, restoring the gross to the source).
+  destination `+amount`). A `HOLDER_TRANSFER` records the KRT-funded `-fee` account leg and
+  holder legs totalling `-fee`, so the same invariant holds. The `REVERSAL` mirror invariant is
+  unchanged (a reversal negates the actual recorded legs, restoring the gross to the source).
 
 > **Amended (2026-07-05, #999) — two fee modes (on-top vs. fee-inclusive):** a fee-bearing booking
 > (`WITHDRAWAL`, holder-changing `TRANSFER`) carries a `feeInclusive` flag, **default `false`**. In
@@ -1499,9 +1630,9 @@ superseding the carve-out model of ADR-0041):
   gross `A + fee`, and is refused when the account cannot cover `A + fee`; the recipient effectively
   receives the full `A` and the holder is not out of pocket.
 - [x] A holder-changing account transfer credits the destination the full `A` and debits the source
-  `A + fee`; its legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer, a
-  deposit and an internal holder→holder Umbuchung record no fee and net to zero / move the full
-  amount.
+  `A + fee`; its legs net to `−fee`; the integrity sweep stays sound. A same-holder transfer and a
+  deposit record no fee and net to zero / move the full amount. A holder→holder Umbuchung
+  retains its KRT-funded fee (REQ-BANK-031).
 - [x] The booking modals show a live "Gebühr / wird abgebucht" preview (fee plus the gross debited)
   as the amount is typed; the rate is the shared `operation.transfer_fee_rate`.
 - [x] A **fee-inclusive** (`feeInclusive = true`) withdrawal/transfer (#999) debits the source the
@@ -1510,7 +1641,7 @@ superseding the carve-out model of ADR-0041):
   `BANK_FEE_EXCEEDS_AMOUNT`; a booking request never carries the flag (confirmation books on-top);
   the preview shows "wird abgebucht" and "kommt an" for the selected mode; default is off.
 
-**Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder + holder-Umbuchung fee-free, legs net to −fee), `BankTransferFeeServiceTest` (rate resolution + whole-aUEC rounding + `totalDebit`), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `bank/internal/BankTransferFeeService` (`feeOn` + `totalDebit`), `bank/internal/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `bank/internal/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `bank/internal/BankTransaction#transferFee`, `bank/web/BankBookingController#getTransferFeeRate`, `bank/internal/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `bank/web/BankPageController` / `BankManagePageController`, `static/js/bank/bank.js`, `templates/bank/fragments/bank-movement-modal.html`, `templates/bank/bank-account-detail.html` / `bank/bank-manage.html` / `bank/bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
+**Enforced by:** `BankLedgerServiceTest` (fee added on top / fee-inclusive debit + amount−fee to destination + BANK_FEE_EXCEEDS_AMOUNT, full amount to destination, overdraft against the actual debit, same-holder fee exemption, legs net to −fee), `TransferFeePolicyTest` (rate resolution, exact whole-aUEC rounding, normalized snapshots and retained historical basis after a setting change), `BankHolderTransferFeeTest` (KRT fee ownership), `BankLedgerIntegrityServiceTest`, `BankControllerSecurityTest` (rate endpoint), frontend `BankInPlaceFragmentMvcTest` (fee-inclusive toggle renders) / `BankPageControllerTest` / `BankManagePageControllerTest` / `BankAccountDetailFragmentMvcTest` / `BankHolderDetailFragmentMvcTest` · **Code:** `admin/api/TransferFeePolicy` (`snapshot` + explicit-basis `feeOn`), `admin/internal/ConfiguredTransferFeePolicy`, `bank/internal/BankLedgerService` (deposit/withdrawal/transfer/holder-transfer), `bank/internal/BankWithdrawalRequest` + `BankTransferRequest` (`feeInclusive`), `bank/internal/BankTransaction#transferFee`, `bank/web/BankBookingController#getTransferFeeRate`, `bank/internal/BankTransactionRepository` + `BankHolderPostingRepository` (integrity), `db/migration/V183`, frontend `bank/web/BankPageController` / `BankManagePageController`, `static/js/bank/bank.js`, `templates/bank/fragments/bank-movement-modal.html`, `templates/bank/bank-account-detail.html` / `bank/bank-manage.html` / `bank/bank-holder-detail.html` · **ADR:** [ADR-0052](../adr/0052-bank-transfer-fee-borne-by-debited-account.md) (supersedes [ADR-0041](../adr/0041-bank-in-game-transfer-fee.md)) · **Issues:** #556, #999
 
 ### REQ-BANK-034 — Per-account responsible holder (derived, "Kontoverantwortliche/r")
 
@@ -1690,6 +1821,11 @@ audit row each) · **Code:** `bank/internal/OrgUnitBankSettingsService`, `db/mig
 
 ### REQ-BANK-038 — Read-only account drill-in (history + redacted statement)
 
+> **Approved aUEC target - not implemented:** order linkage grants no Bank account/global-custody,
+> unrelated history, private-note or audit access. Order financial facts use their own audience;
+> Bank detail links still apply Bank authority/redactions. No staff/approval note is copied into
+> an order projection.
+
 A caller who may view an account (REQ-BANK-035/-037) may open a **read-only copy of the bank-staff
 account detail** from the org-unit bank page: the account header, the balance + target, the 30-day
 delta, the booking count and the **paginated transaction history** — plus a **Kontoauszug (PDF)**
@@ -1766,6 +1902,11 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 
 ### REQ-BANK-039 — Booking-request eligibility = view eligibility
 
+> **Linked Bank contract** — linked account actions retain Bank admission, limits
+> and explicit-actor policy. Authorisation-only uses corresponding debit admission, not the
+> unrestricted deposit rule. REQ-BANK-031 separately defines HOLDER_TRANSFER request/execution;
+> it gains no account-owner approval stage. Order roles alone confer no Bank booking grant.
+
 > **Amended by REQ-BANK-042:** the view-eligibility gate below governs **withdrawal and transfer**
 > requests only. A **deposit** is exempt — any authenticated user may request a deposit against *any*
 > active account (every type, even one they cannot view), with no `canView` / `isRequestCapable`
@@ -1787,6 +1928,11 @@ view-granted member may request), `ArchitectureTest` (`bankClassesMustNotConsult
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
 ### REQ-BANK-040 — User-initiated transfer requests
+
+> **Linked Bank contract** — linked account transfer represents a real change of
+> organisational ownership at the actual same/different custodians, retaining account activity,
+> source eligibility, approval and fees. Designated requester delivery and its order timing belong
+> to REQ-ORDERS-071/-073/-074; no arbitrary transfer automatically fulfils an order.
 
 A requester may raise a `TRANSFER` booking request from a (source) account they may view to **any
 active account** as destination (`bank_booking_request.target_account_id`, V193). The destination is
@@ -1813,6 +1959,12 @@ confirmable even when the employee cannot see the destination; capability gate o
 **ADR:** [ADR-0045](../adr/0045-bank-user-transfers-and-per-account-approval-limits.md) · **Issues:** —
 
 ### REQ-BANK-041 — Per-account approval limits & two-step owner approval
+
+> **Linked Bank contract** — apply the corresponding debit approval policy to
+> authorisation-only provision, including responsible-holder exemptions and KRT tiers. Final Bank
+> confirmation/direct authority remains necessary; in-app approval alone does not enable order
+> availability. Preserve ADR-0353's approver-naming attestation and private staff note. No separate
+> order approval policy is added.
 
 > **Amended (owner-approved, ADR-0353):** the confirm of a flagged request **stays an attestation**:
 > it does not need an approval recorded in the app. But when the request needs approval
@@ -2025,6 +2177,12 @@ swap) · **Code:**
 
 ### REQ-BANK-042 — Unrestricted deposit requests (any user, any active account, no limit)
 
+> **Linked Bank contract** — internal order-originated deposit requests may be
+> recorded on behalf of their actual registered/accountless depositor. Keep active-account/no-limit
+> admission and Bank confirmation, with authenticated requester separate from depositor. This
+> scopes the requester-is-depositor baseline below; connected-client payloads and anonymous
+> surfaces are not expanded.
+
 > **Amended by REQ-BANK-043:** a deposit request (like a direct deposit) may additionally carry a
 > split that distributes a percentage of the gross across all active squadron accounts. The
 > percentage is snapshotted on the off-ledger request and resolved into concrete legs at
@@ -2157,6 +2315,12 @@ snapshot + confirm books a split), `OrgUnitBankAccessServiceTest` (deposit reque
 `static/js/bank/bank.js` · **Issues:** —
 
 ### REQ-BANK-044 — Deposit/withdrawal counterparty (Einzahler / Empfänger + org unit)
+
+> **Linked Bank contract** — linked direct/requested deposits and withdrawals keep
+> the actual registered or named accountless Kartell counterparty separate from requester/recorder
+> and registered Bank custodian. Preserve explicit identity and applicable unit validation. Entering
+> a request for somebody else does not make its recorder the factual payer. Bank-holder
+> prerequisites remain unchanged.
 
 A deposit and a withdrawal each record only the **holder** — the bank custodian who physically
 received the money in (deposit) or paid it out (withdrawal). They do **not** record the *external
@@ -2774,6 +2938,11 @@ seed, no roster) · **Code:** `bank/internal/BankAccountRepository#findAllFilter
 
 ### REQ-BANK-054 — "Notiz Bankmitarbeiter": the booking employee's own note
 
+> **Linked Bank contract** — staff/approver notes stay private Bank data for linked
+> and authorisation-only outcomes. ADR-0353 attestation does not permit copying their content into
+> order history, live/notice payloads, replay/outcome projections or the frozen exchange. Safe
+> actor/decision IDs provide correlation without the free text.
+
 Every booking a **bank employee** performs carries an optional free-text **Notiz Bankmitarbeiter**
 (`staff_note`, `VARCHAR(500)`, V231) recording internal context for the movement — *"in zwei
 Tranchen übergeben"*, *"nach Rücksprache mit der SL"*. It is a **third** free-text field beside the
@@ -2848,6 +3017,12 @@ expandable) • **Code:** `bank/internal/BankTransaction`, `bank/internal/BankBo
 
 ### REQ-BANK-055 — Empfänger on a withdrawal request
 
+> **Linked Bank contract** — internal linked requests may preserve a registered
+> or accountless actual depositor/payee separately from the applicant, including a deposit entered
+> for another person. This scopes the WITHDRAWAL-only/registered-request-recipient restrictions
+> below. Unrelated member/connected-client payloads and admission remain unchanged; an accountless
+> counterparty is not a new Bank custodian.
+
 A **withdrawal request** raised from the unit bank page (`/org-unit-bank`) carries an optional
 **Empfänger** — the member who receives the payout — pre-filled with the requester.
 
@@ -2917,6 +3092,13 @@ real UI) · **Code:** `bank/internal/BankBookingRequest`, `bank/internal/CreateB
 (`syncRequestCounterparty`)
 
 ### REQ-BANK-056 — Editing an own still-pending booking request
+
+Linked attempts preserve normalised economics, parties, accounts, attempt identity and the submitted
+fee basis. Generic Bank editing cannot change these terms. A replacement uses a fresh attempt
+identity for the same opaque purpose. It requires the exact rejected or cancelled predecessor
+request, retains its stored fee basis and runs current admission and approval routing against the
+complete revised terms. The failed request keeps its own terms and cannot be confirmed.
+The owning Order command checks the active attempt and continuity of the actual payment.
 
 A requester may **correct** their own booking request while it is still `PENDING` **and** the
 responsible holder has **not yet granted** the over-limit approval. Until now the only move was to
@@ -3012,6 +3194,11 @@ frontend `OrgUnitBankPageControllerMvcTest` (modal renders after the table, with
 
 ### REQ-BANK-062 — Four-eyes for every booking request
 
+> **Linked Bank contract** — apply this request four-eyes rule to linked
+> authorisation-only and HOLDER_TRANSFER requests. Existing direct authority and Admin exception
+> remain. A narrow integration outcome grants Bank staff no general order edit right and cannot
+> bypass strict invalid-responsibility protection.
+
 The member who raised a booking request **MUST NOT grant its owner approval and MUST NOT confirm it**
 (`BANK_FOUR_EYES_REQUIRED`, 409). A second person decides. The check runs in
 `BankBookingRequestService` under the row lock, after the pending and version guards, for `confirm`
@@ -3048,7 +3235,42 @@ queue flag, approval list) · **Code:** `bank/internal/BankBookingRequestService
 
 ### REQ-BANK-061 — Purpose reference
 
-A booking request MAY carry a purpose: `purpose_kind` (`BankPurposeKind`, today `PURCHASING_DEAL`) and
+> **Linked Bank contract** — extend the purpose contract for accepted
+> optional aUEC actions/accounts: direct/requested deposits, withdrawals, account/holder transfers
+> and no-ledger authorisation. This scopes the CARTEL/SPECIAL, DEPOSIT/WITHDRAWAL-only baseline
+> below. Each account/action retains Bank policy; public member/connected-client payloads cannot
+> set an arbitrary purpose.
+>
+> Keep opaque purpose and stable logical operation reference with distinct attempts, actual
+> depositor/payee, requester, custodian and frozen fee terms. Correlate direct outcomes and later
+> reversals without assuming every operation has a request transaction. Replay protects the Bank
+> ledger as well as order effects; a connected-client creation key is not automatic coverage.
+
+`BankLinkedPayments` submits a typed payment under the current authenticated Bank actor and its
+opaque `BankLinkedAttempt`. V401 stores the attempt's identity, submitted rate and Bank fee. The
+existing staff queue and detail show the frozen terms, with the actual counterparty separate from
+the applicant. A custody-only request uses its two registered custodians for the movement and Bank
+staff authority for the decision. A successful authorisation stores its principal, account,
+and deciding actor in `bank_authorisation`, with the custodian when applicable. The deciding
+actor remains with the historical act during account merges. Staff see **Authorised** in the
+existing confirmed request set. A new Bank attempt uses the current configured rate. A
+replacement checks its basis against the exact failed Bank attempt, retaining the same rate
+across a setting change. The owning operation can verify that a selected active custodian
+matches its known registered member without obtaining Bank custody data.
+
+A linked deposit into an Order account holding enters the ordinary staff queue. The request
+retains the actual depositor and leaves the receiving custodian for staff to select. Confirmation
+requires an active registered custodian and records the usual account and custody legs.
+A linked account-only transfer checks source coverage and records a zero-fee debit and credit
+between active accounts. Custody totals remain unchanged. Account-only authorisation applies
+the same debit controls and records the authorising actor and account.
+
+**Target acceptance**
+
+- [ ] The internal contract covers approved actions/accounts/outcomes with opaque linkage and actual parties, without foreign aggregates.
+- [ ] Duplicate/replacement attempts cannot create a second effective Bank posting or logical payment.
+
+A purchasing request carries `purpose_kind` (`PURCHASING_DEAL`) and
 `purpose_ref` (an id the bank never reads), both or neither (a check constraint). They are set only
 through the bank's command API `bank.api.PurposeBoundRequests`, never by the member or staff REST
 surface, are immutable, and are returned read-only on the request (`purposeKind`, `purposeRef`); the
@@ -3070,8 +3292,35 @@ staff queue shows a chip for the kind. The booked transaction is reached through
 
 ### REQ-BANK-063 — Purpose observer
 
-When the bank confirms, rejects or cancels a purpose-bound request it MUST call the observer
-registered for the request's purpose kind (`BookingRequestPurposeObserver`) inside its own
+> **Linked Bank contract** — synchronous Bank-owned outcomes cover
+> linked direct/requested posting, final no-ledger authorisation and later reversal, plus refusal/
+> cancellation. The composition adapter uses only the two public domain APIs. JobOrder owns its
+> operations/effects; Bank imports no JobOrder internals/aggregates. Required handlers are
+> unambiguous and fail closed when absent. Effect-bearing calls join one transaction; refusal of
+> the owning effect/audit rolls back the Bank decision/posting too.
+>
+> Check active attempt and frozen terms under one deterministic protocol for Bank request/account
+> and order resources. Decided/superseded attempts cannot later add an effective posting. Reversal
+> identifies its original linked effect; REQ-ORDERS-075 owns pure-Bank versus actual-game order
+> consequences. Genuine game-transfer confirmation needs the known actual-payment fact;
+> authorisation/same-player purpose changes need no fabricated transfer.
+
+**Target acceptance**
+
+- [ ] Direct/requested/no-ledger/reversal outcomes reach the owning adapter atomically or fail closed.
+- [ ] Confirmation/cancel/replacement/reversal races have one effective result and invalid responsibility rolls back the Bank outcome.
+
+`BankLinkedEffectHandler` prepares each decision before Bank locks, then receives the synchronous
+typed outcome inside the Bank transaction. A reversal resolves its original attempt from the
+posting and prepares the owner before locking the original and affected accounts. The Bank
+checks for a prior reversal while holding the original posting lock. Replacing a failed request
+locks that request before acquiring accounts. Bank paths acquire shared account locks in
+PostgreSQL UUID order. The purpose owner can cancel an exact unexecuted request during terminal
+cleanup after proving its Order guard is already held. The Bank then records and announces the
+ordinary cancelled outcome in the same transaction.
+
+For a purchasing request, the Bank calls the purpose's `BookingRequestPurposeObserver` when it
+confirms, rejects or cancels the request. The observer runs inside the Bank's
 transaction, with the request id, the stored reference and, on confirmation, the booked transaction.
 The owner's state equals the request's state when the transaction commits; an observer that throws
 rolls the bank's decision back. A request without a purpose calls no observer. A cancellation the
@@ -3138,7 +3387,7 @@ A depositor pays the in-game transfer fee on top of what arrives (REQ-BANK-033).
 knows straight away how much to send for the requested amount to land on the account, every place
 that states a deposit amount to be transferred shows a small line **„Mit Gebühr: X aUEC"** beneath
 it, with `X = amount + round(amount × rate)` in whole aUEC, HALF_UP — the backend's
-`BankTransferFeeService.totalDebit` formula — and the separators of the page language
+`amount + TransferFeePolicy.feeOn(amount, basis)` formula — and the separators of the page language
 (`3.015.000` in German, `3,015,000` in English), like the amount above it.
 
 - **Request queue** (`/bank/requests`): under the amount of every **pending** deposit request.
@@ -3205,6 +3454,13 @@ answers `404` like an unknown id, through the real token chain) ·
 REQ-BANK-038, REQ-BANK-056
 
 ### REQ-BANK-067 — A request raised through a connected application shows where it came from
+
+> **Linked Bank contract** — connected-client origin and scoped idempotency are separate from the
+> internal attempt identity. The own snapshot, change feed and staff queue cover the existing
+> connected-client request scope. They omit aUEC Order-linked requests, including feed tombstones.
+> Correction and cancellation of a linked request through a connected client answer the shared
+> `404`. The connected-client raise cap counts the pending requests in its own snapshot across
+> channels. Posted Bank transactions follow the existing account views and redactions.
 
 A booking request a connected application raised through the exchange (REQ-BXCH-004) records that
 application in `bank_booking_request.client_id`, the registry client id the exchange gate admitted;
@@ -3307,8 +3563,10 @@ read out of the rest of the bank.
 
 - **Accounts for individual players** — an explicit owner decision: players appear only
   as holders (custody dimension, REQ-BANK-003), never as account owners.
-- **Automated money flows** from missions/operations/orders into the bank (REQ-BANK-019)
-  — a possible future epic, requires its own spec.
+- **Implicit automated money flows** from missions/operations/orders remain excluded.
+  The approved/planned explicit optional aUEC integration is the REQ-BANK-019 exception;
+  [orders-auec-bank.md](orders-auec-bank.md) owns its order effects. Other automatic profit flows
+  and progress-to-ledger behavior are not authorised.
 - **Interest, loans, bank-levied fees and currencies other than aUEC.** The in-game transfer fee
   of REQ-BANK-033 is not a bank fee: it models aUEC the game itself destroys.
 - **Booking by org-unit members.** Members reach the org-unit bank page (REQ-BANK-021, -035…-038):

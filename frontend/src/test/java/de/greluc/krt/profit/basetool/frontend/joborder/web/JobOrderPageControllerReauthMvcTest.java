@@ -28,10 +28,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ParallelPageLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.QualityTierCatalog;
-import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
 import de.greluc.krt.profit.basetool.frontend.support.ReauthPageMvc;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -53,8 +53,13 @@ class JobOrderPageControllerReauthMvcTest {
         ReauthPageMvc.standalone(
             new JobOrderPageController(
                 client,
-                new JobOrderPageReader(client, mock(ParallelPageLoader.class)),
-                mock(LogisticianGate.class),
+                new JobOrderPageReader(
+                    client,
+                    mock(JobOrderMoneyBackendClient.class),
+                    mock(
+                        de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient
+                            .class),
+                    mock(ParallelPageLoader.class)),
                 mock(QualityTierCatalog.class),
                 mock(JobOrderItemLines.class)));
     ReauthPageMvc.signInMember();
@@ -67,13 +72,21 @@ class JobOrderPageControllerReauthMvcTest {
 
   @Test
   void anExpiredSessionOnTheOrderListRedirectsToLogin() throws Exception {
-    when(client.orders(any(OrderListScope.class), anyInt(), anyInt(), any(), any()))
+    when(client.orders(
+            any(OrderListScope.class),
+            anyInt(),
+            anyInt(),
+            any(),
+            any(),
+            org.mockito.ArgumentMatchers.any()))
         .thenThrow(expiredSession());
 
     mockMvc
         .perform(
             get("/orders")
                 .param("canViewJobOrders", "true")
+                .param("canViewOrderWorkspace", "true")
+                .param("canViewOrderUnitWork", "false")
                 .param("canViewOwnJobOrders", "false")
                 .param("canViewAssignedJobOrders", "false"))
         .andExpect(redirectsToLogin());

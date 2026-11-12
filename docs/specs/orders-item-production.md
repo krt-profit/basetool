@@ -1,6 +1,11 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
 > [ADR-0101](../adr/0101-inventory-game-item-rows.md) (production book-in)
+
+> **Status:** Implemented baseline with accepted/planned shared-order amendments below.
+> The marked target is not implemented; new criteria are unchecked. Existing acceptance and
+> Enforced-by references establish baseline behavior only. Shared truth: [orders-core.md](orders-core.md)
+> and [orders-material-claims.md](orders-material-claims.md).
 
 # Item-order production booking (Herstellung) & order-detail tab layout
 
@@ -37,6 +42,30 @@ booking flow is [ADR-0099](../adr/0099-job-order-item-production-booking.md).
 
 ### REQ-ORDERS-025 — Production booking (Herstellung) consumes linked stock and gates delivery
 
+> **Approved shared-order target - not implemented:** shared responsibility, action grants and
+> lifecycle follow [orders-core.md](orders-core.md), including direct Profit-Bereich responsibility
+> and supporting Staffeln. No aUEC holding, movement or fee model is added to ITEM/MATERIAL.
+> Production and item delivery retain their own counters, recipes, quantity/quality checks,
+> inventory ownership and atomic book-in/consumption. No production reversal feature is introduced.
+>
+> The ITEM material-promise capacity replaces the full-original-requirement baseline below:
+> calculate material demand only for not-yet-manufactured units, then deduct currently linked
+> qualifying coverage using REQ-ORDERS-037. Open promises cannot exceed that uncovered demand.
+> The common contribution contract in REQ-ORDERS-024 owns credit-before-reduction, proportional
+> reductions and historical attribution; production/consumption cannot erase or re-credit true past
+> contributions. The production quantity calculation itself is unchanged.
+>
+> ITEM may be manually completed early under the shared status rights; delivery still cannot
+> exceed manufactured-but-undelivered units when it is booked. COMPLETED, REJECTED and CANCELLED
+> release order earmarks, without deleting physical/produced stock, undoing production or erasing
+> handovers. Need edits do not automatically reopen manual completion/cancellation.
+
+**Target acceptance**
+
+- [ ] Production lowers unmanufactured demand and uncovered promise capacity without resetting historical contribution credit.
+- [ ] Partial-work safe edits preserve all manufactured/delivered bounds and production history.
+- [ ] Early manual completion and cancellation release earmarks without a physical reversal or automatic reopening.
+
 An `ITEM` order's line (`JobOrderItem`) MUST carry a **`manufacturedAmount`** (whole units already
 manufactured) alongside its `deliveredAmount` and ordered `amount`, subject to the invariant
 
@@ -65,11 +94,17 @@ that no manufactured items are available for handover and points the operator at
 is delivered (`isFullyDelivered` — every line's `deliveredAmount ≥ amount`). Both empty states leave
 `hasOutstandingItemLines` false, so that flag plus `isFullyDelivered` disambiguate them.
 
+**Recipe preparation.** ITEM creation, responsible-side edits, requester edits and the derivation preview use the same owning material derivation. Preparation captures an immutable ordered batch of submitted line identities, client and parent provenance, canonical outputs, explicit recipes, selected material quantities and quality identities. Quality choices change only a derived material's tier; they never select optional or otherwise uncounted costs. The complete resource plan includes current material requirements and the exact newly derived materials, including resolved zero-quantity snapshot lines.
+
+Before mutation after a resource wait, the action re-reads current scalar recipe, group, ingredient, output, redirect, bridge name, unit, quality and kept snapshot facts from PostgreSQL, including kept identities, progress and versions. Relevant drift returns HTTP 409 even when material and recipe identities stay the same. The action applies its original validated preparation; a second resource calculation cannot silently replace its quantities or quality choices. Reading distinct recipes, groups, ingredients, bridges and kept material collections uses bounded batches rather than one query per cost or ordered line.
+
+A scaled material requirement must be finite and representable in the existing exact thousandths representation. SCU rounding preserves its exact rounded source quanta; PIECE retains its ordinary whole-unit rounding. A subassembly suggestion must fit its integer unit count. Checked arithmetic returns HTTP 400 `ILLEGAL_ARGUMENT` for an unrepresentable requirement or count instead of zero, saturation or wraparound, without a separate business quantity cap.
+
 **Booking.** A production run is booked through
 `POST /api/v1/orders/{id}/items/{itemId}/production`
-(`JobOrderItemProductionService.bookProduction`), gated `(hasRole('LOGISTICIAN') or
-hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id)` — the same
-authorisation as the item handovers. The payload is `JobOrderItemProductionCreateDto` (`amount` ≥ 1,
+(`JobOrderItemProductionService.bookProduction`). The current responsible-unit writer must be
+allowed to fulfill the order (`canFulfillJobOrder`), the same gate used by item handovers.
+The payload is `JobOrderItemProductionCreateDto` (`amount` ≥ 1,
 the line `version`, a `consumption` list of `JobOrderItemProductionConsumptionDto`, each naming an
 `inventoryItemId`, the `materialId` it holds, a positive `amount`, and the entry `version`, and an
 optional `skippedMaterialIds` — the required materials the operator marked "nicht ausbuchen" and does
@@ -134,8 +169,9 @@ rounded per bucket), so the aggregated *Materialien* tab and the item-order *Off
 manufactured (the row is kept so its quality bucket and claims stay visible). This is what makes a
 skipped material's demand actually disappear even though its stock was never drawn down. The
 squadron **material-claim** targets (`MaterialClaimService.requiredByBucket`, the Eintragungen supply
-sign-up) intentionally stay on the **full** order requirement — a supply commitment is against the
-whole order, independent of how far production has progressed.
+sign-up) in the implemented baseline stay on the **full** order requirement — a supply commitment is against the
+whole order, independent of how far production has progressed. The approved target above
+replaces that claim basis with uncovered unmanufactured demand; production arithmetic stays intact.
 - **Audits**: one `JOB_ORDER_PRODUCTION_BOOKED` (domain `JOB_ORDER`) for the booking — its details
 recording the manufactured `amount`, the number of `consumed` entries and the count of `skipped`
 (not-booked-out) materials — plus one `INVENTORY_CONSUMED_BY_PRODUCTION` (domain `INVENTORY`) per
@@ -202,7 +238,7 @@ registry), and the receiver's apply map.
   not-yet-manufactured units: booking `N` units reduces each line's contribution to `requiredQuantity
   × (amount − manufacturedAmount) / amount`, reaching 0 for a fully manufactured line — regardless of
   whether the material was booked out or skipped. The material-claim (Eintragungen) target stays on
-  the full order requirement.
+  the full order requirement (baseline only; approved target: uncovered unmanufactured demand).
 - [ ] A consumption entry not earmarked to the order, or holding a different material, or drawing
   more than the order's slice/stock, is rejected (400 / 422 respectively); a whole depletion deletes
   the row and a partial draw decrements amount + order slice and clamps the mission earmarks.
@@ -214,9 +250,9 @@ registry), and the receiver's apply map.
 - [ ] A booking with a `bookIn` block creates (or merges into) the matching game-item stack,
   earmarked to the order unless deselected, audited as `INVENTORY_RECEIVED_FROM_PRODUCTION` in
   the same transaction (REQ-INV-032); a payload without `bookIn` is rejected with 400.
-- [ ] The endpoint is reachable only by a LOGISTICIAN/ADMIN with `canEditJobOrder`; the
-  success response re-renders the `items` (booking surface + inline stock) and `kpi` sections, among
-  others, in place and propagates them to a peer without a reload.
+- [ ] The endpoint uses the current order's fulfillment authority. The success response
+  re-renders the `items` (booking surface and inline stock) and `kpi` sections in place and
+  propagates them to a peer without a reload.
 
 **Enforced by:** `JobOrderItemProductionServiceTest` (amount/coverage/slice caps, delete-on-depletion,
 mission auto-clamp, 409/422 mapping, audit, skipped/not-booked-out material),
@@ -234,6 +270,25 @@ mapping), `JobOrderItemHandoverServiceTest` (delivery capped at manufactured-but
 ADR-0099
 
 ### REQ-ORDERS-026 — Order-detail tab layout and KPI band
+
+> **Approved shared-order target - not implemented:** the central detail and action capabilities
+> follow [orders-core.md](orders-core.md). Shared participation and material/quality contribution
+> lines are available for Bereich-, SK- and Staffel-responsible orders; claiming is not SK-public-only
+> and there is no duplicate enrolment. The active responsible Staffel contributes through its
+> responsibility, without enrolling as its own supporter.
+>
+> **Implemented MATERIAL/ITEM read:** Requesters receive the same permitted progress, handover
+> and linked-stock facts. Requester-specific panel and KPI omissions are removed. Show ITEM manufacturing/delivery counts, current material demand
+> and current qualifying coverage separately from historical contribution credit. Claim entry/edit
+> limits use the uncovered unmanufactured basis in REQ-ORDERS-025/-024, including after production.
+> Private producer access remains REQ-ORDERS-016; inventory writes retain their own gates. Relevant
+> sections/capabilities update in place for current readers after scoped edits and lifecycle changes.
+
+**Target acceptance**
+
+- [ ] A responsible Bereich or Staffel has the same participation/contribution surface as an SK.
+- [ ] Requesters can explain current progress and handovers without gaining private producer or inventory-write rights.
+- [ ] No displayed claim maximum uses the full original ITEM demand after production/coverage reduced the remaining need.
 
 The order-detail page (`/orders/{id}`) MUST render a page head, a summary card, a **KPI grid** and a
 `.tab-nav` with **one `.tab-pane` per section**, adopting the mission-detail tab pattern
@@ -254,12 +309,10 @@ status select.
   against what was required, per unit — one SCU line and one Stück line, each only when the order
   holds that unit; the requirement is the still-open line amount plus the delivered amount, because a
   handover lowers its line. With both units the percentage is the mean of the two per-unit shares;
-  SCU and pieces are never summed. The tile is omitted while nothing is required, and on the
-  requester-redacted view of a `MATERIAL` order, which carries no handovers.
-- **`MATERIAL`** — *Materialien erfüllt* (`fulfilled / total`; not on the requester view) and *Offene
+  SCU and pieces are never summed. The tile is omitted while nothing is required.
+- **`MATERIAL`** — *Materialien erfüllt* (`fulfilled / total`) and *Offene
   Menge*. **`ITEM`** — *Offene Materialmenge*.
-- The claims tile *Eingetragen (Claims)* (see below) and *Übergaben* (handover count; not on the
-  requester view).
+- The claims tile *Eingetragen (Claims)* (see below) and *Übergaben* (handover count).
 
 The **_Offene Menge_ tile splits the still-open quantity by unit type**: SCU-measured and
 whole-unit (PIECE) materials are incommensurable, so the tile reports up to two separate numbers
@@ -269,12 +322,10 @@ when the order actually contains a material of that unit type (`kpi.hasScuMateri
 both; an order with no open demand still shows `0` SCU. The tile never adds SCU and pieces into one
 figure.
 
-The **claims KPI tile is shown only for SK-public orders** — the tile renders only when the order
-supports material claims (`kpi.supportsClaims`), i.e. a public Spezialkommando order that can carry
-Eintragungen ([`orders-material-claims.md`](orders-material-claims.md)); a strict-staffel order that
-cannot be claimed omits the tile entirely. The KPI grid is its own AJAX-swappable fragment
-(`kpiSection`, container `#order-kpi-results`, live-sync key `kpi`) so a production booking, a claim,
-a delivery or an assignee change refreshes the KPIs in place.
+The claims KPI tile renders when the backend provides material promise capacity. Eligible
+Profit Bereich, SK and Staffel orders use the same projection and the current caller receives
+only permitted write actions. The KPI grid refreshes in place with the `kpi` live section
+after production, contribution and handover changes.
 
 **Tabs.** The tabs are filtered by order kind, in this order:
 
@@ -286,8 +337,8 @@ a delivery or an assignee change refreshes the KPIs in place.
 A tab appears only when its pane applies, and an empty tab is not shown: *Materialien* is hidden
 while the aggregate is empty; *Übergaben* is hidden while the order has none and the caller may not
 record one (Logistician, Officer, Admin); *Hersteller* needs the caller to see the blueprint
-coverage; *Verknüpft* needs orphaned linked inventory. The requester-redacted view (`REQ-ORDERS-023`)
-drops *Materialien*, *Übergaben* and *Bearbeiter* as before. A hidden tab reappears when a live swap
+coverage; *Verknüpft* needs orphaned linked inventory. Admitted requesters retain the same
+applicable fact tabs as other readers. A hidden tab reappears when a live swap
 brings its count above zero. Each tab holds at most one primary action: *Übergaben* „Übergabe
 erfassen", which opens the dialog of the same name for a material or an item handover (submit
 „Übergabe speichern"), and *Bearbeiter* „Mich eintragen". Empty sections render an `.empty-state`
@@ -306,11 +357,10 @@ tab). `ArrowLeft`/`ArrowRight` move focus and selection along the tablist; selec
 active pane's visibility — every pane is server-rendered, so no data is fetched on a tab switch. The
 tab counts (`.tab-count`) reflect each section's item count.
 
-This is a **presentation restructure**: every backend contract, DTO, optimistic-lock version and
-permission gate of the previous panel layout is preserved; the redacted requester view
-(`REQ-ORDERS-023`) keeps hiding the same sections.
+The layout uses the common order-read contract and distinct per-action capabilities. Independent
+producer access and the relevant optimistic versions remain unchanged.
 
-The **production booking surface stays on the *Items* tab** for LOGISTICIAN+ editors — the
+The **production booking surface stays on the *Items* tab** for writers with current fulfillment authority — the
 *Hersteller* tab shows who can craft, it books nothing. Each item line carries a leading chevron
 that reveals the per-unit material demand (*Bedarf je Stück*) in a collapsible sub-row (hidden by
 default, mirroring the bank request table's Notiz/Begründung detail row, so a multi-material recipe
@@ -318,31 +368,18 @@ no longer widens the row) and, as the last column, a *Herstellung erfassen* butt
 booking modal. Manufactured and delivered each render a progress bar. The machine-readable
 per-material demand the modal consumes stays on the main row, so booking is unaffected; a booking
 re-renders the *Items* section rather than a separate production section. The chevron and the
-demand sub-row (with the line's earmarked *Item-Bestand*) are shown to every non-requester viewer,
-editor or not; only the *Herstellung erfassen* button and the booking demand need the LOGISTICIAN+
-editor. Requesters see the plain status columns without chevron, sub-row or button.
+demand sub-row (with the line's earmarked *Item-Bestand*) are shown to every admitted viewer,
+including requesters. The *Herstellung erfassen* button and the booking demand require current
+fulfillment authority.
 
-**Columns of the aggregated *Materialien* pane.** The pane lists, per material+quality bucket,
-*Material*, *Qualität*, *Gesamtmenge* (the outstanding requirement), **_Vorhanden_**, and —
-for SK-public orders only — the single claim column *Eingetragen* (Σ claims), which also hosts the
-*Eintragen* action. *Vorhanden* sits **between *Gesamtmenge* and *Eingetragen*** and shows the
-linked-inventory stock earmarked to the order for that material at or above the bucket's quality
-floor (`AggregatedMaterialDto.currentStock`, the same value the order-overview list renders as
-collection progress); it is always shown (strict-staffel and SK-public orders alike). The gap
-*Gesamtmenge − Vorhanden* is the still-to-procure amount.
-
-**This pane renders no *Offen* column** — unlike the MATERIAL requirement table, which keeps its
-*Offen* (`amount − Σ claims`). The two figures do not share a base here: `AggregatedMaterialDto`'s
-`openAmount` is `MaterialClaimService.requiredByBucket() − Σ claims`, i.e. derived from the **full**
-order requirement (a supply commitment is against the whole order, see `REQ-ORDERS-025` above),
-while *Gesamtmenge* is the **outstanding** demand of the not-yet-manufactured units. Side by side in
-one row they contradicted each other: as soon as production was booked, *Offen* exceeded
-*Gesamtmenge* — observed on a live order at `Offen` 71.52 SCU against a `Gesamtmenge` of 56.2 SCU
-with zero Eintragungen, which reads as "more open than is needed at all". On a MATERIAL order no
-such gap exists (`amount` is not manufacturing-reduced), so that table is unaffected. The claimable
-remainder is **not** dropped from the contract: `openAmount` still travels in the DTO, still gates
-the write server-side (no overclaim), and is still surfaced to the user as the claim modal's
-`Maximal verfügbar:` hint, fed by the `data-open` attribute on the *Eintragen* / edit controls.
+**Columns of the aggregated *Materialien* pane.** The pane lists the material, quality,
+outstanding requirement (*Gesamtmenge*), earmarked stock (*Vorhanden*) and current promises
+(*Eingetragen*) per material and quality bucket. *Vorhanden* counts stock at or above the
+quality floor (`AggregatedMaterialDto.currentStock`), using the same value as the overview's
+collection progress. Eligible writers use *Eintragen* inside *Eingetragen*. The promise modal's
+*Maximal verfügbar* hint uses `openAmount`, the uncovered capacity of the unmanufactured need
+defined in [REQ-ORDERS-024](orders-material-claims.md). The MATERIAL need table has an
+*Offen* column.
 
 **Material tables on a phone.** Below 768px the *Bedarf* table of a material order and the
 aggregated *Materialien* table of an item order (`.od-lines-table`) stack each row as a card: the
@@ -369,32 +406,29 @@ on the *Items* tab.*
   *Verknüpft* — each only when it applies, in that order.
 - [ ] The „Geliefert / benötigt" tile shows delivered against required per unit for a material order
   (requirement = open amount + delivered) and delivered against ordered pieces for an item order,
-  with a meter; it is absent while nothing is required and on a redacted material order.
+  with a meter; it is absent while nothing is required.
 - [ ] The *Offene Menge* tile shows the open SCU sum and the open whole-unit (*Stück*) sum as two
   separate numbers when the order mixes unit types, a single number when only one type is present,
   and never sums SCU and pieces together.
-- [ ] The claims KPI tile renders only for an SK-public order (claims supported); a strict-staffel
-  order omits it. The requester view omits *Materialien erfüllt* and *Übergaben*.
+- [ ] The claims KPI tile reflects material promise capacity on eligible orders. Requesters see the same applicable fulfillment and handover facts.
 - [ ] *Materialien* is hidden while the aggregate is empty, and *Übergaben* while there are none
   and the caller may not record one; a live swap that brings a count above zero shows the tab again.
-- [ ] The aggregated *Materialien* pane of an SK-public order renders *Eingetragen* but **no**
-  *Offen* column, and the *Eintragen* action sits inside *Eingetragen*; the claim modal still offers
-  the full-requirement remainder as its maximum. The *Bedarf* table of a material order keeps its
-  *Offen*.
-- [ ] The *Items* tab shows the chevron/demand sub-row (*Bedarf je Stück*) to every non-requester
-  viewer of an `ITEM` order and the *Herstellung erfassen* button only to a LOGISTICIAN+ editor; a
-  requester sees only the plain status columns. The *Hersteller* tab books nothing.
+- [ ] The aggregated *Materialien* pane renders *Eingetragen* on eligible ITEM orders.
+  The *Eintragen* action uses the uncovered unmanufactured capacity as its maximum. The *Bedarf*
+  table of a MATERIAL order renders *Offen*.
+- [ ] Every admitted reader can expand *Bedarf je Stück* on the *Items* tab. Current fulfillment
+  authority controls the *Herstellung erfassen* button. The *Hersteller* tab shows eligible
+  producers.
 - [ ] `?tab=<key>` selects that tab on load and is honoured over `#tab=`, `localStorage`, and the
   default; back/forward re-applies the tab.
 - [ ] Arrow-key navigation moves selection along the tablist; `aria-selected` tracks the active tab.
-- [ ] Requester-redacted views omit the same tabs (*Bearbeiter*, *Materialien*, *Übergaben*) they
-  omitted before.
+- [ ] Requester reads include applicable Bearbeiter, materials, progress and handover facts;
+  producer panels and mutations retain their independent gates.
 - [ ] On the *Items* tab a line's per-unit demand is hidden behind a chevron and revealed in a
   sub-row on click; both Hergestellt and Geliefert render a progress bar; booking a production run
   from that tab still works (its machine-readable demand stays on the main row).
-- [ ] The aggregated *Materialien* pane shows a *Vorhanden* column (linked stock,
-  `AggregatedMaterialDto.currentStock`) between *Gesamtmenge* and the claim columns, for both
-  strict-staffel and SK-public item orders.
+- [ ] The aggregated *Materialien* pane shows earmarked stock (*Vorhanden*) between the
+  outstanding requirement and promises for each eligible responsible unit.
 - [ ] Below 768px both material tables show each row as a card with one labelled line per value
   (label left, value right); every value cell of a row carries its column name as `data-label`.
 - [ ] The item order's *Übergaben* tab shows the "record production first" hint while the order is
@@ -414,10 +448,15 @@ produce-first hint) ·
 
 ### REQ-ORDERS-028 — Order detail surfaces the earmarked item stock (inline in the item expand row)
 
+> **Implemented MATERIAL/ITEM read:** Every reader admitted by the current common order gate,
+> including the requesting side, may inspect this order's linked item stock and owner/location.
+> Private producer access and unrelated Inventory or Mission objects retain independent gates.
+
+
 An `ITEM` order's detail page MUST surface the **game-item stock earmarked to the order**
 ([`inventory-items.md`](inventory-items.md) REQ-INV-029/031) — the item sibling of the material
 drill-down — **inline in each ordered item's expand row** on the *Items* tab. The leading
-expand chevron is available to every non-requester viewer; expanding a line reveals, beneath the
+expand chevron is available to every admitted viewer; expanding a line reveals, beneath the
 per-unit material demand, a read-only **earmarked-stock** block listing the game
 item's linked rows: each row shows owner, location and the **THIS-order earmark slice** in whole
 units (with the entry's total stock as context when the row is only partially earmarked). A line
@@ -450,12 +489,9 @@ units), an item handover that consumes the earmark (`REQ-ORDERS-030` — re-rend
 (REQ-ORDERS-031, which broadcasts `items`). A section whose container a page does not render is
 silently skipped.
 
-**Redaction.** The inline stock renders only for an `ITEM` order and is omitted from the
-requester-redacted view (REQ-ORDERS-023), mirroring the aggregated *Materialien* pane — a
-requester-only viewer (`redacted == true`) additionally cannot reach the endpoint at all
-(`canSeeJobOrder` → 403). Every caller who *can* see the order gets each entry's owner and location
-(REQ-ORDERS-029); an entry without owner or location renders `—`. A line with no earmarked item
-stock renders no stock block (no empty-state message).
+**Read boundary.** The inline stock renders for every admitted reader of an ITEM order. Each
+entry keeps its owner and location (REQ-ORDERS-029); an absent owner or location renders a dash.
+The block remains read-only, and a line without earmarks renders no stock block.
 
 **Acceptance**
 
@@ -463,7 +499,7 @@ stock renders no stock block (no empty-state message).
   line's expand row (owner, location, THIS-order slice — never a sibling order's slice — plus the
   entry total as context on a partial earmark); a `MATERIAL` order renders no inline stock (and the
   frontend never fetches the endpoint for it); a line without earmarks shows no stock block.
-- [ ] The expand chevron is available to every non-requester viewer; a line with only material
+- [ ] The expand chevron is available to every admitted viewer; a line with only material
   demand or only earmarked stock is still expandable.
 - [ ] The inline stock is read-only — no delivered toggle; collecting (owner/location transfer +
   delivered) happens on the Itemsammelübersicht page (REQ-ORDERS-031).
@@ -486,20 +522,19 @@ visible after a booked production with auto-earmark) · **Code:** `JobOrderItemS
 
 ### REQ-ORDERS-029 — Every order viewer sees the linked-stock owner/location; unreadable missions stay anonymised
 
+> **Implemented MATERIAL/ITEM read:** The common current order audience follows orders-core.md.
+> Linked-stock facts stay bounded to the concrete order; Mission anonymisation and Inventory write
+> authority remain independent.
+
+
 The four per-order reads that expose the **owner identity and location** of the stock linked to a
 job order — the inline item stock (`GET /orders/{id}/item-stock`, REQ-ORDERS-028), the material
 collection (`GET /orders/{id}/material-collection`), and the two inventory pickers
 (`GET /orders/{id}/materials/{matId}/inventory`, `GET /orders/{id}/allocations/orphaned`) — MUST
 return each entry's owner and location to **every caller who may read the order**
-(`canSeeJobOrder`). On a Spezialkommando-responsible (SK-public) order that is every profit-eligible
-member, requesting side and uninvolved squadrons included; on a squadron-responsible order it is the
-responsible squadron, its LOGISTICIAN grantees and the order's assignees (owner decision 2026-11-07,
-ADR-0350, superseding ADR-0107).
-
-A requester-**only** viewer (`redacted == true`, i.e. `!canSeeJobOrder`) is refused all four
-endpoints with `403`. The frontend renders an entry without owner or location as `—` (inline item
-stock, Itemsammelübersicht and material-collection pages; the JS drill-down / orphaned /
-Herstellung surfaces fall back to a dash as well).
+(`canSeeJobOrder`), including concrete requester, current Profit, personal assignment and retained
+unit relations. A caller without a permitted relation receives 403. A missing owner or location
+renders a dash; this is not a requester-specific privacy mode.
 
 **Mission slices.** The two pickers also carry the mission slices of each row (REQ-INV-027). For
 every caller, a slice whose mission the caller may not read (the mission detail rule,
@@ -512,7 +547,8 @@ assignee grant of REQ-ORDERS-047 — never widens access to a mission referenced
 
 - [ ] Every caller who passes `canSeeJobOrder` gets owner and location on all four endpoints,
   including a member of an uninvolved squadron on an SK-public order.
-- [ ] A requester-only viewer (`redacted`) gets `403` on all four endpoints.
+- [ ] A concrete requester gets the same permitted linked-stock facts on all four endpoints; an
+  unrelated reader remains refused.
 - [ ] A caller who may read the order but not an internal mission earmarked on its linked stock sees
   that slice without name and start on both pickers; a caller who may read the mission sees both.
 - [ ] An entry without owner or location renders `—` on the inline item stock, the
@@ -639,7 +675,14 @@ units with the entry's total stock as context, and a delivered toggle).
 tolerating partial failure; the backend read stays gated on `canSeeJobOrder` and returns owner and
 location to every such viewer (REQ-ORDERS-029); a row without owner or location renders `—`.
 
-**Writes.** The two row controls reuse the existing generic inventory endpoints, exactly like the
+**Current capabilities.** Material and item collection entries carry `canEdit` from the existing
+backend Inventory write authority. A read-only entry preserves owner/location, quantities and the
+delivered marker while disabling owner, location and delivered mutations. Independently authorized
+stock owners retain their Inventory rights without needing a responsible-order role. Invalid order
+responsibility disables these controls. The projection is batched and remains statement-bounded
+for small and large collections (`JobOrderLinkedStockMissionAllocationIntegrationTest`).
+
+**Writes.** The row controls reuse the existing generic inventory endpoints, exactly like the
 Materialsammlung: an owner/location change POSTs `/inventory/{id}/transfer` (`type=TRANSFER`) moving
 the row's **full amount**, which deletes the source item and appends a new target item that
 **carries the order earmark** — the `InventoryJobOrderAllocation` (jobOrder link + amount +
@@ -680,6 +723,21 @@ persists) · **Code:** `ItemCollectionPageController`, `joborder/item-collection
 [`DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md)
 
 ### REQ-ORDERS-032 — An item-order edit re-derives its lines in place and never discards booked production
+
+> **Approved shared-order target - not implemented:** a prior item handover does not impose a
+> blanket edit freeze. A requesting-side need writer may safely change ordered needs after partial
+> work, while processing-side writers retain their separate rights under orders-core. Reconcile
+> persistent line identities and preserve manufactured/delivered counters, recipe/history and
+> existing catalogue validation; no amount may fall below booked manufacture/delivery and no
+> produced line may be deleted or retyped to another item. Require the relevant scoped versions.
+> No implicit production undo or automatic reopening follows a need edit. Invalid responsibility
+> blocks these mutations until the permitted transfer.
+
+**Target acceptance**
+
+- [ ] A safe quantity/need edit after a partial handover preserves identities and booked work.
+- [ ] Deleting/retyping produced lines or lowering quantities below their booked bounds remains refused.
+- [ ] A need edit does not silently reopen a completed/cancelled ITEM order.
 
 Editing an `ITEM` order MUST preserve every line's booked `manufacturedAmount` and `deliveredAmount`.
 

@@ -1,0 +1,343 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.joborder.internal;
+
+import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy.RateSnapshot;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Books a Bank-free movement once and preserves its durable outcome for recovery. */
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class JobOrderMoneyMovements {
+
+  private final JobOrderEditor editor;
+  private final JobOrderMoneyQueries queries;
+  private final JobOrderMoneyAccess access;
+  private final JobOrderMoneyHolders holderChoices;
+  private final JobOrderMoneyHolderRepository holders;
+  private final JobOrderMoneyOperationRepository operations;
+  private final JobOrderMoneyTargetRepository targets;
+  private final JobOrderMoneyRecipients recipients;
+  private final JobOrderMoneyMovementBasis basis;
+  private final JobOrderMoneyIdentityLock identityLock;
+  private final JobOrderMoneyLedger ledger;
+  private final JobOrderMoneyMovementWriter writer;
+  private final JobOrderLinkedMoneyCommands linked;
+  private final JobOrderMoneyAccountCommands accountCommands;
+  private final JobOrderMoneyCommitmentCredit commitmentCredit;
+
+  /**
+   * Calculates a movement without creating a holder, booking or audit entry.
+   *
+   * @param orderId the aUEC order
+   * @param dto the observed movement terms
+   * @return the effect of these exact terms
+   */
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public JobOrderMoneyMovementPreview preview(UUID orderId, MoveJobOrderMoneyDto dto) {
+    var bank = dto.bank();
+    if (bank != null && Boolean.TRUE.equals(bank.accountOnly())) {
+      return accountCommands.preview(orderId, dto, bank);
+    }
+    JobOrder order = queries.requireReadableMoneyOrder(orderId);
+    if (queries.responsibilityInvalid(order) || !order.getStatus().isActive()) {
+      throw new BusinessConflictException("orders.money.movement.inactive");
+    }
+    UUID actor = access.requireActiveActor();
+    var terms = JobOrderMoneyMovementTerms.from(dto);
+    bank = resolveBank(orderId, bank, terms);
+    try {
+      var resolved = basis.resolve(order, dto, terms, actor, null, bank);
+      authorizeAttribution(order, terms);
+      if (terms.commitmentId() != null) {
+        commitmentCredit.assertCurrentTarget(order, terms.commitmentId());
+      }
+      var quote = bank == null ? null : linked.previewMovement(terms, resolved, bank);
+      return resolved.preview(terms, holderChoices.nameOf(resolved.source()), quote);
+    } catch (JobOrderMoneyMovementBasis.UnavailableBasis unavailable) {
+      throw unavailable.previewProblem();
+    } catch (JobOrderMoneyHolders.UnavailableHolderException unavailable) {
+      throw unavailable.previewProblem();
+    }
+  }
+
+  /**
+   * Books both sides of a movement or recovers its prior outcome.
+   *
+   * @param orderId the aUEC order
+   * @param dto the operation identity, terms and observed versions
+   * @return the accepted result or empty for a durable refusal
+   */
+  public Optional<JobOrderMoneyOutcome> record(UUID orderId, MoveJobOrderMoneyDto dto) {
+    var bank = dto.bank();
+    if (bank != null && Boolean.TRUE.equals(bank.accountOnly())) {
+      return accountCommands.move(orderId, dto, bank);
+    }
+    UUID operationId = dto.operationId();
+    if (operationId == null) {
+      throw new BadRequestException("orders.money.movement.operationRequired");
+    }
+    var terms = JobOrderMoneyMovementTerms.from(dto);
+    RateSnapshot rate = JobOrderMoneyMovementTerms.submittedRate(dto.rate());
+    UUID actor = access.actorId();
+    Accounts accounts = accounts(orderId, terms);
+    identityLock.lockAccounts(actor, accounts.source(), accounts.destination());
+    Attempt attempt = new Attempt(operationId, dto, terms, rate, actor, accounts);
+    return editor.editMoney(
+        orderId,
+        order -> mayComplete(order, attempt),
+        (order, queueLocked) -> recordLocked(order, attempt, queueLocked));
+  }
+
+  private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> recordLocked(
+      JobOrder order, Attempt attempt, boolean queueLocked) {
+    access.requireActiveActor();
+    authorizeAttribution(order, attempt.terms());
+    UUID id = order.getId();
+    var bank = resolveBank(id, attempt.dto().bank(), attempt.terms());
+    var linkedReplay =
+        linked.replayMovement(
+            order, attempt.id(), bank, attempt.actor(), attempt.terms(), attempt.rate());
+    if (linkedReplay.isPresent()) {
+      basis.authorize(
+          order,
+          attempt.terms(),
+          attempt.actor(),
+          attempt.accounts().source(),
+          attempt.accounts().destination());
+      return new JobOrderEditor.MoneyEdit<>(linkedReplay, JobOrderEdit.unchanged(order));
+    }
+    var previous = operations.findByOrderIdAndOperationId(id, attempt.id());
+    if (previous.isPresent()) {
+      if (bank != null) {
+        throw new BusinessConflictException("orders.money.operation.termsMismatch");
+      }
+      return replay(order, attempt, previous.orElseThrow());
+    }
+    if (operations.isRefused(id, attempt.id())) {
+      return refused(order);
+    }
+    if (!order.getStatus().isActive()) {
+      Accounts current = accounts(id, attempt.terms());
+      basis.authorize(
+          order, attempt.terms(), attempt.actor(), current.source(), current.destination());
+      return refuse(order, attempt.id());
+    }
+    JobOrderMoneyMovementBasis.Resolved resolved;
+    try {
+      resolved =
+          basis.resolve(
+              order, attempt.dto(), attempt.terms(), attempt.actor(), attempt.rate(), bank);
+    } catch (ObjectOptimisticLockingFailureException
+        | JobOrderMoneyHolders.UnavailableHolderException
+        | JobOrderMoneyMovementBasis.UnavailableBasis staleBasis) {
+      return refuse(order, attempt.id());
+    }
+    Accounts current =
+        new Accounts(resolved.source().getUserId(), resolved.recipient().accountId());
+    if (!current.equals(attempt.accounts())
+        || resolved.sourceAfter().signum() < 0
+        || (resolved.completes() && !queueLocked)) {
+      return refuse(order, attempt.id());
+    }
+    UUID commitmentId = attempt.terms().commitmentId();
+    if (commitmentId != null) {
+      try {
+        commitmentCredit.assertCurrentTarget(order, commitmentId);
+      } catch (BusinessConflictException unavailableCommitment) {
+        return refuse(order, attempt.id());
+      }
+    }
+    if (bank != null) {
+      var outcome =
+          linked.submitMovement(
+              order, attempt.id(), attempt.actor(), attempt.terms(), resolved, bank);
+      return new JobOrderEditor.MoneyEdit<>(Optional.of(outcome), JobOrderEdit.unchanged(order));
+    }
+    return post(order, attempt, resolved);
+  }
+
+  private @Nullable JobOrderBankSelection resolveBank(
+      UUID orderId, @Nullable JobOrderBankSelection bank, JobOrderMoneyMovementTerms terms) {
+    if (bank == null) {
+      return null;
+    }
+    if (bank.type() == JobOrderBankSelection.Type.TRANSFER
+        && terms.kind().delivers()
+        && bank.targetAccountId() == null) {
+      var designation = recipients.require(orderId, Objects.requireNonNull(terms.recipientId()));
+      return JobOrderLinkedPaymentTerms.resolveAccountTransfer(
+          bank, bank.accountId(), designation.getBankAccountId());
+    }
+    JobOrderLinkedPaymentTerms.validate(bank);
+    return bank;
+  }
+
+  private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> post(
+      JobOrder order, Attempt attempt, JobOrderMoneyMovementBasis.Resolved resolved) {
+    var terms =
+        new JobOrderMoneyMovementWriter.Terms(
+            attempt.id(),
+            attempt.actor(),
+            attempt.actor(),
+            attempt.terms(),
+            resolved.recipient().accountId(),
+            resolved.rate().rate(),
+            resolved.fee(),
+            resolved.completes(),
+            null);
+    var posted = writer.post(order, resolved.source(), resolved.destination(), terms);
+    return new JobOrderEditor.MoneyEdit<>(
+        Optional.of(queries.projectOutcome(posted.fact(), resolved.source())), posted.edit());
+  }
+
+  /**
+   * Searches accounts only for a caller who can select another collection holder.
+   *
+   * @param orderId the aUEC order
+   * @param sourceHolderId the holder making the actual outgoing transfer
+   * @param query optional name fragment
+   * @return eligible receiving accounts
+   */
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  public List<JobOrderMoneyHolderCandidate> candidates(
+      UUID orderId, UUID sourceHolderId, @Nullable String query) {
+    JobOrder order = queries.requireReadableMoneyOrder(orderId);
+    UUID actor = access.requireActiveActor();
+    JobOrderMoneyHolder source =
+        holders
+            .findByOrderIdAndId(orderId, sourceHolderId)
+            .orElseThrow(() -> new BadRequestException("orders.money.holder.notFound"));
+    if (source.getMergedIntoId() != null
+        || queries.responsibilityInvalid(order)
+        || !order.getStatus().isActive()
+        || !(access.responsible(order) || actor.equals(source.getUserId()))) {
+      throw new AccessDeniedException("Caller may not choose the receiving holder.");
+    }
+    return holderChoices.candidates(query);
+  }
+
+  private Accounts accounts(UUID orderId, JobOrderMoneyMovementTerms terms) {
+    UUID source = holders.accountFor(orderId, terms.sourceId()).orElse(null);
+    UUID destination =
+        switch (terms.selection().kind()) {
+          case LINKED -> terms.selection().reference();
+          case EXISTING ->
+              terms.recipientId() == null
+                  ? holders
+                      .accountFor(orderId, Objects.requireNonNull(terms.selection().reference()))
+                      .orElse(null)
+                  : recipients.accountFor(orderId, terms.recipientId());
+          case ACCOUNTLESS -> null;
+          case SELF ->
+              throw new IllegalStateException("The movement requires an explicit counterparty.");
+        };
+    return new Accounts(source, destination);
+  }
+
+  private boolean mayComplete(JobOrder order, Attempt attempt) {
+    JobOrderMoneyMovementTerms terms = attempt.terms();
+    UUID orderId = order.getId();
+    if (!order.getStatus().isActive()
+        || !terms.kind().delivers()
+        || operations.existsByOrderIdAndOperationId(orderId, attempt.id())
+        || operations.isRefused(orderId, attempt.id())) {
+      return false;
+    }
+    BigDecimal delivered = ledger.delivered(orderId).add(terms.amount());
+    if (targets.amountFor(orderId).filter(target -> delivered.compareTo(target) >= 0).isEmpty()) {
+      return false;
+    }
+    access.requireActiveActor();
+    basis.authorize(
+        order,
+        terms,
+        attempt.actor(),
+        attempt.accounts().source(),
+        attempt.accounts().destination());
+    authorizeAttribution(order, terms);
+    return true;
+  }
+
+  private void authorizeAttribution(JobOrder order, JobOrderMoneyMovementTerms terms) {
+    UUID commitmentId = terms.commitmentId();
+    if (commitmentId != null) {
+      commitmentCredit.assertAttributionAuthority(order, commitmentId);
+    }
+  }
+
+  private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> replay(
+      JobOrder order, Attempt attempt, JobOrderMoneyOperation previous) {
+    if (!attempt.actor().equals(previous.getActorId())) {
+      throw new AccessDeniedException("Caller may not replay this operation.");
+    }
+    if (!attempt.terms().matches(previous, attempt.rate())) {
+      throw new BusinessConflictException("orders.money.operation.termsMismatch");
+    }
+    var identities = ledger.read(order.getId());
+    var holder = identities.holder(previous.personalHolderId());
+    UUID destinationId = previous.getDestinationHolderId();
+    UUID recipientId = previous.getRecipientId();
+    UUID destinationAccount =
+        destinationId != null
+            ? identities.holder(destinationId).getUserId()
+            : recipientId == null ? null : recipients.accountFor(order.getId(), recipientId);
+    basis.authorize(
+        order, attempt.terms(), attempt.actor(), holder.getUserId(), destinationAccount);
+    return new JobOrderEditor.MoneyEdit<>(
+        Optional.of(queries.projectOutcome(previous, holder)), JobOrderEdit.unchanged(order));
+  }
+
+  private JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> refuse(
+      JobOrder order, UUID operationId) {
+    operations.reserveRefusal(order.getId(), operationId);
+    return refused(order);
+  }
+
+  private static JobOrderEditor.MoneyEdit<Optional<JobOrderMoneyOutcome>> refused(JobOrder order) {
+    return new JobOrderEditor.MoneyEdit<>(Optional.empty(), JobOrderEdit.unchanged(order));
+  }
+
+  private record Accounts(@Nullable UUID source, @Nullable UUID destination) {}
+
+  private record Attempt(
+      UUID id,
+      MoveJobOrderMoneyDto dto,
+      JobOrderMoneyMovementTerms terms,
+      RateSnapshot rate,
+      UUID actor,
+      Accounts accounts) {}
+}

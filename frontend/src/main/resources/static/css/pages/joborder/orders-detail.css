@@ -53,6 +53,10 @@
         font-size: 0.8rem;
         color: var(--color-gray-2-text);
     }
+    .od-money .kpi-value,
+    .od-money .od-assignee > * {
+        overflow-wrap: anywhere;
+    }
     .od-progress__meter {
         margin: var(--space-2) 0 var(--space-1);
     }
