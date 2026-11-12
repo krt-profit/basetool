@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.client;
 import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeItemReleaseRequest;
@@ -65,6 +66,9 @@ public class MaterialExchangeBackendClient {
 
   private static final ParameterizedTypeReference<List<BlueprintProductDto>> PRODUCT_LIST =
       new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<PageResponse<InventoryGameItemReferenceDto>>
+      GAME_ITEM_PAGE = new ParameterizedTypeReference<>() {};
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
@@ -147,9 +151,9 @@ public class MaterialExchangeBackendClient {
   }
 
   /**
-   * Lists a craftable item on the board.
+   * Lists an item on the board without a Lager row.
    *
-   * @param request the product, quantity and remark
+   * @param request the product or catalogue row, quantity and remark
    * @return the offer, or {@code null} when the backend sent no body
    */
   @Nullable
@@ -159,7 +163,7 @@ public class MaterialExchangeBackendClient {
   }
 
   /**
-   * Searches the blueprint products the item-offer dialog can list.
+   * Searches the blueprint products the item pickers can name.
    *
    * @param q the name fragment, or {@code null}/blank for the first products
    * @param limit the result cap
@@ -171,6 +175,25 @@ public class MaterialExchangeBackendClient {
         UriComponentsBuilder.fromPath("/api/v1/blueprints/products/search")
             .queryParam("limit", limit);
     return getWithQuery(uri, q, PRODUCT_LIST);
+  }
+
+  /**
+   * Searches the stocked items no blueprint produces, which the item pickers name by their
+   * catalogue row (ADR-0372).
+   *
+   * @param q the name fragment, or {@code null}/blank for the first items
+   * @param size the page size
+   * @return the page in name order, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public PageResponse<InventoryGameItemReferenceDto> itemsWithoutBlueprint(
+      @Nullable String q, int size) {
+    UriComponentsBuilder uri =
+        UriComponentsBuilder.fromPath("/api/v1/game-items")
+            .queryParam("withoutBlueprint", true)
+            .queryParam("size", size)
+            .queryParam("sort", "name,asc");
+    return getWithQuery(uri, q, GAME_ITEM_PAGE);
   }
 
   /**
@@ -316,9 +339,9 @@ public class MaterialExchangeBackendClient {
   }
 
   /**
-   * Posts a craftable-item wanted-listing.
+   * Posts an item wanted-listing.
    *
-   * @param request the product, quality floor, quantity and description
+   * @param request the product or catalogue row, quality floor, quantity and description
    * @return the request, or {@code null} when the backend sent no body
    */
   @Nullable

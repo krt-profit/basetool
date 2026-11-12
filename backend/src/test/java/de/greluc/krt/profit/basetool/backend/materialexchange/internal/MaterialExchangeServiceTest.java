@@ -42,9 +42,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRowLocks;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
@@ -108,6 +111,8 @@ class MaterialExchangeServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BlueprintProductService blueprintProductService;
+  @Mock private SelectableGameItems selectableGameItems;
+  @Mock private StockItemCatalogue stockItemCatalogue;
   @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private ExchangeItemReferences exchangeItemReferences;
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -136,7 +141,8 @@ class MaterialExchangeServiceTest {
             authHelperService,
             auditService,
             boardService,
-            blueprintProductService,
+            new ExchangeItemSubjects(
+                blueprintProductService, selectableGameItems, stockItemCatalogue),
             requestScopeResolver,
             eventPublisher,
             selfProvider);
@@ -508,7 +514,7 @@ class MaterialExchangeServiceTest {
 
     MaterialExchangeOfferDto dto =
         service.releaseItem(
-            new MaterialExchangeItemReleaseRequest("venture helmet", 5, "gegen aUEC"));
+            new MaterialExchangeItemReleaseRequest("venture helmet", null, 5, "gegen aUEC"));
 
     ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
     verify(offerRepository).saveAndFlush(captor.capture());
@@ -516,6 +522,7 @@ class MaterialExchangeServiceTest {
     assertThat(saved.getKind()).isEqualTo(MaterialExchangeOfferKind.ITEM);
     assertThat(saved.getInventoryItemId()).as("item offer has no Lager row").isNull();
     assertThat(saved.getItemProductKey()).isEqualTo("venture helmet");
+    assertThat(saved.getItemGameItemId()).isNull();
     assertThat(saved.getItemName()).isEqualTo("Venture Helmet");
     assertThat(saved.getItemQuantity()).isEqualTo(5);
     assertThat(saved.getOwner()).isEqualTo(owner);
@@ -535,12 +542,112 @@ class MaterialExchangeServiceTest {
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(blueprintProductService.resolveByProductKey("unknown")).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () -> service.releaseItem(new MaterialExchangeItemReleaseRequest("unknown", 3, "x")))
+    assertThatThrownBy(() ->
+            service.releaseItem(new MaterialExchangeItemReleaseRequest("unknown", null, 3, "x")))
         .isInstanceOf(NotFoundException.class);
     verify(offerRepository, never()).saveAndFlush(any());
     verify(auditService, never()).record(any(), any(), any(), any(), any());
     verify(eventPublisher, never()).publishEvent(any());
+  }
+
+  /**
+   * Listing a stocked item no blueprint produces persists an ITEM offer under its catalogue row,
+   * with no product key, and audits the catalogue row (ADR-0372).
+   */
+  @Test
+  void releaseItem_gameItemWithoutBlueprint_persistsOfferUnderTheCatalogueRow() {
+    GameItem gameItem = gameItem("Scourge Railgun");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(selectableGameItems.require(gameItem.getId())).thenReturn(gameItem);
+    when(blueprintProductService.resolveByGameItem(gameItem.getId())).thenReturn(Optional.empty());
+    when(stockItemCatalogue.isStockedByType(gameItem)).thenReturn(true);
+    when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.empty());
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.countByOfferId(any())).thenReturn(0L);
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    service.releaseItem(
+        new MaterialExchangeItemReleaseRequest(null, gameItem.getId(), 2, "gegen aUEC"));
+
+    ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
+    verify(offerRepository).saveAndFlush(captor.capture());
+    MaterialExchangeOffer saved = captor.getValue();
+    assertThat(saved.getItemProductKey()).isNull();
+    assertThat(saved.getItemGameItemId()).isEqualTo(gameItem.getId());
+    assertThat(saved.getItemName()).isEqualTo("Scourge Railgun");
+    ArgumentCaptor<AuditDetails> details = ArgumentCaptor.captor();
+    verify(auditService)
+        .record(
+            eq(AuditEventType.MARKET_OFFER_RELEASED),
+            any(),
+            eq("Scourge Railgun"),
+            eq(ownerId),
+            details.capture());
+    assertThat(details.getValue().toString())
+        .contains("gameItem=" + gameItem.getId())
+        .doesNotContain("product=");
+  }
+
+  /**
+   * A catalogue row an active blueprint produces is listed under its blueprint product, so one item
+   * never carries two identities on the board.
+   */
+  @Test
+  void releaseItem_gameItemWithBlueprint_persistsOfferUnderTheProduct() {
+    GameItem gameItem = gameItem("Venture Helmet");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(selectableGameItems.require(gameItem.getId())).thenReturn(gameItem);
+    when(blueprintProductService.resolveByGameItem(gameItem.getId()))
+        .thenReturn(Optional.of(new ResolvedProduct("venture helmet", "Venture Helmet", null)));
+    when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.empty());
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.countByOfferId(any())).thenReturn(0L);
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    service.releaseItem(new MaterialExchangeItemReleaseRequest(null, gameItem.getId(), 1, ""));
+
+    ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
+    verify(offerRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getItemProductKey()).isEqualTo("venture helmet");
+    assertThat(captor.getValue().getItemGameItemId()).isNull();
+    verify(stockItemCatalogue, never()).isStockedByType(any());
+  }
+
+  /** A catalogue row of a type the Lager does not book, such as clothing, cannot be listed. */
+  @Test
+  void releaseItem_gameItemTheLagerDoesNotBook_badRequest() {
+    GameItem gameItem = gameItem("Pembroke Pants");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(selectableGameItems.require(gameItem.getId())).thenReturn(gameItem);
+    when(blueprintProductService.resolveByGameItem(gameItem.getId())).thenReturn(Optional.empty());
+    when(stockItemCatalogue.isStockedByType(gameItem)).thenReturn(false);
+
+    UUID gameItemId = gameItem.getId();
+    assertThatThrownBy(() ->
+            service.releaseItem(new MaterialExchangeItemReleaseRequest(null, gameItemId, 1, "")))
+        .isInstanceOf(BadRequestException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
+    verify(auditService, never()).record(any(), any(), any(), any(), any());
+  }
+
+  /** A release naming both a product key and a catalogue row, or neither, is rejected. */
+  @Test
+  void releaseItem_bothOrNeitherIdentity_badRequest() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    UUID gameItemId = UUID.randomUUID();
+
+    assertThatThrownBy(() ->
+            service.releaseItem(
+                new MaterialExchangeItemReleaseRequest("venture helmet", gameItemId, 1, "")))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(
+            () -> service.releaseItem(new MaterialExchangeItemReleaseRequest(null, null, 1, "")))
+        .isInstanceOf(BadRequestException.class);
+    verify(offerRepository, never()).saveAndFlush(any());
   }
 
   /**
@@ -559,7 +666,8 @@ class MaterialExchangeServiceTest {
     when(interestRepository.countByOfferId(any())).thenReturn(0L);
     when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
 
-    service.releaseItem(new MaterialExchangeItemReleaseRequest("venture helmet", 5, "gegen aUEC"));
+    service.releaseItem(
+        new MaterialExchangeItemReleaseRequest("venture helmet", null, 5, "gegen aUEC"));
 
     ArgumentCaptor<AuditDetails> detailsCaptor = ArgumentCaptor.captor();
     verify(auditService)
@@ -880,18 +988,55 @@ class MaterialExchangeServiceTest {
     verify(offerRepository, never()).saveAndFlush(any());
   }
 
-  /** A game-item row not produced by any active blueprint cannot be offered (400). */
+  /**
+   * A game-item row no active blueprint produces is offered under its catalogue row (ADR-0372): the
+   * offer carries the row's game item and no product key, and the audit names the catalogue row.
+   */
   @Test
-  void release_gameItemRow_noBlueprintProduct_badRequest() {
-    GameItem gameItem = gameItem("Loot Only");
+  void release_gameItemRow_noBlueprintProduct_namesTheCatalogueRow() {
+    GameItem gameItem = gameItem("Scourge Railgun");
+    InventoryItem row = itemStockRow(owner, gameItem, 4.0);
+    UUID itemId = row.getId();
+    rows.put(itemId, row);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.of(row));
+    when(blueprintProductService.resolveByGameItem(gameItem.getId())).thenReturn(Optional.empty());
+    when(selectableGameItems.requireSelectable(gameItem)).thenReturn(gameItem);
+    when(offerRepository.findByInventoryItemIdAndStatus(itemId, MaterialExchangeOfferStatus.ACTIVE))
+        .thenReturn(Optional.empty());
+    when(offerRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(interestRepository.findByOfferIdOrderByCreatedAtDesc(any())).thenReturn(List.of());
+
+    service.release(new MaterialExchangeReleaseRequest(itemId, 2.0, "x"));
+
+    ArgumentCaptor<MaterialExchangeOffer> captor = ArgumentCaptor.captor();
+    verify(offerRepository).saveAndFlush(captor.capture());
+    MaterialExchangeOffer saved = captor.getValue();
+    assertThat(saved.getItemProductKey()).isNull();
+    assertThat(saved.getItemGameItemId()).isEqualTo(gameItem.getId());
+    assertThat(saved.getItemName()).isEqualTo("Scourge Railgun");
+    ArgumentCaptor<AuditDetails> details = ArgumentCaptor.captor();
+    verify(auditService)
+        .record(eq(AuditEventType.MARKET_OFFER_RELEASED), any(), any(), any(), details.capture());
+    assertThat(details.getValue().toString())
+        .contains("gameItem=" + gameItem.getId())
+        .doesNotContain("product=");
+  }
+
+  /** A row whose item no blueprint produces and the P4K retired cannot be offered. */
+  @Test
+  void release_gameItemRow_retiredWithoutBlueprint_isRefused() {
+    GameItem gameItem = gameItem("Retired Railgun");
     InventoryItem row = itemStockRow(owner, gameItem, 4.0);
     UUID itemId = row.getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(stockRowLocks.lockRowForOfferWrite(itemId)).thenReturn(Optional.of(row));
     when(blueprintProductService.resolveByGameItem(gameItem.getId())).thenReturn(Optional.empty());
+    when(selectableGameItems.requireSelectable(gameItem))
+        .thenThrow(new RetiredGameItemException(gameItem.getId()));
 
     assertThatThrownBy(() -> service.release(new MaterialExchangeReleaseRequest(itemId, 2.0, "x")))
-        .isInstanceOf(BadRequestException.class);
+        .isInstanceOf(RetiredGameItemException.class);
     verify(offerRepository, never()).saveAndFlush(any());
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
@@ -1025,7 +1170,24 @@ class MaterialExchangeServiceTest {
             gameItem.getId(), "Shield", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY");
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(itemOffer));
-    when(exchangeItemReferences.ofProductKey("prod-key")).thenReturn(reference);
+    when(exchangeItemReferences.ofEntry("prod-key", null)).thenReturn(reference);
+
+    assertThat(boardService.detail(offerId).gameItem()).isEqualTo(reference);
+  }
+
+  /** An item offer named by its catalogue row resolves its game item through that row. */
+  @Test
+  void detail_catalogueRowOfferCarriesItsGameItem() {
+    GameItem gameItem = gameItem("Scourge Railgun");
+    InventoryItem row = itemStockRow(owner, gameItem, 2.0);
+    MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 1);
+    itemOffer.setItemProductKey(null);
+    itemOffer.setItemGameItemId(gameItem.getId());
+    GameItemReferenceDto reference =
+        new GameItemReferenceDto(gameItem.getId(), "Scourge Railgun", null, null, 4, null, null);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(itemOffer));
+    when(exchangeItemReferences.ofEntry(null, gameItem.getId())).thenReturn(reference);
 
     assertThat(boardService.detail(offerId).gameItem()).isEqualTo(reference);
   }
@@ -1037,7 +1199,7 @@ class MaterialExchangeServiceTest {
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
 
     assertThat(boardService.detail(offerId).gameItem()).isNull();
-    verify(exchangeItemReferences, never()).ofProductKey(any());
+    verify(exchangeItemReferences, never()).ofEntry(any(), any());
   }
 
   /**

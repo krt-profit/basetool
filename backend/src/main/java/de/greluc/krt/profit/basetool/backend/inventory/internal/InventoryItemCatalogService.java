@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
@@ -68,6 +69,38 @@ public class InventoryItemCatalogService implements StockItemCatalogue {
             StockableItemGroup.EXCLUDED_TYPE_SUB_TYPES,
             pageable)
         .map(inventoryItemMapper::gameItemToReferenceDto);
+  }
+
+  /**
+   * Pages the game items the Lager books through their type alone, those no active blueprint
+   * produces, optionally filtered by name, as slim Lager references.
+   *
+   * @param search case-insensitive name substring, or {@code null}/blank for no filter
+   * @param pageable page request (whitelisted {@code name} / {@code id} sort)
+   * @return a page of stocked game-item references without a blueprint; never {@code null}
+   */
+  @Override
+  @NotNull
+  public Page<InventoryGameItemReferenceDto> findBookableItemsWithoutBlueprint(
+      @Nullable String search, @NotNull Pageable pageable) {
+    return gameItemRepository
+        .findStockedWithoutBlueprint(
+            likeTerm(search),
+            StockableItemGroup.TYPES,
+            StockableItemGroup.EXCLUDED_TYPE_SUB_TYPES,
+            pageable)
+        .map(inventoryItemMapper::gameItemToReferenceDto);
+  }
+
+  /**
+   * Tells whether a stocked item group covers the item's P4K type and sub-type.
+   *
+   * @param item the catalogue item
+   * @return {@code true} when the Lager books the item through its type
+   */
+  @Override
+  public boolean isStockedByType(@NotNull GameItem item) {
+    return StockableItemGroup.covers(item.getWikiType(), item.getWikiSubType());
   }
 
   /**

@@ -213,6 +213,28 @@ class ItemReconciliationIntegrationTest {
                 partner,
                 member,
                 pair.retired())));
+    references.add(
+        new Reference(
+            "material_exchange_offer",
+            "item_game_item_id",
+            insert(
+                "INSERT INTO material_exchange_offer (id, offer_kind, owner_id, item_game_item_id,"
+                    + " item_name, item_quantity, status, released_at, version, created_at,"
+                    + " updated_at) VALUES (?, 'ITEM', ?, ?, 'Source Item', 2, 'ACTIVE', now(), 0,"
+                    + " now(), now())",
+                member,
+                pair.retired())));
+    references.add(
+        new Reference(
+            "material_exchange_request",
+            "item_game_item_id",
+            insert(
+                "INSERT INTO material_exchange_request (id, request_kind, owner_id,"
+                    + " item_game_item_id, item_name, item_quantity, status, posted_at, version,"
+                    + " created_at, updated_at) VALUES (?, 'ITEM', ?, ?, 'Source Item', 1,"
+                    + " 'ACTIVE', now(), 0, now(), now())",
+                member,
+                pair.retired())));
     UUID retiredFloor = floor(unit, pair.retired(), 8, 10);
     UUID canonicalFloor = floor(unit, pair.canonical(), 5, 20);
     UUID movedFloor = floor(unit(), pair.retired(), 2, 4);
@@ -673,6 +695,8 @@ class ItemReconciliationIntegrationTest {
             "supply_need.game_item_id",
             "supply_donation.game_item_id",
             "purchasing_deal.game_item_id",
+            "material_exchange_offer.item_game_item_id",
+            "material_exchange_request.item_game_item_id",
             "game_item_redirect.canonical_id",
             "ship_type_loadout_port.game_item_id",
             "ship_type_paint.game_item_id",

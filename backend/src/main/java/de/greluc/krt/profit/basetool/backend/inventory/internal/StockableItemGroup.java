@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
@@ -101,6 +102,21 @@ enum StockableItemGroup {
 
   /** The sub-types of the group's types that stay out of the Lager. */
   @Unmodifiable private final Set<String> excludedSubTypes;
+
+  /**
+   * Tells whether a group covers an item of this type and sub-type, the single-item form of the
+   * type rule {@link GameItemRepository#findStockable} applies.
+   *
+   * @param type the item's P4K type, or {@code null} when unknown
+   * @param subType the item's sub-type, or {@code null} when unknown
+   * @return {@code true} when a group books the type and does not leave out the sub-type
+   */
+  static boolean covers(@Nullable String type, @Nullable String subType) {
+    return type != null
+        && TYPES.contains(type)
+        && !EXCLUDED_TYPE_SUB_TYPES.contains(
+            GameItemRepository.typeSubTypeKey(type, subType == null ? "" : subType));
+  }
 
   /**
    * Pairs each of the group's types with each of its excluded sub-types.
