@@ -67,7 +67,9 @@ The owner decided (2026-11-11):
 
 The owner settled the follow-up questions of the audit the same day:
 
-7. **No membership right without `KRT Member` (D7).** A member without the role reaches no unit:
+7. **No membership right without `KRT Member` (D7)**, the Basetool role an admin assigns on the
+   member page and an approval grants ([ADR-0355](0355-roles-are-held-in-the-basetool-database.md)).
+   A member without the role reaches no unit:
    no reach, no pin, no switcher entry, no seat or plain-membership right and no explicit
    Logistiker or Einsatzleiter flag (ADR-0300 decision 4, extended to the flags), no bank
    membership audience and no membership-derived notification. Bank roles stay a separate axis.
