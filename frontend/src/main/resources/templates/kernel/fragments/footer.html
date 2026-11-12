@@ -17,10 +17,9 @@
         <div class="krt-footer-meta">
             <a class="krt-footer-sc-links" sec:authorize="isAuthenticated()" th:href="@{/sc-links}"
                data-testid="footer-sc-links" data-entry-key="sclinks.list" th:text="#{nav.scLinks}">Star-Citizen-Links</a>
-            <a class="krt-footer-handbook"
-               href="https://github.com/krt-profit/basetool/wiki"
-               target="_blank" rel="noopener noreferrer"
-               th:text="#{footer.handbook}">Handbuch</a>
+            <th:block th:each="entry : ${navigation.legal().links().?[external()]}">
+                <th:block th:replace="~{kernel/fragments/nav-entries :: link(${entry}, null, null, null, false)}" />
+            </th:block>
             <a class="krt-footer-github"
                href="https://github.com/krt-profit/basetool"
                target="_blank" rel="noopener noreferrer"

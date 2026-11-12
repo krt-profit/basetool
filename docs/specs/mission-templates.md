@@ -1,6 +1,6 @@
 > **Doc type:** Living spec
 > **Owner area:** MISSION/UI
-> **Related ADR:** [ADR-0375](../adr/0375-mission-templates-have-one-owner-and-revision.md)
+> **Related ADR:** [ADR-0376](../adr/0376-mission-templates-have-one-owner-and-revision.md)
 
 # Mission templates
 

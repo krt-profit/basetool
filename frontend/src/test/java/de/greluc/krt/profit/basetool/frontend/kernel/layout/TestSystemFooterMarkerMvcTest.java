@@ -24,11 +24,16 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationAccess;
+import de.greluc.krt.profit.basetool.frontend.navigation.web.NavigationMenu;
+import de.greluc.krt.profit.basetool.frontend.navigation.web.NavigationRegistry;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.Cookie;
 import java.util.Locale;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -52,20 +57,22 @@ class TestSystemFooterMarkerMvcTest {
   @Autowired private WebApplicationContext context;
 
   @Autowired private ITemplateEngine templateEngine;
+  @Autowired private NavigationRegistry navigationRegistry;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
   /**
    * Renders the public Impressum with the configured default and returns its footer markup.
    *
+   * @param language the language selected in the locale cookie
    * @return the markup from the opening {@code <footer} to its closing tag
    * @throws Exception if the request fails
    */
-  private String impressumFooter() throws Exception {
+  private String impressumFooter(String language) throws Exception {
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     String html =
         mockMvc
-            .perform(get("/impressum").cookie(new Cookie("KRT_LOCALE", "de")))
+            .perform(get("/impressum").cookie(new Cookie("KRT_LOCALE", language)))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -91,16 +98,34 @@ class TestSystemFooterMarkerMvcTest {
             locale);
     webContext.setVariable("testSystem", true);
     webContext.setVariable("appVersion", "1.0.0");
+    webContext.setVariable(
+        "navigation",
+        NavigationMenu.resolve(navigationRegistry, new NavigationAccess(Set.of(), Set.of())));
     return templateEngine.process("kernel/fragments/footer", Set.of("footer"), webContext);
   }
 
   @Test
   void productionShowsNoMarker() throws Exception {
-    assertThat(impressumFooter())
+    assertThat(impressumFooter("de"))
         .startsWith("<footer class=\"krt-footer\">")
         .doesNotContain("krt-footer--test-system")
         .doesNotContain("krt-footer-instance")
         .doesNotContain("Testsystem");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"de, Forumdiskussion", "en, Forum discussion"})
+  void thePublicFooterLinksToBothForumThreads(String language, String discussionLabel)
+      throws Exception {
+    assertThat(impressumFooter(language))
+        .containsSubsequence(
+            "class=\"krt-footer-meta\"",
+            "href=\"https://das-kartell.org/forum/thread/9468-profit-basetool-changelog/\"",
+            "target=\"_blank\" rel=\"noopener noreferrer\" data-entry-key=\"legal.changelog\"",
+            ">Changelog</a>",
+            "href=\"https://das-kartell.org/forum/thread/9469-profit-basetool-diskussion-und-sammelthread/\"",
+            "target=\"_blank\" rel=\"noopener noreferrer\" data-entry-key=\"legal.discussion\"",
+            ">" + discussionLabel + "</a>");
   }
 
   @Test

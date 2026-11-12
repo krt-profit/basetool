@@ -1,4 +1,4 @@
-# ADR-0375 - Mission templates have one owner and revision
+# ADR-0376 - Mission templates have one owner and revision
 
 - **Status:** Accepted
 - **Date:** 2026-11-12

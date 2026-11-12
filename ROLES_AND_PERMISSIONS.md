@@ -99,6 +99,9 @@ That is the whole list, and it is enumerated rather than described: `AnonymousSu
 `AnonymousSurfaceSweepMvcTest` issue **every** mapping the dispatcher knows without a principal, so
 a path added next month is covered on the day it is added.
 
+The shared footer links to the external changelog and forum discussion without requiring a Basetool
+account. Signed-in users with the phone tab bar can open the same links from the menu.
+
 ### 1.2 What a visitor without a login may **not** do
 
 **Everything else.** The list above is the surface; there is no second tier below member that
