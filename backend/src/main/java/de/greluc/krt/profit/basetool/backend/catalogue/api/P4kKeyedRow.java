@@ -99,7 +99,7 @@ public interface P4kKeyedRow {
    * Whether the row is out of the game or hidden, so it leaves every picker and its references show
    * the "no longer in the game" notice (REQ-P4K-013).
    *
-   * @return {@code true} when the sweep stamped it or an admin hid it
+   * @return {@code true} when the sweep stamped it or an admin hid it through a review case
    */
   default boolean isP4kRetired() {
     return getP4kDeletedAt() != null || getP4kHiddenAt() != null;

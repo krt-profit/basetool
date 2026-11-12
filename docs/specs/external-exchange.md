@@ -2003,13 +2003,22 @@ Change-set sanitization removes every undeclared field independently of the fift
 reporting cap. Unknown fields in later operations are removed too. The pointer-length check
 examines all undeclared fields before relay, including fields beyond the warning cap.
 
+**The release baseline is mandatory in CI.** The *Fetch the previous release's exchange schemas*
+step of `ci.yml` copies the newest `vX.Y.Z` tag's v1 schemas to `ingest/build/exchange-baseline/`,
+which `ingest/build.gradle.kts` passes to the tests as `-Dexchange.baseline`. The step fails the job
+when it finds no such tag, cannot fetch it or finds no schema in it, so a green build has compared
+the schemas with the last release. The tag is read anonymously from the public repository, which
+works for a fork's pull request too, so a failed fetch is a transient error to re-run, never a
+reason to skip. A local build fetches no baseline, and the comparison skips.
+
 **Acceptance**
 
-- [x] A contract test fails a change that removes or narrows anything in a v1 schema: CI copies
-  the latest release's schemas to `ingest/build/exchange-baseline/` and
-  `ExchangeContractTest.theSchemasOnlyGrewSinceThePreviousRelease` compares them with
-  `SchemaCompatibility`, whose rules `SchemaCompatibilityTest` pins. Until a release carries the
-  v1 schemas the comparison has nothing to compare and is skipped.
+- [x] A contract test fails a change that removes or narrows anything in a v1 schema:
+  `ExchangeContractTest.theSchemasOnlyGrewSinceThePreviousRelease` compares the release baseline
+  with the current schemas through `SchemaCompatibility`, whose rules `SchemaCompatibilityTest`
+  pins.
+- [x] CI cannot skip the comparison: the fetch step fails on a missing release tag, a failed fetch
+  and a tag without schemas.
 - [x] A narrowing the owner accepts as a correction is listed by its exact comparison message, with
   its reason, in `ExchangeContractTest.ACCEPTED_NARROWINGS`; any other narrowing still fails, and the
   entry is proven to match exactly what the comparison reports for it.
@@ -2031,7 +2040,8 @@ examines all undeclared fields before relay, including fields beyond the warning
 > with `400 VALIDATION_FAILED` (`ExchangeWireContractTest`), and all three narrowings are listed in
 > `ACCEPTED_NARROWINGS`.
 
-**Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest` · **Status:** implemented —
+**Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest`, the
+*Fetch the previous release's exchange schemas* step of `ci.yml` · **Status:** implemented —
 WP 0.2 (#2080)
 
 ### REQ-XCH-027 — Approved clients meet the client security requirements
@@ -2725,6 +2735,15 @@ G-18)
 
 ### REQ-XCH-039 — The relay surface has its own internal OpenAPI document
 
+> [!note] Amended 2026-11-12 (ADR-0268, ADR-0269) — no release comparison reads the relay document
+> The contract tiers and the previous-release comparison of the backend documents (REQ-API-017)
+> ended with the Android app (ADR-0269), the API vhost with ADR-0268. Nothing compares the relay
+> document with a release any more, and CI no longer fetches one. What holds the relay operations
+> to their clients is the exchange contract on the gateway: every backend answer validates against
+> the published v1 schemas (`ExchangeWireContractTest`, REQ-XCH-036), and those schemas only grow
+> from one release to the next (REQ-XCH-026). The tier, release-comparison and vhost lines leave
+> this requirement; git keeps the text.
+
 The backend operations the gateway relays to — the 20 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
@@ -2740,17 +2759,16 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  31 relay operations, all of the `exchange` domain and tier `T0`, none anonymous, the `bearer-jwt`
-  scheme and requirement, and no dangling reference; of `openapi.json` no relay path and no dangling
-  reference (REQ-API-018).
+  31 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
+  requirement, and no dangling reference; of `openapi.json` no relay path and no dangling reference
+  (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
   ignored. Outside CI a stale file is rewritten; in CI (`CI=true`) the generator fails, naming the
   file. CI's `git diff` step covers both files as well.
-- **The freeze reads both.** The `T0` tier check, the previous-release comparison
-  (REQ-API-017), the anonymous-operation check, the 429 header check and the API vhost's exchange
-  exclusion read the two documents joined. A previous release is compared together with its relay
-  document when it has one (CI fetches it beside `openapi.json`); a baseline that does not document
-  every `T0` operation fails instead of skipping them.
+- **The whole-surface checks read both.** The anonymous-operation check
+  (`OpenApiAnonymousOperationsTest`), the 429 header check (`ProblemCodeRegistryTest`) and the
+  schema-name check (`OpenApiSchemaNamesTest`) read the two documents joined
+  (`CommittedOpenApi.merged()`).
 
 **Acceptance**
 
@@ -2760,16 +2778,12 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
   editing the committed file and running the generator with `CI=true`.
   *`OpenApiGeneratorTest`, `ExchangeFenceTest.aStaleDocumentFailsOrIsRewritten`.*
-- [x] A field dropped from a relay answer since the previous release fails the release comparison;
-  a baseline without the relay document fails once `openapi.json` no longer carries it.
-  *`ExternalContractTest`.*
 - [x] Each guard proven able to fail: planted documents with a relay path in `openapi.json`, a
-  foreign path, a wrong tier, an anonymous operation, a missing operation and a dangling reference
-  in the relay document, two documents that disagree on a schema, and a baseline without its relay
-  document.
+  foreign path, a foreign domain, an anonymous operation, a missing operation and a dangling
+  reference in the relay document, and two documents that disagree on a schema.
 
-**Enforced by:** `OpenApiGeneratorTest`, `ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`,
-`ExternalContractTest` · **Status:** implemented (plan step 0.7, the exchange fence)
+**Enforced by:** `OpenApiGeneratorTest`, `ExchangeFenceTest`, `OpenApiDocumentAssertionsTest` ·
+**Status:** implemented (plan step 0.7, the exchange fence)
 
 ### REQ-XCH-042 — Org stock is the shared stock of the member's own units, as lots per pool
 

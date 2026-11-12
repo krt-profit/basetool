@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatBaseDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatProperty;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatUnit;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStat;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatSource;
@@ -69,6 +70,7 @@ class BlueprintProductServiceTest {
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private BlueprintMapper blueprintMapper;
   @Mock private GameItemStatRepository gameItemStatRepository;
+  @Mock private GameItemRepository gameItemRepository;
 
   private BlueprintProductService service;
 
@@ -80,7 +82,8 @@ class BlueprintProductServiceTest {
             personalBlueprintRepository,
             new ProductKeys(new BlueprintNameNormalizer()),
             blueprintMapper,
-            gameItemStatRepository);
+            gameItemStatRepository,
+            gameItemRepository);
   }
 
   private static BlueprintProductRow row(
@@ -120,6 +123,38 @@ class BlueprintProductServiceTest {
     assertEquals("BP_A", dto.exampleKey());
     assertEquals("Behring", dto.manufacturerName());
     assertFalse(dto.ownedByCurrentUser());
+  }
+
+  @Test
+  void searchProducts_leavesOutAProductWhoseItemAnAdminHidAsUnobtainable() {
+    UUID hidden = UUID.randomUUID();
+    UUID offered = UUID.randomUUID();
+    when(blueprintRepository.findOfferableProductRows(""))
+        .thenReturn(
+            List.of(
+                row("Hidden Rifle", "BP_H", null, hidden),
+                row("Offered Rifle", "BP_O", null, offered),
+                row("Unresolved Rifle", "BP_U", null, null)));
+    when(gameItemRepository.findUnobtainableIds()).thenReturn(List.of(hidden));
+    noneOwned();
+
+    List<BlueprintProductDto> result = service.searchProducts(null, 25, SUB);
+
+    assertEquals(
+        List.of("Offered Rifle", "Unresolved Rifle"),
+        result.stream().map(BlueprintProductDto::name).toList());
+  }
+
+  @Test
+  void resolveByProductKey_stillResolvesAProductWhoseItemAnAdminHid() {
+    UUID hidden = UUID.randomUUID();
+    when(blueprintRepository.findOfferableProductRows(""))
+        .thenReturn(List.of(row("Hidden Rifle", "BP_H", null, hidden)));
+
+    Optional<ResolvedProduct> resolved = service.resolveByProductKey("hidden rifle");
+
+    assertTrue(resolved.isPresent(), "imports and existing references keep the product");
+    assertEquals(hidden, resolved.get().outputItemId());
   }
 
   @Test

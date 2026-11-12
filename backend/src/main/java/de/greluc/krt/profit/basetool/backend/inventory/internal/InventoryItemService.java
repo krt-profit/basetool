@@ -344,7 +344,7 @@ public class InventoryItemService {
    * @throws NotFoundException when any referenced id is unknown
    * @throws de.greluc.krt.profit.basetool.backend.kernel.BadRequestException when the job-order
    *     requirement, catalog-kind or quality rules are violated, or a game-item row names a mission
-   * @throws RetiredGameItemException when the P4K retired the game item
+   * @throws RetiredGameItemException when the game item is retired or unobtainable
    */
   @Transactional
   public InventoryItemDto createInventoryItem(

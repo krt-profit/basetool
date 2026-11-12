@@ -379,7 +379,9 @@ approval waiting is not itself a new deadline or technical failure.
   [Hosted App CI](https://github.com/krt-profit/basetool/actions/runs/43098702371)
 - The linked-money dashboard signals and passing contradiction alert test are recorded in
   [REQ-OBS-011](observability.md#req-obs-011--business-metrics-basetool_).
-- The integrated S15 tree passed the Gradle wrapper's `spotlessApply build --continue` with
-  `CONTRACT_BASELINE_REQUIRED=true` and the published `v1.23.4` contracts as the compatibility
-  baseline. The isolated Chromium runs cover both operating modes and the expanded Bank
-  draft assertion.
+- The integrated S15 tree passed the Gradle wrapper's `spotlessApply build --continue` against the
+  published `v1.23.4` release. Of that release's contracts only the exchange schemas have a
+  previous-release comparison
+  ([REQ-XCH-026](external-exchange.md#req-xch-026--the-contract-grows-additively-under-exchangev1));
+  the backend's OpenAPI documents have none since ADR-0269. The isolated Chromium runs cover both
+  operating modes and the expanded Bank draft assertion.

@@ -4232,6 +4232,10 @@ alerts never carry `source="P4K"`.
   an APPLY or a review resolution (`P4kCatalogueRevision`) or at the latest after an hour, which
   bounds what a Wiki or UEX merge of two P4K rows leaves stale; the due gauge and the oldest open
   case's age are fresh on every sample.
+- **Hidden items.** `basetool_catalogue_items_unobtainable` (untagged,
+  `UnobtainableItemBusinessGauges`) counts the game items an admin hid as not obtainable in the game
+  (REQ-P4K-048), read on every sample; the dashboard below shows it beside the stamped rows. It has
+  no alert: a hide is an admin decision, audited one event per change.
 - **Refused uploads.** `basetool_p4k_import_rejected_total{reason}` counts every upload the
   synchronous gate refuses, with `reason` one of `channel`, `schema_version`, `build_missing`,
   `older_build` and `too_large`; every reason's series is registered at zero at start, so the first
@@ -4264,9 +4268,10 @@ alerts never carry `source="P4K"`.
   reason exists at zero before the first refusal (`P4kUploadGateTest`, `P4kRejectionsTest`).
 - [x] Every alert above has a promtool rule test that fires and stays silent.
 
-**Enforced by:** `P4kImportDueService`, `P4kCatalogueBusinessGauges`, `P4kRejections`,
-`CatalogueMetricNames` · `P4kImportDueTest`, `P4kGameVersionTest`, `P4kItemClassShareTest`,
-`P4kCatalogueBusinessGaugesTest`, `P4kRejectionsTest`, `BusinessMetricsCollectorTest`,
+**Enforced by:** `P4kImportDueService`, `P4kCatalogueBusinessGauges`,
+`UnobtainableItemBusinessGauges`, `P4kRejections`, `CatalogueMetricNames` · `P4kImportDueTest`,
+`P4kGameVersionTest`, `P4kItemClassShareTest`, `P4kCatalogueBusinessGaugesTest`,
+`UnobtainableItemBusinessGaugesTest`, `P4kRejectionsTest`, `BusinessMetricsCollectorTest`,
 `AdminP4kImportDueMvcTest` · `monitoring/prometheus/alerts/business.yml`,
 `monitoring/prometheus/tests/p4k_catalogue_alerts_test.yml`,
 `monitoring/grafana/dashboards/12-p4k-catalogue.json` · **Related:** REQ-OBS-006, REQ-OBS-011,

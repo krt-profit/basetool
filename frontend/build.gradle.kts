@@ -1033,7 +1033,7 @@ val testBlueprintStatsJs =
 val testCatalogueAdminJs =
   registerNodeScriptTest(
     "testCatalogueAdminJs",
-    "Regression tests for the P4K catalogue admin pages: the storage-place name, read ordering and peer sync.",
+    "Regression tests for the P4K catalogue admin pages: the storage-place name, read ordering, peer sync and the item hide.",
     "scripts/catalogue-admin.test.mjs",
     "npmSetup",
   ) {

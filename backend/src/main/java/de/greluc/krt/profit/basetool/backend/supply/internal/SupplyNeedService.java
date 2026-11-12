@@ -176,7 +176,7 @@ public class SupplyNeedService {
    * @throws SupplyProblemException when the unit may not raise needs
    * @throws AccessDeniedException when the caller does not manage the unit
    * @throws BadRequestException when the request is inconsistent
-   * @throws RetiredGameItemException when the P4K retired the game item
+   * @throws RetiredGameItemException when the game item is retired or unobtainable
    */
   @Transactional
   public @NotNull NeedDto create(@NotNull CreateNeedRequest request) {
@@ -221,7 +221,7 @@ public class SupplyNeedService {
    * @param id the need
    * @param request the new values and the echoed version
    * @return the edited need
-   * @throws RetiredGameItemException when the P4K retired the need's game item
+   * @throws RetiredGameItemException when the need's game item is retired or unobtainable
    */
   @Transactional
   public @NotNull NeedDto update(@NotNull UUID id, @NotNull UpdateNeedRequest request) {

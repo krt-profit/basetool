@@ -353,6 +353,14 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Nullable
   private Instant p4kHiddenAt;
 
+  /**
+   * When an admin hid the item as not obtainable in the game (REQ-P4K-048), or {@code null} while
+   * the pickers offer it; no import, sync, sweep or merge writes it.
+   */
+  @Column(name = "unobtainable_since")
+  @Nullable
+  private Instant unobtainableSince;
+
   /** The P4K import run that last matched this row (REQ-P4K-005), or {@code null}. */
   @Column(name = "p4k_seen_run_id")
   @Nullable
@@ -423,4 +431,24 @@ public class GameItem extends AbstractEntity<UUID> implements P4kKeyedRow {
   @Column(name = "p4k_mass")
   @Nullable
   private Double p4kMass;
+
+  /**
+   * Whether an admin hid the item as not obtainable in the game (REQ-P4K-048).
+   *
+   * @return {@code true} while {@link #unobtainableSince} is set
+   */
+  public boolean isUnobtainable() {
+    return unobtainableSince != null;
+  }
+
+  /**
+   * Whether a new reference may take the item: the P4K lists it and no admin hid it as not
+   * obtainable (REQ-P4K-013, REQ-P4K-048); {@link SelectableGameItemJpql#SELECTABLE_ITEM} is its
+   * query form.
+   *
+   * @return {@code false} for a retired or an unobtainable item
+   */
+  public boolean isSelectable() {
+    return !isP4kRetired() && !isUnobtainable();
+  }
 }

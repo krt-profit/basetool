@@ -156,6 +156,7 @@ These terms come with ADR-0335…0347 (map #2884); the rules are in
 | **Lagerort / storage place** | A `location` where stock can lie: a city or station from UEX, or any visible starmap object an admin picks. The import never creates one (REQ-P4K-036). |
 | **Mass guard** | The 5 % threshold above which the orphan sweep of a kind stamps nothing unless the admin ticks "apply marking anyway" for that run (REQ-P4K-012, ADR-0336). |
 | **P4K stamp** | `p4k_deleted_at`, set by the orphan sweep on a row a complete kind no longer lists: the row leaves every picker and search, its references stay with a "no longer in the game" notice, and it wins over UEX and the Wiki (REQ-P4K-011, REQ-P4K-013). |
+| **Nicht erhältlich / unobtainable item** | A game item an admin hid as not obtainable in the game (`game_item.unobtainable_since`, `/admin/items`): it leaves every item picker and no new write takes it, while existing entries keep it without a notice. Not a P4K stamp or a review-case hide: no import writes it, and an admin offers the item again (REQ-P4K-048, ADR-0373). |
 
 
 ## 12.8 External catalogue reconciliation

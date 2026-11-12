@@ -563,6 +563,11 @@ The coverage list holds the **Katalog** area
     `CATALOGUE_SHOP_LINK_SET`, `CATALOGUE_SHOP_LINK_CLEARED` and `CATALOGUE_SHOP_LINK_RELEASED` when
     an admin links, unlinks or hands back to the import the UEX terminal link of a shop (subject the
     shop, label its entity name, details `terminalId` and `previousTerminalId`);
+  - the game items' obtainability
+    ([ADR-0373](../adr/0373-an-admin-hides-a-game-item-as-not-obtainable-in-a-column-of-its-own.md),
+    REQ-P4K-048): `CATALOGUE_GAME_ITEM_OBTAINABILITY_CHANGED` when an admin hides an item as not
+    obtainable in the game or offers it again (subject the item, label its name,
+    `obtainable=true|false`); an unchanged state records nothing;
   - `CATALOGUE_SYNC_REPORTS_DELETED`, the manual delete of sync reports, with `source` (`UEX`,
     `SCWIKI`, `P4K` or `ALL`), `olderThanDays` and the `deleted` count (the automatic `pruneRuns`
     stays a log line);

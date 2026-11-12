@@ -228,7 +228,10 @@ pass, REQ-P4K-040, REQ-P4K-041), and the orphan sweep `P4kSweeper`; `P4kImportRe
 reports and the review list; its wire format and streaming reader are `catalogue.internal.p4k`
 (REQ-P4K-001…016). The starmap tree (`StarmapObject`) is imported by `P4kStarmapReconciler`,
 `P4kStarmapLinker` links the nine UEX location tables to it through `StarmapPlaceRows`, and
-`StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038). The shops
+`StarmapAdminService` serves the admin's visibility overrides and manual links (REQ-P4K-034…038).
+`GameItemAdminService` serves the admin's hide of a game item as not obtainable, a state of its own
+that the item pickers and `SelectableGameItems` read beside the P4K retirement (REQ-P4K-048,
+ADR-0373). The shops
 (`Shop`, `ShopItem`) are imported by `P4kShopReconciler`, `P4kShopLinker` links each to a UEX
 terminal of its place by name (`ShopTerminalNames`), and `ShopAdminService` serves the admin's
 manual links; `ItemCatalogueDetailsService` shows an item's shops as "available at"

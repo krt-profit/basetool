@@ -38,6 +38,9 @@
 /admin/exchange-clients/{id}/undo POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#startUndo gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/{id}/undo/installations GET headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#undoInstallations gate=class:hasRole('ADMIN') layout=no
 /admin/exchange-clients/{id}/undo/preview POST headers=[X-Requested-With=XMLHttpRequest] -> AdminExchangeClientsRelayController#previewUndo gate=class:hasRole('ADMIN') layout=no
+/admin/items GET -> AdminItemsPageController#view gate=class:hasRole('ADMIN') layout=yes
+/admin/items/list GET -> AdminItemsController#items gate=class:hasRole('ADMIN') layout=no
+/admin/items/{id}/obtainability POST -> AdminItemsController#setObtainability gate=class:hasRole('ADMIN') layout=no
 /admin/locations GET -> AdminLocationsPageController#listData gate=class:hasRole('ADMIN') layout=yes
 /admin/locations/{id}/toggle-home-location POST -> AdminLocationsPageController#toggleHomeLocation gate=method:hasRole('ADMIN') layout=yes
 /admin/locations/{id}/toggle-home-location POST headers=[X-Requested-With=XMLHttpRequest] -> AdminLocationsPageController#toggleHomeLocationAjax gate=method:hasRole('ADMIN') layout=yes

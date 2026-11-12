@@ -158,7 +158,7 @@ public class SupplyDonationService {
    *
    * @param request the pledge
    * @return the pledged donation
-   * @throws RetiredGameItemException when the P4K retired the donated game item
+   * @throws RetiredGameItemException when the donated game item is retired or unobtainable
    */
   @Transactional
   public @NotNull DonationDto pledge(@NotNull PledgeRequest request) {
@@ -240,7 +240,7 @@ public class SupplyDonationService {
    *
    * @param request the received donation
    * @return the recorded donation
-   * @throws RetiredGameItemException when the P4K retired the donated game item
+   * @throws RetiredGameItemException when the donated game item is retired or unobtainable
    */
   @Transactional
   public @NotNull DonationDto record(@NotNull RecordDonationRequest request) {

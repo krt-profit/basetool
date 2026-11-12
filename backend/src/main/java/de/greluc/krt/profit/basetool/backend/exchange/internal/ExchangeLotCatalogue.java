@@ -170,7 +170,9 @@ public class ExchangeLotCatalogue {
     }
 
     /**
-     * Whether the entry is an item the P4K swept or an admin hid, which no write may book in.
+     * Whether the entry is an item the P4K swept or an admin hid through a review case, which no
+     * write may book in; an item hidden as not obtainable is booked, because the client read it
+     * from the game (REQ-P4K-048).
      *
      * @return {@code true} for a retired item
      */

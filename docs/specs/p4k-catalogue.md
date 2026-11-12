@@ -1,6 +1,6 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-07.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** P4K · **Related ADRs:** ADR-0335, ADR-0336, ADR-0337, ADR-0338, ADR-0339,
-> ADR-0340, ADR-0341, ADR-0342, ADR-0343, ADR-0344, ADR-0345, ADR-0346, ADR-0347
+> ADR-0340, ADR-0341, ADR-0342, ADR-0343, ADR-0344, ADR-0345, ADR-0346, ADR-0347, ADR-0373
 
 # P4K catalogue import
 
@@ -26,7 +26,8 @@ The decisions come from the wayfinder map #2884 and its tickets (#2885–#2897, 
 > REQ-P4K-017…019 (#3035), REQ-P4K-020…023 (#3036), REQ-P4K-024…026 (#3037), REQ-P4K-027 and
 > REQ-P4K-028 (#3038), REQ-P4K-029 (#3039), REQ-P4K-030 (#3040), REQ-P4K-031 and REQ-P4K-032
 > (#3042), REQ-P4K-033 (#3041), REQ-P4K-034…038 (#3044), REQ-P4K-039 (#3043), REQ-P4K-040 and
-> REQ-P4K-041 (#3045), REQ-P4K-042…044 (#3046), REQ-P4K-046 (#3032) and REQ-P4K-047 (#3034). The
+> REQ-P4K-041 (#3045), REQ-P4K-042…044 (#3046), REQ-P4K-046 (#3032), REQ-P4K-047 (#3034) and
+> REQ-P4K-048 (ADR-0373). The
 > import is `P4kImportService`, which hands the kinds to `P4kReconcilers` in dependency order, with one reconciler per kind (`P4kManufacturerReconciler`,
 > `P4kItemReconciler`, `P4kShipReconciler`, `P4kResourceGroupReconciler`, `P4kCommodityReconciler`,
 > `P4kBlueprintCategoryReconciler`, `P4kBlueprintReconciler`) sharing `P4kRowMatcher`, then
@@ -411,9 +412,12 @@ prices and terminals.
   `ITEM_RETIRED`; a fall, and a move the batch's falls cover, still apply.
 
 A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
-set. The pickers that filter it: the Lager and item-order item pickers
-(`GameItemRepository.findStockable`, `BlueprintRepository.findOrderableItems`), the blueprint pickers,
-the ship-type, manufacturer and material pickers and searches. A blueprint recipe leaves the product
+set. The pickers that filter it: the Lager, Materialbörse and item-order item pickers
+(`GameItemRepository.findStockable`, `findStockedWithoutBlueprint`,
+`BlueprintRepository.findOrderableItems`), the blueprint pickers,
+the ship-type, manufacturer and material pickers and searches. A game item an admin hid as not
+obtainable leaves the same item pickers and is refused on the same writes, without being retired
+(REQ-P4K-048). A blueprint recipe leaves the product
 search, the product-key resolution of a new personal blueprint, default blueprint, Materialbörse
 offer or request, the name and Wiki-key matches of the imports and the exchange's catalogue
 resolution (`BlueprintRepository.findOfferableProductRows`, `findExchangeKeyRows`); an owned
@@ -434,9 +438,13 @@ Materialbörse item offer or request named by its catalogue row (REQ-MARKET-012,
 REQ-MARKET-015). Reads,
 lists, deletes, withdrawals and the state changes of an existing entry (pause, resume, receive,
 decline) stay open. Every such write resolves the item through `SelectableGameItems` in
-`catalogue.api`; the JPQL queries that keep only listed items and recipes concatenate
-`P4kRetirementJpql`, the query form of `P4kKeyedRow.isP4kRetired()`. The frontend shows
-`error.catalogue.itemRetired` for the code (`krtFetch.catalogueRetiredMessage`).
+`catalogue.api`, which refuses an item that is not `GameItem#isSelectable()`; an item-order line
+reads the same rule from its write facts (`BlueprintRepository.findItemOrderDirectItems`,
+`findItemOrderRetainedItems`). The item pickers and those facts concatenate
+`SelectableGameItemJpql.SELECTABLE_ITEM`, its query form; the other JPQL queries that keep only
+listed items and recipes concatenate `P4kRetirementJpql`, the query form of
+`P4kKeyedRow.isP4kRetired()`. The frontend shows `error.catalogue.itemRetired` for the code
+(`krtFetch.catalogueRetiredMessage`), a wording that names both causes.
 
 The exchange refuses the same per op, with the change-result reason `ITEM_RETIRED` instead of a
 `400`: an org-stock `book-in` of a retired item (REQ-XCH-045), and a stock `set-quantity` that
@@ -682,6 +690,59 @@ sources. `p4k_item_class` carries the CHECK `ck_game_item_p4k_item_class`.
 **Enforced by:** `P4kItemPrecedenceTest`, `ShipComponentClassTest`, `ScWikiItemFieldWriterTest` ·
 **Code:** `ItemClassResolver` · **ADR:** [ADR-0337](../adr/0337-the-p4k-catalogue-leads-a-game-items-attributes-and-the-sc-wiki-fills-gaps.md) ·
 **Issues:** #2889
+
+### REQ-P4K-048 — an admin hides an item as not obtainable in the game and offers it again
+
+The catalogue lists every player item of the game files, also items that cannot be obtained in the
+game yet (REQ-P4K-009). An admin hides such an item on `/admin/items` and offers it again there. The
+decision is the item's own state, `game_item.unobtainable_since`: no APPLY, sweep, Wiki or UEX sync
+and no duplicate merge writes it, and it is no P4K retirement (REQ-P4K-013).
+
+A hidden item:
+
+- leaves every item picker: the Lager picker (`findStockable`), the item-order picker
+  (`findOrderableItems`) and the Materialbörse item pickers — the stocked items without a blueprint
+  (`findStockedWithoutBlueprint`) and the blueprint-product search, which also backs the personal
+  and default blueprint pickers;
+- is refused on every write that names it by id like a retired item (REQ-P4K-013): `400` with code
+  `CATALOGUE_ITEM_RETIRED`, an edit that keeps it included;
+- keeps its existing references, which show no notice; reads, lists, deletes, withdrawals and the
+  state changes of an existing entry stay open, and its minimum stock levels stay listed.
+
+The exchange's book-ins (REQ-XCH-045), the blueprint imports and the writes that name a blueprint
+product by key are not refused: they carry observed game data or follow the blueprint
+(ADR-0373).
+
+**Acceptance**
+
+- [x] A hidden item leaves the Lager, item-order and blueprint-product pickers; offered again, it is
+  back.
+- [x] A write that sets a hidden item, or edits an entry that keeps one, answers `400` with code
+  `CATALOGUE_ITEM_RETIRED`; the entry stays listed and can be removed.
+- [x] A hide and an offer-again write one `CATALOGUE_GAME_ITEM_OBTAINABILITY_CHANGED` event each;
+  repeating either writes none.
+- [x] A change while an APPLY or a Wiki or UEX sync holds the catalogue is refused with `409` and
+  writes nothing.
+- [x] The admin page swaps the changed row in place and reloads its list on a peer admin's change.
+
+`/admin/items` is a tab of the P4K data-import tabs beside the starmap. It lists every item the P4K
+lists, searched by name, or only the hidden items, the retired among them. A change names the wanted
+state (`PUT /api/v1/catalog/admin/game-items/{id}/obtainability` with `obtainable`), so a repeated
+change records nothing, and it takes the `SyncCoordinator` lock without waiting, as a review
+resolution does (REQ-P4K-016). The Lager, Materialbörse and item-order pickers and the item-order
+write facts concatenate `SelectableGameItemJpql.SELECTABLE_ITEM`, the query form of
+`GameItem#isSelectable()`;
+the blueprint-product search drops a product whose output item `findUnobtainableIds` names; the
+reads of existing entries keep `P4kRetirementJpql.LISTED_ITEM`. Each change announces the
+`catalogue-admin` room's `items` section (`CatalogueAdminLiveSync`, REQ-FE-015), the frontend proxy
+evicts the item-order picker's probe (`CacheDomain.ITEM_CATALOG`), and the gauge
+`basetool_catalogue_items_unobtainable` counts the hidden items (REQ-OBS-022).
+
+**Enforced by:** `GameItemAdminServiceTest`, `AdminGameItemControllerTest`,
+`SelectableGameItemsTest`, `BlueprintProductServiceTest`, `InventoryBookableItemsTest`,
+`StockLevelIntegrationTest`, `JobOrderItemServiceTest`, `UnobtainableItemBusinessGaugesTest`,
+`AdminItemsControllerMvcTest`, `frontend/scripts/catalogue-admin.test.mjs` · **Code:** `GameItemAdminService`,
+`SelectableGameItemJpql` · **ADR:** [ADR-0373](../adr/0373-an-admin-hides-a-game-item-as-not-obtainable-in-a-column-of-its-own.md)
 
 ## Manufacturers
 
@@ -1627,8 +1688,9 @@ The catalogue admin area is the audited area `AuditDomain.CATALOGUE` (REQ-AUDIT-
 spec that covers: a P4K preview enqueued (one event per job, with the Build) and an APPLY (one event
 per run, with Build, run id and counts per kind; actor the admin who enqueued it), each mass-guard override (REQ-P4K-012), each review resolution (REQ-P4K-016), each
 manual starmap link (REQ-P4K-035), shop link (REQ-P4K-043) and visibility override (REQ-P4K-038),
-and each storage place an admin creates on a non-UEX node (REQ-P4K-036). `p4k_import_change` stays
-the never-pruned detail record; the audit event carries no free text.
+each storage place an admin creates on a non-UEX node (REQ-P4K-036), and each item an admin hides
+as not obtainable or offers again (REQ-P4K-048). `p4k_import_change` stays the never-pruned detail
+record; the audit event carries no free text.
 
 **Acceptance**
 
@@ -1642,13 +1704,15 @@ The starmap's events are recorded: `CATALOGUE_STARMAP_LINK_SET`, `…_LINK_CLEAR
 `…_LINK_RELEASED` (subject the UEX row, details `kind`, `starmapObjectId`,
 `previousStarmapObjectId`), `CATALOGUE_STARMAP_VISIBILITY_OVERRIDDEN` and
 `CATALOGUE_STORAGE_PLACE_CREATED`; the shop's are `CATALOGUE_SHOP_LINK_SET`, `…_LINK_CLEARED` and
-`…_LINK_RELEASED` (subject the shop, details `terminalId`, `previousTerminalId`).
+`…_LINK_RELEASED` (subject the shop, details `terminalId`, `previousTerminalId`); an item's hide
+and offer-again is `CATALOGUE_GAME_ITEM_OBTAINABILITY_CHANGED` (subject the item, details
+`obtainable`).
 
 **Enforced by:** `CatalogueAuditTest` (the catalogue admin edits), `P4kImportAuditTest`,
 `P4kImportJobServiceTest`, `P4kImportJobRunnerTest`, `P4kImportServiceSweepTest` (the mass-guard
 override), `P4kReviewServiceTest` (the review
 resolutions), `P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`,
-`P4kShopTerminalLinkTest` · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901, #3032
+`P4kShopTerminalLinkTest`, `GameItemAdminServiceTest` (the item hide) · **ADR:** [ADR-0346](../adr/0346-catalogue-admin-activity-is-audited-in-its-own-domain.md) · **Issues:** #2901, #3032
 
 ### REQ-P4K-047 — the import is monitored and says when it is due
 
