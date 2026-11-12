@@ -38,10 +38,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Runs the Lager item picker read against PostgreSQL (REQ-INV-029): every listed blueprint output
- * and every listed item of a stocked type is bookable; consumables, clothing, paints, turrets,
- * untyped rows and retired rows are not. The Materialbörse's read of the stocked items no active
- * recipe produces runs here too (ADR-0372).
+ * Runs the Lager item picker read against PostgreSQL (REQ-INV-029, REQ-P4K-048): every listed
+ * blueprint output and every listed item of a stocked type is bookable; consumables, clothing,
+ * paints, turrets, untyped rows, retired rows and rows an admin hid as not obtainable are not. The
+ * Materialbörse's read of the stocked items no active recipe produces runs here too (ADR-0372).
  */
 @SpringBootTest
 @Transactional
@@ -101,6 +101,41 @@ class InventoryBookableItemsTest {
     blueprintRepository.flush();
 
     assertThat(bookable(TAG)).containsExactly(name("Live Railgun"));
+  }
+
+  @Test
+  void anItemAnAdminHidAsUnobtainableIsNotBookable_untilItIsOfferedAgain() {
+    item("Offered Railgun", "WeaponPersonal", "Large");
+    GameItem hidden = item("Unobtainable Railgun", "WeaponPersonal", "Large");
+    hidden.setUnobtainableSince(RETIRED);
+    crafted(item("Unobtainable Magazine", "WeaponAttachment", "Magazine"))
+        .getOutputItem()
+        .setUnobtainableSince(RETIRED);
+    gameItemRepository.flush();
+
+    assertThat(bookable(TAG)).containsExactly(name("Offered Railgun"));
+
+    hidden.setUnobtainableSince(null);
+    gameItemRepository.flush();
+
+    assertThat(bookable(TAG))
+        .containsExactlyInAnyOrder(name("Offered Railgun"), name("Unobtainable Railgun"));
+  }
+
+  @Test
+  void theBoerseReadLeavesOutAnItemAnAdminHidAsUnobtainable() {
+    item("Offered Railgun", "WeaponPersonal", "Large");
+    item("Unobtainable Railgun", "WeaponPersonal", "Large").setUnobtainableSince(RETIRED);
+    gameItemRepository.flush();
+
+    assertThat(
+            catalogue
+                .findBookableItemsWithoutBlueprint(TAG, PageRequest.of(0, 100))
+                .getContent()
+                .stream()
+                .map(InventoryGameItemReferenceDto::name)
+                .toList())
+        .containsExactly(name("Offered Railgun"));
   }
 
   @Test

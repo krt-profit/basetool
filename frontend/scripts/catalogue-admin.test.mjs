@@ -18,7 +18,7 @@
  */
 
 /**
- * Regression tests for the P4K catalogue admin pages (REQ-P4K-037): each page module runs in a vm
+ * Regression tests for the P4K catalogue admin pages (REQ-P4K-037, REQ-P4K-048): each page module runs in a vm
  * context over a fake DOM, with the transport, the modal, the toasts and the section seam replaced by
  * recording stand-ins, and is driven through the functions its event handlers call.
  */
@@ -544,6 +544,71 @@ await test('an upload above the multipart limit names the size limit', async () 
     page.fn('upload')();
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.deepEqual(page.ui.errors, ['krtP4kImportI18n.tooLarge']);
+});
+
+/**
+ * Loads the admin items page with the shared link-admin stand-ins, a transport whose reads the test
+ * records and a write that answers `__net.answer`.
+ *
+ * @param {Record<string, FakeElement>} [elements] the elements by id
+ */
+function itemsPage(elements = {}) {
+    const reads = [];
+    const page = load(
+        'catalogue/admin-items.js',
+        elements,
+        (url) => {
+            reads.push(url);
+            return new Promise(() => {});
+        },
+        {
+            '/js/catalogue/catalogue-link-admin.js': [
+                'const krtFetch = {',
+                '  getJson(url, opts) { return __net.read(url, opts || {}); },',
+                '  write(opts) { __net.writes.push(opts);',
+                '    return Promise.resolve(__net.answer || { ok: false }); },',
+                '};',
+                LINK_ADMIN_AS_IMPORTED,
+            ].join('\n'),
+        },
+    );
+    return { fn: page.fn, reads, ui: page.ui, live: page.live, net: page.net };
+}
+
+await test('the items page follows the admin room items section and reloads its list', () => {
+    const page = itemsPage();
+    const room = page.live.sections.find((s) => s.topicClass === 'CATALOGUE_ADMIN');
+    assert.ok(room, 'the page joins the admin catalogue room');
+    assert.equal(room.topic, 'catalogue-admin');
+    assert.deepEqual(Object.keys(room.sections), ['items']);
+
+    room.receiver.refresh(['items']);
+    assert.deepEqual(page.reads, ['/admin/items/list?page=0']);
+});
+
+await test('a hide names the wanted state, and a running sync shows the busy toast', () => {
+    const page = itemsPage();
+    page.fn('changeObtainability')({ id: 'i-1', name: 'Railgun' }, false, null);
+    const [write] = page.net.writes;
+    assert.equal(write.method, 'POST');
+    assert.equal(write.url, '/admin/items/i-1/obtainability');
+    assert.deepEqual(JSON.parse(JSON.stringify(write.payload)), { obtainable: false });
+
+    assert.equal(write.onConflict(), true, 'the 409 is handled by the page');
+    assert.deepEqual(page.ui.errors, ['busy']);
+});
+
+await test('an item offered again leaves the hidden-only list, which reloads in place', async () => {
+    const toggle = new FakeInput('admin-items-unobtainable');
+    toggle.checked = true;
+    const page = itemsPage({ 'admin-items-unobtainable': toggle });
+    page.net.answer = { ok: true, body: { id: 'i-1', name: 'Railgun', unobtainableSince: null } };
+
+    page.fn('changeObtainability')({ id: 'i-1', name: 'Railgun' }, true, null);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(page.ui.successes, ['toastShown']);
+    assert.deepEqual(page.reads, ['/admin/items/list?page=0&unobtainableOnly=true']);
 });
 
 if (failures > 0) {
