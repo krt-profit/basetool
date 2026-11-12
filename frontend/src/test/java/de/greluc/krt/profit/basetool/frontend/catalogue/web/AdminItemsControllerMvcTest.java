@@ -174,10 +174,7 @@ class AdminItemsControllerMvcTest {
   @WithMockUser(roles = "ADMIN")
   void aHide_returnsTheItemAndEvictsTheOrderProbe_andARunningSyncIsAConflict() throws Exception {
     when(backendApiClient.put(
-            OBTAINABILITY,
-            new GameItemObtainabilityRequest(false),
-            GameItemAdminDto.class,
-            ITEM))
+            OBTAINABILITY, new GameItemObtainabilityRequest(false), GameItemAdminDto.class, ITEM))
         .thenReturn(railgun("2026-11-12T10:00:00Z"));
     when(backendApiClient.put(
             OBTAINABILITY, new GameItemObtainabilityRequest(true), GameItemAdminDto.class, ITEM))

@@ -56,11 +56,10 @@ public final class CatalogueMetricNames {
   public static final String CATALOGUE_ITEMS_WITH_STATS = "basetool.catalogue.items.with.stats";
 
   /**
-   * Untagged gauge {@code basetool_catalogue_items_unobtainable}: the game items an admin hid as not
-   * obtainable in the game (REQ-P4K-048).
+   * Untagged gauge {@code basetool_catalogue_items_unobtainable}: the game items an admin hid as
+   * not obtainable in the game (REQ-P4K-048).
    */
-  public static final String CATALOGUE_ITEMS_UNOBTAINABLE =
-      "basetool.catalogue.items.unobtainable";
+  public static final String CATALOGUE_ITEMS_UNOBTAINABLE = "basetool.catalogue.items.unobtainable";
 
   /** Counter {@code basetool_sync_events_total} — tags {@code source}, {@code event_type}. */
   public static final String SYNC_EVENTS = "basetool.sync.events";

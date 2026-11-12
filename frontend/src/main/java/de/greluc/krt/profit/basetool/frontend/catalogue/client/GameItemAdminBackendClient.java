@@ -78,7 +78,6 @@ public class GameItemAdminBackendClient {
   @Nullable
   public GameItemAdminDto setObtainability(
       @NotNull UUID id, @NotNull GameItemObtainabilityRequest request) {
-    return backendApiClient.put(
-        BASE + "/{id}/obtainability", request, GameItemAdminDto.class, id);
+    return backendApiClient.put(BASE + "/{id}/obtainability", request, GameItemAdminDto.class, id);
   }
 }

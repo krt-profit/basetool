@@ -30,7 +30,8 @@ import org.springframework.stereotype.Component;
 /**
  * Tells the open admin starmap, shops, items and P4K import pages that what they list changed
  * (REQ-FE-010, REQ-FE-015): after the commit, one frame to the global {@link
- * LiveSyncTopicClass#CATALOGUE_ADMIN} room naming the page's section, never for a rolled-back write.
+ * LiveSyncTopicClass#CATALOGUE_ADMIN} room naming the page's section, never for a rolled-back
+ * write.
  */
 @Component
 @RequiredArgsConstructor

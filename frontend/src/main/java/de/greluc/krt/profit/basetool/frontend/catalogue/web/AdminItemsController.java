@@ -85,8 +85,7 @@ public class AdminItemsController {
       @RequestParam(defaultValue = "false") boolean unobtainableOnly,
       @RequestParam(defaultValue = "0") int page) {
     return withBackendStatus(() ->
-        itemClient.items(
-            StringNormalization.trimToNull(query), unobtainableOnly, page, PAGE_SIZE));
+        itemClient.items(StringNormalization.trimToNull(query), unobtainableOnly, page, PAGE_SIZE));
   }
 
   /**

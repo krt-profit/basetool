@@ -44,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -117,6 +118,20 @@ class GameItemAdminServiceTest {
   }
 
   @Test
+  void theItemOrderWriteFactsMarkAHiddenItemAsNotSelectable() {
+    GameItem cannon = item("Order Cannon", "WeaponGun", "Gun");
+    assertThat(blueprintRepository.findItemOrderDirectItems(Set.of(cannon.getId())))
+        .singleElement()
+        .satisfies(row -> assertThat(row.retired()).isFalse());
+
+    service.setObtainable(cannon.getId(), false);
+
+    assertThat(blueprintRepository.findItemOrderDirectItems(Set.of(cannon.getId())))
+        .singleElement()
+        .satisfies(row -> assertThat(row.retired()).as("an order line may not take it").isTrue());
+  }
+
+  @Test
   void eachChangeIsAuditedOnce_andAnUnchangedStateRecordsNothing() {
     GameItem helmet = item("Helmet", "Char_Armor_Helmet", "Heavy");
 
@@ -182,7 +197,8 @@ class GameItemAdminServiceTest {
     delta.setP4kHiddenAt(EARLIER);
     gameItemRepository.flush();
 
-    assertThat(listed(false)).extracting(GameItemAdminDto::name)
+    assertThat(listed(false))
+        .extracting(GameItemAdminDto::name)
         .containsExactly(name("Alpha"), name("Bravo"));
     assertThat(listed(true))
         .extracting(GameItemAdminDto::name, GameItemAdminDto::retired)

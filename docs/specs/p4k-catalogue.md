@@ -435,9 +435,11 @@ edited (REQ-SUP-003), a donation pledged or recorded (REQ-SUP-007, REQ-SUP-011),
 added or edited (REQ-ORDERS-032) and a trade deal created or edited for a need (REQ-PUR-007). Reads,
 lists, deletes, withdrawals and the state changes of an existing entry (pause, resume, receive,
 decline) stay open. Every such write resolves the item through `SelectableGameItems` in
-`catalogue.api`, which refuses an item that is not `GameItem#isSelectable()`. The item pickers
-concatenate `SelectableGameItemJpql.SELECTABLE_ITEM`, its query form; the other JPQL queries that
-keep only listed items and recipes concatenate `P4kRetirementJpql`, the query form of
+`catalogue.api`, which refuses an item that is not `GameItem#isSelectable()`; an item-order line
+reads the same rule from its write facts (`BlueprintRepository.findItemOrderDirectItems`,
+`findItemOrderRetainedItems`). The item pickers and those facts concatenate
+`SelectableGameItemJpql.SELECTABLE_ITEM`, its query form; the other JPQL queries that keep only
+listed items and recipes concatenate `P4kRetirementJpql`, the query form of
 `P4kKeyedRow.isP4kRetired()`. The frontend shows `error.catalogue.itemRetired` for the code
 (`krtFetch.catalogueRetiredMessage`), a wording that names both causes.
 
@@ -723,17 +725,18 @@ product by key are not refused: they carry observed game data or follow the blue
 lists, searched by name, or only the hidden items, the retired among them. A change names the wanted
 state (`PUT /api/v1/catalog/admin/game-items/{id}/obtainability` with `obtainable`), so a repeated
 change records nothing, and it takes the `SyncCoordinator` lock without waiting, as a review
-resolution does (REQ-P4K-016). The pickers concatenate `SelectableGameItemJpql.SELECTABLE_ITEM`, the
-query form of `GameItem#isSelectable()`; the reads of existing entries keep
-`P4kRetirementJpql.LISTED_ITEM`. Each change announces the `catalogue-admin` room's `items` section
-(`CatalogueAdminLiveSync`, REQ-FE-015), the frontend proxy evicts the item-order picker's probe
-(`CacheDomain.ITEM_CATALOG`), and the gauge `basetool_catalogue_items_unobtainable` counts the hidden
-items (REQ-OBS-022).
+resolution does (REQ-P4K-016). The Lager and item-order pickers and the item-order write facts
+concatenate `SelectableGameItemJpql.SELECTABLE_ITEM`, the query form of `GameItem#isSelectable()`;
+the blueprint-product search drops a product whose output item `findUnobtainableIds` names; the
+reads of existing entries keep `P4kRetirementJpql.LISTED_ITEM`. Each change announces the
+`catalogue-admin` room's `items` section (`CatalogueAdminLiveSync`, REQ-FE-015), the frontend proxy
+evicts the item-order picker's probe (`CacheDomain.ITEM_CATALOG`), and the gauge
+`basetool_catalogue_items_unobtainable` counts the hidden items (REQ-OBS-022).
 
 **Enforced by:** `GameItemAdminServiceTest`, `AdminGameItemControllerTest`,
 `SelectableGameItemsTest`, `BlueprintProductServiceTest`, `InventoryBookableItemsTest`,
-`StockLevelIntegrationTest`, `UnobtainableItemBusinessGaugesTest`, `AdminItemsControllerMvcTest`,
-`frontend/scripts/catalogue-admin.test.mjs` · **Code:** `GameItemAdminService`,
+`StockLevelIntegrationTest`, `JobOrderItemServiceTest`, `UnobtainableItemBusinessGaugesTest`,
+`AdminItemsControllerMvcTest`, `frontend/scripts/catalogue-admin.test.mjs` · **Code:** `GameItemAdminService`,
 `SelectableGameItemJpql` · **ADR:** [ADR-0373](../adr/0373-an-admin-hides-a-game-item-as-not-obtainable-in-a-column-of-its-own.md)
 
 ## Manufacturers

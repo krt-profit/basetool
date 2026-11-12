@@ -44,7 +44,9 @@ public class UnobtainableItemBusinessGauges implements BusinessGaugeSource {
   @Override
   public void register(@NotNull MeterRegistry registry) {
     Gauge.builder(
-            CatalogueMetricNames.CATALOGUE_ITEMS_UNOBTAINABLE, unobtainable, AtomicLong::doubleValue)
+            CatalogueMetricNames.CATALOGUE_ITEMS_UNOBTAINABLE,
+            unobtainable,
+            AtomicLong::doubleValue)
         .register(registry);
   }
 

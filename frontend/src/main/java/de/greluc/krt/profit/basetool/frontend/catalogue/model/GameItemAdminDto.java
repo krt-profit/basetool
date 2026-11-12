@@ -34,8 +34,8 @@ import java.util.UUID;
  * @param subType the item sub-type, or {@code null}
  * @param manufacturerName the manufacturer's name, or {@code null}
  * @param retired whether the P4K swept the item or an admin hid it through a review case
- * @param unobtainableSince ISO-8601 instant an admin hid the item as not obtainable, or {@code null}
- *     while the pickers offer it
+ * @param unobtainableSince ISO-8601 instant an admin hid the item as not obtainable, or {@code
+ *     null} while the pickers offer it
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 @DtoMirror

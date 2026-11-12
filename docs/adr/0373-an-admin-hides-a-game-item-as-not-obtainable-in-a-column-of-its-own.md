@@ -38,9 +38,10 @@ the Lager list (REQ-INV-067) and the exchange's refusal to book the item in (REQ
    - the blueprint-product search drops a product whose output item is unobtainable. It backs the
      Materialbörse item pickers and the personal and default blueprint pickers; a blueprint of an
      item nobody can obtain cannot be obtained either;
-   - every write that names a game item by id refuses an unobtainable one through
-     `SelectableGameItems`, like a retired one: `400`, code `CATALOGUE_ITEM_RETIRED`, an edit that
-     keeps the item included. The refusal's wording covers both causes.
+   - every write that names a game item by id refuses an unobtainable one like a retired one,
+     through `SelectableGameItems` or, for an item-order line, its write facts, which concatenate
+     the same fragment: `400`, code `CATALOGUE_ITEM_RETIRED`, an edit that keeps the item
+     included. The refusal's wording covers both causes.
 3. **What stays open.** Reads, lists, deletes, withdrawals and the state changes of existing
    entries; the minimum stock levels of an unobtainable item stay listed and counted; existing
    references show no notice, because the item is still in the game. Observed game data is not

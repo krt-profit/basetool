@@ -390,7 +390,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   List<ItemOrderRecipeFacts.Output> findItemOrderOutputs(@Param("ids") Collection<UUID> ids);
 
   /**
-   * Reads current selectable-item facts for direct submitted identities.
+   * Reads current selectable-item facts for direct submitted identities; an item the P4K retired or
+   * an admin hid as not obtainable is not selectable (REQ-P4K-013, REQ-P4K-048).
    *
    * @param ids the submitted local game-item identities
    * @return each directly matching item
@@ -398,16 +399,17 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$OrderedItem(
-        gi.id, gi.id,
-        CASE WHEN gi.p4kDeletedAt IS NOT NULL OR gi.p4kHiddenAt IS NOT NULL THEN true ELSE false END,
-        gi.version)
-      FROM GameItem gi WHERE gi.id IN :ids ORDER BY gi.id
-      """)
+        gi.id, gi.id, CASE WHEN\
+      """
+          + SELECTABLE_ITEM
+          + "THEN false ELSE true END, gi.version)"
+          + " FROM GameItem gi WHERE gi.id IN :ids ORDER BY gi.id")
   List<ItemOrderRecipeFacts.OrderedItem> findItemOrderDirectItems(
       @Param("ids") Collection<UUID> ids);
 
   /**
-   * Reads current selectable-item facts for retained submitted identities.
+   * Reads current selectable-item facts for retained submitted identities; an item the P4K retired
+   * or an admin hid as not obtainable is not selectable (REQ-P4K-013, REQ-P4K-048).
    *
    * @param ids the submitted local game-item identities
    * @return each matching retained identity and its surviving item
@@ -415,11 +417,11 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
   @Query(
       """
       SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts$OrderedItem(
-        r.id, gi.id,
-        CASE WHEN gi.p4kDeletedAt IS NOT NULL OR gi.p4kHiddenAt IS NOT NULL THEN true ELSE false END,
-        gi.version)
-      FROM GameItemRedirect r JOIN r.canonicalItem gi WHERE r.id IN :ids ORDER BY r.id
-      """)
+        r.id, gi.id, CASE WHEN\
+      """
+          + SELECTABLE_ITEM
+          + "THEN false ELSE true END, gi.version)"
+          + " FROM GameItemRedirect r JOIN r.canonicalItem gi WHERE r.id IN :ids ORDER BY r.id")
   List<ItemOrderRecipeFacts.OrderedItem> findItemOrderRetainedItems(
       @Param("ids") Collection<UUID> ids);
 }

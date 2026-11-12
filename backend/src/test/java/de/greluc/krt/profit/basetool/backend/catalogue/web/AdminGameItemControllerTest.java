@@ -90,8 +90,7 @@ class AdminGameItemControllerTest {
         .andExpect(jsonPath("$.unobtainableSince").isNotEmpty())
         .andExpect(jsonPath("$.retired").value(false));
     mockMvc
-        .perform(
-            get(PATH).param("query", TAG).param("unobtainableOnly", "true").with(admin()))
+        .perform(get(PATH).param("query", TAG).param("unobtainableOnly", "true").with(admin()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content.length()").value(1))
         .andExpect(jsonPath("$.content[0].id").value(item.getId().toString()));
@@ -100,8 +99,7 @@ class AdminGameItemControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.unobtainableSince").doesNotExist());
     mockMvc
-        .perform(
-            get(PATH).param("query", TAG).param("unobtainableOnly", "true").with(admin()))
+        .perform(get(PATH).param("query", TAG).param("unobtainableOnly", "true").with(admin()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content.length()").value(0));
     assertThat(gameItemRepository.findById(item.getId()).orElseThrow().isUnobtainable()).isFalse();
@@ -163,6 +161,7 @@ class AdminGameItemControllerTest {
     return jwt()
         .jwt(builder -> builder.subject(adminId.toString()))
         .authorities(
-            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"), new SimpleGrantedAuthority("ROLE_ADMIN"));
+            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+            new SimpleGrantedAuthority("ROLE_ADMIN"));
   }
 }

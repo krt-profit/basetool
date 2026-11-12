@@ -43,10 +43,10 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The admin item list (REQ-P4K-048, ADR-0373): pages the catalogue's game items and hides one as not
- * obtainable in the game, or offers it again. A hidden item leaves every item picker and no new
- * write may take it ({@code SelectableGameItems}); its existing references stay. Each change records
- * one {@code CATALOGUE} audit event and reaches the other admins' item lists (REQ-FE-015).
+ * The admin item list (REQ-P4K-048, ADR-0373): pages the catalogue's game items and hides one as
+ * not obtainable in the game, or offers it again. A hidden item leaves every item picker and no new
+ * write may take it ({@code SelectableGameItems}); its existing references stay. Each change
+ * records one {@code CATALOGUE} audit event and reaches the other admins' item lists (REQ-FE-015).
  */
 @Service
 @RequiredArgsConstructor

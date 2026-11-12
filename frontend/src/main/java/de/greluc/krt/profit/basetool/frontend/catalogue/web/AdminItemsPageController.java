@@ -28,8 +28,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Admin-only page {@code /admin/items} (REQ-P4K-048): the catalogue's game items, each hidden as not
- * obtainable in the game or offered in the item pickers. The page renders an empty shell; its
+ * Admin-only page {@code /admin/items} (REQ-P4K-048): the catalogue's game items, each hidden as
+ * not obtainable in the game or offered in the item pickers. The page renders an empty shell; its
  * script fills the list through {@link AdminItemsController}.
  */
 @Controller

@@ -321,8 +321,8 @@ public enum LiveSyncTopicClass {
    * storage places, and the UEX links), {@code shops} (the shops and their terminal links), {@code
    * items} (the game items and their obtainability), {@code runs} (the applied runs and the
    * import-due banner) and {@code review} (the open review cases), authorized locally by {@code
-   * ROLE_ADMIN} ({@link #requiredAnyRole}). The backend publishes into it after an admin's change, a
-   * review resolution and an APPLY (REQ-P4K-035, REQ-P4K-038, REQ-P4K-043, REQ-P4K-048,
+   * ROLE_ADMIN} ({@link #requiredAnyRole}). The backend publishes into it after an admin's change,
+   * a review resolution and an APPLY (REQ-P4K-035, REQ-P4K-038, REQ-P4K-043, REQ-P4K-048,
    * REQ-FE-015).
    */
   CATALOGUE_ADMIN(

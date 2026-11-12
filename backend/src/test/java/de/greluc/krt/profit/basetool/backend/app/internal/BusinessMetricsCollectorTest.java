@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kImportJobStatus;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.CatalogueStatBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ExternalSyncRunRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kCatalogueBusinessGauges;
-import de.greluc.krt.profit.basetool.backend.catalogue.internal.UnobtainableItemBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kCatalogueRevision;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportChangeRepository;
@@ -43,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportDueServ
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kImportRunRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kReviewCaseRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kStampedRows;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.UnobtainableItemBusinessGauges;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
