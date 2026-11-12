@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -37,12 +38,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -121,7 +124,7 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
     when(backendApiClient.post("/api/v1/orders/auec", AUEC_FORM, JobOrderDto.class))
         .thenReturn(createdOrder("AUEC"));
 
-    var response = mvc.perform(auecRequest(ajax));
+    var response = mvc.perform(auecRequest(ajax, AUEC_FORM));
     if (ajax) {
       response
           .andExpect(status().isOk())
@@ -145,7 +148,7 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
             new BackendServiceException(
                 "Denied", null, 403, "ACCESS_DENIED", null, List.of(), "Writer required."));
 
-    var response = mvc.perform(auecRequest(ajax));
+    var response = mvc.perform(auecRequest(ajax, AUEC_FORM));
     if (ajax) {
       response
           .andExpect(status().isForbidden())
@@ -163,14 +166,49 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
     verifyNoInteractions(liveSyncLocalBus);
   }
 
-  private static RequestBuilder auecRequest(boolean ajax) {
+  @Test
+  @WithMockUser
+  void invalidNativeAuecCreationKeepsTheFormWithoutWriting() throws Exception {
+    var invalid =
+        new CreateAuecJobOrderDto(
+            AUEC_FORM.responsibleOrgUnitId(),
+            AUEC_FORM.requestingOrgUnitId(),
+            "",
+            AUEC_FORM.comment(),
+            AUEC_FORM.target());
+
+    mvc.perform(auecRequest(false, invalid))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/orders/create"))
+        .andExpect(flash().attribute("errorToast", "orders.money.create.error"))
+        .andExpect(flash().attribute("startInAuecMode", true))
+        .andExpect(flash().attribute("auecTarget", AUEC_FORM.target()));
+    verify(backendApiClient, never()).post(eq("/api/v1/orders/auec"), any(), eq(JobOrderDto.class));
+    verifyNoInteractions(liveSyncLocalBus);
+  }
+
+  @Test
+  @WithMockUser
+  void nativeAuecCreationPropagatesWrappedSessionLoss() throws Exception {
+    var expired = new ReauthenticationRequiredException("OAuth2 session expired", null);
+    when(backendApiClient.post("/api/v1/orders/auec", AUEC_FORM, JobOrderDto.class))
+        .thenThrow(new BackendServiceException("Backend authentication failed", expired, 401));
+
+    mvc.perform(auecRequest(false, AUEC_FORM))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl(ReauthenticationRequiredException.REAUTH_PATH))
+        .andExpect(flash().attributeCount(0));
+    verifyNoInteractions(liveSyncLocalBus);
+  }
+
+  private static RequestBuilder auecRequest(boolean ajax, CreateAuecJobOrderDto form) {
     Map<String, String> fields =
         Map.of(
-            "responsibleOrgUnitId", AUEC_FORM.responsibleOrgUnitId().toString(),
-            "requestingOrgUnitId", AUEC_FORM.requestingOrgUnitId().toString(),
-            "handle", AUEC_FORM.handle(),
-            "comment", AUEC_FORM.comment(),
-            "target", AUEC_FORM.target());
+            "responsibleOrgUnitId", form.responsibleOrgUnitId().toString(),
+            "requestingOrgUnitId", form.requestingOrgUnitId().toString(),
+            "handle", form.handle(),
+            "comment", form.comment(),
+            "target", form.target());
     if (ajax) {
       MockMultipartHttpServletRequestBuilder request = multipart("/orders/auec");
       fields.forEach((name, value) ->

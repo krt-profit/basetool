@@ -466,6 +466,8 @@ and Bank details can follow later. Show only kind-relevant inputs. After create,
 detail and retain the list/filter return context.
 Use the shared create transport in REQ-FE-006. AJAX submits the form and follows the server's
 detail target. A native form submission redirects to the same detail.
+An invalid native form returns the entered fields without writing. A backend create attempt that
+requires reauthentication uses the existing session recovery.
 
 The ordinary money entry points are provision and movement, with correction on a history entry.
 The movement's purpose reveals only needed fields for collection, handover, return, release,

@@ -433,16 +433,27 @@ public class JobOrderWriteController {
       @Valid @ModelAttribute("auecJobOrderForm") @Nullable CreateAuecJobOrderDto form,
       @NotNull BindingResult bindingResult,
       @NotNull RedirectAttributes redirectAttributes) {
-    if (!bindingResult.hasErrors() && form != null) {
-      try {
-        String targetUrl = orderCreation.createAuecOrder(form);
-        redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
-        return "redirect:" + targetUrl;
-      } catch (BackendServiceException e) {
-        SectionFallback.rethrowIfReauthenticationRequired(e);
-        log.debug("Failed to create aUEC order (status {})", e.getStatusCode());
-      }
+    if (form == null || bindingResult.hasErrors()) {
+      return redirectToAuecForm(form, redirectAttributes);
     }
+    return createAuecOrderAndRedirect(form, redirectAttributes);
+  }
+
+  private @NotNull String createAuecOrderAndRedirect(
+      @NotNull CreateAuecJobOrderDto form, @NotNull RedirectAttributes redirectAttributes) {
+    try {
+      String targetUrl = orderCreation.createAuecOrder(form);
+      redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
+      return "redirect:" + targetUrl;
+    } catch (BackendServiceException e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
+      log.debug("Failed to create aUEC order (status {})", e.getStatusCode());
+      return redirectToAuecForm(form, redirectAttributes);
+    }
+  }
+
+  private static @NotNull String redirectToAuecForm(
+      @Nullable CreateAuecJobOrderDto form, @NotNull RedirectAttributes redirectAttributes) {
     redirectAttributes.addFlashAttribute("errorToast", "orders.money.create.error");
     redirectAttributes.addFlashAttribute("startInAuecMode", true);
     if (form != null) {
