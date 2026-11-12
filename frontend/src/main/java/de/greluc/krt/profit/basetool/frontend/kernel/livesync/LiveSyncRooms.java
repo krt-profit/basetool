@@ -161,6 +161,41 @@ final class LiveSyncRooms {
   }
 
   /**
+   * Takes a socket out of a room and, in a presence-enabled room where its user holds no other
+   * socket, drops that user's presence there and broadcasts the new snapshot.
+   *
+   * @param decorated the decorator leaving the room
+   * @param topic the room it leaves
+   * @param userId the socket owner's stable user id, or {@code null} on a refused socket
+   */
+  void depart(
+      @NotNull WebSocketSession decorated, @NotNull LiveSyncTopic topic, @Nullable String userId) {
+    Set<WebSocketSession> mates = leave(decorated, topic.canonical());
+    if (userId == null || !topic.topicClass().presenceEnabled()) {
+      return;
+    }
+    boolean hasOtherSession =
+        mates != null
+            && mates.stream().anyMatch(s -> userId.equals(LiveSyncSessionRegistry.userId(s)));
+    if (!hasOtherSession && !presenceService.clearAll(topic.canonical(), userId).isEmpty()) {
+      broadcastLocalPresenceChange(topic);
+    }
+  }
+
+  /**
+   * Reports whether a socket's decorator sits in a room; a subscribe still being authorized holds
+   * none.
+   *
+   * @param decorated the decorator to look for
+   * @param canonicalTopic the canonical topic of the room
+   * @return {@code true} when the socket holds the room
+   */
+  boolean holds(@NotNull WebSocketSession decorated, @NotNull String canonicalTopic) {
+    Set<WebSocketSession> mates = sessionsByTopic.get(canonicalTopic);
+    return mates != null && mates.contains(decorated);
+  }
+
+  /**
    * Sends a sanitised {@code changed} frame to every socket in the topic's room except {@code
    * origin}.
    *

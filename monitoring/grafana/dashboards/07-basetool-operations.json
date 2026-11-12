@@ -2002,7 +2002,7 @@
       },
       "type": "timeseries",
       "title": "Live-sync subscribe outcomes/hour by topic class",
-      "description": "Multiplexed /ws/sync subscribe-authorization verdicts per topic class (REQ-FE-015, ADR-0094). A rising `denied` rate on a room every viewer should reach hints at an auth/gate regression; `allowed` includes transient fail-open.",
+      "description": "Multiplexed /ws/sync subscribe-authorization verdicts per topic class (REQ-FE-015, ADR-0094). A rising `denied` rate on a room every viewer should reach hints at an auth/gate regression; `allowed` includes transient fail-open. The re-check series count the re-authorization of joined rooms (basetool_livesync_reauthorize_total): `evicted` is a revocation the relay caught, `token_expired` the expected 4401 rotation of a socket holding a checked room, `indeterminate` a check without a verdict that kept the room.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2034,6 +2034,15 @@
           "expr": "sum by (job, topic_class, outcome) (rate(basetool_livesync_subscribe_total[1h])) * 3600",
           "refId": "A",
           "legendFormat": "{{job}} · {{topic_class}} · {{outcome}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum by (job, topic_class, outcome) (rate(basetool_livesync_reauthorize_total[1h])) * 3600",
+          "refId": "B",
+          "legendFormat": "{{job}} · {{topic_class}} · re-check {{outcome}}",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -2525,7 +2534,7 @@
       },
       "type": "timeseries",
       "title": "Live-sync socket lifetime",
-      "description": "How long each /ws/sync socket stayed open, sampled when it closes (basetool_livesync_socket_lifetime_seconds). Every other live-sync meter counts events ON a socket; this one measures the socket. The signature to read is the mean or max collapsing toward a fixed value near a proxy timeout — that is an intermediary closing idle connections, and each close costs a reconnect, one subscribe-authorization probe per subscribed room and a page-wide resync, for every open tab. It happened: the edge's proxy_read_timeout is 90 s and the socket sent nothing at all, so every tab reconnected on a 90-second cadence and no meter here could see it. The handler now pings every socket every 30 s, and a parity test pins that interval to the edge timeout. NOT alertable — an ordinary navigation also ends a socket after seconds, so no threshold separates it from a teardown; read the panel, do not wait for a page.",
+      "description": "How long each /ws/sync socket stayed open, sampled when it closes (basetool_livesync_socket_lifetime_seconds). Every other live-sync meter counts events ON a socket; this one measures the socket. The signature to read is the mean or max collapsing toward a fixed value near a proxy timeout — that is an intermediary closing idle connections, and each close costs a reconnect, one subscribe-authorization probe per subscribed room and a page-wide resync, for every open tab. It happened: the edge's proxy_read_timeout is 90 s and the socket sent nothing at all, so every tab reconnected on a 90-second cadence and no meter here could see it. The handler now pings every socket every 30 s, and a parity test pins that interval to the edge timeout. A socket holding a room whose class needs a check also ends at its captured token's expiry (4401 from the re-authorization sweep, REQ-FE-015), so a mode near the 300 s access-token lifespan is that rotation, not a proxy. NOT alertable — an ordinary navigation also ends a socket after seconds, so no threshold separates it from a teardown; read the panel, do not wait for a page.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -5054,6 +5063,55 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 108,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 368
+      },
+      "type": "timeseries",
+      "title": "Active org unit switches/hour by target",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (target) (increase(basetool_active_org_unit_choice_writes_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{target}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "description": "Stored changes of the active org unit: unit is a choice of one org unit, all a choice of all of a member's org units. Counted, not audited (REQ-ORG-031, REQ-OBS-011)."
     }
   ]
 }

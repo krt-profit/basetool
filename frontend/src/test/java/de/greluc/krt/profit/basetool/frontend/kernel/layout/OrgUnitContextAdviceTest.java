@@ -22,11 +22,11 @@ package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -34,11 +34,11 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.ContextKind;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,14 +48,14 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * Unit tests for {@link OrgUnitContextAdvice}: the catalogue reads go through the cached path
- * (REQ-DATA-007), and {@code activeSquadronId} resolves correctly in its four branches.
+ * (REQ-DATA-007), and the context attributes show the backend's effective context, never a context
+ * of the frontend's own (REQ-ORG-024).
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitContextAdviceTest {
 
   @Mock private BackendApiClient backendApiClient;
   @Mock private FrontendAuthHelperService authHelper;
-  @Mock private HttpServletRequest request;
 
   private OrgUnitContextAdvice advice() {
     return new OrgUnitContextAdvice(
@@ -94,48 +94,89 @@ class OrgUnitContextAdviceTest {
   }
 
   @Test
-  void activeSquadronId_sessionPin_isReturned() {
+  void activeSquadronId_isTheOneUnitOfTheBackendsEffectiveContext() {
     UUID pinned = UUID.randomUUID();
-    when(authHelper.isAuthenticated()).thenReturn(true);
-    HttpSession session = mock(HttpSession.class);
-    when(request.getSession(false)).thenReturn(session);
-    when(session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY))
-        .thenReturn(pinned);
+    stubLayout(LayoutResponses.context(ContextKind.ORG_UNIT, pinned, List.of()));
 
-    assertEquals(pinned, advice().activeSquadronId(request));
-    verify(backendApiClient, never()).get(any(String.class), anyClass());
+    assertEquals(pinned, advice().activeSquadronId(new MockHttpServletRequest()));
   }
 
   @Test
-  void activeSquadronId_adminWithoutPin_isNull() {
-    when(authHelper.isAuthenticated()).thenReturn(true);
-    when(request.getSession(false)).thenReturn(null);
-    when(authHelper.isAdmin()).thenReturn(true);
+  void activeSquadronId_unpinnedMemberOfSeveralUnits_isNullSoAllMyOrgUnitsIsSelected() {
+    stubLayout(LayoutResponses.context(ContextKind.ALL_MY_ORG_UNITS, null, List.of()));
+    MockHttpServletRequest request = new MockHttpServletRequest();
+
+    OrgUnitContextAdvice advice = advice();
+    assertNull(advice.activeSquadronId(request));
+    assertTrue(advice.isAllMyOrgUnitsMode(request));
+    assertFalse(advice.isAllSquadronsMode(request));
+    assertTrue(advice.contextSpansOrgUnits(false, true));
+    assertEquals("ALL_MY_ORG_UNITS", advice.activeOrgUnitContextKey(request));
+  }
+
+  @Test
+  void activeSquadronId_ignoresASessionPinTheBackendDidNotHonour() {
+    stubLayout(LayoutResponses.context(ContextKind.ALL_MY_ORG_UNITS, null, List.of()));
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request
+        .getSession(true)
+        .setAttribute(
+            ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, UUID.randomUUID().toString());
 
     assertNull(advice().activeSquadronId(request));
-    verify(backendApiClient, never()).get(any(String.class), anyClass());
   }
 
   @Test
-  void activeSquadronId_nonAdmin_fallsBackToBackendActiveOrgUnit() {
-    UUID home = UUID.randomUUID();
-    when(authHelper.isAuthenticated()).thenReturn(true);
-    when(request.getSession(false)).thenReturn(null);
-    when(authHelper.isAdmin()).thenReturn(false);
-    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
-        .thenReturn(LayoutResponses.activeOrgUnit(home));
+  void anAdminWithoutPinIsInAllOrgUnitsMode() {
+    stubLayout(LayoutResponses.context(ContextKind.ALL_ORG_UNITS, null, List.of()));
+    MockHttpServletRequest request = new MockHttpServletRequest();
 
-    assertEquals(home, advice().activeSquadronId(request));
+    OrgUnitContextAdvice advice = advice();
+    assertNull(advice.activeSquadronId(request));
+    assertTrue(advice.isAllSquadronsMode(request));
+    assertFalse(advice.isAllMyOrgUnitsMode(request));
+    assertEquals("ALL_ORG_UNITS", advice.activeOrgUnitContextKey(request));
   }
 
   @Test
-  void activeSquadronId_backendFailure_degradesToNull() {
+  void aOneUnitContextIsAnnouncedWithItsUnit() {
+    UUID unit = UUID.randomUUID();
+    stubLayout(LayoutResponses.context(ContextKind.ORG_UNIT, unit, List.of()));
+    MockHttpServletRequest request = new MockHttpServletRequest();
+
+    OrgUnitContextAdvice advice = advice();
+    assertEquals("ORG_UNIT:" + unit, advice.activeOrgUnitContextKey(request));
+    assertFalse(advice.contextSpansOrgUnits(false, false));
+  }
+
+  @Test
+  void activeSquadronId_backendFailure_degradesToNullAndAnnouncesNothing() {
     when(authHelper.isAuthenticated()).thenReturn(true);
-    when(request.getSession(false)).thenReturn(null);
-    when(authHelper.isAdmin()).thenReturn(false);
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenThrow(new RuntimeException("boom"));
+    MockHttpServletRequest request = new MockHttpServletRequest();
 
-    assertNull(advice().activeSquadronId(request));
+    OrgUnitContextAdvice advice = advice();
+    assertNull(advice.activeSquadronId(request));
+    assertFalse(advice.isAllMyOrgUnitsMode(request));
+    assertNull(advice.activeOrgUnitContextKey(request));
+  }
+
+  @Test
+  void anAnonymousCallerHasNoContextAndCostsNoRead() {
+    when(authHelper.isAuthenticated()).thenReturn(false);
+    MockHttpServletRequest request = new MockHttpServletRequest();
+
+    OrgUnitContextAdvice advice = advice();
+    assertNull(advice.activeSquadronId(request));
+    assertFalse(advice.isAllSquadronsMode(request));
+    assertNull(advice.activeOrgUnitContextKey(request));
+    verify(backendApiClient, never()).get(any(String.class), anyClass());
+  }
+
+  private void stubLayout(LayoutContextLoader.MeLayoutResponse response) {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(response);
   }
 }

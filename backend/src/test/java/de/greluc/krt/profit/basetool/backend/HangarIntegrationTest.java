@@ -362,7 +362,9 @@ class HangarIntegrationTest {
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(user1.getId().toString()))
-                            .authorities(new SimpleGrantedAuthority("HANGAR_READ"))))
+                            .authorities(
+                                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                                new SimpleGrantedAuthority("HANGAR_READ"))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -441,7 +443,9 @@ class HangarIntegrationTest {
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(user1.getId().toString()))
-                            .authorities(new SimpleGrantedAuthority("HANGAR_READ"))))
+                            .authorities(
+                                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                                new SimpleGrantedAuthority("HANGAR_READ"))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -458,7 +462,9 @@ class HangarIntegrationTest {
                     .with(
                         jwt()
                             .jwt(builder -> builder.subject(user1.getId().toString()))
-                            .authorities(new SimpleGrantedAuthority("HANGAR_READ"))))
+                            .authorities(
+                                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                                new SimpleGrantedAuthority("HANGAR_READ"))))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()

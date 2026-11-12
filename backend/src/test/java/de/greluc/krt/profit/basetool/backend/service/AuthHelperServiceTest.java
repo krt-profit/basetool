@@ -29,6 +29,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.Collection;
 import java.util.List;
@@ -292,6 +293,48 @@ class AuthHelperServiceTest {
       stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
 
       assertFalse(helper.hasReachableRole("ROLE_NONEXISTENT"));
+    }
+  }
+
+  /** The one check of whether a caller's memberships confer anything (REQ-SEC-015, REQ-XCH-009). */
+  @Nested
+  class HoldsKrtMemberTests {
+
+    @Test
+    void falseWhenContextIsEmpty() {
+      assertFalse(helper.holdsKrtMember());
+    }
+
+    @Test
+    void trueForTheKrtMemberRole() {
+      authContextWith("ROLE_KRT_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_KRT_MEMBER"));
+
+      assertTrue(helper.holdsKrtMember());
+    }
+
+    @Test
+    void trueForAnExchangeActingMemberCarryingTheMarker() {
+      authContextWith("ROLE_EXCHANGE_MEMBER", Roles.EXCHANGE_KRT_MEMBER_MARKER);
+      stubHierarchyReaches(List.of("ROLE_EXCHANGE_MEMBER", Roles.EXCHANGE_KRT_MEMBER_MARKER));
+
+      assertTrue(helper.holdsKrtMember());
+    }
+
+    @Test
+    void falseForAnExchangeActingMemberWithoutTheMarker() {
+      authContextWith("ROLE_EXCHANGE_MEMBER");
+      stubHierarchyReaches(List.of("ROLE_EXCHANGE_MEMBER"));
+
+      assertFalse(helper.holdsKrtMember());
+    }
+
+    @Test
+    void falseForARoleThatDoesNotReachKrtMember() {
+      authContextWith("ROLE_BANK_EMPLOYEE");
+      stubHierarchyReaches(List.of("ROLE_BANK_EMPLOYEE"));
+
+      assertFalse(helper.holdsKrtMember());
     }
   }
 

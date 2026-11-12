@@ -122,7 +122,8 @@ public class PurchasingAccessPolicy {
   }
 
   /**
-   * Whether the caller leads or is a Logistician of the unit, or is an admin.
+   * Whether the caller leads or is a Logistician of the unit, or is an admin, inside the active
+   * context (REQ-ORG-032).
    *
    * @param orgUnitId the unit
    * @return {@code true} when the caller manages the unit's side of a deal
@@ -132,14 +133,15 @@ public class PurchasingAccessPolicy {
   }
 
   /**
-   * Returns the units the caller manages explicitly; an admin manages every unit, which this set
-   * does not list.
+   * Returns the units the caller manages explicitly inside the active context: the pinned unit when
+   * they manage it, otherwise all of their managed units (REQ-ORG-032). An admin manages every
+   * unit, which this set does not list.
    *
-   * @return the ids of the units the caller leads or is a Logistician of
+   * @return the ids of the units the caller leads or is a Logistician of in the active context
    */
   @NotNull
   public Set<UUID> managedUnitIds() {
-    return requestScopeResolver.currentGrantedOrgUnitIds(UNIT_MANAGER_ROLE);
+    return requestScopeResolver.currentGrantedOrgUnitIdsInActiveContext(UNIT_MANAGER_ROLE);
   }
 
   /**
@@ -205,8 +207,10 @@ public class PurchasingAccessPolicy {
   }
 
   /**
-   * Whether the caller reads the purchasing report: delegates, the governing leadership, bank staff
-   * and the leads and Logisticians of a raising unit (REQ-PUR-023).
+   * Whether the caller reads the purchasing report, whatever unit is pinned: delegates, the
+   * governing leadership, bank staff and the leads and Logisticians of a raising unit
+   * (REQ-PUR-023), so the „Bericht" tab does not depend on the pinned unit (ADR-0329). Which deals
+   * the report lists follows the active context ({@link #managedUnitIds()}).
    *
    * @return {@code true} when the caller may read and export the report
    */
@@ -214,7 +218,7 @@ public class PurchasingAccessPolicy {
     return isActiveDelegate()
         || isGoverningLeadership()
         || isBankStaff()
-        || !managedUnitIds().isEmpty();
+        || !requestScopeResolver.currentGrantedOrgUnitIds(UNIT_MANAGER_ROLE).isEmpty();
   }
 
   /**

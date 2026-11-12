@@ -30,8 +30,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -80,7 +78,7 @@ class BlueprintAccessPolicyDifferentialTest {
       when(authHelper.isAuthenticated()).thenReturn(true);
       when(authHelper.isAdmin()).thenReturn(caller.admin());
       when(authHelper.hasReachableRole(any())).thenReturn(false);
-      when(authHelper.hasReachableRole("ROLE_KRT_MEMBER")).thenReturn(true);
+      when(authHelper.holdsKrtMember()).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
 
       OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);
@@ -91,7 +89,7 @@ class BlueprintAccessPolicyDifferentialTest {
         row.setRole(caller.seat());
         rows.add(row);
       }
-      when(memberships.findAllByIdUserId(callerId)).thenReturn(rows);
+      when(memberships.findAllOnActiveOrgUnitsByIdUserId(callerId)).thenReturn(rows);
 
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
       RequestScopeResolver resolver =
@@ -100,7 +98,6 @@ class BlueprintAccessPolicyDifferentialTest {
               memberships,
               orgUnits,
               mock(OrgUnitCascadeService.class),
-              new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               new MockHttpServletRequest());
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       BlueprintAccessPolicy policy = new BlueprintAccessPolicy(resolver);

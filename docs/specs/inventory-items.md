@@ -136,7 +136,8 @@ requirements — the gates are parallel, not a replacement. The orphaned-link wa
 `POST /api/v1/orders/{id}/items/{itemId}/production` (REQ-ORDERS-025) additionally
 creates the produced units as item stock: the request's `bookIn` block names the
 location ("wo"), owner user ("bei wem", default: actor), owning org unit (create-on-
-behalf stamping semantics, REQ-ORG-004/016) and personal flag, and auto-earmarks the
+behalf stamping semantics, REQ-ORG-004/016; REQ-ORDERS-025 states how the production
+modal preselects it) and personal flag, and auto-earmarks the
 produced units to the producing order by default (`allocateToOrder`, deselectable;
 mutually exclusive with `personal = true` — personal stock never carries allocations).
 Book-in runs in the same transaction as the consumption (slice-first-then-merge

@@ -119,7 +119,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
   }
 
   /** Path of the waiting page a non-approved registration is routed to. */
-  private static final String PENDING_APPROVAL_PATH = "/pending-approval";
+  static final String PENDING_APPROVAL_PATH = "/pending-approval";
 
   /**
    * How long a non-terminal ({@code PENDING}/{@code REJECTED}) approval verdict may be reused

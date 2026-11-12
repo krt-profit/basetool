@@ -71,6 +71,14 @@ class UserMapperTest {
     return m;
   }
 
+  /** Builds the stored {@code KRT Member} role. */
+  private static Role krtMember() {
+    Role role = new Role();
+    role.setCode("KRT_MEMBER");
+    role.setName("KRT Member");
+    return role;
+  }
+
   /** Builds a squadron fixture with the given id, name and shorthand. */
   private static Squadron squadron(UUID id, String name, String shorthand) {
     Squadron s = new Squadron();
@@ -215,6 +223,7 @@ class UserMapperTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("noRequest");
+    user.getRoles().add(krtMember());
     when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
 
@@ -258,6 +267,7 @@ class UserMapperTest {
     User dual = new User();
     dual.setId(UUID.randomUUID());
     dual.setUsername("dual");
+    dual.getRoles().add(krtMember());
     User none = new User();
     none.setId(UUID.randomUUID());
     none.setUsername("none");
@@ -293,6 +303,31 @@ class UserMapperTest {
     verify(membershipRepository, times(1)).findAllByIdUserIdInAndKindIn(any(), any());
     verify(orgUnitRepository, times(1)).findAllById(any());
     verify(membershipRepository, times(0)).findAllByIdUserIdAndKind(any(), any());
+  }
+
+  @Test
+  void toDto_flagsConferNothingWithoutKrtMember() {
+    UUID alphaId = UUID.randomUUID();
+    User departed = new User();
+    departed.setId(UUID.randomUUID());
+    departed.setUsername("departed");
+    OrgUnitMembership flagged = staffelRow(departed.getId(), alphaId);
+    flagged.setLogistician(true);
+    flagged.setMissionManager(true);
+    when(membershipRepository.findAllByIdUserIdAndKind(departed.getId(), OrgUnitKind.SQUADRON))
+        .thenReturn(List.of(flagged));
+    when(orgUnitRepository.findAllById(any()))
+        .thenReturn(List.of((OrgUnit) squadron(alphaId, "Alpha", "ALP")));
+
+    UserDto withoutRole = mapper.toDto(departed);
+    departed.getRoles().add(krtMember());
+    UserDto withRole = mapper.toDto(departed);
+
+    assertFalse(withoutRole.isLogistician());
+    assertFalse(withoutRole.isMissionManager());
+    assertEquals(alphaId, withoutRole.squadron().id());
+    assertTrue(withRole.isLogistician());
+    assertTrue(withRole.isMissionManager());
   }
 
   @Test

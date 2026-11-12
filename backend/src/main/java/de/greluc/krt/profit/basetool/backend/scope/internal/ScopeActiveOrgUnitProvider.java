@@ -28,8 +28,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 /**
- * The scope module's {@link ActiveOrgUnitProvider}: the org unit {@link
- * RequestScopeResolver#currentSquadronId()} filters the current request by.
+ * The scope module's {@link ActiveOrgUnitProvider}: the one org unit the current request's
+ * effective context covers ({@link RequestScopeResolver#currentActiveContext()}).
  */
 @Service
 @RequiredArgsConstructor
@@ -38,13 +38,13 @@ public class ScopeActiveOrgUnitProvider implements ActiveOrgUnitProvider {
   private final RequestScopeResolver requestScopeResolver;
 
   /**
-   * The admin's header pin or the member's persistent org unit.
+   * The honoured pin, or a member's only org unit.
    *
-   * @return the org unit id, or empty when no filter applies
+   * @return the org unit id, or empty when the context covers several units or none
    */
   @Override
   @NotNull
   public Optional<UUID> activeOrgUnitId() {
-    return requestScopeResolver.currentSquadronId();
+    return Optional.ofNullable(requestScopeResolver.currentActiveContext().orgUnitId());
   }
 }

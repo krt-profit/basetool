@@ -64,7 +64,7 @@ class MaterialContributionMvcTest {
 
   @BeforeEach
   void setUp() {
-    doReturn(new MeLayoutResponse(null, List.of(), CapabilitiesResponse.NONE, 0L))
+    doReturn(new MeLayoutResponse(null, null, List.of(), CapabilitiesResponse.NONE, 0L))
         .when(backendApiClient)
         .get("/api/v1/me/layout", MeLayoutResponse.class);
     mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

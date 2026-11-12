@@ -215,7 +215,7 @@ public final class BankAccessPolicyFixtures {
      * @return the pinned org unit
      */
     public Optional<UUID> readsThePin() {
-      return requestScopeResolver.readActiveSquadronFromHeader();
+      return requestScopeResolver.currentPin();
     }
   }
 }

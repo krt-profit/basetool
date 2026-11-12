@@ -38,14 +38,16 @@ public enum SelectorKind {
 
   /**
    * Resolves to holders of a role <em>relative to an org unit carried by the event</em> — the role
-   * given by {@code orgRelativeRole} within the org unit selected by {@code contextRole}.
+   * given by {@code orgRelativeRole} within the org unit selected by {@code contextRole}, among the
+   * members who hold {@code KRT Member} (REQ-NOTIF-024).
    */
   ORG_RELATIVE_ROLE,
 
   /**
-   * Resolves to every employee holding a {@code bank_account_grant} on the <em>bank account carried
-   * by the event</em> ({@link NotificationEvent#contextAccountId()}). Reads no selector columns —
-   * the account comes from the event, mirroring {@link #ORG_RELATIVE_ROLE}.
+   * Resolves to every grantee of a {@code bank_account_grant} on the <em>bank account carried by
+   * the event</em> ({@link NotificationEvent#contextAccountId()}) who holds Bank Employee or a role
+   * above it; an inert grant resolves to nobody. Reads no selector columns — the account comes from
+   * the event, mirroring {@link #ORG_RELATIVE_ROLE}.
    */
   ACCOUNT_GRANT,
 
@@ -59,9 +61,9 @@ public enum SelectorKind {
 
   /**
    * Resolves to the responsible holder(s) (Kontoverantwortliche) of the bank account carried by the
-   * event ({@link NotificationEvent#contextAccountId()}), derived from the account's owning org
-   * unit via {@code OrgUnitBankAccessService} (REQ-BANK-034). Reads no selector columns, like
-   * {@link #ACCOUNT_GRANT}.
+   * event ({@link NotificationEvent#contextAccountId()}): the seat holders REQ-BANK-034 names for
+   * the account's type, each only while they hold {@code KRT Member}. Reads no selector columns,
+   * like {@link #ACCOUNT_GRANT}.
    */
   ACCOUNT_RESPONSIBLE,
 
@@ -95,17 +97,17 @@ public enum SelectorKind {
   EVENT_RECIPIENTS,
 
   /**
-   * Resolves to every member who holds a leadership seat in any org unit. Reads no selector columns
-   * and nothing from the event.
+   * Resolves to every member who holds a leadership seat in any org unit and {@code KRT Member}.
+   * Reads no selector columns and nothing from the event.
    */
   SEAT_HOLDERS,
 
   /**
    * Resolves to the members whose approval the booking request carried by the event ({@link
    * NotificationEvent#contextBankRequestId()}) still waits for, read from its {@code
-   * required_approver}: the account's responsible holders, the Bankleitung or the OL, never the
-   * requester; nobody once the request is approved, decided or needs no approval (REQ-NOTIF-033).
-   * Reads no selector columns.
+   * required_approver}: the account's responsible holders, the Bankleitung or the OL, a seat holder
+   * only while they hold {@code KRT Member}, never the requester; nobody once the request is
+   * approved, decided or needs no approval (REQ-NOTIF-033). Reads no selector columns.
    */
   REQUIRED_APPROVER,
 

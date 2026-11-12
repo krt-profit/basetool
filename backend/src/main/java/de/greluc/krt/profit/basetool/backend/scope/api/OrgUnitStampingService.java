@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.LinkedHashSet;
@@ -55,6 +56,7 @@ public class OrgUnitStampingService {
   private final AuthHelperService authHelper;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitRepository orgUnitRepository;
+  private final OrgUnitSeatEligibility seatEligibility;
 
   /**
    * Resolves the {@link Squadron} a newly created aggregate is stamped on from the optional
@@ -89,7 +91,7 @@ public class OrgUnitStampingService {
       if (memberOrgUnitIds.size() == 1) {
         stampedOrgUnitId = memberOrgUnitIds.iterator().next();
       } else {
-        Optional<UUID> pinned = requestScopeResolver.readActiveSquadronFromHeader();
+        Optional<UUID> pinned = requestScopeResolver.currentPin();
         if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
           stampedOrgUnitId = pinned.get();
         } else {
@@ -140,55 +142,76 @@ public class OrgUnitStampingService {
       throw new BadRequestException(
           "User has no org-unit membership — cannot stamp an aggregate owner");
     }
-    return resolveStampedOrgUnit(memberOrgUnitIds, owningOrgUnitId);
+    return resolveStampedOrgUnit(memberOrgUnitIds, owningOrgUnitId, pinAmong(memberOrgUnitIds));
   }
 
   /**
    * Resolves the owning org unit of an aggregate a connected application creates for a member
-   * (REQ-XCH-017): the member's only direct membership, or none when the member has none or
-   * several, because a client names no unit and the member assigns it later in the web.
+   * (REQ-XCH-017): the member's only stampable unit ({@link #collectStampableOrgUnitIds(User)}), or
+   * none when the member has none or several, because a client names no unit and the member assigns
+   * it later in the web.
    *
    * @param targetUser the member the aggregate is created for
-   * @return the member's only org unit, or {@code null}
+   * @return the member's only stampable org unit, or {@code null}
    */
   @Nullable
   public OrgUnit resolveOrgUnitForClientCreate(@NotNull User targetUser) {
-    Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
-    return memberOrgUnitIds.size() == 1 ? resolveStampedOrgUnit(memberOrgUnitIds, null) : null;
+    Set<UUID> stampableOrgUnitIds = collectStampableOrgUnitIds(targetUser);
+    return stampableOrgUnitIds.size() == 1 ? load(stampableOrgUnitIds.iterator().next()) : null;
   }
 
   /**
    * Resolves the owning org unit of the ships a hangar import creates (REQ-HANGAR-014): the
-   * member's only direct membership, else the active-context pin when it is one of them, else none,
-   * because an import names no unit and the member assigns it later with „Einheit ändern".
+   * active-context pin when it is one of the member's stampable units ({@link
+   * #collectStampableOrgUnitIds(User)}), else the member's only stampable unit, else none, because
+   * an import names no unit and the member assigns it later with „Einheit ändern".
    *
    * @param targetUser the member the ships are imported for
    * @return the resolved org unit, or {@code null} when none applies
    */
   @Nullable
   public OrgUnit resolveOrgUnitForImport(@NotNull User targetUser) {
-    Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
-    if (memberOrgUnitIds.isEmpty()) {
-      return null;
+    Set<UUID> stampableOrgUnitIds = collectStampableOrgUnitIds(targetUser);
+    UUID pinnedMembership = pinAmong(stampableOrgUnitIds);
+    if (pinnedMembership != null) {
+      return load(pinnedMembership);
     }
-    if (memberOrgUnitIds.size() > 1) {
-      Optional<UUID> pinned = requestScopeResolver.readActiveSquadronFromHeader();
-      if (pinned.isEmpty() || !memberOrgUnitIds.contains(pinned.get())) {
-        return null;
-      }
+    return stampableOrgUnitIds.size() == 1 ? load(stampableOrgUnitIds.iterator().next()) : null;
+  }
+
+  /**
+   * Resolves the owning org unit of a personal row an admin creates on a member's behalf
+   * (REQ-HANGAR-011): a pick must be one of the member's direct memberships; without one, the
+   * member's only stampable unit ({@link #collectStampableOrgUnitIds(User)}) is stamped and a
+   * member without one keeps the row without a unit. The admin's own active context never decides
+   * it.
+   *
+   * @param member the member the row is created for
+   * @param owningOrgUnitId the picked org unit, or {@code null}
+   * @return the resolved org unit, or {@code null} for a member without a stampable unit
+   * @throws BadRequestException when the pick is not a direct membership of the member
+   * @throws OwnerOrgUnitRequiredException when the member has several stampable units and nothing
+   *     is picked
+   */
+  @Nullable
+  public OrgUnit resolveOrgUnitForAdminOnBehalf(
+      @NotNull User member, @Nullable UUID owningOrgUnitId) {
+    if (owningOrgUnitId != null) {
+      return resolveOwnerMembershipTarget(member, owningOrgUnitId);
     }
-    return resolveStampedOrgUnit(memberOrgUnitIds, null);
+    return resolveStampedOrgUnitOrNone(collectStampableOrgUnitIds(member), null, null);
   }
 
   /**
    * Resolves the target of a later org-unit change of an owner's aggregate (REQ-HANGAR-009): one of
-   * the owner's direct memberships of any kind, or none. Neither the caller's scope nor an
-   * active-context pin widens it.
+   * the owner's direct memberships of any kind on an active unit, or none; a deactivated unit takes
+   * no row (REQ-ORG-032). Neither the caller's scope nor an active-context pin widens it.
    *
    * @param owner the aggregate's owner
    * @param targetOrgUnitId the chosen org unit, or {@code null} for none
    * @return the chosen org unit as its concrete subtype, or {@code null} for none
-   * @throws BadRequestException when the target is not a direct membership of the owner
+   * @throws BadRequestException when the target is not a direct membership of the owner or is
+   *     deactivated
    */
   @Nullable
   public OrgUnit resolveOwnerMembershipTarget(@NotNull User owner, @Nullable UUID targetOrgUnitId) {
@@ -198,37 +221,64 @@ public class OrgUnitStampingService {
     if (!collectMemberOrgUnitIds(owner).contains(targetOrgUnitId)) {
       throw new BadRequestException("Target org unit is not a direct membership of the owner");
     }
-    return orgUnitRepository
-        .findById(targetOrgUnitId)
-        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
-        .orElseThrow(() -> new BadRequestException("Target org unit does not exist"));
+    OrgUnit target =
+        orgUnitRepository
+            .findById(targetOrgUnitId)
+            .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+            .orElseThrow(() -> new BadRequestException("Target org unit does not exist"));
+    if (!target.isActive()) {
+      throw new BadRequestException("Target org unit is deactivated");
+    }
+    return target;
   }
 
   /**
-   * Variant of {@link #resolveOrgUnitForPickerOutput(User, UUID)} for the ownerless-personal
-   * aggregates (ship, refinery order, inventory item): a membershipless user without a pick
-   * resolves to {@code null} instead of a 400. Every other case behaves identically.
+   * Variant of {@link #resolveOrgUnitForPickerOutput(User, UUID)} for the personal aggregates that
+   * may stay without an owning unit (ship, refinery order, inventory item), over the owner's
+   * stampable units ({@link #collectStampableOrgUnitIds(User)}): without a pick, the honoured pin
+   * is stamped only when it is one of them (REQ-ORG-032), so a personal row never lands in a unit
+   * its owner does not belong to. An owner without a stampable unit and without a pick resolves to
+   * {@code null} instead of a 400.
    *
-   * @param targetUser the user whose memberships gate the picker output; never {@code null}.
+   * @param targetUser the user the personal row belongs to; never {@code null}.
    * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} when the picker was not
    *     used.
-   * @return the resolved {@link OrgUnit}, or {@code null} when {@code targetUser} has no membership
-   *     and supplied no explicit choice.
-   * @throws BadRequestException for every other rejection, including a membershipless user who
-   *     supplied a pick.
+   * @return the resolved {@link OrgUnit}, or {@code null} when {@code targetUser} has no stampable
+   *     unit and no pick names a unit.
+   * @throws BadRequestException for every other rejection
    */
   @Nullable
   public OrgUnit resolveOrgUnitForPickerOutputNullable(
       @NotNull User targetUser, @Nullable UUID owningOrgUnitId) {
-    Set<UUID> memberOrgUnitIds = collectMemberOrgUnitIds(targetUser);
-    if (memberOrgUnitIds.isEmpty()) {
-      if (owningOrgUnitId == null) {
-        return null;
-      }
-      throw new BadRequestException(
-          "Selected owner org unit is not a membership of the target user");
-    }
-    return resolveStampedOrgUnit(memberOrgUnitIds, owningOrgUnitId);
+    Set<UUID> stampableOrgUnitIds = collectStampableOrgUnitIds(targetUser);
+    return resolveStampedOrgUnitOrNone(
+        stampableOrgUnitIds, owningOrgUnitId, pinAmong(stampableOrgUnitIds));
+  }
+
+  /**
+   * Resolves the owning org unit of a mission or operation a caller creates (REQ-ORG-032): without
+   * a pick, the honoured pin is stamped, since every honoured pin is a unit the caller may edit, so
+   * the new row lands in the selected unit; without a pin, the creator's only stampable unit
+   * ({@link #collectStampableOrgUnitIds(User)}).
+   *
+   * @param creator the creating user, whose stampable units gate the picker output; never {@code
+   *     null}
+   * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} when the picker was not
+   *     used
+   * @return the resolved {@link OrgUnit}, or {@code null} when the creator has no stampable unit
+   *     and neither a pick nor a pin names a unit
+   * @throws BadRequestException on a pick that is neither a stampable unit of the creator nor
+   *     within the caller's editable scope
+   * @throws OwnerOrgUnitRequiredException when several stampable units lack both a pick and a pin
+   *     (REQ-ORG-023)
+   */
+  @Nullable
+  public OrgUnit resolveOrgUnitForUnitOwnedAggregate(
+      @NotNull User creator, @Nullable UUID owningOrgUnitId) {
+    return resolveStampedOrgUnitOrNone(
+        collectStampableOrgUnitIds(creator),
+        owningOrgUnitId,
+        requestScopeResolver.currentPin().orElse(null));
   }
 
   /**
@@ -286,50 +336,110 @@ public class OrgUnitStampingService {
   }
 
   /**
-   * Validates the picker output for a user with at least one membership and loads the chosen id as
-   * its concrete, unproxied {@link OrgUnit} subtype.
+   * Collects the units a row of {@code user} is stamped on without a pick (REQ-ORG-032,
+   * REQ-SEC-015): their direct memberships on active units, and none while they lack the stored
+   * {@code KRT Member} role. These are the direct memberships the owner picker offers.
    *
-   * <p>Without a pick, a single direct membership is auto-stamped. An explicit pick is accepted
-   * when it is a direct membership or an org unit the caller may edit ({@link
-   * AccessGateService#canEditSquadron(UUID)}).
+   * @param user the owner or creator of the new row; never {@code null}
+   * @return the stampable org-unit ids, unordered; never {@code null}, possibly empty
+   */
+  @NotNull
+  private Set<UUID> collectStampableOrgUnitIds(@NotNull User user) {
+    Set<UUID> activeOrgUnitIds =
+        orgUnitMembershipRepository.findActiveOrgUnitIdsByUserId(user.getId());
+    if (activeOrgUnitIds.isEmpty() || !seatEligibility.holdsKrtMember(user.getId())) {
+      return Set.of();
+    }
+    return activeOrgUnitIds;
+  }
+
+  /**
+   * The honoured active-context pin when it is one of the given units of the target user.
    *
-   * @param memberOrgUnitIds the target user's non-empty DIRECT membership set.
+   * @param memberOrgUnitIds the target user's units a row may be stamped on
+   * @return the pin, or {@code null} when none is honoured or it is not among the units
+   */
+  @Nullable
+  private UUID pinAmong(@NotNull Set<UUID> memberOrgUnitIds) {
+    return requestScopeResolver.currentPin().filter(memberOrgUnitIds::contains).orElse(null);
+  }
+
+  /**
+   * {@link #resolveStampedOrgUnit} for the aggregates that may stay without an owning unit: {@code
+   * null} when the user has no unit to stamp on and neither a pick nor a stampable pin names one.
+   *
+   * @param memberOrgUnitIds the target user's units a row may be stamped on
+   * @param owningOrgUnitId the picker-supplied org unit id, or {@code null}
+   * @param stampablePin the pin the caller's aggregate may be stamped on without a pick, or {@code
+   *     null}
+   * @return the resolved {@link OrgUnit}, or {@code null} for an ownerless row
+   */
+  @Nullable
+  private OrgUnit resolveStampedOrgUnitOrNone(
+      @NotNull Set<UUID> memberOrgUnitIds,
+      @Nullable UUID owningOrgUnitId,
+      @Nullable UUID stampablePin) {
+    if (memberOrgUnitIds.isEmpty() && owningOrgUnitId == null && stampablePin == null) {
+      return null;
+    }
+    return resolveStampedOrgUnit(memberOrgUnitIds, owningOrgUnitId, stampablePin);
+  }
+
+  /**
+   * Validates the picker output and loads the chosen id as its concrete, unproxied {@link OrgUnit}
+   * subtype.
+   *
+   * <p>An explicit pick is accepted when it is one of {@code memberOrgUnitIds} or an org unit the
+   * caller may edit ({@link AccessGateService#canEditSquadron(UUID)}, REQ-ORG-016). Without a pick,
+   * the stampable pin wins (REQ-ORG-032), else the only unit of {@code memberOrgUnitIds}.
+   *
+   * @param memberOrgUnitIds the target user's units a row may be stamped on: their stampable units
+   *     ({@link #collectStampableOrgUnitIds(User)}), or their direct memberships for the strict
+   *     resolvers.
    * @param owningOrgUnitId the picker-supplied org unit id, or {@code null} for the auto-stamp
    *     path.
+   * @param stampablePin the pin a pick-less create is stamped on, or {@code null}
    * @return the resolved {@link OrgUnit}; never {@code null}.
-   * @throws BadRequestException on a pick that is neither a direct membership nor within the
-   *     caller's editable scope, or a resolved id that no longer exists / is not an ownable kind.
-   * @throws OwnerOrgUnitRequiredException on a &gt;1-membership {@code null} choice with no
-   *     honourable active-context pin (REQ-ORG-023).
+   * @throws BadRequestException on a pick that is neither one of {@code memberOrgUnitIds} nor
+   *     within the caller's editable scope, or a resolved id that no longer exists.
+   * @throws OwnerOrgUnitRequiredException on a {@code null} choice with neither a stampable pin nor
+   *     exactly one unit in {@code memberOrgUnitIds} (REQ-ORG-023).
    */
   @NotNull
   private OrgUnit resolveStampedOrgUnit(
-      @NotNull Set<UUID> memberOrgUnitIds, @Nullable UUID owningOrgUnitId) {
-    UUID stampedOrgUnitId;
-    if (owningOrgUnitId == null) {
-      if (memberOrgUnitIds.size() == 1) {
-        stampedOrgUnitId = memberOrgUnitIds.iterator().next();
-      } else {
-        Optional<UUID> pinned = requestScopeResolver.readActiveSquadronFromHeader();
-        if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
-          stampedOrgUnitId = pinned.get();
-        } else {
-          throw new OwnerOrgUnitRequiredException(
-              "User belongs to multiple org units; owningOrgUnitId is required");
-        }
-      }
-    } else {
+      @NotNull Set<UUID> memberOrgUnitIds,
+      @Nullable UUID owningOrgUnitId,
+      @Nullable UUID stampablePin) {
+    if (owningOrgUnitId != null) {
       if (!memberOrgUnitIds.contains(owningOrgUnitId)
           && !accessGateService.canEditSquadron(owningOrgUnitId)) {
         throw new BadRequestException(
             "Selected owner org unit is neither a membership of the target user nor within the"
                 + " caller's editable scope");
       }
-      stampedOrgUnitId = owningOrgUnitId;
+      return load(owningOrgUnitId);
     }
+    if (stampablePin != null) {
+      return load(stampablePin);
+    }
+    if (memberOrgUnitIds.size() == 1) {
+      return load(memberOrgUnitIds.iterator().next());
+    }
+    throw new OwnerOrgUnitRequiredException(
+        "User belongs to multiple org units; owningOrgUnitId is required");
+  }
 
+  /**
+   * Loads a stamp target as its concrete, unproxied {@link OrgUnit} subtype.
+   *
+   * @param orgUnitId the stamp target
+   * @return the org unit; never {@code null}
+   * @throws BadRequestException when the id no longer resolves
+   */
+  @NotNull
+  private OrgUnit load(@NotNull UUID orgUnitId) {
     return orgUnitRepository
-        .findById(stampedOrgUnitId)
+        .findById(orgUnitId)
         .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
         .orElseThrow(() ->
             new BadRequestException("Picked owner org unit no longer resolves — repository miss"));

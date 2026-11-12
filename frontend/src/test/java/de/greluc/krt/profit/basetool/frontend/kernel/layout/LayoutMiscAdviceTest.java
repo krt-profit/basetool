@@ -45,7 +45,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
  * Unit tests for {@link LayoutMiscAdvice}'s {@code appTitle} composition (REQ-ORG-024): Staffel
- * pin, SK pin, pin without shorthand, admin in all-OrgUnits mode, and no context.
+ * pin, SK pin, pin without shorthand, admin in all-OrgUnits mode, a member in „Alle meine
+ * Org-Einheiten", and no context.
  */
 @ExtendWith(MockitoExtension.class)
 class LayoutMiscAdviceTest {
@@ -65,7 +66,7 @@ class LayoutMiscAdviceTest {
     OrgUnitMembershipOptionDto pin =
         new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON");
 
-    assertEquals("app.title.with.squadron:ALP", advice().appTitle(pin, false));
+    assertEquals("app.title.with.squadron:ALP", advice().appTitle(pin, false, false));
   }
 
   @Test
@@ -75,7 +76,7 @@ class LayoutMiscAdviceTest {
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Spezialkommando Alpha", "SK-A", "SPECIAL_COMMAND");
 
-    assertEquals("app.title.with.squadron:SK-A", advice().appTitle(pin, false));
+    assertEquals("app.title.with.squadron:SK-A", advice().appTitle(pin, false, false));
   }
 
   @Test
@@ -84,21 +85,30 @@ class LayoutMiscAdviceTest {
     OrgUnitMembershipOptionDto pin =
         new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Leadership", null, "SQUADRON");
 
-    assertEquals("app.title.with.squadron:Leadership", advice().appTitle(pin, false));
+    assertEquals("app.title.with.squadron:Leadership", advice().appTitle(pin, false, false));
   }
 
   @Test
   void appTitle_adminAllOrgUnitsMode_usesAllLabel() {
     stubEchoMessages();
 
-    assertEquals("app.title.all.squadrons:squadron.switcher.all", advice().appTitle(null, true));
+    assertEquals(
+        "app.title.all.squadrons:squadron.switcher.all", advice().appTitle(null, true, false));
+  }
+
+  @Test
+  void appTitle_memberInAllMyOrgUnits_saysSo() {
+    stubEchoMessages();
+
+    assertEquals(
+        "app.title.all.squadrons:orgUnit.switcher.allMine", advice().appTitle(null, false, true));
   }
 
   @Test
   void appTitle_noContext_isPlain() {
     stubEchoMessages();
 
-    assertEquals("app.title", advice().appTitle(null, false));
+    assertEquals("app.title", advice().appTitle(null, false, false));
   }
 
   @Test
@@ -107,7 +117,7 @@ class LayoutMiscAdviceTest {
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(
             new LayoutContextLoader.MeLayoutResponse(
-                null, List.of(), CapabilitiesResponse.NONE, 7L));
+                null, null, List.of(), CapabilitiesResponse.NONE, 7L));
 
     assertEquals(7L, advice().unreadNotificationCount(new MockHttpServletRequest()));
     verify(backendApiClient, never())

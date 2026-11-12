@@ -56,10 +56,10 @@ public class BankGrantService {
 
   /**
    * Role codes whose holders are eligible grantees: the Bank Employee role itself plus the roles
-   * that reach it through the hierarchy. Joining or leaving an org unit changes none of these
-   * (REQ-BANK-008).
+   * that reach it through the hierarchy. A grant of anyone holding none of them is inert. Joining
+   * or leaving an org unit changes none of these (REQ-BANK-008).
    */
-  private static final Set<String> ELIGIBLE_ROLE_CODES =
+  static final Set<String> ELIGIBLE_ROLE_CODES =
       Set.of(Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT, Roles.ADMIN);
 
   private final BankAccountGrantRepository grantRepository;

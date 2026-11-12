@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.supply.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
@@ -49,7 +50,7 @@ public class SupplyAccessPolicy {
   public static final String BEAN_NAME = "supplyAccessPolicy";
 
   /** The contextual role that stands for the lead or a Logistician of a unit. */
-  static final String UNIT_MANAGER_ROLE = "LOGISTICIAN";
+  static final String UNIT_MANAGER_ROLE = Roles.LOGISTICIAN;
 
   private final RequestScopeResolver requestScopeResolver;
   private final AccessGateService accessGateService;
@@ -67,7 +68,10 @@ public class SupplyAccessPolicy {
   }
 
   /**
-   * Whether the caller leads or is a Logistician of the unit, or is an admin.
+   * Whether the caller manages the unit's needs and donations inside the active context
+   * (REQ-ORG-032): as its lead or a Logistician, or as an admin without a pin or pinned to the
+   * unit. The write gate of every manager action; {@link #managedUnits()} holds the same rule for
+   * the flags and lists.
    *
    * @param orgUnitId the unit
    * @return {@code true} when the caller manages the unit's needs and donations
@@ -88,13 +92,30 @@ public class SupplyAccessPolicy {
   }
 
   /**
-   * Returns the units the caller manages explicitly; an admin manages every unit, which this set
-   * does not list.
+   * Returns the units the caller manages inside the active context (REQ-ORG-032), by the rule of
+   * {@link #canManageUnit(UUID)}: every unit for an admin without a pin, only the pinned unit for a
+   * pinned admin, otherwise the units the caller leads or is a Logistician of in the active
+   * context. Every manage flag and manager list of the module reads it.
    *
-   * @return the ids of the units the caller leads or is a Logistician of
+   * @return the caller's managed units
    */
-  public @NotNull Set<UUID> managedUnitIds() {
-    return requestScopeResolver.currentGrantedOrgUnitIds(UNIT_MANAGER_ROLE);
+  public @NotNull SupplyManagedUnits managedUnits() {
+    return SupplyManagedUnits.of(accessGateService.currentGrantScope(UNIT_MANAGER_ROLE));
+  }
+
+  /**
+   * Returns the units the caller manages in any context, whatever unit is pinned: every unit for an
+   * admin, otherwise the units they lead or are a Logistician of. Only the tab decisions read it,
+   * because a tab flag must not depend on the pinned unit (ADR-0329); every manage flag, list and
+   * write reads {@link #managedUnits()}.
+   *
+   * @return the caller's managed units in any context
+   */
+  public @NotNull SupplyManagedUnits managedUnitsInAnyContext() {
+    return isAdmin()
+        ? new SupplyManagedUnits(true, Set.of())
+        : new SupplyManagedUnits(
+            false, requestScopeResolver.currentGrantedOrgUnitIds(UNIT_MANAGER_ROLE));
   }
 
   /**
@@ -114,13 +135,15 @@ public class SupplyAccessPolicy {
   }
 
   /**
-   * Whether the caller reads the donation statistics: the governing leadership and the lead or a
-   * Logistician of at least one unit.
+   * Whether the caller reads the donation statistics, whatever unit is pinned: the governing
+   * leadership and the lead or a Logistician of at least one unit, so the „Statistik" tab does not
+   * depend on the pinned unit (ADR-0329). Whose figures they read follows the active context
+   * ({@link #managedUnits()}).
    *
    * @return {@code true} when the statistics answer the caller
    */
   public boolean canReadStats() {
-    return isGoverningLeadership() || !managedUnitIds().isEmpty();
+    return isGoverningLeadership() || !managedUnitsInAnyContext().isEmpty();
   }
 
   /**

@@ -182,7 +182,7 @@ public final class PurchasingNotices {
    * @param dealNo the deal's running number
    * @param delegateId the deal's delegate, or {@code null} once erased
    * @param governingLeadership the Bereichsleiter and Bereichskoordinatoren of every governing
-   *     Bereich
+   *     Bereich who hold {@code KRT Member}
    * @return the event
    */
   @NotNull

@@ -111,7 +111,7 @@ class OrgUnitBankAccessServiceTest {
   @BeforeEach
   void defaultStubs() {
     actingAs(BankActor.NOBODY);
-    when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentPin()).thenReturn(Optional.empty());
     when(viewGrantRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of());
     when(viewGrantRepository.findByAccountId(any())).thenReturn(List.of());
     when(approvalLimitRepository.findByAccountIdIn(anyCollection())).thenReturn(List.of());
@@ -194,7 +194,7 @@ class OrgUnitBankAccessServiceTest {
    * @param orgUnitId the pinned org unit
    */
   private void pinned(UUID orgUnitId) {
-    when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.of(orgUnitId));
+    when(requestScopeResolver.currentPin()).thenReturn(Optional.of(orgUnitId));
   }
 
   private static OrgUnit squadron(UUID id, String name, String shorthand) {
@@ -432,13 +432,31 @@ class OrgUnitBankAccessServiceTest {
   }
 
   @Test
-  void listViewableActiveAccounts_pinDoesNotNarrowTheSet() {
+  void listViewableActiveAccounts_thePinNarrowsTheSetToThePinnedUnit() {
     UUID staffelAId = UUID.randomUUID();
     UUID staffelBId = UUID.randomUUID();
     UUID accountAId = UUID.randomUUID();
     UUID accountBId = UUID.randomUUID();
     actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelAId, staffelBId));
     pinned(staffelAId);
+    when(bankAccountRepository.findAllByOrderByAccountNoAsc())
+        .thenReturn(
+            List.of(
+                account(accountAId, "KB-0001", squadron(staffelAId, "A", "AAA")),
+                account(accountBId, "KB-0002", squadron(staffelBId, "B", "BBB"))));
+
+    List<BankAccount> visible = service.listViewableActiveAccounts();
+
+    assertThat(visible).extracting(BankAccount::getId).containsExactly(accountAId);
+  }
+
+  @Test
+  void listViewableActiveAccounts_unpinnedCoversTheWholeReach() {
+    UUID staffelAId = UUID.randomUUID();
+    UUID staffelBId = UUID.randomUUID();
+    UUID accountAId = UUID.randomUUID();
+    UUID accountBId = UUID.randomUUID();
+    actingAs(TestBankActor.member(UUID.randomUUID()).reach(staffelAId, staffelBId));
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(
             List.of(
@@ -2318,11 +2336,11 @@ class OrgUnitBankAccessServiceTest {
   }
 
   /**
-   * REQ-BANK-066: the responsible holder reaches the settings of their account even when the
-   * active-org-unit pin hides it from their view scope.
+   * REQ-BANK-066, REQ-ORG-032: a responsible holder pinned to another of their units has no holder
+   * right on the account outside that context, so its settings answer like an unknown account.
    */
   @Test
-  void getAccountSettings_byHolderOutsideTheViewScope_returnsTheSnapshot() {
+  void getAccountSettings_byHolderPinnedToAnotherUnit_answersLikeAnUnknownAccount() {
     UUID staffelId = UUID.randomUUID();
     UUID otherUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
@@ -2335,7 +2353,40 @@ class OrgUnitBankAccessServiceTest {
     pinned(otherUnitId);
 
     assertThat(service.accessTo(account).has(BankAccountRight.VIEW)).isFalse();
-    assertThat(settingsService.getAccountSettings(accountId).accountId()).isEqualTo(accountId);
+    assertThat(service.accessTo(account).has(BankAccountRight.RESPONSIBLE_HOLDER)).isFalse();
+    assertThrows(NotFoundException.class, () -> settingsService.getAccountSettings(accountId));
+  }
+
+  /**
+   * REQ-BANK-066, REQ-ORG-032: an admin pinned to one unit holds no settings right on another
+   * unit's account, so every account route answers it like an unknown account and writes nothing,
+   * while the pinned unit's account keeps every settings control.
+   */
+  @Test
+  void accountRoutes_byAdminPinnedToAnotherUnit_answerLikeAnUnknownAccount() {
+    UUID pinnedUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID pinnedAccountId = UUID.randomUUID();
+    when(bankAccountRepository.findById(accountId))
+        .thenReturn(
+            Optional.of(account(accountId, "KB-0001", squadron(UUID.randomUUID(), "B", "BBB"))));
+    when(bankAccountRepository.findById(pinnedAccountId))
+        .thenReturn(
+            Optional.of(account(pinnedAccountId, "KB-0002", squadron(pinnedUnitId, "A", "AAA"))));
+    actingAs(TestBankActor.of(UUID.randomUUID()).admin());
+    pinned(pinnedUnitId);
+
+    accountRoutes()
+        .forEach((route, call) ->
+            assertThrows(NotFoundException.class, () -> call.accept(accountId), route));
+    OrgUnitBankAccountSettingsDto pinnedSettings =
+        settingsService.getAccountSettings(pinnedAccountId);
+
+    assertThat(pinnedSettings.canSetTarget()).isTrue();
+    assertThat(pinnedSettings.canConfigureVisibility()).isTrue();
+    assertThat(pinnedSettings.canConfigureApprovalLimits()).isTrue();
+    verify(bankAccountRepository, never()).saveAndFlush(any());
+    verifyNoInteractions(bankAccountService, bankStatementReportService, bankAuditService);
   }
 
   /**

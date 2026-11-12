@@ -116,7 +116,7 @@ Staffel references per user, and `primeStaffelMemberships(users)` seeds both mem
 with one `findAllByIdUserIdInAndKindIn` and one `findAllById`. Every surface that maps many users
 primes first: the full mission DTO (a `@BeforeMapping` in `MissionMapper` over participants and unit
 ship owners), the job-order Bearbeiter lists (per page in `JobOrderStockProjectionService`, per order
-in `JobOrderMapper`), the user lists and searches and the all-ships list.
+in `JobOrderMapper`) and the user lists and searches.
 
 **Every to-one association is `LAZY`** (BE-PERF-11, 2026-09-23). A `@ManyToOne` / `@OneToOne`
 without an explicit `fetch` is EAGER by the JPA default, and 38 of them were: every load of the owner
@@ -878,8 +878,9 @@ materialize an operation's whole finance / refinery ledger under a held Hikari c
   graph — it never re-runs the full per-participant payout computation (double ledger load-all + money
   math) just to hand back one row.
 - **Operation-picker reference lookup is status / recency-bounded.**
-  `OperationRepository.findAllReferenceScoped` returns PLANNED / ACTIVE always but COMPLETED / CANCELED
-  only within the last 3 months (by `createdAt`), and the mission-detail controller fetches it only on
+  `OperationRepository.findAllEditableReference` (the operations the caller may edit,
+  REQ-MISSION-034) returns PLANNED / ACTIVE always but COMPLETED / CANCELED only within the last 3
+  months (by `createdAt`), and the mission-detail controller fetches it only on
   a full render (not on fragment refetches) — the operation analogue of the mission
   `findAllActiveReference` bound.
 - **Job-order detail reads no user list.** The assignee picker searches its candidates on demand
@@ -897,8 +898,8 @@ per-mission finance fragment renders the breakdown and an error state).
 **Enforced by:** `OperationFinanceService.getOperationFinanceSummary` / `getMissionFinanceDetail`,
 `OperationController` (`/finance-summary`, `/finances/{missionId}`), `OperationPageController`
 (`ParallelPageLoader` + lazy `operationMissionFinance`), `OperationPayoutService.setPayoutStatus`
-(`OperationPayoutStatusDto`), `OperationRepository.findAllReferenceScoped` (status / recency bound),
-`JobOrderPageController.viewOrderDetail` (users gated to the full render). See ADR-0081.
+(`OperationPayoutStatusDto`), `OperationRepository.findAllEditableReference` (status / recency
+bound), `JobOrderPageController.viewOrderDetail` (users gated to the full render). See ADR-0081.
 
 ### REQ-DATA-013 — OrgUnit hierarchy rows load polymorphically, never subclass-typed (ADR-0119)
 
@@ -1145,7 +1146,7 @@ are unaffected, because they do not go through the HQL `like` rendering.
   escape their input.
 - [x] The same holds for every other escaping JPQL query, and an ordinary fragment still matches:
   `LikeEscapeCatalogRepositoriesDataTest` (location, material picker and price overview, mission,
-  operation), `UserScopedQueriesDataTest`, `ShipRepositoryPersonalHangarTest` (own hangar and
+  operation), `UserDirectoryQueriesDataTest`, `ShipRepositoryPersonalHangarTest` (own hangar and
   squadron overview), `MaterialExchangeRepositoryDataTest` (offer board, releasable picker) and
   `MaterialExchangeRequestRepositoryDataTest`.
 
@@ -1185,6 +1186,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
 | `catalogue` | 53 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_scwiki_identity`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
+| `scope` | 1 | `member_active_org_unit` |
 | `admin` | 1 | `system_setting` |
 | `dashboard` | 1 | `announcement` |
 | `personalinventory` | 1 | `personal_inventory_item` |
@@ -1235,7 +1237,7 @@ The listed crossings:
 ### REQ-DATA-021 — every column that references a member has a disposition in each GDPR registry
 
 A column **references a member** when it carries a foreign key to `app_user`, or when it is a `uuid`
-named `user_id`, `owner_id`, `*_user_id`, `*_by`, `*_by_id` or `*_sub` (56 columns today, three of
+named `user_id`, `owner_id`, `*_user_id`, `*_by`, `*_by_id` or `*_sub` (57 columns today, three of
 them without a foreign key). Each such column has a disposition in all three registries, or is
 listed with its reason:
 
@@ -1248,7 +1250,7 @@ listed with its reason:
   is never pruned, REQ-P4K-005; `p4k_review_case.resolved_by`, the admin who resolved a review
   case, never pruned, REQ-P4K-016).
 - **Export** (REQ-SEC-058, the `PersonalDataExportSection` participants of the modules): a
-  section selects the member's rows by it, or it is listed as not exported. Today 43 columns are exported and 15 are not, each of which names the
+  section selects the member's rows by it, or it is listed as not exported. Today 44 columns are exported and 15 are not, each of which names the
   member as the actor on somebody else's or the organisation's record, or mirrors an exported
   column. The eight columns that held data about the member without a section
   (`bank_account_approval_limit.grantee_user_id`, `bank_account_grant.user_id`,

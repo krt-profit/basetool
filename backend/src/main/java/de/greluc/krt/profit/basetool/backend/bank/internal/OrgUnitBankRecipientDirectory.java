@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.AccountRecipientDi
 import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -40,7 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
  * the required approvers of a booking request from its {@code required_approver}.
  *
  * <p>On the org-unit side of the bank, because the responsible holders and the OL follow org-unit
- * membership (ADR-0020).
+ * membership (ADR-0020). A grant counts only while its grantee holds Bank Employee or a role above
+ * it (REQ-BANK-009), a seat only while its holder holds {@code KRT Member} (REQ-SEC-015).
  */
 @Service
 @RequiredArgsConstructor
@@ -51,10 +53,12 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
   private final BankBookingRequestRepository bankBookingRequestRepository;
   private final OrgUnitBankResponsibilityService orgUnitBankResponsibilityService;
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+  private final OrgUnitSeatEligibility seatEligibility;
   private final RoleRecipientDirectory roleRecipientDirectory;
 
   /**
-   * The bank employees holding a {@code bank_account_grant} on an account (REQ-BANK-026).
+   * The grantees of an account who hold Bank Employee or a role above it; the inert grant of anyone
+   * else notifies nobody (REQ-BANK-009, REQ-BANK-026).
    *
    * @param accountId the bank account
    * @return the grantees' user subs; never {@code null}, possibly empty
@@ -62,23 +66,23 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
   @Override
   @NotNull
   public Set<UUID> grantHoldersOf(@NotNull UUID accountId) {
-    Set<UUID> holders = new HashSet<>();
-    for (BankAccountGrant grant : bankAccountGrantRepository.findByAccountId(accountId)) {
-      holders.add(grant.getId().getUserId());
-    }
-    return holders;
+    return bankAccountGrantRepository.findGranteeIdsHoldingAnyRole(
+        accountId, BankGrantService.ELIGIBLE_ROLE_CODES);
   }
 
   /**
-   * The responsible holders of an account (REQ-BANK-034).
+   * The responsible holders of an account who hold {@code KRT Member}, from seats on active units
+   * only (REQ-BANK-034, REQ-SEC-015, REQ-ORG-032).
    *
    * @param accountId the bank account
-   * @return their user subs; never {@code null}, empty for a Sonderkonto or an unlinked account
+   * @return their user subs; never {@code null}, empty for a Sonderkonto, an unlinked account or
+   *     the account of a deactivated unit
    */
   @Override
   @NotNull
   public Set<UUID> responsibleHoldersOf(@NotNull UUID accountId) {
-    return orgUnitBankResponsibilityService.resolveResponsibleHolderUserIds(accountId);
+    return seatEligibility.krtMembersAmong(
+        orgUnitBankResponsibilityService.resolveNotifiedResponsibleHolderUserIds(accountId));
   }
 
   /**
@@ -102,9 +106,10 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
   /**
    * The members whose approval a pending, over-limit, not yet approved request waits for, by its
    * {@code required_approver} (REQ-NOTIF-033, REQ-BANK-041/-047): the account's responsible
-   * holders, the {@code BANK_MANAGEMENT} role holders or every {@code OL_MEMBER}. A request naming
-   * no approver class falls to the responsible holders, as its approval does. The requester is left
-   * out, because they may not approve their own request (REQ-BANK-062).
+   * holders, the {@code BANK_MANAGEMENT} role holders or every {@code OL_MEMBER}, a seat holder
+   * only while they hold {@code KRT Member}. A request naming no approver class falls to the
+   * responsible holders, as its approval does. The requester is left out, because they may not
+   * approve their own request (REQ-BANK-062).
    *
    * @param requestId the booking request
    * @return their user subs; never {@code null}, empty when no approval is outstanding
@@ -151,7 +156,8 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
       case RESPONSIBLE_HOLDER -> responsibleHoldersOf(accountId);
       case BANK_MANAGEMENT -> roleRecipientDirectory.holdersOfRole(Roles.BANK_MANAGEMENT);
       case ORGANISATIONSLEITUNG ->
-          orgUnitMembershipRepository.findUserIdsByRole(MembershipRole.OL_MEMBER);
+          seatEligibility.krtMembersAmong(
+              orgUnitMembershipRepository.findUserIdsByRole(MembershipRole.OL_MEMBER));
       case null -> responsibleHoldersOf(accountId);
     };
   }

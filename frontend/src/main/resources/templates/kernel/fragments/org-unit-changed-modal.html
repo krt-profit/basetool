@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="orgUnitChangedModal">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='org-unit-changed-modal', titleKey='orgUnit.switcher.changedElsewhere.title', closeId='org-unit-changed-close-btn', closeTrigger=null, body=~{kernel/fragments/org-unit-changed-modal :: org-unit-changed-modal-body})}">
+        <th:block th:ref="org-unit-changed-modal-body">
+            <div class="krt-modal-body">
+                <p th:text="#{orgUnit.switcher.changedElsewhere.message}" class="m-0">Die aktive Org-Einheit wurde in einem anderen Tab gewechselt. Diese Seite zeigt noch die vorige Einheit.</p>
+            </div>
+            <div class="krt-modal-foot">
+                <button type="button" class="btn btn-secondary" data-trigger="close-modal-display" data-modal-id="org-unit-changed-modal" th:text="#{orgUnit.switcher.changedElsewhere.stay}">Später</button>
+                <button type="button" id="org-unit-changed-reload-btn" class="btn" th:text="#{orgUnit.switcher.changedElsewhere.reload}">Neu laden</button>
+            </div>
+        </th:block>
+    </th:block>
+</th:block>
+</body>
+</html>

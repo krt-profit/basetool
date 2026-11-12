@@ -29,9 +29,10 @@ import org.springframework.stereotype.Component;
  * Method-security gate for the officer-only surfaces, answering from the backend's officer flags of
  * the active context (REQ-SEC-047) instead of a role in the token.
  *
- * <p>Presentation-level only: the backend re-checks officer reach in the owning unit of every
- * target. Used in {@code @PreAuthorize} as {@code @officerSurfaceGate.canOpenLeitung()}; an admin
- * passes, an anonymous caller or a failed backend read does not.
+ * <p>Presentation-level only: the backend decides every target itself, with the KRT-gated rank and
+ * roster verdicts inside the active context (REQ-ROLE-004, REQ-ORG-032). Used in
+ * {@code @PreAuthorize} as {@code @officerSurfaceGate.canOpenLeitung()}; an admin passes, an
+ * anonymous caller or a failed backend read does not.
  */
 @Component("officerSurfaceGate")
 @RequiredArgsConstructor

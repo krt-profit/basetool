@@ -78,7 +78,7 @@ class OrgUnitMembershipTest {
     membership.setRole(role);
     membership.setLogistician(flag);
 
-    assertThat(membership.isLogisticianOfOwnUnit(true))
+    assertThat(membership.isLogisticianOfOwnUnit())
         .isEqualTo(flag || rankAloneMakesLogistician(role));
   }
 }

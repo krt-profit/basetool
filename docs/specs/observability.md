@@ -432,6 +432,10 @@ is `DEBUG`, because at any higher level it is a log-flood vector; an operator-ac
   **unlogged** `RejectedExecutionException` executor-saturation branch are `WARN`, one line each,
   emitted by whichever component produced the verdict — `completeSubscribe` deliberately logs nothing
   so the same denial cannot be reported twice.
+- **Live-sync re-authorization of joined rooms** (`LiveSyncSubscriptions`) — an eviction, a
+  lapsed-token close and an indeterminate or unscheduled re-check are `DEBUG`: they recur per socket
+  on a fixed cadence, so a backend outage would flood the log at any higher level, and
+  `basetool_livesync_reauthorize_total` carries the signal. Only a failed sweep is `WARN`.
 - **Access log** (`RequestLoggingFilter`) — level unchanged; the single line gains a
   `[fragment=… ajax=true]` suffix so a fragment refresh is distinguishable from a full page load.
   `fragment` is read by scanning the raw query string for the literal `fragment=` prefix — never
@@ -1265,8 +1269,8 @@ aggregated counts and bounded `app`/`host` labels.
 > positive contradiction count. Routine approval waiting contributes to the waiting gauges.
 > See the [optional Bank contract](orders-auec-bank.md).
 
-> **Status: shipped** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, map #2800) for the signals
-> of the amendment at the end of this requirement.
+> **Status: shipped** (ADR-0297, ADR-0298, ADR-0299, ADR-0301, ADR-0302, ADR-0374, map #2800) for
+> the signals of the amendments at the end of this requirement.
 
 The three modules expose custom `basetool_*` business metrics on existing choke points so
 operations can alarm on regressions, security signals and work-queue backlog without scraping
@@ -2499,7 +2503,18 @@ signature is `max`, or the windowed mean `rate(_sum) / rate(_count)`, collapsing
 near a proxy timeout. **Deliberately not alerted**: an ordinary page navigation also ends a socket
 after a few seconds, so no threshold separates it from a proxy teardown — the same unsoundness that
 keeps the `changed`-flatline rule off the board. The keepalive that prevents the condition is pinned
-to the edge timeout by a parity test instead (REQ-FE-015). Together with the backend
+to the edge timeout by a parity test instead (REQ-FE-015). A socket that holds a room whose class
+needs a check also ends at its captured token's expiry, closed with `4401` by the re-authorization
+sweep (REQ-FE-015), so a mode near the access-token lifespan (300 s) is that rotation and not a
+proxy. The sweep counts every re-checked room on
+`basetool_livesync_reauthorize_total{topic_class,outcome}`: `outcome` = `allowed` (the room stays),
+`evicted` (an explicit deny took the socket out of the room), `indeterminate` (no verdict — a 5xx, a
+timeout, a failing probe or a saturated executor — so the room stays until the next check) or
+`token_expired` (the socket was closed with `4401`: one sample per checked room it held when its
+captured token lapsed, one for the room whose probe saw the token rejected). A steady
+`token_expired` rate is the expected rotation and `evicted` a revocation the relay caught; the `07`
+subscribe-outcomes panel plots the series beside the subscribe verdicts, and no alert is wired on
+it. Together with the backend
 `basetool_sse_redis_*` counters above, a sustained `publish`-error stream on either fan-out drives the
 `LiveSyncRedisFanoutBroken` alert (both fire only where the Redis fan-out is enabled, i.e. prod). All labels are fixed literals, pure counts. The `frontend-sse-pool` and
 `frontend-pool` Reactor-Netty connection pools additionally export `reactor.netty.connection.provider.*`
@@ -2910,6 +2925,24 @@ A low minimum stock level is a notification (REQ-NOTIF-030), **never an alert**.
 **Enforced by:** `QuickAccessSearchMetricsTest`, `quick_access_search_slow_test.yml`,
 `StockLevelNoticeIntegrationTest`, `InventoryBusinessGaugesTest`, `NavigationMetricsTest`,
 `navigation_endpoints_erroring_test.yml`
+
+#### Amendment (ADR-0374)
+
+A member's stored choice of the active org unit (REQ-ORG-031) is counted, not audited, like the
+navigation preferences (REQ-AUDIT-001, „Deliberately not audited").
+
+- `basetool_active_org_unit_choice_writes_total{target}` counter in the `scope` module (name and
+  tag values in `ScopeMetricNames`, counted by `ActiveOrgUnitChoiceMetrics`), one increment per
+  stored change of the choice, also when the write was retried after a concurrent switch; an
+  unchanged choice, a refused unit (`400`), a stale version (`409`) and a switch that lost the race
+  on every attempt count nothing. `target` ∈ `unit` (one
+  org unit), `all` (all of the member's org units); neither the unit nor the member reaches a
+  label. Registered at zero for both values.
+
+**Dashboard.** `07-basetool-operations.json` carries the panel „Active org unit switches/hour by
+target". The count is a usage trend, so no alert reads it.
+
+**Enforced by:** `ActiveOrgUnitChoiceMetricsTest`, `ActiveOrgUnitChoicesTest`
 
 ### REQ-OBS-012 — Edge posture assertions (deny / redirect / HSTS probes)
 

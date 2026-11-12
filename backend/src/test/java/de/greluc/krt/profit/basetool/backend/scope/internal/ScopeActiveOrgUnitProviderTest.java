@@ -23,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.scope.api.ActiveOrgUnitContext;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -37,16 +37,18 @@ class ScopeActiveOrgUnitProviderTest {
       new ScopeActiveOrgUnitProvider(requestScopeResolver);
 
   @Test
-  void answersTheOrgUnitTheRequestIsFilteredBy() {
+  void answersTheOneOrgUnitOfTheEffectiveContext() {
     UUID orgUnitId = UUID.randomUUID();
-    when(requestScopeResolver.currentSquadronId()).thenReturn(Optional.of(orgUnitId));
+    when(requestScopeResolver.currentActiveContext())
+        .thenReturn(ActiveOrgUnitContext.orgUnit(orgUnitId));
 
     assertThat(provider.activeOrgUnitId()).contains(orgUnitId);
   }
 
   @Test
-  void isEmptyWhenNoFilterApplies() {
-    when(requestScopeResolver.currentSquadronId()).thenReturn(Optional.empty());
+  void isEmptyWhenTheContextSpansSeveralUnits() {
+    when(requestScopeResolver.currentActiveContext())
+        .thenReturn(ActiveOrgUnitContext.ALL_MY_ORG_UNITS);
 
     assertThat(provider.activeOrgUnitId()).isEmpty();
   }

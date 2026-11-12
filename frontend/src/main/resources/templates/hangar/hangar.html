@@ -214,6 +214,7 @@
         <div th:if="${isAllSquadronsMode}" class="alert alert-info" th:text="#{hangar.squadron.all_squadrons_notice}">
             Aggregation across all org units. Select a single org unit to filter.
         </div>
+        <div th:replace="~{kernel/fragments/components :: allMyOrgUnitsNotice}"></div>
 
         <div id="squadron-results" class="card card--flush" th:data-live-sync-topic="${unitLiveSyncTopic}">
         <th:block th:fragment="squadronResults">

@@ -39,11 +39,16 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronMapper;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
+/**
+ * The Lager row mapper (REQ-INV-027, REQ-INV-029): the earmark chips as the caller is shown them,
+ * the game-item reference and the caller's edit flag.
+ */
 class InventoryItemMapperTest {
 
   /** Says yes to every row, so these tests assert the mapping rather than the gate. */
@@ -120,29 +125,13 @@ class InventoryItemMapperTest {
             .donationId(donationId)
             .amount(4.0)
             .build());
-    InventoryEarmarkLookup targets =
-        new InventoryEarmarkLookup() {
-          @Override
-          public MissionEarmark mission(UUID id) {
-            return id.equals(missionId)
-                ? new MissionEarmark(missionId, mission.getName(), mission.getPlannedStartTime())
-                : null;
-          }
-
-          @Override
-          public DonationEarmark donation(UUID id) {
-            if (id.equals(donationId)) {
-              return new DonationEarmark(donationId, "Bereich Profit");
-            }
-            return null;
-          }
-
-          @Override
-          public JobOrderEarmark jobOrder(UUID id) {
-            return id.equals(jobOrderId) ? new JobOrderEarmark(jobOrderId, 42) : null;
-          }
-        };
-    mapper.setEarmarkTargets(targets);
+    mapper.setEarmarkTargets(
+        callersView(
+            Map.of(
+                missionId,
+                new MissionEarmark(missionId, mission.getName(), mission.getPlannedStartTime())),
+            Map.of(jobOrderId, new JobOrderEarmark(jobOrderId, 42)),
+            Map.of(donationId, new DonationEarmark(donationId, "Bereich Profit"))));
 
     InventoryItemDto dto = mapper.toDto(item);
 
@@ -177,6 +166,33 @@ class InventoryItemMapperTest {
     assertNotNull(dto.location());
     assertEquals(locationId, dto.location().id());
     assertEquals("Lorville", dto.location().name());
+  }
+
+  @Test
+  void toDto_missionChip_showsAMissionTheCallerMayNotReadWithItsIdAndAmountAlone() {
+    UUID missionId = UUID.randomUUID();
+    User user = new User();
+    user.setId(UUID.randomUUID());
+    Material material = new Material();
+    material.setId(UUID.randomUUID());
+    InventoryItem item = new InventoryItem();
+    item.setId(UUID.randomUUID());
+    item.setUser(user);
+    item.setMaterial(material);
+    item.setAmount(10.0);
+    item.setPersonal(false);
+    InventoryAllocations.addMission(item, missionId, 4.0);
+    mapper.setEarmarkTargets(
+        callersView(
+            Map.of(missionId, new MissionEarmark(missionId, null, null)), Map.of(), Map.of()));
+
+    InventoryItemDto dto = mapper.toDto(item);
+
+    assertEquals(1, dto.missionAllocations().size());
+    assertEquals(missionId, dto.missionAllocations().get(0).missionId());
+    assertNull(dto.missionAllocations().get(0).missionName());
+    assertNull(dto.missionAllocations().get(0).missionPlannedStartTime());
+    assertEquals(4.0, dto.missionAllocations().get(0).amount());
   }
 
   @Test
@@ -342,6 +358,42 @@ class InventoryItemMapperTest {
     assertEquals("COOLER", dto.componentType());
     assertNull(dto.size());
     assertNull(dto.grade());
+  }
+
+  /**
+   * Builds the Lager's earmark lookup as a chip reads it: what the caller is shown of each mission,
+   * and the job orders and donations; the write and undo paths' mission lookup is no chip's source.
+   *
+   * @param shown the missions as the caller is shown them, by id
+   * @param jobOrders the job orders by id
+   * @param donations the donations by id
+   * @return the lookup
+   */
+  private static InventoryEarmarkLookup callersView(
+      Map<UUID, MissionEarmark> shown,
+      Map<UUID, JobOrderEarmark> jobOrders,
+      Map<UUID, DonationEarmark> donations) {
+    return new InventoryEarmarkLookup() {
+      @Override
+      public MissionEarmark mission(UUID missionId) {
+        throw new AssertionError("a chip shows the caller's view, not the write and undo lookup");
+      }
+
+      @Override
+      public MissionEarmark shownMission(UUID missionId) {
+        return shown.get(missionId);
+      }
+
+      @Override
+      public JobOrderEarmark jobOrder(UUID jobOrderId) {
+        return jobOrders.get(jobOrderId);
+      }
+
+      @Override
+      public DonationEarmark donation(UUID donationId) {
+        return donations.get(donationId);
+      }
+    };
   }
 
   private static GameItem gameItem(

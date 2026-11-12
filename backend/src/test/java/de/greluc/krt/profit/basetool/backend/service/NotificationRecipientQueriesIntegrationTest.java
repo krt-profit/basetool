@@ -28,8 +28,11 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientSta
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallation;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeInstallationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
@@ -54,7 +57,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 /**
  * The recipient queries behind the mission, exchange-client and unit-leadership selectors against
- * Postgres (REQ-NOTIF-024).
+ * Postgres (REQ-NOTIF-024), including the {@code KRT Member} condition on every recipient a
+ * membership yields.
  */
 @SpringBootTest
 class NotificationRecipientQueriesIntegrationTest {
@@ -65,10 +69,17 @@ class NotificationRecipientQueriesIntegrationTest {
   private static final UUID WAITING = UUID.fromString("00000000-0000-0000-0000-00000000a0a4");
   private static final UUID STAFFELLEITER = UUID.fromString("00000000-0000-0000-0000-00000000a0a5");
   private static final UUID PLAIN_MEMBER = UUID.fromString("00000000-0000-0000-0000-00000000a0a6");
+  private static final UUID RETAINED_SEAT = UUID.fromString("00000000-0000-0000-0000-00000000a0a7");
+  private static final UUID FLAGGED = UUID.fromString("00000000-0000-0000-0000-00000000a0a8");
+  private static final UUID FLAGGED_WITHOUT_ROLE =
+      UUID.fromString("00000000-0000-0000-0000-00000000a0a9");
+  private static final Set<UUID> MEMBERSHIP_HOLDERS =
+      Set.of(STAFFELLEITER, PLAIN_MEMBER, RETAINED_SEAT, FLAGGED, FLAGGED_WITHOUT_ROLE);
   private static final String CLIENT_ID = "queries-it-client";
 
   @Autowired private RecipientResolutionService recipientResolutionService;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private MissionRepository missionRepository;
   @Autowired private MissionParticipantRepository missionParticipantRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
@@ -80,10 +91,15 @@ class NotificationRecipientQueriesIntegrationTest {
 
   @BeforeEach
   void seed() {
+    Role krtMember = roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow();
     Set<User> users = new HashSet<>();
-    for (UUID id : Set.of(OWNER, MANAGER, CHECKED_IN, WAITING, STAFFELLEITER, PLAIN_MEMBER)) {
-      users.add(user(id));
+    for (UUID id : Set.of(OWNER, MANAGER, CHECKED_IN, WAITING, PLAIN_MEMBER)) {
+      users.add(user(id, Set.of()));
     }
+    users.add(user(RETAINED_SEAT, Set.of()));
+    users.add(user(FLAGGED_WITHOUT_ROLE, Set.of()));
+    users.add(user(STAFFELLEITER, Set.of(krtMember)));
+    users.add(user(FLAGGED, Set.of(krtMember)));
     User owner = users.stream().filter(u -> OWNER.equals(u.getId())).findFirst().orElseThrow();
     User manager = users.stream().filter(u -> MANAGER.equals(u.getId())).findFirst().orElseThrow();
 
@@ -100,8 +116,11 @@ class NotificationRecipientQueriesIntegrationTest {
     guest.setGuestName("Guest");
     missionParticipantRepository.saveAndFlush(guest);
 
-    membership(userById(users, STAFFELLEITER), MembershipRole.STAFFELLEITER);
-    membership(userById(users, PLAIN_MEMBER), MembershipRole.MEMBER);
+    membership(userById(users, STAFFELLEITER), MembershipRole.STAFFELLEITER, false);
+    membership(userById(users, PLAIN_MEMBER), MembershipRole.MEMBER, false);
+    membership(userById(users, RETAINED_SEAT), MembershipRole.ENSIGN, false);
+    membership(userById(users, FLAGGED), MembershipRole.MEMBER, true);
+    membership(userById(users, FLAGGED_WITHOUT_ROLE), MembershipRole.MEMBER, true);
 
     ExchangeClient client = new ExchangeClient();
     client.setClientId(CLIENT_ID);
@@ -119,12 +138,11 @@ class NotificationRecipientQueriesIntegrationTest {
         .filter(c -> CLIENT_ID.equals(c.getClientId()))
         .forEach(exchangeClientRepository::delete);
     missionRepository.deleteById(missionId);
-    orgUnitMembershipRepository.deleteAll(
-        orgUnitMembershipRepository.findAllByIdUserId(STAFFELLEITER));
-    orgUnitMembershipRepository.deleteAll(
-        orgUnitMembershipRepository.findAllByIdUserId(PLAIN_MEMBER));
-    userRepository.deleteAllById(
-        Set.of(OWNER, MANAGER, CHECKED_IN, WAITING, STAFFELLEITER, PLAIN_MEMBER));
+    for (UUID holder : MEMBERSHIP_HOLDERS) {
+      orgUnitMembershipRepository.deleteAll(orgUnitMembershipRepository.findAllByIdUserId(holder));
+    }
+    userRepository.deleteAllById(Set.of(OWNER, MANAGER, CHECKED_IN, WAITING));
+    userRepository.deleteAllById(MEMBERSHIP_HOLDERS);
   }
 
   @Test
@@ -163,12 +181,39 @@ class NotificationRecipientQueriesIntegrationTest {
         .doesNotContain(PLAIN_MEMBER);
   }
 
-  private User user(UUID id) {
+  @Test
+  void aSeatWhoseHolderLacksKrtMemberYieldsNoRecipient() {
+    assertThat(
+            recipientResolutionService.resolveOrgRelative(
+                OrgRelativeRole.UNIT_LEADERSHIP, Squadron.IRIDIUM_ID))
+        .contains(STAFFELLEITER)
+        .doesNotContain(RETAINED_SEAT);
+    assertThat(recipientResolutionService.resolveSeatHolders())
+        .contains(STAFFELLEITER)
+        .doesNotContain(RETAINED_SEAT, PLAIN_MEMBER);
+  }
+
+  @Test
+  void theLogisticianAndMissionManagerFlagsYieldARecipientOnlyWithKrtMember() {
+    assertThat(
+            recipientResolutionService.resolveOrgRelative(
+                OrgRelativeRole.LOGISTICIAN, Squadron.IRIDIUM_ID))
+        .contains(FLAGGED)
+        .doesNotContain(FLAGGED_WITHOUT_ROLE);
+    assertThat(
+            recipientResolutionService.resolveOrgRelative(
+                OrgRelativeRole.MISSION_MANAGER, Squadron.IRIDIUM_ID))
+        .contains(FLAGGED)
+        .doesNotContain(FLAGGED_WITHOUT_ROLE);
+  }
+
+  private User user(UUID id, Set<Role> roles) {
     User user = new User();
     user.setId(id);
     user.setUsername("queries-it-" + id);
     user.setApprovalStatus(ApprovalStatus.ACTIVE);
     user.setInKeycloak(true);
+    user.setRoles(new HashSet<>(roles));
     return userRepository.saveAndFlush(user);
   }
 
@@ -184,11 +229,13 @@ class NotificationRecipientQueriesIntegrationTest {
     missionParticipantRepository.saveAndFlush(participant);
   }
 
-  private void membership(User user, MembershipRole role) {
+  private void membership(User user, MembershipRole role, boolean flagged) {
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(user.getId(), Squadron.IRIDIUM_ID));
     membership.setUser(user);
     membership.setRole(role);
+    membership.setLogistician(flagged);
+    membership.setMissionManager(flagged);
     membership.setJoinedAt(Instant.now());
     orgUnitMembershipRepository.saveAndFlush(membership);
   }

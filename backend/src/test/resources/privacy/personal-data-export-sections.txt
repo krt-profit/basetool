@@ -54,7 +54,8 @@
 54|bankAuditActionsOnMember|ART_15|09668c132366e434||
 55|payoutPreference|ART_15_20|c2551d2dbd6dce66||
 56|blueprintSharing|ART_15_20|61c70ab961a6406a||
-57|supplyDonations|ART_15_20|d2a50ef07a187ae8||entry,receiving_unit
-58|purchasingDeals|ART_15_20|671189ea89a219de||entry
-59|purchasingAppointments|ART_15_20|458d0230d3fdb40a||
-60|navigationPreferences|ART_15_20|8743efa8be2923d2||
+57|activeOrgUnitChoice|ART_15_20|66b92abaa94a1b80||org_unit,shorthand
+58|supplyDonations|ART_15_20|d2a50ef07a187ae8||entry,receiving_unit
+59|purchasingDeals|ART_15_20|671189ea89a219de||entry
+60|purchasingAppointments|ART_15_20|458d0230d3fdb40a||
+61|navigationPreferences|ART_15_20|8743efa8be2923d2||

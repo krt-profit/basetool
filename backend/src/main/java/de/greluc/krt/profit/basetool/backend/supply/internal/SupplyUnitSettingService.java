@@ -29,12 +29,12 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,22 +77,10 @@ public class SupplyUnitSettingService {
     Map<UUID, SupplyUnitSetting> settings =
         settingRepository.findAll().stream()
             .collect(Collectors.toMap(SupplyUnitSetting::getId, Function.identity()));
-    Set<UUID> managed = accessPolicy.managedUnitIds();
-    boolean admin = accessPolicy.isAdmin();
+    SupplyManagedUnits managed = accessPolicy.managedUnits();
     return orgUnitRepository.findAll().stream()
         .filter(OrgUnit::isActive)
-        .map(unit -> {
-          SupplyUnitSetting setting = settings.get(unit.getId());
-          return new SupplyUnitDto(
-              unit.getId(),
-              unit.getName(),
-              unit.getShorthand(),
-              unit.getKind(),
-              setting != null && setting.isMayRaiseNeeds(),
-              setting != null && setting.isAcceptsDonations(),
-              admin || managed.contains(unit.getId()),
-              setting == null ? null : setting.getVersion());
-        })
+        .map(unit -> toDto(unit, settings.get(unit.getId()), managed))
         .filter(dto -> !onlyConfigured || dto.mayRaiseNeeds() || dto.acceptsDonations())
         .sorted(Comparator.comparing(SupplyUnitDto::name, String.CASE_INSENSITIVE_ORDER))
         .toList();
@@ -103,7 +91,7 @@ public class SupplyUnitSettingService {
    *
    * @param orgUnitId the unit
    * @param request the flags and the echoed version
-   * @return the unit with its new setting
+   * @return the unit with its new setting and the caller's manage flag of REQ-SUP-003
    */
   @Transactional
   public @NotNull SupplyUnitDto update(
@@ -135,14 +123,29 @@ public class SupplyUnitSettingService {
             .with("acceptsDonations", saved.isAcceptsDonations())
             .with("wasMayRaiseNeeds", wasRaising)
             .with("wasAcceptsDonations", wasAccepting));
+    return toDto(unit, saved, accessPolicy.managedUnits());
+  }
+
+  /**
+   * Maps a unit with its setting.
+   *
+   * @param unit the unit
+   * @param setting the unit's setting, or {@code null} while it has none
+   * @param managed the caller's managed units, which decide the unit's manage flag
+   * @return the unit as the pickers and the admin page show it
+   */
+  private static @NotNull SupplyUnitDto toDto(
+      @NotNull OrgUnit unit,
+      @Nullable SupplyUnitSetting setting,
+      @NotNull SupplyManagedUnits managed) {
     return new SupplyUnitDto(
-        orgUnitId,
+        unit.getId(),
         unit.getName(),
         unit.getShorthand(),
         unit.getKind(),
-        saved.isMayRaiseNeeds(),
-        saved.isAcceptsDonations(),
-        true,
-        saved.getVersion());
+        setting != null && setting.isMayRaiseNeeds(),
+        setting != null && setting.isAcceptsDonations(),
+        managed.contains(unit.getId()),
+        setting == null ? null : setting.getVersion());
   }
 }

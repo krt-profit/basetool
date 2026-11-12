@@ -26,8 +26,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationRepository;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationStatus;
@@ -67,6 +69,8 @@ class OperationMissionManagerFlagTest {
   @Autowired private WebApplicationContext context;
 
   @Autowired private UserRepository userRepository;
+
+  @Autowired private RoleRepository roleRepository;
 
   @Autowired private OperationRepository operationRepository;
 
@@ -140,6 +144,7 @@ class OperationMissionManagerFlagTest {
     User u = new User();
     u.setId(UUID.randomUUID());
     u.setUsername(username);
+    u.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     u = userRepository.save(u);
     OrgUnitMembership m = new OrgUnitMembership();
     m.setId(new OrgUnitMembershipId(u.getId(), Squadron.IRIDIUM_ID));

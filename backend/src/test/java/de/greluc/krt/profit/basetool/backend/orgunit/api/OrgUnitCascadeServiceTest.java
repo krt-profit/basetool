@@ -80,8 +80,9 @@ class OrgUnitCascadeServiceTest {
 
     assertEquals(Set.of(STAFFEL_A1_ID), reach);
     assertTrue(service.cascadedOfficerReach(List.of(staffel)).isEmpty());
-    verify(orgUnitRepository, never()).findChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
-    verify(orgUnitRepository, never()).findAllOrgUnitIds();
+    verify(orgUnitRepository, never())
+        .findActiveChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
+    verify(orgUnitRepository, never()).findAllActiveOrgUnitIds();
   }
 
   @Test
@@ -91,7 +92,8 @@ class OrgUnitCascadeServiceTest {
     OrgUnitMembership plain = membership(FOREIGN_STAFFEL_ID, OrgUnitKind.SQUADRON);
     OrgUnitMembership bereich = membership(BEREICH_B_ID, OrgUnitKind.BEREICH);
     bereich.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_B_ID)).thenReturn(List.of(STAFFEL_B1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_B_ID))
+        .thenReturn(List.of(STAFFEL_B1_ID));
 
     Set<UUID> reach = service.officerReach(List.of(lead, plain, bereich));
 
@@ -108,7 +110,7 @@ class OrgUnitCascadeServiceTest {
   void bereichsleiter_reachesBereichAndAllItsChildren() {
     OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID))
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
         .thenReturn(List.of(STAFFEL_A1_ID, STAFFEL_A2_ID, SK_A1_ID));
 
     Set<UUID> reach = service.expandWithDescendants(List.of(lead));
@@ -123,7 +125,8 @@ class OrgUnitCascadeServiceTest {
   void bereichskoordinatorAndOperatorFlags_alsoCascade() {
     OrgUnitMembership koord = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     koord.setRole(MembershipRole.BEREICHSKOORDINATOR);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
+        .thenReturn(List.of(STAFFEL_A1_ID));
 
     assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), service.cascadedOfficerReach(List.of(koord)));
 
@@ -138,14 +141,16 @@ class OrgUnitCascadeServiceTest {
 
     assertEquals(Set.of(BEREICH_A_ID), service.expandWithDescendants(List.of(seat)));
     assertTrue(service.cascadedOfficerReach(List.of(seat)).isEmpty());
-    verify(orgUnitRepository, never()).findChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
+    verify(orgUnitRepository, never())
+        .findActiveChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
   }
 
   @Test
   void strictSilo_bereichsleiterDoesNotReachOtherBereichOrItsChildren() {
     OrgUnitMembership leadA = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     leadA.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
+        .thenReturn(List.of(STAFFEL_A1_ID));
 
     Set<UUID> reach = service.expandWithDescendants(List.of(leadA));
 
@@ -154,14 +159,14 @@ class OrgUnitCascadeServiceTest {
     org.junit.jupiter.api.Assertions.assertFalse(reach.contains(BEREICH_B_ID));
     org.junit.jupiter.api.Assertions.assertFalse(reach.contains(STAFFEL_B1_ID));
     org.junit.jupiter.api.Assertions.assertFalse(reach.contains(FOREIGN_STAFFEL_ID));
-    verify(orgUnitRepository, never()).findChildOrgUnitIds(BEREICH_B_ID);
+    verify(orgUnitRepository, never()).findActiveChildOrgUnitIds(BEREICH_B_ID);
   }
 
   @Test
   void olMember_reachesEveryOrgUnit_viaConcreteUnion_notAdminMarker() {
     OrgUnitMembership ol = membership(OL_ID, OrgUnitKind.ORGANISATIONSLEITUNG);
     ol.setRole(MembershipRole.OL_MEMBER);
-    when(orgUnitRepository.findAllOrgUnitIds())
+    when(orgUnitRepository.findAllActiveOrgUnitIds())
         .thenReturn(
             List.of(
                 OL_ID,
@@ -176,7 +181,8 @@ class OrgUnitCascadeServiceTest {
     assertEquals(
         Set.of(OL_ID, BEREICH_A_ID, BEREICH_B_ID, STAFFEL_A1_ID, STAFFEL_B1_ID, FOREIGN_STAFFEL_ID),
         reach);
-    verify(orgUnitRepository, never()).findChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
+    verify(orgUnitRepository, never())
+        .findActiveChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -185,8 +191,10 @@ class OrgUnitCascadeServiceTest {
     leadA.setRole(MembershipRole.BEREICHSLEITER);
     OrgUnitMembership leadB = membership(BEREICH_B_ID, OrgUnitKind.BEREICH);
     leadB.setRole(MembershipRole.BEREICHSKOORDINATOR);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_B_ID)).thenReturn(List.of(STAFFEL_B1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
+        .thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_B_ID))
+        .thenReturn(List.of(STAFFEL_B1_ID));
 
     Set<UUID> reach = service.cascadedOfficerReach(List.of(leadA, leadB));
 
@@ -198,7 +206,8 @@ class OrgUnitCascadeServiceTest {
     OrgUnitMembership ownStaffel = membership(FOREIGN_STAFFEL_ID, OrgUnitKind.SQUADRON);
     OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
+        .thenReturn(List.of(STAFFEL_A1_ID));
 
     Set<UUID> reach = service.expandWithDescendants(List.of(ownStaffel, lead));
 
@@ -214,15 +223,17 @@ class OrgUnitCascadeServiceTest {
 
     assertTrue(service.cascadedOfficerReach(List.of(skLead)).isEmpty());
     assertEquals(Set.of(SK_A1_ID), service.expandWithDescendants(List.of(skLead)));
-    verify(orgUnitRepository, never()).findChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
-    verify(orgUnitRepository, never()).findAllOrgUnitIds();
+    verify(orgUnitRepository, never())
+        .findActiveChildOrgUnitIds(org.mockito.ArgumentMatchers.any());
+    verify(orgUnitRepository, never()).findAllActiveOrgUnitIds();
   }
 
   @Test
   void cascadedReach_isMemoisedPerRequest_hierarchyReadOnce() {
     OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
+        .thenReturn(List.of(STAFFEL_A1_ID));
     bindRequest();
 
     Set<UUID> first = service.cascadedOfficerReach(List.of(lead));
@@ -232,14 +243,15 @@ class OrgUnitCascadeServiceTest {
     assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), first);
     assertEquals(Set.of(BEREICH_A_ID, STAFFEL_A1_ID), third);
     assertTrue(viaExpand.containsAll(Set.of(BEREICH_A_ID, STAFFEL_A1_ID)));
-    verify(orgUnitRepository, times(1)).findChildOrgUnitIds(BEREICH_A_ID);
+    verify(orgUnitRepository, times(1)).findActiveChildOrgUnitIds(BEREICH_A_ID);
   }
 
   @Test
   void memoisedReach_returnsDefensiveCopy_callerMutationDoesNotCorruptCache() {
     OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
+        .thenReturn(List.of(STAFFEL_A1_ID));
     bindRequest();
 
     Set<UUID> first = service.cascadedOfficerReach(List.of(lead));
@@ -256,7 +268,7 @@ class OrgUnitCascadeServiceTest {
   void olReach_isMemoisedPerRequest_findAllOrgUnitIdsReadOnce() {
     OrgUnitMembership ol = membership(OL_ID, OrgUnitKind.ORGANISATIONSLEITUNG);
     ol.setRole(MembershipRole.OL_MEMBER);
-    when(orgUnitRepository.findAllOrgUnitIds())
+    when(orgUnitRepository.findAllActiveOrgUnitIds())
         .thenReturn(List.of(OL_ID, BEREICH_A_ID, STAFFEL_A1_ID));
     bindRequest();
 
@@ -265,19 +277,20 @@ class OrgUnitCascadeServiceTest {
     Set<UUID> third = service.cascadedOfficerReach(List.of(ol));
 
     assertEquals(Set.of(OL_ID, BEREICH_A_ID, STAFFEL_A1_ID), third);
-    verify(orgUnitRepository, times(1)).findAllOrgUnitIds();
+    verify(orgUnitRepository, times(1)).findAllActiveOrgUnitIds();
   }
 
   @Test
   void withoutBoundRequest_cascadeDoesNotMemoise_recomputesEachCall() {
     OrgUnitMembership lead = membership(BEREICH_A_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
+        .thenReturn(List.of(STAFFEL_A1_ID));
 
     service.cascadedOfficerReach(List.of(lead));
     service.cascadedOfficerReach(List.of(lead));
 
-    verify(orgUnitRepository, times(2)).findChildOrgUnitIds(BEREICH_A_ID);
+    verify(orgUnitRepository, times(2)).findActiveChildOrgUnitIds(BEREICH_A_ID);
   }
 
   @Test
@@ -286,8 +299,10 @@ class OrgUnitCascadeServiceTest {
     leadA.setRole(MembershipRole.BEREICHSLEITER);
     OrgUnitMembership leadB = membership(BEREICH_B_ID, OrgUnitKind.BEREICH);
     leadB.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_A_ID)).thenReturn(List.of(STAFFEL_A1_ID));
-    when(orgUnitRepository.findChildOrgUnitIds(BEREICH_B_ID)).thenReturn(List.of(STAFFEL_B1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_A_ID))
+        .thenReturn(List.of(STAFFEL_A1_ID));
+    when(orgUnitRepository.findActiveChildOrgUnitIds(BEREICH_B_ID))
+        .thenReturn(List.of(STAFFEL_B1_ID));
     bindRequest();
 
     Set<UUID> reachA = service.cascadedOfficerReach(List.of(leadA));
@@ -316,7 +331,7 @@ class OrgUnitCascadeServiceTest {
   void unitsBelow_olGrant_reachesEveryUnit() {
     when(orgUnitRepository.findOrganisationsleitungIdsAmong(Set.of(OL_ID)))
         .thenReturn(List.of(OL_ID));
-    when(orgUnitRepository.findAllOrgUnitIds())
+    when(orgUnitRepository.findAllActiveOrgUnitIds())
         .thenReturn(List.of(OL_ID, BEREICH_A_ID, BEREICH_B_ID, STAFFEL_A1_ID, SK_A1_ID));
 
     assertEquals(
@@ -328,7 +343,7 @@ class OrgUnitCascadeServiceTest {
   void unitsBelow_bereichGrant_reachesItsStaffelnAndSpezialkommandosOnly() {
     when(orgUnitRepository.findOrganisationsleitungIdsAmong(Set.of(BEREICH_A_ID)))
         .thenReturn(List.of());
-    when(orgUnitRepository.findChildOrgUnitIdsIn(Set.of(BEREICH_A_ID)))
+    when(orgUnitRepository.findActiveChildOrgUnitIdsIn(Set.of(BEREICH_A_ID)))
         .thenReturn(List.of(STAFFEL_A1_ID, STAFFEL_A2_ID, SK_A1_ID));
 
     assertEquals(
@@ -339,7 +354,8 @@ class OrgUnitCascadeServiceTest {
   void unitsBelow_staffelGrant_reachesNothingFurther() {
     when(orgUnitRepository.findOrganisationsleitungIdsAmong(Set.of(STAFFEL_A1_ID)))
         .thenReturn(List.of());
-    when(orgUnitRepository.findChildOrgUnitIdsIn(Set.of(STAFFEL_A1_ID))).thenReturn(List.of());
+    when(orgUnitRepository.findActiveChildOrgUnitIdsIn(Set.of(STAFFEL_A1_ID)))
+        .thenReturn(List.of());
 
     assertTrue(service.unitsBelow(Set.of(STAFFEL_A1_ID)).isEmpty());
   }
@@ -347,7 +363,8 @@ class OrgUnitCascadeServiceTest {
   @Test
   void unitsBelow_noGrant_readsNoHierarchy() {
     assertTrue(service.unitsBelow(Set.of()).isEmpty());
-    verify(orgUnitRepository, never()).findChildOrgUnitIdsIn(org.mockito.ArgumentMatchers.any());
+    verify(orgUnitRepository, never())
+        .findActiveChildOrgUnitIdsIn(org.mockito.ArgumentMatchers.any());
     verify(orgUnitRepository, never())
         .findOrganisationsleitungIdsAmong(org.mockito.ArgumentMatchers.any());
   }
@@ -359,7 +376,7 @@ class OrgUnitCascadeServiceTest {
     OrgUnitMembership plainStaffel = membership(STAFFEL_B1_ID, OrgUnitKind.SQUADRON);
     when(orgUnitRepository.findOrganisationsleitungIdsAmong(Set.of(BEREICH_A_ID)))
         .thenReturn(List.of());
-    when(orgUnitRepository.findChildOrgUnitIdsIn(Set.of(BEREICH_A_ID)))
+    when(orgUnitRepository.findActiveChildOrgUnitIdsIn(Set.of(BEREICH_A_ID)))
         .thenReturn(List.of(STAFFEL_A1_ID, SK_A1_ID));
 
     Set<UUID> granted =

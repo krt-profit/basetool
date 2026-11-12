@@ -19,15 +19,21 @@
 
 package de.greluc.krt.profit.basetool.frontend.orgunit.web;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveOrgUnitRestore;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClient;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.ActiveOrgUnitChoiceResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,25 +43,39 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.view.RedirectView;
 
 /**
- * Manages the caller's active OrgUnit, stored in the frontend session and relayed to the backend as
- * the {@code X-Active-Org-Unit-Id} header. The backend re-validates the pin against the caller's
- * memberships.
+ * Switches the caller's active org unit: stores the choice in the backend (REQ-ORG-031), mirrors it
+ * in the frontend session and relays it to the backend as the {@code X-Active-Org-Unit-Id} header.
+ * The backend re-validates the pin on every request.
  */
 @Controller
 @UsesLayoutModel
 @RequestMapping("/me")
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
+@Slf4j
 public class MeFrontendController {
 
+  /** Flash key of the success toast the toast fragment renders. */
+  static final String SUCCESS_TOAST = "successToast";
+
+  /** Flash key of the error toast the toast fragment renders. */
+  static final String ERROR_TOAST = "errorToast";
+
+  /** The org-unit domain's backend client. */
+  private final OrgUnitBackendClient orgUnitBackendClient;
+
   /**
-   * Sets the caller's active OrgUnit, or clears it for a blank id, and redirects back.
+   * Sets the caller's active org unit, or clears it for a blank id, and redirects back.
    *
-   * @param orgUnitId the OrgUnit to activate, {@code null} (absent or blank) to clear.
+   * <p>A unit the backend refuses leaves the session unchanged. When the backend cannot store the
+   * choice, the session still switches and the toast says the choice lasts for this session only.
+   *
+   * @param orgUnitId the org unit to activate, {@code null} (absent or blank) for all of the
+   *     caller's org units.
    * @param referer optional redirect target; anything but a same-origin path falls back to {@code
    *     /}.
    * @param request HTTP request injected by Spring; never {@code null}.
-   * @param redirectAttributes flash attribute carrier for the success toast.
+   * @param redirectAttributes flash attribute carrier for the toast.
    * @return redirect view to the referring page so the next render sees the new context.
    */
   @NotNull
@@ -65,7 +85,22 @@ public class MeFrontendController {
       @RequestParam(value = "_referer", required = false) @Nullable String referer,
       HttpServletRequest request,
       RedirectAttributes redirectAttributes) {
-    return applyActiveOrgUnitSelection(orgUnitId, referer, request, redirectAttributes);
+    HttpSession session = request.getSession(true);
+    try {
+      ActiveOrgUnitChoiceResponse stored = orgUnitBackendClient.storeActiveOrgUnitChoice(orgUnitId);
+      applyPin(session, stored != null ? stored.orgUnitId() : orgUnitId);
+      redirectAttributes.addFlashAttribute(SUCCESS_TOAST, switchedToastKey(orgUnitId));
+    } catch (BackendServiceException e) {
+      if (e.getStatusCode() == HttpStatus.BAD_REQUEST.value()) {
+        log.debug("The backend refused the org-unit choice", e);
+        redirectAttributes.addFlashAttribute(ERROR_TOAST, "orgUnit.switcher.rejected");
+        return new RedirectView(safeRedirectTarget(referer));
+      }
+      log.warn("Storing the org-unit choice failed; it applies to this session only", e);
+      applyPin(session, orgUnitId);
+      redirectAttributes.addFlashAttribute(ERROR_TOAST, "orgUnit.switcher.notStored");
+    }
+    return new RedirectView(safeRedirectTarget(referer));
   }
 
   /**
@@ -94,29 +129,32 @@ public class MeFrontendController {
   }
 
   /**
-   * Stores or clears the active OrgUnit in {@link
-   * ActiveSquadronContext#ACTIVE_ORG_UNIT_SESSION_KEY} and adds the matching flash toast.
+   * Names the message of the toast after a stored switch.
    *
-   * @param orgUnitId the OrgUnit id to activate, {@code null} to clear.
-   * @param referer optional redirect target, validated by {@link #safeRedirectTarget(String)}.
-   * @param request HTTP request injected by Spring.
-   * @param redirectAttributes flash attribute carrier for the success toast.
-   * @return redirect view to the referring page, or to {@code /} when it is not a same-origin path.
+   * @param orgUnitId the activated org unit, {@code null} for all of the caller's org units
+   * @return the message key of the toast
    */
-  @NotNull
-  private RedirectView applyActiveOrgUnitSelection(
-      @Nullable UUID orgUnitId,
-      @Nullable String referer,
-      @NotNull HttpServletRequest request,
-      RedirectAttributes redirectAttributes) {
-    HttpSession session = request.getSession(true);
+  @Contract(pure = true)
+  private static @NotNull String switchedToastKey(@Nullable UUID orgUnitId) {
+    return orgUnitId == null ? "orgUnit.switcher.cleared" : "orgUnit.switcher.activated";
+  }
+
+  /**
+   * Stores or clears the session pin and records that it reflects the caller's own choice, so the
+   * session's restore does not replace it.
+   *
+   * @param session the caller's session; never {@code null}
+   * @param orgUnitId the org unit to pin, {@code null} for all of the caller's org units
+   */
+  private static void applyPin(@NotNull HttpSession session, @Nullable UUID orgUnitId) {
     if (orgUnitId == null) {
       session.removeAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY);
-      redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.cleared");
     } else {
       session.setAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, orgUnitId.toString());
-      redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.activated");
     }
-    return new RedirectView(safeRedirectTarget(referer));
+    String principal = ActiveOrgUnitRestore.currentPrincipal();
+    if (principal != null) {
+      ActiveOrgUnitRestore.markRestored(session, principal);
+    }
   }
 }

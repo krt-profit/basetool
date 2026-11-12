@@ -300,7 +300,9 @@ class HangarShipOrgUnitChangeIntegrationTest {
   private static @NotNull RequestPostProcessor as(@NotNull User caller) {
     return jwt()
         .jwt(builder -> builder.subject(caller.getId().toString()))
-        .authorities(new SimpleGrantedAuthority("HANGAR_WRITE"));
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+            new SimpleGrantedAuthority("HANGAR_WRITE"));
   }
 
   private @Nullable UUID unitOf(@NotNull UUID id) {

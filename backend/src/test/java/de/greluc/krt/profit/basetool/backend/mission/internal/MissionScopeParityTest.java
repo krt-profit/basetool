@@ -88,8 +88,7 @@ class MissionScopeParityTest {
                 .map(MissionReferenceDto::id)
                 .collect(Collectors.toSet()),
         (wired, id) ->
-            new MissionAccessPolicy(
-                    wired.gate(), wired.authHelper(), missionRepository, null, null, null, null)
+            new MissionAccessPolicy(wired.gate(), wired.authHelper(), missionRepository, null, null)
                 .canSeeMission(id));
   }
 

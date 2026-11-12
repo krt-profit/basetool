@@ -628,7 +628,7 @@
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
-                        th:if="${entry.canEdit == true and entry.owningSquadron != null}"
+                        th:if="${entry.canEdit == true and entry.owningSquadron != null and contextSpansOrgUnits}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
                         th:data-amount="${entry.amount}"
@@ -780,7 +780,7 @@
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
                 <button type="button" class="btn btn-ghost btn-xs btn-icon"
-                        th:if="${entry.canEdit == true and entry.owningSquadron != null}"
+                        th:if="${entry.canEdit == true and entry.owningSquadron != null and contextSpansOrgUnits}"
                         th:data-id="${entry.id}"
                         th:data-version="${entry.version}"
                         th:data-amount="${entry.amount}"

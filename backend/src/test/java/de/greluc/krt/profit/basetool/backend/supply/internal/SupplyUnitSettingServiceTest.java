@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -42,7 +43,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
-/** What an admin lets each org unit do in the supply module (REQ-SUP-002). */
+/**
+ * What an admin lets each org unit do in the supply module, and the manage flag of each unit inside
+ * the active context (REQ-SUP-002, REQ-SUP-003).
+ */
 @ExtendWith(MockitoExtension.class)
 class SupplyUnitSettingServiceTest {
 
@@ -58,11 +62,20 @@ class SupplyUnitSettingServiceTest {
 
   @BeforeEach
   void setUp() {
-    service =
-        new SupplyUnitSettingService(
-            settingRepository, orgUnitRepository, settingsService, accessPolicy, auditRecorder);
+    service = serviceWith(accessPolicy);
     raising = unit("Zulu");
     plain = unit("alpha");
+  }
+
+  /**
+   * The service over this test's mocks, deciding the manage flags by the given policy.
+   *
+   * @param policy the caller's policy
+   * @return the service
+   */
+  private SupplyUnitSettingService serviceWith(SupplyAccessPolicy policy) {
+    return new SupplyUnitSettingService(
+        settingRepository, orgUnitRepository, settingsService, policy, auditRecorder);
   }
 
   private static Squadron unit(String name) {
@@ -86,8 +99,8 @@ class SupplyUnitSettingServiceTest {
   void theConfiguredListHoldsOnlyUnitsWithAFlagSortedByName() {
     when(settingRepository.findAll()).thenReturn(List.of(setting(raising.getId(), true, false, 1)));
     when(orgUnitRepository.findAll()).thenReturn(List.of(raising, plain));
-    when(accessPolicy.managedUnitIds()).thenReturn(Set.of(raising.getId()));
-    when(accessPolicy.isAdmin()).thenReturn(false);
+    when(accessPolicy.managedUnits())
+        .thenReturn(new SupplyManagedUnits(false, Set.of(raising.getId())));
 
     List<SupplyUnitDto> units = service.listConfigured();
 
@@ -102,8 +115,7 @@ class SupplyUnitSettingServiceTest {
     plain.setActive(false);
     when(settingRepository.findAll()).thenReturn(List.of());
     when(orgUnitRepository.findAll()).thenReturn(List.of(raising, plain));
-    when(accessPolicy.managedUnitIds()).thenReturn(Set.of());
-    when(accessPolicy.isAdmin()).thenReturn(true);
+    when(accessPolicy.managedUnits()).thenReturn(new SupplyManagedUnits(true, Set.of()));
 
     List<SupplyUnitDto> units = service.listAll();
 
@@ -113,17 +125,50 @@ class SupplyUnitSettingServiceTest {
   }
 
   @Test
-  void aFirstSettingIsCreatedAndAudited() {
+  void anAdminPinnedToAUnitManagesOnlyThatUnitInTheUnitChoices() {
+    when(settingRepository.findAll())
+        .thenReturn(
+            List.of(
+                setting(raising.getId(), true, false, 1), setting(plain.getId(), false, true, 1)));
+    when(orgUnitRepository.findAll()).thenReturn(List.of(raising, plain));
+
+    List<SupplyUnitDto> units =
+        serviceWith(SupplyAccessPolicies.admin(raising.getId())).listConfigured();
+
+    assertThat(units)
+        .extracting(SupplyUnitDto::name, SupplyUnitDto::canManage)
+        .containsExactly(tuple("alpha", false), tuple("Zulu", true));
+  }
+
+  @Test
+  void anAdminPinnedToAnotherUnitStillConfiguresAUnitButDoesNotManageIt() {
     when(orgUnitRepository.findById(raising.getId())).thenReturn(Optional.of(raising));
     when(settingRepository.findById(raising.getId())).thenReturn(Optional.empty());
     when(settingRepository.saveAndFlush(any(SupplyUnitSetting.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     SupplyUnitDto dto =
+        serviceWith(SupplyAccessPolicies.admin(plain.getId()))
+            .update(raising.getId(), new UpdateSupplyUnitRequest(true, false, null));
+
+    assertThat(dto.mayRaiseNeeds()).isTrue();
+    assertThat(dto.canManage()).isFalse();
+  }
+
+  @Test
+  void aFirstSettingIsCreatedAndAudited() {
+    when(orgUnitRepository.findById(raising.getId())).thenReturn(Optional.of(raising));
+    when(settingRepository.findById(raising.getId())).thenReturn(Optional.empty());
+    when(settingRepository.saveAndFlush(any(SupplyUnitSetting.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(accessPolicy.managedUnits()).thenReturn(new SupplyManagedUnits(true, Set.of()));
+
+    SupplyUnitDto dto =
         service.update(raising.getId(), new UpdateSupplyUnitRequest(true, true, null));
 
     assertThat(dto.mayRaiseNeeds()).isTrue();
     assertThat(dto.acceptsDonations()).isTrue();
+    assertThat(dto.canManage()).isTrue();
     verify(auditRecorder)
         .record(
             eq(AuditEventType.SUPPLY_UNIT_SETTING_CHANGED),
@@ -155,6 +200,7 @@ class SupplyUnitSettingServiceTest {
     when(orgUnitRepository.findById(raising.getId())).thenReturn(Optional.of(raising));
     when(settingRepository.findById(raising.getId())).thenReturn(Optional.of(stored));
     when(settingRepository.saveAndFlush(stored)).thenReturn(stored);
+    when(accessPolicy.managedUnits()).thenReturn(new SupplyManagedUnits(true, Set.of()));
 
     service.update(raising.getId(), new UpdateSupplyUnitRequest(false, true, 4L));
 

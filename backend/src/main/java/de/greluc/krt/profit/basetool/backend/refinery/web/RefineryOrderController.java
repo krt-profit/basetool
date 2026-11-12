@@ -188,9 +188,9 @@ public class RefineryOrderController {
   }
 
   /**
-   * Updates a refinery order. Non-logistician callers must be the owner (HTTP-boundary check
-   * because the rule is per-resource and {@code @PreAuthorize} can't see the order's owner). A
-   * Logistician of the order's unit may edit it. The order is row-locked before it is read.
+   * Updates a refinery order for its owner or a Logistician of its unit, the rule of the gate
+   * (REQ-REFINERY-019). The order is row-locked before it is read, and a caller who is no
+   * Logistician of it must still own the locked row.
    *
    * @param jwt the caller's token
    * @param id the order to update

@@ -1,7 +1,8 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-31.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** SUP · **Related ADRs:** [ADR-0252](../adr/0252-stockcommands-gains-the-pool-and-donation-commands.md),
 > [ADR-0253](../adr/0253-material-supply-and-purchasing-are-two-modules.md),
-> [ADR-0320](../adr/0320-a-need-shows-its-linked-orders-stock-and-only-donations-and-purchases-cover-it.md)
+> [ADR-0320](../adr/0320-a-need-shows-its-linked-orders-stock-and-only-donations-and-purchases-cover-it.md),
+> [ADR-0374](../adr/0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)
 
 # Bedarf & Spenden (supply)
 
@@ -36,7 +37,9 @@ off, every supply endpoint except `GET /api/v1/supply/state` and the admin endpo
 
 An admin marks any active org unit as `may_raise_needs` and / or `accepts_donations`. No unit is
 hardcoded; a unit without a setting does neither. Changes are audited (`SUPPLY_UNIT_SETTING_CHANGED`)
-and carry the setting's own version.
+and carry the setting's own version. The admin page is an administration tool and lists and changes
+every unit under any active org unit (REQ-ORG-032); the manage flag it returns for a unit follows
+REQ-SUP-003.
 
 **Enforced by:** `SupplyUnitSettingServiceTest` · **Code:** `supply/internal/SupplyUnitSettingService`,
 `supply/web/SupplyAdminController`
@@ -52,9 +55,32 @@ edited, only withdrawn (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013). A unit's leaders
 unit (`hasRoleInOrgUnit(unit, LOGISTICIAN)`), so the lead is no separate case and no gate evaluates
 the two differently.
 
+Who manages a unit follows the active org unit (REQ-ORG-032): with a unit selected, the caller
+manages that unit only, and only when they hold the grant there; under „Alle meine Org-Einheiten"
+every unit they manage. An admin manages every unit while no unit is selected and only the selected
+unit while one is. One rule decides it on every manager surface of the module and on every flag that
+offers one: raising and editing needs and the need form's job-order picker, the incoming donations
+and their unit choice, receiving, declining and recording donations, the manage flag of each unit
+the forms offer, and the units whose statistics a manager reads (REQ-SUP-013). The write gates ask
+`SupplyAccessPolicy#canManageUnit` (`hasRoleInOrgUnit`), the flags and lists
+`SupplyAccessPolicy#managedUnits`, and both answer alike. The open needs every member reads, the
+organisation-wide reads of the governing leadership, to which every admin belongs, and the admin
+page of REQ-SUP-002 do not depend on it.
+
+The tabs „Eingehende Spenden" and „Statistik" do not depend on it either (ADR-0329): a tab flag that
+reads false deletes the member's stored favourite, phone slot and start page of that tab
+(REQ-UI-032). Both read `SupplyAccessPolicy#managedUnitsInAnyContext`, the units the caller manages
+whatever unit is selected (every unit for an admin, otherwise the units they lead or are a
+Logistician of): „Eingehende Spenden" is offered while one of them is an active unit that accepts
+donations (`SupplyTabAccessService`), „Statistik" by the statistics gate
+`SupplyAccessPolicy#canReadStats` (REQ-SUP-013). The pages themselves follow the active org unit:
+„Eingehende Spenden" lists only the units the caller manages there, an empty page and never a `403`
+under a unit they do not manage, which then points to the switcher
+(`supply.incoming.noUnitInContext`, `SupplyIncomingEmptyStateRenderTest`).
+
 The need form offers the job order as a picker: the open and in-progress orders of the units the
-caller manages (every raising unit for an admin), filtered to the selected unit
-(`GET /api/v1/supply/needs/job-orders`). A newly linked order must belong to the need's unit and be
+caller manages (every raising unit for an admin while no unit is selected), filtered to the selected
+unit (`GET /api/v1/supply/needs/job-orders`). A newly linked order must belong to the need's unit and be
 `OPEN` or `IN_PROGRESS`; a link to an order that has closed since survives an edit unchanged, and an
 edit sends the link back instead of clearing it (ADR-0320).
 
@@ -67,10 +93,23 @@ opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` and 
 server-searched picker `remote-game-items` (REQ-FE-016); no item list is preloaded, so none is cut
 off. A form set to an item asks for one before it sends, and opening a form clears its pickers.
 
+**Acceptance**
+
+- [x] An admin with a unit selected gets the manage flag, the job-order link, the receive action, the
+  unit choices and the job-order picker only for that unit, and the write gates refuse every other
+  unit.
+- [x] For every caller the manage flag of a unit agrees with the write gate of its actions.
+- [x] A lead or Logistician who selects a unit they do not manage keeps both tabs and manages no
+  unit there, so „Eingehende Spenden" lists none; an admin with any unit selected keeps both tabs.
+
 **Enforced by:** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`,
-`aNeedForAGameItemTheP4kRetiredIsRefused`), `SupplyNeedOrderRenderTest`, `SupplyItemPickerE2eTest`
-· **Code:** `supply/internal/SupplyNeedService`, `supply/needs.html`,
-`static/js/supply/supply-needs.js` · **Related:** REQ-INV-068, REQ-ROLE-002
+`aNeedForAGameItemTheP4kRetiredIsRefused`), `SupplyNeedOrderRenderTest`, `SupplyItemPickerE2eTest`,
+`SupplyAccessPolicyTest`, `SupplyManagedUnitsTest`, `SupplyMapperTest`,
+`SupplyUnitSettingServiceTest`, `SupplyTabAccessServiceTest`
+· **Code:** `supply/internal/SupplyNeedService`, `supply/internal/SupplyAccessPolicy`,
+`supply/internal/SupplyManagedUnits`, `supply/internal/SupplyTabAccessService`, `supply/needs.html`,
+`static/js/supply/supply-needs.js` · **Related:** REQ-INV-068, REQ-ROLE-002, REQ-ORG-032,
+REQ-UI-026, ADR-0329
 
 ### REQ-SUP-004 — Purchasable flag
 
@@ -132,9 +171,10 @@ remainder) and shows the pledged slice as a chip (REQ-INV-058).
 ### REQ-SUP-009 — Receive
 
 The lead or a Logistician of the receiving unit, or an admin, confirms a pledge with a received amount
-between zero and the pledged amount and a location. In the same transaction the received amount moves
-into the unit's pool — from the earmarked row by `transferToPool`, otherwise by `bookIntoPool` — the
-donation becomes `RECEIVED` or `PARTIALLY_RECEIVED`, and the credited need's progress includes it.
+between zero and the pledged amount and a location; who manages the unit follows the active org unit
+(REQ-SUP-003). In the same transaction the received amount moves into the unit's pool — from the
+earmarked row by `transferToPool`, otherwise by `bookIntoPool` — the donation becomes `RECEIVED` or
+`PARTIALLY_RECEIVED`, and the credited need's progress includes it.
 The receipt transfers from the live earmark carrier at its current quality and stolen marker.
 If that carrier disappears while the receipt waits for its lock, a fresh transaction rechecks the
 pledge and the absence of any carrier, then books the received amount into the pledge's
@@ -180,7 +220,14 @@ Per month and receiving unit the module reports the number of received donations
 and the received amount per material or item. A member sees their own totals; the managers of a unit
 see their unit; the governing leadership sees every unit and the per-donor list.
 
-**Enforced by:** `SupplyStatsServiceTest` · **Code:** `supply/internal/SupplyStatsService`
+Who reads the unit statistics does not depend on the selected org unit
+(`SupplyAccessPolicy#canReadStats`: the governing leadership and the lead or a Logistician of at
+least one unit in any context, ADR-0329). Whose figures a lead or Logistician outside the governing
+leadership reads follows it: the units they manage in the active context (REQ-SUP-003), none under
+a unit they do not manage.
+
+**Enforced by:** `SupplyStatsServiceTest`, `SupplyAccessPolicyTest` · **Code:**
+`supply/internal/SupplyStatsService`, `supply/internal/SupplyAccessPolicy`
 
 ### REQ-SUP-014 — No free text
 
@@ -280,17 +327,19 @@ A need and a donation for a game item show the Lager chips beside the item's nam
 
 ### REQ-SUP-023 — A linked need shows its order's stock
 
-For the managers of the raising unit (and an admin), an `OPEN` or `PAUSED` need linked to a job order
-shows that order's number and, when the order is open or in progress and requires the need's material
-at the need's tier, the order-linked stock attributed to that requirement next to the requirement —
+For the managers of the raising unit (an admin among them by the rule of REQ-SUP-003), an `OPEN` or
+`PAUSED` need linked to a job order shows that order's number and, when the order is open or in
+progress and requires the need's material at the need's tier, the order-linked stock attributed to
+that requirement next to the requirement —
 „Auftrag #42: 12,4 von 12,4 SCU im Bestand" — with an „Auftrag gedeckt" chip once the stock reaches
 it. The figures are those of the material-demand overview for that order (REQ-ORDERS-034), read
 through `joborder.api.JobOrderMaterialCoverage` in one batch per page (REQ-DATA-003).
 
 - The coverage is a hint. It never adds to the need's covered amount, never fulfils it and is not
   audited; only received donations and accepted deliveries cover a need (REQ-SUP-005, ADR-0320).
-- Any other caller receives no `jobOrder` property on the need; the order's own visibility is not
-  widened.
+- Any other caller receives neither the `jobOrder` nor the `jobOrderId` property on the need, on
+  every read that returns needs, the Lager's donation targets (REQ-SUP-026) included; the order's
+  own visibility is not widened.
 - The hint is computed when the need list renders and refreshes with it (REQ-SUP-018).
 
 **Enforced by:** `JobOrderMaterialCoverageTest`, `SupplyMapperTest`, `SupplyNeedOrderRenderTest` ·

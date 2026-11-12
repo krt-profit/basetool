@@ -376,9 +376,9 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
 
   /**
    * Returns every ship owned by any of the given users, eagerly fetching the relations needed for
-   * DTO projection. Unlike {@link #findAllScoped}, this is intentionally NOT OrgUnit-scoped: it
-   * surfaces the ships of a mission's participants regardless of which OrgUnit each participant
-   * belongs to, so a cross-OrgUnit participant's ship can be assigned to a unit.
+   * DTO projection. Unlike the {@link ShipScope#TRIPLE} queries, this is intentionally NOT
+   * OrgUnit-scoped: it surfaces the ships of a mission's participants regardless of which OrgUnit
+   * each participant belongs to, so a cross-OrgUnit participant's ship can be assigned to a unit.
    *
    * @param ownerIds the owner user ids to match; an empty collection yields an empty list
    * @return ships owned by those users
@@ -393,20 +393,6 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   @Override
   @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
   Page<Ship> findAll(Pageable pageable);
-
-  /**
-   * Multi-tenant variant of {@link #findAll(Pageable)}: returns every ship whose owning squadron
-   * matches {@code owningSquadronId}, or every ship when {@code owningSquadronId} is {@code null}
-   * (admin "all squadrons" mode). Eagerly fetches {@code shipType}, {@code location} and {@code
-   * owner} via {@code @EntityGraph}.
-   */
-  @EntityGraph(attributePaths = {"shipType", "location", "owner", "owningOrgUnit"})
-  @Query("SELECT s FROM Ship s WHERE " + ShipScope.TRIPLE)
-  Page<Ship> findAllScoped(
-      @Param("isAdminAllScope") boolean isAdminAllScope,
-      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
-      Pageable pageable);
 
   /**
    * Aggregates the ships in scope by type for the squadron overview: rows of {@code [ShipType,

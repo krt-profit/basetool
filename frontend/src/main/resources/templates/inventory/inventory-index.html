@@ -21,6 +21,7 @@
     <div th:if="${isAllSquadronsMode}" class="alert alert-info" th:text="#{inventory.index.all_squadrons_notice}">
         Aggregation across all squadrons. Select a single squadron to filter.
     </div>
+    <div th:replace="~{kernel/fragments/components :: allMyOrgUnitsNotice}"></div>
 
     <div class="tab-nav inventory-tabs" role="tablist" th:aria-label="#{inventory.items.view.aria}">
         <a th:href="@{/inventory}" class="tab" role="tab"

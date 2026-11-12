@@ -21,18 +21,18 @@ package de.greluc.krt.profit.basetool.frontend.kernel.layout;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.ContextKind;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
-import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronDto;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -41,16 +41,21 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 /**
  * Adds the active org-unit context to every model of a {@link UsesLayoutModel} controller for the
  * layout fragments: {@code activeSquadronId}, {@code activeOrgUnit}, {@code availableSquadrons},
- * {@code availableOrgUnits} and {@code isAllSquadronsMode}.
+ * {@code availableOrgUnits}, {@code isAllSquadronsMode}, {@code isAllMyOrgUnitsMode}, {@code
+ * contextSpansOrgUnits} and {@code activeOrgUnitContextKey}.
  *
- * <p>Data comes from the request's {@code GET /api/v1/me/layout} read via {@link
- * LayoutContextLoader} and the cached squadron catalogue. Backend failures degrade to empty or
- * {@code null} values instead of failing the page.
+ * <p>The context is the backend's effective one from the request's {@code GET /api/v1/me/layout}
+ * read via {@link LayoutContextLoader}, so the page shows exactly the context its data was read in
+ * (REQ-ORG-024). Backend failures degrade to empty or {@code null} values instead of failing the
+ * page.
  */
 @ControllerAdvice(annotations = UsesLayoutModel.class)
 @RequiredArgsConstructor
 @Slf4j
 public class OrgUnitContextAdvice {
+
+  /** The prefix of {@code activeOrgUnitContextKey} for a context of one org unit. */
+  private static final String ORG_UNIT_CONTEXT_KEY_PREFIX = "ORG_UNIT:";
 
   /** Captured generic type for decoding the paged Squadron catalogue. */
   private static final ParameterizedTypeReference<PageResponse<SquadronDto>> SQUADRON_PAGE =
@@ -66,29 +71,18 @@ public class OrgUnitContextAdvice {
   private final FrontendAuthHelperService authHelper;
 
   /**
-   * Resolves {@code activeSquadronId}: an admin's switcher selection from the session ({@code null}
-   * meaning all squadrons), or a member's home squadron from {@code GET /api/v1/me/layout}. Returns
-   * {@code null} for anonymous callers and on backend failure.
+   * Resolves {@code activeSquadronId}: the one org unit the backend's effective context covers, the
+   * honoured pin or a member's only unit. {@code null} when the context covers several org units
+   * („Alle meine Org-Einheiten" or an admin's „Alle Org-Einheiten"), none, for anonymous callers
+   * and on backend failure.
    *
    * @param request the current HTTP servlet request; never {@code null}.
-   * @return the active squadron UUID, or {@code null}.
+   * @return the active org unit's UUID, or {@code null}.
    */
   @Nullable
   @ModelAttribute("activeSquadronId")
   public UUID activeSquadronId(HttpServletRequest request) {
     if (!authHelper.isAuthenticated()) {
-      return null;
-    }
-    HttpSession session = request.getSession(false);
-    if (session != null) {
-      UUID fromSession =
-          ActiveSquadronContext.coerce(
-              session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY));
-      if (fromSession != null) {
-        return fromSession;
-      }
-    }
-    if (authHelper.isAdmin()) {
       return null;
     }
     return layoutContextLoader.load(request).activeOrgUnitId();
@@ -155,16 +149,78 @@ public class OrgUnitContextAdvice {
   }
 
   /**
-   * {@code true} when the current admin is viewing the cross-staffel union (no active squadron
-   * selection). False for everyone else - non-admins always operate in their persistent home
-   * squadron and cannot enter this mode.
+   * {@code true} when the context covers every org unit: an admin without a pin.
    *
-   * @param activeSquadronId previously-resolved id, {@code null} signals all-squadrons mode for
-   *     admins.
-   * @return whether the current viewer is an admin without a selection.
+   * @param request the current request, through which the layout context is memoised
+   * @return whether the current viewer is an admin in „Alle Org-Einheiten"
    */
   @ModelAttribute("isAllSquadronsMode")
-  public boolean isAllSquadronsMode(@ModelAttribute("activeSquadronId") UUID activeSquadronId) {
-    return authHelper.isAdmin() && activeSquadronId == null;
+  public boolean isAllSquadronsMode(HttpServletRequest request) {
+    return contextKind(request) == ContextKind.ALL_ORG_UNITS;
+  }
+
+  /**
+   * {@code true} when the context covers all of a member's several org units: „Alle meine
+   * Org-Einheiten", a non-admin without a pin who belongs to more than one unit.
+   *
+   * @param request the current request, through which the layout context is memoised
+   * @return whether the current viewer is a member in „Alle meine Org-Einheiten"
+   */
+  @ModelAttribute("isAllMyOrgUnitsMode")
+  public boolean isAllMyOrgUnitsMode(HttpServletRequest request) {
+    return contextKind(request) == ContextKind.ALL_MY_ORG_UNITS;
+  }
+
+  /**
+   * {@code true} when the context covers several org units, so a list shows which unit each row
+   * belongs to.
+   *
+   * @param isAllSquadronsMode whether an admin views every org unit
+   * @param isAllMyOrgUnitsMode whether a member views all of their org units
+   * @return whether rows carry their org unit
+   */
+  @ModelAttribute("contextSpansOrgUnits")
+  public boolean contextSpansOrgUnits(
+      @ModelAttribute("isAllSquadronsMode") boolean isAllSquadronsMode,
+      @ModelAttribute("isAllMyOrgUnitsMode") boolean isAllMyOrgUnitsMode) {
+    return isAllSquadronsMode || isAllMyOrgUnitsMode;
+  }
+
+  /**
+   * The key a page announces to the browser's other tabs (REQ-ORG-032): {@code ORG_UNIT:<id>},
+   * {@code ALL_MY_ORG_UNITS} or {@code ALL_ORG_UNITS}; {@code null} when no context could be read,
+   * so the page takes no part.
+   *
+   * @param request the current request, through which the layout context is memoised
+   * @return the context key, or {@code null}
+   */
+  @Nullable
+  @ModelAttribute("activeOrgUnitContextKey")
+  public String activeOrgUnitContextKey(HttpServletRequest request) {
+    if (!authHelper.isAuthenticated()) {
+      return null;
+    }
+    LayoutContextLoader.LayoutContext context = layoutContextLoader.load(request);
+    return switch (context.activeContext()) {
+      case ORG_UNIT ->
+          context.activeOrgUnitId() == null
+              ? null
+              : ORG_UNIT_CONTEXT_KEY_PREFIX + context.activeOrgUnitId();
+      case ALL_MY_ORG_UNITS, ALL_ORG_UNITS -> context.activeContext().name();
+      case NONE -> null;
+    };
+  }
+
+  /**
+   * What the backend's effective context covers for the current request.
+   *
+   * @param request the current request
+   * @return the kind; {@link ContextKind#NONE} for anonymous callers and on backend failure
+   */
+  @NotNull
+  private ContextKind contextKind(@NotNull HttpServletRequest request) {
+    return authHelper.isAuthenticated()
+        ? layoutContextLoader.load(request).activeContext()
+        : ContextKind.NONE;
   }
 }

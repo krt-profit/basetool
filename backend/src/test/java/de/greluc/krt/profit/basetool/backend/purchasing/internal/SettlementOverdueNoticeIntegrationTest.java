@@ -26,9 +26,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.identity.api.Role;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
@@ -51,6 +54,7 @@ import de.greluc.krt.profit.basetool.backend.purchasing.api.PaymentModel;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.RiskClassCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -66,7 +70,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * The overdue-settlement notice end to end against real Postgres (REQ-PUR-003, REQ-PUR-018): the
  * producer raises one event for an overdue deal, and the seeded rule resolves the delegate and the
- * Bereichsleiter and Bereichskoordinator of a governing Bereich — never a Bereichsoperator.
+ * Bereichsleiter and Bereichskoordinator of a governing Bereich who hold {@code KRT Member} — never
+ * a Bereichsoperator.
  */
 @SpringBootTest
 @RecordApplicationEvents
@@ -79,6 +84,7 @@ class SettlementOverdueNoticeIntegrationTest {
   @Autowired private PurchasingPartnerRepository partnerRepository;
   @Autowired private MaterialRepository materialRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private OrgUnitRepository orgUnitRepository;
   @Autowired private OrganisationsleitungRepository organisationsleitungRepository;
   @Autowired private OrgUnitMembershipRepository membershipRepository;
@@ -115,10 +121,12 @@ class SettlementOverdueNoticeIntegrationTest {
   @Test
   void theNoticeReachesTheDelegateTheLeaderAndTheCoordinatorButNotTheOperator() {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
-    UUID delegate = user("pur-ov-delegate-" + suffix);
-    UUID leader = user("pur-ov-leader-" + suffix);
-    UUID coordinator = user("pur-ov-coord-" + suffix);
-    UUID operator = user("pur-ov-oper-" + suffix);
+    Role krtMember = roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow();
+    UUID delegate = user("pur-ov-delegate-" + suffix, Set.of());
+    UUID leader = user("pur-ov-leader-" + suffix, Set.of(krtMember));
+    UUID formerLeader = user("pur-ov-former-" + suffix, Set.of());
+    UUID coordinator = user("pur-ov-coord-" + suffix, Set.of(krtMember));
+    UUID operator = user("pur-ov-oper-" + suffix, Set.of(krtMember));
 
     Organisationsleitung ol =
         organisationsleitungRepository.findAll().stream()
@@ -135,6 +143,7 @@ class SettlementOverdueNoticeIntegrationTest {
     area.setParent(ol);
     area = orgUnitRepository.saveAndFlush(area);
     member(leader, area, MembershipRole.BEREICHSLEITER);
+    member(formerLeader, area, MembershipRole.BEREICHSLEITER);
     member(coordinator, area, MembershipRole.BEREICHSKOORDINATOR);
     member(operator, area, MembershipRole.BEREICHSOPERATOR);
 
@@ -162,13 +171,14 @@ class SettlementOverdueNoticeIntegrationTest {
     Map<NotificationType, Set<UUID>> recipients = ruleEvaluationService.resolveRecipients(notice);
     assertThat(recipients.get(NotificationType.PURCHASING_SETTLEMENT_OVERDUE))
         .contains(delegate, leader, coordinator)
-        .doesNotContain(operator);
+        .doesNotContain(operator, formerLeader);
   }
 
-  private UUID user(String name) {
+  private UUID user(String name, Set<Role> roles) {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername(name);
+    user.setRoles(new HashSet<>(roles));
     return userRepository.saveAndFlush(user).getId();
   }
 

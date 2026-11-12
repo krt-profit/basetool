@@ -32,6 +32,7 @@ import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.LoggingProperties;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
@@ -139,7 +140,9 @@ class AsyncDispatchMdcTest {
     probeLogger.addAppender(appender);
     mockMvc =
         MockMvcBuilders.standaloneSetup(controller)
-            .addFilters(new CorrelationIdFilter(props), new ActiveSquadronContextFilter())
+            .addFilters(
+                new CorrelationIdFilter(props),
+                new ActiveSquadronContextFilter(new ActiveOrgUnitRestore(Optional::empty)))
             .build();
   }
 

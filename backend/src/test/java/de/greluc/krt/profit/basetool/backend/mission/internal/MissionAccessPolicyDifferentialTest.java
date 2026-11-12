@@ -34,8 +34,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -176,12 +174,14 @@ class MissionAccessPolicyDifferentialTest {
       AuthHelperService authHelper = mock(AuthHelperService.class);
       when(authHelper.isAuthenticated()).thenReturn(true);
       when(authHelper.isAdmin()).thenReturn(caller.admin());
+      when(authHelper.holdsKrtMember()).thenReturn(caller.memberOrAbove());
       when(authHelper.isMemberOrAbove()).thenReturn(caller.memberOrAbove());
       when(authHelper.currentUserId()).thenReturn(Optional.of(UUID.randomUUID()));
 
       OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);
       List<OrgUnitMembership> callerRows = rows(caller.memberships());
       when(memberships.findAllByIdUserId(any())).thenReturn(callerRows);
+      when(memberships.findAllOnActiveOrgUnitsByIdUserId(any())).thenReturn(callerRows);
       when(memberships.findAllByIdUserIdAndKind(any(), any()))
           .thenReturn(
               callerRows.stream().filter(r -> r.getKind() == OrgUnitKind.SQUADRON).toList());
@@ -233,19 +233,17 @@ class MissionAccessPolicyDifferentialTest {
         request.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, caller.pin().toString());
       }
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
+      when(orgUnits.existsByIdAndActiveTrue(any())).thenReturn(true);
       RequestScopeResolver resolver =
-          new RequestScopeResolver(
-              authHelper,
-              memberships,
-              orgUnits,
-              cascade,
-              new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
-              request);
+          new RequestScopeResolver(authHelper, memberships, orgUnits, cascade, request);
+      if (caller.memberOrAbove()) {
+        assertThat(resolver.currentMemberOrgUnitIds())
+            .as("the caller's memberships reach the resolver")
+            .containsAll(caller.memberships());
+      }
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       scopeHub = new ScopeHubMissionGates(accessGateService, authHelper, repository);
-      policy =
-          new MissionAccessPolicy(
-              accessGateService, authHelper, repository, null, null, null, null);
+      policy = new MissionAccessPolicy(accessGateService, authHelper, repository, null, null);
     }
 
     private static Mission mission(UUID unit, boolean internal, Mission parent) {

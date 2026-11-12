@@ -293,6 +293,21 @@ class OrgUnitMembershipServiceTest {
   }
 
   @Test
+  void addMember_firstMembershipOnADeactivatedSk_adoptsNothing() {
+    sc.setActive(false);
+    when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, scId)).thenReturn(false);
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
+    when(membershipRepository.save(any(OrgUnitMembership.class)))
+        .thenAnswer(inv -> inv.getArgument(0));
+
+    membershipService.addMember(scId, userId);
+
+    verify(firstMembershipObserver, never()).onUserGainedFirstOrgUnit(any(), any());
+  }
+
+  @Test
   void addMember_userAlreadyHadMemberships_doesNotPromoteInventory() {
     when(specialCommandService.getSpecialCommandById(scId)).thenReturn(sc);
     when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
@@ -520,6 +535,34 @@ class OrgUnitMembershipServiceTest {
 
     verify(firstMembershipObserver).onUserGainedFirstOrgUnit(userId, sqAlpha);
     verify(firstMembershipObserver, never()).onUserGainedFirstOrgUnit(userId, sqZeta);
+  }
+
+  @Test
+  void reconcileStaffelMemberships_firstStaffelnAdoptIntoTheActiveOneOnly() {
+    UUID retiredId = UUID.randomUUID();
+    UUID activeId = UUID.randomUUID();
+    Squadron retired = new Squadron();
+    retired.setId(retiredId);
+    retired.setName("Alpha");
+    retired.setActive(false);
+    Squadron active = new Squadron();
+    active.setId(activeId);
+    active.setName("Zeta");
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+    when(membershipRepository.countByIdUserId(userId)).thenReturn(0L);
+    when(membershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON))
+        .thenReturn(List.of());
+    when(squadronRepository.findById(retiredId)).thenReturn(Optional.of(retired));
+    when(squadronRepository.findById(activeId)).thenReturn(Optional.of(active));
+
+    membershipService.reconcileStaffelMemberships(
+        user,
+        List.of(
+            new MembershipDeltaRequest.StaffelChange(retiredId, false, false),
+            new MembershipDeltaRequest.StaffelChange(activeId, false, false)));
+
+    verify(firstMembershipObserver).onUserGainedFirstOrgUnit(userId, active);
+    verify(firstMembershipObserver, never()).onUserGainedFirstOrgUnit(userId, retired);
   }
 
   @Test

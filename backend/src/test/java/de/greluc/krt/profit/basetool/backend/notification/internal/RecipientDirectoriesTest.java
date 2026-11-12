@@ -20,13 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
-import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrant;
-import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantId;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountGrantRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountRepository;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountType;
@@ -41,15 +41,18 @@ import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.internal.UserRoleRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionRecipientDirectoryImpl;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitMembershipRecipientDirectory;
-import java.util.List;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -61,7 +64,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * The recipient directories the identity, orgunit and bank modules implement, and {@link
- * RecipientResolutionService} resolving every selector through them (REQ-NOTIF-008).
+ * RecipientResolutionService} resolving every selector through them (REQ-NOTIF-008, REQ-NOTIF-024):
+ * a membership yields a recipient only while its holder holds {@code KRT Member}, a grant only
+ * while its grantee holds a bank role.
  */
 @ExtendWith(MockitoExtension.class)
 class RecipientDirectoriesTest {
@@ -71,6 +76,8 @@ class RecipientDirectoriesTest {
   private static final UUID ALICE = UUID.randomUUID();
   private static final UUID BOB = UUID.randomUUID();
   private static final UUID CAROL = UUID.randomUUID();
+  private static final Set<String> BANK_STAFF_ROLES =
+      Set.of(Roles.BANK_EMPLOYEE, Roles.BANK_MANAGEMENT, Roles.ADMIN);
 
   @Mock private UserRepository userRepository;
   @Mock private RoleRepository roleRepository;
@@ -84,23 +91,26 @@ class RecipientDirectoriesTest {
   @Mock private ExchangeInstallationRepository exchangeInstallationRepository;
 
   private UserRoleRecipientDirectory roles;
-  private OrgUnitMembershipRecipientDirectory orgUnits;
-  private OrgUnitBankRecipientDirectory accounts;
   private RecipientResolutionService resolution;
 
   @BeforeEach
   void setUp() {
     roles = new UserRoleRecipientDirectory(userRepository, roleRepository);
-    orgUnits =
+    OrgUnitSeatEligibility seatEligibility =
+        new OrgUnitSeatEligibility(orgUnitMembershipRepository, userRepository);
+    OrgUnitMembershipRecipientDirectory orgUnits =
         new OrgUnitMembershipRecipientDirectory(
-            orgUnitMembershipRepository, new OrgUnitWriterDirectory(orgUnitMembershipRepository));
-    accounts =
+            orgUnitMembershipRepository,
+            seatEligibility,
+            new OrgUnitWriterDirectory(orgUnitMembershipRepository));
+    OrgUnitBankRecipientDirectory accounts =
         new OrgUnitBankRecipientDirectory(
             bankAccountGrantRepository,
             bankAccountRepository,
             bankBookingRequestRepository,
             orgUnitBankResponsibilityService,
             orgUnitMembershipRepository,
+            seatEligibility,
             roles);
     resolution =
         new RecipientResolutionService(
@@ -128,17 +138,41 @@ class RecipientDirectoriesTest {
   void anOrgRelativeOfficerIsTheSeatHoldersDirectlyInThatOrgUnit() {
     when(orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(ORG_UNIT))
         .thenReturn(Set.of(BOB));
+    holdKrtMember(BOB);
 
     assertThat(resolution.resolveOrgRelative(OrgRelativeRole.OFFICER, ORG_UNIT))
         .containsExactly(BOB);
-    verifyNoInteractions(userRepository);
   }
 
   @Test
-  void everySeatHolderResolvesWithoutReadingTheRoleMirror() {
+  void everySeatHolderWithKrtMemberResolves() {
     when(orgUnitMembershipRepository.findAllLeadershipUserIds()).thenReturn(Set.of(ALICE, BOB));
+    holdKrtMember(ALICE, BOB);
 
     assertThat(resolution.resolveSeatHolders()).containsExactlyInAnyOrder(ALICE, BOB);
+  }
+
+  @Test
+  void aSeatHolderWithoutKrtMemberIsNoRecipient() {
+    when(orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(ORG_UNIT))
+        .thenReturn(Set.of(ALICE, BOB));
+    when(orgUnitMembershipRepository.findAllLeadershipUserIds()).thenReturn(Set.of(ALICE, BOB));
+    when(orgUnitMembershipRepository.findLeadUserIdsByOrgUnit(ORG_UNIT)).thenReturn(Set.of(ALICE));
+    holdKrtMember(BOB);
+
+    assertThat(resolution.resolveOrgRelative(OrgRelativeRole.UNIT_LEADERSHIP, ORG_UNIT))
+        .containsExactly(BOB);
+    assertThat(resolution.resolveOrgRelative(OrgRelativeRole.OFFICER, ORG_UNIT))
+        .containsExactly(BOB);
+    assertThat(resolution.resolveSeatHolders()).containsExactly(BOB);
+    assertThat(resolution.resolveOrgRelative(OrgRelativeRole.LEAD, ORG_UNIT)).isEmpty();
+  }
+
+  @Test
+  void anOrgUnitWithoutSeatHoldersResolvesWithoutReadingTheRoleMirror() {
+    when(orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(ORG_UNIT)).thenReturn(Set.of());
+
+    assertThat(resolution.resolveOrgRelative(OrgRelativeRole.UNIT_LEADERSHIP, ORG_UNIT)).isEmpty();
     verifyNoInteractions(userRepository);
   }
 
@@ -149,6 +183,7 @@ class RecipientDirectoriesTest {
         .thenReturn(Set.of(BOB));
     when(orgUnitMembershipRepository.findMissionManagerUserIdsByOrgUnit(ORG_UNIT))
         .thenReturn(Set.of(ALICE, BOB));
+    holdKrtMember(ALICE, BOB);
 
     assertThat(resolution.resolveOrgRelative(OrgRelativeRole.LEAD, ORG_UNIT))
         .containsExactly(ALICE);
@@ -159,9 +194,23 @@ class RecipientDirectoriesTest {
   }
 
   @Test
+  void aFlaggedMemberWithoutKrtMemberIsNoRecipient() {
+    when(orgUnitMembershipRepository.findLogisticianUserIdsByOrgUnit(ORG_UNIT))
+        .thenReturn(Set.of(ALICE, CAROL));
+    when(orgUnitMembershipRepository.findMissionManagerUserIdsByOrgUnit(ORG_UNIT))
+        .thenReturn(Set.of(CAROL));
+    holdKrtMember(ALICE);
+
+    assertThat(resolution.resolveOrgRelative(OrgRelativeRole.LOGISTICIAN, ORG_UNIT))
+        .containsExactly(ALICE);
+    assertThat(resolution.resolveOrgRelative(OrgRelativeRole.MISSION_MANAGER, ORG_UNIT)).isEmpty();
+  }
+
+  @Test
   void orgunitResolvesEverySeatHolderAsUnitLeadership() {
     when(orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(ORG_UNIT))
         .thenReturn(Set.of(ALICE, BOB));
+    holdKrtMember(ALICE, BOB);
 
     assertThat(resolution.resolveOrgRelative(OrgRelativeRole.UNIT_LEADERSHIP, ORG_UNIT))
         .containsExactlyInAnyOrder(ALICE, BOB);
@@ -210,15 +259,29 @@ class RecipientDirectoriesTest {
   }
 
   @Test
-  void bankResolvesGrantAndResponsibleHolders() {
-    BankAccountGrant grant = new BankAccountGrant();
-    grant.setId(new BankAccountGrantId(ALICE, ACCOUNT));
-    when(bankAccountGrantRepository.findByAccountId(ACCOUNT)).thenReturn(List.of(grant));
-    when(orgUnitBankResponsibilityService.resolveResponsibleHolderUserIds(ACCOUNT))
+  void bankResolvesTheGranteesWithABankRoleAndTheResponsibleHolders() {
+    when(bankAccountGrantRepository.findGranteeIdsHoldingAnyRole(ACCOUNT, BANK_STAFF_ROLES))
+        .thenReturn(Set.of(ALICE));
+    when(orgUnitBankResponsibilityService.resolveNotifiedResponsibleHolderUserIds(ACCOUNT))
         .thenReturn(Set.of(BOB));
+    holdKrtMember(BOB);
 
     assertThat(resolution.resolveAccountGrantHolders(ACCOUNT)).containsExactly(ALICE);
     assertThat(resolution.resolveAccountResponsibleHolders(ACCOUNT)).containsExactly(BOB);
+  }
+
+  @Test
+  void aResponsibleHolderWithoutKrtMemberIsNeitherToldNorAsked() {
+    UUID request = pending(BankRequestApprover.RESPONSIBLE_HOLDER, false);
+    when(bankAccountRepository.findById(ACCOUNT))
+        .thenReturn(Optional.of(account(BankAccountType.ORG_UNIT)));
+    when(orgUnitBankResponsibilityService.resolveNotifiedResponsibleHolderUserIds(ACCOUNT))
+        .thenReturn(Set.of(ALICE, BOB));
+    holdKrtMember(BOB);
+
+    assertThat(resolution.resolveAccountResponsibleHolders(ACCOUNT)).containsExactly(BOB);
+    assertThat(resolution.resolveRequestResponsibleHolders(ACCOUNT)).containsExactly(BOB);
+    assertThat(resolution.resolveRequiredApprovers(request)).containsExactly(BOB);
   }
 
   @Test
@@ -233,8 +296,9 @@ class RecipientDirectoriesTest {
   void anotherAccountsResponsibleHoldersAreToldOfEveryRequest() {
     when(bankAccountRepository.findById(ACCOUNT))
         .thenReturn(Optional.of(account(BankAccountType.ORG_UNIT)));
-    when(orgUnitBankResponsibilityService.resolveResponsibleHolderUserIds(ACCOUNT))
+    when(orgUnitBankResponsibilityService.resolveNotifiedResponsibleHolderUserIds(ACCOUNT))
         .thenReturn(Set.of(BOB));
+    holdKrtMember(BOB);
 
     assertThat(resolution.resolveRequestResponsibleHolders(ACCOUNT)).containsExactly(BOB);
   }
@@ -248,19 +312,21 @@ class RecipientDirectoriesTest {
   }
 
   @Test
-  void theTopKrtBandWaitsForEveryOlMember() {
+  void theTopKrtBandWaitsForEveryOlMemberWithKrtMember() {
     UUID request = pending(BankRequestApprover.ORGANISATIONSLEITUNG, false);
     when(orgUnitMembershipRepository.findUserIdsByRole(MembershipRole.OL_MEMBER))
         .thenReturn(Set.of(ALICE, BOB));
+    holdKrtMember(ALICE);
 
-    assertThat(resolution.resolveRequiredApprovers(request)).containsExactlyInAnyOrder(ALICE, BOB);
+    assertThat(resolution.resolveRequiredApprovers(request)).containsExactly(ALICE);
   }
 
   @Test
   void anOverLimitRequestWaitsForTheAccountsResponsibleHolders() {
     UUID request = pending(BankRequestApprover.RESPONSIBLE_HOLDER, false);
-    when(orgUnitBankResponsibilityService.resolveResponsibleHolderUserIds(ACCOUNT))
+    when(orgUnitBankResponsibilityService.resolveNotifiedResponsibleHolderUserIds(ACCOUNT))
         .thenReturn(Set.of(BOB));
+    holdKrtMember(BOB);
 
     assertThat(resolution.resolveRequiredApprovers(request)).containsExactly(BOB);
   }
@@ -280,6 +346,16 @@ class RecipientDirectoriesTest {
     when(bankBookingRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
 
     assertThat(resolution.resolveRequiredApprovers(request.getId())).isEmpty();
+  }
+
+  private void holdKrtMember(UUID... members) {
+    Set<UUID> holders = Set.of(members);
+    when(userRepository.findRoleHoldersAmong(anyCollection(), eq(Roles.KRT_MEMBER)))
+        .thenAnswer(call -> {
+          Set<UUID> kept = new HashSet<>(call.<Collection<UUID>>getArgument(0));
+          kept.retainAll(holders);
+          return kept;
+        });
   }
 
   private static BankAccount account(BankAccountType type) {

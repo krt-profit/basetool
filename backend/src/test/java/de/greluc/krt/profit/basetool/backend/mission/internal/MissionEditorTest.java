@@ -37,7 +37,6 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
-import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionFinanceEntryRepository;
@@ -58,7 +57,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.Authentication;
 
 /** The mission edit recipe, tested once for every timeline, roster and structure mutation. */
@@ -169,8 +167,6 @@ class MissionEditorTest {
             mock(AccessGateService.class),
             authHelperService,
             missionRepository,
-            mock(UserService.class),
-            mock(RoleHierarchy.class),
             mock(MissionParticipantRepository.class),
             mock(MissionFinanceEntryRepository.class));
     MissionEditor withRealPolicy =

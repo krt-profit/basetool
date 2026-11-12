@@ -60,6 +60,10 @@ class ApiDomainsMatchTheDomainMapTest {
               "identity: the REST cut serves the caller's own context under identity; the code"
                   + " hosts the read across seven modules in the composition root"),
           Map.entry(
+              "ActiveOrgUnitChoiceController",
+              "identity: the REST cut serves the caller's own context under identity; the code"
+                  + " keeps the stored choice with the scope module that validates it"),
+          Map.entry(
               "UserProfileController",
               "identity: the REST cut serves the user list, search and profile under identity; the"
                   + " code needs the user mapper of the org-unit module"),

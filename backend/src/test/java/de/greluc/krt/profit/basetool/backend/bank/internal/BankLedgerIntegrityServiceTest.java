@@ -30,13 +30,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Integration tests for {@link BankLedgerIntegrityService} against the real Testcontainers
  * PostgreSQL (REQ-BANK-020): a clean ledger built through the service passes; a synthetically
  * corrupted ledger — a raw posting inserted past the service guards — is flagged.
+ *
+ * <p>Each test rolls back, so the corrupted rows never reach another test's integrity sweep.
  */
 @SpringBootTest
+@Transactional
 class BankLedgerIntegrityServiceTest {
 
   @Autowired private BankLedgerIntegrityService integrityService;

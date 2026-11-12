@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 import de.greluc.krt.profit.basetool.backend.notification.api.TimedNoticeProducer;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.events.PurchasingNotices;
 import java.time.Instant;
 import java.util.HashSet;
@@ -36,10 +37,11 @@ import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
 /**
- * Tells the delegate, the Bereichsleiter and Bereichskoordinatoren of the governing Bereiche and
- * the bank management when a deal's settlement is past its due date (REQ-PUR-018), once per deal:
- * the marker is set by an atomic update that does not touch the deal's version, and only the caller
- * whose update changed the row publishes. While the purchasing surface is off nothing is announced.
+ * Tells the delegate, the Bereichsleiter and Bereichskoordinatoren of the governing Bereiche who
+ * hold {@code KRT Member} (REQ-SEC-015) and the bank management when a deal's settlement is past
+ * its due date (REQ-PUR-018), once per deal: the marker is set by an atomic update that does not
+ * touch the deal's version, and only the caller whose update changed the row publishes. While the
+ * purchasing surface is off nothing is announced.
  */
 @Component
 @Order(4)
@@ -49,6 +51,7 @@ public class SettlementOverdueNoticeProducer implements TimedNoticeProducer {
   private final PurchasingDealRepository dealRepository;
   private final PurchasingSettingsService settingsService;
   private final OrgUnitMembershipRepository membershipRepository;
+  private final OrgUnitSeatEligibility seatEligibility;
   private final ApplicationEventPublisher eventPublisher;
 
   @Override
@@ -63,15 +66,16 @@ public class SettlementOverdueNoticeProducer implements TimedNoticeProducer {
       return 0;
     }
     List<UUID> areas = settingsService.governingAreaIds();
-    Set<UUID> leadership = new HashSet<>();
+    Set<UUID> seats = new HashSet<>();
     if (!areas.isEmpty()) {
-      leadership.addAll(
-          membershipRepository.findUserIdsByOrgUnitIdsAndRole(
+      seats.addAll(
+          membershipRepository.findUserIdsByActiveOrgUnitIdsAndRole(
               areas, MembershipRole.BEREICHSLEITER));
-      leadership.addAll(
-          membershipRepository.findUserIdsByOrgUnitIdsAndRole(
+      seats.addAll(
+          membershipRepository.findUserIdsByActiveOrgUnitIdsAndRole(
               areas, MembershipRole.BEREICHSKOORDINATOR));
     }
+    Set<UUID> leadership = seatEligibility.krtMembersAmong(seats);
     int raised = 0;
     for (UUID id : dealRepository.findOverdueNotYetAnnouncedIds(now, Limit.of(limit))) {
       if (dealRepository.markOverdueNotified(id, now) != 1) {

@@ -35,8 +35,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -157,6 +155,7 @@ class HangarAccessPolicyDifferentialTest {
       AuthHelperService authHelper = mock(AuthHelperService.class);
       when(authHelper.isAuthenticated()).thenReturn(true);
       when(authHelper.isAdmin()).thenReturn(caller.admin());
+      when(authHelper.holdsKrtMember()).thenReturn(true);
       when(authHelper.isMemberOrAbove()).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
 
@@ -164,6 +163,8 @@ class HangarAccessPolicyDifferentialTest {
       List<OrgUnitMembership> callerRows = rows(callerId, caller.memberships());
       when(memberships.findAllByIdUserId(any())).thenReturn(List.of());
       when(memberships.findAllByIdUserId(callerId)).thenReturn(callerRows);
+      when(memberships.findAllOnActiveOrgUnitsByIdUserId(any())).thenReturn(List.of());
+      when(memberships.findAllOnActiveOrgUnitsByIdUserId(callerId)).thenReturn(callerRows);
       when(memberships.findAllByIdUserIdAndKind(any(), any()))
           .thenReturn(
               callerRows.stream().filter(r -> r.getKind() == OrgUnitKind.SQUADRON).toList());
@@ -197,14 +198,12 @@ class HangarAccessPolicyDifferentialTest {
         request.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, caller.pin().toString());
       }
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
+      when(orgUnits.existsByIdAndActiveTrue(any())).thenReturn(true);
       RequestScopeResolver resolver =
-          new RequestScopeResolver(
-              authHelper,
-              memberships,
-              orgUnits,
-              cascade,
-              new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
-              request);
+          new RequestScopeResolver(authHelper, memberships, orgUnits, cascade, request);
+      assertThat(resolver.currentMemberOrgUnitIds())
+          .as("the caller's memberships reach the resolver")
+          .containsAll(caller.memberships());
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       scopeHub = new ScopeHubShipGates(accessGateService, authHelper, resolver, repository);
       policy = new HangarAccessPolicy(resolver, accessGateService, repository);
@@ -266,8 +265,7 @@ class HangarAccessPolicyDifferentialTest {
         return true;
       }
       if (ship.getOwningOrgUnit() == null) {
-        return (authHelper.isAdmin() && resolver.readActiveSquadronFromHeader().isEmpty())
-            || isOwner(owner);
+        return (authHelper.isAdmin() && resolver.currentPin().isEmpty()) || isOwner(owner);
       }
       UUID unit = ship.getOwningOrgUnit().getId();
       return edit

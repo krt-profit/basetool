@@ -111,6 +111,14 @@ ownership according to a documented matrix, the admin area is an explicit carve-
 and `orgUnitId` travels in the MDC and in a relay header so the active context is visible in logs
 and across the module boundary.
 
+The active context has one rule for every surface (REQ-ORG-032): the backend honours the relayed
+unit only when the caller may select it and reports the effective context (one unit, all of the
+member's units, every unit, or none), which is all the web displays. The member's choice is stored
+and restored at the next sign-in (REQ-ORG-031), and other tabs of the same browser follow a switch.
+Reads, writes, role powers and create-time stamping follow the context, an admin's included; a
+target without an owning unit passes a role gate only for an admin without a pin. Whether a
+membership confers anything rests on one check of `KRT Member` (`AuthHelperService`, REQ-SEC-015).
+
 A scoped aggregate says so in its own code: it carries `@TenantScoped`, naming its owning or
 responsible unit, and the tenancy guards select by that marker and by what a controller writes,
 never by class names, so a split or moved controller stays under the scope-gate rule (REQ-ORG-028).

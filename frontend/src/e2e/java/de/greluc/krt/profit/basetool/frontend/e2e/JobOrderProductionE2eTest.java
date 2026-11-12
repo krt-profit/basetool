@@ -212,10 +212,11 @@ class JobOrderProductionE2eTest {
   }
 
   /**
-   * Opens the production modal from the "Bestellte Items" tab, allocates the required demand from
-   * the single linked stock entry, picks the REQUIRED book-in location (REQ-INV-032 — the reconcile
-   * gate keeps the book button disabled until one is chosen), and books the manufacture of one
-   * unit, awaiting the production POST so the mutation is not dropped.
+   * Opens the production modal from the "Bestellte Items" tab, checks that the book-in org-unit
+   * picker preselects IRIDIUM, the owner's only org unit (REQ-ORDERS-025), allocates the required
+   * demand from the single linked stock entry, picks the REQUIRED book-in location (REQ-INV-032 —
+   * the reconcile gate keeps the book button disabled until one is chosen), and books the
+   * manufacture of one unit, awaiting the production POST so the mutation is not dropped.
    *
    * <p>The allocation is typed on the German page with a fourth decimal, below the material's
    * precision: the field must not pass it on, or the backend refuses the booking with 422
@@ -228,6 +229,7 @@ class JobOrderProductionE2eTest {
   private static void bookProductionOfOneUnit(Page page, String baseUrl, String orderId) {
     E2eSupport.navigate(page, baseUrl + "/orders/" + orderId + "?tab=items");
     page.locator("[data-trigger='od-open-production']").first().click();
+    assertThat(page.locator("#production-orgunit")).hasValue(IRIDIUM_ID);
 
     Locator allocation = page.locator("#production-materials [data-prod-alloc]").first();
     allocation.waitFor();

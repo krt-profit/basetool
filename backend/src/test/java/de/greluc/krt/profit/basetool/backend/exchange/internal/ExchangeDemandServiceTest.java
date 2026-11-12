@@ -114,7 +114,7 @@ class ExchangeDemandServiceTest {
 
   @Test
   void aMemberOfNoUnitSeesNoDemandAndNoOrderIsRead() {
-    when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of());
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of());
 
     ExchangeOrgDemandDto demand = service.demand(MEMBER, false);
 
@@ -153,7 +153,7 @@ class ExchangeDemandServiceTest {
 
   @Test
   void onlyTheUnitsTheMemberBelongsToAreAsked() {
-    when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of(UNIT));
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of(UNIT));
     when(jobOrderRepository.findOpenForExchangeDemand(any(), eq(Set.of(UNIT))))
         .thenReturn(List.of());
 
@@ -277,7 +277,7 @@ class ExchangeDemandServiceTest {
     mine.setRequestingOrgUnit(squadron(requesting, "Bravo"));
     JobOrder foreign = order(JobOrderType.MATERIAL);
     foreign.setResponsibleOrgUnit(squadron(other, "Charlie"));
-    when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of(UNIT, other));
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of(UNIT, other));
     when(jobOrderRepository.findOpenForExchangeDemand(any(), any()))
         .thenReturn(List.of(mine, foreign));
     when(orgUnitService.logisticianUnits(MEMBER)).thenReturn(Set.of(UNIT));
@@ -387,7 +387,7 @@ class ExchangeDemandServiceTest {
    * @param orders the open orders
    */
   private void givenOrders(JobOrder... orders) {
-    when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of(UNIT));
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(MEMBER)).thenReturn(Set.of(UNIT));
     when(jobOrderRepository.findOpenForExchangeDemand(any(), any()))
         .thenReturn(new ArrayList<>(List.of(orders)));
   }

@@ -142,27 +142,26 @@ public class OperationService {
   }
 
   /**
-   * Returns the id + name projection of the picker-relevant operations in the caller's squadron
-   * scope, sorted by name: {@code PLANNED} and {@code ACTIVE} always, {@code COMPLETED} and {@code
+   * Returns the id + name projection of the operations a mission may be linked to, sorted by name:
+   * those the caller may edit ({@link OperationAccessPolicy#canEditOperation(UUID)},
+   * REQ-MISSION-034), {@code PLANNED} and {@code ACTIVE} always, {@code COMPLETED} and {@code
    * CANCELED} only when created within the last {@link #REFERENCE_TERMINAL_CUTOFF_MONTHS} months.
    *
-   * @return slim {@link OperationReferenceDto} list within the caller's scope and the
+   * @return slim {@link OperationReferenceDto} list of the editable operations within the
    *     status/recency bound
    */
   @NotNull
   public List<OperationReferenceDto> findAllReference() {
-    ScopePredicate scope =
-        requestScopeResolver.currentScopePredicateGranting(Roles.MISSION_MANAGER);
+    ScopePredicate scope = accessGateService.currentGrantScope(Roles.MISSION_MANAGER);
     Instant terminalCutoff =
         OffsetDateTime.now(ZoneOffset.UTC)
             .minusMonths(REFERENCE_TERMINAL_CUTOFF_MONTHS)
             .toInstant();
-    return operationRepository.findAllReferenceScoped(
+    return operationRepository.findAllEditableReference(
         scope.adminAllScope(),
         scope.activeOrgUnitId(),
         scope.memberOrgUnitIds(),
-        authHelperService.isMemberOrAbove(),
-        authHelperService.currentUserId().orElse(null),
+        accessGateService.canManageMissionsOf(null),
         terminalCutoff);
   }
 
@@ -192,15 +191,21 @@ public class OperationService {
   /**
    * Persists a new operation and stamps its owning org unit.
    *
-   * <p>With an authenticated caller, a picked org unit is validated against the caller's
-   * memberships; without a pick the caller's single membership is used, and a caller without any
-   * membership creates an ownerless operation (REQ-ORG-009). Without an authenticated caller the
-   * pick is ignored and {@code RequestScopeResolver.currentOrgUnit()} is stamped.
+   * <p>With an authenticated caller, a picked org unit must be one of the caller's stampable units
+   * (active direct memberships while they hold {@code KRT Member}) or a unit they may edit; without
+   * a pick the honoured active-context pin is stamped (REQ-ORG-032), else the caller's only
+   * stampable unit, and a caller without one creates an ownerless operation (REQ-ORG-009). Without
+   * an authenticated caller the pick is ignored and {@code RequestScopeResolver.currentOrgUnit()}
+   * is stamped.
    *
    * @param operation transient entity
    * @param owningOrgUnitId optional picker output from {@link OperationCreateDto#owningOrgUnitId},
    *     or {@code null}
    * @return the persisted operation
+   * @throws BadRequestException when the picked unit is neither one of the caller's stampable units
+   *     nor a unit they may edit
+   * @throws de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException when the
+   *     caller has several stampable units and neither a pick nor a pin names one (REQ-ORG-023)
    * @throws AccessDeniedException when the caller holds no Mission Manager grant in the stamped
    *     unit, or for an ownerless operation none in an Organisationsleitung or Bereich unit
    */
@@ -210,7 +215,7 @@ public class OperationService {
       User caller = userService.getCurrentUser().orElse(null);
       if (caller != null) {
         operation.setOwningOrgUnit(
-            orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, owningOrgUnitId));
+            orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, owningOrgUnitId));
       } else {
         requestScopeResolver.currentOrgUnit().ifPresent(operation::setOwningOrgUnit);
       }

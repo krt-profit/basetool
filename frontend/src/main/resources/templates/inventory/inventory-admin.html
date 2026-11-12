@@ -32,6 +32,7 @@
     </th:block>
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
+    <div th:replace="~{kernel/fragments/components :: allMyOrgUnitsNotice}"></div>
 
     <div th:if="${org?.springframework?.validation?.BindingResult?.inventoryForm != null}" class="alert alert-danger" role="alert">
         <ul class="lager-error-list">
@@ -283,8 +284,8 @@
                                     <span class="tree-label" th:text="${stack.user.effectiveName}" th:title="${stack.user.effectiveName}">User</span>
                                 </div>
                                 <div class="tree-cell lager-cell-context">
-                                    <span th:if="${isAllSquadronsMode and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">ALP</span>
-                                    <span th:if="${isAllSquadronsMode and stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                                    <span th:if="${contextSpansOrgUnits and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">ALP</span>
+                                    <span th:if="${contextSpansOrgUnits and stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                                     <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
                                     <span th:if="${stack.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                                           th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
@@ -341,8 +342,8 @@
                                     <span class="tree-label" th:text="${stack.user.effectiveName}" th:title="${stack.user.effectiveName}">User</span>
                                 </div>
                                 <div class="tree-cell lager-cell-context">
-                                    <span th:if="${isAllSquadronsMode and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">ALP</span>
-                                    <span th:if="${isAllSquadronsMode and stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
+                                    <span th:if="${contextSpansOrgUnits and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">ALP</span>
+                                    <span th:if="${contextSpansOrgUnits and stack.owningSquadron == null}" class="squadron-badge squadron-badge-muted">&mdash;</span>
                                     <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
                                     <span th:if="${stack.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                                           th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>

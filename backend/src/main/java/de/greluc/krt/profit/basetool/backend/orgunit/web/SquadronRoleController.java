@@ -42,7 +42,8 @@ import org.springframework.web.bind.annotation.RestController;
  * stellvertretender Kommandoleiter, Ensign) of existing Staffel members (REQ-ROLE-003/004).
  *
  * <p>A Staffelleiter is appointed by the parent Bereichsleiter, the lower ranks by the squadron's
- * Staffelleiter, never by the appointee on their own seat; admins may always act. Response DTOs are
+ * Staffelleiter, never by the appointee on their own seat; admins may act on any squadron. Every
+ * write acts only on a squadron inside the active context (REQ-ORG-032). Response DTOs are
  * projected inside the service transaction.
  */
 @RestController
@@ -63,11 +64,12 @@ public class SquadronRoleController {
    */
   @PutMapping("/{userId}")
   @PreAuthorize(
-      "hasRole('"
+      "(hasRole('"
           + Roles.ADMIN
           + "') or (@orgRoleManagementSecurityService.canAssignSquadronRank(#squadronId,"
           + " #request.role(), authentication) and"
-          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication))")
+          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication)))"
+          + " and @requestScopeResolver.isInActiveContext(#squadronId)")
   @Operation(summary = "Assign a squadron leadership rank to a Staffel member")
   public OrgUnitMembershipDto assignRank(
       @PathVariable @NotNull UUID squadronId,
@@ -88,11 +90,12 @@ public class SquadronRoleController {
    */
   @DeleteMapping("/{userId}")
   @PreAuthorize(
-      "hasRole('"
+      "(hasRole('"
           + Roles.ADMIN
           + "') or (@orgRoleManagementSecurityService.canRemoveSquadronRank(#squadronId, #userId,"
           + " authentication) and"
-          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication))")
+          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication)))"
+          + " and @requestScopeResolver.isInActiveContext(#squadronId)")
   @Operation(summary = "Clear a Staffel member's squadron leadership rank")
   public OrgUnitMembershipDto removeRank(
       @PathVariable @NotNull UUID squadronId,

@@ -117,7 +117,7 @@ public final class ListenerAndObserverFixtures {
     /** Reads the active org unit on another thread. */
     @Async
     public void readsTheActiveOrgUnit() {
-      requestScopeResolver.currentOrgUnitId();
+      requestScopeResolver.currentActiveContext();
     }
 
     /** Reads the current user id in an event listener. */

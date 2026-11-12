@@ -33,6 +33,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.CurrentUserId;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess.PurchasingTabGrants;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.ActiveOrgUnitContext;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess.SupplyTabGrants;
@@ -94,11 +95,9 @@ public class MeController {
   private final PurchasingTabAccess purchasingTabAccess;
 
   /**
-   * Returns the org-unit context applied to staffel-scoped queries for this request.
-   *
-   * <p>Admins get the relayed header value; non-admins get the header only if it matches one of
-   * their memberships, otherwise their home Staffel. {@code orgUnitId} is {@code null} for admin
-   * "all OrgUnits" mode or a user without a home Staffel.
+   * Returns the effective org-unit context of this request (REQ-ORG-024): the honoured pin of any
+   * kind, otherwise a member's only org unit, all of a member's several units, every unit for an
+   * admin, or none.
    *
    * @return current effective org-unit context; never {@code null}.
    */
@@ -114,7 +113,8 @@ public class MeController {
    * @return current effective org-unit context
    */
   private @NotNull ActiveOrgUnitResponse activeOrgUnit() {
-    return new ActiveOrgUnitResponse(requestScopeResolver.currentOrgUnitId().orElse(null));
+    ActiveOrgUnitContext context = requestScopeResolver.currentActiveContext();
+    return new ActiveOrgUnitResponse(context.orgUnitId(), context.kind());
   }
 
   /**
@@ -187,8 +187,9 @@ public class MeController {
    * Returns the org units the caller may pin as their active context, sorted OL, Bereich, Staffel,
    * SK, then by name.
    *
-   * <p>Admins get every active unit of every kind; others get their member units plus the units
-   * reached through a Bereich or OL leadership seat (REQ-ORG-015).
+   * <p>Admins get every active unit of every kind. Others, while they hold {@code KRT Member}, get
+   * their active member units plus the units reached through a Bereich or OL leadership seat, and
+   * without it no unit (REQ-ORG-015, REQ-ORG-032).
    *
    * @param jwt the caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
    * @return the pinnable options; never {@code null}, possibly empty for a membership-less
@@ -200,9 +201,10 @@ public class MeController {
   @Operation(
       summary = "List the org units the caller may pin as their active context",
       description =
-          "Admins get every active org unit of all four kinds; everyone else gets the units they"
-              + " belong to or reach through a Bereich/OL seat. Encapsulates the branch both"
-              + " clients would otherwise duplicate.")
+          "Admins get every active org unit of all four kinds; everyone else, while holding KRT"
+              + " Member, gets the active units they belong to or reach through a Bereich/OL seat,"
+              + " and no unit without it. Encapsulates the branch both clients would otherwise"
+              + " duplicate.")
   @ApiResponses(
       value = {@ApiResponse(responseCode = "200", description = "Pinnable org-unit options")})
   public List<OrgUnitMembershipOptionDto> getPinnableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
@@ -216,10 +218,13 @@ public class MeController {
    * @return the pinnable options, possibly empty
    */
   private List<OrgUnitMembershipOptionDto> pinnableOrgUnits(Jwt jwt) {
-    return authHelperService.isAdmin()
-        ? orgUnitMembershipQueryService.listAllPinnableOptions()
-        : orgUnitMembershipQueryService.listPickerOptionsWithDescendants(
-            userService.getUserIdFromJwt(jwt));
+    if (authHelperService.isAdmin()) {
+      return orgUnitMembershipQueryService.listAllPinnableOptions();
+    }
+    return authHelperService.holdsKrtMember()
+        ? orgUnitMembershipQueryService.listPickerOptionsWithDescendants(
+            userService.getUserIdFromJwt(jwt))
+        : List.of();
   }
 
   /**
@@ -248,8 +253,10 @@ public class MeController {
         @ApiResponse(responseCode = "401", description = "Authentication required")
       })
   public LayoutResponse getLayout(@AuthenticationPrincipal Jwt jwt, @CurrentUserId UUID callerId) {
+    ActiveOrgUnitResponse active = activeOrgUnit();
     return new LayoutResponse(
-        activeOrgUnit().orgUnitId(),
+        active.orgUnitId(),
+        active.context(),
         pinnableOrgUnits(jwt),
         capabilities(),
         notificationService.unreadCount(callerId));
@@ -257,12 +264,14 @@ public class MeController {
 
   /**
    * Response for {@code GET /api/v1/org-units/me/active}: the resolved effective org-unit context
-   * for the current request. {@code null} means the admin is viewing all OrgUnits (or the user has
-   * no assigned home Staffel and no pinned context).
+   * for the current request.
    *
-   * @param orgUnitId effective OrgUnit UUID, or {@code null}.
+   * @param orgUnitId the one org unit the context covers, or {@code null} when it covers several or
+   *     none
+   * @param context what the context covers; never {@code null}
    */
-  public record ActiveOrgUnitResponse(@Nullable UUID orgUnitId) {}
+  public record ActiveOrgUnitResponse(
+      @Nullable UUID orgUnitId, @NotNull ActiveOrgUnitContext.Kind context) {}
 
   /**
    * Response for {@code GET /api/v1/me/capabilities}: per-principal UI capability flags.
@@ -299,7 +308,7 @@ public class MeController {
    *     whatever unit is pinned; {@code true} for an admin
    * @param canViewSupplyIncoming whether „Eingehende Spenden" is offered: the supply surface is on
    *     and the caller manages, or as an admin reaches, an active unit that accepts donations;
-   *     whatever unit is pinned
+   *     whatever unit is pinned (ADR-0329)
    * @param canViewSupplyStats whether the donation statistics are offered: the supply surface is on
    *     and the caller belongs to the governing leadership or manages at least one unit; whatever
    *     unit is pinned
@@ -343,14 +352,16 @@ public class MeController {
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.
    *
-   * @param activeOrgUnitId the effective org-unit context; {@code null} for admin "all org units"
-   *     or no home Staffel
+   * @param activeOrgUnitId the one org unit the effective context covers; {@code null} when it
+   *     covers several units or none
+   * @param activeContext what the effective context covers; never {@code null}
    * @param orgUnits the pinnable org units; never {@code null}, possibly empty
    * @param capabilities the caller's capability flags; never {@code null}
    * @param unreadNotifications the caller's unread-notification count
    */
   public record LayoutResponse(
       @Nullable UUID activeOrgUnitId,
+      @NotNull ActiveOrgUnitContext.Kind activeContext,
       @NotNull List<OrgUnitMembershipOptionDto> orgUnits,
       @NotNull CapabilitiesResponse capabilities,
       long unreadNotifications) {}

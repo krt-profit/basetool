@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
@@ -59,6 +60,9 @@ public class MemberMembershipController {
   private final UserService userService;
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
+  /** Answers whether the caller holds {@code KRT Member}, which the leadership reach rests on. */
+  private final AuthHelperService authHelperService;
+
   /**
    * Lists the org units a user belongs to as picker-optimised {@link OrgUnitMembershipOptionDto}
    * rows for the owner picker.
@@ -67,8 +71,10 @@ public class MemberMembershipController {
    * carries only org-unit names and shorthands, no personal data.
    *
    * @param id the user id whose memberships to list; never {@code null}.
-   * @param allKinds {@code true} to include all four org-unit kinds (Staffel, SK, Bereich,
-   *     Organisationsleitung); {@code false} for Staffel and SK only.
+   * @param allKinds {@code true} for the pickers: all four org-unit kinds (Staffel, SK, Bereich,
+   *     Organisationsleitung), active units only (REQ-ORG-032); {@code false} for the
+   *     administration's member views: the stored Staffel and SK memberships, deactivated units
+   *     included.
    * @return option DTOs sorted Staffel-first then SK alphabetical, or top-down by kind when {@code
    *     allKinds=true}; never {@code null}, possibly empty.
    */
@@ -92,7 +98,9 @@ public class MemberMembershipController {
 
   /**
    * Returns the calling user's pickable owning-org-unit options for create forms: direct
-   * memberships plus the units reachable through leadership (REQ-ORG-016, REQ-ORG-018).
+   * memberships plus the units reachable through leadership (REQ-ORG-016, REQ-ORG-018); deactivated
+   * units are left out. Without {@code KRT Member} a membership confers nothing (ADR-0300), so the
+   * list is empty.
    *
    * <p>Resolved for the caller only; for an ordinary member it equals their direct memberships.
    *
@@ -103,8 +111,10 @@ public class MemberMembershipController {
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> getMyPickableOrgUnits(@AuthenticationPrincipal Jwt jwt) {
-    return orgUnitMembershipQueryService.listPickerOptionsWithDescendants(
-        userService.getUserIdFromJwt(jwt));
+    return authHelperService.holdsKrtMember()
+        ? orgUnitMembershipQueryService.listPickerOptionsWithDescendants(
+            userService.getUserIdFromJwt(jwt))
+        : List.of();
   }
 
   /**
@@ -132,8 +142,8 @@ public class MemberMembershipController {
   }
 
   /**
-   * Returns the ids of every org unit the calling user is a direct member of, across all kinds and
-   * without leadership cascade (REQ-MISSION-012).
+   * Returns the ids of every active org unit the calling user is a direct member of, across all
+   * kinds and without leadership cascade (REQ-MISSION-012, REQ-ORG-032).
    *
    * <p>Open to every authenticated caller; no memberships yield an empty set.
    *

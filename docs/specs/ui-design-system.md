@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -1716,8 +1716,13 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   | `purchasing.delegates` | `canViewPurchasingDelegates` | is the governing leadership |
   | `purchasing.report` | `canViewPurchasingReport` | is a delegate, the governing leadership, bank staff or a unit manager (REQ-PUR-023) |
 
-  The tab bars of „Bedarf & Spenden" and „Ankauf" read the same flags, so the navigation, the tab
-  bars and the quick access offer the same tabs. Empty, it offers up to four recently visited pages (`localStorage`
+  None of the five depends on the selected org unit: a unit manager counts as one whatever unit is
+  selected (`SupplyAccessPolicy#managedUnitsInAnyContext`, `PurchasingAccessPolicy#canReadReport`),
+  so a lead or Logistician who selects a unit they do not manage keeps „Eingehende Spenden",
+  „Statistik" and „Bericht", and the pages list what the active context covers (REQ-ORG-032,
+  REQ-SUP-003, REQ-PUR-021). The tab bars of „Bedarf & Spenden" and „Ankauf" read the same flags,
+  so the navigation, the tab bars and the quick access offer the same tabs.
+  Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
   anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins Einheitslager
@@ -1775,7 +1780,9 @@ their filter query; in-place requests and sub-paths are not redirected) ·
 `StickyHeaderTest` (the header is sticky at the top; no `html` / `body` scroll container) ·
 `NavigationMenuTest` (gates per role and flag, tab stand-ins, quick-access-only pages) ·
 `SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `MeControllerTest` (each tab flag
-positive and negative, none while its surface is off) · `MeLayoutSingleTransactionTest` (the tab
+positive and negative, none while its surface is off; the supply flags kept under a pin on another
+unit) · `SupplyAccessPolicyTest`, `PurchasingAccessPolicyTest` (the statistics and report gates kept
+under a pin on another unit) · `MeLayoutSingleTransactionTest` (the tab
 flags add no statement per unit) · `NavigationAdvicePromotionFlagsTest`, `NavigationFlagTest` (the
 flags and their user-wide rule) · `NavigationDataTabGateMvcTest` (the start-page select and the
 favourites offer a tab only with its flag, the quick access indexes exactly the granted tabs, a

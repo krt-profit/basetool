@@ -154,13 +154,12 @@ public class OrgUnitMembership {
    * Whether this membership makes its user a Logistician of its own org unit: it carries {@code
    * is_logistician} or any leadership rank, the Bereich and OL ranks included (REQ-XCH-043,
    * ADR-0257). The cascade of a Bereich or OL rank to other org units is not part of this rule. A
-   * rank counts only while its holder holds {@code KRT Member} (REQ-SEC-015); the flag always does.
+   * membership confers this only while its holder holds {@code KRT Member} (REQ-SEC-015), which
+   * every caller checks first.
    *
-   * @param seatsConfer whether the holder holds {@code KRT Member}
-   * @return {@code true} iff the flag is set, or the rank is not {@link MembershipRole#MEMBER} and
-   *     {@code seatsConfer}
+   * @return {@code true} iff the flag is set or the rank is not {@link MembershipRole#MEMBER}
    */
-  public boolean isLogisticianOfOwnUnit(boolean seatsConfer) {
-    return isLogistician || (seatsConfer && role.confersOwnLevelOversight());
+  public boolean isLogisticianOfOwnUnit() {
+    return isLogistician || role.confersOwnLevelOversight();
   }
 }

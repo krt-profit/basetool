@@ -24,8 +24,10 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -62,6 +64,8 @@ class MissionManagerRoleTest {
   @Autowired private WebApplicationContext context;
 
   @Autowired private UserRepository userRepository;
+
+  @Autowired private RoleRepository roleRepository;
 
   @Autowired private MissionRepository missionRepository;
 
@@ -239,6 +243,7 @@ class MissionManagerRoleTest {
     User user = new User();
     user.setId(userId);
     user.setUsername("manager_user");
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     userRepository.save(user);
     userRepository.flush();
     saveIridiumMembership(user, false, true);
