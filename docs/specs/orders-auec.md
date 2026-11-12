@@ -489,6 +489,8 @@ REQ-ORDERS-065; a new default does not reinterpret a submitted operation or repl
 
 Use the existing live-update/section framework for own and peer changes across every authorised
 audience. Preserve dirty input in the open form while refreshing server basis/other sections.
+An open commitment history stays expanded when a refreshed participation section still contains
+the same commitment. Its entries and links come from the refreshed section.
 An open Bank movement keeps the selected account and custodians while its options refresh.
 Check the choices against the new options and obtain a fresh preview before saving.
 The status badge follows the latest lifecycle revision delivered with the money or header fragment,

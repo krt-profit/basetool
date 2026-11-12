@@ -822,8 +822,22 @@ class JobOrderMoneyE2eTest {
 
       assertThat(actor.getByTestId("order-money-provided")).containsText("4.000.000");
       assertThat(actor.getByTestId("order-money-commitment-outstanding")).containsText("2.000.000");
-      actor.getByTestId("order-money-commitment").locator("summary").click();
+      Locator history = actor.getByTestId("order-money-commitment").locator("details");
+      history.locator("summary").click();
       var source = actor.getByTestId("order-money-commitment-operation");
+      assertThat(source).isVisible();
+      var previousHistory = history.elementHandle();
+      actor.evaluate(
+          """
+          url => window.krtFetch.swap({
+            url,
+            container: '#order-participations-results',
+            fragmentValue: 'participations',
+            history: false
+          })
+          """,
+          orderPath);
+      actor.waitForFunction("previous => !previous.isConnected", previousHistory);
       assertThat(source).isVisible();
       String operationAnchor = source.getAttribute("href");
       assertNotNull(operationAnchor);

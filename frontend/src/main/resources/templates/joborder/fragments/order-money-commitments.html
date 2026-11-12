@@ -30,7 +30,7 @@
                           th:text="#{orders.money.amount.display(${@moneyFormat.exactWhole(commitment.outstanding, #locale)})}"></span>
                     <span th:unless="${commitment.endedAt == null}" class="status-pill status-cancelled"
                           th:text="#{orders.support.ended}"></span>
-                    <details>
+                    <details th:id="|order-money-commitment-history-${commitment.id}|" data-preserve-open>
                         <summary th:text="#{orders.money.commitment.history}"></summary>
                         <ul class="od-assignee-list">
                             <li class="od-assignee split" th:each="change : ${commitment.changes}">
