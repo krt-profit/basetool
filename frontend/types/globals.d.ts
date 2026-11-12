@@ -659,7 +659,7 @@ interface KrtHerkunftApi {
 }
 
 /**
- * The per-page settings of the two Lager lists sharing `inventory-common.js`: the global Lager
+ * The per-page settings of the two Lager lists sharing `inventory-common.js`: the Einheitslager
  * (`/inventory?storage=all`) and the personal one (`/inventory?storage=my`).
  */
 interface KrtInventoryLagerConfig {
@@ -669,7 +669,7 @@ interface KrtInventoryLagerConfig {
     basePath: string;
     /** The option of the Lager tab the page shows: `all` or `my`. */
     storage: 'all' | 'my';
-    /** The global Lager's stacks are per owner: its stack-entries URL carries `userId`. */
+    /** The Einheitslager's stacks are per owner: its stack-entries URL carries `userId`. */
     stackPerOwner: boolean;
     /** The personal Lager's stack key carries the personal flag. */
     stackPersonalFlag: boolean;

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pageFocus=false, pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
-    <title th:text="#{inventory.overview.global} + ' - ' + ${appTitle}">Globales Lager - Profit Basetool</title>
+    <title th:text="#{inventory.overview.global} + ' - ' + ${appTitle}">Einheitslager - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/inventory/inventory-lager.css}">
     </th:block>
@@ -23,7 +23,7 @@
                                 data-testid="delete-all-global-inventory"
                                 th:text="#{inventory.deleteAll.btn}"
                                 th:data-error-failed="#{inventory.deleteAll.error.failed}"
-                                th:data-success="#{inventory.deleteAll.success}">Globales Lager leeren</button>
+                                th:data-success="#{inventory.deleteAll.success}">Einheitslager leeren</button>
                     </th:block>
                 </th:block>
             </th:block>
@@ -542,7 +542,7 @@
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='delete-all-global-inventory-modal', titleKey='inventory.deleteAll.modal.title', variant='krt-modal--wide krt-modal--danger', body=~{::delete-all-global-inventory-modal-body})}">
     <th:block th:ref="delete-all-global-inventory-modal-body">
         <div class="krt-modal-body">
-        <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle globalen Lagereintr&auml;ge wirklich l&ouml;schen?</p>
+        <p th:text="#{inventory.deleteAll.modal.body}" class="mb-2">Alle Eintr&auml;ge des Einheitslagers wirklich l&ouml;schen?</p>
         </div>
         <div class="krt-modal-foot">
             <button type="button" id="delete-all-global-inventory-cancel-btn" class="btn btn-ghost" th:text="#{general.cancel}">Abbrechen</button>

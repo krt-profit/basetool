@@ -82,7 +82,7 @@ function fillPoolTargets(entryId, select, submit) {
 }
 
 /**
- * Opens the pool-change dialog for one entry of the Globales Lager.
+ * Opens the pool-change dialog for one entry of the Einheitslager.
  *
  * @param {Element} el the entry's action button
  */
@@ -174,7 +174,7 @@ function submitPoolChange(event) {
 }
 
 /**
- * Wires the pool-change dialog of the Globales Lager (REQ-INV-059).
+ * Wires the pool-change dialog of the Einheitslager (REQ-INV-059).
  *
  * @param {() => void} onChanged what the page refreshes after a change: its table and its peers
  */

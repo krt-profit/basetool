@@ -426,7 +426,7 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * The "Globales Lager" filters sit in the toolbar's filter popover in both views (REQ-INV-037,
+   * The "Einheitslager" filters sit in the toolbar's filter popover in both views (REQ-INV-037,
    * REQ-UI-027), with the same guarantees as the "Mein Lager" test; the source-order assertion
    * ensures the popover sits inside the filter form, ahead of the tree.
    *
