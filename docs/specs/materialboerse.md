@@ -32,7 +32,8 @@ offer:
 Either way other members register interest and the anbieter takes the negotiation from there. The
 page is built on the DAS KARTELL design system's locked master-detail layout (`.master-detail` /
 `.master-list` / `.master-row` / `.detail-pane`, specimen
-`.claude/skills/das-kartell-design/components/MasterDetail/preview.html`) as this spec describes it.
+`.claude/skills/das-kartell-design/components/MasterDetail/preview.html`) as this spec describes it,
+as frameless panes inside the list panel (`.master-detail--panes`, REQ-UI-007).
 Data model + visibility decisions are recorded in ADR-0082 (offer model), ADR-0086 (partial offers),
 ADR-0087 (item offers) and ADR-0372 (items without a blueprint).
 

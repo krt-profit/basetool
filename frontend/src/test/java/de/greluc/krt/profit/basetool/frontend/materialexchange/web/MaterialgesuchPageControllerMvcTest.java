@@ -129,7 +129,7 @@ class MaterialgesuchPageControllerMvcTest {
     mockMvc
         .perform(get("/materialboerse").param("view", "requests"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("master-detail mb-md")))
+        .andExpect(content().string(containsString("master-detail master-detail--panes mb-md")))
         .andExpect(content().string(not(containsString("has-sel"))));
   }
 
@@ -145,7 +145,8 @@ class MaterialgesuchPageControllerMvcTest {
                 .param("view", "requests")
                 .param("selected", requestId.toString()))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("master-detail mb-md has-sel")));
+        .andExpect(
+            content().string(containsString("master-detail master-detail--panes mb-md has-sel")));
   }
 
   /**

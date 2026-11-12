@@ -6951,6 +6951,38 @@
         border: var(--border-hairline);
         padding: 14px 16px;
     }
+    .master-detail--panes {
+        gap: 0;
+    }
+    .master-detail--panes > .master-list {
+        /* Fills its grid row, so its bottom corner is the box's; min-height outranks max-height,
+           which caps only the row height the list asks for. */
+        min-height: 100%;
+        overflow-y: auto;
+        background: transparent;
+        border: 0;
+        border-right: var(--border-hairline);
+        border-radius: var(--flush-corner-top) 0 0 var(--flush-corner-bottom);
+    }
+    .master-detail--panes > .master-list .master-row:nth-child(1 of :not([hidden])),
+    .master-detail--panes > .master-list .master-row:nth-last-child(1 of :not([hidden])) {
+        border-radius: 0;
+    }
+    .master-detail--panes > .master-list .master-row:nth-last-child(1 of :not([hidden])) {
+        border-bottom: 0;
+    }
+    .master-detail--panes > .detail-pane {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+    }
+    @media (width <= 1024px) {
+        .master-detail--panes > .master-list {
+            border-right: 0;
+            border-radius: var(--flush-corner-top) var(--flush-corner-top)
+                var(--flush-corner-bottom) var(--flush-corner-bottom);
+        }
+    }
 
     input[type='range'] {
         accent-color: var(--color-primary);

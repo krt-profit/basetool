@@ -145,7 +145,7 @@ class MaterialboersePageControllerMvcTest {
     mockMvc
         .perform(get("/materialboerse"))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("master-detail mb-md")))
+        .andExpect(content().string(containsString("master-detail master-detail--panes mb-md")))
         .andExpect(content().string(containsString("Agricium")))
         .andExpect(content().string(not(containsString("has-sel"))));
   }
@@ -159,7 +159,8 @@ class MaterialboersePageControllerMvcTest {
     mockMvc
         .perform(get("/materialboerse").param("selected", offerId.toString()))
         .andExpect(status().isOk())
-        .andExpect(content().string(containsString("master-detail mb-md has-sel")));
+        .andExpect(
+            content().string(containsString("master-detail master-detail--panes mb-md has-sel")));
   }
 
   /** An unknown picked id falls back to the first offer without opening the detail. */
