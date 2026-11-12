@@ -351,7 +351,7 @@ class InventoryLagerPatternRenderTest {
   }
 
   /**
-   * The Globales Lager items view renders the same group row with the chips (REQ-INV-061,
+   * The Einheitslager items view renders the same group row with the chips (REQ-INV-061,
    * REQ-INV-062).
    */
   @Test
@@ -437,7 +437,7 @@ class InventoryLagerPatternRenderTest {
         main(render("/inventory?storage=all", "/inventory/all/grouped", materialGroups()));
 
     assertThat(main)
-        .contains("<h1>Globales Lager</h1>")
+        .contains("<h1>Einheitslager</h1>")
         .containsPattern(
             "href=\"/inventory/input\\?source=admin\"\\s+class=\"btn btn--cta\""
                 + "\\s+data-testid=\"page-head-primary\"\\s*>Einbuchen<")

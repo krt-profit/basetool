@@ -700,7 +700,7 @@ function submitUmbuchen(event) {
         });
 }
 
-/** Wires the delete-all dialog of the global Lager. */
+/** Wires the delete-all dialog of the Einheitslager. */
 function initInventoryAdmin() {
     const deleteBtn = document.getElementById('delete-all-global-inventory-btn');
     const modal = document.getElementById('delete-all-global-inventory-modal');

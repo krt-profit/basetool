@@ -27,7 +27,7 @@ Der Nutzer öffnet die Lager-Ansichten oder den Hangar und filtert, klappt, blä
 
 1. **Gruppenansicht** (ADR-0003, REQ-INV-002): `/inventory/all` laden.
 2. **Filter-Popover „Mein Lager"** (REQ-INV-037, REQ-UI-027): Seite laden, „Filter" öffnen, mit Escape schließen, neu laden; dann im Popover „Gestohlen:" setzen und in der Werkzeugleiste „Persönlich" wählen.
-3. **Filter-Popover „Globales Lager":** derselbe Ablauf; der Zähler wird über das Mindestqualitäts-Select getrieben.
+3. **Filter-Popover „Einheitslager":** derselbe Ablauf; der Zähler wird über das Mindestqualitäts-Select getrieben.
 4. **Ortsfilter** (REQ-INV-040): auf `/inventory/my` den Reload-Marker setzen und einen der zwei Orte anhaken.
 5. **Live-Sync des geteilten Lagers** (#1307): beide Kontexte klappen denselben Stack auf `/inventory/all` auf; B wartet, bis `window.krtLiveSync.subscribedTopics()` `inventory` enthält. A fügt über „+ Zuordnen" einen Auftrags-Chip hinzu (`POST /inventory/{id}/allocation`); B lädt nie neu.
 6. **Filter-Persistenz** (REQ-UI-017, ADR-0120): auf `/refinery-orders` das Segment „Abgeschlossen" wählen und den Schalter „Meine Aufträge" setzen; auf `/missions` `showPast` einschalten; auf `/materialboerse` die Sortierung ändern — jeweils neu laden.

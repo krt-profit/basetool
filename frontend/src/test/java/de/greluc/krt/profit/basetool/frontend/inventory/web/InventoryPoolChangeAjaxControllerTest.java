@@ -56,7 +56,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc coverage of the two AJAX proxies of the Globales Lager's pool change (REQ-INV-059): the
+ * MockMvc coverage of the two AJAX proxies of the Einheitslager's pool change (REQ-INV-059): the
  * payload is forwarded unchanged, a request without target is refused locally, the target list is
  * relayed, and a backend refusal is relayed with its code.
  */
