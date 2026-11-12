@@ -249,7 +249,7 @@ class AnonymousSurfaceSweepTest {
 
   /** Pass 2: a bearer whose only authority is the pending marker. */
   @Test
-  @DisplayName("a pending registration reaches nothing but its own status")
+  @DisplayName("a pending registration reaches nothing but its status and the terms document")
   void pendingRegistrationIsRefusedEverywhere() throws Exception {
     assertRefusedEverywhere(
         jwt().authorities(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL")),
