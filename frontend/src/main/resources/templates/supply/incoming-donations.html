@@ -19,7 +19,10 @@
 
     <th:block th:replace="~{supply/fragments/supply-tabs :: tabs(active='incoming')}"></th:block>
 
-    <div th:if="${unit == null}" class="alert alert-info" th:text="#{supply.incoming.noUnit}" data-testid="supply-no-unit">Du verwaltest keine annehmende Einheit.</div>
+    <div th:if="${unit == null}" class="alert alert-info"
+         th:with="unionLabel=${#authorization.expression('hasRole(T(de.greluc.krt.profit.basetool.frontend.kernel.security.Roles).ADMIN)')} ? #{orgUnit.switcher.all} : #{orgUnit.switcher.allMine}"
+         th:text="${meCapabilities != null and meCapabilities.canViewSupplyIncoming()} ? #{supply.incoming.noUnitInContext(${unionLabel})} : #{supply.incoming.noUnit}"
+         data-testid="supply-no-unit">Du verwaltest keine annehmende Einheit.</div>
 
     <section class="list-panel" th:if="${unit != null}">
         <form id="supply-incoming-filter" class="no-track" role="search" method="get" th:action="@{/supply/donations/incoming}">

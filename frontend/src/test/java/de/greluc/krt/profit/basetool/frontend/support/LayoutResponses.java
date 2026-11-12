@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.support;
 
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.ContextKind;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.CapabilitiesResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
@@ -48,6 +49,7 @@ public final class LayoutResponses {
       boolean canSeeBlueprintOverview, boolean canViewJobOrders, boolean canViewOwnJobOrders) {
     return new MeLayoutResponse(
         null,
+        null,
         List.of(),
         caps(canSeeBlueprintOverview, canViewJobOrders, canViewOwnJobOrders, false),
         0L);
@@ -64,6 +66,7 @@ public final class LayoutResponses {
   public static MeLayoutResponse orderAccess(
       boolean canViewJobOrders, boolean canViewOwnJobOrders, boolean canViewAssignedJobOrders) {
     return new MeLayoutResponse(
+        null,
         null,
         List.of(),
         new CapabilitiesResponse(
@@ -229,7 +232,7 @@ public final class LayoutResponses {
    * @return the answer, with no org unit, no pinnable units and no unread notifications
    */
   public static MeLayoutResponse withCapabilities(CapabilitiesResponse capabilities) {
-    return new MeLayoutResponse(null, List.of(), capabilities, 0L);
+    return new MeLayoutResponse(null, null, List.of(), capabilities, 0L);
   }
 
   /**
@@ -240,7 +243,7 @@ public final class LayoutResponses {
    *     unread notifications
    */
   public static MeLayoutResponse officerReach(boolean officerHere) {
-    return new MeLayoutResponse(null, List.of(), officerCaps(officerHere), 0L);
+    return new MeLayoutResponse(null, null, List.of(), officerCaps(officerHere), 0L);
   }
 
   /**
@@ -251,7 +254,8 @@ public final class LayoutResponses {
    *     notifications
    */
   public static MeLayoutResponse officerReachIn(UUID activeOrgUnitId) {
-    return new MeLayoutResponse(activeOrgUnitId, List.of(), officerCaps(true), 0L);
+    return new MeLayoutResponse(
+        activeOrgUnitId, kindOf(activeOrgUnitId), List.of(), officerCaps(true), 0L);
   }
 
   private static CapabilitiesResponse officerCaps(boolean officerHere) {
@@ -287,17 +291,19 @@ public final class LayoutResponses {
    *     unread notifications
    */
   public static MeLayoutResponse stolenMarking(boolean canMarkStolen) {
-    return new MeLayoutResponse(null, List.of(), caps(false, false, false, canMarkStolen), 0L);
+    return new MeLayoutResponse(
+        null, null, List.of(), caps(false, false, false, canMarkStolen), 0L);
   }
 
   /**
-   * A layout answer carrying only the effective org unit a non-admin's home Staffel resolves to.
+   * A layout answer carrying only the one org unit the backend's effective context covers.
    *
    * @param activeOrgUnitId the effective org unit, or {@code null} for none
    * @return the answer, with every capability off, no pinnable units and no unread notifications
    */
   public static MeLayoutResponse activeOrgUnit(UUID activeOrgUnitId) {
-    return new MeLayoutResponse(activeOrgUnitId, List.of(), CapabilitiesResponse.NONE, 0L);
+    return new MeLayoutResponse(
+        activeOrgUnitId, kindOf(activeOrgUnitId), List.of(), CapabilitiesResponse.NONE, 0L);
   }
 
   /**
@@ -307,6 +313,31 @@ public final class LayoutResponses {
    * @return the answer, with no active org unit, every capability off and no unread notifications
    */
   public static MeLayoutResponse orgUnits(List<OrgUnitMembershipOptionDto> orgUnits) {
-    return new MeLayoutResponse(null, List.copyOf(orgUnits), CapabilitiesResponse.NONE, 0L);
+    return new MeLayoutResponse(null, null, List.copyOf(orgUnits), CapabilitiesResponse.NONE, 0L);
+  }
+
+  /**
+   * A layout answer carrying the effective context and the org units the caller may pin.
+   *
+   * @param activeContext what the effective context covers
+   * @param activeOrgUnitId the one org unit of an {@link ContextKind#ORG_UNIT} context, else {@code
+   *     null}
+   * @param orgUnits the pinnable org units, in switcher order
+   * @return the answer, with every capability off and no unread notifications
+   */
+  public static MeLayoutResponse context(
+      ContextKind activeContext, UUID activeOrgUnitId, List<OrgUnitMembershipOptionDto> orgUnits) {
+    return new MeLayoutResponse(
+        activeOrgUnitId, activeContext, List.copyOf(orgUnits), CapabilitiesResponse.NONE, 0L);
+  }
+
+  /**
+   * The context kind the backend reports for an effective org unit in these canned answers.
+   *
+   * @param activeOrgUnitId the effective org unit, or {@code null}
+   * @return {@link ContextKind#ORG_UNIT} for a unit, otherwise {@code null} (no kind sent)
+   */
+  private static ContextKind kindOf(UUID activeOrgUnitId) {
+    return activeOrgUnitId != null ? ContextKind.ORG_UNIT : null;
   }
 }

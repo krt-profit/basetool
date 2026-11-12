@@ -23,12 +23,16 @@
                 th:with="lead=${m.isLead() != null and m.isLead()},
                          logistician=${m.isLogistician() != null and m.isLogistician()},
                          missionManager=${m.isMissionManager() != null and m.isMissionManager()},
-                         rowLead=${canLead and (admin or selfUserId == null or m.userId() != selfUserId)}"
+                         rowOwn=${selfUserId != null and m.userId() == selfUserId},
+                         rowWritable=${admin or (!rowOwn and !lead)},
+                         rowLead=${canLead and (admin or !rowOwn)},
+                         rowFlags=${showFlags and rowWritable},
+                         rowRemove=${canRemove and rowWritable}"
                 th:data-user-id="${m.userId()}" th:data-version="${m.version()}"
                 th:data-user-name="${m.userDisplayName()}" th:data-lead="${lead}"
                 th:data-logistician="${logistician}" th:data-mission-manager="${missionManager}"
-                th:data-flags-url="${showFlags} ? @{/organisation/special-commands/{id}/members/{userId}/flags(id=${skId},userId=${m.userId()})} : null"
-                th:data-remove-url="${canRemove} ? @{/organisation/special-commands/{id}/members/{userId}/delete(id=${skId},userId=${m.userId()})} : null"
+                th:data-flags-url="${rowFlags} ? @{/organisation/special-commands/{id}/members/{userId}/flags(id=${skId},userId=${m.userId()})} : null"
+                th:data-remove-url="${rowRemove} ? @{/organisation/special-commands/{id}/members/{userId}/delete(id=${skId},userId=${m.userId()})} : null"
                 th:data-lead-url="${rowLead} ? (${leadMode == 'admin'} ? @{/admin/special-commands/{id}/members/{userId}/lead(id=${skId},userId=${m.userId()})} : @{/organisation/leitung/special-commands/{id}/members/{userId}/lead/ajax(id=${skId},userId=${m.userId()})}) : null">
                 <td>
                     <span class="cell-title unit-roster__name">
@@ -37,28 +41,35 @@
                     </span>
                 </td>
                 <td th:if="${showFlags}" class="unit-roster__flags" th:attr="data-label=#{admin.specialcommands.members.column.roles}">
-                    <form class="unit-flag-form" method="post"
-                          th:action="@{/organisation/special-commands/{id}/members/{userId}/flags(id=${skId},userId=${m.userId()})}">
-                        <input type="hidden" name="version" th:value="${m.version()}">
-                        <input type="hidden" name="isLogistician" th:value="${!logistician}">
-                        <input type="hidden" name="isMissionManager" th:value="${missionManager}">
-                        <button type="submit" class="unit-flag" data-sk-flag="isLogistician"
-                                th:aria-pressed="${logistician}" th:classappend="${logistician} ? 'is-on'">
-                            <span class="matrix-flag" th:classappend="${logistician} ? 'on'" aria-hidden="true"></span>
-                            <span th:text="#{admin.specialcommands.members.role.logistician}">Logistiker</span>
-                        </button>
-                    </form>
-                    <form class="unit-flag-form" method="post"
-                          th:action="@{/organisation/special-commands/{id}/members/{userId}/flags(id=${skId},userId=${m.userId()})}">
-                        <input type="hidden" name="version" th:value="${m.version()}">
-                        <input type="hidden" name="isLogistician" th:value="${logistician}">
-                        <input type="hidden" name="isMissionManager" th:value="${!missionManager}">
-                        <button type="submit" class="unit-flag" data-sk-flag="isMissionManager"
-                                th:aria-pressed="${missionManager}" th:classappend="${missionManager} ? 'is-on'">
-                            <span class="matrix-flag" th:classappend="${missionManager} ? 'on'" aria-hidden="true"></span>
-                            <span th:text="#{admin.specialcommands.members.role.mission_manager}">Einsatzleiter</span>
-                        </button>
-                    </form>
+                    <th:block th:if="${rowFlags}">
+                        <form class="unit-flag-form" method="post"
+                              th:action="@{/organisation/special-commands/{id}/members/{userId}/flags(id=${skId},userId=${m.userId()})}">
+                            <input type="hidden" name="version" th:value="${m.version()}">
+                            <input type="hidden" name="isLogistician" th:value="${!logistician}">
+                            <input type="hidden" name="isMissionManager" th:value="${missionManager}">
+                            <button type="submit" class="unit-flag" data-sk-flag="isLogistician"
+                                    th:aria-pressed="${logistician}" th:classappend="${logistician} ? 'is-on'">
+                                <span class="matrix-flag" th:classappend="${logistician} ? 'on'" aria-hidden="true"></span>
+                                <span th:text="#{admin.specialcommands.members.role.logistician}">Logistiker</span>
+                            </button>
+                        </form>
+                        <form class="unit-flag-form" method="post"
+                              th:action="@{/organisation/special-commands/{id}/members/{userId}/flags(id=${skId},userId=${m.userId()})}">
+                            <input type="hidden" name="version" th:value="${m.version()}">
+                            <input type="hidden" name="isLogistician" th:value="${logistician}">
+                            <input type="hidden" name="isMissionManager" th:value="${!missionManager}">
+                            <button type="submit" class="unit-flag" data-sk-flag="isMissionManager"
+                                    th:aria-pressed="${missionManager}" th:classappend="${missionManager} ? 'is-on'">
+                                <span class="matrix-flag" th:classappend="${missionManager} ? 'on'" aria-hidden="true"></span>
+                                <span th:text="#{admin.specialcommands.members.role.mission_manager}">Einsatzleiter</span>
+                            </button>
+                        </form>
+                    </th:block>
+                    <th:block th:unless="${rowFlags}">
+                        <span th:if="${logistician}" class="chip" th:text="#{admin.specialcommands.members.role.logistician}">Logistiker</span>
+                        <span th:if="${missionManager}" class="chip" th:text="#{admin.specialcommands.members.role.mission_manager}">Einsatzleiter</span>
+                        <span th:unless="${logistician or missionManager}" class="cell-sub" aria-hidden="true">&mdash;</span>
+                    </th:block>
                 </td>
                 <td th:attr="data-label=#{admin.specialcommands.members.column.lead}">
                     <span class="matrix-flag unit-roster__lead" th:classappend="${lead} ? 'on'" role="img"
@@ -66,7 +77,7 @@
                           th:title="${lead} ? #{leitung.rank.SK_LEAD} : #{leitung.sk.notLead}"></span>
                 </td>
                 <td class="cell-actions">
-                    <th:block th:if="${rowLead or canRemove}">
+                    <th:block th:if="${rowLead or rowRemove}">
                         <th:block th:replace="~{kernel/fragments/components :: overflowMenu(id=${'sk-menu-' + skId + '-' + m.userId()}, items=~{orgunit/organisation/unit-detail :: sk-row-items})}">
                             <th:block th:ref="sk-row-items">
                                 <form th:if="${rowLead and leadMode == 'admin'}" class="unit-menu-form" method="post"
@@ -80,7 +91,7 @@
                                 <button th:if="${rowLead and leadMode != 'admin'}" type="button" class="overflow-menu__item" role="menuitem"
                                         data-sk-action="toggle-lead"
                                         th:text="${lead} ? #{leitung.sk.demote} : #{leitung.sk.promote}">Zum SK-Leiter ernennen</button>
-                                <form th:if="${canRemove}" class="unit-menu-form" method="post"
+                                <form th:if="${rowRemove}" class="unit-menu-form" method="post"
                                       th:action="@{/organisation/special-commands/{id}/members/{userId}/delete(id=${skId},userId=${m.userId()})}">
                                     <button type="submit" class="overflow-menu__item overflow-menu__item--danger" role="menuitem"
                                             data-sk-action="remove"

@@ -47,18 +47,20 @@ public class LayoutMiscAdvice {
 
   /**
    * Composes the application title for the {@code <title>} tag and sidebar brand (REQ-ORG-024):
-   * "Profit Basetool – &lt;shorthand or name&gt;" for an active org unit, "– Alle Staffeln" for an
-   * admin without a pin, otherwise plain "Profit Basetool", localised via {@link
-   * LocaleContextHolder}.
+   * "Profit Basetool – &lt;shorthand or name&gt;" for a context of one org unit, "– Alle Staffeln"
+   * for an admin without a pin, "– Alle meine Org-Einheiten" for a member whose context spans their
+   * several units, otherwise plain "Profit Basetool", localised via {@link LocaleContextHolder}.
    *
-   * @param activeOrgUnit the active org unit (Staffel or SK), or {@code null}
+   * @param activeOrgUnit the org unit of a one-unit context (any kind), or {@code null}
    * @param isAllSquadronsMode whether the viewer is an admin without a selection
+   * @param isAllMyOrgUnitsMode whether the viewer is a member in „Alle meine Org-Einheiten"
    * @return the rendered title, never {@code null}
    */
   @ModelAttribute("appTitle")
   public String appTitle(
       @ModelAttribute("activeOrgUnit") OrgUnitMembershipOptionDto activeOrgUnit,
-      @ModelAttribute("isAllSquadronsMode") boolean isAllSquadronsMode) {
+      @ModelAttribute("isAllSquadronsMode") boolean isAllSquadronsMode,
+      @ModelAttribute("isAllMyOrgUnitsMode") boolean isAllMyOrgUnitsMode) {
     Locale locale = LocaleContextHolder.getLocale();
     if (activeOrgUnit != null) {
       String label =
@@ -70,6 +72,11 @@ public class LayoutMiscAdvice {
     if (isAllSquadronsMode) {
       String allLabel = messageSource.getMessage("squadron.switcher.all", null, locale);
       return messageSource.getMessage("app.title.all.squadrons", new Object[] {allLabel}, locale);
+    }
+    if (isAllMyOrgUnitsMode) {
+      String allMineLabel = messageSource.getMessage("orgUnit.switcher.allMine", null, locale);
+      return messageSource.getMessage(
+          "app.title.all.squadrons", new Object[] {allMineLabel}, locale);
     }
     return messageSource.getMessage("app.title", null, locale);
   }

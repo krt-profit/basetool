@@ -16,6 +16,8 @@
 
     <div th:if="${isAllSquadronsMode}" class="alert alert-info" data-testid="bp-overview-all-units"
          th:text="#{blueprintOverview.all_orgunits_notice}">Aggregation across all org units.</div>
+    <div th:if="${isAllMyOrgUnitsMode}" class="alert alert-info" data-testid="bp-overview-overseen-units"
+         th:text="#{blueprintOverview.overseen_orgunits_notice}">You are seeing the blueprints of the members of every org unit you oversee.</div>
 
     <section class="list-panel">
     <form id="bp-overview-filter-form" class="bpo-filter-form no-track" method="get" th:action="@{/blueprint-overview}"

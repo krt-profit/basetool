@@ -24,6 +24,7 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.OfficerSurfaceGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.FrontendAuthHelperService;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.leadership.web.LeitungPageController;
@@ -46,6 +47,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -62,10 +65,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * /organisation/special-commands/{id}}): the roster, adding and removing members and setting their
  * Logistiker / Einsatzmanager flags, each with an AJAX twin.
  *
- * <p>Gated to {@link OfficerSurfaceGate#hasOfficerReach()}; the backend's per-SK {@code
- * SpecialCommandSecurityService#canManageMembers} admits only admins and the SK's lead. The SK-lead
- * toggle lives on {@link AdminSpecialCommandsPageController}. Also compare {@link
- * LeitungPageController}.
+ * <p>Gated to {@link OfficerSurfaceGate#hasOfficerReach()}; the backend's per-SK verdict {@code
+ * SpecialCommandSecurityService#canManageMembers} admits only admins and the SK's lead, for an SK
+ * inside the active context, and its row verdict {@code #canManageMember} keeps a non-admin lead
+ * off their own row and a lead's row. The SK-lead toggle lives on {@link
+ * AdminSpecialCommandsPageController}. Also compare {@link LeitungPageController}.
  */
 @Controller
 @UsesLayoutModel
@@ -93,15 +97,17 @@ public class SpecialCommandMembersPageController {
   /**
    * Renders the SK member page with its roster.
    *
-   * <p>The model carries {@code canToggleLead} (admins only) and {@code backUrl}. A backend 403
-   * becomes an {@link AccessDeniedException}; any other failure or an empty SK read redirects to
-   * {@code backUrl} with an {@code error} parameter.
+   * <p>The model carries {@code canToggleLead} (admins only), {@code selfUserId} (the caller, whose
+   * own row a non-admin may not write) and {@code backUrl}. A backend 403 becomes an {@link
+   * AccessDeniedException}; any other failure or an empty SK read redirects to {@code backUrl} with
+   * an {@code error} parameter.
    *
    * @param id Spezialkommando id.
    * @param fragment {@code "members"} to render only the roster fragment (REQ-FE-005); otherwise
    *     the full page.
-   * @param model Thymeleaf model populated with the SK, the member roster, {@code canToggleLead}
-   *     and {@code backUrl}.
+   * @param principal the signed-in member; {@code null} marks no roster row as the caller's own.
+   * @param model Thymeleaf model populated with the SK, the member roster, {@code canToggleLead},
+   *     {@code selfUserId} and {@code backUrl}.
    * @return the {@code organisation/special-command-detail} view name, its {@code membersResults}
    *     fragment for an AJAX swap, or a redirect to {@code backUrl} on a non-403 failure.
    * @throws AccessDeniedException when the backend refuses the SK or member read with 403.
@@ -111,10 +117,12 @@ public class SpecialCommandMembersPageController {
   public String detail(
       @PathVariable @NotNull UUID id,
       @RequestParam(required = false) String fragment,
+      @AuthenticationPrincipal @Nullable OidcUser principal,
       Model model) {
     boolean admin = authHelperService.isAdmin();
     String backUrl = admin ? ADMIN_BACK_URL : LEITUNG_BACK_URL;
     model.addAttribute("canToggleLead", admin);
+    model.addAttribute("selfUserId", CurrentUser.userId(principal));
     model.addAttribute("backUrl", backUrl);
     try {
       SpecialCommandDto sc = fetchSpecialCommand(id);
@@ -127,7 +135,7 @@ public class SpecialCommandMembersPageController {
       if (e.getStatusCode() == HttpStatus.FORBIDDEN.value()) {
         throw new AccessDeniedException(
             "The backend refused the Spezialkommando member page: the caller is neither an admin"
-                + " nor the lead of this Spezialkommando.",
+                + " nor the lead of this Spezialkommando, or it lies outside the active org unit.",
             e);
       }
       log.debug("Load SpecialCommand detail failed", e);
@@ -177,8 +185,8 @@ public class SpecialCommandMembersPageController {
   }
 
   /**
-   * Removes a user from the Spezialkommando (no-JS fallback). The backend admits an admin or the
-   * lead of this SK.
+   * Removes a user from the Spezialkommando (no-JS fallback). The backend admits an admin, or the
+   * lead of this SK for another member's row that holds no lead seat.
    *
    * @param id Spezialkommando id.
    * @param userId user to remove.
@@ -327,7 +335,7 @@ public class SpecialCommandMembersPageController {
    * @param id Spezialkommando id.
    * @return the SK, or {@code null} when the backend answered with an empty body.
    * @throws BackendServiceException when the backend refuses or fails the read (403 when the caller
-   *     is neither admin nor the lead of this SK).
+   *     is neither admin nor the lead of this SK, or the SK lies outside the active org unit).
    */
   @Nullable
   private SpecialCommandDto fetchSpecialCommand(@NotNull UUID id) {

@@ -171,6 +171,7 @@ class PagePatternTestIdsRenderTest {
             new de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader
                 .MeLayoutResponse(
                 null,
+                null,
                 List.of(),
                 de.greluc.krt.profit.basetool.frontend.support.LayoutResponses.missionManager(),
                 0L));

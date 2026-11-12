@@ -1047,9 +1047,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             .getResponse()
             .getContentAsString();
 
-    int locationAt = html.indexOf("id=\"production-location\"");
-    assertThat(locationAt).as("book-in location picker rendered").isGreaterThan(0);
-    assertThat(html.substring(locationAt, html.indexOf('>', locationAt)))
+    assertThat(openingTag(html, "id=\"production-location\""))
         .as("location picker carries the remote-locations combobox marker")
         .contains("data-krt-combobox=\"remote-locations\"");
     assertThat(html)
@@ -1065,10 +1063,72 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         .contains("data-acting-user-name=\"Logi Stician\"");
     assertThat(html).as("org-unit picker shell").contains("id=\"production-orgunit\"");
     assertThat(html).as("personal checkbox").contains("id=\"production-personal\"");
-    int allocateAt = html.indexOf("id=\"production-allocate\"");
-    assertThat(allocateAt).as("allocate checkbox rendered").isGreaterThan(0);
-    String allocateTag = html.substring(allocateAt, html.indexOf('>', allocateAt));
-    assertThat(allocateTag).as("allocate checkbox defaults on").contains("checked");
+    assertThat(openingTag(html, "id=\"production-allocate\""))
+        .as("allocate checkbox defaults on")
+        .contains("checked");
+  }
+
+  @Test
+  void itemOrder_productionModal_namesTheActiveOrgUnitForThePreselection() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID activeOrgUnitId = UUID.randomUUID();
+    when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.activeOrgUnit(activeOrgUnitId));
+    stubDetail(orderId, userId, oneLineItemOrder(orderId));
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/" + orderId)
+                    .header("Accept-Language", "de")
+                    .with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(openingTag(html, "id=\"production-orgunit-wrapper\""))
+        .as("the org-unit picker names the active org unit it preselects first")
+        .contains("data-owner-picker-active=\"" + activeOrgUnitId + "\"");
+    assertThat(openingTag(html, "id=\"production-orgunit\""))
+        .as("choosing an org unit re-runs the booking gate")
+        .contains("data-trigger=\"od-production-bookin-changed\"");
+    assertThat(html)
+        .as("the required empty choice reads like the shared owner picker's")
+        .contains("orgUnitPlaceholder: \"-- Bitte w");
+  }
+
+  @Test
+  void itemOrder_productionModal_namesNoActiveOrgUnitWithoutOneUnitInContext() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    stubDetail(orderId, userId, oneLineItemOrder(orderId));
+
+    String html =
+        mockMvc
+            .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(openingTag(html, "id=\"production-orgunit-wrapper\""))
+        .as("without one unit in context the owner's only unit or the member's choice decides")
+        .doesNotContain("data-owner-picker-active");
+  }
+
+  /**
+   * Cuts the opening tag that carries a marker attribute out of a rendered page.
+   *
+   * @param html the rendered page
+   * @param marker an attribute of the tag, such as {@code id="x"}
+   * @return the tag from the marker up to its closing {@code >}
+   */
+  private static String openingTag(String html, String marker) {
+    int at = html.indexOf(marker);
+    assertThat(at).as(marker + " rendered").isGreaterThan(0);
+    return html.substring(at, html.indexOf('>', at));
   }
 
   /**

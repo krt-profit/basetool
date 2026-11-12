@@ -26,6 +26,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.MDC;
@@ -35,13 +36,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Copies the caller's active OrgUnit selection from the session into {@link ActiveSquadronContext}
- * and the {@code orgUnitId} MDC key for each request, and clears both afterwards.
+ * and the {@code orgUnitId} MDC key for each request, and clears both afterwards; the first request
+ * of a session whose response can depend on the context seeds the selection from the caller's
+ * stored choice ({@link ActiveOrgUnitRestore}, REQ-ORG-031).
  *
  * <p>Only the OrgUnit UUID enters the MDC, never its name (REQ-OBS-004). An async dispatch of the
  * same request re-binds only the MDC value stashed by the initial dispatch, not {@link
  * ActiveSquadronContext}, so outbound call scope is unchanged.
  */
 @Component
+@RequiredArgsConstructor
 public class ActiveSquadronContextFilter extends OncePerRequestFilter implements Ordered {
 
   /**
@@ -66,6 +70,9 @@ public class ActiveSquadronContextFilter extends OncePerRequestFilter implements
    */
   public static final String NO_ACTIVE_ORG_UNIT = "none";
 
+  /** Seeds the session's selection from the caller's stored choice once per session. */
+  private final ActiveOrgUnitRestore activeOrgUnitRestore;
+
   /**
    * Filter order: late enough that Spring Session's {@code SessionRepositoryFilter} (default order
    * {@code Integer.MIN_VALUE + 50}) has already wrapped the request with the Redis-backed session,
@@ -88,6 +95,7 @@ public class ActiveSquadronContextFilter extends OncePerRequestFilter implements
       rebindForAsyncDispatch(request, response, chain);
       return;
     }
+    activeOrgUnitRestore.restoreOnce(request);
     UUID active = readActiveSquadron(request);
     if (active != null) {
       ActiveSquadronContext.set(active);

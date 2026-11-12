@@ -1082,7 +1082,7 @@
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='production-modal', titleKey='orders.detail.production.record', variant='krt-modal--xwide', titleId='production-modal-title', body=~{::production-modal-body})}">
     <th:block th:ref="production-modal-body">
         <div class="krt-modal-body">
-        <div class="krt-form" id="production-form" th:data-order-id="${order.id}" th:data-acting-user-id="${actingUser != null ? actingUser.id : ''}" th:data-acting-user-name="${actingUser != null ? (actingUser.effectiveName != null ? actingUser.effectiveName : actingUser.username) : ''}" th:data-responsible-org-unit-id="${order.responsibleOrgUnit != null ? order.responsibleOrgUnit.id() : ''}">
+        <div class="krt-form" id="production-form" th:data-order-id="${order.id}" th:data-acting-user-id="${actingUser != null ? actingUser.id : ''}" th:data-acting-user-name="${actingUser != null ? (actingUser.effectiveName != null ? actingUser.effectiveName : actingUser.username) : ''}">
             <div class="form-group mb-1">
                 <label for="production-amount" class="form-label" th:text="#{orders.detail.production.amount}">Anzahl herstellen</label>
                 <input type="text" data-number-input id="production-amount" step="1" min="1" value="1" class="w-full">
@@ -1105,9 +1105,9 @@
                     <option th:if="${actingUser != null}" th:value="${actingUser.id}" th:text="${actingUser.effectiveName != null ? actingUser.effectiveName : actingUser.username}" selected></option>
                 </select>
             </div>
-            <div id="production-orgunit-wrapper" class="form-group mb-1" hidden>
+            <div id="production-orgunit-wrapper" class="form-group mb-1" th:data-owner-picker-active="${activeSquadronId}" hidden>
                 <label for="production-orgunit" class="form-label" th:text="#{orders.production.bookIn.orgUnit}">Buchen in OrgUnit</label>
-                <select id="production-orgunit" data-prod-orgunit class="w-full"></select>
+                <select id="production-orgunit" data-prod-orgunit class="w-full" data-trigger="od-production-bookin-changed"></select>
             </div>
             <div class="form-group mb-1">
                 <label class="flex-gap-sm cursor-pointer m-0">
@@ -1248,7 +1248,8 @@
         booked: /*[[#{success.production.booked}]]*/ 'Herstellung gebucht \u2014 Materialbedarf und Lagerbestand reduziert.',
         unitScu: /*[[#{material.quantity.scu}]]*/ 'SCU',
         unitPiece: /*[[#{material.quantity.piece}]]*/ 'St\u00fcck',
-        bookInLocationRequired: /*[[#{orders.production.bookIn.locationRequired}]]*/ 'Bitte einen Lagerort w\u00e4hlen.'
+        bookInLocationRequired: /*[[#{orders.production.bookIn.locationRequired}]]*/ 'Bitte einen Lagerort w\u00e4hlen.',
+        orgUnitPlaceholder: /*[[#{ownerPicker.placeholder}]]*/ '-- Bitte w\u00e4hlen --'
     };
 
     window.orderId = /*[[${order.id}]]*/ null;

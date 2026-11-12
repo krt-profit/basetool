@@ -81,6 +81,15 @@ public final class PublicPaths {
           PATH_PARSER.parse("/terms"),
           PATH_PARSER.parse("/licenses"));
 
+  /**
+   * The pages of the session gates themselves: the terms consent page, and the approval waiting
+   * page with its status poll — see {@link #isAccessGatePage}.
+   */
+  private static final List<PathPattern> ACCESS_GATE_PAGES =
+      List.of(
+          PATH_PARSER.parse(TermsAcceptanceGateFilter.CONSENT_PATH),
+          PATH_PARSER.parse(BackendRoleSyncFilter.PENDING_APPROVAL_PATH + "/**"));
+
   /** Not instantiable: a predicate holder with no state. */
   private PublicPaths() {}
 
@@ -104,7 +113,7 @@ public final class PublicPaths {
    * @param path a context-relative path, as returned by {@link #relativePath}
    * @return {@code true} when no session gate may redirect this path
    */
-  static boolean isAssetOrPublicDocument(@NotNull String path) {
+  public static boolean isAssetOrPublicDocument(@NotNull String path) {
     return isAssetOrPublicDocument(PathContainer.parsePath(path));
   }
 
@@ -116,6 +125,19 @@ public final class PublicPaths {
    */
   private static boolean isAssetOrPublicDocument(@NotNull PathContainer path) {
     return isStaticAsset(path) || isPublicDocument(path);
+  }
+
+  /**
+   * Checks whether the path is a page of a session gate itself: the terms consent page, or the
+   * approval waiting page and its status poll. A gated session lands on these pages, they render
+   * without the active org unit, and the waiting page polls its status, so the restore of the
+   * stored choice ({@code ActiveOrgUnitRestore}) skips them.
+   *
+   * @param path a context-relative path, as returned by {@link #relativePath}
+   * @return {@code true} for the consent page, the waiting page or a path below the waiting page
+   */
+  public static boolean isAccessGatePage(@NotNull String path) {
+    return matchesAny(ACCESS_GATE_PAGES, PathContainer.parsePath(path));
   }
 
   /**
@@ -230,7 +252,7 @@ public final class PublicPaths {
   /**
    * Whether any pattern in the group matches the parsed path.
    *
-   * @param patterns one of the four groups above
+   * @param patterns one of the pattern groups above
    * @param path the parsed context-relative path
    * @return {@code true} if at least one pattern matches
    */

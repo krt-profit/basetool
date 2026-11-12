@@ -1057,6 +1057,37 @@ val testShipTypePickerJs =
     )
   }
 
+val testOrdersDetailProductionJs =
+  registerNodeScriptTest(
+    "testOrdersDetailProductionJs",
+    "Regression tests for the production modal's book-in org-unit picker: the preselection order, the required choice and the booking gate.",
+    "scripts/orders-detail-production.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/joborder/orders-detail-production.js",
+      ),
+    )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/joborder/joborder-hooks.js"),
+    )
+  }
+
+val testOrgUnitContextSyncJs =
+  registerNodeScriptTest(
+    "testOrgUnitContextSyncJs",
+    "Regression tests for the cross-tab follow of the active org-unit context: the reload, the unsaved-input dialog and the reload-loop guard.",
+    "scripts/org-unit-context-sync.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/org-unit-context-sync.js"),
+    )
+  }
+
 val testEslintBans =
   registerNodeScriptTest(
     "testEslintBans",
@@ -1202,6 +1233,8 @@ tasks.named("check").configure {
     testBlueprintStatsJs,
     testCatalogueAdminJs,
     testShipTypePickerJs,
+    testOrdersDetailProductionJs,
+    testOrgUnitContextSyncJs,
     testEslintBans,
     testPageCapabilitiesJs,
     testTypecheckRatchet,

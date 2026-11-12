@@ -39,13 +39,15 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
  * Unit tests for {@link SpecialCommandMembersPageController#detail}: the admin / non-admin model
- * split ({@code canToggleLead}, {@code backUrl}), the roster sort, the backend-403 → {@link
- * AccessDeniedException} mapping and the redirect for an empty SK read.
+ * split ({@code canToggleLead}, {@code backUrl}), the caller's own row ({@code selfUserId}), the
+ * roster sort, the backend-403 → {@link AccessDeniedException} mapping and the redirect for an
+ * empty SK read.
  */
 class SpecialCommandMembersPageControllerTest {
 
@@ -76,11 +78,25 @@ class SpecialCommandMembersPageControllerTest {
     stubSkWithTwoMembers();
     Model model = new ConcurrentModel();
 
-    String view = controller.detail(skId, null, model);
+    String view = controller.detail(skId, null, null, model);
 
     assertEquals("orgunit/organisation/special-command-detail", view);
     assertEquals(Boolean.TRUE, model.getAttribute("canToggleLead"));
     assertEquals("/admin/special-commands", model.getAttribute("backUrl"));
+  }
+
+  @Test
+  void detail_marksTheCallerAsTheOwnerOfTheirRow() {
+    UUID callerId = UUID.randomUUID();
+    OidcUser principal = mock(OidcUser.class);
+    when(principal.getSubject()).thenReturn(callerId.toString());
+    when(authHelper.isAdmin()).thenReturn(false);
+    stubSkWithTwoMembers();
+    Model model = new ConcurrentModel();
+
+    controller.detail(skId, null, principal, model);
+
+    assertEquals(callerId, model.getAttribute("selfUserId"));
   }
 
   @Test
@@ -89,7 +105,7 @@ class SpecialCommandMembersPageControllerTest {
     stubSkWithTwoMembers();
     Model model = new ConcurrentModel();
 
-    String view = controller.detail(skId, "members", model);
+    String view = controller.detail(skId, "members", null, model);
 
     assertEquals("orgunit/organisation/special-command-detail :: membersResults", view);
     assertEquals(Boolean.FALSE, model.getAttribute("canToggleLead"));
@@ -112,7 +128,8 @@ class SpecialCommandMembersPageControllerTest {
         .thenThrow(new BackendServiceException("forbidden", null, 403));
 
     assertThrows(
-        AccessDeniedException.class, () -> controller.detail(skId, null, new ConcurrentModel()));
+        AccessDeniedException.class,
+        () -> controller.detail(skId, null, null, new ConcurrentModel()));
   }
 
   @Test
@@ -121,7 +138,7 @@ class SpecialCommandMembersPageControllerTest {
     when(client.get(eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
         .thenReturn(null);
 
-    String view = controller.detail(skId, null, new ConcurrentModel());
+    String view = controller.detail(skId, null, null, new ConcurrentModel());
 
     assertEquals("redirect:/admin/special-commands?error=SpecialCommandNotFound", view);
   }

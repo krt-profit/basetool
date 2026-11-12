@@ -66,7 +66,8 @@ class AdminAuditLogPageControllerTest {
 
   /**
    * The non-bank area tabs, mirroring the controller's private domain list. Every generic audit
-   * event type the backend can emit must be offered by one of these tabs.
+   * event type the backend can emit must be offered by one of these tabs, and every type they offer
+   * must be one the backend can emit.
    */
   private static final List<String> GENERIC_DOMAINS =
       List.of(
@@ -245,15 +246,7 @@ class AdminAuditLogPageControllerTest {
         produced.contains("MEMBERSHIP_GRANTED"),
         "sanity: openapi should list the ROLE-domain MEMBERSHIP_GRANTED");
 
-    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
-    Set<String> filterable = new HashSet<>();
-    for (String domain : GENERIC_DOMAINS) {
-      Model model = new ConcurrentModel();
-      controller.auditLog(domain, null, null, null, null, null, 0, null, model);
-      List<String> types = (List<String>) model.getAttribute("eventTypes");
-      assertNotNull(types, "no event-type list for domain " + domain);
-      filterable.addAll(types);
-    }
+    Set<String> filterable = offeredGenericEventTypes();
     Properties labels = loadDefaultBundle();
 
     for (String type : produced) {
@@ -264,6 +257,38 @@ class AdminAuditLogPageControllerTest {
           labels.containsKey("admin.audit.event." + type),
           "Missing i18n label admin.audit.event." + type);
     }
+  }
+
+  @Test
+  void everyOfferedGenericAuditEventType_isProducedByTheBackend() throws Exception {
+    Set<String> produced = genericAuditEventTypesFromOpenApi();
+
+    for (String type : offeredGenericEventTypes()) {
+      assertTrue(
+          produced.contains(type),
+          "An area tab (AdminAuditLogPageController) offers event type "
+              + type
+              + ", which the backend does not produce");
+    }
+  }
+
+  /**
+   * The event types the generic area tabs offer as filters, collected over every tab of {@link
+   * #GENERIC_DOMAINS}.
+   *
+   * @return the offered event-type names
+   */
+  private Set<String> offeredGenericEventTypes() {
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    Set<String> filterable = new HashSet<>();
+    for (String domain : GENERIC_DOMAINS) {
+      Model model = new ConcurrentModel();
+      controller.auditLog(domain, null, null, null, null, null, 0, null, model);
+      List<String> types = (List<String>) model.getAttribute("eventTypes");
+      assertNotNull(types, "no event-type list for domain " + domain);
+      filterable.addAll(types);
+    }
+    return filterable;
   }
 
   /**

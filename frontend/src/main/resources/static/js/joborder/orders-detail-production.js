@@ -734,7 +734,32 @@ export function _prodSyncPersonalForOwner() {
     }
 }
 
-/** Reloads the owning org-unit choices for the chosen owner and shows or hides the picker. */
+/** The number of the newest org-unit picker refresh; the answer of an older one is dropped. */
+let prodOrgUnitRefresh = 0;
+
+/** Whether the chosen owner's memberships are still loading, which keeps the booking gate shut. */
+let prodOrgUnitLoading = false;
+
+/**
+ * Picks the owning org unit the book-in preselects among the owner's direct memberships: the active
+ * org unit, else the only membership (REQ-ORDERS-025, REQ-ORG-032).
+ *
+ * @param {string[]} optionIds the org units the owner is a direct member of
+ * @param {string} activeId the active org unit of the page, empty without one
+ * @returns {string} the org unit to preselect, empty when the member has to choose
+ */
+function _prodOrgUnitPreset(optionIds, activeId) {
+    if (activeId !== '' && optionIds.includes(activeId)) {
+        return activeId;
+    }
+    return optionIds.length === 1 ? optionIds[0] : '';
+}
+
+/**
+ * Reloads the owning org-unit choices for the chosen owner, shows or hides the picker and re-runs
+ * the booking gate, which stays shut while the memberships load; without a preselection the picker
+ * leads with the required empty choice. Only the newest refresh renders.
+ */
 export function _prodRefreshOrgUnitPicker() {
     const wrapper = document.getElementById('production-orgunit-wrapper');
     const select = /** @type {HTMLSelectElement | null} */ (
@@ -744,18 +769,39 @@ export function _prodRefreshOrgUnitPicker() {
     if (!wrapper || !select) {
         return;
     }
+    const refresh = ++prodOrgUnitRefresh;
     const ownerId = (ownerEl && ownerEl.value) || _prodActingUserId();
     select.replaceChildren();
+    select.required = false;
     if (!ownerId) {
+        prodOrgUnitLoading = false;
         wrapper.hidden = true;
+        _prodReconcile();
         return;
     }
+    prodOrgUnitLoading = true;
+    _prodReconcile();
     krtFetch
         .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
         .then((memberships) => {
+            if (refresh !== prodOrgUnitRefresh) {
+                return;
+            }
             if (!Array.isArray(memberships) || memberships.length < 1) {
                 wrapper.hidden = true;
                 return;
+            }
+            const preset = _prodOrgUnitPreset(
+                memberships.map((m) => {
+                    return m.orgUnitId;
+                }),
+                wrapper.getAttribute('data-owner-picker-active') || '',
+            );
+            if (!preset) {
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = PRODUCTION_I18N.orgUnitPlaceholder;
+                select.appendChild(placeholder);
             }
             memberships.forEach((opt) => {
                 const o = document.createElement('option');
@@ -763,23 +809,36 @@ export function _prodRefreshOrgUnitPicker() {
                 o.textContent = opt.orgUnitName;
                 select.appendChild(o);
             });
-            const form = document.getElementById('production-form');
-            const responsibleId = form
-                ? form.getAttribute('data-responsible-org-unit-id') || ''
-                : '';
-            if (
-                responsibleId &&
-                memberships.some((m) => {
-                    return m.orgUnitId === responsibleId;
-                })
-            ) {
-                select.value = responsibleId;
-            }
+            select.value = preset;
+            select.required = !preset;
             wrapper.hidden = false;
         })
         .catch(() => {
-            wrapper.hidden = true;
+            if (refresh === prodOrgUnitRefresh) {
+                wrapper.hidden = true;
+            }
+        })
+        .finally(() => {
+            if (refresh === prodOrgUnitRefresh) {
+                prodOrgUnitLoading = false;
+                _prodReconcile();
+            }
         });
+}
+
+/**
+ * Tells whether the book-in still waits for its owning org unit: the owner's memberships are
+ * loading, or the shown picker is required and nothing is chosen.
+ *
+ * @returns {boolean} true while the owning org unit is not settled
+ */
+function _prodOrgUnitMissing() {
+    if (prodOrgUnitLoading) {
+        return true;
+    }
+    const wrapper = document.getElementById('production-orgunit-wrapper');
+    const select = _prodPicker('production-orgunit');
+    return !!(wrapper && !wrapper.hidden && select && select.required && !select.value);
 }
 
 /**
@@ -862,7 +921,7 @@ export function _prodReconcile() {
         }
     });
     const locEl = _prodPicker('production-location');
-    if (!locEl || !locEl.value) {
+    if (!locEl || !locEl.value || _prodOrgUnitMissing()) {
         allCovered = false;
     }
     const bookBtn = /** @type {HTMLButtonElement | null} */ (

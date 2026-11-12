@@ -40,8 +40,8 @@ before changing a template, a stylesheet, a script tag, a DOM write or a dialog.
 
 **Every part of the frontend supports live update to the current standard.** Every mutating,
 filtering or paginating interaction updates the DOM **in place** through `krtFetch` / `krtCsrf` /
-fragment swap, with no full-page reload on success (the two sanctioned reloads are in
-`REQ-FE-008`); reads go through `krtFetch` too (REQ-FE-031); a section-structured page is wired
+fragment swap, with no full-page reload on success (the three sanctioned reloads are listed in
+`REQ-FE-001`); reads go through `krtFetch` too (REQ-FE-031); a section-structured page is wired
 through `krtPageSections.create` (ADR-0289). **Live update and multi-user sync move with every
 feature added, changed or removed**, and a section key stays consistent across the broadcast, the
 relay's `LiveSyncTopicClass.allowedSections` and the receiver in the same change

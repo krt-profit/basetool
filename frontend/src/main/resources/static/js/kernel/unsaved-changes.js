@@ -9,6 +9,15 @@ export function resetUnsavedChanges() {
     isDirty = false;
 }
 
+/**
+ * Tells whether the page holds an edit that has not been saved.
+ *
+ * @returns {boolean} true while the unsaved-changes guard is armed
+ */
+export function hasUnsavedChanges() {
+    return isDirty;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     if (window.__unsavedChangesInitialized) return;
     window.__unsavedChangesInitialized = true;

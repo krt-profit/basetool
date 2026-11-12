@@ -52,16 +52,20 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMaterialNee
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.ContextKind;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.PickerSearch;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import de.greluc.krt.profit.basetool.frontend.support.PageStylesheets;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
@@ -73,6 +77,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -1516,8 +1521,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * The owner picker preselects the active org unit of the sidebar when it is one of its options,
-   * and then offers no empty choice (REQ-ORG-023).
+   * The owner picker preselects the active org unit the backend reports when it is one of its
+   * options, and then offers no empty choice (REQ-ORG-023, REQ-ORG-032).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -1528,6 +1533,8 @@ class InventoryPageControllerMvcTest {
         List.of(
             new OrgUnitMembershipOptionDto(staffel, "ALPHA", "ALP", "SQUADRON", true),
             new OrgUnitMembershipOptionDto(sk, "Bergbau", "BB", "SPECIAL_COMMAND", true)));
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.activeOrgUnit(sk));
 
     mockMvc
         .perform(
@@ -1740,6 +1747,77 @@ class InventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("#1042 " + NEED_SEPARATOR + " noch 250")))
         .andExpect(content().string(containsString("value=\"" + orderId + "\"")));
+  }
+
+  /**
+   * The „Pool wechseln" action needs a context of several units (REQ-INV-059, REQ-ORG-032): it is
+   * offered under „Alle meine Org-Einheiten" and not with one unit selected.
+   *
+   * @param context the effective context the backend reports
+   * @param offered whether the action is rendered
+   * @throws Exception if the request fails
+   */
+  @ParameterizedTest
+  @CsvSource({"ALL_MY_ORG_UNITS, true", "ORG_UNIT, false"})
+  @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
+  void viewAllStackEntries_offersThePoolChangeOnlyWhenTheContextSpansUnits(
+      ContextKind context, boolean offered) throws Exception {
+    UUID unitId = UUID.randomUUID();
+    UUID materialId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    InventoryItemDto item =
+        new InventoryItemDto(
+            UUID.randomUUID(),
+            new UserReferenceDto(userId, "tester", "Tester", "Tester", null),
+            new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
+            null,
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            90,
+            10.0,
+            false,
+            false,
+            java.util.List.of(),
+            null,
+            java.util.List.of(),
+            null,
+            null,
+            new SquadronReferenceDto(unitId, "Hel", "HEL"),
+            1L,
+            true,
+            Instant.parse("2026-01-01T00:00:00Z"));
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(
+            new MeLayoutResponse(
+                context == ContextKind.ORG_UNIT ? unitId : null,
+                context,
+                List.of(),
+                LayoutResponses.logistician(),
+                0L));
+    when(backendApiClient.get(anyString(), anyTypeRef()))
+        .thenAnswer(inv -> {
+          String url = inv.getArgument(0);
+          return url.contains("/inventory/all/stack/entries")
+              ? new PageResponse<>(List.of(item), 0, 20, 1, 1, Collections.emptyList())
+              : Collections.emptyList();
+        });
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    String html =
+        mockMvc
+            .perform(
+                get("/inventory/all/stack/entries")
+                    .param("materialId", materialId.toString())
+                    .param("userId", userId.toString())
+                    .param("locationId", locationId.toString())
+                    .param("quality", "90"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html.contains("data-testid=\"pool-change-open\"")).isEqualTo(offered);
   }
 
   /**

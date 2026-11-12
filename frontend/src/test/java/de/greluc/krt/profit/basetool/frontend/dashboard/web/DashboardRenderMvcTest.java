@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardStatus;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetResponse;
 import de.greluc.krt.profit.basetool.frontend.dashboard.model.DashboardWidgetType;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.ContextKind;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.AppearanceResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.FavouritesResponse;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.frontend.navigation.model.HiddenResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationPreferencesResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.OrderResponse;
 import de.greluc.krt.profit.basetool.frontend.navigation.model.TabBarsResponse;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.DashboardCatalogueFixture;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.util.List;
@@ -188,6 +190,33 @@ class DashboardRenderMvcTest {
         .contains("data-available=\"false\"")
         .contains("data-testid=\"dashboard-widget-unavailable\"")
         .contains("is-unavailable");
+  }
+
+  @Test
+  @DisplayName("in „Alle meine Org-Einheiten“ a widget of any own unit loads and the head says so")
+  void theUnionOfTheOwnUnitsKeepsEveryOwnUnitsWidget() throws Exception {
+    OrgUnitMembershipOptionDto hel =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Hel", "HEL", "SQUADRON", true);
+    OrgUnitMembershipOptionDto argon =
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Argon", "ARG", "SPECIAL_COMMAND", true);
+    stored(
+        true,
+        2,
+        widget(
+            DashboardWidgetType.UPCOMING_DAYS,
+            DashboardColumn.WIDE,
+            UUID.randomUUID(),
+            argon.orgUnitId()));
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(
+            LayoutResponses.context(ContextKind.ALL_MY_ORG_UNITS, null, List.of(hel, argon)));
+
+    String html = home(member());
+
+    assertThat(html)
+        .contains("data-available=\"true\"")
+        .doesNotContain("data-testid=\"dashboard-widget-unavailable\"")
+        .containsPattern("data-testid=\"home-eyebrow\"[^>]*>Alle meine Org-Einheiten · ");
   }
 
   @Test
