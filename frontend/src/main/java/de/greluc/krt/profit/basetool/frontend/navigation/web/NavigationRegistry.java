@@ -26,6 +26,7 @@ import static de.greluc.krt.profit.basetool.frontend.navigation.model.Navigation
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_DE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LANGUAGE_EN;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.LOGISTICIAN_HERE;
+import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.MANAGE_MISSION_TEMPLATES;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OPEN_LEITUNG;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.ORDER_WORKSPACE;
 import static de.greluc.krt.profit.basetool.frontend.navigation.model.NavigationFlag.OWN_JOB_ORDERS;
@@ -452,6 +453,9 @@ public class NavigationRegistry {
         of("operations.list", "/operations", "nav.page.operations")
             .keywords("palette.keywords.operations")
             .with(PALETTE_ONLY),
+        of("missions.templates", "/mission-templates", "nav.page.missionTemplates")
+            .gate(NavigationGate.requires(MANAGE_MISSION_TEMPLATES))
+            .with(PALETTE_ONLY),
         of("hangar.overview", "/hangar", "nav.hangar")
             .keywords("palette.keywords.hangar")
             .testId("nav-hangar"),
@@ -788,7 +792,7 @@ public class NavigationRegistry {
   @NotNull
   private static List<NavigationPageTabs> buildPageTabs() {
     return List.of(
-        NavigationPageTabs.of("missions.list", "operations.list"),
+        NavigationPageTabs.of("missions.list", "operations.list", "missions.templates"),
         NavigationPageTabs.of("hangar.overview", "hangar.catalog"),
         NavigationPageTabs.of("storage.overview", "storage.levels"),
         NavigationPageTabs.of("orders.list", "orders.demand", "blueprints.availability"),

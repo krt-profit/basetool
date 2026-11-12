@@ -489,6 +489,9 @@ scope as well: every mission and operation unpinned, under a pin only the pinned
 pin. Creating an operation requires the grant in the unit the operation is stamped to. Finance
 edits and the owner change of an ownerless mission stay with an admin without a pin, beside the
 entry's own participant and the mission's owner (REQ-SEC-065).
+Mission template management checks the target unit for every list, detail and write request.
+Officer reach or a contextual Mission Manager grant in that active owning unit qualifies, subject
+to the active pin (REQ-MISSION-035, REQ-ORG-032). A flat role alone grants no unit access.
 `isMissionManagerOrAbove` is pin-aware: the grant in the pinned unit, or in any unit when none is
 pinned (`RequestScopeResolver#canActAsMissionManagerInActiveContext()`); the frontend gates read it
 through `MissionManagerGate`. **Enforced by:** `ScopeKernelTest.MissionManagerGateTests`,
@@ -2318,6 +2321,7 @@ family decides, so a sub-family can differ from its parent.
 | `no-store` | What makes it sensitive |
 | --- | --- |
 | `/api/v1/bank/**` (the org-unit slice `/api/v1/bank/org-units/**` included) | bank ledgers, balances and holder handles |
+| `/api/v1/mission-templates/**` | reusable planning content and owner options scoped to the caller |
 | `/api/v1/users/**`, `/api/v1/me/**` | member records, the caller's own context |
 | `/api/v1/navigation/**` | **new** — one member's own navigation preferences (REQ-UI-032) |
 | `/api/v1/notifications/**` | one member's feed, including the SSE stream, and the recipient rules, whose selector can name an individual member |

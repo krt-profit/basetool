@@ -106,6 +106,10 @@ public class NavigationAdvice {
       addIf(flags, capabilities.isLogisticianOrAbove(), NavigationFlag.LOGISTICIAN_HERE);
       addIf(flags, capabilities.canActAsOfficerAnywhere(), NavigationFlag.OFFICER_ANYWHERE);
       addIf(flags, capabilities.canOpenLeitung(), NavigationFlag.OPEN_LEITUNG);
+      addIf(
+          flags,
+          capabilities.hasOfficerReach() || capabilities.isMissionManagerOrAbove(),
+          NavigationFlag.MANAGE_MISSION_TEMPLATES);
       addIf(flags, capabilities.canViewSupplyIncoming(), NavigationFlag.SUPPLY_INCOMING);
       addIf(flags, capabilities.canViewSupplyStats(), NavigationFlag.SUPPLY_STATS);
       addIf(flags, capabilities.canViewPurchasingPartners(), NavigationFlag.PURCHASING_PARTNERS);

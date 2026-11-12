@@ -81,6 +81,9 @@ honours counts; any other pin is no pin.
   (`ship.owner` / `inventory_item.user` / `refinery_order.owner`) may always see/edit it regardless
   of the `owning_org_unit_id` stamp; this is a per-owner detail/edit carve-out only and does not
   widen the shared Lager-/Hangar-/refinery views. A non-owner stays strictly scoped.
+- **Managed unit only:** `MissionTemplate` has a required, immutable owning unit. The active
+  context limits owner choices and every list, detail and write operation to active units where
+  the caller has officer reach or a contextual Mission Manager grant (REQ-MISSION-035).
 - **Strict-staffel with two read-only escapes:** `Operation` — owned by a Staffel/SK and filtered
   by `owning_org_unit_id` like the strict aggregates, but visible beyond the owning scope in two
   cases (view only; editing stays role+scope via `canEditOperation`): (1) an **ownerless** operation

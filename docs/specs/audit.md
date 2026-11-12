@@ -10,7 +10,7 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
 guarantee is extended to twelve more areas — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
-Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`),
+Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`, `MissionTemplate`), **Operationen** (`Operation`),
 **Rollen & Mitglieder** (`org_unit_membership`, epic #800), **Materialbörse** (`MaterialExchangeOffer` /
 `MaterialExchangeInterest`), **Hangar** (`Ship`), **Blueprints** (`PersonalBlueprint`,
 `DefaultBlueprint`), **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`) and **Bedarf & Spenden** (`SupplyNeed`, `SupplyDonation`). Every
@@ -200,7 +200,9 @@ web, naming its client (REQ-AUDIT-005):
   (mission/external participant names beyond the snapshot label, notes, **step titles and
   time/place hints, goal
   titles, and custom-frequency labels**) is never written to the details payload — only ids, counts,
-  the goal kind enum and the non-personal mission name snapshot.
+  the goal kind enum and the non-personal mission name snapshot. Template create / update / delete
+  record `MISSION_TEMPLATE_CREATED`, `MISSION_TEMPLATE_UPDATED` and `MISSION_TEMPLATE_DELETED`
+  with the template and owning org-unit IDs only (REQ-MISSION-035, REQ-AUDIT-007).
 - **Operationen** — create / edit (incl. status change) / delete (missions are unlinked, not
   deleted); per-participant payout toggle.
 - **Rollen & Mitglieder** (`org_unit_membership` + `kommando_group`, epic #800) — every org-unit

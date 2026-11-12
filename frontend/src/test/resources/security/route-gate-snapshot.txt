@@ -408,6 +408,12 @@
 /members/{id}/edit POST -> MemberManagementController#updateMember gate=class:hasRole('ADMIN') layout=yes
 /members/{id}/edit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberManagementController#updateMemberAjax gate=class:hasRole('ADMIN') layout=yes
 /members/{id}/export GET -> MemberManagementController#memberExport gate=class:hasRole('ADMIN') layout=yes
+/mission-templates GET -> MissionTemplatePageController#page gate=class:isAuthenticated() layout=yes
+/mission-templates POST -> MissionTemplateAjaxController#create gate=class:isAuthenticated() layout=no
+/mission-templates/list GET -> MissionTemplatePageController#list gate=class:isAuthenticated() layout=yes
+/mission-templates/{id} DELETE -> MissionTemplateAjaxController#delete gate=class:isAuthenticated() layout=no
+/mission-templates/{id} GET -> MissionTemplateAjaxController#detail gate=class:isAuthenticated() layout=no
+/mission-templates/{id} PUT -> MissionTemplateAjaxController#update gate=class:isAuthenticated() layout=no
 /missions GET -> MissionPageController#listMissions gate=class:isAuthenticated() layout=yes
 /missions POST -> MissionWriteController#createMission gate=class:isAuthenticated() layout=yes
 /missions/new GET -> MissionPageController#createMissionForm gate=class:isAuthenticated() layout=yes

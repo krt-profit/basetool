@@ -104,6 +104,8 @@ unwritable. Mapping is MapStruct with `unmappedTargetPolicy = ERROR`, as above.
 Errors are `application/problem+json` with `type`, `title`, `status`, `detail`, `instance`, a
 stable machine-readable `code`, and a per-request `correlationId`; validation errors add an
 `errors` object (field → message) **and** a structured `fieldErrors` array (`{field, message}`).
+The mission-template name conflict uses HTTP 409 `DUPLICATE_ENTITY` with a `name` field error
+(REQ-MISSION-035). Stale template revisions use `OPTIMISTIC_LOCK`.
 Titles and details are localized via `MessageSource`. Extend `GlobalExceptionHandler` rather than
 throwing into the void; problem-type URIs come from `AppProblemProperties`, not hardcoded strings.
 

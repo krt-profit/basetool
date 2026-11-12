@@ -1722,6 +1722,8 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   „Statistik" and „Bericht", and the pages list what the active context covers (REQ-ORG-032,
   REQ-SUP-003, REQ-PUR-021). The tab bars of „Bedarf & Spenden" and „Ankauf" read the same flags,
   so the navigation, the tab bars and the quick access offer the same tabs.
+  **Mission templates** joins the Missions and Operations tab family under the same registry
+  contract, gated by template-management reach in the active context (REQ-MISSION-035).
   Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<section id="mission-template-editor" class="list-panel mission-template-editor" th:fragment="editor"
+         aria-labelledby="mission-template-editor-title" hidden
+         th:attr="data-create-title=#{missionTemplate.create},data-edit-title=#{missionTemplate.edit},data-hidden-ship-type=#{missionTemplate.shipType.hidden}">
+    <h2 id="mission-template-editor-title" th:text="#{missionTemplate.create}">Neue Vorlage</h2>
+    <form method="post" id="mission-template-form">
+        <div class="mission-template-fields">
+            <label for="mission-template-owner">
+                <span th:text="#{missionTemplate.owner}">Zuständige Org-Einheit</span>
+                <select id="mission-template-owner" name="owningOrgUnitId" required>
+                    <option th:each="owner : ${owners}" th:value="${owner.id}" th:text="${owner.name}">Staffel</option>
+                </select>
+            </label>
+            <label for="mission-template-name">
+                <span th:text="#{general.name}">Name</span>
+                <input id="mission-template-name" name="name" type="text" required maxlength="255"
+                       aria-describedby="mission-template-name-error">
+                <span class="mission-template-error" id="mission-template-name-error" hidden role="alert"></span>
+            </label>
+        </div>
+
+        <fieldset>
+            <legend th:text="#{mission.objective.section}">Ziele</legend>
+            <ol data-template-rows="objectives"></ol>
+            <button type="button" class="btn btn-ghost" data-template-add="objectives">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{mission.objective.add}">Ziel hinzufügen</span>
+            </button>
+        </fieldset>
+        <fieldset>
+            <legend th:text="#{mission.step.section}">Ablauf</legend>
+            <ol data-template-rows="steps"></ol>
+            <button type="button" class="btn btn-ghost" data-template-add="steps">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{mission.step.add}">Schritt hinzufügen</span>
+            </button>
+        </fieldset>
+        <fieldset>
+            <legend th:text="#{missionTemplate.units}">Einheitenplanung</legend>
+            <ol data-template-rows="units"></ol>
+            <button type="button" class="btn btn-ghost" data-template-add="units">
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                <span th:text="#{mission.unit.add}">Einheit hinzufügen</span>
+            </button>
+        </fieldset>
+
+        <p class="mission-template-error" id="mission-template-editor-error" hidden role="alert"></p>
+        <div class="mission-template-actions">
+            <button type="button" class="btn btn-quiet-danger" data-template-delete hidden>
+                <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+                <span th:text="#{general.delete}">Löschen</span>
+            </button>
+            <button type="button" class="btn btn-ghost" data-template-cancel th:text="#{general.cancel}">Abbrechen</button>
+            <button type="submit" class="btn btn--cta" data-testid="mission-template-save" th:text="#{general.save}">Speichern</button>
+        </div>
+    </form>
+
+    <template data-template-row="objectives">
+        <li class="mission-template-row">
+            <div class="mission-template-fields">
+                <label>
+                    <span th:text="#{mission.objective.title.placeholder}">Zieltext</span>
+                    <input type="text" name="title" required maxlength="500">
+                </label>
+                <label>
+                    <span th:text="#{mission.objective.kind.label}">Klassifizierung</span>
+                    <select name="kind" required>
+                        <option th:each="kind : ${objectiveKinds}" th:value="${kind}"
+                                th:text="#{${'mission.objective.kind.' + #strings.toLowerCase(kind.name())}}">Hauptziel</option>
+                    </select>
+                </label>
+            </div>
+            <th:block th:replace="~{mission/fragments/mission-template-editor :: rowActions}"></th:block>
+        </li>
+    </template>
+    <template data-template-row="steps">
+        <li class="mission-template-row">
+            <div class="mission-template-fields">
+                <label>
+                    <span th:text="#{mission.step.title.placeholder}">Schritt</span>
+                    <input type="text" name="title" required maxlength="500">
+                </label>
+                <label>
+                    <span th:text="#{missionTemplate.step.hint}">Zeit oder Ort</span>
+                    <input type="text" name="meta" maxlength="200">
+                </label>
+            </div>
+            <th:block th:replace="~{mission/fragments/mission-template-editor :: rowActions}"></th:block>
+        </li>
+    </template>
+    <template data-template-row="units">
+        <li class="mission-template-row">
+            <div class="mission-template-fields">
+                <label>
+                    <span th:text="#{mission.unit.display_name}">Anzeigename</span>
+                    <input type="text" name="name" required maxlength="255">
+                </label>
+                <label>
+                    <span th:text="#{mission.unit.shiptype}">Schiffstyp</span>
+                    <select name="shipTypeId">
+                        <option value="" th:text="#{general.none}">Keiner</option>
+                        <option th:each="shipType : ${shipTypes}" th:value="${shipType.id}"
+                                th:text="${shipType.displayName(#locale)}">Typ</option>
+                    </select>
+                </label>
+                <label>
+                    <span th:text="#{mission.unit.note}">Notiz</span>
+                    <input type="text" name="note" maxlength="500">
+                </label>
+                <label>
+                    <span th:text="#{mission.unit.frequency}">Frequenz</span>
+                    <input type="text" inputmode="decimal" data-number-input name="frequency" min="100" max="999.99" step="0.01"
+                           th:placeholder="#{mission.unit.frequency.placeholder}">
+                </label>
+                <label class="mission-template-checkbox">
+                    <input type="checkbox" name="highValueUnit">
+                    <span th:text="#{mission.unit.hvu}">High Value Unit</span>
+                </label>
+            </div>
+            <th:block th:replace="~{mission/fragments/mission-template-editor :: rowActions}"></th:block>
+        </li>
+    </template>
+</section>
+<div th:fragment="rowActions" class="mission-template-actions">
+    <button type="button" class="btn btn-ghost btn-icon" data-template-row-action="up"
+            th:aria-label="#{missionTemplate.row.up}" th:title="#{missionTemplate.row.up}">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-up"/></svg>
+    </button>
+    <button type="button" class="btn btn-ghost btn-icon" data-template-row-action="down"
+            th:aria-label="#{missionTemplate.row.down}" th:title="#{missionTemplate.row.down}">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-chevron-down"/></svg>
+    </button>
+    <button type="button" class="btn btn-quiet-danger btn-icon" data-template-row-action="remove"
+            th:aria-label="#{missionTemplate.row.remove}" th:title="#{missionTemplate.row.remove}">
+        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-trash"/></svg>
+    </button>
+</div>
+</body>
+</html>

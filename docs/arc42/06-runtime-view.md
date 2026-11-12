@@ -69,6 +69,10 @@ missing one turns the next edit into a spurious 409.
    (`basetool:livesync:changed`), so every other frontend replica reaches its own members.
 4. Each receiving client re-reads the named sections and swaps them in place.
 
+For a mission template write, the backend publishes to the owning unit's room after commit. The
+list section refreshes while open editors retain their inputs and saved revision
+([REQ-MISSION-035](../specs/mission-templates.md)).
+
 An installed PWA is the frontend in its own window and takes the same `/ws/sync` door as any other
 tab; there is no second door (ADR-0274). Design: ADR-0094.
 

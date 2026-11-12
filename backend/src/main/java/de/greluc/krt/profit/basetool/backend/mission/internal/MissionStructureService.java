@@ -40,8 +40,6 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionCrew;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -184,15 +182,7 @@ public class MissionStructureService {
     missionUnit.setNote(StringNormalization.trimToNull(attributes.note()));
     missionUnit.setHighValueUnit(attributes.highValueUnit());
 
-    if (frequency != null) {
-      double roundedFrequency =
-          BigDecimal.valueOf(frequency).setScale(2, RoundingMode.HALF_UP).doubleValue();
-
-      if (roundedFrequency < 100.00 || roundedFrequency > 999.99) {
-        throw new IllegalArgumentException("Frequency must be between 100.00 and 999.99");
-      }
-      missionUnit.setFrequency(roundedFrequency);
-    }
+    missionUnit.setFrequency(MissionUnitFrequency.normalize(frequency));
 
     mission.getAssignedUnits().add(missionUnit);
     missionUnitRepository.save(missionUnit);
@@ -344,17 +334,7 @@ public class MissionStructureService {
 
     missionUnit.setName(resolveUnitName(attributes.name(), missionUnit));
 
-    if (frequency != null) {
-      double roundedFrequency =
-          BigDecimal.valueOf(frequency).setScale(2, RoundingMode.HALF_UP).doubleValue();
-
-      if (roundedFrequency < 100.00 || roundedFrequency > 999.99) {
-        throw new IllegalArgumentException("Frequency must be between 100.00 and 999.99");
-      }
-      missionUnit.setFrequency(roundedFrequency);
-    } else {
-      missionUnit.setFrequency(null);
-    }
+    missionUnit.setFrequency(MissionUnitFrequency.normalize(frequency));
 
     missionUnitRepository.save(missionUnit);
     announceShipChange(mission, missionUnit, previousShip);

@@ -82,6 +82,9 @@ public enum LiveSyncTopicClass {
   /** A member's own blueprints, keyed by the member's id. */
   BLUEPRINTS_OWN("blueprints", true, "blueprints_own"),
 
+  /** The template list of one manageable org unit. */
+  MISSION_TEMPLATES("mission-templates", true, "mission_templates"),
+
   /** Global Materialbörse room; the backend pokes {@code board} when a book-out changed offers. */
   MATERIALBOARD("materialboard", false, "materialboard"),
 
@@ -183,6 +186,7 @@ public enum LiveSyncTopicClass {
       case PURCHASING_DEALS -> Set.of("deals");
       case HANGAR_OWN, HANGAR_UNIT, HANGAR_UNITS -> SHIPS_SECTIONS;
       case BLUEPRINTS_OWN -> BLUEPRINTS_OWN_SECTIONS;
+      case MISSION_TEMPLATES -> Set.of("list");
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;
       case REFINERY -> Set.of("queue");
       case REFINERY_ORDER -> Set.of("order", "store", "deleted");

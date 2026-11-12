@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.kernel;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Thrown when an insert or update would violate a uniqueness constraint the service layer checks
  * explicitly, such as a duplicate Keycloak {@code sub}.
@@ -27,6 +29,8 @@ package de.greluc.krt.profit.basetool.backend.kernel;
  */
 public final class DuplicateEntityException extends AppException {
 
+  private final @Nullable String field;
+
   /**
    * Creates a {@code DuplicateEntityException} with a description of the duplicate.
    *
@@ -34,5 +38,27 @@ public final class DuplicateEntityException extends AppException {
    */
   public DuplicateEntityException(String message) {
     super(AppExceptionKind.DUPLICATE_ENTITY, message);
+    field = null;
+  }
+
+  /**
+   * Creates a uniqueness conflict attributed to a single input field.
+   *
+   * @param message localized message key or safe description
+   * @param field the input field with the conflicting value
+   * @param cause the failed write
+   */
+  public DuplicateEntityException(String message, String field, Throwable cause) {
+    super(AppExceptionKind.DUPLICATE_ENTITY, message, cause);
+    this.field = field;
+  }
+
+  /**
+   * Returns the field to highlight for this uniqueness conflict.
+   *
+   * @return the field name, or null for a conflict without an input field
+   */
+  public @Nullable String field() {
+    return field;
   }
 }

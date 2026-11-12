@@ -220,6 +220,8 @@
       "mission/mission-detail.js",
       "mission/mission-hooks.js",
       "mission/mission-presence.js",
+      "mission/mission-template-editor.js",
+      "mission/mission-templates.js",
       "mission/missions.js"
     ],
     "notification": [

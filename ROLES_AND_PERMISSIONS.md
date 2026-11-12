@@ -728,6 +728,16 @@ mission's owner or co-manager an admin keeps those rights under any selection, l
 > squadron Mission-Manager nor officer reach in a unit manages it (REQ-SEC-005, REQ-SEC-065).
 > Details: REQ-ORG-009 in [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md).
 
+#### Mission templates
+
+| Function (gate) | Member | Log. | MM | Officer | Admin |
+| --- | :---: | :---: | :---: | :---: | :---: |
+| List, view, create, edit or delete templates in the owning unit (`canActAsOfficerIn` or `canManageMissionsOf`) | ❌ | ❌ | ✅ | ✅ | ✅ |
+
+The owning unit must be active and within the caller's selected context. Each row in the owner
+picker passes the same gate as a direct template request. An admin without a pin may manage
+active units throughout the organisation (REQ-MISSION-035, REQ-ORG-032).
+
 ### 3.6 Operations (mission bracket, finances & payouts)
 
 | Function (gate)                                                                           | Member | Log. | MM | Officer | Admin |
