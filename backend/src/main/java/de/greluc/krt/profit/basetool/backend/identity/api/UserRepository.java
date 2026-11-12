@@ -61,7 +61,7 @@ public interface UserRepository
   List<UUID> lockAccountsForMerge(@Param("accountIds") Collection<UUID> accountIds);
 
   /**
-   * Tries to reserve an account until the surrounding consolidation transaction ends.
+   * Tries to reserve an account until the surrounding Discord link transaction ends.
    *
    * @param accountId the source or surviving account
    * @return whether this transaction holds the reservation
@@ -72,7 +72,7 @@ public interface UserRepository
           "SELECT pg_try_advisory_xact_lock("
               + "hashtextextended('account-consolidation:' || CAST(:accountId AS text), 0))",
       nativeQuery = true)
-  boolean tryLockAccountForConsolidation(@Param("accountId") UUID accountId);
+  boolean tryReserveDiscordLinkAccount(@Param("accountId") UUID accountId);
 
   /**
    * Reads only the names needed to scrub personal-data exports.

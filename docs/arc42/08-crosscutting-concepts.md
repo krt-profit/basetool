@@ -182,8 +182,9 @@ Transaction-bound live-sync flushes and read memos follow suspension and resumpt
 Role permissions and descriptions use independent row-locked section counters
 ([REQ-SEC-088](../specs/security-and-access.md#req-sec-088--the-four-application-roles-are-assigned-in-the-basetool)).
 
-Account consolidation reserves both account IDs through its Keycloak calls, separate database
-commit and any compensation ([ADR-0160](../adr/0160-a-duplicate-account-stays-consolidatable-after-approval.md)).
+Account consolidation and Discord registration linking share a reservation for both account IDs
+through the Keycloak calls, separate database commit and any compensation
+([ADR-0160](../adr/0160-a-duplicate-account-stays-consolidatable-after-approval.md)).
 
 Operation payout marks and input writes share a transaction lock per operation. The settlement
 rule and the retained fee and attendance basis live in [ADR-0375](../adr/0375-operation-payout-inputs-freeze-while-paid.md).

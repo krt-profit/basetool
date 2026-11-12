@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.privacy.api;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountLinkReservation;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
@@ -59,6 +60,7 @@ public class AccountConsolidationService {
   private final UserDeletionService userDeletionService;
   private final UserApprovalEventRepository userApprovalEventRepository;
   private final KeycloakService keycloakService;
+  private final AccountLinkReservation accountLinkReservation;
 
   /**
    * This service through the Spring proxy, so {@link #completeConsolidationTransactionally}
@@ -93,7 +95,7 @@ public class AccountConsolidationService {
     if (duplicateId.equals(targetUserId)) {
       throw new BusinessConflictException("An account cannot be consolidated into itself");
     }
-    reserveAccounts(duplicateId, targetUserId);
+    accountLinkReservation.reserve(duplicateId, targetUserId);
     User duplicate =
         Entities.require(userRepository.findById(duplicateId), "Duplicate account not found");
     OptimisticLock.checkOptionalClient(duplicate.getVersion(), version, User.class, duplicateId);
@@ -137,22 +139,6 @@ public class AccountConsolidationService {
     }
     keycloakService.deleteUser(duplicateId);
     return result;
-  }
-
-  /**
-   * Reserves both accounts in a stable order for the entire consolidation.
-   *
-   * @param duplicateId the account to dissolve
-   * @param targetUserId the surviving account
-   * @throws BusinessConflictException if either account is already reserved
-   */
-  private void reserveAccounts(UUID duplicateId, UUID targetUserId) {
-    boolean duplicateFirst = duplicateId.compareTo(targetUserId) < 0;
-    if (!userRepository.tryLockAccountForConsolidation(duplicateFirst ? duplicateId : targetUserId)
-        || !userRepository.tryLockAccountForConsolidation(
-            duplicateFirst ? targetUserId : duplicateId)) {
-      throw new BusinessConflictException("An account is already being consolidated");
-    }
   }
 
   /**

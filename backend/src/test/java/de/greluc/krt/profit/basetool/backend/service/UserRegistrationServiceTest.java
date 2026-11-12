@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.AccountErasure;
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountLinkReservation;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalRoleGrant;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
@@ -80,6 +82,7 @@ class UserRegistrationServiceTest {
   @Mock private UserApprovalEventRepository userApprovalEventRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private KeycloakService keycloakService;
+  @Mock private AccountLinkReservation accountLinkReservation;
   @Mock private AccountErasure accountErasure;
   @Mock private ApprovalRoleGrant approvalRoleGrant;
   @Mock private ObjectProvider<UserRegistrationService> selfProvider;
@@ -341,6 +344,22 @@ class UserRegistrationServiceTest {
       ArgumentCaptor<UserApprovalEvent> audit = ArgumentCaptor.forClass(UserApprovalEvent.class);
       verify(userApprovalEventRepository).save(audit.capture());
       assertEquals(ApprovalDecision.LINKED, audit.getValue().getDecision());
+    }
+
+    @Test
+    void linkRegistration_refusesAReservedAccountBeforeTouchingKeycloak() {
+      doThrow(new BusinessConflictException("An account is already being consolidated"))
+          .when(accountLinkReservation)
+          .reserve(USER_ID, TARGET_ID);
+
+      assertThrows(
+          BusinessConflictException.class,
+          () ->
+              userRegistrationService.linkRegistrationToExistingAccount(
+                  USER_ID, TARGET_ID, 0L, ADMIN_ID));
+
+      verifyNoInteractions(
+          userRepository, keycloakService, accountErasure, userApprovalEventRepository);
     }
 
     @Test

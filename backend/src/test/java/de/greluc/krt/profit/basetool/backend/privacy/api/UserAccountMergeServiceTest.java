@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRegistrationService;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -54,8 +55,8 @@ class UserAccountMergeServiceTest {
 
   @Autowired private UserAccountMergeService mergeService;
   @Autowired private AccountConsolidationService consolidationService;
+  @Autowired private UserRegistrationService registrationService;
   @Autowired private PlatformTransactionManager transactionManager;
-
   @Autowired private UserRepository userRepository;
 
   @Autowired private DataSource dataSource;
@@ -68,8 +69,8 @@ class UserAccountMergeServiceTest {
   }
 
   @Test
-  @DisplayName("a consolidation refuses an overlapping reservation and can retry after release")
-  void consolidate_conflictsWhileEitherAccountIsReserved() {
+  @DisplayName("both Discord linking routes share the account reservation")
+  void discordLinking_conflictsWhileEitherAccountIsReserved() {
     UUID source = UUID.randomUUID();
     UUID target = UUID.randomUUID();
     UUID admin = UUID.randomUUID();
@@ -77,13 +78,20 @@ class UserAccountMergeServiceTest {
     reservation.setReadOnly(true);
     for (UUID lockedAccount : List.of(source, target)) {
       reservation.executeWithoutResult(_ -> {
-        assertThat(userRepository.tryLockAccountForConsolidation(lockedAccount)).isTrue();
+        assertThat(userRepository.tryReserveDiscordLinkAccount(lockedAccount)).isTrue();
         assertThatThrownBy(() -> consolidationService.consolidate(source, target, null, admin))
+            .isInstanceOf(BusinessConflictException.class)
+            .hasMessage("An account is already being consolidated");
+        assertThatThrownBy(() ->
+                registrationService.linkRegistrationToExistingAccount(source, target, null, admin))
             .isInstanceOf(BusinessConflictException.class)
             .hasMessage("An account is already being consolidated");
       });
     }
     assertThatThrownBy(() -> consolidationService.consolidate(source, target, null, admin))
+        .isInstanceOf(NotFoundException.class);
+    assertThatThrownBy(() ->
+            registrationService.linkRegistrationToExistingAccount(source, target, null, admin))
         .isInstanceOf(NotFoundException.class);
   }
 

@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountLinkReservation;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
@@ -79,7 +80,7 @@ class AccountConsolidationServiceTest {
 
   @BeforeEach
   void setUp() {
-    lenient().when(userRepository.tryLockAccountForConsolidation(any(UUID.class))).thenReturn(true);
+    lenient().when(userRepository.tryReserveDiscordLinkAccount(any(UUID.class))).thenReturn(true);
     service =
         new AccountConsolidationService(
             userRepository,
@@ -87,6 +88,7 @@ class AccountConsolidationServiceTest {
             userDeletionService,
             userApprovalEventRepository,
             keycloakService,
+            new AccountLinkReservation(userRepository),
             selfProvider);
   }
 
@@ -125,8 +127,8 @@ class AccountConsolidationServiceTest {
 
     InOrder order =
         inOrder(userRepository, keycloakService, userAccountMergeService, userDeletionService);
-    order.verify(userRepository).tryLockAccountForConsolidation(DUPLICATE_ID);
-    order.verify(userRepository).tryLockAccountForConsolidation(TARGET_ID);
+    order.verify(userRepository).tryReserveDiscordLinkAccount(DUPLICATE_ID);
+    order.verify(userRepository).tryReserveDiscordLinkAccount(TARGET_ID);
     order.verify(userRepository).findById(DUPLICATE_ID);
     order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "duplicate");
     order.verify(userAccountMergeService).merge(DUPLICATE_ID, TARGET_ID, ADMIN_ID);
