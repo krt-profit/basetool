@@ -61,7 +61,6 @@ import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;

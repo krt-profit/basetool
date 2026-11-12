@@ -147,10 +147,16 @@ class InventoryPoolEarmarkWithoutRequestIntegrationTest {
     PoolEntryChange added = earmark(entry, 0, EarmarkChange.ADD, mission, EARMARKED);
     PoolEntryChange removed =
         earmark(
-            entry, Objects.requireNonNull(added.after()).version(), EarmarkChange.REMOVE, mission, null);
+            entry,
+            Objects.requireNonNull(added.after()).version(),
+            EarmarkChange.REMOVE,
+            mission,
+            null);
     StockLotWritePlans.EntryRestore undo =
         new StockLotWritePlans.EntryRestore(
-            0, journaled(entry, removed), new PoolRestore(entry, removed.after(), removed.before()));
+            0,
+            journaled(entry, removed),
+            new PoolRestore(entry, removed.after(), removed.before()));
 
     List<PoolRestoreResult> results =
         withoutRequest(
@@ -298,18 +304,17 @@ class InventoryPoolEarmarkWithoutRequestIntegrationTest {
    */
   private @NotNull UUID journaled(@NotNull UUID entry, @NotNull PoolEntryChange removal) {
     return Objects.requireNonNull(
-        transactionTemplate.execute(
-            _ ->
-                journal
-                    .record(
-                        new ExchangeCaller(writer, "pool-earmark", "pool-earmark-installation"),
-                        UUID.randomUUID(),
-                        ExchangeJournalAction.ORG_STOCK_EARMARK_REMOVE,
-                        entry.toString(),
-                        false,
-                        removal.before(),
-                        removal.after())
-                    .getId()));
+        transactionTemplate.execute(_ ->
+            journal
+                .record(
+                    new ExchangeCaller(writer, "pool-earmark", "pool-earmark-installation"),
+                    UUID.randomUUID(),
+                    ExchangeJournalAction.ORG_STOCK_EARMARK_REMOVE,
+                    entry.toString(),
+                    false,
+                    removal.before(),
+                    removal.after())
+                .getId()));
   }
 
   /**

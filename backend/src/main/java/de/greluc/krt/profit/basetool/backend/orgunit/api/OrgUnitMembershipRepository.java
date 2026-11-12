@@ -335,9 +335,9 @@ public interface OrgUnitMembershipRepository
   boolean existsLeadershipSeat(@Param("userId") UUID userId);
 
   /**
-   * Resolves the active direct or covering functional writers of affected units: a Logistician
-   * flag or a seat on an active unit that is the target, the OL or the target's parent Bereich,
-   * each only while its holder holds {@code KRT Member} (REQ-SEC-015). A deactivated target has no
+   * Resolves the active direct or covering functional writers of affected units: a Logistician flag
+   * or a seat on an active unit that is the target, the OL or the target's parent Bereich, each
+   * only while its holder holds {@code KRT Member} (REQ-SEC-015). A deactivated target has no
    * writer (REQ-ORG-032).
    *
    * @param unitIds the units requiring coordination
