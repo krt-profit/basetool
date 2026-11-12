@@ -24,6 +24,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import de.greluc.krt.profit.basetool.backend.kernel.TransactionMemo;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncFanout;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
@@ -58,18 +59,16 @@ class TransactionResourceSuspensionIntegrationTest {
     TransactionTemplate inner = new TransactionTemplate(transactionManager);
     inner.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     outer.executeWithoutResult(outerStatus -> {
-      Object outerMemo = RefineryTransactionMemo.bound(owner, Object.class, Object::new);
+      Object outerMemo = TransactionMemo.bound(owner, Object.class, Object::new);
       publisher.publishAfterCommit(outerTopic, List.of("stock"));
       inner.executeWithoutResult(innerStatus -> {
-        assertThat(RefineryTransactionMemo.bound(owner, Object.class, Object::new))
-            .isNotSameAs(outerMemo);
+        assertThat(TransactionMemo.bound(owner, Object.class, Object::new)).isNotSameAs(outerMemo);
         publisher.publishAfterCommit(innerTopic, List.of("board"));
         if (!innerCommit) {
           innerStatus.setRollbackOnly();
         }
       });
-      assertThat(RefineryTransactionMemo.bound(owner, Object.class, Object::new))
-          .isSameAs(outerMemo);
+      assertThat(TransactionMemo.bound(owner, Object.class, Object::new)).isSameAs(outerMemo);
       if (!outerCommit) {
         outerStatus.setRollbackOnly();
       }

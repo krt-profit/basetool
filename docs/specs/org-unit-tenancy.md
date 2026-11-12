@@ -98,8 +98,8 @@ honours counts; any other pin is no pin.
   operation picker (`findAllEditableReference`) lists only the operations the caller may edit
   (REQ-MISSION-034). See REQ-ORG-009.
 - **Cross-staffel with public escape:** `Mission` — visible to other OrgUnits iff
-  `is_internal = false` (`searchMissions` enforces
-  `owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal = false`); editable only by the owning
+  `is_internal = false`. The mission and every ancestor must pass the read rule in the detail
+  view, lists, pickers and next-mission lookups (REQ-MISSION-008). Editable only by the owning
   OrgUnit and by admins inside the active context (REQ-ORG-032). A mission may
   also be **ownerless** (`owning_org_unit_id IS NULL`, V144) — a leadership / "Bereichsleitung"
   mission created by a user who belongs to no OrgUnit; see REQ-ORG-009.
@@ -178,35 +178,30 @@ and on the **0-unit** row:
   `resolveOrgUnitForClientCreate` (a connected application, REQ-XCH-017) and
   `resolveOrgUnitForImport` (a hangar import, REQ-HANGAR-014) read the member's stampable units as
   well. The admin's own pin never decides an on-behalf row, and an on-behalf pick must be one of
-  the member's direct memberships.
-- `resolveOrgUnitForPickerOutput` and `resolveSquadronForPickerOutput` (strict) → **400** for a
-  user without a membership. Wired to no aggregate — retained as the strict counterparts
-  (`Operation` moved off them in V145; `JobOrder` uses its own resolvers, see below).
+  the member's stampable units.
 
 **Refinery-store output stamping (#596).** Storing a refinery order creates one `InventoryItem`
 per output, owned by the receiving member (`RefineryOrderStoreItemDto.userId`, else the order
-owner). The store dialog carries a per-item owning-OrgUnit picker whose options are the *receiver's*
-memberships and whose default selection is the order's own `owningOrgUnit`; the chosen id rides
-`RefineryOrderStoreItemDto.owningOrgUnitId` into `resolveOrgUnitForPickerOutputNullable`. This closes
-the gap where a multi-membership receiver was hard-rejected with the `>1 + no output → 400` branch
-because the form offered no choice — the picker is always shown so the receiver's OrgUnit pool is
-explicit, while the inherited default keeps a same-OrgUnit self-store one-click.
+owner). Each output has an owner picker with the receiver's stampable units. It selects the
+effective active unit when eligible, else the receiver's only option. With several options and no
+eligible active unit, the member must choose. The selected id reaches
+`resolveOrgUnitForPickerOutputNullable` as `RefineryOrderStoreItemDto.owningOrgUnitId`.
 
 Job Order uses its own resolvers: `responsible_org_unit_id` is required and must be profit-eligible
 — the guest fallback onto a configured intake SK went with the anonymous create (ADR-0149);
 `requesting_org_unit_id` accepts any OrgUnit and is freely editable.
 
 **Personal Lager rows can be re-stamped by their owner** (REQ-INV-052): a member may move their own
-personal row onto one of their direct memberships or onto **no** unit after the booking.
-Re-stamping gives or takes access for that unit's editors, and the dialog says so. A ship's later
-„Einheit ändern" (REQ-HANGAR-009) validates against its owner's direct memberships too, not against
-the stampable units.
+personal row onto one of their stampable units or onto **no** unit after the booking. Re-stamping
+gives or takes access for that unit's editors, and the dialog says so. A ship's later „Einheit ändern"
+(REQ-HANGAR-009) uses its owner's stampable units as well. Both use the same active direct memberships
+while the owner holds `KRT Member`.
 
 **The exchange stamps on its own paths** (REQ-XCH-016/-017). A stock book-in through the exchange
 creates a personal row with **no** unit, outside the picker resolvers — REQ-INV-052 is how it gets
 one. A ship created through the exchange runs the Hangar's own create: without a named unit on
 `resolveOrgUnitForClientCreate` (the member's only stampable unit, else none), with one on the
-member's direct memberships (`resolveOwnerMembershipTarget`).
+member's stampable units (`resolveOwnerMembershipTarget`).
 
 > **Amended by epic #692 (REQ-ORG-016):** stamping **validation** widens to `(direct memberships ∪
 > oversight descendants)` so a Bereichsleitung/OL can create on behalf of a subordinate Staffel/SK and
@@ -563,8 +558,9 @@ extended:
   stamping is unchanged.
 - **Create-on-behalf is authorised by `canEditOrgUnit(target)`** (cascades per REQ-ORG-015), not by
   admin-ness. This gate lives in the shared **owning-org-unit picker resolver**
-  (`OrgUnitStampingService.resolveStampedOrgUnit`, reached directly): an explicit pick is accepted when it is a DIRECT
-  membership of the **target user** *or* an org unit the current **caller** may edit. The gate keys
+  (reached through `resolveOrgUnitForPickerOutputNullable` and
+  `resolveOrgUnitForUnitOwnedAggregate`): an explicit pick is accepted when it is one of the
+  **target user's** stampable units or an org unit the current **caller** may edit. The gate keys
   `canEditOrgUnit` on the caller while the membership set is the target user's, so the two coincide for
   every **self-service** create (caller = target) — there an ordinary member, whose `canEditOrgUnit`
   reach equals their own memberships, is byte-identical to today — and diverge only on the two
@@ -939,29 +935,37 @@ sidebar (`activeSquadronId`) is one of its options and nothing else is selected,
 „Alle meine Org-Einheiten" nothing is preselected.
 Otherwise the empty choice reads „-- Bitte wählen --" / „-- Please choose --". *Amended 2026-10-02 by
 the owner: the empty choice read „-- Heimat-Staffel beibehalten --", although an empty pick resolves
-to the only direct membership or the pin, and is refused otherwise.* The rule lives in the shared
-`kernel/fragments/owner-picker.html` and so holds on all five surfaces.
+to the only direct membership or the pin, and is refused otherwise.* The shared
+`kernel/fragments/owner-picker.html` renders initial choices. Its JavaScript counterpart
+`/js/kernel/krt-owner-picker.js` renders choices reloaded for a destination member, grouping
+options by kind when several kinds are offered. It picks the effective active unit when eligible,
+else the sole option. With several options and no eligible active unit it requires an explicit
+choice before a booking or rebooking.
 
 On the **on-behalf book-in** (`/inventory/input?source=admin`) the picker follows the member being
 booked for: it is rendered even with one option (hidden), and choosing a member refills it from
-`GET /users/{id}/memberships?allKinds=true` — that member's **direct** memberships, which is exactly
+`GET /users/{id}/memberships?allKinds=true&ownerPicker=true` — that member's **stampable** units, which is exactly
 the set the backend stamps from. Because the set is the direct one, the client may require a choice
 there: with several memberships and the active unit not among them, the picker is shown and
 required; with one it is hidden and preselected; with none it is hidden and empty. Choosing the own
 entry again restores the caller's options.
 
 On the **refinery order create form** the picker is built for the order's owner from
-`GET /api/v1/org-units/members/{id}/memberships?allKinds=true` — the owner's direct memberships of
+`GET /api/v1/org-units/members/{id}/memberships?allKinds=true&ownerPicker=true` — the owner's stampable units of
 all four kinds, the set the backend counts. Built from Staffel and SK alone, a member of one Staffel
 and one Bereich got no picker and a refusal on every submit.
 
 On the **production book-in** of an item order (the „Herstellung erfassen" modal, REQ-ORDERS-025)
-`orders-detail-production.js` builds the picker from the owner's direct memberships
-(`GET /users/{id}/memberships?allKinds=true`) and reads the active org unit from the wrapper's
+`orders-detail-production.js` builds the picker from the owner's stampable units
+(`GET /users/{id}/memberships?allKinds=true&ownerPicker=true`) and reads the active org unit from the wrapper's
 `data-owner-picker-active`, as the shared fragment does. It preselects the active org unit when the
 owner is a direct member of it, else the owner's only membership; otherwise it leads with the empty
 choice and is required, because the list is the owner's direct set, as on the on-behalf book-in.
-The booking stays disabled until a unit is chosen and while the memberships load.
+The booking stays disabled until a unit is chosen and while the memberships load. The Lager's
+transfer, de-personalize and bulk-rebook pickers and the refinery's store picker use the same
+preselection. The Bank counterparty picker continues to read active direct memberships under
+REQ-BANK-044. The named-member owner picker requires `KRT Member` or `Admin`; a
+bank-only account can read the counterparty options.
 
 **Acceptance**
 
@@ -984,8 +988,8 @@ pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidd
 `InventoryOperationsE2eTest#onBehalfOwnerPickerFollowsTheChosenMember`,
 `orders-detail-production.test.mjs` (the production book-in's preselection and required pick) ·
 **Code:** `kernel/fragments/owner-picker.html`, `inventory-input.js`, `orders-detail-production.js`,
-`OrgUnitStampingService#resolveStampedOrgUnit` /
-`#resolveSquadronForPickerOutput`, `scope/api/OwnerOrgUnitRequiredException`, `ScopeProblemCode`,
+`OrgUnitStampingService#resolveOrgUnitForPickerOutputNullable` /
+`#resolveOrgUnitForUnitOwnedAggregate`, `scope/api/OwnerOrgUnitRequiredException`, `ScopeProblemCode`,
 `krt-fetch.js#ownerOrgUnitRequiredMessage`, `kernel/fragments/head.html` ·
 **Related:** REQ-ORG-016, REQ-ORG-017, REQ-API-* (RFC 7807), the i18n rule in the root `AGENTS.md`
 
@@ -1002,6 +1006,8 @@ Every entity whose rows belong to an owning or responsible org unit carries the 
   marker or listed, with its reason, as no tenancy boundary. Order-scoped participation units,
   observed unit-read history and retained provision-credit units are relationships within the order,
   not aggregate ownership; reads still follow the order's current access policy.
+  A notification's subject unit is display metadata. The recipient owns the notice and the
+  active unit leaves inbox access unchanged (REQ-NOTIF-004).
   Other examples include the job order's customer unit, the executing unit of the two handovers, the material
   claim's claiming unit, the participant's affiliation, the Materialbörse's offer and request
   attribution (the board is organisation-wide), the bank account holder and the two bank
@@ -1119,7 +1125,9 @@ detail gates, create-time stamping, role powers and the oversight reach (ADR-037
   seat; no leadership cascade into it or out of it, so neither its own seats nor a parent
   Bereichsleiter or the OL appoint, change or clear a seat in it; no recipient of its unit notices,
   its bank account's holder notices or the seat-holder broadcasts; and it takes no new or moved row,
-  a first membership's adoption of unowned Lager rows included. One read gives every access decision
+  a first membership's adoption of unowned Lager rows included. A stored membership on a
+  deactivated unit does not count against adoption when a `KRT Member` joins their first active
+  unit (REQ-INV-004). One read gives every access decision
   the memberships on active units, `OrgUnitMembershipRepository#findAllOnActiveOrgUnitsByIdUserId`
   (ids: `#findActiveOrgUnitIdsByUserId`); the cascade reads the active units only, and the recipient
   queries skip a deactivated unit. Nothing is written by the rule: an admin without a pin still sees
@@ -1173,11 +1181,9 @@ detail gates, create-time stamping, role powers and the oversight reach (ADR-037
   member uses the member's units, never the admin's pin.
 - **Earmarks on missions.** A Lager row's earmark names its mission only to a reader who may see
   the mission (REQ-MISSION-008); to anyone else — an internal mission of another unit, for a pinned
-  admin as well — it reads „Unbekannter Einsatz" (REQ-INV-027). The earmark writes and undos look
-  the mission up through the JPQL projection `MissionRepository#findEarmarks`, which does not depend
-  on the caller and loads no mission entity, so neither a write nor a connected application's bulk
-  undo fails on an earmark the caller cannot see; only `EarmarkTargets.Missions#shownMissions` loads
-  the missions, to apply the visibility rule to what a reader sees.
+  admin as well — it reads „Unbekannter Einsatz" (REQ-INV-027). A new reservation requires
+  the writer to be able to see the mission. Changes and removal of existing reservations and
+  bulk undo use the caller-independent lookup, including on a worker without a web request.
 - **Cross-unit by design.** These features do not follow the pin, as decided by the owner: the
   member directory (REQ-ORG-017); the personal notification inbox (REQ-NOTIF-004); the bank's KRT,
   cartel bank and Sonderkonto accounts, the transfer targets and deposits into any active account

@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceEntr
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionFinanceTotalsDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.Set;
@@ -154,6 +156,12 @@ public class MissionFinanceEntryController {
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @missionAccessPolicy.canCreateFinanceEntry(#missionId,"
           + " #dto.participantId(), authentication)")
+  @ApiResponses({
+    @ApiResponse(responseCode = "201", description = "Finance entry created."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "The linked operation's payout inputs are frozen.")
+  })
   public MissionFinanceEntryDto createFinanceEntry(
       @PathVariable UUID missionId, @RequestBody @Valid MissionFinanceEntryCreateDto dto) {
     if (!missionId.equals(dto.missionId())) {
@@ -173,6 +181,12 @@ public class MissionFinanceEntryController {
    */
   @PutMapping("/missions/{missionId}/finance-entries/{entryId}")
   @PreAuthorize("isAuthenticated()")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Finance entry updated."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "Stale entry version or frozen payout inputs on the linked operation.")
+  })
   public MissionFinanceEntryDto updateFinanceEntry(
       @PathVariable UUID missionId,
       @PathVariable UUID entryId,
@@ -189,6 +203,12 @@ public class MissionFinanceEntryController {
   @DeleteMapping("/missions/{missionId}/finance-entries/{entryId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("isAuthenticated()")
+  @ApiResponses({
+    @ApiResponse(responseCode = "204", description = "Finance entry deleted."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "The linked operation's payout inputs are frozen.")
+  })
   public void deleteFinanceEntry(@PathVariable UUID missionId, @PathVariable UUID entryId) {
     financeEntryService.deleteEntry(missionId, entryId);
   }

@@ -11,7 +11,7 @@
 
 - `test-bank-management`, `test-bank-employee`, `test-bank-member` — Bankrollen (jeweils plus `KRT Member`).
 - `test-officer` — Officer, der eine Staffel beaufsichtigt; stellt Anträge für deren Einheitenkonto.
-- `test-bereich` — per Mitgliedschaft Bereichsleiter (nicht per Keycloak-Rolle).
+- `test-bereich` — Bereichsleiter über seinen Mitgliedschaftsrang.
 - `test-member`, `test-none` — einfaches Mitglied ohne Bankrolle bzw. Konto ohne Mitgliedschaft.
 - `test-admin` — Admin-Override für Freigaben und Konfiguration.
 
@@ -57,8 +57,11 @@ Ein Officer beantragt eine Buchung für seine Einheit; Bankmitarbeiter entscheid
 
 ## Sonderfälle & Lehren
 
-- **Bank-Gates fragen Bankrollen und Kontofreigaben — nie die Mitgliedschaft in einer OrgUnit.** Die Sonderkonto-Auto-Sicht hängt dagegen an der **Mitgliedschaft** (Bereich/OL), nie an der Keycloak-Rolle (REQ-BANK-037). Diese Rollen-Modell-Aussage kann nur ein E2E-Test mit echtem Token beweisen; `OrgUnitBankAccessServiceTest` kann sie nur mocken.
-- **Es gibt kein Nur-Bank-Konto.** `default-roles-basetool` gibt jedem Konto `KRT Member` (REQ-SEC-053). Bis 2026-09-06 modellierten die Bank-Fixtures ein Konto ohne Mitgliedsrolle, das Keycloak gar nicht erzeugen kann; seit der Korrektur erscheint der Navigationslink zur Officer-Seite legitim auch beim Mitarbeiter — die Grenze war immer die Seite.
+- **Bankzugriff folgt dem Konto und der Aktion.** Die E2E-Fixtures erhalten ihre Bankrollen
+  in `user_roles`. Die automatische Sicht auf Sonderkonten folgt zusätzlich der wirksamen
+  Bereichs- oder OL-Mitgliedschaft (REQ-BANK-037). Der Browser-Test prüft die Auflösung
+  dieser Rechte mit einem echten Zugangstoken.
+- **Ein Konto kann ausschließlich Bankrollen halten.** Die Basetool-Rolle `KRT Member` kommt bei der Freigabe hinzu und kann separat entzogen werden (REQ-SEC-053, REQ-SEC-088). Ohne sie gelten weiterhin die Bankrollen und die zugehörigen Bankfreigaben. Die Testkonten erhalten ihre Rollen ausdrücklich in `user_roles`.
 - **UI treiben, API verifizieren.** Status und Saldo werden aus dem Backend gelesen, damit die Prüfung nie mit dem In-Place-Tausch wettläuft.
 - **Live-Sync-Mechanik** (#1102, REQ-FE-015, ADR-0094): Zwei Kontexte sind zwei `/ws/sync`-Sockets. Die Ablehnung bucht nichts, sendet aber `bank/[requestQueue,grid]` in den globalen `bank`-Raum; der Beitritt zum Raum wird lokal gegen die beim Handshake erfassten Rollen geprüft.
 - **Modal-Wiederöffnung** (REQ-UI-013, ADR-0093): Der Erfolgspfad schloss das Modal früher per Inline-`style.display = 'none'`, das die klassenbasierte Wiederöffnung (heute `is-open`, damals `krtm-modal-open`) überstimmte — der Button des nächsten Antrags tat bis zum Reload nichts.

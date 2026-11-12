@@ -44,6 +44,18 @@ import org.springframework.stereotype.Repository;
 public interface MissionRepository
     extends JpaRepository<Mission, UUID>, MissionRepositoryAuthorizationFragment {
 
+  /** Search restrictions shared by the result and count queries. */
+  String SEARCH_PREDICATE =
+      MissionScope.PREDICATE
+          + " AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
+          + " string), '%') ESCAPE '\\' OR CAST(m.description AS string) ILIKE CONCAT('%',"
+          + " CAST(:query AS string), '%') ESCAPE '\\') AND (CAST(:start AS timestamp) IS NULL OR"
+          + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
+          + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
+          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operationId"
+          + " = :operationId) AND (CAST(:orgUnitId AS uuid) IS NULL OR m.owningOrgUnit.id ="
+          + " :orgUnitId)";
+
   /**
    * Returns slim {@link de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto}s for
    * the Lager mission pickers: every visible {@code PLANNED} / {@code ACTIVE} mission plus {@code
@@ -66,13 +78,11 @@ public interface MissionRepository
    * @return slim reference DTOs visible to the caller, ordered newest planned-start first.
    */
   @Query(
-      """
-      SELECT new de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto(m.id, m.name,
-      m.status, m.plannedStartTime) FROM Mission m WHERE (
-        m.status IN ('PLANNED', 'ACTIVE')
-        OR (m.status IN ('COMPLETED', 'CANCELLED') AND m.plannedStartTime >= :cutoff)
-      ) AND
-      """
+      MissionScope.ANCESTOR_VISIBILITY
+          + "SELECT new de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto("
+          + "m.id, m.name, m.status, m.plannedStartTime) FROM Mission m WHERE "
+          + "(m.status IN ('PLANNED', 'ACTIVE')"
+          + " OR (m.status IN ('COMPLETED', 'CANCELLED') AND m.plannedStartTime >= :cutoff)) AND "
           + MissionScope.PREDICATE
           + " ORDER BY m.plannedStartTime DESC NULLS LAST, m.name ASC")
   List<MissionReferenceDto> findAllActiveReference(
@@ -124,76 +134,13 @@ public interface MissionRepository
   List<Mission> fetchAssignedUnitGraph(@Param("id") UUID id);
 
   /**
-   * Returns the next mission whose {@code plannedStartTime} is after {@code date} and whose status
-   * is one of {@code statuses}.
-   *
-   * <p>Loads no collections; callers needing them re-fetch via {@link #findById(UUID)}.
-   *
-   * @param date exclusive lower bound on {@code plannedStartTime}
-   * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
-   * @return the next matching mission, or empty when none upcoming
-   */
-  Optional<Mission> findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-      Instant date, Collection<String> statuses);
-
-  /**
-   * Returns the next public mission whose {@code plannedStartTime} is after {@code date} and whose
-   * status is one of {@code statuses}; the lookup of a caller without an org-unit scope
-   * (REQ-MISSION-008).
-   *
-   * <p>Loads no collections; callers needing them re-fetch via {@link #findById(UUID)}.
-   *
-   * @param date exclusive lower bound on {@code plannedStartTime}
-   * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
-   * @return the next matching public mission, or empty when none upcoming
-   */
-  @Query(
-      """
-      SELECT m FROM Mission m WHERE m.plannedStartTime > :date AND m.status IN :statuses AND
-      m.isInternal = false ORDER BY m.plannedStartTime ASC LIMIT 1
-      """)
-  Optional<Mission> findNextPublicMission(
-      @Param("date") Instant date, @Param("statuses") Collection<String> statuses);
-
-  /**
-   * Returns upcoming missions owned by the caller's org units, soonest first, for the home-page
-   * "next mission" banner (REQ-MISSION-008).
-   *
-   * <p>Narrows to {@code activeOrgUnitId} when set, else to {@code memberOrgUnitIds}; other units'
-   * public missions are excluded, internal ones included. Loads no collections.
-   *
-   * @param now exclusive lower bound on {@code plannedStartTime}
-   * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
-   * @param activeOrgUnitId the single pinned OrgUnit id, or {@code null} to use {@code
-   *     memberOrgUnitIds}
-   * @param memberOrgUnitIds the caller's effective (cascade-expanded) org-unit reach; consulted
-   *     only when {@code activeOrgUnitId} is {@code null}
-   * @param pageable limits the result to the head ({@code PageRequest.of(0, 1)})
-   * @return the matching missions in soonest-first order (at most {@code pageable} size)
-   */
-  @Query(
-      """
-      SELECT m FROM Mission m WHERE m.plannedStartTime > :now AND m.status IN :statuses AND
-      ((:activeOrgUnitId IS NOT NULL
-      AND m.owningOrgUnit.id = :activeOrgUnitId) OR (:activeOrgUnitId IS NULL AND
-      m.owningOrgUnit.id IN :memberOrgUnitIds)) ORDER BY m.plannedStartTime ASC
-      """)
-  List<Mission> findNextScopedMission(
-      @Param("now") Instant now,
-      @Param("statuses") Collection<String> statuses,
-      @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
-      Pageable pageable);
-
-  /**
    * Returns the upcoming missions of the caller's own org units merged with those the caller is
    * signed up for, each mission once, soonest first (REQ-MISSION-031).
    *
-   * <p>The own-unit part follows {@link #findNextScopedMission}: the pin when set, else the member
-   * units, every mission when {@code ownOrgWide}, or the public missions when {@code
-   * ownPublicOnly}. The rows are candidates: the caller applies the mission-detail visibility
-   * (ancestors included) page by page. Fetches only {@code owningOrgUnit}, so the limit stays in
-   * SQL.
+   * <p>The own-unit part uses the pin when set, else the member units, every mission when {@code
+   * ownOrgWide}, or the public missions when {@code ownPublicOnly}. The rows are candidates: the
+   * caller applies the mission-detail visibility (ancestors included) page by page. Fetches only
+   * {@code owningOrgUnit}, so the limit stays in SQL.
    *
    * @param now exclusive lower bound on {@code plannedStartTime}
    * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
@@ -237,16 +184,12 @@ public interface MissionRepository
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query(
-      "SELECT m FROM Mission m WHERE "
-          + MissionScope.PREDICATE
-          + " AND (CAST(:query AS string) IS NULL OR m.name ILIKE CONCAT('%', CAST(:query AS"
-          + " string), '%') ESCAPE '\\' OR CAST(m.description AS string) ILIKE CONCAT('%',"
-          + " CAST(:query AS string), '%') ESCAPE '\\') AND (CAST(:start AS timestamp) IS NULL OR"
-          + " m.plannedStartTime >= :start) AND (CAST(:end AS timestamp) IS NULL OR"
-          + " m.plannedStartTime <= :end) AND (m.status IN (:status)) AND (:isInternal IS NULL OR"
-          + " m.isInternal = :isInternal) AND (CAST(:operationId AS uuid) IS NULL OR m.operationId"
-          + " = :operationId) AND (CAST(:orgUnitId AS uuid) IS NULL OR m.owningOrgUnit.id ="
-          + " :orgUnitId)")
+      value =
+          MissionScope.ANCESTOR_VISIBILITY + "SELECT m FROM Mission m WHERE " + SEARCH_PREDICATE,
+      countQuery =
+          MissionScope.ANCESTOR_VISIBILITY
+              + "SELECT COUNT(m) FROM Mission m WHERE "
+              + SEARCH_PREDICATE)
   Page<Mission> searchMissions(
       @Param("query") @Nullable String query,
       @Param("start") @Nullable Instant start,

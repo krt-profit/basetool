@@ -217,7 +217,7 @@ class InventoryItemServiceAllocationTest {
     UUID missionId = UUID.randomUUID();
     Mission m = mission(missionId, "Op Nightfall");
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
-    when(earmarkTargets.mission(missionId))
+    when(earmarkTargets.missionForAllocation(missionId))
         .thenReturn(new MissionEarmark(missionId, m.getName(), m.getPlannedStartTime()));
     when(inventoryItemRepository.saveAndFlush(item)).thenReturn(item);
     when(inventoryItemMapper.toDto(item)).thenReturn(sentinelDto());
@@ -352,7 +352,7 @@ class InventoryItemServiceAllocationTest {
     slice.setAmount(3.0);
     item.getMissionAllocations().add(slice);
     when(inventoryItemRepository.findByIdForAllocationWrite(itemId)).thenReturn(Optional.of(item));
-    when(earmarkTargets.mission(missionId))
+    when(earmarkTargets.missionForAllocation(missionId))
         .thenReturn(new MissionEarmark(missionId, m.getName(), m.getPlannedStartTime()));
 
     BadRequestException ex =

@@ -134,12 +134,13 @@ web, naming its client (REQ-AUDIT-005):
   Variante C; an edit is now an allocation, note or rebooking event above).
 - **Aufträge** — create (material/item) / edit / status / priority / blueprint-coverage variant-counting
   toggle / delete / completion (a single funnel — manual and auto-completion via handover both record
-  exactly one `JOB_ORDER_COMPLETED`) / reassign / assignee add/remove/note / material+inventory unlink /
+  exactly one `JOB_ORDER_COMPLETED`) / reassign / assignee add/remove/note / inventory unlink /
   material+item handover / item-production booking (`JOB_ORDER_PRODUCTION_BOOKED` — recording
   manufactured units and consuming the linked inventory, REQ-ORDERS-025) / claim upsert+withdraw /
   quality-tier catalogue create, update, deactivate and delete (`QUALITY_TIER_*`, REQ-ORDERS-036). A requesting-owner edit (REQ-ORDERS-023) reuses the
-  existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` / `JOB_ORDER_MATERIAL_UNLINKED` events with a
-  bounded `byRequester=true` details flag (no new event type; the actor already identifies who edited).
+  existing `JOB_ORDER_UPDATED` or `JOB_ORDER_ITEM_UPDATED` event with a bounded
+  `byRequester=true` details flag. Removing a material uses the order update event.
+  `JOB_ORDER_MATERIAL_UNLINKED` remains available in the viewer for historical rows.
   Cancellation and reopening record `JOB_ORDER_STATUS_CHANGED` with the previous and next states.
   Active Staffel support starts with `JOB_ORDER_PARTICIPATION_ENROLLED` and ends with
   `JOB_ORDER_PARTICIPATION_ENDED`, with safe participation and unit ids and a bounded reason.
@@ -187,11 +188,12 @@ web, naming its client (REQ-AUDIT-005):
   purge of a deleted member's personal stores — "Mein Inventar", personal blueprints,
   notifications and notification-rule selectors — as a single summary event
   (`PERSONAL_DATA_PURGED_ON_USER_DELETION`, REQ-DATA-008) carrying the four row counts.
-- **Missionen** — mission create (incl. sub-mission; any goals/steps seeded on the create form each
-  additionally record their own `MISSION_OBJECTIVE_ADDED` / `MISSION_STEP_ADDED`, REQ-MISSION-015.
-  Create-time unit plans record `MISSION_UNIT_ADDED`. A rejected template revision produces no
-  mission or child audit event, REQ-MISSION-037) /
-  edit (core, schedule, flags) / delete;
+- **Missionen** — mission create (incl. sub-mission; `operation` is its linked operation id or `none`;
+  any goals/steps seeded on the create form each record their own `MISSION_OBJECTIVE_ADDED` /
+  `MISSION_STEP_ADDED`, REQ-MISSION-015. Create-time unit plans record `MISSION_UNIT_ADDED`.
+  A rejected template revision produces no mission or child audit event, REQ-MISSION-037) /
+  edit (core, schedule, flags; changing the core link records `fromOperation` and `toOperation`
+  as ids or `none`) / delete;
   participant add / remove / edit / check-in / check-out (the manager's check-in / check-out of
   everyone records one event per stamped row with `bulk=true`, REQ-MISSION-032); unit add / edit / remove; crew add / edit /
   remove; frequency change / remove (typed and custom mission-specific channels alike,
@@ -206,11 +208,13 @@ web, naming its client (REQ-AUDIT-005):
   record `MISSION_TEMPLATE_CREATED`, `MISSION_TEMPLATE_UPDATED` and `MISSION_TEMPLATE_DELETED`
   with the template and owning org-unit IDs only (REQ-MISSION-035, REQ-AUDIT-007).
 - **Operationen** — create / edit (incl. status change) / delete (missions are unlinked, not
-  deleted); per-participant payout toggle.
+  deleted); per-participant payout toggle, including reversal of a mark without a current payout
+  row with the opaque `orphanedMark` status id and no former participant identity.
 - **Rollen & Mitglieder** (`org_unit_membership` + `kommando_group`, epic #800) — every org-unit
   membership / role mutation: membership grant + revoke (SK join/leave, Staffel assign/move/remove);
   leadership-rank grant / change / revoke (Bereichsleitung, OL, SK-Lead and the squadron ranks
-  Staffelleiter / Kommandoleiter / stellv. / Ensign); Grand Admiral designation / vacation
+  Staffelleiter / Kommandoleiter / stellv. / Ensign, including seats vacated by deleting their SK
+  or Staffel membership); Grand Admiral designation / vacation
   (`ROLE_CHANGED` carrying a `grandAdmiral` boolean, REQ-ORG-021); Logistician / Mission-Manager
   capability-flag changes; **role permission-set changes** (`ROLE_PERMISSIONS_CHANGED` — the admin
   role editor's permission grid, previously the one mutation in this area that left no trace);
@@ -238,17 +242,10 @@ web, naming its client (REQ-AUDIT-005):
   `null` `subjectId`: `Role.id` is a `Long` while `AuditEvent.subjectId` is a `UUID`, so the code is
   the only usable subject key. Its details payload renders
   `added=… removed=… unknownAdded=N unknownRemoved=N`: the two named sides are filtered through the
-  closed `Permissions` vocabulary and rendered `-` when empty, and the two counts tally the changed
-  members that vocabulary cannot name. The write endpoint accepts a raw string set, so an
-  out-of-vocabulary value is still applied but **never named** — only counted — which keeps client
-  free text out of both the trail and the log line while making the case observable at all (before
-  2026-08 such a change produced an audit row reading `added=- removed=-`, indistinguishable from no
-  change). The counts are always emitted so the shape is stable and `unknownAdded>0` is greppable; a
-  value present on **both** sides of the edit is not counted, so leaving an out-of-vocabulary
-  permission in place does not report a phantom change. The vocabulary itself is **derived
-  reflectively** from the `Permissions` constants rather than hand-listed, so a new permission is
-  audited by name the moment it is declared — pinned by the `RoleServiceTest` parity test, which also
-  asserts every public constant in `Permissions` is a `String` whose value equals its field name.
+  closed `Permissions` vocabulary and rendered `-` when empty. The write endpoint refuses
+  unknown permissions (REQ-SEC-088), so a successful edit always records `unknownAdded=0`.
+  `unknownRemoved` counts removed stored values outside the vocabulary without naming them.
+  `RoleServiceTest` verifies that every declared permission can be audited by name.
   The details payload carries only the rank/kind enum names, the two flag booleans and the squadron
   label —
   never a user handle or free text (the group name is a non-personal structure label, like an order
@@ -745,8 +742,8 @@ the request that caused the mutation was made from, stored in `audit_event.clien
 **Why the actor is not enough.** "Who did this" and "from where" are two questions, and the second
 one only became askable when a second first-party client appeared. While one client could reach a
 given mutation, its answer was implied by the row's own domain. It is not implied any more: the
-realm roles on a client's Keycloak scope decide which mutations it can reach, and wherever two
-clients' scopes overlap the same mutation can arrive from either. The case this exists for is
+member's stored Basetool roles and the client's endpoint and capability gates decide which mutations
+are available. A mutation can arrive from either client when both clients' gates admit it. The case this exists for is
 narrower than "an app row looks like a browser row": an **access token replayed inside its
 lifetime** acts with its member's full authority, so its rows would be indistinguishable from the
 same person working in the browser — and "which client did this" is the first question of the review
@@ -792,13 +789,9 @@ that guesses is no longer evidence. But a reader must not treat the two alike:
 - **`audit_event`** (pre-V237): the nulls are **unambiguous anyway**. While those rows were written,
   the authority they record could come from one client only, so the row's own domain implies the
   answer.
-- **`bank_audit_event`** (pre-V238): the nulls mean **not recorded**, and nothing more. `Bank
-  Employee` and `Bank Management` have been on the mobile client's Keycloak scope since it was
-  provisioned — REQ-SEC-035's role list named them from its first revision — so a bank row has been
-  reachable from two clients for as long as that client has existed, independent of whether a
-  shipped app screen ever exercised it, because the authority rides on the token and a replayed
-  token carries it. **A null client on a pre-V238 bank row must never be read as "the web
-  frontend".**
+- **`bank_audit_event`** (pre-V238): the nulls mean **not recorded**. During that period, the
+  mobile client's tokens could carry the bank roles, so two clients could reach the same bank
+  mutations. The actor cannot identify the originating client on those rows.
 
 Each migration states its own case in a `COMMENT ON COLUMN`, so the distinction survives without
 this document. New rows on both tables always carry a value; `none` is an answer, not an absence.

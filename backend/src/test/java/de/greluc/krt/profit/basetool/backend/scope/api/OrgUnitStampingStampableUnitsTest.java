@@ -25,12 +25,15 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -57,7 +60,7 @@ class OrgUnitStampingStampableUnitsTest {
   @Mock private AuthHelperService authHelper;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
-  @Mock private OrgUnitSeatEligibility seatEligibility;
+  @Mock private UserRepository userRepository;
 
   private OrgUnitStampingService service;
   private User owner;
@@ -70,9 +73,8 @@ class OrgUnitStampingStampableUnitsTest {
             requestScopeResolver,
             accessGateService,
             authHelper,
-            orgUnitMembershipRepository,
             orgUnitRepository,
-            seatEligibility);
+            new OrgUnitSeatEligibility(orgUnitMembershipRepository, userRepository));
     owner = new User();
     owner.setId(UUID.randomUUID());
     hel = new Squadron();
@@ -85,21 +87,21 @@ class OrgUnitStampingStampableUnitsTest {
 
   @Test
   void aPersonalRowWithoutAPickLandsInTheOnlyActiveMembership() {
-    when(seatEligibility.holdsKrtMember(owner.getId())).thenReturn(true);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
 
     assertThat(service.resolveOrgUnitForPickerOutputNullable(owner, null)).isSameAs(hel);
   }
 
   @Test
   void aMissionWithoutAPickOrPinLandsInTheOnlyActiveMembership() {
-    when(seatEligibility.holdsKrtMember(owner.getId())).thenReturn(true);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
 
     assertThat(service.resolveOrgUnitForUnitOwnedAggregate(owner, null)).isSameAs(hel);
   }
 
   @Test
   void aConnectedApplicationAndAnImportStampTheOnlyActiveMembership() {
-    when(seatEligibility.holdsKrtMember(owner.getId())).thenReturn(true);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
 
     assertThat(service.resolveOrgUnitForClientCreate(owner)).isSameAs(hel);
     assertThat(service.resolveOrgUnitForImport(owner)).isSameAs(hel);
@@ -107,14 +109,14 @@ class OrgUnitStampingStampableUnitsTest {
 
   @Test
   void anAdminOnBehalfCreateWithoutAPickStampsTheMembersOnlyActiveMembership() {
-    when(seatEligibility.holdsKrtMember(owner.getId())).thenReturn(true);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
 
     assertThat(service.resolveOrgUnitForAdminOnBehalf(owner, null)).isSameAs(hel);
   }
 
   @Test
   void anOwnerWithoutKrtMemberKeepsANewPersonalRowWithoutAUnit() {
-    when(seatEligibility.holdsKrtMember(owner.getId())).thenReturn(false);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(false);
 
     assertThat(service.resolveOrgUnitForPickerOutputNullable(owner, null)).isNull();
     assertThat(service.resolveOrgUnitForClientCreate(owner)).isNull();
@@ -124,7 +126,7 @@ class OrgUnitStampingStampableUnitsTest {
 
   @Test
   void anOwnerWithoutKrtMemberMayNotPickAFormerUnitOutsideTheCallersScope() {
-    when(seatEligibility.holdsKrtMember(owner.getId())).thenReturn(false);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(false);
     when(accessGateService.canEditSquadron(HEL)).thenReturn(false);
 
     assertThatThrownBy(() -> service.resolveOrgUnitForPickerOutputNullable(owner, HEL))
@@ -132,8 +134,31 @@ class OrgUnitStampingStampableUnitsTest {
   }
 
   @Test
+  void aStoredMembershipOfAnOwnerWithoutKrtMemberCannotBeChosenExplicitly() {
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(false);
+
+    assertThatThrownBy(() -> service.resolveOwnerMembershipTarget(owner, HEL))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() -> service.resolveOrgUnitForAdminOnBehalf(owner, HEL))
+        .isInstanceOf(BadRequestException.class);
+    assertThat(service.resolveOwnerMembershipTarget(owner, null)).isNull();
+  }
+
+  @Test
+  void anExplicitPersonalTargetMustBeAnActiveDirectMembership() {
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
+
+    assertThat(service.resolveOwnerMembershipTarget(owner, HEL)).isSameAs(hel);
+    assertThatThrownBy(() -> service.resolveOwnerMembershipTarget(owner, PINNED_STAFFEL))
+        .isInstanceOf(BadRequestException.class);
+    hel.setActive(false);
+    assertThatThrownBy(() -> service.resolveOwnerMembershipTarget(owner, HEL))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  @Test
   void aMissionWithoutAPickLandsOnTheHonouredPin() {
-    when(seatEligibility.holdsKrtMember(owner.getId())).thenReturn(true);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
     when(requestScopeResolver.currentPin()).thenReturn(Optional.of(PINNED_STAFFEL));
     Squadron pinned = new Squadron();
     pinned.setId(PINNED_STAFFEL);
@@ -144,7 +169,7 @@ class OrgUnitStampingStampableUnitsTest {
 
   @Test
   void aPersonalRowIgnoresAPinOutsideTheOwnersActiveMemberships() {
-    when(seatEligibility.holdsKrtMember(owner.getId())).thenReturn(true);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
     when(requestScopeResolver.currentPin()).thenReturn(Optional.of(PINNED_STAFFEL));
 
     assertThat(service.resolveOrgUnitForPickerOutputNullable(owner, null)).isSameAs(hel);

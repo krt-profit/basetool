@@ -27,7 +27,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,22 +56,6 @@ public class KommandoGroupService {
   private final OrgUnitMembershipRepository membershipRepository;
   private final AuditRecorder auditRecorder;
   private final KommandoGroupMapper kommandoGroupMapper;
-
-  /**
-   * Lists the Kommandogruppen of a Staffel in display order.
-   *
-   * @param squadronId the Staffel whose groups to list; must be a {@code SQUADRON} org unit.
-   * @return the squadron's groups, ascending by sort index; never {@code null}, possibly empty.
-   * @throws NotFoundException if no org unit matches the id.
-   * @throws BadRequestException if the org unit is not a Staffel.
-   */
-  @NotNull
-  public List<KommandoGroupDto> listGroups(@NotNull UUID squadronId) {
-    requireSquadron(squadronId);
-    return kommandoGroupRepository.findBySquadronIdOrderBySortIndexAsc(squadronId).stream()
-        .map(kommandoGroupMapper::toDto)
-        .toList();
-  }
 
   /**
    * Creates a Kommandogruppe at the end of a Staffel's order.

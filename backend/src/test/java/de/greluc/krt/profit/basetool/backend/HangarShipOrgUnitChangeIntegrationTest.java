@@ -36,8 +36,10 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
@@ -75,6 +77,7 @@ class HangarShipOrgUnitChangeIntegrationTest {
   @Autowired private ShipRepository shipRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Autowired private SpecialCommandRepository specialCommandRepository;
   @Autowired private AuditEventRepository auditEventRepository;
@@ -94,6 +97,7 @@ class HangarShipOrgUnitChangeIntegrationTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     owner = saveUser("unit-owner");
+    owner.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     stranger = saveUser("unit-stranger");
     ownersCommand = saveCommand("Owner SK", "OSK");
     foreignCommand = saveCommand("Foreign SK", "FSK");

@@ -280,6 +280,30 @@ class BankAccessRulesTest {
   }
 
   @Test
+  void foreignCartelRequestsFollowTheApprovalBandInsteadOfAccountResponsibility() {
+    BankActor ol =
+        TestBankActor.member(UUID.randomUUID())
+            .seat(UUID.randomUUID(), MembershipRole.OL_MEMBER)
+            .build();
+    when(accountRepository.findAllByOrderByAccountNoAsc()).thenReturn(List.of(cartelAccount));
+    BankBookingRequest request = new BankBookingRequest();
+    request.setAccount(cartelAccount);
+    request.setRequestedBy(UUID.randomUUID());
+
+    BankAccessRules.ForeignRequestScope scope = policy.foreignRequestScope(ol, null);
+
+    assertThat(scope.candidateAccountIds()).containsExactly(cartelAccount.getId());
+    assertThat(scope.shows(null, cartelAccount.getId())).isFalse();
+    assertThat(scope.approves(request)).isFalse();
+    assertThat(policy.mayApprove(ol, request, null)).isFalse();
+    request.setRequiredApprover(BankRequestApprover.BANK_MANAGEMENT);
+    assertThat(scope.approves(request)).isFalse();
+    request.setRequiredApprover(BankRequestApprover.ORGANISATIONSLEITUNG);
+    assertThat(scope.approves(request)).isTrue();
+    assertThat(policy.mayApprove(ol, request, null)).isTrue();
+  }
+
+  @Test
   void holderRights_pinOnAnotherOwnUnit_leaveTheAccountOutOfContext() {
     stubFind(staffelAccount);
     BankActor lead =

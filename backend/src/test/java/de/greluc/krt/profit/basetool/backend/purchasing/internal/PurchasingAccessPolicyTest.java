@@ -338,10 +338,9 @@ class PurchasingAccessPolicyTest {
   }
 
   @Test
-  void theLeadOfAUnitPausesOnlyThatUnitAndNotTheWholeOrganisation() {
+  void aSpecialCommandLeadPausesOnlyThatUnitAndNotTheWholeOrganisation() {
     noLeadership();
-    when(accessGateService.canActAsOfficerIn(UNIT)).thenReturn(false);
-    when(accessGateService.hasRoleInOrgUnit(UNIT, "LEAD")).thenReturn(true);
+    when(accessGateService.canActAsOfficerIn(UNIT)).thenReturn(true);
 
     assertThat(policy.canPause(UNIT)).isTrue();
     assertThat(policy.canPause(null)).isFalse();
@@ -351,7 +350,6 @@ class PurchasingAccessPolicyTest {
   void aMemberWhoLeadsNothingPausesNothing() {
     noLeadership();
     when(accessGateService.canActAsOfficerIn(UNIT)).thenReturn(false);
-    when(accessGateService.hasRoleInOrgUnit(UNIT, "LEAD")).thenReturn(false);
 
     assertThat(policy.canPause(UNIT)).isFalse();
   }
@@ -368,7 +366,6 @@ class PurchasingAccessPolicyTest {
     UUID other = UUID.randomUUID();
     when(accessGateService.canActAsOfficerIn(UNIT)).thenReturn(true);
     when(accessGateService.canActAsOfficerIn(other)).thenReturn(false);
-    when(accessGateService.hasRoleInOrgUnit(other, "LEAD")).thenReturn(false);
 
     assertThat(policy.leadsUnit(UNIT)).isTrue();
     assertThat(policy.leadsUnit(other)).isFalse();

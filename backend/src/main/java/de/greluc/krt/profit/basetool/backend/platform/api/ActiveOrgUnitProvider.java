@@ -19,24 +19,16 @@
 
 package de.greluc.krt.profit.basetool.backend.platform.api;
 
-import java.util.Optional;
-import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
-/**
- * Supplies the org unit the current request acts in, for the {@code orgUnitId} MDC field (plan
- * §5.3).
- *
- * <p>Owned by the platform and implemented by the scope module. It is asked only for an
- * authenticated request.
- */
+/** Supplies the effective org-unit context for the authenticated request's MDC. */
 public interface ActiveOrgUnitProvider {
 
   /**
-   * The org unit the current caller acts in: an admin's active selection, else the home org unit.
+   * Returns the effective context's bounded log value.
    *
-   * @return the org unit id, or empty for an admin without a selection or an unassigned member
+   * @return an org-unit UUID, {@code mine}, {@code all}, or {@code none}
    */
   @NotNull
-  Optional<UUID> activeOrgUnitId();
+  String activeOrgUnitLogValue();
 }

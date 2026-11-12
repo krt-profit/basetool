@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.TermsAcceptanceGateFilter;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationBulkResultDto;
@@ -424,6 +425,17 @@ public class NotificationPageController {
       @org.jetbrains.annotations.NotNull NotificationDto dto,
       Locale locale,
       NotificationTargets.@org.jetbrains.annotations.NotNull Viewer viewer) {
+    String href =
+        NotificationTargets.targetOf(dto.type(), dto.entityType(), dto.entityId(), viewer);
+    String unitLabel = unitLabel(dto, locale);
+    UUID activeUnit = ActiveSquadronContext.get();
+    String hint =
+        unitLabel != null
+                && activeUnit != null
+                && !activeUnit.equals(dto.orgUnitId())
+                && NotificationTargets.usesActiveUnit(href)
+            ? messageSource.getMessage("notifications.activeUnitHint", null, locale)
+            : null;
     return new NotificationViewDto(
         dto.id(),
         render(dto.type(), dto.params(), locale),
@@ -431,7 +443,19 @@ public class NotificationPageController {
         dto.createdAt() == null ? "" : DISPLAY_FORMAT.format(dto.createdAt()),
         dto.entityType(),
         dto.entityId(),
-        NotificationTargets.targetOf(dto.type(), dto.entityType(), dto.entityId(), viewer));
+        href,
+        unitLabel,
+        hint);
+  }
+
+  private String unitLabel(NotificationDto dto, Locale locale) {
+    if (dto.orgUnitName() != null) {
+      return dto.orgUnitName();
+    }
+    return dto.orgUnitKind() == null
+        ? null
+        : messageSource.getMessage(
+            "notifications.orgUnitKind." + dto.orgUnitKind(), null, null, locale);
   }
 
   /**

@@ -115,7 +115,8 @@ class MassAssignmentGuardTest {
           .importPackages("de.greluc.krt.profit.basetool.guardfixture.massassignment");
 
   private static final String STAMP =
-      "create-time stamp, resolved by OrgUnitStampingService.resolveOrgUnitForPickerOutput"
+      "create-time stamp, resolved by OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable,"
+          + " resolveOrgUnitForUnitOwnedAggregate or resolveOrgUnitForAdminOnBehalf"
           + " (REQ-ORG-004)";
 
   private static final String MOVE_TARGET =
@@ -124,7 +125,7 @@ class MassAssignmentGuardTest {
 
   private static final String REBOOK_TARGET =
       "stamp of the rebooked stock, resolved by"
-          + " OrgUnitStampingService.resolveOrgUnitForPickerOutput";
+          + " OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable";
 
   private static final String JOB_ORDER_UNITS =
       "processing and customer unit, validated by JobOrderOrgUnitResolver (REQ-ORG-003)";

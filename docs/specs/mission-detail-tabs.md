@@ -557,15 +557,33 @@ their expenses (REQ-SEC-042 holds the same for a refinery order's mission link).
   active context (REQ-ORG-032), for an ownerless operation one in an Organisationsleitung or Bereich
   unit, an admin within their own scope. Reading the operation through a read escape (an ownerless
   operation, a participation) is not enough. A refused link answers `403`, an unknown operation
-  `404`, and nothing is written. The core patch checks the link only when it changes: an unchanged
-  link is not re-checked, so a mission another unit's operation already holds stays editable, and
-  clearing the link is always allowed. The mission module asks through its read SPI
-  (`mission.api.OperationSummaryProvider#linkability`), which the operation module answers.
+  `404`, and nothing is written. A core patch that keeps its link needs no operation edit right.
+  The mission module asks its operation SPI when the link changes.
+- **A paid-out mark freezes the payout inputs.** Adding, removing or moving a mission link
+  answers `409 Conflict` while either operation has any current paid-out mark, in any operation
+  status. The same freeze covers deleting the operation or a linked mission, changing mission actual
+  times, modifying the roster or attendance and payout choices, and adding, changing or removing
+  mission finance entries or linked refinery figures. Independent changes such as renaming a mission
+  remain available. The existing payout-clear gate can reverse the marks. Ordinary changes can resume
+  once the last current mark is cleared. Required identity unlink and ownership reassignment during
+  account erasure retain their own rules (REQ-DATA-008). Authorized payout reviewers see any mark
+  without a current row separately. Its opaque key can reverse that operation's mark through the
+  same payout endpoint without displaying the former participant key. The mark's history remains.
+- **Payout basis.** The first current mark retains the transfer-fee rate and the reference time used
+  for open attendance. Further marks and reads share that basis until the final reversal. The
+  migration records the then-current basis for existing marks. See [ADR-0375](../adr/0375-operation-payout-inputs-freeze-while-paid.md).
+- **Review of stored links.** [`scripts/mission-operation-link-review.sql`](../../scripts/mission-operation-link-review.sql)
+  reports links between different owning units, including cases where only one side has a unit.
+  Its output contains ids, statuses and dates only. The report flags candidates for review, including
+  legitimate joint operations. The owner reviews each link and uses the mission's core edit for any
+  correction.
 - **The picker offers what may be linked.** `GET /api/v1/operations/lookup` lists exactly the
-  operations the caller may edit (`OperationAccessPolicy.OPERATION_EDIT_PREDICATE`), within the
-  status and recency bound of ADR-0081. The edit mode's operation select adds the mission's current
+  operations the caller may edit (`OperationAccessPolicy.OPERATION_EDIT_PREDICATE`) without any
+  paid-out marks, within the status and recency bound of ADR-0081. The edit mode's operation select adds the mission's current
   operation when it is not among them, so saving the core section keeps a link the editor could not
-  set.
+  set. The operation detail hides the new-mission action while payout inputs are frozen and
+  refreshes it after payout changes. If a create-form preset is unavailable, the form returns 409
+  and keeps the unavailable value selected until the member explicitly picks another option.
 - **Everyone who sees the mission sees its operation.** The detail DTO and the list row embed the
   linked operation whatever the caller may read of it, resolved for the whole page in one statement
   (REQ-DATA-003). By owner decision the operation's name is part of the mission and cross-unit by
@@ -577,13 +595,15 @@ their expenses (REQ-SEC-042 holds the same for a refinery order's mission link).
   caller may only read, or not read at all, is refused (`403`) and writes nothing.
 - [x] A Mission Manager of the operation's unit links a mission to it; an unknown operation is a
   `404`.
-- [x] A core patch that keeps a link the caller could not set is not re-checked, and clearing a link
-  is allowed.
-- [x] The operation picker lists exactly the operations the caller may edit.
+- [x] A core patch may keep a link the caller could not set. A move to or from an operation with a
+  paid-out mark is refused, as are changes to its payout inputs. Authorized reversal of every mark
+  makes them editable again.
+- [x] The operation picker excludes operations that cannot accept a new link.
 - [x] The edit mode keeps the mission's current operation selected, with its name, when the caller
   may not link to it, and lists a linkable current operation once.
 
 **Enforced by:** `MissionServiceOperationLinkTest`, `OperationSummaryReaderTest`,
+`OperationPayoutStatusConcurrencyTest`,
 `OperationScopeParityTest`, `OperationModuleContractTest`, `MissionOperationReadNoNPlusOneTest`,
 `MissionDetailPatternRenderTest` · **Code:** `MissionService#requireLinkableOperation`,
 `OperationSummaryReader`, `OperationAccessPolicy`, `OperationService#findAllReference`,

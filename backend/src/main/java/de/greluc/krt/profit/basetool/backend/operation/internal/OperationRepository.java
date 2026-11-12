@@ -39,6 +39,17 @@ import org.springframework.stereotype.Repository;
 public interface OperationRepository extends JpaRepository<Operation, UUID> {
 
   /**
+   * Serialises a payout mark or reversal against changes to the same calculation's inputs.
+   *
+   * @param operationId the calculation to lock until transaction completion
+   * @return a scalar acknowledgment
+   */
+  @Query(
+      value = "SELECT 1 FROM pg_advisory_xact_lock(operation_payout_lock_key(:operationId))",
+      nativeQuery = true)
+  int lockPayoutCalculation(@Param("operationId") UUID operationId);
+
+  /**
    * Counts operations in the given lifecycle status, backing the {@code basetool_operation_open_*}
    * queue-depth gauge (REQ-OBS-011).
    *
@@ -114,7 +125,8 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
    *
    * <p>Uses {@link OperationAccessPolicy#OPERATION_EDIT_PREDICATE}, which carries no read escape.
    * {@code PLANNED} / {@code ACTIVE} operations are always returned, {@code COMPLETED} / {@code
-   * CANCELED} ones only when created on or after {@code cutoff}.
+   * CANCELED} ones only when created on or after {@code cutoff}. Operations with a paid-out mark
+   * are excluded.
    *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
    * @param activeOrgUnitId the OrgUnit a pinned admin edits, or {@code null}
@@ -131,6 +143,9 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
       o.id, o.name) FROM Operation o WHERE (
         o.status IN ('PLANNED', 'ACTIVE')
         OR (o.status IN ('COMPLETED', 'CANCELED') AND o.createdAt >= :cutoff)
+      ) AND NOT EXISTS (
+        SELECT 1 FROM OperationPayoutStatus payout
+        WHERE payout.operation.id = o.id AND payout.paidOut = true
       ) AND
       """
           + OperationAccessPolicy.OPERATION_EDIT_PREDICATE

@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReconciliationService;
 import de.greluc.krt.profit.basetool.backend.identity.api.events.UserRolesChangedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
@@ -190,6 +191,21 @@ class CustomJwtGrantedAuthoritiesConverterTest {
         converter.assembleFor(user).stream().map(GrantedAuthority::getAuthority).toList();
 
     assertTrue(authorities.contains("ROLE_ADMIN"));
+  }
+
+  @Test
+  void assembledPermissionsComeOnlyFromTheClosedVocabulary() {
+    User user = userWithNoRoles();
+    Role role = codeRole(Roles.BANK_EMPLOYEE);
+    role.setPermissions(Set.of(Permissions.HANGAR_READ, "UNRECOGNIZED_PERMISSION"));
+    user.setRoles(Set.of(role));
+
+    Collection<String> authorities =
+        converter.assembleFor(user).stream().map(GrantedAuthority::getAuthority).toList();
+
+    assertEquals(
+        Set.of(Roles.authority(Roles.BANK_EMPLOYEE), Permissions.HANGAR_READ),
+        Set.copyOf(authorities));
   }
 
   /**

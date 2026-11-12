@@ -33,12 +33,24 @@ import org.jetbrains.annotations.Nullable;
  * @param globalReason why, or {@code null} while running
  * @param globalPausedAt since when, or {@code null} while running
  * @param units the raising units whose needs may not be bought
+ * @param mayManageGlobal whether the caller can pause or resume the whole organisation
+ * @param pausableUnits the active raising units the caller may pause
  */
 public record PauseStateDto(
     boolean globalPaused,
     @Nullable PauseReason globalReason,
     @Nullable Instant globalPausedAt,
-    List<UnitPause> units) {
+    List<UnitPause> units,
+    boolean mayManageGlobal,
+    List<PausableUnit> pausableUnits) {
+
+  /**
+   * An active raising unit that the caller may pause.
+   *
+   * @param orgUnitId the unit
+   * @param orgUnitName the unit's name
+   */
+  public record PausableUnit(UUID orgUnitId, String orgUnitName) {}
 
   /**
    * One paused raising unit.
@@ -47,7 +59,12 @@ public record PauseStateDto(
    * @param orgUnitName the unit's name
    * @param reason why it is paused
    * @param pausedAt since when
+   * @param mayResume whether the caller may resume purchasing for the unit
    */
   public record UnitPause(
-      UUID orgUnitId, String orgUnitName, PauseReason reason, Instant pausedAt) {}
+      UUID orgUnitId,
+      String orgUnitName,
+      PauseReason reason,
+      Instant pausedAt,
+      boolean mayResume) {}
 }

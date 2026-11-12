@@ -59,8 +59,8 @@ class NavigationAppearanceServiceTest {
   private double writes(NavigationWriteOutcome outcome) {
     return meterRegistry
         .counter(
-            NavigationMetrics.PREFERENCE_WRITES,
-            NavigationMetrics.TAG_SECTION,
+            NavigationMetricNames.PREFERENCE_WRITES,
+            NavigationMetricNames.TAG_SECTION,
             NavigationSection.APPEARANCE.getTag(),
             MetricNames.TAG_OUTCOME,
             outcome.getTag())

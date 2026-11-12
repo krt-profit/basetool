@@ -31,6 +31,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -106,6 +107,16 @@ public class OperationPayoutStatus extends AbstractEntity<UUID> {
   @Column(name = "paid_out_at")
   @Nullable
   private Instant paidOutAt;
+
+  /** Transfer-fee rate shared by all current paid marks of this operation. */
+  @Column(name = "settlement_fee_rate", columnDefinition = "numeric")
+  @Nullable
+  private BigDecimal settlementFeeRate;
+
+  /** Reference time used when a participant's attendance remains open. */
+  @Column(name = "settlement_calculated_at")
+  @Nullable
+  private Instant settlementCalculatedAt;
 
   /**
    * The user (mission manager / officer / admin) who most recently flipped the flag to paid. Lazy

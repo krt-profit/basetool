@@ -33,7 +33,10 @@ import org.springframework.http.HttpStatus;
 public enum IdentityProblemCode implements ProblemCode {
 
   /** The last active admin was about to lose the Admin role (REQ-SEC-088). */
-  LAST_ADMIN(HttpStatus.CONFLICT);
+  LAST_ADMIN(HttpStatus.CONFLICT),
+
+  /** A role permission is outside the closed vocabulary (REQ-SEC-088). */
+  UNKNOWN_ROLE_PERMISSION(HttpStatus.BAD_REQUEST);
 
   /** The status the code is answered with. */
   private final HttpStatus status;

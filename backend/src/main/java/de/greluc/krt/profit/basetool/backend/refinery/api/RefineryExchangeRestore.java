@@ -32,7 +32,7 @@ import org.jetbrains.annotations.NotNull;
  * @param gameDataVersion the game-data counter it comes back with
  * @param financesVersion the finances counter it comes back with
  * @param origin its creation, unit, mission, pickup and notice markers; the unit only while the
- *     owner is a direct member of it, the mission only while that mission exists
+ *     owner may stamp it, the mission only while that mission exists
  */
 public record RefineryExchangeRestore(
     @NotNull UUID id,

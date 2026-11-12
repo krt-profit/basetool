@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientRep
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeClientStatus;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettings;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeSettingsRepository;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeUndoService;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
@@ -93,6 +94,7 @@ class ExchangeUndoControllerTest {
   @Autowired private RoleRepository roleRepository;
   @Autowired private ExchangeClientRepository clientRepository;
   @Autowired private ExchangeSettingsRepository settingsRepository;
+  @Autowired private ExchangeUndoService undoService;
   @Autowired private BlueprintRepository blueprintRepository;
   @Autowired private BlueprintNameNormalizer normalizer;
   @Autowired private KnownExchangeClients knownClients;
@@ -608,6 +610,30 @@ class ExchangeUndoControllerTest {
             jdbc.queryForList(
                 "SELECT owning_org_unit_id FROM ship WHERE owner_id = ?", UUID.class, member))
         .containsExactly(squadron);
+  }
+
+  @Test
+  void aFormerMembersShipComesBackWithoutItsEarlierUnit() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID squadron = orgUnit("SQUADRON");
+    joins(squadron);
+    UUID removed = ship("Retired", cutlass, squadron);
+    Instant since = Instant.now().minus(1, ChronoUnit.MINUTES);
+    write(
+            "ships",
+            "{\"ops\":[{\"op\":\"remove\",\"shipId\":\"%s\",\"version\":0}]}".formatted(removed))
+        .andExpect(jsonPath("$.applied").value(1));
+    jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
+
+    var result = undoService.undo(member, client, since);
+
+    assertThat(result.restored()).isOne();
+    assertThat(result.skipped()).isEmpty();
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT name, owning_org_unit_id FROM ship WHERE owner_id = ?", member))
+        .containsEntry("name", "Retired")
+        .containsEntry("owning_org_unit_id", null);
   }
 
   @Test

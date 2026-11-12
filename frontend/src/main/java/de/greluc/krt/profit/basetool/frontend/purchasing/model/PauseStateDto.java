@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.BackendEnumAsString;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code PauseStateDto}; must match it field for field.
@@ -31,10 +32,24 @@ import java.util.List;
  * @param globalReason the reason, or {@code null}
  * @param globalPausedAt since when, or {@code null}
  * @param units the paused raising units
+ * @param mayManageGlobal whether the caller may manage the global pause
+ * @param pausableUnits the raising units the caller may pause
  */
 @DtoMirror
 public record PauseStateDto(
     boolean globalPaused,
     @BackendEnumAsString String globalReason,
     Instant globalPausedAt,
-    List<UnitPause> units) {}
+    List<UnitPause> units,
+    boolean mayManageGlobal,
+    List<PausableUnit> pausableUnits) {
+
+  /**
+   * Frontend mirror of the backend pause scope option.
+   *
+   * @param orgUnitId the unit
+   * @param orgUnitName the unit's name
+   */
+  @DtoMirror
+  public record PausableUnit(UUID orgUnitId, String orgUnitName) {}
+}

@@ -549,7 +549,6 @@
 /orders/{id}/items/update POST -> JobOrderWriteController#updateItemOrder gate=class:isAuthenticated() layout=yes
 /orders/{id}/items/update POST headers=[X-Requested-With=XMLHttpRequest] -> JobOrderWriteController#updateItemOrderAjax gate=class:isAuthenticated() layout=yes
 /orders/{id}/items/{itemId}/production POST consumes=[application/json] -> JobOrderWriteController#bookProductionAjax gate=class:isAuthenticated() layout=yes
-/orders/{id}/materials/unlink POST -> JobOrderWriteController#unlinkMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/materials/{matId}/attribution GET headers=[X-Requested-With=XMLHttpRequest] -> JobOrderStockAttributionProxyController#stockAttribution gate=class:isAuthenticated() layout=no
 /orders/{id}/materials/{matId}/inventory GET -> JobOrderPageController#getInventoryItemsForMaterial gate=class:isAuthenticated() layout=yes
 /orders/{id}/money/bank-accounts GET -> JobOrderMoneyProxyController#bankAccounts gate=class:isAuthenticated() layout=no

@@ -67,6 +67,7 @@ class ApprovalNeededNoticeIntegrationTest {
   private static final UUID APPROVER = UUID.fromString("44444444-4444-4444-4444-4444444531c4");
   private static final UUID FORMER_EMPLOYEE =
       UUID.fromString("44444444-4444-4444-4444-4444444531c5");
+  private static final UUID ADMIN = UUID.fromString("44444444-4444-4444-4444-4444444531c6");
   private static final BigDecimal AMOUNT = new BigDecimal("2500000");
 
   @Autowired private NotificationCreationService creationService;
@@ -187,6 +188,24 @@ class ApprovalNeededNoticeIntegrationTest {
         .containsExactly(NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED);
     assertThat(inbox(GRANTEE)).containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
     assertThat(inbox(REQUESTER)).isEmpty();
+  }
+
+  @Test
+  void aHolderRoutedRequestWithoutAnEligibleApproverNotifiesTheAdministrators() {
+    Role admin = roleRepository.findByNameIgnoreCase("Admin").orElseThrow();
+    user(ADMIN, "approval-admin", Set.of(admin));
+    BankBookingRequest request = pendingRequest(true);
+    request.setRequiredApprover(BankRequestApprover.RESPONSIBLE_HOLDER);
+    requestRepository.saveAndFlush(request);
+
+    created(request);
+
+    assertThat(inbox(ADMIN)).containsExactly(NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED);
+    assertThat(inbox(MANAGER)).containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+    assertThat(inbox(GRANTEE)).containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+    assertThat(inbox(REQUESTER)).isEmpty();
+    approve(request);
+    assertThat(inbox(ADMIN)).doesNotContain(NotificationType.BANK_BOOKING_REQUEST_APPROVAL_NEEDED);
   }
 
   @Test

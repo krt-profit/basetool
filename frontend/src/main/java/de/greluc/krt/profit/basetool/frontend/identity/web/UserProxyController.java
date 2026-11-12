@@ -88,20 +88,21 @@ public class UserProxyController {
   }
 
   /**
-   * Forwards the per-user membership lookup for the bank counterparty org-unit picker
-   * (REQ-BANK-044); empty on backend failure.
+   * Forwards the membership lookup for counterparty and owner pickers.
    *
-   * @param userId the counterparty user whose org-unit memberships to list
+   * @param userId the user whose org-unit memberships to list
    * @param allKinds {@code true} to include all four org-unit kinds, else Staffel and SK only
+   * @param ownerPicker {@code true} to list only the member's stampable units
    * @return the user's membership options, never {@code null}
    */
   @GetMapping("/{userId}/memberships")
   @PreAuthorize("isAuthenticated()")
   public List<OrgUnitMembershipOptionDto> userMemberships(
       @PathVariable UUID userId,
-      @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
+      @RequestParam(required = false, defaultValue = "false") boolean allKinds,
+      @RequestParam(defaultValue = "false") boolean ownerPicker) {
     List<OrgUnitMembershipOptionDto> memberships =
-        identityClient.membershipOptions(userId, allKinds);
+        identityClient.membershipOptions(userId, allKinds, ownerPicker);
     return memberships != null ? memberships : List.of();
   }
 

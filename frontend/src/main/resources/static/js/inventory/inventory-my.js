@@ -30,6 +30,7 @@ import {
 import { showFrontendErrorToast, showFrontendSuccessToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { ownerPickerError, refreshOwnerPicker } from '/js/kernel/krt-owner-picker.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { krtFilterChips } from '/js/kernel/krt-filter-chips.js';
@@ -382,9 +383,10 @@ function refreshBulkRebookOrgUnitPicker() {
     );
     if (!wrapper || !select) return;
     const mode = bulkRebookMode();
-    select.replaceChildren();
-    wrapper.hidden = true;
-    if (mode === 'PERSONALIZE') return;
+    if (mode === 'PERSONALIZE') {
+        refreshOwnerPicker(select, wrapper, null);
+        return;
+    }
     const userSelect = /** @type {HTMLInputElement | null} */ (
         document.getElementById('bulkRebookTargetUserId')
     );
@@ -392,22 +394,13 @@ function refreshBulkRebookOrgUnitPicker() {
         mode === 'LOCATION' && userSelect && userSelect.value
             ? userSelect.value
             : currentInventoryUserId();
-    if (!ownerId) return;
-    krtFetch
-        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
-        .then((memberships) => {
-            if (!Array.isArray(memberships) || memberships.length < 1) return;
-            memberships.forEach((opt) => {
-                const o = document.createElement('option');
-                o.value = opt.orgUnitId;
-                o.textContent = opt.orgUnitName;
-                select.appendChild(o);
-            });
-            wrapper.hidden = false;
-        })
-        .catch(() => {
-            wrapper.hidden = true;
-        });
+    refreshOwnerPicker(
+        select,
+        wrapper,
+        ownerId
+            ? `/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true&ownerPicker=true`
+            : null,
+    );
 }
 
 function toggleBulkRebookMode() {
@@ -513,10 +506,12 @@ function submitBulkRebook(event) {
     const orgSelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('bulkRebookOrgUnitId')
     );
-    const orgUnitId =
-        orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
-            ? orgSelect.value || null
-            : null;
+    const pickerError = ownerPickerError(orgSelect);
+    if (pickerError !== null) {
+        showBulkRebookError(pickerError);
+        return;
+    }
+    const orgUnitId = orgWrapper && !orgWrapper.hidden ? orgSelect?.value || null : null;
     const mergeCheckbox = /** @type {HTMLInputElement | null} */ (
         document.getElementById('bulkRebookMergeStock')
     );
@@ -1047,18 +1042,14 @@ document.addEventListener('change', (event) => {
 
 /** @type {string | null} */
 let umbuchenItemId = null;
-/** @type {string | null} */
-let umbuchenCurrentOwningOrgUnitId = null;
 let umbuchenInFlight = false;
 /** @type {{ userId: string | null, locationId: string | null }} */
 let umbuchenSource = { userId: null, locationId: null };
 
 /**
- * Fills the de-personalize org-unit picker with the row owner's memberships of all four org-unit
- * kinds, preset to the row's owning unit or else the owner's primary unit; hidden when the owner
- * has no membership.
+ * Refreshes the de-personalization destination for the owner.
  *
- * @param {string | null} ownerId the row owner's user id
+ * @param {string | null} ownerId the row owner's user id, or null to clear the picker
  */
 function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
     const wrapper = document.getElementById('umbuchenPersonalOrgUnitWrapper');
@@ -1066,32 +1057,13 @@ function refreshUmbuchenPersonalOrgUnitPicker(ownerId) {
         document.getElementById('umbuchenPersonalOrgUnitId')
     );
     if (!wrapper || !select) return;
-    select.replaceChildren();
-    wrapper.hidden = true;
-    if (!ownerId) return;
-    krtFetch
-        .getJson(`/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true`)
-        .then((memberships) => {
-            if (!Array.isArray(memberships) || memberships.length < 1) return;
-            memberships.forEach((opt) => {
-                const o = document.createElement('option');
-                o.value = opt.orgUnitId;
-                o.textContent = opt.orgUnitName;
-                select.appendChild(o);
-            });
-            if (
-                umbuchenCurrentOwningOrgUnitId &&
-                memberships.some((m) => {
-                    return m.orgUnitId === umbuchenCurrentOwningOrgUnitId;
-                })
-            ) {
-                select.value = umbuchenCurrentOwningOrgUnitId;
-            }
-            wrapper.hidden = false;
-        })
-        .catch(() => {
-            wrapper.hidden = true;
-        });
+    refreshOwnerPicker(
+        select,
+        wrapper,
+        ownerId
+            ? `/users/${encodeURIComponent(ownerId)}/memberships?allKinds=true&ownerPicker=true`
+            : null,
+    );
 }
 
 /**
@@ -1169,7 +1141,6 @@ function toggleUmbuchenMode() {
  * @param {string | null} quantityType `PIECE` or `SCU`
  * @param {boolean} personal whether the entry is personal
  * @param {boolean} hasAssoc whether the entry carries job-order or mission earmarks
- * @param {string | null} owningOrgUnitId the row's owning org unit
  */
 function openUmbuchenModal(
     id,
@@ -1182,12 +1153,9 @@ function openUmbuchenModal(
     quantityType,
     personal,
     hasAssoc,
-    owningOrgUnitId,
 ) {
     umbuchenItemId = id;
     umbuchenSource = { userId: userId || null, locationId: locationId || null };
-    umbuchenCurrentOwningOrgUnitId = owningOrgUnitId || null;
-    myLager.setUmbuchenCurrentOwningOrgUnit(umbuchenCurrentOwningOrgUnitId);
     const isScu = quantityType !== 'PIECE';
     const amountEl = /** @type {HTMLInputElement | null} */ (
         document.getElementById('umbuchenAmount')
@@ -1256,8 +1224,7 @@ function openUmbuchenModal(
     if (!personalizing) {
         refreshUmbuchenPersonalOrgUnitPicker(userId);
     } else {
-        const w = document.getElementById('umbuchenPersonalOrgUnitWrapper');
-        if (w) w.hidden = true;
+        refreshUmbuchenPersonalOrgUnitPicker(null);
     }
 
     const locationMode = /** @type {HTMLInputElement | null} */ (
@@ -1301,10 +1268,12 @@ function submitUmbuchen(event) {
         const orgSelect = /** @type {HTMLSelectElement | null} */ (
             document.getElementById('umbuchenPersonalOrgUnitId')
         );
-        const orgUnitId =
-            orgWrapper && window.getComputedStyle(orgWrapper).display !== 'none' && orgSelect
-                ? orgSelect.value || null
-                : null;
+        const pickerError = ownerPickerError(orgSelect);
+        if (pickerError !== null) {
+            showFrontendErrorToast(pickerError);
+            return;
+        }
+        const orgUnitId = orgWrapper && !orgWrapper.hidden ? orgSelect?.value || null : null;
         payload = {
             amount,
             version,
@@ -1312,6 +1281,14 @@ function submitUmbuchen(event) {
             mergeStock,
         };
     } else {
+        const targetOrgUnit = /** @type {HTMLSelectElement | null} */ (
+            document.getElementById('umbuchenTargetOwningOrgUnitId')
+        );
+        const pickerError = ownerPickerError(targetOrgUnit);
+        if (pickerError !== null) {
+            showFrontendErrorToast(pickerError);
+            return;
+        }
         const targetUserId = myFieldValue('umbuchenTargetUserId') || null;
         const targetLocationId = myFieldValue('umbuchenTargetLocationId') || null;
         if (
@@ -1332,7 +1309,7 @@ function submitUmbuchen(event) {
             type: 'TRANSFER',
             targetUserId,
             targetLocationId,
-            targetOwningOrgUnitId: myFieldValue('umbuchenTargetOwningOrgUnitId') || null,
+            targetOwningOrgUnitId: targetOrgUnit?.value || null,
             version,
             mergeStock,
             jobOrderReductions: reductions.jobOrderReductions,
@@ -1392,7 +1369,7 @@ function fillOrgUnitChangePicker(currentOrgUnitId) {
     const me = currentInventoryUserId();
     if (!me) return;
     krtFetch
-        .getJson(`/users/${encodeURIComponent(me)}/memberships?allKinds=true`)
+        .getJson(`/users/${encodeURIComponent(me)}/memberships?allKinds=true&ownerPicker=true`)
         .then((memberships) => {
             if (!Array.isArray(memberships)) return;
             memberships.forEach((opt) => {
@@ -1636,7 +1613,6 @@ krtEvents.on('click', 'inv-my-umbuchen', (el) => {
         el.getAttribute('data-quantity-type'),
         el.getAttribute('data-personal') === 'true',
         el.getAttribute('data-has-assoc') === 'true',
-        el.getAttribute('data-owning-org-unit-id'),
     );
 });
 krtEvents.on('click', 'inv-my-open-note', (el) => {

@@ -129,6 +129,27 @@ class UserMembershipsSecurityTest {
    * @throws Exception MockMvc plumbing.
    */
   @Test
+  void ownerPickerRejectsBankOnlyCaller() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID())
+                .param("allKinds", "true")
+                .param("ownerPicker", "true")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_BANK_EMPLOYEE"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void ownerPickerAllowsMember() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID())
+                .param("ownerPicker", "true")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void getUserMemberships_anonymous_isRejected() throws Exception {
     mockMvc
         .perform(get("/api/v1/org-units/members/{id}/memberships", UUID.randomUUID()))

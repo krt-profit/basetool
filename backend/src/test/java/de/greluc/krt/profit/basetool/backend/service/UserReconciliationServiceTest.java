@@ -35,6 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountLinkReservation;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalRoleGrant;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.IdentityMetricNames;
@@ -124,6 +125,7 @@ class UserReconciliationServiceTest {
             userApprovalEventRepository,
             eventPublisher,
             keycloakService,
+            new AccountLinkReservation(userRepository),
             userDeletionService,
             approvalRoleGrant,
             selfProvider);

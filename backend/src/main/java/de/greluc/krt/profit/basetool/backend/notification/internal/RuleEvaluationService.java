@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRoleAudience;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRule;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleSelector;
@@ -26,11 +29,13 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.EnumMap;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
@@ -62,24 +67,121 @@ public class RuleEvaluationService {
    */
   @NotNull
   public Map<NotificationType, Set<UUID>> resolveRecipients(@NotNull NotificationEvent event) {
+    Map<NotificationType, Map<UUID, NotificationRoleAudience>> audiences =
+        resolveRoleAudiences(event);
+    dropOutranked(audiences, event.outrankedNotificationTypes());
+    return recipientIds(audiences);
+  }
+
+  @NotNull
+  Map<NotificationType, Map<UUID, NotificationRoleAudience>> resolveRoleAudiences(
+      @NotNull NotificationEvent event) {
     List<NotificationRule> rules =
         notificationRuleRepository.findEnabledByEventTypeWithSelectors(event.eventType());
-    Map<NotificationType, Set<UUID>> byType = new EnumMap<>(NotificationType.class);
+    Map<NotificationType, Map<UUID, NotificationRoleAudience>> byType =
+        new EnumMap<>(NotificationType.class);
     for (NotificationRule rule : rules) {
-      Set<UUID> recipients = new HashSet<>();
+      Map<UUID, NotificationRoleAudience> recipients = new HashMap<>();
       for (NotificationRuleSelector selector : rule.getSelectors()) {
-        recipients.addAll(resolveSelector(selector, event));
+        if (event
+            .eventType()
+            .permitsSelector(
+                selector.getKind(), selector.getRoleCode(), event.subjectOrgUnit() != null)) {
+          roleAudience(selector, event)
+              .forEach((id, audience) ->
+                  recipients.merge(id, audience, NotificationRoleAudience::union));
+        }
       }
       if (rule.isExcludeActor() && event.actorSub() != null) {
         recipients.remove(event.actorSub());
       }
-      recipients.removeIf(recipient -> !event.admitsRecipient(recipient));
+      recipients.keySet().removeIf(recipient -> !event.admitsRecipient(recipient));
       if (!recipients.isEmpty()) {
-        byType.computeIfAbsent(rule.getNotificationType(), _ -> new HashSet<>()).addAll(recipients);
+        Map<UUID, NotificationRoleAudience> typed =
+            byType.computeIfAbsent(rule.getNotificationType(), _ -> new HashMap<>());
+        recipients.forEach(
+            (id, audience) -> typed.merge(id, audience, NotificationRoleAudience::union));
       }
     }
-    dropOutranked(byType, event.outrankedNotificationTypes());
     return byType;
+  }
+
+  static @NotNull Map<NotificationType, Set<UUID>> recipientIds(
+      Map<NotificationType, Map<UUID, NotificationRoleAudience>> byType) {
+    return byType.entrySet().stream()
+        .collect(
+            Collectors.toUnmodifiableMap(
+                Map.Entry::getKey, entry -> Set.copyOf(entry.getValue().keySet())));
+  }
+
+  private @NotNull Map<UUID, NotificationRoleAudience> roleAudience(
+      NotificationRuleSelector selector, NotificationEvent event) {
+    return switch (selector.getKind()) {
+      case SPECIFIC_USER ->
+          selector.getUserId() == null
+              ? Map.of()
+              : Map.of(selector.getUserId(), NotificationRoleAudience.DIRECT);
+      case ROLE -> byStoredRole(selector.getRoleCode());
+      case ORG_RELATIVE_ROLE ->
+          audience(resolveOrgRelative(selector, event), NotificationRoleAudience.MEMBER);
+      case ACCOUNT_GRANT ->
+          audience(resolveAccountGrant(event), NotificationRoleAudience.BANK_STAFF);
+      case ACCOUNT_RESPONSIBLE ->
+          audience(resolveAccountResponsible(event), NotificationRoleAudience.MEMBER);
+      case REQUEST_RESPONSIBLE ->
+          audience(resolveRequestResponsible(event), NotificationRoleAudience.MEMBER);
+      case EVENT_RECIPIENT ->
+          audience(resolveEventRecipient(event), directedAudience(event.eventType()));
+      case EVENT_RECIPIENTS ->
+          audience(event.contextRecipientUserIds(), directedAudience(event.eventType()));
+      case MISSION_PARTICIPANTS ->
+          audience(resolveMissionParticipants(event), NotificationRoleAudience.DIRECT);
+      case MISSION_LEADERSHIP ->
+          audience(resolveMissionLeadership(event), NotificationRoleAudience.DIRECT);
+      case EXCHANGE_CLIENT_HOLDERS ->
+          audience(resolveExchangeClientHolders(event), NotificationRoleAudience.DIRECT);
+      case SEAT_HOLDERS ->
+          audience(
+              recipientResolutionService.resolveSeatHolders(), NotificationRoleAudience.MEMBER);
+      case REQUIRED_APPROVER -> requiredApproverAudience(event);
+    };
+  }
+
+  private Map<UUID, NotificationRoleAudience> byStoredRole(String roleCode) {
+    if (roleCode == null) {
+      return Map.of();
+    }
+    NotificationRoleAudience audience =
+        switch (roleCode) {
+          case Roles.KRT_MEMBER -> NotificationRoleAudience.MEMBER;
+          case Roles.BANK_EMPLOYEE -> NotificationRoleAudience.BANK_STAFF;
+          default -> NotificationRoleAudience.DIRECT;
+        };
+    return audience(recipientResolutionService.resolveByRole(roleCode), audience);
+  }
+
+  private static NotificationRoleAudience directedAudience(NotificationEventType eventType) {
+    return switch (eventType) {
+      case BANK_ACCOUNT_RESPONSIBLE_ASSIGNED,
+          JOB_ORDER_CLAIM_WITHDRAWN,
+          JOB_ORDER_PARTICIPATION_CHANGED ->
+          NotificationRoleAudience.MEMBER;
+      case BANK_GRANT_CHANGED -> NotificationRoleAudience.BANK_STAFF;
+      default -> NotificationRoleAudience.DIRECT;
+    };
+  }
+
+  private Map<UUID, NotificationRoleAudience> requiredApproverAudience(NotificationEvent event) {
+    UUID requestId = event.contextBankRequestId();
+    return requestId == null
+        ? Map.of()
+        : recipientResolutionService.requiredApproverAudience(requestId);
+  }
+
+  private static Map<UUID, NotificationRoleAudience> audience(
+      Set<UUID> recipients, NotificationRoleAudience audience) {
+    return recipients.stream()
+        .collect(Collectors.toUnmodifiableMap(Function.identity(), _ -> audience));
   }
 
   /**
@@ -89,59 +191,24 @@ public class RuleEvaluationService {
    * @param byType the resolved recipients by notification type, changed in place
    * @param outranked the outranked types by outranking type
    */
-  private static void dropOutranked(
-      @NotNull Map<NotificationType, Set<UUID>> byType,
+  static void dropOutranked(
+      @NotNull Map<NotificationType, Map<UUID, NotificationRoleAudience>> byType,
       @NotNull Map<NotificationType, Set<NotificationType>> outranked) {
     outranked.forEach((outranking, lower) -> {
-      Set<UUID> holders = byType.get(outranking);
+      Map<UUID, NotificationRoleAudience> holders = byType.get(outranking);
       if (holders == null) {
         return;
       }
       for (NotificationType type : lower) {
-        Set<UUID> recipients = byType.get(type);
+        Map<UUID, NotificationRoleAudience> recipients = byType.get(type);
         if (recipients != null) {
-          recipients.removeAll(holders);
+          recipients.keySet().removeAll(holders.keySet());
           if (recipients.isEmpty()) {
             byType.remove(type);
           }
         }
       }
     });
-  }
-
-  @NotNull
-  private Set<UUID> resolveSelector(
-      @NotNull NotificationRuleSelector selector, @NotNull NotificationEvent event) {
-    return switch (selector.getKind()) {
-      case SPECIFIC_USER -> selector.getUserId() == null ? Set.of() : Set.of(selector.getUserId());
-      case ROLE ->
-          selector.getRoleCode() == null
-              ? Set.of()
-              : recipientResolutionService.resolveByRole(selector.getRoleCode());
-      case ORG_RELATIVE_ROLE -> resolveOrgRelative(selector, event);
-      case ACCOUNT_GRANT -> resolveAccountGrant(event);
-      case ACCOUNT_RESPONSIBLE -> resolveAccountResponsible(event);
-      case EVENT_RECIPIENT -> resolveEventRecipient(event);
-      case EVENT_RECIPIENTS -> Set.copyOf(event.contextRecipientUserIds());
-      case MISSION_PARTICIPANTS -> resolveMissionParticipants(event);
-      case MISSION_LEADERSHIP -> resolveMissionLeadership(event);
-      case EXCHANGE_CLIENT_HOLDERS -> resolveExchangeClientHolders(event);
-      case SEAT_HOLDERS -> recipientResolutionService.resolveSeatHolders();
-      case REQUIRED_APPROVER -> resolveRequiredApprover(event);
-      case REQUEST_RESPONSIBLE -> resolveRequestResponsible(event);
-    };
-  }
-
-  @NotNull
-  private Set<UUID> resolveRequiredApprover(@NotNull NotificationEvent event) {
-    UUID requestId = event.contextBankRequestId();
-    if (requestId == null) {
-      log.debug(
-          "Event {} carries no booking request; REQUIRED_APPROVER selector resolves to nobody",
-          event.eventType());
-      return Set.of();
-    }
-    return recipientResolutionService.resolveRequiredApprovers(requestId);
   }
 
   @NotNull

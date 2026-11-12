@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.backend.purchasing.api.PauseReason;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.events.PurchasingNotices;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyRaisingUnits;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -72,6 +73,7 @@ class PurchasingPauseServiceTest {
   @Mock private PurchasingDelegateService delegateService;
   @Mock private PurchasingAccessPolicy accessPolicy;
   @Mock private OrgUnitRepository orgUnitRepository;
+  @Mock private SupplyRaisingUnits supplyRaisingUnits;
   @Mock private AuthHelperService authHelperService;
   @Mock private AuditRecorder auditRecorder;
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -88,6 +90,7 @@ class PurchasingPauseServiceTest {
             delegateService,
             accessPolicy,
             orgUnitRepository,
+            supplyRaisingUnits,
             authHelperService,
             auditRecorder,
             eventPublisher);
@@ -130,8 +133,15 @@ class PurchasingPauseServiceTest {
             List.of(
                 unitPause(known.getId(), PauseReason.INCIDENT),
                 unitPause(unknownUnit, PauseReason.OTHER)));
-    when(orgUnitRepository.findById(known.getId())).thenReturn(Optional.of(known));
-    when(orgUnitRepository.findById(unknownUnit)).thenReturn(Optional.empty());
+    Squadron other = squadron("Staffel Bravo");
+    Squadron inactive = squadron("Staffel Charlie");
+    inactive.setActive(false);
+    when(supplyRaisingUnits.raisingUnitIds())
+        .thenReturn(Set.of(known.getId(), other.getId(), inactive.getId()));
+    when(orgUnitRepository.findAllById(
+            Set.of(known.getId(), other.getId(), inactive.getId(), unknownUnit)))
+        .thenReturn(List.of(known, other, inactive));
+    when(accessPolicy.canPause(known.getId())).thenReturn(true);
 
     PauseStateDto state = service.state();
 
@@ -141,7 +151,12 @@ class PurchasingPauseServiceTest {
     assertThat(state.units()).hasSize(2);
     assertThat(state.units().get(0).orgUnitName()).isEqualTo("Staffel Alpha");
     assertThat(state.units().get(0).reason()).isEqualTo(PauseReason.INCIDENT);
+    assertThat(state.units().get(0).mayResume()).isTrue();
     assertThat(state.units().get(1).orgUnitName()).isEqualTo("—");
+    assertThat(state.units().get(1).mayResume()).isFalse();
+    assertThat(state.mayManageGlobal()).isFalse();
+    assertThat(state.pausableUnits())
+        .containsExactly(new PauseStateDto.PausableUnit(known.getId(), known.getName()));
   }
 
   @Test

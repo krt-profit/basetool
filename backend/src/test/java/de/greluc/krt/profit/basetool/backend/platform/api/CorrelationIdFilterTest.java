@@ -33,7 +33,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +67,7 @@ class CorrelationIdFilterTest {
 
   {
     when(authHelperService.isAuthenticated()).thenReturn(false);
-    when(activeOrgUnitProvider.activeOrgUnitId()).thenReturn(Optional.empty());
+    when(activeOrgUnitProvider.activeOrgUnitLogValue()).thenReturn("none");
   }
 
   @AfterEach
@@ -156,7 +155,7 @@ class CorrelationIdFilterTest {
       throws ServletException, IOException {
     UUID orgUnitId = UUID.randomUUID();
     when(authHelperService.isAuthenticated()).thenReturn(true);
-    when(activeOrgUnitProvider.activeOrgUnitId()).thenReturn(Optional.of(orgUnitId));
+    when(activeOrgUnitProvider.activeOrgUnitLogValue()).thenReturn(orgUnitId.toString());
 
     assertThat(orgUnitIdDuringChain()).isEqualTo(orgUnitId.toString());
   }
@@ -164,7 +163,7 @@ class CorrelationIdFilterTest {
   @Test
   void authenticatedAdminWithoutSelection_ShouldExposeAll() throws ServletException, IOException {
     when(authHelperService.isAuthenticated()).thenReturn(true);
-    when(authHelperService.isAdmin()).thenReturn(true);
+    when(activeOrgUnitProvider.activeOrgUnitLogValue()).thenReturn("all");
 
     assertThat(orgUnitIdDuringChain()).isEqualTo("all");
   }
@@ -177,11 +176,20 @@ class CorrelationIdFilterTest {
   }
 
   @Test
-  void failingOrgUnitLookup_ShouldExposeNone() throws ServletException, IOException {
+  void authenticatedMemberInAllMyOrgUnits_ShouldExposeMine() throws ServletException, IOException {
     when(authHelperService.isAuthenticated()).thenReturn(true);
-    when(activeOrgUnitProvider.activeOrgUnitId()).thenThrow(new IllegalStateException("no scope"));
+    when(activeOrgUnitProvider.activeOrgUnitLogValue()).thenReturn("mine");
 
-    assertThat(orgUnitIdDuringChain()).isEqualTo("none");
+    assertThat(orgUnitIdDuringChain()).isEqualTo("mine");
+  }
+
+  @Test
+  void failingOrgUnitLookup_ShouldExposeUnavailable() throws ServletException, IOException {
+    when(authHelperService.isAuthenticated()).thenReturn(true);
+    when(activeOrgUnitProvider.activeOrgUnitLogValue())
+        .thenThrow(new IllegalStateException("no scope"));
+
+    assertThat(orgUnitIdDuringChain()).isEqualTo("unavailable");
   }
 
   private String orgUnitIdDuringChain() throws ServletException, IOException {

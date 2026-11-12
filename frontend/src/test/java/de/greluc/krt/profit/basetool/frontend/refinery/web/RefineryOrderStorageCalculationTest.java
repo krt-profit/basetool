@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.refinery.web;
 
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
+import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LogisticianGate;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderDto;
@@ -39,6 +41,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -66,9 +70,32 @@ class RefineryOrderStorageCalculationTest {
     model = new ExtendedModelMap();
   }
 
-  @Test
-  void testStoreFormCalculationForPiece() {
+  private enum PickerCase {
+    ACTIVE_OPTION,
+    ONLY_OPTION,
+    EXPLICIT_CHOICE
+  }
+
+  @ParameterizedTest
+  @EnumSource(PickerCase.class)
+  void pieceOutputUsesTheEffectiveContextForItsUnit(PickerCase pickerCase) {
     UUID orderId = UUID.randomUUID();
+    UUID orderOrgUnitId = UUID.randomUUID();
+    UUID activeOrgUnitId = UUID.randomUUID();
+    UUID currentUserId = UUID.randomUUID();
+    OrgUnitMembershipOptionDto active =
+        new OrgUnitMembershipOptionDto(activeOrgUnitId, "Hel", "HEL", "SQUADRON");
+    OrgUnitMembershipOptionDto inherited =
+        new OrgUnitMembershipOptionDto(orderOrgUnitId, "A", "A", "SQUADRON");
+    if (pickerCase == PickerCase.ACTIVE_OPTION) {
+      model.addAttribute("activeSquadronId", activeOrgUnitId);
+    }
+    when(backendApiClient.get(
+            eq("/api/v1/org-units/members/{id}/memberships?allKinds=true&ownerPicker=true"),
+            anyTypeRef(),
+            eq(currentUserId)))
+        .thenReturn(
+            pickerCase == PickerCase.ONLY_OPTION ? List.of(active) : List.of(inherited, active));
     MaterialDto pieceMaterial =
         new MaterialDto(
             UUID.randomUUID(),
@@ -105,14 +132,14 @@ class RefineryOrderStorageCalculationTest {
             RefineryOrderStatus.OPEN,
             null,
             0L,
-            null,
+            orderOrgUnitId,
             null,
             null,
             null);
 
     when(backendApiClient.get(eq("/api/v1/refinery-orders/{id}"), anyClass(), eq(orderId)))
         .thenReturn(orderDto);
-    when(oidcUser.getSubject()).thenReturn(UUID.randomUUID().toString());
+    when(oidcUser.getSubject()).thenReturn(currentUserId.toString());
 
     controller.viewOrderDetail(orderId, null, model, oidcUser);
 
@@ -121,6 +148,9 @@ class RefineryOrderStorageCalculationTest {
     assertEquals(1, storeForm.getItems().size());
     RefineryOrderStoreItemForm item = storeForm.getItems().get(0);
 
+    assertEquals(
+        pickerCase == PickerCase.EXPLICIT_CHOICE ? null : activeOrgUnitId,
+        item.getOwningOrgUnitId());
     assertEquals(15.0, item.getAmount());
     assertEquals("PIECE", item.getQuantityType());
     assertTrue(item.getAmountFixed());

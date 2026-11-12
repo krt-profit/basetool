@@ -74,6 +74,16 @@ public interface NotificationEvent {
   Map<NotificationContextRole, OrgUnitRef> contextOrgUnits();
 
   /**
+   * Identifies the unit the subject belongs to for display on its notice.
+   *
+   * @return the subject's unit, or {@code null} when the event carries none
+   */
+  @Nullable
+  default OrgUnitRef subjectOrgUnit() {
+    return contextOrgUnits().get(NotificationContextRole.RESPONSIBLE);
+  }
+
+  /**
    * The bank account this event concerns, for {@code ACCOUNT_GRANT} selector resolution (the
    * employees holding a {@code bank_account_grant} on it). {@code null} for events that concern no
    * account — the default, so non-bank producers need not implement it.

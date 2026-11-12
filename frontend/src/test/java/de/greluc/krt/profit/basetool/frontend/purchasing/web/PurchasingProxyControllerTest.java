@@ -205,8 +205,9 @@ class PurchasingProxyControllerTest {
     PausePurchasingRequest pause = new PausePurchasingRequest(OTHER, "BUDGET");
     ResumePurchasingRequest resume = new ResumePurchasingRequest(OTHER);
     PauseStateDto paused =
-        new PauseStateDto(true, "BUDGET", Instant.parse("2026-09-01T12:00:00Z"), List.of());
-    PauseStateDto resumed = new PauseStateDto(false, null, null, List.of());
+        new PauseStateDto(
+            true, "BUDGET", Instant.parse("2026-09-01T12:00:00Z"), List.of(), true, List.of());
+    PauseStateDto resumed = new PauseStateDto(false, null, null, List.of(), true, List.of());
     when(purchasingClient.pause(pause)).thenReturn(paused);
     when(purchasingClient.resume(resume)).thenReturn(resumed);
 

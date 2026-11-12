@@ -29,6 +29,12 @@ import java.util.List;
  * @param totalDonations sum of donated shares, two-decimal scale; {@link BigDecimal#ZERO} when no
  *     participant donated
  * @param payouts the per-participant rows, sorted by participant name
+ * @param payoutInputsFrozen whether paid marks prevent an operation editor from changing links
+ * @param orphanedPaidMarkKeys opaque keys of paid marks with no current payout row, returned only
+ *     to callers who may reverse them
  */
 public record OperationPayoutSummaryDto(
-    BigDecimal totalDonations, List<OperationPayoutDto> payouts) {}
+    BigDecimal totalDonations,
+    List<OperationPayoutDto> payouts,
+    boolean payoutInputsFrozen,
+    List<String> orphanedPaidMarkKeys) {}

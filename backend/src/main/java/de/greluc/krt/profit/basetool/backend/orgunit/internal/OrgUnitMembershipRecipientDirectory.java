@@ -20,9 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.orgunit.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgUnitRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterDirectory;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +44,12 @@ public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDire
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitSeatEligibility seatEligibility;
   private final OrgUnitWriterDirectory writers;
+  private final OrgUnitRepository orgUnitRepository;
+
+  @Override
+  public @NotNull Optional<String> unitName(@NotNull UUID orgUnitId) {
+    return orgUnitRepository.findById(orgUnitId).map(OrgUnit::getName);
+  }
 
   /**
    * The members flagged as Lead of an org unit who hold {@code KRT Member}.

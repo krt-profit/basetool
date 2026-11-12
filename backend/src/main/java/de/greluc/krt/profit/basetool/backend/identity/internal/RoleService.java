@@ -24,13 +24,12 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.UnknownRolePermissionException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.CacheConfig;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -56,12 +55,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RoleService {
 
-  /**
-   * The permission names audit rows and log lines may name, read from the constants of {@link
-   * Permissions}. Values outside it are still applied but reported only as counts (REQ-AUDIT-001).
-   */
-  private static final Set<String> KNOWN_PERMISSIONS = readPermissionVocabulary();
-
   /** Rendered in place of an empty added/removed list so every detail keeps a non-empty value. */
   private static final String NONE = "-";
 
@@ -85,8 +78,8 @@ public class RoleService {
    * Replaces the permission set of the named role; takes effect on the next authentication.
    *
    * <p>Records a {@link AuditEventType#ROLE_PERMISSIONS_CHANGED} event and an INFO line with the
-   * added and removed permissions from the {@link Permissions} vocabulary plus counts of unknown
-   * ones (REQ-AUDIT-001). Concurrent edits of the same role collide with a 409.
+   * added and removed permissions from the {@link Permissions} vocabulary and a count of unknown
+   * permissions removed from storage (REQ-AUDIT-001).
    *
    * @param roleName role display name, matched case-sensitively
    * @param permissions new permission set
@@ -98,6 +91,9 @@ public class RoleService {
   @CacheEvict(cacheNames = CacheConfig.ROLES_CACHE, allEntries = true)
   public Role updatePermissions(
       @NotNull String roleName, @NotNull Set<String> permissions, @NotNull Long version) {
+    if (!permissions.stream().allMatch(Permissions::isKnown)) {
+      throw new UnknownRolePermissionException();
+    }
     Role role = Entities.require(roleRepository.lockByName(roleName), "Role not found");
     OptimisticLock.check(role.getPermissionsVersion(), version, Role.class, role.getId());
     role.setPermissionsVersion(role.getPermissionsVersion() + 1L);
@@ -130,7 +126,7 @@ public class RoleService {
 
   /**
    * Splits the members of {@code from} missing from {@code to} into sorted names known to {@link
-   * #KNOWN_PERMISSIONS} and a count of unknown ones. A {@code null} element counts as unknown.
+   * Permissions} and a count of unknown ones.
    *
    * @param from the side whose exclusive members are wanted
    * @param to the side subtracted from it
@@ -145,7 +141,7 @@ public class RoleService {
       if (candidate == null) {
         unknown++;
       } else if (!to.contains(candidate)) {
-        if (KNOWN_PERMISSIONS.contains(candidate)) {
+        if (Permissions.isKnown(candidate)) {
           named.add(candidate);
         } else {
           unknown++;
@@ -164,35 +160,6 @@ public class RoleService {
   @NotNull
   private static String render(@NotNull List<String> permissions) {
     return permissions.isEmpty() ? NONE : String.join(",", permissions);
-  }
-
-  /**
-   * Reads the {@code public static final String} constants of {@link Permissions} by reflection,
-   * skipping synthetic fields.
-   *
-   * @return the immutable set of permission strings the audit payload and the log line may name
-   * @throws IllegalStateException if a constant cannot be read
-   */
-  @NotNull
-  private static Set<String> readPermissionVocabulary() {
-    Set<String> vocabulary = new HashSet<>();
-    for (Field field : Permissions.class.getDeclaredFields()) {
-      int modifiers = field.getModifiers();
-      if (field.isSynthetic()
-          || !Modifier.isPublic(modifiers)
-          || !Modifier.isStatic(modifiers)
-          || !Modifier.isFinal(modifiers)
-          || field.getType() != String.class) {
-        continue;
-      }
-      try {
-        vocabulary.add((String) field.get(null));
-      } catch (IllegalAccessException e) {
-        throw new IllegalStateException(
-            "Cannot read permission constant " + field.getName() + " for the audit vocabulary", e);
-      }
-    }
-    return Set.copyOf(vocabulary);
   }
 
   /**
@@ -223,8 +190,7 @@ public class RoleService {
   }
 
   /**
-   * One side of a permission difference: members named in {@link #KNOWN_PERMISSIONS}, and a count
-   * of the rest, which never reach the audit or log (REQ-AUDIT-001).
+   * One side of a permission difference, with unknown values represented only by their count.
    *
    * @param named the sorted in-vocabulary members
    * @param unknownCount how many changed members fell outside the vocabulary

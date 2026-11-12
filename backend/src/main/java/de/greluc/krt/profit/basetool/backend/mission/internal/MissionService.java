@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -59,6 +60,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -256,22 +258,15 @@ public class MissionService implements MissionCommands {
    * Returns the next {@code PLANNED} or {@code ACTIVE} mission by planned start for the home-page
    * banner. With an org-unit scope only that scope's missions count (REQ-MISSION-008); an admin in
    * all-squadrons mode sees the organisation-wide next mission, a caller without any unit only the
-   * next public one.
+   * next public one. Every ancestor must also be visible.
    *
    * @return the next mission, or empty when none upcoming
    */
   public Optional<Mission> getNextMission() {
-    ScopePredicate scope = requestScopeResolver.currentScopePredicate();
-    Instant now = Instant.now();
-    Optional<Mission> next;
-    if (scope.adminAllScope()) {
-      next = findNextMissionHead(now);
-    } else if (hasNoUnitScope(scope)) {
-      next = missionRepository.findNextPublicMission(now, NEXT_MISSION_STATUSES);
-    } else {
-      next = findNextScopedMissionHead(now, scope);
-    }
-    return next.map(Mission::getId).flatMap(missionRepository::findById);
+    return findUpcomingVisibleMissions(1, null).stream()
+        .findFirst()
+        .map(Mission::getId)
+        .flatMap(missionRepository::findById);
   }
 
   /**
@@ -287,9 +282,12 @@ public class MissionService implements MissionCommands {
    * @return the missions with their owning org unit loaded, empty when none is upcoming
    */
   public List<Mission> getUpcomingOwnAndSignedUp(int limit) {
+    return findUpcomingVisibleMissions(limit, authHelperService.currentUserId().orElse(null));
+  }
+
+  private List<Mission> findUpcomingVisibleMissions(int limit, @Nullable UUID userId) {
     ScopePredicate scope = requestScopeResolver.currentScopePredicate();
     Instant now = Instant.now();
-    UUID userId = authHelperService.currentUserId().orElse(null);
     List<Mission> visible = new ArrayList<>();
     for (int page = 0; visible.size() < limit; page++) {
       List<Mission> candidates =
@@ -326,36 +324,6 @@ public class MissionService implements MissionCommands {
   }
 
   /**
-   * Fetches the unscoped next-mission head in {@link #NEXT_MISSION_STATUSES}.
-   *
-   * @param now exclusive lower bound on {@code plannedStartTime}
-   * @return the next-mission head; the caller re-fetches it with its graph
-   */
-  private Optional<Mission> findNextMissionHead(Instant now) {
-    return missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-        now, NEXT_MISSION_STATUSES);
-  }
-
-  /**
-   * Fetches the next-mission head within the caller's org-unit scope (REQ-MISSION-008).
-   *
-   * @param now exclusive lower bound on {@code plannedStartTime}
-   * @param scope the caller's effective, non-empty org-unit scope
-   * @return the next-mission head; the caller re-fetches it with its graph
-   */
-  private Optional<Mission> findNextScopedMissionHead(Instant now, @NotNull ScopePredicate scope) {
-    return missionRepository
-        .findNextScopedMission(
-            now,
-            NEXT_MISSION_STATUSES,
-            scope.activeOrgUnitId(),
-            scope.memberOrgUnitIds(),
-            PageRequest.of(0, 1))
-        .stream()
-        .findFirst();
-  }
-
-  /**
    * Persists a new mission; all server-managed fields are set here, the request carries only
    * caller-controllable ones.
    *
@@ -388,7 +356,8 @@ public class MissionService implements MissionCommands {
         mission.getId(),
         mission.getName(),
         null,
-        AuditDetails.of("status", mission.getStatus()));
+        AuditDetails.of("status", mission.getStatus())
+            .with("operation", Objects.toString(mission.getOperationId(), "none")));
     applyCreateTimeline(saved, request);
     if (request.units() != null) {
       request.units().forEach(unit -> missionStructureService.addUnitAtCreate(saved, unit));
@@ -487,6 +456,7 @@ public class MissionService implements MissionCommands {
    * @return {@code operationId}
    * @throws NotFoundException when no operation matches
    * @throws AccessDeniedException when the caller may not edit the operation
+   * @throws BusinessConflictException when a current paid-out mark freezes the link
    */
   private @NotNull UUID requireLinkableOperation(@NotNull UUID operationId) {
     return switch (operationSummaryProvider.linkability(operationId)) {
@@ -494,6 +464,7 @@ public class MissionService implements MissionCommands {
       case NOT_LINKABLE ->
           throw new AccessDeniedException("The caller may not link a mission to this operation");
       case NO_SUCH_OPERATION -> throw new NotFoundException("Operation not found");
+      case SETTLED -> throw new BusinessConflictException("Operation payout inputs are frozen");
     };
   }
 
@@ -502,8 +473,8 @@ public class MissionService implements MissionCommands {
    *
    * <p>A transition to {@code ACTIVE} without an actual start time also stamps {@code
    * actualStartTime} and bumps {@code scheduleVersion}. A changed operation link needs the caller
-   * to be allowed to link to the new operation; an unchanged link is not re-checked and clearing it
-   * is always allowed (REQ-MISSION-034).
+   * to be allowed to link to the new operation. Either side with a paid-out mark prevents a link
+   * change (REQ-MISSION-034).
    *
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
    *     is unknown
@@ -522,10 +493,16 @@ public class MissionService implements MissionCommands {
       @Nullable String meetingPoint,
       @NotNull Long expectedCoreVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    UUID previousOperationId = mission.getOperationId();
     final UUID linkedOperationId =
-        operationId != null && !operationId.equals(mission.getOperationId())
+        operationId != null && !operationId.equals(previousOperationId)
             ? requireLinkableOperation(operationId)
             : operationId;
+    if (previousOperationId != null
+        && !previousOperationId.equals(linkedOperationId)
+        && operationSummaryProvider.hasPaidOutPayouts(previousOperationId)) {
+      throw new BusinessConflictException("Operation payout inputs are frozen");
+    }
     enforceSectionVersion(
         missionRepository, mission, MissionSection.CORE, expectedCoreVersion, missionId);
 
@@ -547,12 +524,14 @@ public class MissionService implements MissionCommands {
     mission.setOperationId(linkedOperationId);
 
     Mission saved = missionRepository.save(mission);
+    AuditDetails details = AuditDetails.of("section", "core").with("status", mission.getStatus());
+    if (!Objects.equals(previousOperationId, linkedOperationId)) {
+      details
+          .with("fromOperation", Objects.toString(previousOperationId, "none"))
+          .with("toOperation", Objects.toString(linkedOperationId, "none"));
+    }
     auditRecorder.record(
-        AuditEventType.MISSION_UPDATED,
-        mission.getId(),
-        mission.getName(),
-        null,
-        AuditDetails.of("section", "core").with("status", mission.getStatus()));
+        AuditEventType.MISSION_UPDATED, mission.getId(), mission.getName(), null, details);
     return saved;
   }
 
@@ -590,7 +569,7 @@ public class MissionService implements MissionCommands {
     notificationPublisher.endChanged(mission, oldPlannedEnd, oldActualEnd);
     Mission saved = missionRepository.save(mission);
 
-    if (actualEndTime != null) {
+    if (actualEndTime != null && !actualEndTime.equals(oldActualEnd)) {
       missionParticipantRepository.clampCheckedInEndTimes(missionId, actualEndTime);
     }
     auditRecorder.record(
@@ -653,7 +632,7 @@ public class MissionService implements MissionCommands {
 
     final UUID deletedMissionId = mission.getId();
     final String deletedMissionName = mission.getName();
-    final Set<UUID> deletedParticipants = MissionNotificationPublisher.participantUserIds(mission);
+    final Set<UUID> deletedParticipants = notificationPublisher.visibleParticipantUserIds(mission);
 
     missionDeletionObserver.beforeMissionDelete(missionId);
 
@@ -663,7 +642,7 @@ public class MissionService implements MissionCommands {
     }
 
     missionRepository.delete(mission);
-    notificationPublisher.deleted(deletedMissionId, deletedMissionName, deletedParticipants);
+    notificationPublisher.deleted(mission, deletedParticipants);
     auditRecorder.record(
         AuditEventType.MISSION_DELETED, deletedMissionId, deletedMissionName, null, null);
   }
@@ -711,7 +690,8 @@ public class MissionService implements MissionCommands {
         subMission.getId(),
         subMission.getName(),
         null,
-        AuditDetails.of("parent", parentMissionId));
+        AuditDetails.of("parent", parentMissionId)
+            .with("operation", Objects.toString(subMission.getOperationId(), "none")));
     return saved;
   }
 

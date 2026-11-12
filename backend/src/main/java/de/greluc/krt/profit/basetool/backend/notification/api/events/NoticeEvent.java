@@ -43,6 +43,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param entityType the loose entity-type tag stored on the notification
  * @param entityId the loose entity id stored on the notification
  * @param contextOrgUnits the org units the event exposes by role
+ * @param displayOrgUnit the subject's explicit unit, independent of recipient selection
  * @param contextAccountId the bank account the event concerns
  * @param contextBankRequestId the bank booking request the event concerns
  * @param contextRecipientUserId the single member the event is directed at
@@ -60,13 +61,14 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param supersedeRecipients the members whose notices are superseded
  * @param reconcileRecipients the members whose notice is reconciled
  */
-@Builder
+@Builder(toBuilder = true)
 public record NoticeEvent(
     @NotNull NotificationEventType eventType,
     @Nullable UUID actorSub,
     @NotNull String entityType,
     @NotNull UUID entityId,
     Map<NotificationContextRole, OrgUnitRef> contextOrgUnits,
+    @Nullable OrgUnitRef displayOrgUnit,
     @Nullable UUID contextAccountId,
     @Nullable UUID contextBankRequestId,
     @Nullable UUID contextRecipientUserId,
@@ -91,6 +93,7 @@ public record NoticeEvent(
    * @param entityType the loose entity-type tag
    * @param entityId the loose entity id
    * @param contextOrgUnits the org units by role
+   * @param displayOrgUnit the explicit subject unit
    * @param contextAccountId the bank account
    * @param contextBankRequestId the bank booking request
    * @param contextRecipientUserId the single directed member
@@ -124,6 +127,22 @@ public record NoticeEvent(
   @Override
   public @NotNull Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
     return contextOrgUnits;
+  }
+
+  /**
+   * Adds a subject-unit marker without changing the event's recipient context.
+   *
+   * @param unit the subject's unit, or {@code null} for an unowned subject
+   * @return the marked event
+   */
+  @NotNull
+  public NoticeEvent inOrgUnit(@Nullable OrgUnitRef unit) {
+    return unit == null ? this : toBuilder().displayOrgUnit(unit).build();
+  }
+
+  @Override
+  public @Nullable OrgUnitRef subjectOrgUnit() {
+    return displayOrgUnit == null ? NotificationEvent.super.subjectOrgUnit() : displayOrgUnit;
   }
 
   @Override

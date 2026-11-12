@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,6 +76,25 @@ class MissionCreatePageTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("pane-grid-2 pane-grid--single")))
         .andExpect(content().string(not(containsString("class=\"pane-col\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void unavailableOperationPresetReturnsConflictAndRemainsExplicitlySelected() throws Exception {
+    UUID unavailable = UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            get("/missions/new").param("operationId", unavailable.toString()).param("lang", "en"))
+        .andExpect(status().isConflict())
+        .andExpect(
+            content()
+                .string(
+                    matchesPattern(
+                        "(?s).*<option(?=[^>]*selected=\"selected\")(?=[^>]*value=\""
+                            + unavailable
+                            + "\")[^>]*>Operation unavailable</option>.*")))
+        .andExpect(content().string(containsString("Choose another operation or select None.")));
   }
 
   @Test

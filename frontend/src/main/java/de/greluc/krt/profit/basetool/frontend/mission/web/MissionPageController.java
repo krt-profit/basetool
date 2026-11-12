@@ -52,6 +52,7 @@ import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
+import jakarta.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DateTimeException;
@@ -73,6 +74,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -156,8 +158,10 @@ public class MissionPageController {
    * @param model the view model receiving {@code operationsList}
    * @param current the operation the mission belongs to, or {@code null} on the create page and for
    *     a mission without one
+   * @return the available operation options
    */
-  private void addOperationsToModel(@NotNull Model model, @Nullable OperationDto current) {
+  private List<OperationReferenceDto> addOperationsToModel(
+      @NotNull Model model, @Nullable OperationDto current) {
     List<OperationReferenceDto> linkable =
         SectionFallback.load(
             log, "operation-references", missionClient::operationReferences, List.of());
@@ -167,6 +171,7 @@ public class MissionPageController {
       options.add(new OperationReferenceDto(current.id(), current.name()));
     }
     model.addAttribute("operationsList", options);
+    return options;
   }
 
   /**
@@ -543,6 +548,8 @@ public class MissionPageController {
    *
    * @param model Thymeleaf model populated with the form and reference catalogs
    * @param principal authenticated OIDC user
+   * @param operationId optional operation preset
+   * @param response response whose status is 409 for an unavailable preset
    * @return the {@code mission-create} view name
    */
   @NotNull
@@ -550,7 +557,25 @@ public class MissionPageController {
   public String createMissionForm(
       Model model,
       @AuthenticationPrincipal OidcUser principal,
-      @RequestParam(required = false) UUID operationId) {
+      @RequestParam(required = false) UUID operationId,
+      HttpServletResponse response) {
+    String view = createMissionForm(model, principal, operationId);
+    if (Boolean.TRUE.equals(model.getAttribute("operationPresetUnavailable"))) {
+      response.setStatus(HttpStatus.CONFLICT.value());
+    }
+    return view;
+  }
+
+  /**
+   * Renders the create form and retains an unavailable operation until the member changes it.
+   *
+   * @param model the form and selection model
+   * @param principal the caller whose org-unit options are loaded
+   * @param operationId the optional initial operation link
+   * @return the mission create view
+   */
+  @NotNull
+  public String createMissionForm(Model model, OidcUser principal, UUID operationId) {
     if (!model.containsAttribute("missionForm")) {
       model.addAttribute(
           "missionForm",
@@ -589,7 +614,15 @@ public class MissionPageController {
             null, null, null, true, true, null, null, null, null, 0, 0, null, null, null, null, 0L,
             List.of(), 0L, List.of(), 0L, null, 0L));
     addFormsToModel(model, principal, true);
-    addOperationsToModel(model, null);
+    List<OperationReferenceDto> operations = addOperationsToModel(model, null);
+    if (model.getAttribute("missionForm") instanceof MissionForm form
+        && form.operationId() != null
+        && !form.operationId().isBlank()) {
+      model.addAttribute(
+          "operationPresetUnavailable",
+          operations.stream()
+              .noneMatch(option -> option.id().toString().equals(form.operationId())));
+    }
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
     model.addAttribute(
         "createShipTypes",

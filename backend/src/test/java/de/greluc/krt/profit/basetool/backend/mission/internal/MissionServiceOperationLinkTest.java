@@ -23,13 +23,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
@@ -49,7 +54,7 @@ import org.springframework.security.access.AccessDeniedException;
 /**
  * Verifies that a mission is linked only to an operation the caller may link to (REQ-MISSION-034):
  * create, sub-mission create and a changed core link ask the operation module and refuse before
- * anything is written; an unchanged link is not re-checked and clearing one is always allowed.
+ * anything is written; an unchanged link is not re-checked and changing a settled link is refused.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionServiceOperationLinkTest {
@@ -99,6 +104,13 @@ class MissionServiceOperationLinkTest {
     Mission saved = missionService.createMission(request(operationId));
 
     assertThat(saved.getOperationId()).isEqualTo(operationId);
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.MISSION_CREATED),
+            eq(saved.getId()),
+            eq(saved.getName()),
+            isNull(),
+            argThat(details -> details.toString().contains("operation=" + operationId)));
   }
 
   @Test
@@ -135,6 +147,24 @@ class MissionServiceOperationLinkTest {
   }
 
   @Test
+  void subMission_recordsTheParentAndAbsenceOfAnOperation() {
+    Mission parent = mission(null);
+    when(missionRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArgument(0));
+
+    Mission saved = missionService.addSubMission(parent.getId(), subMissionRequest(null));
+
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.MISSION_CREATED),
+            eq(saved.getId()),
+            eq(saved.getName()),
+            isNull(),
+            argThat(details ->
+                details.toString().equals("parent=" + parent.getId() + " operation=none")));
+  }
+
+  @Test
   void subMission_refusesAnOperationTheCallerMayNotLinkTo_andWritesNothing() {
     Mission parent = mission(null);
     UUID operationId = UUID.randomUUID();
@@ -142,21 +172,7 @@ class MissionServiceOperationLinkTest {
     when(operationSummaryProvider.linkability(operationId))
         .thenReturn(OperationLinkability.NOT_LINKABLE);
 
-    CreateSubMissionRequest request =
-        new CreateSubMissionRequest(
-            "Einsatz",
-            null,
-            null,
-            "PLANNED",
-            null,
-            null,
-            null,
-            false,
-            operationId,
-            null,
-            null,
-            null,
-            null);
+    CreateSubMissionRequest request = subMissionRequest(operationId);
     assertThatThrownBy(() -> missionService.addSubMission(parent.getId(), request))
         .isInstanceOf(AccessDeniedException.class);
     verify(missionRepository, never()).save(any(Mission.class));
@@ -180,12 +196,23 @@ class MissionServiceOperationLinkTest {
 
   @Test
   void corePatch_movesTheLinkToAnOperationTheCallerMayLinkTo() {
-    Mission existing = mission(UUID.randomUUID());
+    UUID previous = UUID.randomUUID();
+    Mission existing = mission(previous);
     UUID target = UUID.randomUUID();
     stubCorePatch(existing);
     when(operationSummaryProvider.linkability(target)).thenReturn(OperationLinkability.LINKABLE);
 
     assertThat(patchCore(existing, target).getOperationId()).isEqualTo(target);
+    verify(auditRecorder)
+        .record(
+            eq(AuditEventType.MISSION_UPDATED),
+            eq(existing.getId()),
+            eq(existing.getName()),
+            isNull(),
+            argThat(details ->
+                details
+                    .toString()
+                    .contains("fromOperation=" + previous + " toOperation=" + target)));
   }
 
   @Test
@@ -199,12 +226,37 @@ class MissionServiceOperationLinkTest {
   }
 
   @Test
-  void corePatch_clearsALinkWithoutCheckingIt() {
+  void corePatch_clearsALinkWhenItsOperationHasNoPaidMark() {
     Mission existing = mission(UUID.randomUUID());
     stubCorePatch(existing);
 
+    UUID previous = existing.getOperationId();
     assertThat(patchCore(existing, null).getOperationId()).isNull();
-    verifyNoInteractions(operationSummaryProvider);
+    verify(operationSummaryProvider).hasPaidOutPayouts(previous);
+  }
+
+  @Test
+  void corePatch_cannotLinkToAnOperationWithAPaidMark() {
+    Mission existing = mission(null);
+    UUID target = UUID.randomUUID();
+    when(missionRepository.findById(existing.getId())).thenReturn(Optional.of(existing));
+    when(operationSummaryProvider.linkability(target)).thenReturn(OperationLinkability.SETTLED);
+
+    assertThatThrownBy(() -> patchCore(existing, target))
+        .isInstanceOf(BusinessConflictException.class);
+    verify(missionRepository, never()).bumpCoreVersionIfMatches(any(), anyLong());
+  }
+
+  @Test
+  void corePatch_cannotUnlinkFromAnOperationWithAPaidMark() {
+    UUID operationId = UUID.randomUUID();
+    Mission existing = mission(operationId);
+    when(missionRepository.findById(existing.getId())).thenReturn(Optional.of(existing));
+    when(operationSummaryProvider.hasPaidOutPayouts(operationId)).thenReturn(true);
+
+    assertThatThrownBy(() -> patchCore(existing, null))
+        .isInstanceOf(BusinessConflictException.class);
+    verify(missionRepository, never()).bumpCoreVersionIfMatches(any(), anyLong());
   }
 
   private void stubCorePatch(Mission existing) {
@@ -226,6 +278,23 @@ class MissionServiceOperationLinkTest {
     mission.setCoreVersion(CORE_VERSION);
     mission.setOperationId(operationId);
     return mission;
+  }
+
+  private static CreateSubMissionRequest subMissionRequest(@Nullable UUID operationId) {
+    return new CreateSubMissionRequest(
+        "Einsatz",
+        null,
+        null,
+        "PLANNED",
+        null,
+        null,
+        null,
+        false,
+        operationId,
+        null,
+        null,
+        null,
+        null);
   }
 
   private static CreateMissionRequest request(@Nullable UUID operationId) {

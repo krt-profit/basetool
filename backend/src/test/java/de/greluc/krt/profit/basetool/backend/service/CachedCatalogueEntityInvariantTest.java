@@ -627,7 +627,13 @@ class CachedCatalogueEntityInvariantTest {
           return new Case(
               () -> roleService.getAllRoles(ALL),
               () ->
-                  roleService.updatePermissions(name, new HashSet<>(Set.of("g19.permission")), 0L));
+                  roleService.updatePermissions(
+                      name,
+                      new HashSet<>(
+                          Set.of(
+                              de.greluc.krt.profit.basetool.backend.kernel.Permissions
+                                  .HANGAR_READ)),
+                      0L));
         });
     cases.put(
         "RoleService#updateRoleDescription",

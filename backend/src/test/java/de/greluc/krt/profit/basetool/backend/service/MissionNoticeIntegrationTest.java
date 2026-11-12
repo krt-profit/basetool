@@ -22,8 +22,10 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
@@ -38,6 +40,10 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import java.time.Instant;
@@ -79,6 +85,8 @@ class MissionNoticeIntegrationTest {
   @Autowired private MissionParticipantRepository participantRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
+  @Autowired private OrgUnitMembershipRepository membershipRepository;
   @Autowired private ApplicationEvents events;
 
   private Mission mission;
@@ -111,6 +119,7 @@ class MissionNoticeIntegrationTest {
     user.setUsername(name);
     user.setApprovalStatus(ApprovalStatus.ACTIVE);
     user.setInKeycloak(true);
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     return userRepository.saveAndFlush(user);
   }
 
@@ -143,6 +152,62 @@ class MissionNoticeIntegrationTest {
     assertThat(inbox(ALICE)).containsExactly(NotificationType.MISSION_RESCHEDULED);
     assertThat(inbox(BOB)).containsExactly(NotificationType.MISSION_RESCHEDULED);
     assertThat(inbox(OWNER)).isEmpty();
+  }
+
+  @Test
+  void visibilityChangesAndMembershipWithdrawalRestrictSubsequentNotices() {
+    creationService.createFromEvent(
+        MissionNotices.rescheduled(
+            mission.getId(), mission.getName(), Instant.now(), Instant.now(), ACTOR));
+    assertThat(inbox(ALICE)).containsExactly(NotificationType.MISSION_RESCHEDULED);
+    assertThat(inbox(BOB)).containsExactly(NotificationType.MISSION_RESCHEDULED);
+
+    UUID unitId = mission.getOwningOrgUnit().getId();
+    OrgUnitMembership seat = new OrgUnitMembership();
+    seat.setId(new OrgUnitMembershipId(ALICE, unitId));
+    seat.setUser(userRepository.getReferenceById(ALICE));
+    seat.setJoinedAt(Instant.now());
+    seat.setRole(MembershipRole.MEMBER);
+    membershipRepository.saveAndFlush(seat);
+    mission.setIsInternal(true);
+    missionRepository.saveAndFlush(mission);
+
+    creationService.createFromEvent(
+        MissionNotices.cancelled(mission.getId(), mission.getName(), ACTOR));
+    assertThat(inbox(ALICE)).containsExactly(NotificationType.MISSION_CANCELLED);
+    assertThat(inbox(BOB)).isEmpty();
+    assertThat(reminderProducer.produce(Instant.now(), 100)).isEqualTo(1);
+
+    Squadron other = new Squadron();
+    other.setName("Other notice unit");
+    other.setShorthand("ON");
+    mission = missionRepository.findById(mission.getId()).orElseThrow();
+    mission.setOwningOrgUnit(squadronRepository.saveAndFlush(other));
+    missionRepository.saveAndFlush(mission);
+    creationService.createFromEvent(
+        MissionNotices.cancelled(mission.getId(), mission.getName(), ACTOR));
+    assertThat(inbox(ALICE)).isEmpty();
+
+    mission = missionRepository.findById(mission.getId()).orElseThrow();
+    mission.setOwningOrgUnit(squadronRepository.getReferenceById(unitId));
+    missionRepository.saveAndFlush(mission);
+    membershipRepository.delete(seat);
+    membershipRepository.flush();
+    creationService.createFromEvent(
+        MissionNotices.cancelled(mission.getId(), mission.getName(), ACTOR));
+    assertThat(inbox(ALICE)).isEmpty();
+
+    User bob = userRepository.findById(BOB).orElseThrow();
+    bob.getRoles().clear();
+    bob.getRoles().add(roleRepository.findByCode(Roles.BANK_EMPLOYEE).orElseThrow());
+    userRepository.saveAndFlush(bob);
+    mission = missionRepository.findById(mission.getId()).orElseThrow();
+    mission.setIsInternal(false);
+    missionRepository.saveAndFlush(mission);
+    creationService.createFromEvent(
+        MissionNotices.cancelled(mission.getId(), mission.getName(), ACTOR));
+    assertThat(inbox(ALICE)).containsExactly(NotificationType.MISSION_CANCELLED);
+    assertThat(inbox(BOB)).isEmpty();
   }
 
   @Test

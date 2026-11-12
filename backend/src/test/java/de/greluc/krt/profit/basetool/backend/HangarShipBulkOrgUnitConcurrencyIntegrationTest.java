@@ -27,8 +27,10 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOrgUnitResultDto;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
@@ -65,6 +67,7 @@ class HangarShipBulkOrgUnitConcurrencyIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private DataSource dataSource;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Autowired private ShipTypeRepository shipTypeRepository;
   @Autowired private ShipRepository shipRepository;
@@ -78,6 +81,7 @@ class HangarShipBulkOrgUnitConcurrencyIntegrationTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("bulk-lock-" + user.getId());
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     User saved = userRepository.saveAndFlush(user);
     owner = saved.getId();
     OrgUnitMembership membership = new OrgUnitMembership();
@@ -104,6 +108,7 @@ class HangarShipBulkOrgUnitConcurrencyIntegrationTest {
     shipTypeRepository.deleteById(shipType);
     jdbc.update("DELETE FROM audit_event WHERE actor_user_id = ?", owner);
     orgUnitMembershipRepository.deleteById(new OrgUnitMembershipId(owner, Squadron.IRIDIUM_ID));
+    jdbc.update("DELETE FROM user_roles WHERE user_id = ?", owner);
     jdbc.update("DELETE FROM app_user WHERE id = ?", owner);
   }
 

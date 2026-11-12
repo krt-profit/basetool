@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.TransactionMemo;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderProvenanceDto;
 import jakarta.persistence.EntityManager;
@@ -71,7 +72,7 @@ public class RefineryOrderProvenanceView implements RefineryOrderProvenanceLooku
     if (clientId == null) {
       return null;
     }
-    Map<String, String> names = RefineryTransactionMemo.bound(this, Memo.class, Memo::new).names;
+    Map<String, String> names = TransactionMemo.bound(this, Memo.class, Memo::new).names;
     String known = names.get(clientId);
     if (known != null) {
       return known;
@@ -88,7 +89,8 @@ public class RefineryOrderProvenanceView implements RefineryOrderProvenanceLooku
 
   private @NotNull Set<String> clientsInContext() {
     Set<String> ids = new LinkedHashSet<>();
-    for (RefineryOrder order : RefineryTransactionMemo.ordersInContext(entityManager)) {
+    for (RefineryOrder order :
+        TransactionMemo.entitiesInContext(entityManager, RefineryOrder.class)) {
       RefineryOrderProvenance provenance = order.getProvenance();
       addIfPresent(ids, provenance.getCreatedClient());
       addIfPresent(ids, provenance.getLastChangeClient());

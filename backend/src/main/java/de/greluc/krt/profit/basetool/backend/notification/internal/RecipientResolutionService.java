@@ -22,9 +22,14 @@ package de.greluc.krt.profit.basetool.backend.notification.internal;
 import de.greluc.krt.profit.basetool.backend.notification.api.AccountRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.ExchangeRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.MissionRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRoleAudience;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgUnitRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +50,30 @@ public class RecipientResolutionService {
   private final AccountRecipientDirectory accountRecipientDirectory;
   private final MissionRecipientDirectory missionRecipientDirectory;
   private final ExchangeRecipientDirectory exchangeRecipientDirectory;
+
+  @NotNull
+  RoleRecipientDirectory.RoleState lockRoleState(@NotNull Set<UUID> recipients) {
+    return roleRecipientDirectory.lockRoleState(recipients);
+  }
+
+  @Nullable
+  OrgUnitRef subjectOrgUnit(@NotNull NotificationEvent event) {
+    OrgUnitRef unit = event.subjectOrgUnit();
+    UUID accountId = event.contextAccountId();
+    return unit != null || accountId == null
+        ? unit
+        : accountRecipientDirectory.orgUnitOfAccount(accountId).orElse(null);
+  }
+
+  @NotNull
+  Map<UUID, NotificationRoleAudience> requiredApproverAudience(@NotNull UUID requestId) {
+    return accountRecipientDirectory.requiredApproverAudienceOf(requestId);
+  }
+
+  @NotNull
+  Optional<String> unitName(@NotNull UUID orgUnitId) {
+    return orgUnitRecipientDirectory.unitName(orgUnitId);
+  }
 
   /**
    * Resolves every holder of a global role by its stable code.

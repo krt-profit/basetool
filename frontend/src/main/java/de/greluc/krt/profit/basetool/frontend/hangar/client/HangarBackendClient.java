@@ -155,7 +155,7 @@ public class HangarBackendClient {
   @Nullable
   public List<OrgUnitMembershipOptionDto> directOrgUnits() {
     return backendApiClient.get(
-        "/api/v1/org-units/me/memberships?allKinds=true", MEMBERSHIP_OPTION_LIST);
+        "/api/v1/org-units/me/memberships?allKinds=true&ownerPicker=true", MEMBERSHIP_OPTION_LIST);
   }
 
   /**
@@ -264,7 +264,7 @@ public class HangarBackendClient {
   @Nullable
   public List<OrgUnitMembershipOptionDto> memberOrgUnits(@NotNull UUID memberId) {
     return backendApiClient.get(
-        "/api/v1/org-units/members/{id}/memberships?allKinds=true",
+        "/api/v1/org-units/members/{id}/memberships?allKinds=true&ownerPicker=true",
         MEMBERSHIP_OPTION_LIST,
         memberId);
   }

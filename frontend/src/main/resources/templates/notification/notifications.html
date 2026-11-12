@@ -41,6 +41,8 @@
                     <a th:if="${n.href != null}" class="row-link" data-testid="row-link" data-notif-open th:href="@{${n.href}}"
                        ><span class="notification-item-text" th:text="${n.text}">Notification text</span></a>
                     <p th:if="${n.href == null}" class="notification-item-text" th:text="${n.text}">Notification text</p>
+                    <span th:if="${n.orgUnitLabel != null}" class="chip" th:text="${n.orgUnitLabel}" data-notif-org-unit>Unit</span>
+                    <span th:if="${n.activeUnitHint != null}" class="notification-item-time" th:text="${n.activeUnitHint}">Select the unit for this notice.</span>
                     <span class="notification-item-time" th:text="${n.createdAtDisplay}">2026-01-01 00:00 UTC</span>
                 </div>
                 <div class="notification-item-actions">

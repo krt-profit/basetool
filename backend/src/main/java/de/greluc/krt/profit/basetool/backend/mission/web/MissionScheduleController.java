@@ -28,6 +28,8 @@ import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionScheduleRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.UpdateCustomFrequencyRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -73,7 +75,13 @@ public class MissionScheduleController {
       description =
           "Patches only the schedule section (meeting/planned/actual times) of a mission. Thanks "
               + "to decoupled sub-collections, concurrent edits to participants, units or finances "
-              + "no longer cause a version conflict. Timestamps are in UTC.")
+              + "use separate version counters. Timestamps are in UTC.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Mission schedule updated."),
+    @ApiResponse(
+        responseCode = "409",
+        description = "Stale schedule version or frozen payout inputs for actual times.")
+  })
   public MissionDto patchMissionSchedule(
       @PathVariable @NotNull UUID id,
       @RequestBody @Valid @NotNull PatchMissionScheduleRequest request) {

@@ -105,7 +105,7 @@ class HangarBackendClientTest {
     client.changeShipOrgUnit(SHIP, new ShipOrgUnitRequestDto(UNIT, 2L));
     client.changeShipOrgUnit(SHIP, new ShipOrgUnitRequestDto(null, 3L));
 
-    backend.expect("GET", "/api/v1/org-units/me/memberships?allKinds=true");
+    backend.expect("GET", "/api/v1/org-units/me/memberships?allKinds=true&ownerPicker=true");
     backend.expect(
         "PUT",
         "/api/v1/hangar/ships/" + SHIP + "/org-unit",
@@ -187,7 +187,9 @@ class HangarBackendClientTest {
 
     backend.expect("GET", "/api/v1/hangar/admin/users/" + MEMBER + "/ships?page=1&size=10");
     backend.expect("GET", "/api/v1/users/" + MEMBER);
-    backend.expect("GET", "/api/v1/org-units/members/" + MEMBER + "/memberships?allKinds=true");
+    backend.expect(
+        "GET",
+        "/api/v1/org-units/members/" + MEMBER + "/memberships?allKinds=true&ownerPicker=true");
     backend.expect(
         "POST",
         "/api/v1/hangar/admin/users/" + MEMBER + "/ships",

@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepository;
@@ -44,6 +46,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -72,6 +76,7 @@ class OperationPayoutStatusConcurrencyTest {
   @Autowired private MissionParticipantRepository missionParticipantRepository;
   @Autowired private UserRepository userRepository;
   @Autowired private TransactionTemplate transactionTemplate;
+  @Autowired private JdbcTemplate jdbc;
 
   /**
    * Seeded fixture ids of one test run, deleted in {@code @AfterEach}.
@@ -180,6 +185,107 @@ class OperationPayoutStatusConcurrencyTest {
     assertThat(rows.get(0).isPaidOut())
         .as("the surviving row must record the paid-out flag both writers set")
         .isTrue();
+  }
+
+  @Test
+  void aPaidMarkBlocksLinkChangesAndAttendanceAndFinanceUntilReversed() {
+    fixture = seed();
+    UUID candidate = UUID.randomUUID();
+    jdbc.update("INSERT INTO mission (id, status) VALUES (?, 'PLANNED')", candidate);
+    try {
+      String participantKey = fixture.userId().toString();
+      operationPayoutService.setPayoutStatus(fixture.operationId(), participantKey, true);
+      assertFrozen("UPDATE mission SET operation_id = NULL WHERE id = ?", fixture.missionId());
+      assertFrozen(
+          "UPDATE mission SET operation_id = ? WHERE id = ?", fixture.operationId(), candidate);
+      assertFrozen(
+          "UPDATE mission_participant SET end_time = NULL WHERE id = ?", fixture.participantId());
+      assertFrozen(
+          """
+          INSERT INTO mission_finance_entry (id, mission_id, mission_participant_id, type, amount)
+          VALUES (?, ?, ?, 'EXPENSE', 1)
+          """,
+          UUID.randomUUID(),
+          fixture.missionId(),
+          fixture.participantId());
+
+      assertThat(
+              jdbc.update(
+                  "UPDATE mission SET name = 'Updated name' WHERE id = ?", fixture.missionId()))
+          .isEqualTo(1);
+
+      operationPayoutService.setPayoutStatus(fixture.operationId(), participantKey, false);
+      assertThat(
+              jdbc.update(
+                  "UPDATE mission SET operation_id = NULL WHERE id = ?", fixture.missionId()))
+          .isEqualTo(1);
+      assertThat(
+              jdbc.update(
+                  "UPDATE mission SET operation_id = ? WHERE id = ?",
+                  fixture.operationId(),
+                  candidate))
+          .isEqualTo(1);
+    } finally {
+      jdbc.update("DELETE FROM mission WHERE id = ?", candidate);
+    }
+  }
+
+  @Test
+  void anUnlinkedParticipantsPaidMarkCanBeReversedThroughAnOpaqueKey() {
+    fixture = seed();
+    String formerKey = fixture.userId().toString();
+    operationPayoutService.setPayoutStatus(fixture.operationId(), formerKey, true);
+    OperationPayoutStatus paidMark =
+        payoutStatusRepository
+            .findByOperationIdAndParticipantKey(fixture.operationId(), formerKey)
+            .orElseThrow();
+    String opaqueKey = "orphan_" + paidMark.getId();
+
+    assertThatThrownBy(
+            () -> operationPayoutService.setPayoutStatus(fixture.operationId(), opaqueKey, false))
+        .isInstanceOf(NotFoundException.class);
+    jdbc.update(
+        "UPDATE mission_participant SET user_id = NULL WHERE id = ?", fixture.participantId());
+
+    OperationPayoutSummaryDto summary =
+        operationPayoutService.getOperationPayoutSummary(fixture.operationId());
+    assertThat(summary.payoutInputsFrozen()).isTrue();
+    assertThat(summary.orphanedPaidMarkKeys()).containsExactly(opaqueKey);
+    assertThat(summary.toString()).doesNotContain(formerKey);
+    assertThatThrownBy(
+            () -> operationPayoutService.setPayoutStatus(fixture.operationId(), opaqueKey, true))
+        .isInstanceOf(NotFoundException.class);
+
+    Operation other = new Operation();
+    other.setName("Unrelated operation");
+    other.setStatus(OperationStatus.PLANNED);
+    UUID otherId = operationRepository.saveAndFlush(other).getId();
+    try {
+      assertThatThrownBy(() -> operationPayoutService.setPayoutStatus(otherId, opaqueKey, false))
+          .isInstanceOf(NotFoundException.class);
+    } finally {
+      operationRepository.deleteById(otherId);
+    }
+
+    OperationPayoutStatusDto reversal =
+        operationPayoutService.setPayoutStatus(fixture.operationId(), opaqueKey, false);
+    assertThat(reversal.paidOut()).isFalse();
+    assertThat(reversal.paidOutAt()).isEqualTo(paidMark.getPaidOutAt());
+    assertThat(reversal.paidOutByName()).isNull();
+    assertThat(
+            operationPayoutService
+                .getOperationPayoutSummary(fixture.operationId())
+                .orphanedPaidMarkKeys())
+        .isEmpty();
+    assertThat(
+            jdbc.update("UPDATE mission SET operation_id = NULL WHERE id = ?", fixture.missionId()))
+        .isEqualTo(1);
+  }
+
+  private void assertFrozen(String sql, Object... parameters) {
+    assertThatThrownBy(() -> jdbc.update(sql, parameters))
+        .isInstanceOf(DataIntegrityViolationException.class)
+        .hasMessageContaining("Operation payout inputs are frozen");
   }
 
   /**

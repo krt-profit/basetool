@@ -65,8 +65,8 @@ class NavigationPreferencesServiceTest {
   private double writes(NavigationWriteOutcome outcome) {
     return meterRegistry
         .counter(
-            NavigationMetrics.PREFERENCE_WRITES,
-            NavigationMetrics.TAG_SECTION,
+            NavigationMetricNames.PREFERENCE_WRITES,
+            NavigationMetricNames.TAG_SECTION,
             NavigationSection.FAVOURITES.getTag(),
             MetricNames.TAG_OUTCOME,
             outcome.getTag())
@@ -329,8 +329,8 @@ class NavigationPreferencesServiceTest {
   private double tabBarWrites(NavigationWriteOutcome outcome) {
     return meterRegistry
         .counter(
-            NavigationMetrics.PREFERENCE_WRITES,
-            NavigationMetrics.TAG_SECTION,
+            NavigationMetricNames.PREFERENCE_WRITES,
+            NavigationMetricNames.TAG_SECTION,
             NavigationSection.TAB_BAR.getTag(),
             MetricNames.TAG_OUTCOME,
             outcome.getTag())

@@ -446,8 +446,10 @@ repository's fine-grained locking rule asks:
 | **game data** (`gameData`) | location, refining method, timer (`startedAt`, `durationMinutes`), status, goods, the pickup and store markers |
 | **finances** (`finances`) | `expenses`, `otherExpenses`, `oreSales` |
 
-A write echoes the counter of each section whose fields it changes and is refused `409` only when
-that section changed since; a section it leaves as it is is not checked. Every applied write raises
+A write echoes the counter of each section whose fields it changes and receives `409` if that
+section changed since. A section it leaves as it is is not checked. Linked orders also follow
+[REQ-MISSION-034](mission-detail-tabs.md#req-mission-034--a-missions-operation-link-follows-the-operations-rules):
+mission-link and amount changes conflict while an affected operation has a current paid-out mark. Every applied write raises
 the counter of each section it changed by one. The mission link and the owning unit belong to
 neither section, so a mission edit collides with neither. The web's edit form, the store, the
 cancel and every exchange op (REQ-XCH-052) use the same counters, and the read DTO and the
@@ -497,7 +499,8 @@ exchange ops follow with REQ-XCH-052.
   by [`refinery-screenshot-import.md`](refinery-screenshot-import.md) and the controller's other
   handlers; this spec governs the list view's pagination, the refinery locations, storing exactly
   once, the goods' input amount, the yield badge and an order's provenance, pickup marker and section
-  counters (REQ-REFINERY-027…029). The store dialog's personal marker
+  counters (REQ-REFINERY-027…029). The store dialog's owner picker follows REQ-ORG-004 in
+  [the tenancy spec](org-unit-tenancy.md). Its personal marker
   (booking refinery output straight into the receiver's private pool) is specified in
   [`inventory-lager.md`](inventory-lager.md) `REQ-INV-035`.
 - User-chosen sort columns. The UI sorts each segment by the fixed order of REQ-REFINERY-019; the

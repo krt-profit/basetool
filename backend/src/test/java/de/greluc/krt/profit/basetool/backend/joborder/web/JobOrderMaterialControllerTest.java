@@ -130,16 +130,6 @@ class JobOrderMaterialControllerTest {
   }
 
   @Test
-  void unlinkMaterial_delegatesBothPathParameters() {
-    UUID jobOrderId = UUID.randomUUID();
-    UUID materialId = UUID.randomUUID();
-
-    controller.unlinkMaterial(jobOrderId, materialId);
-
-    verify(jobOrderService).unlinkMaterial(jobOrderId, materialId);
-  }
-
-  @Test
   void unlinkInventoryItem_delegatesBothPathParameters() {
     UUID jobOrderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();

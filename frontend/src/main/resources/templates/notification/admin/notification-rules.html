@@ -99,6 +99,7 @@
 
             <fieldset class="form-section" data-testid="rule-section-recipients">
                 <legend class="form-section__head" th:text="|2 · #{admin.notificationRules.section.recipients}|">2 · Empfänger</legend>
+                <p class="form-hint" th:text="#{admin.notificationRules.scopeHelp}">Use event-relative selectors for unit notices.</p>
                 <div class="selector-row selector-row--head" aria-hidden="true">
                     <span class="selector-row__kind" th:text="#{admin.notificationRules.selector.kind}">Art</span>
                     <span class="selector-row__value" th:text="#{admin.notificationRules.selector.value}">Auswahl</span>

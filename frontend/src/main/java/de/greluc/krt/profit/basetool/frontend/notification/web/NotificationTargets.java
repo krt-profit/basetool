@@ -208,6 +208,16 @@ final class NotificationTargets {
 
   private NotificationTargets() {}
 
+  static boolean usesActiveUnit(@Nullable String href) {
+    return href != null
+        && (href.startsWith(MISSIONS)
+            || href.startsWith(OPERATIONS)
+            || href.startsWith(ORDERS)
+            || href.startsWith("/org-unit-bank")
+            || href.startsWith(STOCK_LEVELS)
+            || href.startsWith("/supply/donations/incoming"));
+  }
+
   /**
    * Resolves the page a notification opens for the given viewer.
    *

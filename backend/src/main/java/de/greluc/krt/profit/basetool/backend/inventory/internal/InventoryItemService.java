@@ -476,7 +476,8 @@ public class InventoryItemService {
       }
       requireWholeUnits(wholeUnits, gameItem != null, allocation.amount());
       Entities.require(
-          Optional.ofNullable(earmarkTargets.mission(allocation.targetId())), "Mission not found");
+          Optional.ofNullable(earmarkTargets.missionForAllocation(allocation.targetId())),
+          "Mission not found");
       InventoryAllocations.addMission(
           item,
           allocation.targetId(),
@@ -685,7 +686,8 @@ public class InventoryItemService {
         assertMissionDimensionAllowed(item);
         final MissionEarmark mission =
             Entities.require(
-                Optional.ofNullable(earmarkTargets.mission(dto.targetId())), "Mission not found");
+                Optional.ofNullable(earmarkTargets.missionForAllocation(dto.targetId())),
+                "Mission not found");
         if (findMissionSlice(item, dto.targetId()) != null) {
           throw new BadRequestException("error.inventory.allocation.duplicate.mission");
         }

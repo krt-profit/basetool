@@ -845,6 +845,25 @@ class ExchangeRefineryOrderWriteControllerTest {
   }
 
   @Test
+  void anUndoRecreatesAFormerMembersDeletedOrderWithoutItsEarlierUnit() throws Exception {
+    UUID id = ownOrder();
+    jdbc.update("UPDATE refinery_order SET owning_org_unit_id = ? WHERE id = ?", unit, id);
+    Instant since = Instant.now().minus(1, ChronoUnit.MINUTES);
+    changes(client, delete(id)).andExpect(jsonPath("$.applied").value(1));
+    jdbc.update("DELETE FROM user_roles WHERE user_id = ?", member);
+
+    ExchangeUndoResultDto result = undoService.undo(member, client, since);
+
+    assertThat(result.restored()).isOne();
+    assertThat(result.skipped()).isEmpty();
+    assertThat(
+            jdbc.queryForMap(
+                "SELECT owner_id, owning_org_unit_id FROM refinery_order WHERE id = ?", id))
+        .containsEntry("owner_id", member)
+        .containsEntry("owning_org_unit_id", null);
+  }
+
+  @Test
   void anUndoOfAPickupReopensTheOrderAndClearsTheMarker() throws Exception {
     UUID id = ownOrder("IN_PROGRESS");
     Instant since = Instant.now().minus(1, ChronoUnit.MINUTES);

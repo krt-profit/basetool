@@ -622,8 +622,12 @@
                                     <label for="mission-operation" th:text="#{mission.operation}">Operation</label>
                                     <select id="mission-operation" name="operationId">
                                         <option value="" th:text="#{general.none}">-- Keine --</option>
+                                        <option th:if="${operationPresetUnavailable}" th:value="${missionForm.operationId}"
+                                                selected="selected" th:text="#{mission.operation.unavailable}"></option>
                                         <option th:each="op : ${operationsList}" th:value="${op.id}" th:text="${op.name}" th:selected="${missionForm.operationId != null and missionForm.operationId == op.id.toString()}"></option>
                                     </select>
+                                    <div th:if="${operationPresetUnavailable}" class="field-error"
+                                         th:text="#{mission.operation.unavailable.hint}"></div>
                                     <div th:if="${#fields.hasErrors('operationId')}" th:errors="*{operationId}" class="field-error"></div>
                                 </div>
 

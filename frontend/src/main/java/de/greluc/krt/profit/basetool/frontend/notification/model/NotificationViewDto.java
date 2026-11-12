@@ -34,6 +34,8 @@ import java.util.UUID;
  * @param entityId originating aggregate id, or {@code null}
  * @param href same-origin path of the page the notification is about, or {@code null} when the web
  *     app has no page the recipient can open for it
+ * @param orgUnitLabel the unit marker, or {@code null} when the notice has none
+ * @param activeUnitHint the guidance for a subject outside the selected unit, or {@code null}
  */
 @DtoMirror
 public record NotificationViewDto(
@@ -43,4 +45,6 @@ public record NotificationViewDto(
     String createdAtDisplay,
     String entityType,
     UUID entityId,
-    String href) {}
+    String href,
+    String orgUnitLabel,
+    String activeUnitHint) {}

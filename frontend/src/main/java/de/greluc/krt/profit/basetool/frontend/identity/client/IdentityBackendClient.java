@@ -399,20 +399,23 @@ public class IdentityBackendClient {
   }
 
   /**
-   * Lists a member's org-unit membership options for the counterparty picker (REQ-BANK-044).
+   * Lists a member's org-unit membership options for counterparty and owner pickers.
    *
    * @param userId the member
    * @param allKinds {@code true} to include all four org-unit kinds
+   * @param ownerPicker {@code true} to list only the member's stampable units
    * @return the options, or {@code null} when the backend sent no body
    */
   @Nullable
   public List<OrgUnitMembershipOptionDto> membershipOptions(
-      @NotNull UUID userId, boolean allKinds) {
+      @NotNull UUID userId, boolean allKinds, boolean ownerPicker) {
     return backendApiClient.get(
-        "/api/v1/org-units/members/{userId}/memberships?allKinds={allKinds}",
+        "/api/v1/org-units/members/{userId}/memberships"
+            + "?allKinds={allKinds}&ownerPicker={ownerPicker}",
         MEMBERSHIP_OPTION_LIST,
         userId,
-        allKinds);
+        allKinds,
+        ownerPicker);
   }
 
   /**

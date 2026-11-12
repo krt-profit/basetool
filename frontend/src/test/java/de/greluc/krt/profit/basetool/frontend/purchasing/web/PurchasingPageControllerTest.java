@@ -53,7 +53,6 @@ import de.greluc.krt.profit.basetool.frontend.purchasing.model.RiskClassDto;
 import de.greluc.krt.profit.basetool.frontend.purchasing.web.PurchasingPageController.PurchasingTabs;
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
-import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.time.Instant;
 import java.util.List;
@@ -137,11 +136,6 @@ class PurchasingPageControllerTest {
         Instant.parse("2026-09-01T12:00:00Z"));
   }
 
-  private static SupplyUnitDto unit(String name, boolean mayRaiseNeeds, boolean canManage) {
-    return new SupplyUnitDto(
-        UUID.randomUUID(), name, name, "SQUADRON", mayRaiseNeeds, true, canManage, 1L);
-  }
-
   @Test
   void everyPageAnswersNotFoundWhileTheSurfaceIsOff() {
     when(featureState.enabled()).thenReturn(false);
@@ -223,7 +217,7 @@ class PurchasingPageControllerTest {
     verify(purchasingClient, never()).partners(any(), any(), any(), anyInt(), anyInt());
     assertThat(model.containsAttribute("openNeeds")).isFalse();
     assertThat(model.containsAttribute("partners")).isFalse();
-    assertThat(model.containsAttribute("pausableUnits")).isFalse();
+    verify(purchasingClient).pauseState();
   }
 
   @Test
@@ -243,13 +237,19 @@ class PurchasingPageControllerTest {
     switchOn();
     NeedDto need = need();
     PartnerDto active = partner("Orion", "ORG", "ACTIVE", false, null, null);
-    SupplyUnitDto pausable = unit("ARGON", true, true);
+    PauseStateDto state =
+        new PauseStateDto(
+            false,
+            null,
+            null,
+            List.of(),
+            false,
+            List.of(new PauseStateDto.PausableUnit(UUID.randomUUID(), "ARGON")));
     when(purchasingClient.deals(null, false, false, 0, 10)).thenReturn(page(List.of()));
     when(purchasingClient.state()).thenReturn(state(true, false, false));
     when(supplyClient.purchasableNeeds()).thenReturn(page(List.of(need)));
     when(purchasingClient.partners(null, null, "ACTIVE", 0, 200)).thenReturn(page(List.of(active)));
-    when(supplyClient.units())
-        .thenReturn(List.of(pausable, unit("BETA", true, false), unit("GAMMA", false, true)));
+    when(purchasingClient.pauseState()).thenReturn(state);
     Model model = new ExtendedModelMap();
 
     String view = controller.deals(null, false, false, null, null, null, model);
@@ -257,7 +257,7 @@ class PurchasingPageControllerTest {
     assertThat(view).isEqualTo("purchasing/deals");
     assertThat(model.getAttribute("openNeeds")).isEqualTo(List.of(need));
     assertThat(model.getAttribute("partners")).isEqualTo(List.of(active));
-    assertThat(model.getAttribute("pausableUnits")).isEqualTo(List.of(pausable));
+    assertThat(model.getAttribute("pauseState")).isSameAs(state);
   }
 
   @Test
@@ -280,27 +280,12 @@ class PurchasingPageControllerTest {
     switchOn();
     when(purchasingClient.deals(null, false, false, 0, 10)).thenReturn(page(List.of()));
     when(purchasingClient.state()).thenReturn(state(true, false, false));
-    when(supplyClient.units()).thenReturn(null);
     Model model = new ExtendedModelMap();
 
     controller.deals(null, false, false, null, null, null, model);
 
     assertThat(model.getAttribute("openNeeds")).isEqualTo(List.of());
     assertThat(model.getAttribute("partners")).isEqualTo(List.of());
-    assertThat(model.getAttribute("pausableUnits")).isEqualTo(List.of());
-  }
-
-  @Test
-  void aFailingUnitReadLeavesThePauseUnitsEmpty() {
-    switchOn();
-    when(purchasingClient.deals(null, false, false, 0, 10)).thenReturn(page(List.of()));
-    when(purchasingClient.state()).thenReturn(state(false, true, false));
-    when(supplyClient.units()).thenThrow(new IllegalStateException("down"));
-    Model model = new ExtendedModelMap();
-
-    controller.deals(null, false, false, null, null, null, model);
-
-    assertThat(model.getAttribute("pausableUnits")).isEqualTo(List.of());
   }
 
   @Test
@@ -313,7 +298,7 @@ class PurchasingPageControllerTest {
     controller.deals(null, false, false, null, null, "results", model);
 
     assertThat(model.getAttribute("pauseState"))
-        .isEqualTo(new PauseStateDto(false, null, null, List.of()));
+        .isEqualTo(new PauseStateDto(false, null, null, List.of(), false, List.of()));
   }
 
   @Test

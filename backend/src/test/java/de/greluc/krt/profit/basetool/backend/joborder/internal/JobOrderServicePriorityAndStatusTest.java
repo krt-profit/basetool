@@ -22,7 +22,6 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -646,45 +645,6 @@ class JobOrderServicePriorityAndStatusTest {
 
   @Nested
   class UnlinkTests {
-
-    @Test
-    void unlinkMaterial_notFoundJobOrder_throws() {
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.empty());
-
-      assertThrows(
-          NotFoundException.class, () -> service.unlinkMaterial(ORDER_ID, UUID.randomUUID()));
-    }
-
-    @Test
-    void unlinkMaterial_materialNotLinked_throws() {
-      JobOrder o = newOrder(JobOrderStatus.OPEN, 1, 1L);
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
-
-      UUID missingMatId = UUID.randomUUID();
-      assertThrows(NotFoundException.class, () -> service.unlinkMaterial(ORDER_ID, missingMatId));
-    }
-
-    @Test
-    void unlinkMaterial_happyPath_removesAndUnlinks() {
-      UUID matId = UUID.randomUUID();
-      JobOrder o = newOrder(JobOrderStatus.OPEN, 1, 1L);
-      JobOrderMaterial mat =
-          JobOrderMaterial.builder()
-              .material(materialWithId(matId))
-              .qualityTier(QualityTierFixtures.tier("Q700", 700))
-              .amount(10.0)
-              .build();
-      o.getMaterials().add(mat);
-
-      when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(o));
-
-      service.unlinkMaterial(ORDER_ID, matId);
-
-      assertTrue(
-          o.getMaterials().isEmpty(),
-          "the JobOrderMaterial association must be removed from the in-memory set too");
-      verify(jobOrderRepository).save(o);
-    }
 
     @Test
     void unlinkInventoryItem_notFoundJobOrder_throws() {

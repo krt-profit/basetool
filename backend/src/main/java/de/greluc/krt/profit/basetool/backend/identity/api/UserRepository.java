@@ -35,6 +35,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Spring Data repository for {@link User}.
@@ -46,6 +48,31 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository
     extends JpaRepository<User, UUID>, UserRepositoryPlainLookupFragment {
+
+  /**
+   * Locks both accounts in stable order while a merge moves their memberships.
+   *
+   * @param accountIds the source and target account ids
+   * @return the existing ids locked by the transaction
+   */
+  @Query(
+      value = "SELECT id FROM app_user WHERE id IN (:accountIds) ORDER BY id FOR UPDATE",
+      nativeQuery = true)
+  List<UUID> lockAccountsForMerge(@Param("accountIds") Collection<UUID> accountIds);
+
+  /**
+   * Tries to reserve an account until the surrounding Discord link transaction ends.
+   *
+   * @param accountId the source or surviving account
+   * @return whether this transaction holds the reservation
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  @Query(
+      value =
+          "SELECT pg_try_advisory_xact_lock("
+              + "hashtextextended('account-consolidation:' || CAST(:accountId AS text), 0))",
+      nativeQuery = true)
+  boolean tryReserveDiscordLinkAccount(@Param("accountId") UUID accountId);
 
   /**
    * Reads only the names needed to scrub personal-data exports.
@@ -203,6 +230,20 @@ public interface UserRepository
   @NotNull
   @EntityGraph(attributePaths = {"roles", "roles.permissions"})
   Optional<User> findById(@NotNull UUID id);
+
+  /**
+   * Loads the current member roles for approved, enabled recipients in one query.
+   *
+   * @param userIds candidate recipient ids
+   * @return active accounts among the candidates with their stored roles
+   */
+  @EntityGraph(attributePaths = "roles")
+  @Query(
+      """
+      SELECT u FROM User u WHERE u.id IN :userIds AND u.approvalStatus = 'ACTIVE'
+      AND u.inKeycloak = true AND u.enabledInKeycloak = true
+      """)
+  List<User> findActiveWithRolesByIds(@Param("userIds") Collection<UUID> userIds);
 
   /** Derived Spring-Data query - returns entities matching {@code Email}. */
   Optional<User> findByEmail(String email);
@@ -460,6 +501,30 @@ public interface UserRepository
   @Query("SELECT u.id FROM User u JOIN u.roles r WHERE u.id IN :userIds AND r.code = :roleCode")
   Set<UUID> findRoleHoldersAmong(
       @Param("userIds") Collection<UUID> userIds, @Param("roleCode") String roleCode);
+
+  /**
+   * Locks the user rows in id order against writes to their role-set versions.
+   *
+   * @param userIds the recipients of role-dependent notifications
+   * @return the existing ids locked until the notification transaction commits
+   */
+  @Query(
+      value = "SELECT id FROM app_user WHERE id IN (:userIds) ORDER BY id FOR SHARE",
+      nativeQuery = true)
+  List<UUID> lockRoleSetsForNotice(@Param("userIds") Set<UUID> userIds);
+
+  /**
+   * Finds the users with any of the given stored roles.
+   *
+   * @param userIds the recipients to check
+   * @param roleCodes the stored role codes that confer the same eligibility
+   * @return the matching user ids
+   */
+  @Query(
+      "SELECT DISTINCT u.id FROM User u JOIN u.roles r WHERE u.id IN :userIds AND r.code IN"
+          + " :roleCodes")
+  Set<UUID> findAnyRoleHoldersAmong(
+      @Param("userIds") Set<UUID> userIds, @Param("roleCodes") Set<String> roleCodes);
 
   /**
    * Bumps a user's role-set counter in one conditional statement, leaving the row {@code @Version}

@@ -110,3 +110,10 @@ fail-open precheck let through.
 - **Auto-suggest the matching account in the picker.** Dropped for this case: the matcher keys on the
   same name signals that already failed (handle differs, nickname absent), so it would suggest
   nothing. A plain server-side search is what the admin needs.
+
+## Amendment — Reserve accounts through linking
+
+Registration linking and account consolidation acquire the same transaction-bound reservations for
+both account IDs before reading either account. An overlapping request returns HTTP 409 before
+calling Keycloak. The database changes commit in a separate transaction while the reservations
+stay held through the final Keycloak call. See [ADR-0160](0160-a-duplicate-account-stays-consolidatable-after-approval.md).

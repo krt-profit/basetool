@@ -26,9 +26,11 @@ import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyRaisingUnits;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-public class SupplyUnitSettingService {
+public class SupplyUnitSettingService implements SupplyRaisingUnits {
 
   private final SupplyUnitSettingRepository settingRepository;
   private final OrgUnitRepository orgUnitRepository;
@@ -71,6 +73,14 @@ public class SupplyUnitSettingService {
   @Transactional(readOnly = true)
   public @NotNull List<SupplyUnitDto> listAll() {
     return list(false);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public @NotNull Set<UUID> raisingUnitIds() {
+    return settingRepository.findByMayRaiseNeedsTrue().stream()
+        .map(SupplyUnitSetting::getId)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   private @NotNull List<SupplyUnitDto> list(boolean onlyConfigured) {

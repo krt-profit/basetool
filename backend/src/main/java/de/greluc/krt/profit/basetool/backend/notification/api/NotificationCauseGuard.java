@@ -23,14 +23,14 @@ import de.greluc.krt.profit.basetool.backend.notification.api.events.Notificatio
 import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
 import org.jetbrains.annotations.NotNull;
 
-/** Lets an event's owning domain retire stale action prompts before grouped delivery. */
+/** Lets an event's owning domain retire stale prompts before grouped delivery or reconciliation. */
 @ObserverSpi
 public interface NotificationCauseGuard {
 
   /**
-   * Checks the current business state before a cause creates or removes a prompt.
+   * Checks the current business state before creating or removing a prompt.
    *
-   * @param event one original event in the committed cause
+   * @param event an event in a committed cause or a standalone reconciliation event
    * @return whether this event's notice and cleanup are current
    */
   boolean isCurrent(@NotNull NotificationEvent event);

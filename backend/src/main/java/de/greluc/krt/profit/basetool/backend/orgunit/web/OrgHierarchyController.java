@@ -199,8 +199,8 @@ public class OrgHierarchyController {
   @PreAuthorize(
       "(hasRole('"
           + Roles.ADMIN
-          + "') or (@orgRoleManagementSecurityService.canAppointBereichRole(#id, #request.role(),"
-          + " authentication) and"
+          + "') or (@orgRoleManagementSecurityService.canAppointBereichRole(#id, #request.userId(),"
+          + " #request.role(), authentication) and"
           + " @orgRoleManagementSecurityService.targetsAnotherUser(#request.userId(),"
           + " authentication))) and @requestScopeResolver.isInActiveContext(#id)")
   @Operation(

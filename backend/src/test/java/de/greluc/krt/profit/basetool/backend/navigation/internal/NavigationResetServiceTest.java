@@ -99,8 +99,8 @@ class NavigationResetServiceTest {
   private double ok(NavigationSection section) {
     return meterRegistry
         .counter(
-            NavigationMetrics.PREFERENCE_WRITES,
-            NavigationMetrics.TAG_SECTION,
+            NavigationMetricNames.PREFERENCE_WRITES,
+            NavigationMetricNames.TAG_SECTION,
             section.getTag(),
             MetricNames.TAG_OUTCOME,
             NavigationWriteOutcome.OK.getTag())

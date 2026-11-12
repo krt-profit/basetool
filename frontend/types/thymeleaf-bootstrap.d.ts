@@ -115,7 +115,6 @@ declare const INV_ADD_MSG: KrtI18nDict;
 /** The check-in order picker's need labels (REQ-INV-039), declared in inventory-input.html. */
 declare const INV_ORDER_NEED_MSG: KrtI18nDict;
 /** The check-in owner picker's placeholder and per-kind group labels, declared in inventory-input.html. */
-declare const INV_OWNER_PICKER_MSG: KrtI18nDict;
 
 /** Injected by the page bootstrap (declared in inventory-input.html). */
 declare const MSG_UNIT_PIECE: string;
@@ -185,7 +184,6 @@ declare const MSG_PAYOUT_PAID_ERROR: string;
 /** Injected by the page bootstrap (declared in operation-detail.html). */
 declare const MSG_PAYOUT_PAID_FORBIDDEN: string;
 /** Injected by the page bootstrap (declared in operation-detail.html). */
-declare const MSG_PAYOUT_PAID_UNSET_LOCKED: string;
 /** Injected by the page bootstrap (declared in operation-detail.html). */
 declare const OPS_DETAIL_MSG: KrtI18nDict;
 /** Injected by the page bootstrap (declared in operation-detail.html). */
@@ -441,9 +439,7 @@ declare const MSG_REFINERY_UPDATE_FAILED: string;
 /** Injected by the page bootstrap (declared in refinery-orders-details.html). */
 declare const MSG_SAVING: string;
 /** Injected by the page bootstrap (declared in refinery-orders-details.html). */
-declare const STORE_INHERITED_ORG_UNIT_ID: string | null;
 /** Injected by the page bootstrap (declared in refinery-orders-details.html). */
-declare const STORE_ORG_UNIT_PLACEHOLDER: string;
 
 /** Injected by the page bootstrap (declared in ship-data.html). */
 declare const shipDataConflict: KrtI18nDict;

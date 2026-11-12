@@ -67,14 +67,15 @@ public class MemberMembershipController {
    * Lists the org units a user belongs to as picker-optimised {@link OrgUnitMembershipOptionDto}
    * rows for the owner picker.
    *
-   * <p>Open to every authenticated member and {@code BANK_EMPLOYEE} (REQ-BANK-044); the response
-   * carries only org-unit names and shorthands, no personal data.
+   * <p>Bank employees may use the direct membership list for counterparties (REQ-BANK-044).
+   * Owner-picker mode requires an administrator or a KRT Member.
    *
    * @param id the user id whose memberships to list; never {@code null}.
    * @param allKinds {@code true} for the pickers: all four org-unit kinds (Staffel, SK, Bereich,
    *     Organisationsleitung), active units only (REQ-ORG-032); {@code false} for the
    *     administration's member views: the stored Staffel and SK memberships, deactivated units
    *     included.
+   * @param ownerPicker {@code true} for all active, stampable owner units (REQ-ORG-004)
    * @return option DTOs sorted Staffel-first then SK alphabetical, or top-down by kind when {@code
    *     allKinds=true}; never {@code null}, possibly empty.
    */
@@ -84,13 +85,17 @@ public class MemberMembershipController {
           + Roles.ADMIN
           + "', '"
           + Roles.KRT_MEMBER
-          + "', '"
+          + "') or (!#ownerPicker and hasRole('"
           + Roles.BANK_EMPLOYEE
-          + "')")
+          + "'))")
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> getUserMemberships(
       @PathVariable @NotNull UUID id,
-      @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
+      @RequestParam(required = false, defaultValue = "false") boolean allKinds,
+      @RequestParam(defaultValue = "false") boolean ownerPicker) {
+    if (ownerPicker) {
+      return orgUnitMembershipQueryService.listOwnerMembershipOptions(id);
+    }
     return allKinds
         ? orgUnitMembershipQueryService.listDirectMembershipOptions(id)
         : orgUnitMembershipQueryService.listOptionsForUser(id);
@@ -126,6 +131,7 @@ public class MemberMembershipController {
    * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
    * @param allKinds {@code true} to include all four org-unit kinds (Staffel, SK, Bereich,
    *     Organisationsleitung); {@code false} for Staffel and SK only.
+   * @param ownerPicker {@code true} for all active, stampable owner units (REQ-ORG-004)
    * @return option DTOs, sorted as the sibling endpoint sorts them; never {@code null}, possibly
    *     empty.
    */
@@ -134,8 +140,12 @@ public class MemberMembershipController {
   @Transactional(readOnly = true)
   public List<OrgUnitMembershipOptionDto> getMyMemberships(
       @AuthenticationPrincipal Jwt jwt,
-      @RequestParam(required = false, defaultValue = "false") boolean allKinds) {
+      @RequestParam(required = false, defaultValue = "false") boolean allKinds,
+      @RequestParam(defaultValue = "false") boolean ownerPicker) {
     UUID callerId = userService.getUserIdFromJwt(jwt);
+    if (ownerPicker) {
+      return orgUnitMembershipQueryService.listOwnerMembershipOptions(callerId);
+    }
     return allKinds
         ? orgUnitMembershipQueryService.listDirectMembershipOptions(callerId)
         : orgUnitMembershipQueryService.listOptionsForUser(callerId);

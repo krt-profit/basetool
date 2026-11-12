@@ -73,8 +73,8 @@ class DashboardServiceTest {
   private double writes(NavigationSection section, NavigationWriteOutcome outcome) {
     return meterRegistry
         .counter(
-            NavigationMetrics.PREFERENCE_WRITES,
-            NavigationMetrics.TAG_SECTION,
+            NavigationMetricNames.PREFERENCE_WRITES,
+            NavigationMetricNames.TAG_SECTION,
             section.getTag(),
             MetricNames.TAG_OUTCOME,
             outcome.getTag())

@@ -164,6 +164,7 @@
       "kernel/krt-live-sync.js",
       "kernel/krt-localised-name.js",
       "kernel/krt-modal.js",
+      "kernel/krt-owner-picker.js",
       "kernel/krt-number-format.js",
       "kernel/krt-number-input.js",
       "kernel/krt-overflow-menu.js",

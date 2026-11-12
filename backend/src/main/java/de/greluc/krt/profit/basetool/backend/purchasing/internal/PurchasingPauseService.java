@@ -30,10 +30,16 @@ import de.greluc.krt.profit.basetool.backend.purchasing.api.PauseReason;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemCode;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingProblemException;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.events.PurchasingNotices;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyRaisingUnits;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -58,33 +64,54 @@ public class PurchasingPauseService {
   private final PurchasingDelegateService delegateService;
   private final PurchasingAccessPolicy accessPolicy;
   private final OrgUnitRepository orgUnitRepository;
+  private final SupplyRaisingUnits supplyRaisingUnits;
   private final AuthHelperService authHelperService;
   private final AuditRecorder auditRecorder;
   private final ApplicationEventPublisher eventPublisher;
 
   /**
-   * Reads where purchasing is paused.
+   * Reads the pauses and the scopes the caller may manage.
    *
-   * @return the global pause and the paused units
+   * @return the pauses and the caller's permitted controls
    */
   @NotNull
   @Transactional(readOnly = true)
   public PauseStateDto state() {
     PurchasingSetting setting = settingsService.current();
-    List<PauseStateDto.UnitPause> units =
-        unitPauseRepository.findAll().stream()
-            .map(pause ->
-                new PauseStateDto.UnitPause(
-                    pause.getOrgUnitId(),
-                    orgUnitRepository
-                        .findById(pause.getOrgUnitId())
-                        .map(OrgUnit::getName)
-                        .orElse("—"),
-                    pause.getReason(),
-                    pause.getPausedAt()))
+    List<PurchasingUnitPause> pauses = unitPauseRepository.findAll();
+    Set<UUID> raisingUnitIds = supplyRaisingUnits.raisingUnitIds();
+    Set<UUID> referencedUnitIds = new HashSet<>(raisingUnitIds);
+    pauses.forEach(pause -> referencedUnitIds.add(pause.getOrgUnitId()));
+    Map<UUID, OrgUnit> units =
+        orgUnitRepository.findAllById(referencedUnitIds).stream()
+            .collect(Collectors.toMap(OrgUnit::getId, Function.identity()));
+    List<PauseStateDto.UnitPause> pausedUnits =
+        pauses.stream()
+            .map(pause -> describePause(pause, units.get(pause.getOrgUnitId())))
+            .toList();
+    List<PauseStateDto.PausableUnit> pausableUnits =
+        units.values().stream()
+            .filter(unit -> unit.isActive() && raisingUnitIds.contains(unit.getId()))
+            .filter(unit -> accessPolicy.canPause(unit.getId()))
+            .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
+            .map(unit -> new PauseStateDto.PausableUnit(unit.getId(), unit.getName()))
             .toList();
     return new PauseStateDto(
-        setting.isPaused(), setting.getPauseReason(), setting.getPausedAt(), units);
+        setting.isPaused(),
+        setting.getPauseReason(),
+        setting.getPausedAt(),
+        pausedUnits,
+        accessPolicy.canPause(null),
+        pausableUnits);
+  }
+
+  private PauseStateDto.UnitPause describePause(PurchasingUnitPause pause, @Nullable OrgUnit unit) {
+    return new PauseStateDto.UnitPause(
+        pause.getOrgUnitId(),
+        unit == null ? "—" : unit.getName(),
+        pause.getReason(),
+        pause.getPausedAt(),
+        unit != null && accessPolicy.canPause(unit.getId()));
   }
 
   /**

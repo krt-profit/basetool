@@ -43,6 +43,9 @@ public final class Roles {
   public static final String BANK_EMPLOYEE = "BANK_EMPLOYEE";
   public static final String BANK_MANAGEMENT = "BANK_MANAGEMENT";
 
+  /** Stored roles that confer bank staff eligibility. */
+  public static final Set<String> BANK_STAFF_ROLES = Set.of(BANK_EMPLOYEE, BANK_MANAGEMENT, ADMIN);
+
   /**
    * The marker authority of an approved account holding no application role (REQ-SEC-053), already
    * {@code ROLE_}-prefixed.

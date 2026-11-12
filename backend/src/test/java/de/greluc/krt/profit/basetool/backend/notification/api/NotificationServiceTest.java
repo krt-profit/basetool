@@ -68,7 +68,19 @@ class NotificationServiceTest {
 
   private static NotificationDto dummyDto(UUID id) {
     return new NotificationDto(
-        id, "JOB_ORDER_CREATED", Map.of(), "JOB_ORDER", null, false, null, 0L, null, null);
+        id,
+        "JOB_ORDER_CREATED",
+        Map.of(),
+        "JOB_ORDER",
+        null,
+        false,
+        null,
+        0L,
+        null,
+        null,
+        null,
+        null,
+        null);
   }
 
   @Test

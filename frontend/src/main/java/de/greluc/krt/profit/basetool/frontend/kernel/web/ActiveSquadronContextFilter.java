@@ -62,13 +62,8 @@ public class ActiveSquadronContextFilter extends OncePerRequestFilter implements
    */
   public static final String ORG_UNIT_ID_MDC_KEY = "orgUnitId";
 
-  /**
-   * MDC value rendered when the caller has no active OrgUnit pin — anonymous traffic, a
-   * single-membership member who never opened the switcher, or an admin who has not pinned a
-   * Staffel. A stable literal rather than an absent key, so "unpinned" is distinguishable from "the
-   * filter never ran" and the log line keeps a constant field count.
-   */
-  public static final String NO_ACTIVE_ORG_UNIT = "none";
+  /** MDC value for a request that carries no org-unit selection. */
+  public static final String NO_ACTIVE_ORG_UNIT = "unpinned";
 
   /** Seeds the session's selection from the caller's stored choice once per session. */
   private final ActiveOrgUnitRestore activeOrgUnitRestore;

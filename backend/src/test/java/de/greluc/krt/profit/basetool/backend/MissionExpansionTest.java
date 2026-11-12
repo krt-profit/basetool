@@ -83,6 +83,7 @@ class MissionExpansionTest {
     Ship ship = new Ship();
     ship.setName("Test Ship");
     ship.setShipType(fighter);
+    ship.setInsurance("LTI");
     ship.setOwner(savedUser);
     ship = shipRepository.save(ship);
 

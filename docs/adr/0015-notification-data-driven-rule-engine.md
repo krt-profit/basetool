@@ -31,6 +31,19 @@ The engine unions a rule's selectors, drops the actor when `exclude_actor` is se
 de-duplicates. `kind` is an open enum (a `GROUP` kind is reserved). UC1 ships as a **seeded,
 admin-editable** rule, not hardcoded logic.
 
+## Audience constraints
+
+For unit-scoped and other restricted events, the event's audience bounds rule configuration and
+delivery. Rules can use event-relative recipients and designated cross-unit audiences, including
+the Bankleitung for booking requests. An enabled rule cannot attach an unrestricted selector to
+a restricted event. The delivery engine applies the same check to rules already stored
+(REQ-NOTIF-007).
+
+Delivery records independent recipient paths when entitlement depends on `KRT Member` or bank
+staff eligibility. A role withdrawal removes notices whose last path is withdrawn in the same
+transaction. Delivery checks the stored roles while holding shared locks on the recipient
+role sets (REQ-NOTIF-024).
+
 ## Consequences
 
 - **Easier:** new recipient policies are configuration, not deploys; UC1 and future use cases

@@ -19,34 +19,40 @@
 
 package de.greluc.krt.profit.basetool.backend.mission.api;
 
-/**
- * The JPQL scope fragment of the module's scoped aggregate (REQ-DATA-010), spliced into the
- * {@code @Query} values of the repositories that list the aggregate.
- *
- * <p>The fragment lives beside the aggregate's repository and is the list-side half of the rule
- * that {@code MissionAccessPolicy} enforces row by row: both apply one visibility rule, so a row
- * the list returns is a row the policy lets the caller see. It is a compile-time constant, which an
- * annotation value needs, so the class is {@code public} and has no behaviour. A query that needs
- * more than the fragment starts with a text block, appends the constant and continues only with
- * plain string literals.
- */
+/** HQL visibility of a mission and its parent chain (REQ-DATA-010, REQ-ORG-003). */
 public final class MissionScope {
 
-  /** Non-instantiable constant holder. */
   private MissionScope() {}
 
-  /**
-   * Mission's scope predicate (alias {@code m}): the org-unit triple plus the public escape ({@code
-   * isInternal = false}) and the ownerless-leadership escape (REQ-ORG-003).
-   */
-  public static final String PREDICATE =
+  /** The row read rule for alias {@code m}. */
+  private static final String ROW_READABLE =
       """
       (
         :isAdminAllScope = true
-        OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)
-        OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)
-        OR m.isInternal = false
+        OR coalesce(m.isInternal, false) = false
+        OR (m.owningOrgUnit IS NOT NULL AND (
+          (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)
+          OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)
+        ))
         OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)
        )
       """;
+
+  /** Recursive prefix collecting unreadable ancestors and their descendants. */
+  static final String ANCESTOR_VISIBILITY =
+      """
+      WITH unreadable_mission AS (
+        SELECT m.id AS id FROM Mission m
+        WHERE EXISTS (SELECT 1 FROM Mission child WHERE child.parent.id = m.id)
+          AND NOT
+      """
+          + ROW_READABLE
+          + "  UNION\n"
+          + "  SELECT child.id AS id FROM Mission child\n"
+          + "  JOIN unreadable_mission ancestor ON child.parent.id = ancestor.id\n"
+          + ")\n";
+
+  /** Read rule for alias {@code m} in a query prefixed with {@link #ANCESTOR_VISIBILITY}. */
+  public static final String PREDICATE =
+      ROW_READABLE + "AND m.id NOT IN (SELECT hidden.id FROM unreadable_mission hidden)\n";
 }
