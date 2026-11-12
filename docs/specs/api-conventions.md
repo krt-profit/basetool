@@ -1476,6 +1476,12 @@ under-stated), `s=` the app's own call sites, which the server ignores. No comme
 > `backend/src/test/resources/api/declared-breaks.txt` and the previous-release comparison in
 > `ExternalContractTest`. The ledger's contents stay in git, where a question about a past break is
 > answered by the commit that declared it.
+>
+> **Its input outlived it until 2026-11-12.** CI kept fetching the newest tag's `openapi.json` and
+> relay document into `backend/build/contract-baseline/` and setting `CONTRACT_BASELINE_REQUIRED`,
+> `backend/build.gradle.kts` kept passing both on as `-Dcontract.baseline*`, and `OpenApiWalk` kept
+> the comparison's property walk; no test read any of it. All of it is removed. The CI step keeps
+> only its exchange half, *Fetch the previous release's exchange schemas* (REQ-XCH-026).
 
 
 A break of a frozen operation or field is either declared or a defect. The declaration is a line in
@@ -1540,8 +1546,9 @@ changed or removed (ADR-0234).
   release's relay document included (REQ-XCH-039).
 
 **Enforced by:** nothing — removed with the app (ADR-0269). It used to be `ExternalContractTest`,
-`DeclaredBreaksTest` and `AppCallListTest` (backend) plus the
-*Fetch the previous release's API contract* step of `ci.yml` ·
+`DeclaredBreaksTest` and `AppCallListTest` (backend) plus the backend half of the
+*Fetch the previous release's API contract* step of `ci.yml`; that step is now
+*Fetch the previous release's exchange schemas* and serves REQ-XCH-026 only ·
 **Related:** REQ-API-009, REQ-API-010, REQ-API-016, ADR-0136
 
 ---

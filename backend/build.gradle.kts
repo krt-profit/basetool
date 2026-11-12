@@ -143,38 +143,8 @@ basetool {
   )
 }
 
-val contractBaseline = layout.buildDirectory.file("contract-baseline/openapi.json")
-val relayContractBaseline =
-  layout.buildDirectory.file("contract-baseline/exchange-relay.openapi.json")
-val contractBaselineRequired =
-  providers
-    .environmentVariable("CONTRACT_BASELINE_REQUIRED")
-    .map { it.trim() == "true" }
-    .orElse(false)
-
 tasks.named<Test>("test") {
   maxParallelForks = 2
-  inputs
-    .files(contractBaseline)
-    .withPropertyName("contractBaseline")
-    .withPathSensitivity(PathSensitivity.NONE)
-  inputs
-    .files(relayContractBaseline)
-    .withPropertyName("relayContractBaseline")
-    .withPathSensitivity(PathSensitivity.NONE)
-  inputs.property("contractBaselineRequired", contractBaselineRequired)
-  val baseline = contractBaseline
-  val relayBaseline = relayContractBaseline
-  val baselineRequired = contractBaselineRequired
-  jvmArgumentProviders.add(
-    CommandLineArgumentProvider {
-      listOf(
-        "-Dcontract.baseline=" + baseline.get().asFile.absolutePath,
-        "-Dcontract.baseline.relay=" + relayBaseline.get().asFile.absolutePath,
-        "-Dcontract.baseline.required=" + baselineRequired.get(),
-      )
-    },
-  )
 
   inputs
     .files(
