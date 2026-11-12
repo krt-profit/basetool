@@ -194,7 +194,7 @@ class AnonymousSurfaceSweepMvcTest {
     }
     Assertions.assertThat(served)
         .as(
-            "REQ-SEC-052: every page outside the four public ones must send an anonymous navigation"
+            "REQ-SEC-052: every page outside PUBLIC_PAGES must send an anonymous navigation"
                 + " into the OAuth2 entry point. A 2xx here is a page served to the internet.")
         .isEmpty();
   }
