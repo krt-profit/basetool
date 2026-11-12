@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
@@ -85,7 +84,6 @@ class DeactivatedOrgUnitConfersNothingIntegrationTest {
     area = new Bereich();
     area.setName("Deactivation area " + token);
     area.setShorthand("A" + token);
-    area.setDepartment(Department.PROFIT);
     orgUnitRepository.save(area);
     hel = squadron("Hel " + token, "H" + token, true);
     argon = squadron("Argon " + token, "R" + token, false);
