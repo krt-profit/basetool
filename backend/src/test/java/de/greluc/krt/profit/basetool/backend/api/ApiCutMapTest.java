@@ -70,9 +70,8 @@ class ApiCutMapTest {
   /** The verbs the document and the map use. */
   private static final Set<String> VERBS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
 
-  /** One line of the map. */
-  private record Entry(
-      int wave, String verb, String oldPath, String newPath, String tier, boolean app) {
+  /** One line of the map, without its tier and app columns, which no check reads. */
+  private record Entry(int wave, String verb, String oldPath, String newPath) {
 
     /**
      * Whether the entry deletes the operation.
@@ -93,16 +92,15 @@ class ApiCutMapTest {
     }
   }
 
-  /** Every line of the map parses into its six fields, in a known wave, tier and verb. */
+  /** Every line of the map parses into its six fields, in a known wave and verb. */
   @Test
-  @DisplayName("the map parses and names only known waves, verbs and tiers")
+  @DisplayName("the map parses and names only known waves and verbs")
   void theMapParses() throws IOException {
     List<Entry> entries = map();
 
     assertThat(entries).hasSizeGreaterThanOrEqualTo(185);
     assertThat(entries).allSatisfy(e -> assertThat(e.wave()).isBetween(1, 6));
     assertThat(entries).allSatisfy(e -> assertThat(VERBS).contains(e.verb()));
-    assertThat(entries).allSatisfy(e -> assertThat(e.tier()).isIn("T1", "T2"));
     assertThat(entries).allSatisfy(e -> assertThat(e.oldPath()).startsWith("/api/v"));
     assertThat(entries)
         .allSatisfy(e -> assertThat(e.deleted() || e.newPath().startsWith("/api/v1/")).isTrue());
@@ -127,8 +125,8 @@ class ApiCutMapTest {
   void theChecksCanFail() {
     List<Entry> entries =
         List.of(
-            new Entry(1, "GET", "/api/v1/admin/a", "/api/v1/x/admin/a", "T2", false),
-            new Entry(1, "GET", "/api/v1/admin/b", "/api/v1/x/admin/b", "T2", false));
+            new Entry(1, "GET", "/api/v1/admin/a", "/api/v1/x/admin/a"),
+            new Entry(1, "GET", "/api/v1/admin/b", "/api/v1/x/admin/b"));
 
     assertThat(mixedWaves(entries, Set.of("GET /api/v1/admin/a"))).containsExactly(1);
     assertThat(mixedWaves(entries, Set.of("GET /api/v1/admin/a", "GET /api/v1/admin/b"))).isEmpty();
@@ -143,20 +141,11 @@ class ApiCutMapTest {
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining("100 GET /a /b T2 -");
     assertThat(waveNumber("3", "3 GET /a /b T2 -")).isEqualTo(3);
-    List<Entry> fold =
-        List.of(
-            new Entry(5, "GET", "/api/v1/a", "/api/v1/c", "T2", false),
-            new Entry(5, "GET", "/api/v1/b", "/api/v1/c", "T1", true),
-            new Entry(5, "GET", "/api/v1/d", "/api/v1/e", "T2", false));
-    assertThat(tierAfterMove(fold, fold.get(0))).isEqualTo("T1");
-    assertThat(tierAfterMove(fold, fold.get(1))).isEqualTo("T1");
-    assertThat(tierAfterMove(fold, fold.get(2))).isEqualTo("T2");
   }
 
   /**
    * An operation the map says moved stands at its new path in the committed document, unless the
-   * map deletes it. The tier and app columns are a historical record since ADR-0269 and are no
-   * longer compared with anything.
+   * map deletes it.
    */
   @Test
   @DisplayName("every moved operation stands at its new path in the document")
@@ -203,27 +192,6 @@ class ApiCutMapTest {
     map().forEach(e -> mapped.add(e.oldKey()));
 
     assertThat(escapes(documentedOperations(), mapped)).isEmpty();
-  }
-
-  /**
-   * The tier the target of a move carries: the entry's own tier, or the strictest tier of every
-   * entry folded into the same target, so a frozen operation absorbing a web-only twin stays
-   * frozen.
-   *
-   * @param entries the map
-   * @param entry the moved entry
-   * @return {@code T1} when any entry with the same target is {@code T1}, else the entry's tier
-   */
-  private static String tierAfterMove(List<Entry> entries, Entry entry) {
-    for (Entry other : entries) {
-      if (!other.deleted()
-          && other.verb().equals(entry.verb())
-          && other.newPath().equals(entry.newPath())
-          && "T1".equals(other.tier())) {
-        return "T1";
-      }
-    }
-    return entry.tier();
   }
 
   /**
@@ -278,31 +246,9 @@ class ApiCutMapTest {
     for (String line : lines("/api/api-cut-map.txt")) {
       String[] f = line.split(" ");
       assertThat(f).as("fields of '%s'", line).hasSize(6);
-      entries.add(
-          new Entry(
-              waveNumber(f[0], line),
-              f[1],
-              f[2],
-              "-".equals(f[3]) ? null : f[3],
-              f[4],
-              "app".equals(f[5])));
+      entries.add(new Entry(waveNumber(f[0], line), f[1], f[2], "-".equals(f[3]) ? null : f[3]));
     }
     return entries;
-  }
-
-  /**
-   * Reads the operations the app calls today.
-   *
-   * @return {@code VERB path} of every call in the last released list
-   * @throws IOException if the resource is unreadable
-   */
-  private static Set<String> appCalls() throws IOException {
-    Set<String> calls = new HashSet<>();
-    for (String line : lines("/api/api-cut-app-calls-baseline.txt")) {
-      String[] f = line.split(" ");
-      calls.add(f[0] + " " + f[1]);
-    }
-    return calls;
   }
 
   /**

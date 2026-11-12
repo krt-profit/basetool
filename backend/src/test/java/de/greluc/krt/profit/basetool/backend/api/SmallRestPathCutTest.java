@@ -63,8 +63,8 @@ class SmallRestPathCutTest {
 
   private static final String SAMPLE_UUID = "00000000-0000-4000-8000-00000000cafe";
 
-  /** One wave-6 line of the map: verb, old path, new path or {@code null}, frozen or not. */
-  private record Moved(String verb, String oldPath, String newPath, boolean frozen) {}
+  /** One wave-6 line of the map: verb, old path, new path or {@code null} for a deletion. */
+  private record Moved(String verb, String oldPath, String newPath) {}
 
   @Autowired private WebApplicationContext context;
 
@@ -77,12 +77,11 @@ class SmallRestPathCutTest {
   }
 
   @Test
-  @DisplayName("the wave has 15 operations, 9 of them frozen, and one of them is deleted")
+  @DisplayName("the wave has 15 operations, and one of them is deleted")
   void theWaveIsTheOneTheMapNames() throws IOException {
     List<Moved> moved = wave6();
 
     assertThat(moved).hasSize(15);
-    assertThat(moved).filteredOn(Moved::frozen).hasSize(9);
     assertThat(moved).filteredOn(m -> m.newPath() == null).hasSize(1);
   }
 
@@ -139,7 +138,7 @@ class SmallRestPathCutTest {
   }
 
   @Test
-  @DisplayName("every old path is gone, frozen or not")
+  @DisplayName("every old path is gone")
   void theOldPathsAreGone() throws Exception {
     for (Moved m : wave6()) {
       HttpMethod method = HttpMethod.valueOf(m.verb());
@@ -251,7 +250,7 @@ class SmallRestPathCutTest {
       for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\\R")) {
         String[] f = line.trim().split(" ");
         if (f.length == 6 && "6".equals(f[0])) {
-          moved.add(new Moved(f[1], f[2], "-".equals(f[3]) ? null : f[3], "T1".equals(f[4])));
+          moved.add(new Moved(f[1], f[2], "-".equals(f[3]) ? null : f[3]));
         }
       }
     }
