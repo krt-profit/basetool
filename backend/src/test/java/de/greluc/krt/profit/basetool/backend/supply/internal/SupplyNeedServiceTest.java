@@ -89,6 +89,8 @@ class SupplyNeedServiceTest {
 
   private static final UUID UNIT = UUID.randomUUID();
   private static final UUID CALLER = UUID.randomUUID();
+  private static final Set<JobOrderStatus> LINKABLE =
+      Set.of(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS);
 
   @Mock private SupplyNeedRepository needRepository;
   @Mock private SupplyUnitSettingRepository unitSettingRepository;
@@ -111,22 +113,7 @@ class SupplyNeedServiceTest {
 
   @BeforeEach
   void setUp() {
-    service =
-        new SupplyNeedService(
-            needRepository,
-            unitSettingRepository,
-            materialRepository,
-            new SelectableGameItems(gameItemRepository),
-            qualityTierRepository,
-            jobOrderRepository,
-            settingsService,
-            accessPolicy,
-            mapper,
-            auditRecorder,
-            authHelperService,
-            new SimpleMeterRegistry(),
-            lifecycleObservers,
-            eventPublisher);
+    service = serviceWith(accessPolicy);
     lenient()
         .when(lifecycleObservers.orderedStream())
         .thenAnswer(invocation -> Stream.of(observer));
@@ -137,6 +124,30 @@ class SupplyNeedServiceTest {
     baseTier = new QualityTier();
     baseTier.setId(UUID.randomUUID());
     baseTier.setCode("BASE");
+  }
+
+  /**
+   * The service over this test's mocks, deciding access by the given policy.
+   *
+   * @param policy the caller's policy
+   * @return the service
+   */
+  private SupplyNeedService serviceWith(SupplyAccessPolicy policy) {
+    return new SupplyNeedService(
+        needRepository,
+        unitSettingRepository,
+        materialRepository,
+        new SelectableGameItems(gameItemRepository),
+        qualityTierRepository,
+        jobOrderRepository,
+        settingsService,
+        policy,
+        mapper,
+        auditRecorder,
+        authHelperService,
+        new SimpleMeterRegistry(),
+        lifecycleObservers,
+        eventPublisher);
   }
 
   private CreateNeedRequest createRequest(
@@ -155,10 +166,14 @@ class SupplyNeedServiceTest {
   }
 
   private void raisingUnit() {
+    when(unitSettingRepository.findById(UNIT)).thenReturn(Optional.of(setting(UNIT, true)));
+  }
+
+  private static SupplyUnitSetting setting(UUID unitId, boolean raising) {
     SupplyUnitSetting setting = new SupplyUnitSetting();
-    setting.setId(UNIT);
-    setting.setMayRaiseNeeds(true);
-    when(unitSettingRepository.findById(UNIT)).thenReturn(Optional.of(setting));
+    setting.setId(unitId);
+    setting.setMayRaiseNeeds(raising);
+    return setting;
   }
 
   private SupplyNeed storedNeed(NeedStatus status, double amount, double fulfilled) {
@@ -287,22 +302,7 @@ class SupplyNeedServiceTest {
             authHelperService,
             settingsService,
             org.mockito.Mockito.mock());
-    SupplyNeedService leadService =
-        new SupplyNeedService(
-            needRepository,
-            unitSettingRepository,
-            materialRepository,
-            new SelectableGameItems(gameItemRepository),
-            qualityTierRepository,
-            jobOrderRepository,
-            settingsService,
-            realPolicy,
-            mapper,
-            auditRecorder,
-            authHelperService,
-            new SimpleMeterRegistry(),
-            lifecycleObservers,
-            eventPublisher);
+    SupplyNeedService leadService = serviceWith(realPolicy);
     raisingUnit();
     when(materialRepository.findById(material.getId())).thenReturn(Optional.of(material));
     when(qualityTierRepository.findByMinQuality(0)).thenReturn(Optional.of(baseTier));
@@ -613,7 +613,8 @@ class SupplyNeedServiceTest {
         .thenReturn(List.of());
     when(mapper.needContext(List.of()))
         .thenReturn(
-            new SupplyMapper.NeedContext(Map.of(), false, false, Set.of(), false, Map.of()));
+            new SupplyMapper.NeedContext(
+                Map.of(), false, new SupplyManagedUnits(false, Set.of()), false, Map.of()));
 
     assertThat(service.openNeedsOf(UNIT)).isEmpty();
   }
@@ -683,13 +684,35 @@ class SupplyNeedServiceTest {
   @Test
   void theOrderPickerListsTheOpenOrdersOfTheManagedUnits() {
     JobOrder order = order(UNIT, JobOrderStatus.OPEN);
-    when(accessPolicy.managedUnitIds()).thenReturn(Set.of(UNIT));
-    when(jobOrderRepository.findByResponsibleOrgUnitsAndStatuses(
-            Set.of(JobOrderStatus.OPEN, JobOrderStatus.IN_PROGRESS), Set.of(UNIT)))
+    when(accessPolicy.managedUnits()).thenReturn(new SupplyManagedUnits(false, Set.of(UNIT)));
+    when(jobOrderRepository.findByResponsibleOrgUnitsAndStatuses(LINKABLE, Set.of(UNIT)))
         .thenReturn(List.of(order));
 
     assertThat(service.jobOrderOptions())
         .containsExactly(new NeedJobOrderOptionDto(order.getId(), UNIT, 42));
+  }
+
+  @Test
+  void anAdminWithoutAPinIsOfferedTheOrdersOfEveryRaisingUnit() {
+    JobOrder order = order(UNIT, JobOrderStatus.IN_PROGRESS);
+    when(unitSettingRepository.findAll())
+        .thenReturn(List.of(setting(UNIT, true), setting(UUID.randomUUID(), false)));
+    when(jobOrderRepository.findByResponsibleOrgUnitsAndStatuses(LINKABLE, Set.of(UNIT)))
+        .thenReturn(List.of(order));
+
+    assertThat(serviceWith(SupplyAccessPolicies.admin(null)).jobOrderOptions())
+        .containsExactly(new NeedJobOrderOptionDto(order.getId(), UNIT, 42));
+  }
+
+  @Test
+  void anAdminPinnedToAUnitIsOfferedOnlyTheOrdersOfThatUnit() {
+    JobOrder order = order(UNIT, JobOrderStatus.OPEN);
+    when(jobOrderRepository.findByResponsibleOrgUnitsAndStatuses(LINKABLE, Set.of(UNIT)))
+        .thenReturn(List.of(order));
+
+    assertThat(serviceWith(SupplyAccessPolicies.admin(UNIT)).jobOrderOptions())
+        .containsExactly(new NeedJobOrderOptionDto(order.getId(), UNIT, 42));
+    verify(unitSettingRepository, never()).findAll();
   }
 
   @Test
@@ -737,7 +760,7 @@ class SupplyNeedServiceTest {
 
   @Test
   void aCallerWhoManagesNoUnitGetsNoOrders() {
-    when(accessPolicy.managedUnitIds()).thenReturn(Set.of());
+    when(accessPolicy.managedUnits()).thenReturn(new SupplyManagedUnits(false, Set.of()));
 
     assertThat(service.jobOrderOptions()).isEmpty();
     verify(jobOrderRepository, never()).findByResponsibleOrgUnitsAndStatuses(any(), any());

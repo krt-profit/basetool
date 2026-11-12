@@ -45,8 +45,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Builds the {@link BankActor} from the database (ADR-0352): {@link MemberRoleCodes} with the role
- * hierarchy applied, the membership rows with their officer reach, and the {@code
- * bank_account_grant} rows, in four reads.
+ * hierarchy applied, the membership rows on active org units with their officer reach (a
+ * deactivated unit confers nothing, REQ-ORG-032), and the {@code bank_account_grant} rows, in four
+ * reads.
  */
 @Service
 @RequiredArgsConstructor
@@ -84,7 +85,8 @@ class DatabaseBankActors implements BankActors {
     if (user.isEmpty()) {
       return BankActor.NOBODY;
     }
-    List<OrgUnitMembership> memberships = membershipRepository.findAllByIdUserId(userId);
+    List<OrgUnitMembership> memberships =
+        membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId);
     Set<String> stored =
         MemberRoleCodes.of(user.get(), memberships).stream()
             .filter(code -> !dropped.contains(code))

@@ -71,6 +71,17 @@ class DatabaseActingMemberAuthoritiesTest {
   }
 
   @Test
+  void aKrtMemberCarriesTheMembershipMarkerButNoRole() {
+    stored("ROLE_KRT_MEMBER", "ROLE_LOGISTICIAN");
+
+    assertThat(names(authorities.exchangeAuthoritiesFor(MEMBER, List.of("exchange.connect"))))
+        .containsExactly(
+            "ROLE_EXCHANGE_MEMBER",
+            Roles.EXCHANGE_KRT_MEMBER_MARKER,
+            "XCH_CAPABILITY:exchange.connect");
+  }
+
+  @Test
   void aPendingMemberKeepsTheMarkerTheApprovalGateRefuses() {
     stored("ROLE_PENDING_APPROVAL");
 

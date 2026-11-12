@@ -224,12 +224,12 @@ final class BankAccessMatrix {
   enum Operation {
     /** The org-unit bank page's balance cards. */
     ORG_BALANCES(SubjectKind.NONE, null, 0, false, true),
-    /** The pin-free list of the viewable org-unit accounts. */
+    /** The paged list of the org-unit accounts the caller views under the pin. */
     ORG_VISIBLE(SubjectKind.NONE, null, 0, false, true),
     /** The read-only org-unit drill-in of one account. */
     ORG_VIEW(SubjectKind.ACCOUNT, null, 0, false, true),
     /** The org-unit settings panel of one account. */
-    ORG_SETTINGS(SubjectKind.ACCOUNT, null, 0, false, false),
+    ORG_SETTINGS(SubjectKind.ACCOUNT, null, 0, false, true),
     /** The bank staff's account list. */
     STAFF_LIST(SubjectKind.NONE, null, 0, false, false),
     /** The bank staff's account detail. */
@@ -261,11 +261,11 @@ final class BankAccessMatrix {
     /** Raising a KRT withdrawal between {@code T1} and {@code T2} and approving it oneself. */
     FOUR_EYES_APPROVE(SubjectKind.NONE, null, 2, false, false),
     /** Granting an outsider a view grant from the org-unit settings. */
-    SET_VISIBILITY(SubjectKind.ACCOUNT, null, 1, false, false),
+    SET_VISIBILITY(SubjectKind.ACCOUNT, null, 1, false, true),
     /** Setting the balance target from the org-unit settings. */
-    SET_TARGET(SubjectKind.ACCOUNT, null, 1, false, false),
+    SET_TARGET(SubjectKind.ACCOUNT, null, 1, false, true),
     /** Setting an outsider's approval limit from the org-unit settings. */
-    SET_LIMIT(SubjectKind.ACCOUNT, null, 1, false, false),
+    SET_LIMIT(SubjectKind.ACCOUNT, null, 1, false, true),
     /** Setting the balance target from the bank staff's account page. */
     STAFF_SET_TARGET(SubjectKind.ACCOUNT, null, 1, false, false),
     /** Re-saving the seeded KRT approval tiers from the bank staff's account page. */

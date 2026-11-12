@@ -19,24 +19,36 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopeParityCallers;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Parity of the operation list query and the operation read gate (REQ-DATA-010, plan section 5.4):
- * over the caller matrix of the access-policy differential tests and operations of every unit and
- * of none, {@code OperationRepository#findAllScoped} never lists an operation {@link
+ * Parity of the operation queries and the operation gates (REQ-DATA-010, plan section 5.4): over
+ * the caller matrix of the access-policy differential tests and operations of every unit and of
+ * none, {@code OperationRepository#findAllScoped} never lists an operation {@link
  * OperationAccessPolicy#canSeeOperation} refuses, and the two agree on every operation without
- * participants, for callers that count as a member or above and for those that do not.
+ * participants, for callers that count as a member or above and for those that do not. The
+ * mission's operation picker lists exactly the operations {@link
+ * OperationAccessPolicy#canEditOperation} admits, with and without Mission Manager grants
+ * (REQ-MISSION-034).
  */
 @SpringBootTest
 @Transactional
@@ -56,16 +68,45 @@ class OperationScopeParityTest {
     run(false);
   }
 
+  @Test
+  void thePickerListsExactlyTheOperationsTheCallerMayEdit() {
+    ScopeParityCallers.Units units = ScopeParityCallers.persistUnits(squadronRepository);
+    UUID callerId = ScopeParityCallers.persistUser(userRepository, "caller").getId();
+    List<ScopeParityCallers.Row> rows = rows(units);
+    List<List<UUID>> grantSets =
+        List.of(List.of(), List.of(units.unitA()), List.of(units.unitA(), units.unitB()));
+    int editable = 0;
+    int refused = 0;
+    for (ScopeParityCallers.Caller caller : ScopeParityCallers.matrix(units)) {
+      for (List<UUID> grants : grantSets) {
+        ScopeParityCallers.Wired wired = ScopeParityCallers.wire(caller, units, callerId, true);
+        grantMissionManager(wired, grants);
+        Set<UUID> picker =
+            service(wired).findAllReference().stream()
+                .map(OperationReferenceDto::id)
+                .collect(Collectors.toSet());
+        OperationAccessPolicy policy = policy(wired);
+        for (ScopeParityCallers.Row row : rows) {
+          boolean mayEdit = policy.canEditOperation(row.id());
+          assertThat(picker.contains(row.id()))
+              .as("%s, grants %s: picker and gate agree on %s", caller.name(), grants, row.name())
+              .isEqualTo(mayEdit);
+          if (mayEdit) {
+            editable++;
+          } else {
+            refused++;
+          }
+        }
+      }
+    }
+    assertThat(editable).as("operations some caller may edit").isPositive();
+    assertThat(refused).as("operations some caller may not edit").isPositive();
+  }
+
   private void run(boolean memberOrAbove) {
     ScopeParityCallers.Units units = ScopeParityCallers.persistUnits(squadronRepository);
     UUID callerId = ScopeParityCallers.persistUser(userRepository, "caller").getId();
-    List<ScopeParityCallers.Row> rows =
-        List.of(
-            row("operation of A", operation(units.unitA())),
-            row("operation of B", operation(units.unitB())),
-            row("operation of child C", operation(units.childC())),
-            row("ownerless operation", operation(null)));
-    operationRepository.flush();
+    List<ScopeParityCallers.Row> rows = rows(units);
 
     ScopeParityCallers.check(
         units,
@@ -84,9 +125,49 @@ class OperationScopeParityTest {
                 .stream()
                 .map(Operation::getId)
                 .collect(Collectors.toSet()),
-        (wired, id) ->
-            new OperationAccessPolicy(wired.gate(), wired.authHelper(), operationRepository)
-                .canSeeOperation(id));
+        (wired, id) -> policy(wired).canSeeOperation(id));
+  }
+
+  private List<ScopeParityCallers.Row> rows(ScopeParityCallers.Units units) {
+    List<ScopeParityCallers.Row> rows =
+        List.of(
+            row("operation of A", operation(units.unitA())),
+            row("operation of B", operation(units.unitB())),
+            row("operation of child C", operation(units.childC())),
+            row("ownerless operation", operation(null)));
+    operationRepository.flush();
+    return rows;
+  }
+
+  private OperationAccessPolicy policy(ScopeParityCallers.Wired wired) {
+    return new OperationAccessPolicy(wired.gate(), wired.authHelper(), operationRepository);
+  }
+
+  private OperationService service(ScopeParityCallers.Wired wired) {
+    return new OperationService(
+        operationRepository,
+        null,
+        null,
+        null,
+        wired.resolver(),
+        wired.gate(),
+        null,
+        wired.authHelper(),
+        null,
+        null);
+  }
+
+  private static void grantMissionManager(ScopeParityCallers.Wired wired, List<UUID> units) {
+    if (units.isEmpty()) {
+      return;
+    }
+    List<GrantedAuthority> grants =
+        units.stream()
+            .<GrantedAuthority>map(
+                unit -> new OrgUnitContextualAuthority(Roles.MISSION_MANAGER, unit))
+            .toList();
+    when(wired.authHelper().currentAuthentication())
+        .thenReturn(Optional.of(new TestingAuthenticationToken("caller", null, grants)));
   }
 
   private static ScopeParityCallers.Row row(String name, Operation operation) {

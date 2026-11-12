@@ -58,8 +58,8 @@ public class RecipientResolutionService {
   }
 
   /**
-   * Resolves every member who holds a leadership seat in any org unit, the {@code SEAT_HOLDERS}
-   * selector's recipients.
+   * Resolves every member who holds a leadership seat in any org unit and {@code KRT Member}, the
+   * {@code SEAT_HOLDERS} selector's recipients (REQ-NOTIF-024).
    *
    * @return the seat holders' user subs; never {@code null}, possibly empty
    */
@@ -69,8 +69,9 @@ public class RecipientResolutionService {
   }
 
   /**
-   * Resolves a role evaluated relative to a specific org unit; {@code OFFICER} and {@code
-   * UNIT_LEADERSHIP} are the seat holders directly in that unit, without any cascade.
+   * Resolves a role evaluated relative to a specific org unit among the members who hold {@code KRT
+   * Member}; {@code OFFICER} and {@code UNIT_LEADERSHIP} are the seat holders directly in that
+   * unit, without any cascade (REQ-NOTIF-024).
    *
    * @param role the org-relative role
    * @param orgUnitId the context org unit
@@ -87,8 +88,9 @@ public class RecipientResolutionService {
   }
 
   /**
-   * Resolves every bank employee holding a {@code bank_account_grant} on the given account, the
-   * {@code ACCOUNT_GRANT} selector's recipients (REQ-BANK-026).
+   * Resolves every grantee of a {@code bank_account_grant} on the given account who holds Bank
+   * Employee or a role above it, the {@code ACCOUNT_GRANT} selector's recipients; an inert grant
+   * resolves to nobody (REQ-BANK-026, REQ-BANK-009).
    *
    * @param accountId the bank account whose grant holders to notify
    * @return the granted employees' user subs; never {@code null}, possibly empty
@@ -99,8 +101,8 @@ public class RecipientResolutionService {
   }
 
   /**
-   * Resolves the responsible holders of the given bank account, the {@code ACCOUNT_RESPONSIBLE}
-   * selector's recipients (REQ-BANK-034).
+   * Resolves the responsible holders of the given bank account who hold {@code KRT Member}, the
+   * {@code ACCOUNT_RESPONSIBLE} selector's recipients (REQ-BANK-034).
    *
    * @param accountId the bank account whose responsible holder(s) to notify
    * @return the responsible holders' user subs; never {@code null}, empty for a Sonderkonto or an

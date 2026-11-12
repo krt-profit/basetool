@@ -354,22 +354,27 @@ public class BankAccessRules implements BankAccessPolicy {
         actor.holds(Roles.BANK_EMPLOYEE),
         actor.holds(Roles.BANK_MANAGEMENT),
         actor.holds(Roles.ADMIN),
-        BankAccessJudgement.seatsConfer(actor) && actor.holdsSeat(MembershipRole.OL_MEMBER),
+        BankAccessJudgement.membershipsConfer(actor) && actor.holdsSeat(MembershipRole.OL_MEMBER),
         actor.grants());
   }
 
   /**
-   * Whether the actor may grant or revoke the request's approval (REQ-BANK-041, REQ-BANK-047).
+   * Whether the actor may grant or revoke the request's approval on the org-unit side
+   * (REQ-BANK-041, REQ-BANK-047): only on an account in the active context (REQ-ORG-032), and there
+   * as its band approver, its responsible holder or an administrator.
    *
    * @param actor the actor
    * @param request the request
+   * @param pin the active org unit as sent, or {@code null} for the whole reach
    * @return {@code true} iff the actor acts on its approval
    */
-  boolean mayApprove(@NotNull BankActor actor, @NotNull BankBookingRequest request) {
-    return staffRights(actor)
-        .mayApprove(
-            request.getRequiredApprover(),
-            judgement(actor, null).isResponsibleHolder(request.getAccount()));
+  boolean mayApprove(
+      @NotNull BankActor actor, @NotNull BankBookingRequest request, @Nullable UUID pin) {
+    BankAccessJudgement judgement = judgement(actor, pin);
+    BankAccount account = request.getAccount();
+    return judgement.inContext(account)
+        && staffRights(actor)
+            .mayApprove(request.getRequiredApprover(), judgement.isResponsibleHolder(account));
   }
 
   /**
@@ -384,14 +389,28 @@ public class BankAccessRules implements BankAccessPolicy {
   @NotNull
   @Unmodifiable
   Set<UUID> activeContext(@NotNull BankActor actor, @Nullable UUID pin) {
-    Set<UUID> direct = actor.memberOrgUnitIds();
-    if (pin != null
-        && (actor.holds(Roles.ADMIN)
-            || direct.contains(pin)
-            || actor.officerReach().contains(pin))) {
-      return Set.of(pin);
-    }
-    return direct;
+    UUID honoured = honouredPin(actor, pin);
+    return honoured != null ? Set.of(honoured) : actor.memberOrgUnitIds();
+  }
+
+  /**
+   * The pin as the actor may set it (REQ-ORG-032): any unit for an administrator; for everyone else
+   * a direct membership or a unit of the officer reach, while the memberships confer anything
+   * (REQ-SEC-015); any other pin counts as none.
+   *
+   * @param actor the actor
+   * @param pin the active org unit as sent, or {@code null}
+   * @return the honoured pin, or {@code null}
+   */
+  @Nullable
+  private static UUID honouredPin(@NotNull BankActor actor, @Nullable UUID pin) {
+    return pin != null
+            && (actor.holds(Roles.ADMIN)
+                || (BankAccessJudgement.membershipsConfer(actor)
+                    && (actor.memberOrgUnitIds().contains(pin)
+                        || actor.officerReach().contains(pin))))
+        ? pin
+        : null;
   }
 
   /**
@@ -419,19 +438,24 @@ public class BankAccessRules implements BankAccessPolicy {
   }
 
   /**
-   * The accounts whose requests the actor reads as foreign requests (REQ-BANK-046): every account
-   * for an administrator, the accounts the actor holds, and the KRT account for the Bankleitung.
+   * The accounts whose requests the actor reads as foreign requests (REQ-BANK-046): the accounts
+   * the actor holds, every account for an administrator, and the KRT account for the Bankleitung;
+   * under a pin only the accounts in the active context (REQ-ORG-032).
    *
    * @param actor the actor
+   * @param pin the active org unit as sent, or {@code null} for the whole reach
    * @return the candidate accounts and those the actor is responsible holder of
    */
   @NotNull
-  ForeignRequestScope foreignRequestScope(@NotNull BankActor actor) {
-    BankAccessJudgement judgement = judgement(actor, null);
+  ForeignRequestScope foreignRequestScope(@NotNull BankActor actor, @Nullable UUID pin) {
+    BankAccessJudgement judgement = judgement(actor, pin);
     BankStaffRights rights = staffRights(actor);
     Set<UUID> responsible = new LinkedHashSet<>();
     Set<UUID> candidates = new LinkedHashSet<>();
     for (BankAccount account : accountRepository.findAllByOrderByAccountNoAsc()) {
+      if (!judgement.inContext(account)) {
+        continue;
+      }
       boolean holds = rights.admin() || judgement.isResponsibleHolder(account);
       if (holds) {
         responsible.add(account.getId());
@@ -449,13 +473,17 @@ public class BankAccessRules implements BankAccessPolicy {
    *
    * @param actor the actor
    * @param request the request
+   * @param pin the active org unit as sent, or {@code null} for the whole reach
    * @return {@code true} iff the actor is one of the request's approvers
    */
-  boolean approves(@NotNull BankActor actor, @NotNull BankBookingRequest request) {
+  boolean approves(
+      @NotNull BankActor actor, @NotNull BankBookingRequest request, @Nullable UUID pin) {
+    BankAccessJudgement judgement = judgement(actor, pin);
     BankStaffRights rights = staffRights(actor);
     BankAccount account = request.getAccount();
-    boolean holds = rights.admin() || judgement(actor, null).isResponsibleHolder(account);
-    return !rights.boundByFourEyes(request.getRequestedBy())
+    boolean holds = rights.admin() || judgement.isResponsibleHolder(account);
+    return judgement.inContext(account)
+        && !rights.boundByFourEyes(request.getRequestedBy())
         && isForeignRequestCandidate(rights, account, holds)
         && rights.mayApprove(request.getRequiredApprover(), holds);
   }
@@ -475,16 +503,16 @@ public class BankAccessRules implements BankAccessPolicy {
   }
 
   /**
-   * The judgement of one actor under one pin.
+   * The judgement of one actor under one pin, which counts only as {@link #honouredPin} allows.
    *
    * @param actor the actor
-   * @param pin the active org unit, or {@code null}
+   * @param pin the active org unit as sent, or {@code null}
    * @return the judgement
    */
   @NotNull
   private BankAccessJudgement judgement(@NotNull BankActor actor, @Nullable UUID pin) {
     return new BankAccessJudgement(
-        actor, pin, staffRights(actor), bereichRepository, orgUnitRepository);
+        actor, honouredPin(actor, pin), staffRights(actor), bereichRepository, orgUnitRepository);
   }
 
   /**

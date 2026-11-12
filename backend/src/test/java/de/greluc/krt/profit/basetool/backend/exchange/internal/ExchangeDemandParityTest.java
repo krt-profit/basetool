@@ -285,7 +285,7 @@ class ExchangeDemandParityTest {
    */
   private void givenOrders(@NotNull Set<UUID> units, JobOrder... orders) {
     List<JobOrder> list = Arrays.asList(orders);
-    when(membershipRepository.findOrgUnitIdsByUserId(MEMBER)).thenReturn(units);
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(MEMBER)).thenReturn(units);
     when(jobOrderRepository.findOpenForExchangeDemand(any(), eq(units))).thenReturn(list);
     when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
     when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))

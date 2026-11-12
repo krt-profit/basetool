@@ -104,42 +104,46 @@ public class AccessGateService {
   }
 
   /**
-   * Checks whether the caller holds the contextual role {@code roleName} in {@code orgUnitId}: a
-   * grant in that unit or in the Bereich or Organisationsleitung above it ({@link
-   * RequestScopeResolver#currentGrantedOrgUnitIds(String)}); admins always pass.
+   * Checks whether the caller holds the contextual role {@code roleName} in {@code orgUnitId}, the
+   * unit that owns the target, inside the active context (REQ-ORG-032): a grant in that unit or in
+   * the Bereich or Organisationsleitung above it ({@link
+   * RequestScopeResolver#currentGrantedOrgUnitIdsInActiveContext(String)}), so a pin on another
+   * unit refuses it. An admin passes within their own scope: every unit unpinned, the pinned unit
+   * pinned.
    *
    * @param orgUnitId the org unit the caller wants to act on; never {@code null}
    * @param roleName the role to check (e.g. {@code "LOGISTICIAN"}); never {@code null}
-   * @return {@code true} iff the caller is an admin or holds the role in {@code orgUnitId}
+   * @return {@code true} iff the caller holds the role in {@code orgUnitId} in the active context
    */
   public boolean hasRoleInOrgUnit(@NotNull UUID orgUnitId, @NotNull String roleName) {
     return authHelper.isAdmin()
-        || requestScopeResolver.currentGrantedOrgUnitIds(roleName).contains(orgUnitId);
+        ? canEditSquadron(orgUnitId)
+        : requestScopeResolver
+            .currentGrantedOrgUnitIdsInActiveContext(roleName)
+            .contains(orgUnitId);
   }
 
   /**
    * Checks whether the caller acts as Logistician in {@code orgUnitId}, the unit that owns the
-   * target: a Logistician grant covering that unit inside the active context (a pin outside the
-   * grant refuses it); admins pass within their own scope (REQ-SEC-005).
+   * target: {@link #hasRoleInOrgUnit(UUID, String)} for {@link Roles#LOGISTICIAN} (REQ-SEC-005).
    *
    * @param orgUnitId the target's owning org unit; never {@code null}
    * @return {@code true} iff the caller is Logistician of {@code orgUnitId} in the active context
    */
   public boolean canActAsLogisticianIn(@NotNull UUID orgUnitId) {
-    return authHelper.isAdmin()
-        ? canEditSquadron(orgUnitId)
-        : currentLogisticianOrgUnitIds().contains(orgUnitId);
+    return hasRoleInOrgUnit(orgUnitId, Roles.LOGISTICIAN);
   }
 
   /**
    * {@link #canActAsLogisticianIn(UUID)} for a target that may have no owning unit: such a target
-   * is reserved to admins.
+   * is reserved to an admin without a pin (REQ-ORG-032).
    *
    * @param orgUnitId the target's owning org unit, or {@code null} when it has none
-   * @return {@code true} iff the caller is an admin or Logistician of {@code orgUnitId}
+   * @return {@code true} iff the caller is Logistician of {@code orgUnitId} in the active context,
+   *     or the target has no unit and the caller is an admin without a pin
    */
   public boolean canActAsLogisticianInOwner(@Nullable UUID orgUnitId) {
-    return orgUnitId == null ? authHelper.isAdmin() : canActAsLogisticianIn(orgUnitId);
+    return orgUnitId == null ? isAdminWithoutPin() : canActAsLogisticianIn(orgUnitId);
   }
 
   /**
@@ -163,9 +167,24 @@ public class AccessGateService {
    */
   @NotNull
   public ScopePredicate currentLogisticianScope() {
+    return currentGrantScope(Roles.LOGISTICIAN);
+  }
+
+  /**
+   * Returns the scope vector of the data the caller handles through {@code roleName}, for list
+   * queries: the admin's own scope for an admin (every unit unpinned, the pinned unit pinned),
+   * otherwise exactly the units the caller's grants of that role cover, cascade included, inside
+   * the active context (empty set: nothing).
+   *
+   * @param roleName the contextual role whose grants count, e.g. {@link Roles#MISSION_MANAGER}
+   * @return a never-null scope vector limited to the caller's units of that role
+   */
+  @NotNull
+  public ScopePredicate currentGrantScope(@NotNull String roleName) {
     return authHelper.isAdmin()
         ? requestScopeResolver.currentScopePredicate()
-        : new ScopePredicate(false, null, currentLogisticianOrgUnitIds());
+        : new ScopePredicate(
+            false, null, requestScopeResolver.currentGrantedOrgUnitIdsInActiveContext(roleName));
   }
 
   /**
@@ -184,17 +203,20 @@ public class AccessGateService {
 
   /**
    * Checks whether the caller holds officer reach in {@code orgUnitId}, the unit that owns the
-   * target (REQ-SEC-015, ADR-0300); admins always pass.
+   * target, inside the active context (REQ-SEC-015, ADR-0300, REQ-ORG-032): a pin on another unit
+   * refuses it. An admin passes within their own scope: every unit unpinned, the pinned unit
+   * pinned.
    *
    * @param orgUnitId the target's owning org unit; never {@code null}
-   * @return {@code true} iff the caller is an admin or {@code orgUnitId} is one of {@link
-   *     RequestScopeResolver#currentOfficerOrgUnitIds()}
+   * @return {@code true} iff the caller holds officer reach in {@code orgUnitId} in the active
+   *     context
    */
   public boolean canActAsOfficerIn(@NotNull UUID orgUnitId) {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
-    return requestScopeResolver.currentOfficerOrgUnitIds().contains(orgUnitId);
+    return authHelper.isAdmin()
+        ? canEditSquadron(orgUnitId)
+        : requestScopeResolver
+            .narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds())
+            .contains(orgUnitId);
   }
 
   /**
@@ -210,28 +232,33 @@ public class AccessGateService {
 
   /**
    * {@link #canActAsOfficerIn(UUID)} for a target that may have no owning unit: such a target is
-   * reserved to admins.
+   * reserved to an admin without a pin (REQ-ORG-032).
    *
    * @param orgUnitId the target's owning org unit, or {@code null} when it has none
-   * @return {@code true} iff the caller is an admin or holds officer reach in {@code orgUnitId}
+   * @return {@code true} iff the caller holds officer reach in {@code orgUnitId} in the active
+   *     context, or the target has no unit and the caller is an admin without a pin
    */
   public boolean canActAsOfficerInOwner(@Nullable UUID orgUnitId) {
-    return orgUnitId == null ? authHelper.isAdmin() : canActAsOfficerIn(orgUnitId);
+    return orgUnitId == null ? isAdminWithoutPin() : canActAsOfficerIn(orgUnitId);
   }
 
   /**
-   * Checks whether the caller may manage the missions and operations of {@code orgUnitId}: a
-   * Mission Manager grant in that unit. A target without a unit is managed by a grant in an
-   * Organisationsleitung or Bereich unit only; admins always pass (REQ-SEC-065).
+   * Checks whether the caller may manage the missions and operations of {@code orgUnitId}, inside
+   * the active context: a Mission Manager grant in that unit ({@link #hasRoleInOrgUnit(UUID,
+   * String)}). A target without a unit is managed by a grant in an Organisationsleitung or Bereich
+   * unit only, and by an admin without a pin (REQ-SEC-065, REQ-ORG-032).
    *
    * @param orgUnitId the target's owning org unit, or {@code null} when it has none
-   * @return {@code true} iff the caller is an admin or holds the matching Mission Manager grant
+   * @return {@code true} iff the caller holds the matching Mission Manager grant in the active
+   *     context
    */
   public boolean canManageMissionsOf(@Nullable UUID orgUnitId) {
     if (orgUnitId != null) {
       return hasRoleInOrgUnit(orgUnitId, Roles.MISSION_MANAGER);
     }
-    return authHelper.isAdmin() || requestScopeResolver.holdsLeadershipMissionManagerGrant();
+    return authHelper.isAdmin()
+        ? requestScopeResolver.currentPin().isEmpty()
+        : requestScopeResolver.holdsLeadershipMissionManagerGrantInActiveContext();
   }
 
   /**
@@ -242,10 +269,19 @@ public class AccessGateService {
    * @return {@code true} iff the caller may see or edit the row
    */
   private boolean canAccessOwnerlessPersonalRow(@Nullable User owner) {
-    if (authHelper.isAdmin() && requestScopeResolver.readActiveSquadronFromHeader().isEmpty()) {
-      return true;
-    }
-    return isCurrentUserOwner(owner);
+    return isAdminWithoutPin() || isCurrentUserOwner(owner);
+  }
+
+  /**
+   * Whether the caller is an admin whose request carries no honoured pin (REQ-ORG-032): the only
+   * caller an officer or Logistician gate opens a target without an owning unit to (a Mission
+   * Manager gate also admits a leadership grant, {@link #canManageMissionsOf(UUID)}), and one who
+   * passes every unit gate, so a gate may answer before loading its target.
+   *
+   * @return {@code true} iff the caller is an admin without a pin
+   */
+  public boolean isAdminWithoutPin() {
+    return authHelper.isAdmin() && requestScopeResolver.currentPin().isEmpty();
   }
 
   /**

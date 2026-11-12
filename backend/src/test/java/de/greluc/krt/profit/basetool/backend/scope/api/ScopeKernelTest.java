@@ -59,10 +59,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryAccessPolicy;
@@ -97,7 +96,6 @@ import org.springframework.security.core.GrantedAuthority;
 class ScopeKernelTest {
 
   @Mock private AuthHelperService authHelper;
-  @Mock private SquadronRepository squadronRepository;
   @Mock private MissionRepository missionRepository;
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private JobOrderHandoverRepository jobOrderHandoverRepository;
@@ -113,7 +111,7 @@ class ScopeKernelTest {
 
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
 
-  @Mock private StaffelMembershipResolver staffelMembershipResolver;
+  @Mock private OrgUnitSeatEligibility seatEligibility;
 
   @Mock private HttpServletRequest request;
 
@@ -144,7 +142,7 @@ class ScopeKernelTest {
   @BeforeEach
   void setUp() {
     lenient().when(authHelper.isAuthenticated()).thenReturn(true);
-    lenient().when(authHelper.hasReachableRole("ROLE_KRT_MEMBER")).thenReturn(true);
+    lenient().when(authHelper.holdsKrtMember()).thenReturn(true);
 
     squadronA = new Squadron();
     squadronA.setId(SQUADRON_A_ID);
@@ -174,13 +172,23 @@ class ScopeKernelTest {
         .when(orgUnitCascadeService.officerReach(org.mockito.ArgumentMatchers.anyCollection()))
         .thenCallRealMethod();
 
-    StaffelMembershipResolver realResolver =
-        new StaffelMembershipResolver(squadronRepository, orgUnitRepository);
+    lenient().when(orgUnitRepository.existsByIdAndActiveTrue(any())).thenReturn(true);
+    // Every unit in these scenarios is active, so the active-unit reads return the stubbed rows.
     lenient()
-        .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
+        .when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(any()))
         .thenAnswer(
-            invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
-    lenient().when(squadronRepository.existsById(any())).thenReturn(true);
+            invocation -> orgUnitMembershipRepository.findAllByIdUserId(invocation.getArgument(0)));
+    lenient()
+        .when(orgUnitMembershipRepository.findActiveOrgUnitIdsByUserId(any()))
+        .thenAnswer(invocation -> {
+          java.util.Set<UUID> ids = new java.util.LinkedHashSet<>();
+          for (OrgUnitMembership row :
+              orgUnitMembershipRepository.findAllByIdUserId(invocation.getArgument(0))) {
+            ids.add(row.getId().getOrgUnitId());
+          }
+          return ids;
+        });
+    lenient().when(seatEligibility.holdsKrtMember(any())).thenReturn(true);
 
     wireDelegates();
   }
@@ -197,7 +205,6 @@ class ScopeKernelTest {
             orgUnitMembershipRepository,
             orgUnitRepository,
             orgUnitCascadeService,
-            staffelMembershipResolver,
             request);
     accessGateService = new AccessGateService(requestScopeResolver, authHelper);
     orgUnitStampingService =
@@ -206,15 +213,16 @@ class ScopeKernelTest {
             accessGateService,
             authHelper,
             orgUnitMembershipRepository,
-            orgUnitRepository);
+            orgUnitRepository,
+            seatEligibility);
     operationPolicy = new OperationAccessPolicy(accessGateService, authHelper, operationRepository);
     UserAccessPolicy userAccessPolicy =
         new UserAccessPolicy(accessGateService, authHelper, orgUnitMembershipRepository);
     refineryPolicy =
-        new RefineryAccessPolicy(accessGateService, refineryOrderRepository, userAccessPolicy);
+        new RefineryAccessPolicy(
+            accessGateService, authHelper, refineryOrderRepository, userAccessPolicy);
     missionPolicy =
-        new MissionAccessPolicy(
-            accessGateService, authHelper, missionRepository, null, null, null, null);
+        new MissionAccessPolicy(accessGateService, authHelper, missionRepository, null, null, null);
     inventoryPolicy =
         new InventoryAccessPolicy(accessGateService, inventoryItemRepository, userAccessPolicy);
     hangarPolicy = new HangarAccessPolicy(requestScopeResolver, accessGateService, shipRepository);
@@ -226,6 +234,12 @@ class ScopeKernelTest {
             jobOrderRepository,
             jobOrderHandoverRepository,
             jobOrderItemHandoverRepository);
+  }
+
+  /** Makes the given non-admin user the caller, so their own memberships decide their pin. */
+  private void callerIs(User user) {
+    lenient().when(authHelper.isAdmin()).thenReturn(false);
+    lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(user.getId()));
   }
 
   /** Returns a Staffel membership row pointing the given user at the given Squadron. */
@@ -266,130 +280,6 @@ class ScopeKernelTest {
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setRole(MembershipRole.OL_MEMBER);
     return m;
-  }
-
-  @Nested
-  class CurrentSquadronIdTests {
-
-    @Test
-    void adminWithoutHeader_returnsEmpty_admin_seesAllSquadrons() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      assertTrue(requestScopeResolver.currentSquadronId().isEmpty());
-    }
-
-    @Test
-    void adminWithActiveSquadronHeader_returnsThatSquadron() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-          .thenReturn(SQUADRON_B_ID.toString());
-
-      assertEquals(Optional.of(SQUADRON_B_ID), requestScopeResolver.currentSquadronId());
-    }
-
-    @Test
-    void adminWithBlankHeader_returnsEmpty() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn("");
-
-      assertTrue(requestScopeResolver.currentSquadronId().isEmpty());
-    }
-
-    @Test
-    void adminWithMalformedHeader_returnsEmpty() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn("not-a-uuid");
-
-      assertTrue(requestScopeResolver.currentSquadronId().isEmpty());
-    }
-
-    @Test
-    void nonAdmin_returnsPersistentUserSquadron() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-
-      assertEquals(Optional.of(SQUADRON_A_ID), requestScopeResolver.currentSquadronId());
-    }
-
-    @Test
-    void nonAdmin_anonymousCaller_returnsEmpty() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.empty());
-
-      assertTrue(requestScopeResolver.currentSquadronId().isEmpty());
-    }
-
-    @Test
-    void nonAdmin_userWithoutSquadron_returnsEmpty() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of());
-
-      assertTrue(requestScopeResolver.currentSquadronId().isEmpty());
-    }
-
-    @Test
-    void nonAdmin_twoStaffeln_noMatchingPin_returnsNameSortedPrimary() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(
-              List.of(
-                  staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID),
-                  staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-      squadronA.setName("Alpha");
-      squadronB.setName("Bravo");
-      when(orgUnitRepository.findAllById(any())).thenReturn(List.of(squadronB, squadronA));
-
-      assertEquals(Optional.of(SQUADRON_A_ID), requestScopeResolver.currentSquadronId());
-    }
-
-    @Test
-    void nonAdmin_twoStaffeln_pinMatchesNonPrimary_returnsPinned() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(
-              List.of(
-                  staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID),
-                  staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID)));
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-          .thenReturn(SQUADRON_B_ID.toString());
-
-      assertEquals(Optional.of(SQUADRON_B_ID), requestScopeResolver.currentSquadronId());
-    }
-  }
-
-  @Nested
-  class CurrentSquadronTests {
-
-    @Test
-    void resolvesEntityFromCurrentSquadronId() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-      when(orgUnitRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
-
-      assertEquals(Optional.of(squadronA), requestScopeResolver.currentSquadron());
-    }
-
-    @Test
-    void adminInAllSquadronsMode_returnsEmpty() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      assertTrue(requestScopeResolver.currentSquadron().isEmpty());
-    }
   }
 
   @Nested
@@ -441,6 +331,24 @@ class ScopeKernelTest {
       assertTrue(accessGateService.canSeeSquadron(SQUADRON_A_ID), "own Staffel");
       assertTrue(accessGateService.canSeeSquadron(skId), "own SK — the regression this fixes");
       assertFalse(accessGateService.canSeeSquadron(SQUADRON_B_ID), "foreign Staffel stays hidden");
+    }
+
+    @Test
+    void member_seesNothingOfAUnitThatIsDeactivated() {
+      UUID skId = UUID.randomUUID();
+      lenient().when(authHelper.isAdmin()).thenReturn(false);
+      lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      lenient()
+          .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(
+              List.of(
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID),
+                  skMembership(MEMBER_USER_ID, skId)));
+      when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(MEMBER_USER_ID))
+          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+
+      assertTrue(accessGateService.canSeeSquadron(SQUADRON_A_ID), "the active Staffel");
+      assertFalse(accessGateService.canSeeSquadron(skId), "the deactivated SK confers no reach");
     }
 
     @Test
@@ -729,6 +637,15 @@ class ScopeKernelTest {
           .thenReturn(orgUnitId.toString());
     }
 
+    private void memberOfAAndB() {
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(
+              List.of(
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID),
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID)));
+    }
+
     @Test
     void grantInA_managesAMissionOfA_notOfB() {
       stubGrants(SQUADRON_A_ID);
@@ -747,6 +664,7 @@ class ScopeKernelTest {
     @Test
     void grantInA_pinnedToA_offersTheCapability() {
       stubGrants(SQUADRON_A_ID);
+      memberOfAAndB();
       pinTo(SQUADRON_A_ID);
 
       assertTrue(requestScopeResolver.canActAsMissionManagerInActiveContext());
@@ -755,9 +673,19 @@ class ScopeKernelTest {
     @Test
     void grantInA_pinnedToB_hidesTheCapability() {
       stubGrants(SQUADRON_A_ID);
+      memberOfAAndB();
       pinTo(SQUADRON_B_ID);
 
       assertFalse(requestScopeResolver.canActAsMissionManagerInActiveContext());
+    }
+
+    @Test
+    void grantInA_pinnedToAForeignUnit_offersTheCapabilityAsWithoutPin() {
+      stubGrants(SQUADRON_A_ID);
+      memberOfAAndB();
+      pinTo(UUID.randomUUID());
+
+      assertTrue(requestScopeResolver.canActAsMissionManagerInActiveContext());
     }
 
     @Test
@@ -1272,7 +1200,7 @@ class ScopeKernelTest {
     }
 
     @Test
-    void memberAcceptsOwnSquadronRefineryOrder() {
+    void memberSeesButCannotEditAnotherMembersOwnSquadronRefineryOrder() {
       UUID orderId = UUID.randomUUID();
       RefineryOrder order = new RefineryOrder();
       order.setId(orderId);
@@ -1281,7 +1209,9 @@ class ScopeKernelTest {
       stubMemberInSquadronA();
 
       assertTrue(refineryPolicy.canSeeRefineryOrder(orderId));
-      assertTrue(refineryPolicy.canEditRefineryOrder(orderId));
+      assertFalse(
+          refineryPolicy.canEditRefineryOrder(orderId),
+          "only the owner or a covering Logistician edits a refinery order (REQ-REFINERY-019)");
     }
 
     @Test
@@ -1530,8 +1460,8 @@ class ScopeKernelTest {
   }
 
   /**
-   * Verifies the request-scoped memoisation of {@link RequestScopeResolver#currentSquadronId()} and
-   * {@link RequestScopeResolver#currentSquadron()}.
+   * Verifies the request-scoped memoisation of {@link RequestScopeResolver#currentPin()}, {@link
+   * RequestScopeResolver#currentOrgUnit()} and the membership read behind the scope gates.
    */
   @Nested
   class RequestScopedCacheTests {
@@ -1554,33 +1484,31 @@ class ScopeKernelTest {
     }
 
     @Test
-    void currentSquadronId_nonAdmin_calledTwice_hitsMembershipRepoOnce() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
+    void currentPin_adminCalledTwice_checksTheUnitOnce() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
 
-      Optional<UUID> first = requestScopeResolver.currentSquadronId();
-      Optional<UUID> second = requestScopeResolver.currentSquadronId();
+      Optional<UUID> first = requestScopeResolver.currentPin();
+      Optional<UUID> second = requestScopeResolver.currentPin();
 
-      assertEquals(Optional.of(SQUADRON_A_ID), first);
+      assertEquals(Optional.of(SQUADRON_B_ID), first);
       assertEquals(first, second);
-      verify(orgUnitMembershipRepository, times(1))
-          .findAllByIdUserIdAndKind(MEMBER_USER_ID, OrgUnitKind.SQUADRON);
+      verify(orgUnitRepository, times(1)).existsByIdAndActiveTrue(SQUADRON_B_ID);
     }
 
     @Test
-    void currentSquadron_calledTwice_hitsSquadronRepoOnce() {
+    void currentOrgUnit_calledTwice_hitsOrgUnitRepoOnce() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
-              MEMBER_USER_ID, OrgUnitKind.SQUADRON))
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(orgUnitRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
 
-      Optional<Squadron> first = requestScopeResolver.currentSquadron();
-      Optional<Squadron> second = requestScopeResolver.currentSquadron();
+      Optional<de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit> first =
+          requestScopeResolver.currentOrgUnit();
+      Optional<de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit> second =
+          requestScopeResolver.currentOrgUnit();
 
       assertEquals(Optional.of(squadronA), first);
       assertEquals(first, second);
@@ -1686,6 +1614,7 @@ class ScopeKernelTest {
     UUID staffelBId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
+    callerIs(user);
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
         .thenReturn(
             List.of(
@@ -1728,6 +1657,7 @@ class ScopeKernelTest {
     UUID staffelBId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
+    callerIs(user);
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
         .thenReturn(
             List.of(
@@ -1911,7 +1841,137 @@ class ScopeKernelTest {
             () ->
                 orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
                     user, UUID.randomUUID()));
-    assertTrue(ex.getMessage().toLowerCase().contains("not a membership"), ex.getMessage());
+    assertTrue(ex.getMessage().toLowerCase().contains("neither a membership"), ex.getMessage());
+  }
+
+  @Test
+  void resolveOrgUnitForUnitOwnedAggregate_membershiplessAdmin_withPin_stampsThePin() {
+    Squadron pinned = new Squadron();
+    UUID pinnedId = UUID.randomUUID();
+    pinned.setId(pinnedId);
+    User admin = new User();
+    admin.setId(UUID.randomUUID());
+    pinnedAdminWithoutMemberships(admin, pinnedId);
+    when(orgUnitRepository.findById(pinnedId)).thenReturn(Optional.of(pinned));
+
+    assertSame(pinned, orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(admin, null));
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutputNullable_membershiplessAdmin_withPin_staysOwnerless() {
+    User admin = new User();
+    admin.setId(UUID.randomUUID());
+    pinnedAdminWithoutMemberships(admin, UUID.randomUUID());
+
+    assertNull(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(admin, null));
+  }
+
+  @Test
+  void resolveOrgUnitForUnitOwnedAggregate_singleMembership_pinOnACascadeUnit_stampsThePin() {
+    Squadron pinned = new Squadron();
+    UUID pinnedId = UUID.randomUUID();
+    pinned.setId(pinnedId);
+    User leader = new User();
+    leader.setId(UUID.randomUUID());
+    leaderPinnedOnACascadeUnit(leader, UUID.randomUUID(), pinnedId);
+    when(orgUnitRepository.findById(pinnedId)).thenReturn(Optional.of(pinned));
+
+    assertSame(pinned, orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(leader, null));
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutputNullable_pinOnACascadeUnit_stampsTheOwnMembership() {
+    Squadron home = new Squadron();
+    UUID homeId = UUID.randomUUID();
+    home.setId(homeId);
+    User leader = new User();
+    leader.setId(UUID.randomUUID());
+    leaderPinnedOnACascadeUnit(leader, homeId, UUID.randomUUID());
+    when(orgUnitRepository.findById(homeId)).thenReturn(Optional.of(home));
+
+    assertSame(home, orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(leader, null));
+  }
+
+  @Test
+  void resolveOrgUnitForPickerOutputNullable_twoMemberships_pinOnOne_stampsThePin() {
+    Squadron pinned = new Squadron();
+    UUID pinnedId = UUID.randomUUID();
+    pinned.setId(pinnedId);
+    User member = new User();
+    member.setId(UUID.randomUUID());
+    callerIs(member);
+    when(orgUnitMembershipRepository.findAllByIdUserId(member.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(member.getId(), UUID.randomUUID()),
+                staffelMembership(member.getId(), pinnedId)));
+    when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(pinnedId.toString());
+    when(orgUnitRepository.findById(pinnedId)).thenReturn(Optional.of(pinned));
+
+    assertSame(pinned, orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(member, null));
+  }
+
+  @Test
+  void resolveOrgUnitForAdminOnBehalf_neverTakesTheAdminsPinForAMemberWithSeveralUnits() {
+    UUID pinnedId = UUID.randomUUID();
+    User member = new User();
+    member.setId(UUID.randomUUID());
+    lenient().when(authHelper.isAdmin()).thenReturn(true);
+    when(orgUnitMembershipRepository.findAllByIdUserId(member.getId()))
+        .thenReturn(
+            List.of(
+                staffelMembership(member.getId(), pinnedId),
+                staffelMembership(member.getId(), UUID.randomUUID())));
+    lenient()
+        .when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(pinnedId.toString());
+
+    assertThrows(
+        OwnerOrgUnitRequiredException.class,
+        () -> orgUnitStampingService.resolveOrgUnitForAdminOnBehalf(member, null));
+  }
+
+  @Test
+  void resolveOrgUnitForAdminOnBehalf_refusesAPickOutsideTheMembersMemberships() {
+    User member = new User();
+    member.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(member.getId()))
+        .thenReturn(List.of(staffelMembership(member.getId(), UUID.randomUUID())));
+
+    assertThrows(
+        BadRequestException.class,
+        () -> orgUnitStampingService.resolveOrgUnitForAdminOnBehalf(member, UUID.randomUUID()));
+  }
+
+  @Test
+  void resolveOrgUnitForAdminOnBehalf_leavesAMemberWithoutMembershipsWithoutAUnit() {
+    User member = new User();
+    member.setId(UUID.randomUUID());
+    when(orgUnitMembershipRepository.findAllByIdUserId(member.getId())).thenReturn(List.of());
+
+    assertNull(orgUnitStampingService.resolveOrgUnitForAdminOnBehalf(member, null));
+  }
+
+  /** An admin without memberships whose request pins the given active unit. */
+  private void pinnedAdminWithoutMemberships(User admin, UUID pinnedId) {
+    when(authHelper.isAdmin()).thenReturn(true);
+    when(orgUnitMembershipRepository.findAllByIdUserId(admin.getId())).thenReturn(List.of());
+    when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(pinnedId.toString());
+  }
+
+  /**
+   * A non-admin caller whose only direct membership is {@code homeId} and whose leadership cascade
+   * also reaches {@code pinnedId}, which the request pins.
+   */
+  private void leaderPinnedOnACascadeUnit(User leader, UUID homeId, UUID pinnedId) {
+    callerIs(leader);
+    when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
+        .thenReturn(List.of(staffelMembership(leader.getId(), homeId)));
+    when(orgUnitCascadeService.expandWithDescendants(any())).thenReturn(Set.of(homeId, pinnedId));
+    when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
+        .thenReturn(pinnedId.toString());
   }
 
   @Test
@@ -2002,6 +2062,7 @@ class ScopeKernelTest {
     pinned.setId(pinnedId);
     User user = new User();
     user.setId(UUID.randomUUID());
+    callerIs(user);
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
         .thenReturn(
             List.of(
@@ -2247,6 +2308,24 @@ class ScopeKernelTest {
     }
 
     @Test
+    void pinOnAnOwnUnitOutsideOversight_seesNothing() {
+      when(authHelper.isAdmin()).thenReturn(false);
+      when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
+      when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
+          .thenReturn(
+              List.of(
+                  seatMembership(MEMBER_USER_ID, SQUADRON_A_ID),
+                  staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID)));
+      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      ScopePredicate scope = requestScopeResolver.currentOversightScope();
+
+      assertNull(scope.activeOrgUnitId());
+      assertTrue(scope.memberOrgUnitIds().isEmpty());
+    }
+
+    @Test
     void pinOutsideOversight_isIgnored() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -2304,11 +2383,13 @@ class ScopeKernelTest {
   @Nested
   class OfficerReachTests {
 
-    private static final String KRT_MEMBER_AUTHORITY = "ROLE_KRT_MEMBER";
-
     private void stubCaller(boolean krtMember, OrgUnitMembership... memberships) {
+      when(authHelper.holdsKrtMember()).thenReturn(krtMember);
+      memberOf(memberships);
+    }
+
+    private void memberOf(OrgUnitMembership... memberships) {
       lenient().when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.hasReachableRole(KRT_MEMBER_AUTHORITY)).thenReturn(krtMember);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       lenient()
           .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
@@ -2425,7 +2506,7 @@ class ScopeKernelTest {
     }
 
     @Test
-    void officerReachNarrowedToPin_pinnedToABereichWithASeat_widensToItsCascade() {
+    void officerReachNarrowedToPin_pinnedToABereichWithASeat_isTheBereichAlone() {
       UUID bereichId = UUID.randomUUID();
       UUID skId = UUID.randomUUID();
       OrgUnitMembership seat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
@@ -2437,7 +2518,7 @@ class ScopeKernelTest {
           .thenReturn(bereichId.toString());
 
       assertEquals(
-          Set.of(bereichId, SQUADRON_A_ID, skId),
+          Set.of(bereichId),
           requestScopeResolver.narrowToPin(requestScopeResolver.currentOfficerOrgUnitIds()));
     }
 
@@ -2448,6 +2529,8 @@ class ScopeKernelTest {
       seat.setRole(MembershipRole.BEREICHSKOORDINATOR);
       stubCaller(true, seat);
       when(orgUnitCascadeService.cascadedOfficerReach(any()))
+          .thenReturn(Set.of(bereichId, SQUADRON_A_ID, SQUADRON_B_ID));
+      when(orgUnitCascadeService.expandWithDescendants(any()))
           .thenReturn(Set.of(bereichId, SQUADRON_A_ID, SQUADRON_B_ID));
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_A_ID.toString());
@@ -2466,11 +2549,23 @@ class ScopeKernelTest {
     }
 
     @Test
-    void narrowToPin_pinOutsideTheReach_isEmpty() {
+    void narrowToPin_ownPinOutsideTheReach_isEmpty() {
+      memberOf(
+          staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID),
+          staffelMembership(MEMBER_USER_ID, SQUADRON_B_ID));
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
 
       assertTrue(requestScopeResolver.narrowToPin(Set.of(SQUADRON_A_ID)).isEmpty());
+    }
+
+    @Test
+    void narrowToPin_pinOutsideTheCallersUnits_keepsTheReach() {
+      memberOf(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID));
+      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_B_ID.toString());
+
+      assertEquals(Set.of(SQUADRON_A_ID), requestScopeResolver.narrowToPin(Set.of(SQUADRON_A_ID)));
     }
 
     @Test
@@ -2525,6 +2620,18 @@ class ScopeKernelTest {
       when(authHelper.isAdmin()).thenReturn(true);
 
       assertTrue(accessGateService.canActAsOfficerInOwner(null));
+    }
+
+    @Test
+    void pinnedAdmin_passesNoOwnerlessTarget() {
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
+          .thenReturn(SQUADRON_A_ID.toString());
+
+      assertFalse(accessGateService.canActAsOfficerInOwner(null));
+      assertFalse(accessGateService.canActAsLogisticianInOwner(null));
+      assertFalse(accessGateService.canManageMissionsOf(null));
+      assertTrue(accessGateService.canActAsOfficerInOwner(SQUADRON_A_ID));
     }
 
     @Test

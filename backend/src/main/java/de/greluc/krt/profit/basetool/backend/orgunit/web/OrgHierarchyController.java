@@ -188,6 +188,7 @@ public class OrgHierarchyController {
   /**
    * Grants a user a Bereichsleitung role (Leiter / Koordinator / Operator) on the Bereich. The user
    * must hold no Staffel; an existing membership (e.g. an SK-Leiter seat) has the role flag set.
+   * Only for a Bereich inside the active context (REQ-ORG-032).
    *
    * @param id the Bereich id.
    * @param request the user and the role to grant.
@@ -196,18 +197,19 @@ public class OrgHierarchyController {
   @NotNull
   @PostMapping("/bereiche/{id}/members")
   @PreAuthorize(
-      "hasRole('"
+      "(hasRole('"
           + Roles.ADMIN
           + "') or (@orgRoleManagementSecurityService.canAppointBereichRole(#id, #request.role(),"
           + " authentication) and"
           + " @orgRoleManagementSecurityService.targetsAnotherUser(#request.userId(),"
-          + " authentication))")
+          + " authentication))) and @requestScopeResolver.isInActiveContext(#id)")
   @Operation(
       summary = "Add a Bereichsleitung member",
       description =
           "Grants a Leiter/Koordinator/Operator role on the Bereich. Admin, or — delegated"
               + " (REQ-ROLE-004) — a pure OL member for the Leiter rung and the Bereich's"
-              + " Bereichsleiter for the Koordinator/Operator rungs.")
+              + " Bereichsleiter for the Koordinator/Operator rungs; only for a Bereich inside"
+              + " the active context.")
   public BereichMemberResponse addBereichLeader(
       @PathVariable @NotNull UUID id,
       @NotNull @RequestBody @Valid AddBereichLeaderRequest request) {
@@ -216,24 +218,27 @@ public class OrgHierarchyController {
   }
 
   /**
-   * Removes a user's Bereichsleitung membership from the Bereich.
+   * Removes a user's Bereichsleitung membership from the Bereich, only for a Bereich inside the
+   * active context (REQ-ORG-032).
    *
    * @param id the Bereich id.
    * @param userId the user to remove.
    */
   @DeleteMapping("/bereiche/{id}/members/{userId}")
   @PreAuthorize(
-      "hasRole('"
+      "(hasRole('"
           + Roles.ADMIN
           + "') or (@orgRoleManagementSecurityService.canRemoveBereichRole(#id, #userId,"
           + " authentication) and"
-          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication))")
+          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication)))"
+          + " and @requestScopeResolver.isInActiveContext(#id)")
   @Operation(
       summary = "Remove a Bereichsleitung member",
       description =
           "Removes the user's Bereichsleitung membership. Admin, or — delegated (REQ-ROLE-004) — a"
               + " pure OL member when removing a Bereichsleiter and the Bereich's Bereichsleiter"
-              + " when removing a Koordinator/Operator.")
+              + " when removing a Koordinator/Operator; only for a Bereich inside the active"
+              + " context.")
   public void removeBereichLeader(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID userId) {
     orgUnitMembershipService.removeBereichLeader(id, userId);

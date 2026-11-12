@@ -39,9 +39,9 @@ public interface SupplyTabAccess {
    * The supply tabs the caller may open.
    *
    * @param incoming whether „Eingehende Spenden" is offered: the caller manages, or as an admin
-   *     reaches, an active unit that accepts donations
+   *     reaches, an active unit that accepts donations, whatever unit is pinned (ADR-0329)
    * @param stats whether „Statistik" is offered: the caller belongs to the governing leadership or
-   *     manages at least one unit
+   *     manages at least one unit, whatever unit is pinned
    */
   record SupplyTabGrants(boolean incoming, boolean stats) {
 

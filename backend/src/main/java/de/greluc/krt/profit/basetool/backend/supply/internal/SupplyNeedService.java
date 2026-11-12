@@ -120,8 +120,8 @@ public class SupplyNeedService {
       @Nullable NeedCoverage coverage,
       @NotNull Pageable pageable) {
     settingsService.requireEnabled();
-    final boolean seesAll = accessPolicy.isAdmin() || accessPolicy.isGoverningLeadership();
-    final Set<UUID> managed = accessPolicy.managedUnitIds();
+    final SupplyManagedUnits managed = accessPolicy.managedUnits();
+    final boolean seesAll = managed.everyUnit() || accessPolicy.isGoverningLeadership();
     Specification<SupplyNeed> spec = fetchCatalogue();
     if (coverage != null) {
       spec = spec.and(coverage.specification());
@@ -147,7 +147,7 @@ public class SupplyNeedService {
             if (managed.isEmpty()) {
               return open;
             }
-            return cb.or(open, root.get("orgUnitId").in(managed));
+            return cb.or(open, root.get("orgUnitId").in(managed.unitIds()));
           });
     }
     Page<SupplyNeed> page = needRepository.findAll(spec, pageable);
@@ -386,9 +386,8 @@ public class SupplyNeedService {
     SupplyNeed need = Entities.require(needRepository.findById(id), "Need not found");
     boolean visible =
         need.getStatus() == NeedStatus.OPEN
-            || accessPolicy.isAdmin()
             || accessPolicy.isGoverningLeadership()
-            || accessPolicy.managedUnitIds().contains(need.getOrgUnitId());
+            || accessPolicy.managedUnits().contains(need.getOrgUnitId());
     if (!visible) {
       throw new AccessDeniedException("Need not visible");
     }
@@ -501,21 +500,23 @@ public class SupplyNeedService {
   }
 
   /**
-   * Lists the job orders the caller may link a need to: the open and in-progress orders of every
-   * unit the caller manages, every unit for an admin (REQ-SUP-003).
+   * Lists the job orders the caller may link a need to (REQ-SUP-003): the open and in-progress
+   * orders of the units the caller manages, and of every raising unit for an admin without a pin,
+   * who manages every unit.
    *
    * @return the orders, newest first
    */
   @Transactional(readOnly = true)
   public @NotNull List<NeedJobOrderOptionDto> jobOrderOptions() {
     settingsService.requireEnabled();
+    SupplyManagedUnits managed = accessPolicy.managedUnits();
     Set<UUID> units =
-        accessPolicy.isAdmin()
+        managed.everyUnit()
             ? unitSettingRepository.findAll().stream()
                 .filter(SupplyUnitSetting::isMayRaiseNeeds)
                 .map(SupplyUnitSetting::getId)
                 .collect(Collectors.toSet())
-            : accessPolicy.managedUnitIds();
+            : managed.unitIds();
     if (units.isEmpty()) {
       return List.of();
     }

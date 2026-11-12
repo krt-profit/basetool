@@ -24,7 +24,8 @@ package de.greluc.krt.profit.basetool.backend.notification.api;
  * SelectorKind#ORG_RELATIVE_ROLE}).
  *
  * <p>{@link #OFFICER} and {@link #UNIT_LEADERSHIP} resolve to the seat holders directly in the
- * context org unit; the others read the corresponding per-membership flag of that unit.
+ * context org unit; the others read the corresponding per-membership flag of that unit. Every role
+ * resolves only members who hold {@code KRT Member} (REQ-NOTIF-024).
  */
 public enum OrgRelativeRole {
 

@@ -38,7 +38,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.identity.api.CallerUserProjection;
 import de.greluc.krt.profit.basetool.backend.identity.api.MembershipOperations;
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
-import de.greluc.krt.profit.basetool.backend.identity.api.SquadronVisibility;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -66,8 +65,8 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
  * Profile-attribute + simple-delegate tests for {@link UserService}. Covers the methods not
- * addressed by {@code UserServiceRankTest} (rank-validation only) / {@code UserServiceSortTest} /
- * {@code UserDeletionServiceTest} / {@code UserServiceSyncTest}:
+ * addressed by {@code UserServiceRankTest} (rank-validation only) / {@code UserDeletionServiceTest}
+ * / {@code UserServiceSyncTest}:
  *
  * <ul>
  *   <li>{@link UserService#updateUserAttributes} — the non-rank halves (description / displayName /
@@ -75,9 +74,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
  *   <li>{@link UserService#updateReadAnnouncement}.
  *   <li>{@link UserService#isUsernameOrDisplayNameTaken} + {@link
  *       UserService#findMatchesByExactName} — blank-input short-circuit.
- *   <li>{@link UserService#searchByUsername} (both overloads), {@link
- *       UserService#findAll(org.springframework.data.domain.Pageable)}, {@link
- *       UserService#findAllReference} — straight repository delegates.
+ *   <li>{@link UserService#searchByUsername}, {@link UserService#searchReferencesByUsername},
+ *       {@link UserService#findAll(org.springframework.data.domain.Pageable)} and {@link
+ *       UserService#findAllReference} — directory reads over every user (REQ-ORG-017).
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -85,7 +84,6 @@ class UserServiceAttributesTest {
 
   @Mock private UserRepository userRepository;
   @Mock private AuthHelperService authHelperService;
-  @Mock private SquadronVisibility squadronVisibility;
   @Mock private MembershipOperations membershipOperations;
   @Mock private AuditRecorder auditRecorder;
   @Mock private CallerUserProjection callerUserProjection;
@@ -421,53 +419,42 @@ class UserServiceAttributesTest {
   class SearchAndListDelegateTests {
 
     @Test
-    void searchByUsername_unpaged_delegatesToRepository() {
-      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
-      when(userRepository.searchScopedList("ali", null)).thenReturn(List.of(newUser(USER_ID)));
-
-      assertEquals(1, userService.searchByUsername("ali").size());
-    }
-
-    @Test
-    void searchByUsername_paged_delegatesToRepository() {
+    void searchByUsername_searchesTheWholeDirectoryWithTheEscapedQuery() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
-      when(userRepository.searchScoped("ali", null, pr)).thenReturn(page);
+      when(userRepository.searchByName("a\\_li", pr)).thenReturn(page);
 
-      assertEquals(1, userService.searchByUsername("ali", pr).getTotalElements());
+      assertEquals(1, userService.searchByUsername("a_li", pr).getTotalElements());
     }
 
     @Test
-    void findAllReference_delegatesToRepository() {
+    void searchReferencesByUsername_projectsEveryMatchForTheCaller() {
+      PageRequest pr = PageRequest.of(0, 10);
+      UserReferenceDto full = new UserReferenceDto(USER_ID, "alice", "Alice", "Alice", null);
+      UserReferenceDto peer = new UserReferenceDto(USER_ID, null, "Alice", "Alice", null);
+      when(userRepository.searchReferencesByName("ali", pr))
+          .thenReturn(new PageImpl<>(List.of(full)));
+      when(callerUserProjection.forCaller(full)).thenReturn(peer);
+
+      assertEquals(List.of(peer), userService.searchReferencesByUsername("ali", pr).getContent());
+    }
+
+    @Test
+    void findAllReference_projectsEveryUserForTheCaller() {
       UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
-      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
-      when(userRepository.findAllReferenceScoped(null)).thenReturn(List.of(dto));
+      when(userRepository.findAllReference()).thenReturn(List.of(dto));
       when(callerUserProjection.forCaller(dto)).thenReturn(dto);
 
       assertEquals(List.of(dto), userService.findAllReference());
     }
 
     @Test
-    void findAllPaged_delegatesToRepository() {
+    void findAllPaged_pagesThroughTheWholeDirectory() {
       PageRequest pr = PageRequest.of(0, 10);
       Page<User> page = new PageImpl<>(List.of(newUser(USER_ID)));
-      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(null);
-      when(userRepository.findAllScoped(null, pr)).thenReturn(page);
+      when(userRepository.findAll(pr)).thenReturn(page);
 
       assertSame(page, userService.findAll(pr));
-    }
-
-    @Test
-    void findAllReference_inFocusedMode_passesScopeToRepository() {
-      UUID scope = UUID.randomUUID();
-      java.util.Set<UUID> scopeSet = java.util.Set.of(scope);
-      UserReferenceDto dto = new UserReferenceDto(USER_ID, "alice", null, null, null);
-      when(squadronVisibility.currentUserListScopeSquadronIds()).thenReturn(scopeSet);
-      when(userRepository.findAllReferenceScoped(scopeSet)).thenReturn(List.of(dto));
-      when(callerUserProjection.forCaller(dto)).thenReturn(dto);
-
-      assertEquals(List.of(dto), userService.findAllReference());
     }
   }
 

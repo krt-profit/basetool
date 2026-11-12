@@ -398,14 +398,16 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Appends the membership-derived authorities.
+   * Appends the membership-derived authorities, but only while the member holds {@code KRT Member}:
+   * without it no membership confers anything, the explicit flags included (ADR-0300, REQ-SEC-015).
+   * Only memberships on active org units count; a deactivated unit confers nothing until it is
+   * reactivated (REQ-ORG-032).
    *
    * <ul>
    *   <li>flat {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} from the union of all
-   *       memberships; a rank confers them, and the cascade below applies, only while the holder
-   *       holds {@code KRT Member}, whereas the explicit flags always apply;
+   *       memberships, conferred by a rank or an explicit flag;
    *   <li>a contextual {@code LOGISTICIAN} for each membership's own org unit where {@link
-   *       OrgUnitMembership#isLogisticianOfOwnUnit(boolean)} holds, and a contextual {@code
+   *       OrgUnitMembership#isLogisticianOfOwnUnit()} holds, and a contextual {@code
    *       MISSION_MANAGER} per flag or own-unit officer rank;
    *   <li>contextual authorities for the org units a leadership membership reaches downward, via
    *       {@link OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)} (REQ-ORG-015).
@@ -416,34 +418,32 @@ public class CustomJwtGrantedAuthoritiesConverter
    */
   private void addMembershipDerivedRoles(
       @NonNull User user, @NonNull Collection<GrantedAuthority> authorities) {
+    if (!authorities.contains(KRT_MEMBER_AUTHORITY)) {
+      return;
+    }
     List<OrgUnitMembership> memberships =
-        orgUnitMembershipRepository.findAllByIdUserId(user.getId());
-
+        orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(user.getId());
     if (memberships.isEmpty()) {
       return;
     }
 
-    boolean seatsConfer = authorities.contains(KRT_MEMBER_AUTHORITY);
-    for (String code : MemberRoleCodes.derivedFromMemberships(memberships, seatsConfer)) {
+    for (String code : MemberRoleCodes.derivedFromMemberships(memberships, true)) {
       authorities.add(new SimpleGrantedAuthority(Roles.authority(code)));
     }
 
     Set<GrantedAuthority> contextual = new LinkedHashSet<>();
     for (OrgUnitMembership m : memberships) {
       UUID orgUnitId = m.getId().getOrgUnitId();
-      if (m.isLogisticianOfOwnUnit(seatsConfer)) {
+      if (m.isLogisticianOfOwnUnit()) {
         contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", orgUnitId));
       }
-      if (m.isMissionManager() || (seatsConfer && m.getRole().confersOwnUnitOfficerReach())) {
+      if (m.isMissionManager() || m.getRole().confersOwnUnitOfficerReach()) {
         contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", orgUnitId));
       }
     }
-
-    if (seatsConfer) {
-      for (UUID cascadedOrgUnitId : orgUnitCascadeService.cascadedOfficerReach(memberships)) {
-        contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", cascadedOrgUnitId));
-        contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", cascadedOrgUnitId));
-      }
+    for (UUID cascadedOrgUnitId : orgUnitCascadeService.cascadedOfficerReach(memberships)) {
+      contextual.add(new OrgUnitContextualAuthority("LOGISTICIAN", cascadedOrgUnitId));
+      contextual.add(new OrgUnitContextualAuthority("MISSION_MANAGER", cascadedOrgUnitId));
     }
     authorities.addAll(contextual);
   }

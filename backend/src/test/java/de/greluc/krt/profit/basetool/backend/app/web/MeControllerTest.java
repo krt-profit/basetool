@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess;
 import de.greluc.krt.profit.basetool.backend.purchasing.api.PurchasingTabAccess.PurchasingTabGrants;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
+import de.greluc.krt.profit.basetool.backend.scope.api.ActiveOrgUnitContext;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess.SupplyTabGrants;
@@ -83,6 +84,9 @@ class MeControllerTest {
   void noTabsByDefault() {
     lenient().when(supplyTabAccess.current()).thenReturn(SupplyTabGrants.NONE);
     lenient().when(purchasingTabAccess.current()).thenReturn(PurchasingTabGrants.NONE);
+    lenient()
+        .when(requestScopeResolver.currentActiveContext())
+        .thenReturn(ActiveOrgUnitContext.NONE);
   }
 
   @Test
@@ -173,21 +177,26 @@ class MeControllerTest {
   }
 
   @Test
-  void getActiveOrgUnit_present_returnsUuid() {
+  void getActiveOrgUnit_oneUnit_returnsItsUuid() {
     UUID active = UUID.randomUUID();
-    when(requestScopeResolver.currentOrgUnitId()).thenReturn(Optional.of(active));
+    when(requestScopeResolver.currentActiveContext())
+        .thenReturn(ActiveOrgUnitContext.orgUnit(active));
 
     MeController.ActiveOrgUnitResponse response = controller.getActiveOrgUnit();
 
     assertEquals(active, response.orgUnitId());
-    verify(requestScopeResolver).currentOrgUnitId();
+    assertEquals(ActiveOrgUnitContext.Kind.ORG_UNIT, response.context());
   }
 
   @Test
-  void getActiveOrgUnit_empty_returnsNull() {
-    when(requestScopeResolver.currentOrgUnitId()).thenReturn(Optional.empty());
+  void getActiveOrgUnit_allMyOrgUnits_returnsNoUnit() {
+    when(requestScopeResolver.currentActiveContext())
+        .thenReturn(ActiveOrgUnitContext.ALL_MY_ORG_UNITS);
 
-    assertNull(controller.getActiveOrgUnit().orgUnitId());
+    MeController.ActiveOrgUnitResponse response = controller.getActiveOrgUnit();
+
+    assertNull(response.orgUnitId());
+    assertEquals(ActiveOrgUnitContext.Kind.ALL_MY_ORG_UNITS, response.context());
   }
 
   @Test
@@ -295,12 +304,22 @@ class MeControllerTest {
     UUID callerId = UUID.randomUUID();
     List<OrgUnitMembershipOptionDto> mine = List.of();
     when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.holdsKrtMember()).thenReturn(true);
     when(userService.getUserIdFromJwt(null)).thenReturn(callerId);
     when(orgUnitMembershipQueryService.listPickerOptionsWithDescendants(callerId)).thenReturn(mine);
 
     assertSame(mine, controller.getPinnableOrgUnits(null));
     verify(orgUnitMembershipQueryService, never()).listAllPinnableOptions();
     verify(orgUnitMembershipQueryService, never()).listOptionsForUser(any());
+  }
+
+  @Test
+  void getPinnableOrgUnits_withoutKrtMemberNoUnitIsPinnable() {
+    when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.holdsKrtMember()).thenReturn(false);
+
+    assertTrue(controller.getPinnableOrgUnits(null).isEmpty());
+    verify(orgUnitMembershipQueryService, never()).listPickerOptionsWithDescendants(any());
   }
 
   @Test
@@ -379,7 +398,8 @@ class MeControllerTest {
     UUID active = UUID.randomUUID();
     UUID callerId = UUID.randomUUID();
     List<OrgUnitMembershipOptionDto> catalogue = List.of();
-    when(requestScopeResolver.currentOrgUnitId()).thenReturn(Optional.of(active));
+    when(requestScopeResolver.currentActiveContext())
+        .thenReturn(ActiveOrgUnitContext.orgUnit(active));
     when(authHelperService.isAdmin()).thenReturn(true);
     when(orgUnitMembershipQueryService.listAllPinnableOptions()).thenReturn(catalogue);
     when(accessGateService.canActAsLogisticianInActiveContext()).thenReturn(true);
@@ -388,6 +408,7 @@ class MeControllerTest {
     MeController.LayoutResponse layout = controller.getLayout(null, callerId);
 
     assertEquals(active, layout.activeOrgUnitId());
+    assertEquals(ActiveOrgUnitContext.Kind.ORG_UNIT, layout.activeContext());
     assertSame(catalogue, layout.orgUnits());
     assertTrue(layout.capabilities().isAdmin());
     assertTrue(layout.capabilities().isLogisticianOrAbove());

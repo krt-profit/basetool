@@ -19,7 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -49,6 +51,22 @@ public interface BankAccountGrantRepository
       ORDER BY g.user.username
       """)
   List<BankAccountGrant> findByAccountId(@Param("accountId") UUID accountId);
+
+  /**
+   * The grantees on one account who hold one of the given roles, in one query; a grant of anyone
+   * else is inert (REQ-BANK-009).
+   *
+   * @param accountId the account whose grantees to collect
+   * @param roleCodes the stable codes of the roles that keep a grant live; never empty
+   * @return the grantees' user ids, each once; never {@code null}, possibly empty
+   */
+  @Query(
+      """
+      SELECT DISTINCT g.id.userId FROM BankAccountGrant g JOIN g.user u JOIN u.roles r
+      WHERE g.id.accountId = :accountId AND r.code IN :roleCodes
+      """)
+  Set<UUID> findGranteeIdsHoldingAnyRole(
+      @Param("accountId") UUID accountId, @Param("roleCodes") Collection<String> roleCodes);
 
   /**
    * All grants of one employee with grantee and account pre-fetched, for the per-employee matrix

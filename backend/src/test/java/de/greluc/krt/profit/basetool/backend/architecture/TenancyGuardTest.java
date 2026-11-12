@@ -71,6 +71,7 @@ import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.web.RefineryOrderController;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.internal.MemberActiveOrgUnit;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyDonation;
 import de.greluc.krt.profit.basetool.backend.supply.internal.SupplyNeed;
@@ -182,6 +183,10 @@ class TenancyGuardTest {
               key(SupplyUnitSetting.class, "id"),
               "the key of the unit's own supply setting, an admin-edited flag row"),
           Map.entry(key(OrgUnit.class, "parent"), "the org-unit hierarchy itself (REQ-ORG-014)"),
+          Map.entry(
+              key(MemberActiveOrgUnit.class, "orgUnitId"),
+              "a member's stored choice of the active context, read only by that member and"
+                  + " honoured only while the unit is selectable for them (REQ-ORG-031)"),
           Map.entry(
               key(OrgUnitMembership.class, "id.orgUnitId"),
               "the membership that defines scope, not data within it"));

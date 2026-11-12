@@ -313,11 +313,12 @@ public class InventoryItemService {
   }
 
   /**
-   * Lists every inventory item linked to a mission for the mission-detail "Lagereinträge" table.
-   * Visible to any member.
+   * Lists the inventory items linked to a mission within the caller's scope, for the mission-detail
+   * "Lagereinträge" table: an unpinned admin sees every row; anyone else the pinned unit's rows or,
+   * without a pin, the rows of the units their memberships and their Logistician grant reach.
    *
    * @param missionId the mission whose linked inventory to list
-   * @return the mission's inventory items (empty when none)
+   * @return the mission's inventory items in the caller's scope (empty when none)
    */
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getMissionInventory(UUID missionId) {

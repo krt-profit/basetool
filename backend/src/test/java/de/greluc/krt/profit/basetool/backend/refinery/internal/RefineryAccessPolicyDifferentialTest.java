@@ -27,14 +27,13 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -55,8 +54,9 @@ import org.springframework.mock.web.MockHttpServletRequest;
 /**
  * The differential verdict test of the refinery access policy (plan §5.4, ADR-0236): over one
  * fixture matrix of callers, orders and target members, {@link RefineryAccessPolicy} returns
- * exactly the verdict of the scope hub's former refinery gates for the read and edit gates of an
- * order and the two on-behalf pre-checks.
+ * exactly the verdict of the scope hub's former refinery gates for the read gate of an order and
+ * the two on-behalf pre-checks, and for the edit gate that verdict narrowed to the order's owner
+ * and a Logistician of its unit (REQ-REFINERY-019).
  *
  * <p>{@link ScopeHubRefineryGates} restates those gates as {@link AccessGateService} decided them
  * before they moved, on the scope kernel's primitives, so the comparison outlives their deletion.
@@ -193,11 +193,14 @@ class RefineryAccessPolicyDifferentialTest {
       when(authHelper.isAdmin()).thenReturn(caller.admin());
       when(authHelper.isMemberOrAbove()).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
+      when(authHelper.holdsKrtMember()).thenReturn(true);
 
       OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);
       List<OrgUnitMembership> callerRows = rows(callerId, caller.memberships());
       when(memberships.findAllByIdUserId(any())).thenReturn(List.of());
       when(memberships.findAllByIdUserId(callerId)).thenReturn(callerRows);
+      when(memberships.findAllOnActiveOrgUnitsByIdUserId(any())).thenReturn(List.of());
+      when(memberships.findAllOnActiveOrgUnitsByIdUserId(callerId)).thenReturn(callerRows);
       when(memberships.findAllByIdUserId(TARGET_A)).thenReturn(rows(TARGET_A, List.of(UNIT_A)));
       when(memberships.findAllByIdUserId(TARGET_B)).thenReturn(rows(TARGET_B, List.of(UNIT_B)));
       when(memberships.findAllByIdUserId(TARGET_C)).thenReturn(rows(TARGET_C, List.of(CHILD_C)));
@@ -240,14 +243,12 @@ class RefineryAccessPolicyDifferentialTest {
         request.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, caller.pin().toString());
       }
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
+      when(orgUnits.existsByIdAndActiveTrue(any())).thenReturn(true);
       RequestScopeResolver resolver =
-          new RequestScopeResolver(
-              authHelper,
-              memberships,
-              orgUnits,
-              cascade,
-              new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
-              request);
+          new RequestScopeResolver(authHelper, memberships, orgUnits, cascade, request);
+      assertThat(resolver.currentMemberOrgUnitIds())
+          .as("the caller's memberships reach the resolver")
+          .containsAll(caller.memberships());
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       scopeHub =
           new ScopeHubRefineryGates(
@@ -255,6 +256,7 @@ class RefineryAccessPolicyDifferentialTest {
       policy =
           new RefineryAccessPolicy(
               accessGateService,
+              authHelper,
               repository,
               new UserAccessPolicy(accessGateService, authHelper, memberships));
     }
@@ -288,7 +290,8 @@ class RefineryAccessPolicyDifferentialTest {
   }
 
   /**
-   * The refinery gates as the scope hub decided them, restated on the kernel's primitives.
+   * The refinery gates as the scope hub decided them, restated on the kernel's primitives; the edit
+   * gate also requires the order's owner or a Logistician of its unit.
    *
    * @param accessGateService the scope hub, for its org-unit gates
    * @param authHelper the caller's identity and roles
@@ -308,7 +311,10 @@ class RefineryAccessPolicyDifferentialTest {
     }
 
     boolean canEditRefineryOrder(UUID orderId) {
-      return orders.findById(orderId).map(o -> permits(o, true)).orElse(false);
+      return orders
+          .findById(orderId)
+          .map(o -> permits(o, true) && (isOwner(o.getOwner()) || isLogisticianOf(o)))
+          .orElse(false);
     }
 
     boolean canViewUserRefineryOrders(UUID targetUserId) {
@@ -325,8 +331,7 @@ class RefineryAccessPolicyDifferentialTest {
         return true;
       }
       if (order.getOwningOrgUnit() == null) {
-        return (authHelper.isAdmin() && resolver.readActiveSquadronFromHeader().isEmpty())
-            || isOwner(owner);
+        return (authHelper.isAdmin() && resolver.currentPin().isEmpty()) || isOwner(owner);
       }
       UUID unit = order.getOwningOrgUnit().getId();
       return edit
@@ -338,6 +343,10 @@ class RefineryAccessPolicyDifferentialTest {
       return owner != null
           && owner.getId() != null
           && authHelper.currentUserId().map(owner.getId()::equals).orElse(false);
+    }
+
+    private boolean isLogisticianOf(RefineryOrder order) {
+      return accessGateService.canActAsLogisticianInOwner(OrgUnit.idOf(order.getOwningOrgUnit()));
     }
 
     private boolean actsOn(UUID targetUserId, boolean edit) {

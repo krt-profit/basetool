@@ -435,18 +435,21 @@ public class OrgUnitBankRequestService {
 
   /**
    * Lists the booking requests the caller may act on: all requests of accounts they hold, the KRT
-   * band requests routed to them, or everything for an admin (REQ-BANK-046).
+   * band requests routed to them, or everything for an admin (REQ-BANK-046), each only on an
+   * account in the active context (REQ-ORG-032).
    *
    * @return the requests the caller may act on; empty when none
    */
   @NotNull
   @Transactional(readOnly = true)
   public List<BankBookingRequestDto> listRequestsForResponsibleAccounts() {
-    return bankBookingRequestService.listForeign(policy.foreignRequestScope(accessService.actor()));
+    return bankBookingRequestService.listForeign(
+        policy.foreignRequestScope(accessService.actor(), accessService.pin()));
   }
 
   /**
-   * Reads one booking request the caller raised, sees as bank staff or approves (REQ-BANK-068).
+   * Reads one booking request the caller raised, sees as bank staff or approves in the active
+   * context (REQ-BANK-068, REQ-ORG-032).
    *
    * @param requestId the request
    * @return the request with the caller's roles on it
@@ -456,7 +459,8 @@ public class OrgUnitBankRequestService {
   @NotNull
   @Transactional(readOnly = true)
   public BankBookingRequestViewDto viewRequest(@NotNull UUID requestId) {
-    return bankBookingRequestViewService.view(accessService.actor(), requestId);
+    return bankBookingRequestViewService.view(
+        accessService.actor(), requestId, accessService.pin());
   }
 
   /**
@@ -508,7 +512,7 @@ public class OrgUnitBankRequestService {
     BankBookingRequest request =
         Entities.require(
             bankBookingRequestRepository.findByIdForUpdate(requestId), "Booking request not found");
-    if (!policy.mayApprove(accessService.actor(), request)) {
+    if (!policy.mayApprove(accessService.actor(), request, accessService.pin())) {
       throw new AccessDeniedException("The caller may not approve this request");
     }
     return request;

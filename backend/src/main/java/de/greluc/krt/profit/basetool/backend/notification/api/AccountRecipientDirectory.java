@@ -33,7 +33,8 @@ import org.jetbrains.annotations.NotNull;
 public interface AccountRecipientDirectory {
 
   /**
-   * The bank employees holding a {@code bank_account_grant} on an account (REQ-BANK-026).
+   * The grantees of a {@code bank_account_grant} on an account who hold Bank Employee or a role
+   * above it; an inert grant notifies nobody (REQ-BANK-026, REQ-BANK-009).
    *
    * @param accountId the bank account
    * @return the grantees' user subs; never {@code null}, possibly empty
@@ -42,10 +43,12 @@ public interface AccountRecipientDirectory {
   Set<UUID> grantHoldersOf(@NotNull UUID accountId);
 
   /**
-   * The responsible holders of an account (REQ-BANK-034).
+   * The responsible holders of an account who hold {@code KRT Member}, from seats on active units
+   * only (REQ-BANK-034, REQ-SEC-015, REQ-ORG-032).
    *
    * @param accountId the bank account
-   * @return their user subs; never {@code null}, empty for a Sonderkonto or an unlinked account
+   * @return their user subs; never {@code null}, empty for a Sonderkonto, an unlinked account or
+   *     the account of a deactivated unit
    */
   @NotNull
   Set<UUID> responsibleHoldersOf(@NotNull UUID accountId);
@@ -61,7 +64,8 @@ public interface AccountRecipientDirectory {
   Set<UUID> requestResponsibleHoldersOf(@NotNull UUID accountId);
 
   /**
-   * The members whose approval a booking request still waits for (REQ-NOTIF-033, REQ-BANK-041).
+   * The members whose approval a booking request still waits for, a seat holder only while they
+   * hold {@code KRT Member} (REQ-NOTIF-033, REQ-BANK-041).
    *
    * @param requestId the booking request
    * @return their user subs, never the requester; empty when the request is missing, no longer

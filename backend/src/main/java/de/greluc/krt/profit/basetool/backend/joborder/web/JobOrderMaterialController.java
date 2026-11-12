@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.LinkedStockAttribution
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBlueprintOwnersDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemBlueprintOwnersService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMaterialDemandService;
-import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMissionAllocationRedactor;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOverviewDto;
@@ -63,7 +62,6 @@ public class JobOrderMaterialController {
   private final JobOrderQueryService jobOrderQueryService;
   private final JobOrderMaterialDemandService jobOrderMaterialDemandService;
   private final JobOrderItemBlueprintOwnersService jobOrderItemBlueprintOwnersService;
-  private final JobOrderMissionAllocationRedactor missionAllocationRedactor;
 
   /**
    * Aggregates the outstanding material of every visible {@code OPEN} / {@code IN_PROGRESS} job
@@ -129,8 +127,7 @@ public class JobOrderMaterialController {
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getInventoryItemsForJobOrderMaterial(
       @PathVariable UUID id, @PathVariable UUID matId) {
-    return missionAllocationRedactor.anonymiseUnreadableMissions(
-        jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId));
+    return jobOrderQueryService.getInventoryItemsForJobOrderMaterial(id, matId);
   }
 
   /**
@@ -173,8 +170,7 @@ public class JobOrderMaterialController {
   @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getOrphanedLinkedInventory(@PathVariable UUID id) {
-    return missionAllocationRedactor.anonymiseUnreadableMissions(
-        jobOrderQueryService.getOrphanedLinkedInventory(id));
+    return jobOrderQueryService.getOrphanedLinkedInventory(id);
   }
 
   /**

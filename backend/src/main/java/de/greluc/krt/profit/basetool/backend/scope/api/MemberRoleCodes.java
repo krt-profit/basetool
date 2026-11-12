@@ -77,25 +77,27 @@ public final class MemberRoleCodes {
 
   /**
    * The flat codes the memberships confer: {@code LOGISTICIAN} for a logistician of their own unit,
-   * {@code MISSION_MANAGER} for a mission-manager flag or, while seats confer, any functional rank
-   * (REQ-ROLE-001/002).
+   * {@code MISSION_MANAGER} for a mission-manager flag or any functional rank (REQ-ROLE-001/002).
+   * Without {@code KRT Member} no membership confers a code, flag and rank alike (ADR-0300,
+   * REQ-SEC-015).
    *
    * @param memberships the member's membership rows
-   * @param seatsConfer whether the member holds {@code KRT Member}, without which a rank confers
-   *     nothing (ADR-0300)
+   * @param membershipsConfer whether the member holds {@code KRT Member}
    * @return the derived codes; empty when no membership confers one
    */
   @NotNull
   @Unmodifiable
   static Set<String> derivedFromMemberships(
-      @NotNull Collection<OrgUnitMembership> memberships, boolean seatsConfer) {
+      @NotNull Collection<OrgUnitMembership> memberships, boolean membershipsConfer) {
+    if (!membershipsConfer) {
+      return Set.of();
+    }
     Set<String> derived = new LinkedHashSet<>();
-    if (memberships.stream().anyMatch(m -> m.isLogisticianOfOwnUnit(seatsConfer))) {
+    if (memberships.stream().anyMatch(OrgUnitMembership::isLogisticianOfOwnUnit)) {
       derived.add(Roles.LOGISTICIAN);
     }
     if (memberships.stream()
-        .anyMatch(
-            m -> m.isMissionManager() || (seatsConfer && m.getRole().confersOwnLevelOversight()))) {
+        .anyMatch(m -> m.isMissionManager() || m.getRole().confersOwnLevelOversight())) {
       derived.add(Roles.MISSION_MANAGER);
     }
     return Set.copyOf(derived);

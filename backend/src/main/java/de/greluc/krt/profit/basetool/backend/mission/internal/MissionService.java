@@ -70,6 +70,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -357,6 +358,7 @@ public class MissionService implements MissionCommands {
    * @return the persisted mission entity
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when {@code operationId}
    *     does not resolve
+   * @throws AccessDeniedException when the caller may not link a mission to {@code operationId}
    * @throws BadRequestException when the mission is internal but resolves to no owning org unit
    */
   @Transactional
@@ -370,7 +372,7 @@ public class MissionService implements MissionCommands {
 
     if (mission.getOwner() != null) {
       mission.setOwningOrgUnit(
-          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(
+          orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(
               mission.getOwner(), request.owningOrgUnitId()));
     } else {
       requestScopeResolver.currentOrgUnit().ifPresent(mission::setOwningOrgUnit);
@@ -413,10 +415,12 @@ public class MissionService implements MissionCommands {
 
   /**
    * Copies the caller-controllable fields of {@link CreateMissionRequest} onto a new {@link
-   * Mission}, resolving the operation.
+   * Mission}, refusing an operation the caller may not link to (REQ-MISSION-034).
    *
    * @param mission target entity (caller owns its identity and version)
    * @param request validated create payload
+   * @throws NotFoundException when {@code operationId} does not resolve
+   * @throws AccessDeniedException when the caller may not link a mission to {@code operationId}
    */
   private void applyCreatePayload(@NotNull Mission mission, @NotNull CreateMissionRequest request) {
     mission.setName(request.name());
@@ -428,37 +432,39 @@ public class MissionService implements MissionCommands {
     mission.setPlannedStartTime(request.plannedStartTime());
     mission.setPlannedEndTime(request.plannedEndTime());
     mission.setIsInternal(request.isInternal() != null ? request.isInternal() : Boolean.FALSE);
-
-    if (request.operationId() != null) {
-      mission.setOperationId(requireOperation(request.operationId()));
-    } else {
-      mission.setOperationId(null);
-    }
+    UUID operationId = request.operationId();
+    mission.setOperationId(operationId == null ? null : requireLinkableOperation(operationId));
   }
 
   /**
-   * Confirms that an operation exists before a mission is linked to it.
+   * Confirms that the caller may link a mission to the operation: it exists and the caller may edit
+   * it, which the operation module answers (REQ-MISSION-034).
    *
    * @param operationId the operation to link
    * @return {@code operationId}
-   * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when no operation
-   *     matches
+   * @throws NotFoundException when no operation matches
+   * @throws AccessDeniedException when the caller may not edit the operation
    */
-  private @NotNull UUID requireOperation(@NotNull UUID operationId) {
-    if (!operationSummaryProvider.operations(Set.of(operationId)).containsKey(operationId)) {
-      throw new NotFoundException("Operation not found");
-    }
-    return operationId;
+  private @NotNull UUID requireLinkableOperation(@NotNull UUID operationId) {
+    return switch (operationSummaryProvider.linkability(operationId)) {
+      case LINKABLE -> operationId;
+      case NOT_LINKABLE ->
+          throw new AccessDeniedException("The caller may not link a mission to this operation");
+      case NO_SUCH_OPERATION -> throw new NotFoundException("Operation not found");
+    };
   }
 
   /**
    * Updates the core section of a mission, guarded by {@code coreVersion}.
    *
    * <p>A transition to {@code ACTIVE} without an actual start time also stamps {@code
-   * actualStartTime} and bumps {@code scheduleVersion}.
+   * actualStartTime} and bumps {@code scheduleVersion}. A changed operation link needs the caller
+   * to be allowed to link to the new operation; an unchanged link is not re-checked and clearing it
+   * is always allowed (REQ-MISSION-034).
    *
    * @throws de.greluc.krt.profit.basetool.backend.kernel.NotFoundException when any referenced id
    *     is unknown
+   * @throws AccessDeniedException when the link changes to an operation the caller may not link to
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
    *     {@code expectedCoreVersion} is stale
    */
@@ -473,6 +479,10 @@ public class MissionService implements MissionCommands {
       @Nullable String meetingPoint,
       @NotNull Long expectedCoreVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
+    final UUID linkedOperationId =
+        operationId != null && !operationId.equals(mission.getOperationId())
+            ? requireLinkableOperation(operationId)
+            : operationId;
     enforceSectionVersion(
         missionRepository, mission, MissionSection.CORE, expectedCoreVersion, missionId);
 
@@ -491,12 +501,7 @@ public class MissionService implements MissionCommands {
       mission.setStatus(status);
     }
     notificationPublisher.statusChanged(mission, oldStatus);
-
-    if (operationId != null) {
-      mission.setOperationId(requireOperation(operationId));
-    } else {
-      mission.setOperationId(null);
-    }
+    mission.setOperationId(linkedOperationId);
 
     Mission saved = missionRepository.save(mission);
     auditRecorder.record(
@@ -642,6 +647,7 @@ public class MissionService implements MissionCommands {
    * @param request create payload (validated at the controller boundary)
    * @return the persisted sub-mission entity
    * @throws NotFoundException when {@code parentMissionId} or {@code operationId} does not resolve
+   * @throws AccessDeniedException when the caller may not link a mission to {@code operationId}
    */
   @Transactional
   public Mission addSubMission(@NotNull UUID parentMissionId, CreateMissionRequest request) {

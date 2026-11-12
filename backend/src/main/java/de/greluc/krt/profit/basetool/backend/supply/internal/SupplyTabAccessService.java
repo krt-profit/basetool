@@ -31,8 +31,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Decides the supply tabs of the caller (REQ-UI-026): „Eingehende Spenden" by the units the
- * incoming-donations page lists, „Statistik" by the gate of {@link SupplyStatsService#stats(int)}.
+ * Decides the supply tabs of the caller (REQ-UI-026): „Eingehende Spenden" by the units the caller
+ * manages in any context, „Statistik" by the gate of {@link SupplyStatsService#stats(int)}; neither
+ * depends on the pinned unit (ADR-0329).
  */
 @Service
 @RequiredArgsConstructor
@@ -60,9 +61,11 @@ public class SupplyTabAccessService implements SupplyTabAccess {
   }
 
   /**
-   * Whether the caller manages an active unit that accepts donations; an admin manages every unit.
+   * Whether the caller manages an active unit that accepts donations in any context ({@link
+   * SupplyAccessPolicy#managedUnitsInAnyContext()}), so the tab does not depend on the pinned unit
+   * (ADR-0329); the page itself lists the units of the active context.
    *
-   * @return {@code true} when the incoming-donations page lists at least one unit for the caller
+   * @return {@code true} when the caller manages at least one active accepting unit
    */
   private boolean managesAnAcceptingUnit() {
     List<UUID> accepting =
@@ -72,14 +75,8 @@ public class SupplyTabAccessService implements SupplyTabAccess {
     if (accepting.isEmpty()) {
       return false;
     }
-    List<UUID> reachable = accepting;
-    if (!accessPolicy.isAdmin()) {
-      Set<UUID> managed = accessPolicy.managedUnitIds();
-      reachable = accepting.stream().filter(managed::contains).toList();
-      if (reachable.isEmpty()) {
-        return false;
-      }
-    }
-    return orgUnitRepository.findAllById(reachable).stream().anyMatch(OrgUnit::isActive);
+    Set<UUID> reachable = accessPolicy.managedUnitsInAnyContext().among(accepting);
+    return !reachable.isEmpty()
+        && orgUnitRepository.findAllById(reachable).stream().anyMatch(OrgUnit::isActive);
   }
 }

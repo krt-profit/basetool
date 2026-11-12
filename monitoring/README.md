@@ -439,9 +439,10 @@ e-mail, not Alertmanager.
 
 ## Dashboard 07: navigation and quick access
 
-Panels 92 to 96 of `07-basetool-operations.json` watch the navigation and the quick access
-(REQ-UI-032, REQ-UI-033, REQ-OBS-011); `NavigationEndpointsErroring` and `QuickAccessSearchSlow`
-alert on them.
+Panels 92 to 96 and 102 of `07-basetool-operations.json` watch the navigation, the quick access and
+the active org unit switcher (REQ-UI-032, REQ-UI-033, REQ-ORG-031, REQ-OBS-011).
+`NavigationEndpointsErroring` and `QuickAccessSearchSlow` alert on the navigation and the quick
+access; the switches are a usage trend without an alert.
 
 | Panel | Query | Reads as |
 | --- | --- | --- |
@@ -450,6 +451,7 @@ alert on them.
 | 94 Navigation endpoints 5xx rate | `http_server_requests_seconds_count` on `/api/v1/navigation/*`, `/navigation/*`, `/dashboard/*` | Server errors of the preference and dashboard routes. |
 | 95 Quick-access searches/hour | `basetool_quick_access_search_total` by `kind`, `outcome` | Entity searches per type; `error` failed closed, `timeout` missed the 2 s cap. |
 | 96 Quick-access search p95 | `http_server_requests_seconds_bucket` on `/quick-access/search` | 95th percentile of the entity search. |
+| 102 Active org unit switches/hour | `basetool_active_org_unit_choice_writes_total` by `target` | Stored changes of the active org unit, to one unit (`unit`) or to all of a member's units (`all`); counted, not audited. |
 
 ## Operating procedures
 

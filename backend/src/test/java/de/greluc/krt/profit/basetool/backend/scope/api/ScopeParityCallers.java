@@ -35,7 +35,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -135,6 +134,7 @@ public final class ScopeParityCallers {
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(caller.admin());
     when(authHelper.isMemberOrAbove()).thenReturn(memberOrAbove || caller.admin());
+    when(authHelper.holdsKrtMember()).thenReturn(memberOrAbove);
     when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
 
     List<OrgUnitMembership> rows = new ArrayList<>();
@@ -147,6 +147,11 @@ public final class ScopeParityCallers {
     OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);
     when(memberships.findAllByIdUserId(any())).thenReturn(List.of());
     when(memberships.findAllByIdUserId(callerId)).thenReturn(rows);
+    when(memberships.findAllOnActiveOrgUnitsByIdUserId(any())).thenReturn(List.of());
+    when(memberships.findAllOnActiveOrgUnitsByIdUserId(callerId)).thenReturn(rows);
+    when(memberships.findActiveOrgUnitIdsByUserId(any())).thenReturn(Set.of());
+    when(memberships.findActiveOrgUnitIdsByUserId(callerId))
+        .thenReturn(Set.copyOf(caller.memberships()));
     when(memberships.findAllByIdUserIdAndKind(any(), any()))
         .thenReturn(rows.stream().filter(r -> r.getKind() == OrgUnitKind.SQUADRON).toList());
 
@@ -170,14 +175,14 @@ public final class ScopeParityCallers {
     }
     OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
     when(orgUnits.countProfitEligibleByIdIn(anyCollection())).thenReturn(1L);
+    when(orgUnits.existsByIdAndActiveTrue(any())).thenReturn(true);
     RequestScopeResolver resolver =
-        new RequestScopeResolver(
-            authHelper,
-            memberships,
-            orgUnits,
-            cascade,
-            new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
-            request);
+        new RequestScopeResolver(authHelper, memberships, orgUnits, cascade, request);
+    if (memberOrAbove && !caller.admin()) {
+      assertThat(resolver.currentMemberOrgUnitIds())
+          .as("the memberships of '%s' reach the resolver", caller.name())
+          .containsAll(caller.memberships());
+    }
     AccessGateService gate = new AccessGateService(resolver, authHelper);
     return new Wired(caller, resolver.currentScopePredicate(), resolver, gate, authHelper);
   }

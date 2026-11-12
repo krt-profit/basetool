@@ -61,6 +61,22 @@ public class OperationAccessPolicy {
        )
       """;
 
+  /**
+   * The operations the caller may edit (alias {@code o}), the list form of {@link
+   * #canEditOperation(UUID)}: the caller's Mission Manager scope as a scope triple plus an
+   * ownerless operation when {@code :ownerlessEditable}. It carries no read escape, so it backs the
+   * mission's operation picker (REQ-MISSION-034).
+   */
+  static final String OPERATION_EDIT_PREDICATE =
+      """
+      (
+        :isAdminAllScope = true
+        OR (:activeOrgUnitId IS NOT NULL AND o.owningOrgUnit.id = :activeOrgUnitId)
+        OR (:activeOrgUnitId IS NULL AND o.owningOrgUnit.id IN :editableOrgUnitIds)
+        OR (o.owningOrgUnit IS NULL AND :ownerlessEditable = true)
+       )
+      """;
+
   private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final OperationRepository operationRepository;
@@ -107,28 +123,36 @@ public class OperationAccessPolicy {
 
   /**
    * Checks whether the caller may edit operation {@code operationId}: a Mission Manager grant in
-   * the owning org unit, or for an ownerless operation in an Organisationsleitung or Bereich unit;
-   * admins pass (REQ-SEC-065).
+   * the owning org unit, or for an ownerless operation in an Organisationsleitung or Bereich unit,
+   * inside the active context; an admin passes for every operation without a pin and for the pinned
+   * unit's operations with one (REQ-SEC-065, REQ-ORG-032).
    *
    * @param operationId operation to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the operation
    */
   public boolean canEditOperation(@NotNull UUID operationId) {
-    return operationRepository
-        .findById(operationId)
-        .map(o ->
-            accessGateService.canManageMissionsOf(
-                o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
-        .orElse(false);
+    return operationRepository.findById(operationId).map(this::canEdit).orElse(false);
+  }
+
+  /**
+   * {@link #canEditOperation(UUID)} for an operation already loaded.
+   *
+   * @param operation the operation to inspect
+   * @return {@code true} iff the caller may edit the operation
+   */
+  public boolean canEdit(@NotNull Operation operation) {
+    return accessGateService.canManageMissionsOf(
+        operation.getOwningOrgUnit() == null ? null : operation.getOwningOrgUnit().getId());
   }
 
   /**
    * Checks whether the caller may clear a participant's paid-out flag on operation {@code
-   * operationId}: officer reach in the operation's owning unit; an ownerless operation is reserved
-   * to admins (REQ-SEC-065).
+   * operationId}: officer reach in the operation's owning unit inside the active context; an
+   * ownerless operation is reserved to an admin without a pin (REQ-SEC-065, REQ-ORG-032).
    *
    * @param operationId operation to inspect; never {@code null}
-   * @return {@code true} iff the caller is an admin or holds officer reach in the owning unit
+   * @return {@code true} iff the caller holds officer reach in the owning unit in the active
+   *     context, or the operation has no unit and the caller is an admin without a pin
    */
   public boolean canClearPayout(@NotNull UUID operationId) {
     return operationRepository

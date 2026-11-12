@@ -433,7 +433,8 @@ public interface MissionRepository
   Set<UUID> findManagerUserIdsById(@Param("id") UUID id);
 
   /**
-   * Loads what the Lager shows of the given missions in one read (plan §7.5 P3-5d).
+   * Loads what the Lager shows of the given missions in one read, whoever asks; the write and undo
+   * paths read it without loading the missions themselves (REQ-INV-027).
    *
    * @param ids the missions
    * @return the existing missions' id, name and planned start

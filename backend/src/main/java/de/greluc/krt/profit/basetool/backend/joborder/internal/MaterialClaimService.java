@@ -597,19 +597,17 @@ public class MaterialClaimService implements ClaimBucketSource {
   }
 
   /**
-   * Enforces the claim permission matrix: an admin or a logistician (incl. lead) of the responsible
-   * SK may manage any claim on the order; others only claims for a squadron they are Logistician
-   * of.
+   * Enforces the claim permission matrix in the active context (REQ-ORG-032): a logistician (incl.
+   * lead) of the responsible SK may manage any claim on the order, others only claims for a
+   * squadron they are Logistician of; an admin passes either branch for the units their context
+   * covers.
    *
    * @param order the order whose responsible SK defines the elevated authority.
    * @param claimingOrgUnitId the squadron the claim is for.
    * @throws AccessDeniedException when the caller is neither a logistician/lead of the responsible
-   *     SK nor Logistician of this squadron.
+   *     SK nor Logistician of this squadron in the active context.
    */
   private void assertCanManage(JobOrder order, UUID claimingOrgUnitId) {
-    if (authHelperService.isAdmin()) {
-      return;
-    }
     UUID responsibleSkId = order.getResponsibleOrgUnit().getId();
     boolean managesResponsibleSk =
         accessGateService.hasRoleInOrgUnit(responsibleSkId, "LOGISTICIAN");

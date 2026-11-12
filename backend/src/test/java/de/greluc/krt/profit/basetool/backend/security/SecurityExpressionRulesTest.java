@@ -66,7 +66,7 @@ class SecurityExpressionRulesTest {
    */
   private static final Map<String, Integer> REFERENCE_FLOORS =
       Map.ofEntries(
-          Map.entry("requestScopeResolver", 4),
+          Map.entry("requestScopeResolver", 17),
           Map.entry("operationAccessPolicy", 8),
           Map.entry("refineryAccessPolicy", 8),
           Map.entry("missionAccessPolicy", 19),

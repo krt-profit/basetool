@@ -40,13 +40,24 @@ public final class EarmarkTargets {
   public interface Missions {
 
     /**
-     * Looks the missions up in one read.
+     * Looks the missions up in one read, whoever the caller is: the Lager's write and undo paths
+     * check an earmark's target and label its audit event with it, also without a request.
+     *
+     * @param ids the missions
+     * @return each existing mission by id with its name and planned start; an unknown id is absent
+     */
+    @NotNull
+    Map<UUID, MissionEarmark> missions(@NotNull Collection<UUID> ids);
+
+    /**
+     * Looks the missions up in one read as the current caller is shown them: a mission the caller
+     * may not read (REQ-MISSION-008) comes back with its id alone (REQ-INV-027).
      *
      * @param ids the missions
      * @return each existing mission by id; an unknown id is absent
      */
     @NotNull
-    Map<UUID, MissionEarmark> missions(@NotNull Collection<UUID> ids);
+    Map<UUID, MissionEarmark> shownMissions(@NotNull Collection<UUID> ids);
   }
 
   /** The donations a Lager row's pledge earmark points at; implemented by the supply module. */

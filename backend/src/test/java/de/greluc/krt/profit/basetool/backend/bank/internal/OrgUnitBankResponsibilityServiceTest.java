@@ -185,6 +185,47 @@ class OrgUnitBankResponsibilityServiceTest {
   }
 
   @Test
+  void aDeactivatedUnitsAccountKeepsItsStoredHoldersButNotifiesNone() {
+    UUID orgUnitId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID leiter = UUID.randomUUID();
+    OrgUnit retired = squadron(orgUnitId, "Retired", "RET");
+    retired.setActive(false);
+    when(bankAccountRepository.findById(accountId))
+        .thenReturn(Optional.of(account(accountId, "KB-0010", retired)));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+            orgUnitId, MembershipRole.STAFFELLEITER))
+        .thenReturn(Set.of(leiter));
+
+    assertThat(service.resolveResponsibleHolderUserIds(accountId)).containsExactly(leiter);
+    assertThat(service.resolveNotifiedResponsibleHolderUserIds(accountId)).isEmpty();
+  }
+
+  @Test
+  void theCartelBankNotifiesOnlyTheBereichsleiterOfActiveProfitBereiche() {
+    UUID activeId = UUID.randomUUID();
+    UUID retiredId = UUID.randomUUID();
+    UUID accountId = UUID.randomUUID();
+    UUID bl = UUID.randomUUID();
+    Bereich active = new Bereich();
+    active.setId(activeId);
+    active.setName("Profit");
+    Bereich retired = new Bereich();
+    retired.setId(retiredId);
+    retired.setName("Former profit");
+    retired.setActive(false);
+    when(bankAccountRepository.findById(accountId))
+        .thenReturn(
+            Optional.of(typedAccount(accountId, "KB-0011", BankAccountType.CARTEL_BANK, null)));
+    when(bereichRepository.findByDepartment(any())).thenReturn(List.of(active, retired));
+    when(orgUnitMembershipRepository.findUserIdsByOrgUnitIdsAndRole(
+            List.of(activeId), MembershipRole.BEREICHSLEITER))
+        .thenReturn(Set.of(bl));
+
+    assertThat(service.resolveNotifiedResponsibleHolderUserIds(accountId)).containsExactly(bl);
+  }
+
+  @Test
   void resolveResponsibleHolderUserIds_specialAccount_returnsEmptyWithoutLookup() {
     UUID accountId = UUID.randomUUID();
     BankAccount special = specialAccount(accountId, "KB-0009", BankAccountStatus.ACTIVE);

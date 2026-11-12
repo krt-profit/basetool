@@ -255,15 +255,17 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Paged list of the orders requested by org units the caller is a direct member of, the "Meine
-   * Auftr&auml;ge" list (REQ-ORDERS-023). A memberless caller gets an empty page.
+   * Paged list of the orders requested by org units the caller is a direct member of, inside the
+   * active context, the "Meine Auftr&auml;ge" list (REQ-ORDERS-023, REQ-ORG-032). A memberless
+   * caller, or one pinned to a unit they are no direct member of, gets an empty page.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param pageable page request
    * @return paged job orders requested by the caller's org units
    */
   public Page<JobOrderDto> getRequestedJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
-    Set<UUID> requesterOrgUnitIds = requestScopeResolver.currentDirectMembershipOrgUnitIds();
+    Set<UUID> requesterOrgUnitIds =
+        requestScopeResolver.currentDirectMembershipOrgUnitIdsInActiveContext();
     if (requesterOrgUnitIds.isEmpty()) {
       return Page.empty(pageable);
     }

@@ -506,7 +506,6 @@ class MaterialClaimServiceTest {
     void neitherOwnSquadronNorSkAuthority_forbidden() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(authHelperService.isAdmin()).thenReturn(false);
       when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
       when(accessGateService.canActAsLogisticianIn(SQUADRON_A)).thenReturn(false);
 
@@ -520,7 +519,6 @@ class MaterialClaimServiceTest {
     void ownSquadronLogistician_allowed() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(authHelperService.isAdmin()).thenReturn(false);
       when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(false);
       when(accessGateService.canActAsLogisticianIn(SQUADRON_A)).thenReturn(true);
       when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
@@ -544,7 +542,6 @@ class MaterialClaimServiceTest {
     void responsibleSkLogisticianOrLead_mayManageForeignSquadronClaim() {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, GOOD, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
-      when(authHelperService.isAdmin()).thenReturn(false);
       when(accessGateService.hasRoleInOrgUnit(SK_ID, "LOGISTICIAN")).thenReturn(true);
       when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityTierId(
               ORDER_ID, MATERIAL_ID, QualityTierFixtures.GOOD_ID))
@@ -651,7 +648,7 @@ class MaterialClaimServiceTest {
       claim.setId(claimId);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialClaimRepository.findById(claimId)).thenReturn(Optional.of(claim));
-      when(authHelperService.isAdmin()).thenReturn(true);
+      adminCaller();
 
       service.withdrawClaim(ORDER_ID, claimId);
 
@@ -666,7 +663,7 @@ class MaterialClaimServiceTest {
       claim.setId(claimId);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(materialClaimRepository.findById(claimId)).thenReturn(Optional.of(claim));
-      when(authHelperService.isAdmin()).thenReturn(true);
+      adminCaller();
 
       service.withdrawClaim(ORDER_ID, claimId);
 
@@ -794,8 +791,12 @@ class MaterialClaimServiceTest {
     }
   }
 
+  /**
+   * An unpinned admin: the scope kernel lets them act as Logistician of the order's responsible SK,
+   * like every unit their active context covers (REQ-ORG-032).
+   */
   private void adminCaller() {
-    when(authHelperService.isAdmin()).thenReturn(true);
+    when(accessGateService.hasRoleInOrgUnit(any(), eq("LOGISTICIAN"))).thenReturn(true);
   }
 
   private CreateClaimDto dto(UUID claimingOrgUnitId, double amount) {

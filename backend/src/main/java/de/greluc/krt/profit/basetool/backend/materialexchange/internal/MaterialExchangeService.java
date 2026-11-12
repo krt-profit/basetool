@@ -93,8 +93,8 @@ public class MaterialExchangeService {
   private final BlueprintProducts blueprintProductService;
 
   /**
-   * Resolves the acting member's active {@link
-   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit} to stamp on an item offer's squadron
+   * Resolves the {@link de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit} of the acting
+   * member's active context, of any kind and none for several units, to stamp on an item offer's
    * badge — the item-offer counterpart of copying {@code inventoryItem.getOwningOrgUnit()} for a
    * material offer (an item offer has no source Lager row to copy from).
    */

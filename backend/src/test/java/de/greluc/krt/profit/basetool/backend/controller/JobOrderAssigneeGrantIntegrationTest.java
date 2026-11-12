@@ -353,7 +353,8 @@ class JobOrderAssigneeGrantIntegrationTest {
     List<GrantedAuthority> authorities = new ArrayList<>();
     authorities.add(contextual);
     if (contextual instanceof OrgUnitContextualAuthority) {
-      authorities.add(new SimpleGrantedAuthority("ROLE_" + Roles.LOGISTICIAN));
+      authorities.add(new SimpleGrantedAuthority(Roles.authority(Roles.LOGISTICIAN)));
+      authorities.add(new SimpleGrantedAuthority(Roles.authority(Roles.KRT_MEMBER)));
     }
     return mockMvc.perform(
         request

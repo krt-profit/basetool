@@ -142,13 +142,8 @@ class OrgUnitMembershipQueryServiceTest {
     UUID skId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
     UUID olId = UUID.randomUUID();
-    when(membershipRepository.findAllByIdUserId(userId))
-        .thenReturn(
-            List.of(
-                membershipRow(userId, staffelId, OrgUnitKind.SQUADRON),
-                membershipRow(userId, skId, OrgUnitKind.SPECIAL_COMMAND),
-                membershipRow(userId, bereichId, OrgUnitKind.BEREICH),
-                membershipRow(userId, olId, OrgUnitKind.ORGANISATIONSLEITUNG)));
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(userId))
+        .thenReturn(Set.of(staffelId, skId, bereichId, olId));
 
     Set<UUID> ids = queryService.findDirectMembershipOrgUnitIds(userId);
 
@@ -157,17 +152,9 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void findDirectMembershipOrgUnitIds_noMemberships_returnsEmpty() {
-    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(userId)).thenReturn(Set.of());
 
     assertTrue(queryService.findDirectMembershipOrgUnitIds(userId).isEmpty());
-  }
-
-  /** Builds a membership row of the given kind pointing the user at the given org unit. */
-  private static OrgUnitMembership membershipRow(UUID userId, UUID orgUnitId, OrgUnitKind kind) {
-    OrgUnitMembership m = new OrgUnitMembership();
-    m.setId(new OrgUnitMembershipId(userId, orgUnitId));
-    m.setKind(kind);
-    return m;
   }
 
   /** Builds a squadron fixture with the given id and name. */
@@ -333,6 +320,26 @@ class OrgUnitMembershipQueryServiceTest {
   }
 
   @Test
+  void listOptionsForUser_keepsAMembershipOnADeactivatedUnitForTheAdminViews() {
+    UUID skId = UUID.randomUUID();
+    OrgUnitMembership row = new OrgUnitMembership();
+    row.setId(new OrgUnitMembershipId(userId, skId));
+    row.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(row));
+    SpecialCommand retired = new SpecialCommand();
+    retired.setId(skId);
+    retired.setName("Retired SK");
+    retired.setShorthand("RSK");
+    retired.setActive(false);
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(retired));
+
+    List<OrgUnitMembershipOptionDto> options = queryService.listOptionsForUser(userId);
+
+    assertEquals(1, options.size(), "the stored membership stays visible to the administration");
+    assertEquals(skId, options.getFirst().orgUnitId());
+  }
+
+  @Test
   void listPickerOptionsWithDescendants_bereichLeader_includesBereichAndDescendantsTopDown() {
     UUID bereichId = UUID.randomUUID();
     UUID staffelId = UUID.randomUUID();
@@ -340,7 +347,8 @@ class OrgUnitMembershipQueryServiceTest {
     bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
     bereichRow.setKind(OrgUnitKind.BEREICH);
     bereichRow.setRole(MembershipRole.BEREICHSLEITER);
-    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(bereichRow));
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId))
+        .thenReturn(List.of(bereichRow));
     when(orgUnitCascadeService.expandWithDescendants(any()))
         .thenReturn(new java.util.LinkedHashSet<>(List.of(bereichId, staffelId)));
     Bereich bereich = new Bereich();
@@ -370,7 +378,7 @@ class OrgUnitMembershipQueryServiceTest {
     seat.setId(new OrgUnitMembershipId(userId, bereichId));
     seat.setKind(OrgUnitKind.BEREICH);
     seat.setRole(MembershipRole.MEMBER);
-    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(seat));
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId)).thenReturn(List.of(seat));
     when(orgUnitCascadeService.expandWithDescendants(any()))
         .thenReturn(new java.util.LinkedHashSet<>(List.of(bereichId)));
     Bereich bereich = new Bereich();
@@ -396,7 +404,7 @@ class OrgUnitMembershipQueryServiceTest {
     seat.setId(new OrgUnitMembershipId(userId, olId));
     seat.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     seat.setRole(MembershipRole.OL_MEMBER);
-    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of(seat));
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId)).thenReturn(List.of(seat));
     when(orgUnitCascadeService.expandWithDescendants(any()))
         .thenReturn(new java.util.LinkedHashSet<>(List.of(olId, staffelId, skId)));
     Organisationsleitung ol = new Organisationsleitung();
@@ -424,10 +432,39 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listPickerOptionsWithDescendants_noMemberships_returnsEmptyWithoutCascade() {
-    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId)).thenReturn(List.of());
 
     assertTrue(queryService.listPickerOptionsWithDescendants(userId).isEmpty());
     verify(orgUnitCascadeService, never()).expandWithDescendants(any());
+  }
+
+  @Test
+  void listPickerOptionsWithDescendants_leavesADeactivatedUnitOut() {
+    UUID activeId = UUID.randomUUID();
+    UUID retiredId = UUID.randomUUID();
+    OrgUnitMembership activeRow = new OrgUnitMembership();
+    activeRow.setId(new OrgUnitMembershipId(userId, activeId));
+    activeRow.setKind(OrgUnitKind.SQUADRON);
+    OrgUnitMembership retiredRow = new OrgUnitMembership();
+    retiredRow.setId(new OrgUnitMembershipId(userId, retiredId));
+    retiredRow.setKind(OrgUnitKind.SPECIAL_COMMAND);
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId))
+        .thenReturn(List.of(activeRow, retiredRow));
+    when(orgUnitCascadeService.expandWithDescendants(any()))
+        .thenReturn(new java.util.LinkedHashSet<>(List.of(activeId, retiredId)));
+    Squadron active = new Squadron();
+    active.setId(activeId);
+    active.setName("Hel");
+    SpecialCommand retired = new SpecialCommand();
+    retired.setId(retiredId);
+    retired.setName("Argon");
+    retired.setActive(false);
+    when(orgUnitRepository.findAllById(any())).thenReturn(List.of(active, retired));
+
+    List<OrgUnitMembershipOptionDto> options =
+        queryService.listPickerOptionsWithDescendants(userId);
+
+    assertEquals(List.of(activeId), options.stream().map(o -> o.orgUnitId()).toList());
   }
 
   @Test
@@ -530,12 +567,8 @@ class OrgUnitMembershipQueryServiceTest {
   void listDirectMembershipOptions_includesBereichNotJustStaffelAndSk() {
     UUID squadronId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
-    OrgUnitMembership squadronRow = new OrgUnitMembership();
-    squadronRow.setId(new OrgUnitMembershipId(userId, squadronId));
-    OrgUnitMembership bereichRow = new OrgUnitMembership();
-    bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
-    when(membershipRepository.findAllByIdUserId(userId))
-        .thenReturn(List.of(squadronRow, bereichRow));
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(userId))
+        .thenReturn(Set.of(squadronId, bereichId));
     Squadron squadron = new Squadron();
     squadron.setId(squadronId);
     squadron.setName("Staffel Rot");
@@ -560,16 +593,8 @@ class OrgUnitMembershipQueryServiceTest {
     UUID bereichId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
-    OrgUnitMembership olRow = new OrgUnitMembership();
-    olRow.setId(new OrgUnitMembershipId(userId, olId));
-    OrgUnitMembership bereichRow = new OrgUnitMembership();
-    bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
-    OrgUnitMembership squadronRow = new OrgUnitMembership();
-    squadronRow.setId(new OrgUnitMembershipId(userId, squadronId));
-    OrgUnitMembership skRow = new OrgUnitMembership();
-    skRow.setId(new OrgUnitMembershipId(userId, skId));
-    when(membershipRepository.findAllByIdUserId(userId))
-        .thenReturn(List.of(olRow, bereichRow, squadronRow, skRow));
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(userId))
+        .thenReturn(Set.of(olId, bereichId, squadronId, skId));
     Organisationsleitung ol = new Organisationsleitung();
     ol.setId(olId);
     ol.setName("Organisationsleitung");
@@ -603,12 +628,8 @@ class OrgUnitMembershipQueryServiceTest {
   void findPrimaryDirectMembershipOrgUnitId_returnsTopOfKindOrder_orEmpty() {
     UUID squadronId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
-    OrgUnitMembership squadronRow = new OrgUnitMembership();
-    squadronRow.setId(new OrgUnitMembershipId(userId, squadronId));
-    OrgUnitMembership bereichRow = new OrgUnitMembership();
-    bereichRow.setId(new OrgUnitMembershipId(userId, bereichId));
-    when(membershipRepository.findAllByIdUserId(userId))
-        .thenReturn(List.of(squadronRow, bereichRow));
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(userId))
+        .thenReturn(Set.of(squadronId, bereichId));
     Squadron squadron = new Squadron();
     squadron.setId(squadronId);
     squadron.setName("Staffel Rot");
@@ -622,7 +643,7 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void findPrimaryDirectMembershipOrgUnitId_noMembership_returnsEmpty() {
-    when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
+    when(membershipRepository.findActiveOrgUnitIdsByUserId(userId)).thenReturn(Set.of());
 
     assertEquals(Optional.empty(), queryService.findPrimaryDirectMembershipOrgUnitId(userId));
   }

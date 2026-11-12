@@ -96,7 +96,10 @@ class RefineryScopeParityTest {
         },
         (wired, id) ->
             new RefineryAccessPolicy(
-                    wired.gate(), refineryOrderRepository, mock(UserAccessPolicy.class))
+                    wired.gate(),
+                    wired.authHelper(),
+                    refineryOrderRepository,
+                    mock(UserAccessPolicy.class))
                 .canSeeRefineryOrder(id));
   }
 

@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipDeltaResponse;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,7 @@ class MemberMembershipControllerTest {
 
   @Mock private UserService userService;
   @Mock private OrgUnitMembershipQueryService orgUnitMembershipQueryService;
+  @Mock private AuthHelperService authHelperService;
   @Mock private Jwt jwt;
   @InjectMocks private MemberMembershipController controller;
 
@@ -113,10 +115,19 @@ class MemberMembershipControllerTest {
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "ALPHA", "ALP", OrgUnitKind.SQUADRON, false);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
+    when(authHelperService.holdsKrtMember()).thenReturn(true);
     when(orgUnitMembershipQueryService.listPickerOptionsWithDescendants(CALLER_ID))
         .thenReturn(List.of(option));
 
     assertSame(option, controller.getMyPickableOrgUnits(jwt).getFirst());
+  }
+
+  @Test
+  void getMyPickableOrgUnits_withoutKrtMemberOffersNoUnit() {
+    when(authHelperService.holdsKrtMember()).thenReturn(false);
+
+    assertTrue(controller.getMyPickableOrgUnits(jwt).isEmpty());
+    verify(orgUnitMembershipQueryService, never()).listPickerOptionsWithDescendants(any());
   }
 
   @Test

@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
@@ -28,8 +27,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,7 +39,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -50,13 +46,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Resolves the caller's effective org-unit context for the current request: the active pin, the
+ * Resolves the caller's effective org-unit context for the current request: the honoured pin, the
  * {@link ScopePredicate} scope vectors, the caller's memberships and oversight reach, memoised per
  * request.
  *
- * <p>{@link AccessGateService} and {@link OrgUnitStampingService} build on it;
- * {@code @PreAuthorize} expressions call it as the {@code requestScopeResolver} bean. Read-only
- * transactional.
+ * <p>One pin rule holds for every surface (REQ-ORG-032): a pin counts only when it names a unit the
+ * caller may select, and any other pin counts as no pin. {@link AccessGateService} and {@link
+ * OrgUnitStampingService} build on it; {@code @PreAuthorize} expressions call it as the {@code
+ * requestScopeResolver} bean. Read-only transactional.
  */
 @Service("requestScopeResolver")
 @RequiredArgsConstructor
@@ -64,26 +61,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class RequestScopeResolver {
 
   /**
-   * HTTP request header carrying the caller's active OrgUnit pin; absent means no pin. An admin pin
-   * is honoured directly, a non-admin pin only when it matches one of the caller's memberships.
+   * HTTP request header carrying the caller's active OrgUnit pin; absent means no pin. It counts
+   * only as {@link #currentPin()} allows.
    */
   public static final String ACTIVE_ORG_UNIT_HEADER = "X-Active-Org-Unit-Id";
 
   /**
-   * Request-attribute key under which the result of {@link #readPersistentSquadronFromUser()} is
-   * cached for the duration of the current HTTP request. Stored as {@code Optional<UUID>} (never
-   * {@code null}) so the cache can distinguish "resolved to empty" from "not yet resolved".
+   * Request-memo key for {@link #currentPin()}, an {@code Optional} so "resolved to no pin" is told
+   * apart from "not yet resolved".
    */
-  private static final RequestMemo.Key<Optional<UUID>> CACHE_KEY_PERSISTENT_USER_SQUADRON_ID =
-      RequestMemo.Key.of(RequestScopeResolver.class, "persistentUserSquadronId");
+  private static final RequestMemo.Key<Optional<UUID>> CACHE_KEY_PIN =
+      RequestMemo.Key.of(RequestScopeResolver.class, "pin");
 
   /**
-   * Request-attribute key under which the result of {@link #currentSquadron()} is cached for the
-   * duration of the current HTTP request. Same distinction-via-Optional contract as {@link
-   * #CACHE_KEY_PERSISTENT_USER_SQUADRON_ID}.
+   * Request-memo key for {@link #currentOrgUnit()}, an {@code Optional} like {@link
+   * #CACHE_KEY_PIN}.
    */
-  private static final RequestMemo.Key<Optional<Squadron>> CACHE_KEY_CURRENT_SQUADRON =
-      RequestMemo.Key.of(RequestScopeResolver.class, "currentSquadron");
+  private static final RequestMemo.Key<Optional<OrgUnit>> CACHE_KEY_CURRENT_ORG_UNIT =
+      RequestMemo.Key.of(RequestScopeResolver.class, "currentOrgUnit");
 
   /**
    * Request-memo key for {@link #currentMemberOrgUnitIds()}, so the membership read happens at most
@@ -114,34 +109,77 @@ public class RequestScopeResolver {
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitRepository orgUnitRepository;
   private final OrgUnitCascadeService orgUnitCascadeService;
-  private final StaffelMembershipResolver staffelMembershipResolver;
   private final HttpServletRequest request;
 
   /**
-   * Returns the org unit that filters the current request: the pin header for an admin, the
-   * persistent home Staffel for everyone else. Memoised per request.
+   * Returns the active-context pin of the current request when the caller may select its unit
+   * (REQ-ORG-032): an existing active org unit for an admin, a unit of {@link
+   * #currentMemberOrgUnitIds()} for everyone else. A stale, foreign, unknown or malformed pin is
+   * empty, and every surface then behaves as without a pin. Outside an HTTP request, as for
+   * background work run as a caller, there is no pin, so such work meets the same gates unpinned
+   * (ADR-0236 §6). Memoised per request.
    *
-   * @return the active org-unit id; empty means "all squadrons" for an admin and "no access"
-   *     otherwise.
+   * @return the honoured pin, or empty when the request carries none that counts
    */
   @NotNull
-  public Optional<UUID> currentSquadronId() {
-    if (authHelper.isAdmin()) {
-      return readActiveSquadronFromHeader();
-    }
-    return readPersistentSquadronFromUser();
+  public Optional<UUID> currentPin() {
+    return RequestMemo.get(request, CACHE_KEY_PIN, this::resolvePin);
   }
 
   /**
-   * Plan-aligned alias for {@link #currentSquadronId()}. R2.d will start migrating call sites to
-   * the org-unit-named API; the existing {@code currentSquadronId()} method stays so the
-   * compatibility shim keeps working without translation.
+   * The uncached resolution behind {@link #currentPin()}.
    *
-   * @return the active org-unit id, or empty when no filter applies.
+   * @return the honoured pin, or empty
    */
   @NotNull
-  public Optional<UUID> currentOrgUnitId() {
-    return currentSquadronId();
+  private Optional<UUID> resolvePin() {
+    if (!RequestMemo.readable(request)) {
+      return Optional.empty();
+    }
+    Optional<UUID> raw = parseHeaderUuid(request.getHeader(ACTIVE_ORG_UNIT_HEADER));
+    return raw.isPresent() && authHelper.isAuthenticated() && isSelectable(raw.get())
+        ? raw
+        : Optional.empty();
+  }
+
+  /**
+   * Whether the caller may select the org unit as their active context: an admin every active unit,
+   * everyone else the active units of their reach ({@link #currentMemberOrgUnitIds()}), which the
+   * switcher lists.
+   *
+   * @param orgUnitId the org unit; never {@code null}
+   * @return {@code true} iff a pin on the unit is honoured for the caller
+   */
+  public boolean isSelectable(@NotNull UUID orgUnitId) {
+    return (authHelper.isAdmin() || currentMemberOrgUnitIds().contains(orgUnitId))
+        && orgUnitRepository.existsByIdAndActiveTrue(orgUnitId);
+  }
+
+  /**
+   * Returns what the active context of the current request covers (REQ-ORG-024): the honoured pin;
+   * else for an admin every unit; else the caller's only unit, or all of their units when they
+   * reach several, or none.
+   *
+   * @return the effective context; never {@code null}
+   */
+  @NotNull
+  public ActiveOrgUnitContext currentActiveContext() {
+    if (!authHelper.isAuthenticated()) {
+      return ActiveOrgUnitContext.NONE;
+    }
+    Optional<UUID> pin = currentPin();
+    if (pin.isPresent()) {
+      return ActiveOrgUnitContext.orgUnit(pin.get());
+    }
+    if (authHelper.isAdmin()) {
+      return ActiveOrgUnitContext.ALL_ORG_UNITS;
+    }
+    Set<UUID> reach = currentMemberOrgUnitIds();
+    return switch (reach.size()) {
+      case 0 -> ActiveOrgUnitContext.NONE;
+      case 1 -> ActiveOrgUnitContext.orgUnit(reach.iterator().next());
+      default -> ActiveOrgUnitContext.ALL_MY_ORG_UNITS;
+    };
   }
 
   /**
@@ -149,8 +187,9 @@ public class RequestScopeResolver {
    *
    * <ul>
    *   <li>Admin without pin: {@code adminAllScope=true}.
-   *   <li>Admin with pin: {@code activeOrgUnitId} set, own memberships ignored.
-   *   <li>Non-admin: {@code memberOrgUnitIds} is the union of their memberships and cascaded reach.
+   *   <li>Pinned caller: {@code activeOrgUnitId} set to the honoured pin, nothing else.
+   *   <li>Non-admin without pin: {@code memberOrgUnitIds} is the union of their memberships and
+   *       cascaded reach.
    * </ul>
    *
    * @return a never-null scope vector describing what the current request should see.
@@ -164,25 +203,20 @@ public class RequestScopeResolver {
           "No scope for an unauthenticated caller — every scoped read requires a login"
               + " (REQ-SEC-052). Reaching this means an endpoint lost its gate.");
     }
-    if (authHelper.isAdmin()) {
-      Optional<UUID> active = readActiveSquadronFromHeader();
-      return active
-          .map(id -> new ScopePredicate(false, id, Set.of()))
-          .orElseGet(() -> new ScopePredicate(true, null, Set.of()));
+    Optional<UUID> pin = currentPin();
+    if (pin.isPresent()) {
+      return new ScopePredicate(false, pin.get(), Set.of());
     }
-    Set<UUID> memberOrgUnitIds = currentMemberOrgUnitIds();
-    Optional<UUID> pinned = readActiveSquadronFromHeader();
-    if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
-      return new ScopePredicate(false, pinned.get(), Set.of());
-    }
-    return new ScopePredicate(false, null, memberOrgUnitIds);
+    return authHelper.isAdmin()
+        ? new ScopePredicate(true, null, Set.of())
+        : new ScopePredicate(false, null, currentMemberOrgUnitIds());
   }
 
   /**
-   * The {@link #currentScopePredicate()} widened by the caller's grant of {@code roleName}: a
-   * non-admin's scope also covers the units their Logistician or Mission Manager grant reaches,
-   * cascade included (decision 18, REQ-SEC-005). A pin applies when it lies in the widened set.
-   * Admins and callers without a grant get exactly {@link #currentScopePredicate()}.
+   * The {@link #currentScopePredicate()} widened by the caller's grant of {@code roleName}: an
+   * unpinned non-admin's scope also covers the units their Logistician or Mission Manager grant
+   * reaches, cascade included (decision 18, REQ-SEC-005). A pinned caller and an admin get exactly
+   * {@link #currentScopePredicate()}.
    *
    * @param roleName the contextual role of the surface, {@link Roles#LOGISTICIAN} or {@link
    *     Roles#MISSION_MANAGER}; never {@code null}
@@ -191,7 +225,7 @@ public class RequestScopeResolver {
   @NotNull
   public ScopePredicate currentScopePredicateGranting(@NotNull String roleName) {
     ScopePredicate base = currentScopePredicate();
-    if (base.adminAllScope() || authHelper.isAdmin()) {
+    if (base.adminAllScope() || base.activeOrgUnitId() != null || authHelper.isAdmin()) {
       return base;
     }
     Set<UUID> granted = currentGrantedOrgUnitIds(roleName);
@@ -200,10 +234,6 @@ public class RequestScopeResolver {
     }
     Set<UUID> reach = new LinkedHashSet<>(currentMemberOrgUnitIds());
     reach.addAll(granted);
-    Optional<UUID> pinned = readActiveSquadronFromHeader();
-    if (pinned.isPresent() && reach.contains(pinned.get())) {
-      return new ScopePredicate(false, pinned.get(), Set.of());
-    }
     return new ScopePredicate(false, null, reach);
   }
 
@@ -228,47 +258,11 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Resolves the Staffel scope set for the user-list, search and typeahead queries (REQ-ORG-017).
-   *
-   * <ul>
-   *   <li>admin without a pin: {@code null};
-   *   <li>any caller with a pin: the pinned id;
-   *   <li>non-admin without a pin: their own Staffel ids, or {@code null} when they have none.
-   * </ul>
-   *
-   * @return a non-empty squadron id set to filter on, or {@code null} for no filter.
-   */
-  @Nullable
-  public Set<UUID> currentUserListScopeSquadronIds() {
-    if (authHelper.isAdmin()) {
-      Optional<UUID> pin = readActiveSquadronFromHeader();
-      return pin.<Set<UUID>>map(Set::of).orElse(null);
-    }
-    Optional<UUID> callerId = authHelper.currentUserId();
-    if (callerId.isEmpty()) {
-      return null;
-    }
-    List<OrgUnitMembership> rows =
-        orgUnitMembershipRepository.findAllByIdUserIdAndKind(callerId.get(), OrgUnitKind.SQUADRON);
-    if (rows.isEmpty()) {
-      return null;
-    }
-    Optional<UUID> pinned = readActiveSquadronFromHeader();
-    if (pinned.isPresent()
-        && rows.stream().anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
-      return Set.of(pinned.get());
-    }
-    Set<UUID> ids = new LinkedHashSet<>();
-    for (OrgUnitMembership m : rows) {
-      ids.add(m.getId().getOrgUnitId());
-    }
-    return ids;
-  }
-
-  /**
    * Resolves every OrgUnit the non-admin caller reaches: direct memberships plus the leadership
    * cascade of {@link OrgUnitCascadeService#expandWithDescendants(java.util.Collection)}
-   * (REQ-ORG-015). Always a concrete id set, never an admin grant; empty for anonymous callers.
+   * (REQ-ORG-015). A membership confers reach only while the caller holds {@code KRT Member}
+   * (ADR-0300, REQ-SEC-015), and only on an active unit (REQ-ORG-032); without {@code KRT Member}
+   * the set is empty. Always a concrete id set, never an admin grant; empty for anonymous callers.
    * Memoised per request.
    *
    * @return the OrgUnit ids the caller is a member of or leads by cascade, never {@code null}.
@@ -278,14 +272,18 @@ public class RequestScopeResolver {
     return RequestMemo.get(
         request,
         CACHE_KEY_MEMBER_ORG_UNIT_IDS,
-        () -> orgUnitCascadeService.expandWithDescendants(currentCallerMemberships()));
+        () ->
+            authHelper.holdsKrtMember()
+                ? orgUnitCascadeService.expandWithDescendants(currentCallerMemberships())
+                : Set.of());
   }
 
   /**
-   * Returns the caller's {@code org_unit_membership} rows, memoised per request (REQ-DATA-003);
-   * empty for an anonymous caller.
+   * Returns the caller's {@code org_unit_membership} rows on active org units, memoised per request
+   * (REQ-DATA-003): a membership on a deactivated unit confers nothing until the unit is
+   * reactivated (REQ-ORG-032). Empty for an anonymous caller.
    *
-   * @return the caller's membership rows, never {@code null}.
+   * @return the caller's membership rows on active units, never {@code null}.
    */
   @NotNull
   private List<OrgUnitMembership> currentCallerMemberships() {
@@ -295,23 +293,40 @@ public class RequestScopeResolver {
         () ->
             authHelper
                 .currentUserId()
-                .map(orgUnitMembershipRepository::findAllByIdUserId)
+                .map(orgUnitMembershipRepository::findAllOnActiveOrgUnitsByIdUserId)
                 .orElseGet(List::of));
   }
 
   /**
-   * Returns the org units the caller is a direct member of, without the leadership cascade; the
-   * "own placed orders" key of the requester-side job-order access (REQ-ORDERS-023).
+   * Returns the active org units the caller is a direct member of, without the leadership cascade,
+   * while the caller holds {@code KRT Member} (ADR-0300, REQ-ORG-032); the "own placed orders" key
+   * of the requester-side job-order access (REQ-ORDERS-023).
    *
-   * @return the caller's direct-membership org-unit ids, never {@code null}.
+   * @return the caller's direct-membership org-unit ids, empty without {@code KRT Member}; never
+   *     {@code null}.
    */
   @NotNull
   public Set<UUID> currentDirectMembershipOrgUnitIds() {
+    if (!authHelper.holdsKrtMember()) {
+      return Set.of();
+    }
     Set<UUID> ids = new LinkedHashSet<>();
     for (OrgUnitMembership m : currentCallerMemberships()) {
       ids.add(m.getId().getOrgUnitId());
     }
     return ids;
+  }
+
+  /**
+   * {@link #currentDirectMembershipOrgUnitIds()} inside the active context ({@link
+   * #narrowToPin(Set)}): the pinned unit when the caller is a direct member of it, nothing when
+   * they are not, all direct memberships when no unit is pinned (REQ-ORDERS-023, REQ-ORG-032).
+   *
+   * @return the caller's direct-membership org-unit ids in the active context, never {@code null}
+   */
+  @NotNull
+  public Set<UUID> currentDirectMembershipOrgUnitIdsInActiveContext() {
+    return narrowToPin(currentDirectMembershipOrgUnitIds());
   }
 
   /**
@@ -368,12 +383,8 @@ public class RequestScopeResolver {
     if (authHelper.isAdmin()) {
       return true;
     }
-    return holdsKrtMember()
+    return authHelper.holdsKrtMember()
         && currentCallerMemberships().stream().anyMatch(RequestScopeResolver::isOversightSeat);
-  }
-
-  private boolean holdsKrtMember() {
-    return authHelper.hasReachableRole(Roles.authority(Roles.KRT_MEMBER));
   }
 
   /**
@@ -387,7 +398,8 @@ public class RequestScopeResolver {
    *       OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}.
    * </ul>
    *
-   * <p>A pin applies only when it names one of these units. An empty set means no rows.
+   * <p>A pin narrows the scope to exactly the pinned unit when the caller oversees it, and to
+   * nothing when they do not (REQ-ORG-032). An empty set means no rows.
    *
    * @return a never-null cascading scope vector of the org units whose data the caller may oversee.
    */
@@ -397,11 +409,12 @@ public class RequestScopeResolver {
       return currentScopePredicate();
     }
     Set<UUID> oversightOrgUnitIds = currentOversightOrgUnitIds();
-    Optional<UUID> pinned = readActiveSquadronFromHeader();
-    if (pinned.isPresent() && oversightOrgUnitIds.contains(pinned.get())) {
-      return new ScopePredicate(false, pinned.get(), Set.of());
-    }
-    return new ScopePredicate(false, null, oversightOrgUnitIds);
+    return currentPin()
+        .map(pin ->
+            oversightOrgUnitIds.contains(pin)
+                ? new ScopePredicate(false, pin, Set.of())
+                : new ScopePredicate(false, null, Set.of()))
+        .orElseGet(() -> new ScopePredicate(false, null, oversightOrgUnitIds));
   }
 
   /**
@@ -412,7 +425,7 @@ public class RequestScopeResolver {
    */
   @NotNull
   private Set<UUID> currentOversightOrgUnitIds() {
-    return holdsKrtMember()
+    return authHelper.holdsKrtMember()
         ? orgUnitCascadeService.officerReach(currentCallerMemberships())
         : Set.of();
   }
@@ -431,41 +444,37 @@ public class RequestScopeResolver {
         request,
         CACHE_KEY_OFFICER_ORG_UNIT_IDS,
         () ->
-            holdsKrtMember()
+            authHelper.holdsKrtMember()
                 ? Collections.unmodifiableSet(
                     orgUnitCascadeService.officerReach(currentCallerMemberships()))
                 : Set.of());
   }
 
   /**
-   * Narrows a set of reached org units to the active-context pin: unchanged when nothing is pinned,
-   * empty when the pin is not among them, otherwise the pinned unit plus the units the caller's
-   * seat on it reaches through the cascade (a Bereich or OL pin covers the units below it).
+   * Whether the org unit lies in the active context (REQ-ORG-032): always without an honoured pin,
+   * otherwise only the pinned unit itself, a Bereich or Organisationsleitung pin included. Narrows
+   * a write gate that decides from ranks alone, for admins as for everyone else; it never grants.
+   *
+   * @param orgUnitId the org unit a write targets; never {@code null}
+   * @return {@code true} iff no unit is pinned or the pinned unit is {@code orgUnitId}
+   */
+  public boolean isInActiveContext(@NotNull UUID orgUnitId) {
+    return currentPin().map(orgUnitId::equals).orElse(true);
+  }
+
+  /**
+   * Narrows a set of reached org units to the active context (REQ-ORG-032): unchanged when nothing
+   * is pinned, exactly the pinned unit when it is among them, and empty when it is not. A Bereich
+   * or Organisationsleitung pin is that unit alone, not the units below it.
    *
    * @param reach the org units the caller reaches; never {@code null}
    * @return the reached units the pin leaves; never {@code null}
    */
   @NotNull
   public Set<UUID> narrowToPin(@NotNull Set<UUID> reach) {
-    Optional<UUID> pin = readActiveSquadronFromHeader();
-    if (pin.isEmpty()) {
-      return reach;
-    }
-    UUID pinned = pin.get();
-    if (!reach.contains(pinned)) {
-      return Set.of();
-    }
-    List<OrgUnitMembership> seatsOnPin =
-        currentCallerMemberships().stream()
-            .filter(m -> m.getId().getOrgUnitId().equals(pinned))
-            .toList();
-    Set<UUID> narrowed = new LinkedHashSet<>();
-    narrowed.add(pinned);
-    if (!seatsOnPin.isEmpty()) {
-      narrowed.addAll(orgUnitCascadeService.cascadedOfficerReach(seatsOnPin));
-    }
-    narrowed.retainAll(reach);
-    return narrowed;
+    return currentPin()
+        .<Set<UUID>>map(pin -> reach.contains(pin) ? Set.of(pin) : Set.of())
+        .orElse(reach);
   }
 
   /**
@@ -476,14 +485,7 @@ public class RequestScopeResolver {
    * @return {@code true} iff the caller is an admin or holds reach in the active context
    */
   public boolean canActAsOfficerInActiveContext() {
-    if (authHelper.isAdmin()) {
-      return true;
-    }
-    Set<UUID> reach = currentOfficerOrgUnitIds();
-    if (reach.isEmpty()) {
-      return false;
-    }
-    return readActiveSquadronFromHeader().map(reach::contains).orElse(true);
+    return authHelper.isAdmin() || !narrowToPin(currentOfficerOrgUnitIds()).isEmpty();
   }
 
   /**
@@ -517,40 +519,28 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@link #currentGrantedOrgUnitIds(String)} inside the active context: the pinned unit when it
-   * lies in the granted set, nothing when it does not, the whole set when no unit is pinned.
+   * {@link #currentGrantedOrgUnitIds(String)} inside the active context ({@link
+   * #narrowToPin(Set)}): the pinned unit when it lies in the granted set, nothing when it does not,
+   * the whole set when no unit is pinned.
    *
    * @param roleName the contextual role; never {@code null}
    * @return the org-unit ids the caller's grants cover in the active context; never {@code null}
    */
   @NotNull
   public Set<UUID> currentGrantedOrgUnitIdsInActiveContext(@NotNull String roleName) {
-    Set<UUID> grants = currentGrantedOrgUnitIds(roleName);
-    return readActiveSquadronFromHeader()
-        .<Set<UUID>>map(pin -> grants.contains(pin) ? Set.of(pin) : Set.of())
-        .orElse(grants);
+    return narrowToPin(currentGrantedOrgUnitIds(roleName));
   }
 
   /**
-   * Returns the org units in which the caller holds a Mission Manager grant, own or seat-derived,
-   * including the cascade ({@link #currentGrantedOrgUnitIds(String)}).
+   * Whether the caller holds a Mission Manager grant in an Organisationsleitung or Bereich unit
+   * inside the active context, which is what manages a mission without an owning unit (REQ-SEC-065,
+   * REQ-ORG-032). An admin's pass is not part of this check.
    *
-   * @return the caller's Mission Manager org-unit ids; never {@code null}, possibly empty
+   * @return {@code true} iff a leadership unit carries one of the caller's Mission Manager grants
+   *     in the active context
    */
-  @NotNull
-  public Set<UUID> currentMissionManagerOrgUnitIds() {
-    return currentGrantedOrgUnitIds(Roles.MISSION_MANAGER);
-  }
-
-  /**
-   * Whether the caller holds a Mission Manager grant in an Organisationsleitung or Bereich unit,
-   * which is what manages a mission without an owning unit (REQ-SEC-065). An admin's pass is not
-   * part of this check.
-   *
-   * @return {@code true} iff one of {@link #currentMissionManagerOrgUnitIds()} is a leadership unit
-   */
-  public boolean holdsLeadershipMissionManagerGrant() {
-    Set<UUID> grants = currentMissionManagerOrgUnitIds();
+  public boolean holdsLeadershipMissionManagerGrantInActiveContext() {
+    Set<UUID> grants = currentGrantedOrgUnitIdsInActiveContext(Roles.MISSION_MANAGER);
     return !grants.isEmpty() && !orgUnitRepository.findLeadershipOrgUnitIdsAmong(grants).isEmpty();
   }
 
@@ -578,85 +568,58 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Whether the caller holds an {@code OL_MEMBER} seat. Pure membership check without an admin
+   * Whether the caller holds an {@code OL_MEMBER} seat that confers anything, which it does only
+   * while the caller holds {@code KRT Member} (REQ-SEC-015). Pure membership check without an admin
    * short-circuit (REQ-BANK-037).
    *
-   * @return {@code true} iff the caller has at least one {@code OL_MEMBER} membership.
+   * @return {@code true} iff the caller holds {@code KRT Member} and an {@code OL_MEMBER} seat.
    */
   public boolean currentUserIsOlMember() {
-    return currentCallerMemberships().stream()
-        .anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER);
+    return authHelper.holdsKrtMember()
+        && currentCallerMemberships().stream()
+            .anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER);
   }
 
   /**
-   * Whether the caller holds exactly the given {@link MembershipRole} on the given org unit. Pure
-   * membership check without an admin short-circuit.
+   * Whether the caller holds exactly the given {@link MembershipRole} on the given org unit as a
+   * seat that confers anything, which it does only while the caller holds {@code KRT Member}
+   * (REQ-SEC-015). Pure membership check without an admin short-circuit.
    *
    * @param orgUnitId the org unit to check; never {@code null}
    * @param role the membership role to match; never {@code null}
-   * @return {@code true} iff the caller has a membership on that unit carrying that role
+   * @return {@code true} iff the caller holds {@code KRT Member} and a membership on that unit
+   *     carrying that role
    */
   public boolean currentUserHoldsRoleOnOrgUnit(
       @NotNull UUID orgUnitId, @NotNull MembershipRole role) {
-    return currentCallerMemberships().stream()
-        .anyMatch(m -> m.getId().getOrgUnitId().equals(orgUnitId) && m.getRole() == role);
+    return authHelper.holdsKrtMember()
+        && currentCallerMemberships().stream()
+            .anyMatch(m -> m.getId().getOrgUnitId().equals(orgUnitId) && m.getRole() == role);
   }
 
   /**
-   * Whether the caller holds any membership on the given org unit, including a rank-less {@code
-   * MEMBER} seat.
+   * Loads the one org unit of any kind the effective context covers ({@link
+   * #currentActiveContext()}), unproxied; empty when it covers several units or none. Memoised per
+   * request.
    *
-   * @param orgUnitId the org unit to check; never {@code null}
-   * @return {@code true} iff the caller has any membership on that unit
-   */
-  public boolean currentUserIsMemberOfOrgUnit(@NotNull UUID orgUnitId) {
-    return currentCallerMemberships().stream()
-        .anyMatch(m -> m.getId().getOrgUnitId().equals(orgUnitId));
-  }
-
-  /**
-   * Loads the {@link Squadron} matching {@link #currentSquadronId()}, memoised per request; used to
-   * stamp {@code owningSquadron} on created aggregates that have no owner of their own.
-   *
-   * @return the {@link Squadron} for the current effective context, or empty when none applies.
-   */
-  @NotNull
-  public Optional<Squadron> currentSquadron() {
-    return RequestMemo.get(request, CACHE_KEY_CURRENT_SQUADRON, this::loadCurrentSquadron);
-  }
-
-  /**
-   * The uncached load behind {@link #currentSquadron()}.
-   *
-   * @return the {@link Squadron} for the current effective context, or empty when none applies.
-   */
-  @NotNull
-  private Optional<Squadron> loadCurrentSquadron() {
-    return currentSquadronId()
-        .flatMap(orgUnitRepository::findById)
-        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
-        .filter(Squadron.class::isInstance)
-        .map(Squadron.class::cast);
-  }
-
-  /**
-   * Returns the {@link OrgUnit} matching {@link #currentOrgUnitId()}.
-   *
-   * @return the current effective {@link OrgUnit}, or empty when none applies.
+   * @return the current context's org unit, or empty
    */
   @NotNull
   public Optional<OrgUnit> currentOrgUnit() {
-    return currentSquadron().map(s -> (OrgUnit) s);
+    return RequestMemo.get(request, CACHE_KEY_CURRENT_ORG_UNIT, this::loadCurrentOrgUnit);
   }
 
   /**
-   * Reads the active-context pin from the {@link #ACTIVE_ORG_UNIT_HEADER} request header.
+   * The uncached load behind {@link #currentOrgUnit()}.
    *
-   * @return the parsed active OrgUnit id, or empty when the header is absent, blank or malformed.
+   * @return the current context's org unit, or empty
    */
   @NotNull
-  public Optional<UUID> readActiveSquadronFromHeader() {
-    return parseHeaderUuid(request.getHeader(ACTIVE_ORG_UNIT_HEADER));
+  private Optional<OrgUnit> loadCurrentOrgUnit() {
+    UUID orgUnitId = currentActiveContext().orgUnitId();
+    return orgUnitId == null
+        ? Optional.empty()
+        : orgUnitRepository.findById(orgUnitId).map(ou -> Hibernate.unproxy(ou, OrgUnit.class));
   }
 
   /**
@@ -676,44 +639,5 @@ public class RequestScopeResolver {
     } catch (IllegalArgumentException _) {
       return Optional.empty();
     }
-  }
-
-  /**
-   * Resolves the current non-admin caller's single ACTIVE Staffel id from {@code
-   * org_unit_membership} (kind=SQUADRON), memoised on the request. Honours an {@link
-   * #ACTIVE_ORG_UNIT_HEADER} pin that points at one of the caller's own Staffel memberships;
-   * otherwise falls back to the deterministic name-sorted primary owned by {@link
-   * StaffelMembershipResolver}. Empty for an anonymous / Staffel-less caller.
-   *
-   * @return the caller's active Staffel id, or empty when none applies.
-   */
-  @NotNull
-  private Optional<UUID> readPersistentSquadronFromUser() {
-    return RequestMemo.get(
-        request, CACHE_KEY_PERSISTENT_USER_SQUADRON_ID, this::resolvePersistentSquadronFromUser);
-  }
-
-  /**
-   * The uncached resolution behind {@link #readPersistentSquadronFromUser()}.
-   *
-   * @return the caller's active Staffel id, or empty when none applies.
-   */
-  @NotNull
-  private Optional<UUID> resolvePersistentSquadronFromUser() {
-    return authHelper
-        .currentUserId()
-        .flatMap(userId -> {
-          List<OrgUnitMembership> rows =
-              orgUnitMembershipRepository.findAllByIdUserIdAndKind(userId, OrgUnitKind.SQUADRON);
-          if (rows.isEmpty()) {
-            return Optional.empty();
-          }
-          Optional<UUID> pinned = readActiveSquadronFromHeader();
-          if (pinned.isPresent()
-              && rows.stream().anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
-            return pinned;
-          }
-          return staffelMembershipResolver.resolveNameSortedStaffelIds(rows).stream().findFirst();
-        });
   }
 }

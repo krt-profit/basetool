@@ -49,10 +49,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Races two concurrent first claims on one material bucket against the real Postgres container
@@ -150,6 +153,8 @@ class MaterialClaimConcurrencyTest {
         futures.add(
             pool.submit(() -> {
               SecurityContextHolder.setContext(adminContext);
+              RequestContextHolder.setRequestAttributes(
+                  new ServletRequestAttributes(new MockHttpServletRequest()));
               try {
                 ready.countDown();
                 if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
@@ -163,6 +168,7 @@ class MaterialClaimConcurrencyTest {
                 unexpectedErrors.add(t);
               } finally {
                 SecurityContextHolder.clearContext();
+                RequestContextHolder.resetRequestAttributes();
               }
             }));
       }
@@ -278,6 +284,8 @@ class MaterialClaimConcurrencyTest {
         futures.add(
             pool.submit(() -> {
               SecurityContextHolder.setContext(adminContext);
+              RequestContextHolder.setRequestAttributes(
+                  new ServletRequestAttributes(new MockHttpServletRequest()));
               try {
                 ready.countDown();
                 if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
@@ -293,6 +301,7 @@ class MaterialClaimConcurrencyTest {
                 unexpectedErrors.add(t);
               } finally {
                 SecurityContextHolder.clearContext();
+                RequestContextHolder.resetRequestAttributes();
               }
             }));
       }

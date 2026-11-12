@@ -52,7 +52,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -163,10 +162,6 @@ class JobOrderServicePriorityAndStatusTest {
               null,
               false);
         });
-
-    Squadron testSquadron = new Squadron();
-    testSquadron.setShorthand("Alpha");
-    lenient().when(requestScopeResolver.currentSquadron()).thenReturn(Optional.of(testSquadron));
   }
 
   @Nested

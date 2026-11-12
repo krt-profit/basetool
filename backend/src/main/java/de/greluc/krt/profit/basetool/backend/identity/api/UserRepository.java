@@ -26,10 +26,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -40,9 +38,9 @@ import org.springframework.stereotype.Repository;
 /**
  * Spring Data repository for {@link User}.
  *
- * <p>Squadron-scoped queries filter by SQUADRON memberships in {@code org_unit_membership} against
- * a scope set of squadron ids (REQ-ORG-017); a {@code null} set means admin "all squadrons" mode,
- * and the set is never empty.
+ * <p>The member-directory queries (listing, name search, picker references) cover every user: the
+ * directory is organisation-wide and the caller's projection decides what of a row is shown
+ * (REQ-ORG-017, REQ-SEC-007).
  */
 @Repository
 public interface UserRepository
@@ -106,30 +104,10 @@ public interface UserRepository
   List<UUID> findRejectedDecidedBefore(@Param("cutoff") Instant cutoff);
 
   /**
-   * Returns slim {@link UserReferenceDto}s for the user pickers, ordered by display name.
+   * Returns a slim {@link UserReferenceDto} of every user for the user pickers, ordered by display
+   * name.
    *
-   * <p>{@code scopeSquadronIds} restricts the result to members of those squadrons ({@code null}:
-   * all); users without a squadron are always included.
-   */
-  @Query(
-      """
-      SELECT new de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto(u.id,
-      u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
-      '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE
-      :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE
-      ms.user.id = u.id AND ms.kind =
-      de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
-      FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-      de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
-      IN :scopeSquadronIds) ORDER BY u.displayName
-      """)
-  List<UserReferenceDto> findAllReferenceScoped(
-      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
-
-  /**
-   * Unscoped variant used internally by JWT sync flows where access is always implicit. Kept for
-   * backwards compatibility — every caller-facing path should go through {@link
-   * #findAllReferenceScoped(java.util.Collection)} instead.
+   * @return every user's reference, ordered by display name
    */
   @Query(
       """
@@ -151,84 +129,25 @@ public interface UserRepository
   Set<UUID> findUserIdsByRoleCode(@Param("roleCode") String roleCode);
 
   /**
-   * Paged squadron-scoped user listing (REQ-ORG-017); users without a Staffel membership are always
-   * included. Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
-   */
-  @Query(
-      """
-      SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM
-      OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-      de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
-      FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-      de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
-      IN :scopeSquadronIds)
-      """)
-  Page<User> findAllScoped(
-      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Pageable pageable);
-
-  /**
-   * Unpaged variant of {@link #findAllScoped(java.util.Collection, Pageable)} with the same
-   * predicate.
-   */
-  @EntityGraph(attributePaths = {"roles"})
-  @Query(
-      """
-      SELECT u FROM User u WHERE :scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM
-      OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-      de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
-      FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-      de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
-      IN :scopeSquadronIds)
-      """)
-  List<User> findAllScopedList(
-      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds, Sort sort);
-
-  /**
-   * Squadron-scoped variant of {@link
-   * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String,
-   * Pageable)}. Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
-   */
-  @Query(
-      """
-      SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
-      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND (:scopeSquadronIds IS
-      NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
-      ms.kind = de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON) OR EXISTS
-      (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-      de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
-      IN :scopeSquadronIds))
-      """)
-  Page<User> searchScoped(
-      @Param("query") String query,
-      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds,
-      Pageable pageable);
-
-  /**
-   * Squadron-scoped substring search returning a plain list. Same predicate as {@link
-   * #searchScoped(String, java.util.Collection, Pageable)} without pagination.
-   */
-  @EntityGraph(attributePaths = {"roles"})
-  @Query(
-      """
-      SELECT u FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
-      LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND (:scopeSquadronIds IS
-      NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
-      ms.kind = de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON) OR EXISTS
-      (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-      de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
-      IN :scopeSquadronIds))
-      """)
-  List<User> searchScopedList(
-      @Param("query") String query,
-      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds);
-
-  /**
-   * Squadron-scoped substring search projected to {@link UserReferenceDto}, backing the user
-   * pickers; same predicate as {@link #searchScoped(String, java.util.Collection, Pageable)}
-   * without loading entities.
+   * Paged case-insensitive substring search over username or display name. Roles are batch-loaded
+   * rather than fetch-joined (REQ-DATA-003).
    *
    * @param query the LIKE-escaped substring to match against username or display name
-   * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons
+   * @param pageable page request; its sort applies to the {@code u} alias
+   * @return one page of matching users
+   */
+  @Query(
+      """
+      SELECT u FROM User u WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\'
+      OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\'
+      """)
+  Page<User> searchByName(@Param("query") String query, Pageable pageable);
+
+  /**
+   * Paged substring search projected to {@link UserReferenceDto} for the user pickers, the same
+   * match as {@link #searchByName(String, Pageable)} without loading entities.
+   *
+   * @param query the LIKE-escaped substring to match against username or display name
    * @param pageable page request; its sort applies to the {@code u} alias
    * @return one page of matching user references
    */
@@ -238,29 +157,15 @@ public interface UserRepository
           SELECT new de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto(u.id,
           u.username, u.displayName, CASE WHEN (u.displayName IS NOT NULL AND u.displayName <>
           '') THEN u.displayName ELSE u.username END, u.rank) FROM User u WHERE
-          (LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
-          LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND (:scopeSquadronIds IS
-          NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND
-          ms.kind = de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON) OR EXISTS
-          (SELECT 1 FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-          de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
-          IN :scopeSquadronIds))
+          LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\' OR
+          LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\'
           """,
       countQuery =
           """
-          SELECT COUNT(u) FROM User u WHERE (LOWER(u.username) LIKE LOWER(CONCAT('%', :query,
-          '%')) ESCAPE '\\' OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\') AND
-          (:scopeSquadronIds IS NULL OR NOT EXISTS (SELECT 1 FROM OrgUnitMembership ms WHERE
-          ms.user.id = u.id AND ms.kind =
-          de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON) OR EXISTS (SELECT 1
-          FROM OrgUnitMembership ms WHERE ms.user.id = u.id AND ms.kind =
-          de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind.SQUADRON AND ms.id.orgUnitId
-          IN :scopeSquadronIds))
+          SELECT COUNT(u) FROM User u WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :query,
+          '%')) ESCAPE '\\' OR LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%')) ESCAPE '\\'
           """)
-  Page<UserReferenceDto> searchScopedReferences(
-      @Param("query") String query,
-      @Param("scopeSquadronIds") @Nullable Collection<UUID> scopeSquadronIds,
-      Pageable pageable);
+  Page<UserReferenceDto> searchReferencesByName(@Param("query") String query, Pageable pageable);
 
   /**
    * Unscoped substring search over the active accounts (approved, present and enabled in Keycloak),
@@ -508,6 +413,18 @@ public interface UserRepository
           + " :roleCodes")
   boolean hasAnyRoleCode(
       @Param("userId") UUID userId, @Param("roleCodes") java.util.Collection<String> roleCodes);
+
+  /**
+   * Returns those of the given users who hold the role with the given stable code, in one query for
+   * the whole set (REQ-DATA-003).
+   *
+   * @param userIds the users to check; never empty
+   * @param roleCode the stable role code
+   * @return the holders among {@code userIds}; never {@code null}, possibly empty
+   */
+  @Query("SELECT u.id FROM User u JOIN u.roles r WHERE u.id IN :userIds AND r.code = :roleCode")
+  Set<UUID> findRoleHoldersAmong(
+      @Param("userIds") Collection<UUID> userIds, @Param("roleCode") String roleCode);
 
   /**
    * Bumps a user's role-set counter in one conditional statement, leaving the row {@code @Version}

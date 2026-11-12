@@ -885,7 +885,8 @@ class JobOrderServiceTest {
 
   @Test
   void getRequestedJobOrders_emptyMembership_returnsEmptyPageWithoutHittingRepo() {
-    when(requestScopeResolver.currentDirectMembershipOrgUnitIds()).thenReturn(java.util.Set.of());
+    when(requestScopeResolver.currentDirectMembershipOrgUnitIdsInActiveContext())
+        .thenReturn(java.util.Set.of());
 
     org.springframework.data.domain.Page<JobOrderDto> page =
         jobOrderQueryService.getRequestedJobOrders(
@@ -898,7 +899,7 @@ class JobOrderServiceTest {
   @Test
   void getRequestedJobOrders_nullStatuses_defaultsToAllStatuses_scopedToDirectMembership() {
     UUID requestingUnitId = UUID.randomUUID();
-    when(requestScopeResolver.currentDirectMembershipOrgUnitIds())
+    when(requestScopeResolver.currentDirectMembershipOrgUnitIdsInActiveContext())
         .thenReturn(java.util.Set.of(requestingUnitId));
     when(jobOrderRepository.findRequestedOrders(
             any(), eq(java.util.Set.of(requestingUnitId)), any()))

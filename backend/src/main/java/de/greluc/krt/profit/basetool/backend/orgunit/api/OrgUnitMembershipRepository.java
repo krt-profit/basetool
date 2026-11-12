@@ -44,6 +44,22 @@ public interface OrgUnitMembershipRepository
   List<OrgUnitMembership> findAllByIdUserId(UUID userId);
 
   /**
+   * Returns the given user's memberships on active org units: the memberships that confer reach,
+   * rights and notices (REQ-ORG-032). A membership on a deactivated unit stays stored for its
+   * reactivation and confers nothing meanwhile.
+   *
+   * @param userId the user whose memberships to list; never {@code null}.
+   * @return the user's memberships on active org units, unordered; never {@code null}, possibly
+   *     empty.
+   */
+  @Query(
+      """
+      SELECT m FROM OrgUnitMembership m WHERE m.id.userId = :userId AND m.id.orgUnitId IN
+      (SELECT o.id FROM OrgUnit o WHERE o.active = true)
+      """)
+  List<OrgUnitMembership> findAllOnActiveOrgUnitsByIdUserId(@Param("userId") UUID userId);
+
+  /**
    * Counts the org-unit memberships of the given user. Used by {@code OrgUnitMembershipService} to
    * detect the two inventory-relevant boundary transitions — gaining the first membership
    * (membershipless → member) and losing the last (member → membershipless) — so {@link
@@ -145,54 +161,76 @@ public interface OrgUnitMembershipRepository
   Set<UUID> findOrgUnitIdsByUserId(@Param("userId") UUID userId);
 
   /**
-   * Returns the ids of users who are Leads of the given org unit. Backs the notification rule
-   * engine's {@code ORG_RELATIVE_ROLE = LEAD} resolution (leads of a responsible Spezialkommando).
+   * Returns the ids of the active org units the given user belongs to, without loading membership
+   * entities: the units whose memberships confer anything (REQ-ORG-032).
+   *
+   * @param userId the user whose org units to collect; never {@code null}.
+   * @return the ids of the active org units this user is a member of; never {@code null}, possibly
+   *     empty.
+   */
+  @Query(
+      """
+      SELECT m.id.orgUnitId FROM OrgUnitMembership m WHERE m.id.userId = :userId AND
+      m.id.orgUnitId IN (SELECT o.id FROM OrgUnit o WHERE o.active = true)
+      """)
+  Set<UUID> findActiveOrgUnitIdsByUserId(@Param("userId") UUID userId);
+
+  /**
+   * Returns the ids of users who are Leads of the given org unit while it is active; a deactivated
+   * unit's seats notify nobody (REQ-ORG-032). Backs the notification rule engine's {@code
+   * ORG_RELATIVE_ROLE = LEAD} resolution (leads of a responsible Spezialkommando).
    *
    * @param orgUnitId the org unit whose leads to collect; never {@code null}
-   * @return the lead user ids; never {@code null}, possibly empty
+   * @return the lead user ids; never {@code null}, empty for a deactivated unit
    */
   @Query(
       """
       SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role =
-      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.SK_LEAD
+      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.SK_LEAD AND m.id.orgUnitId IN
+      (SELECT o.id FROM OrgUnit o WHERE o.active = true)
       """)
   Set<UUID> findLeadUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**
-   * Returns the ids of users who are Logisticians of the given org unit. Backs the notification
-   * rule engine's {@code ORG_RELATIVE_ROLE = LOGISTICIAN} resolution.
+   * Returns the ids of users who are Logisticians of the given org unit while it is active
+   * (REQ-ORG-032). Backs the notification rule engine's {@code ORG_RELATIVE_ROLE = LOGISTICIAN}
+   * resolution.
    *
    * @param orgUnitId the org unit whose logisticians to collect; never {@code null}
-   * @return the logistician user ids; never {@code null}, possibly empty
+   * @return the logistician user ids; never {@code null}, empty for a deactivated unit
    */
   @Query(
       """
       SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND
-      m.isLogistician = true
+      m.isLogistician = true AND m.id.orgUnitId IN (SELECT o.id FROM OrgUnit o WHERE o.active = true)
       """)
   Set<UUID> findLogisticianUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**
-   * Returns the ids of users who are Mission Managers of the given org unit. Backs the notification
-   * rule engine's {@code ORG_RELATIVE_ROLE = MISSION_MANAGER} resolution.
+   * Returns the ids of users who are Mission Managers of the given org unit while it is active
+   * (REQ-ORG-032). Backs the notification rule engine's {@code ORG_RELATIVE_ROLE = MISSION_MANAGER}
+   * resolution.
    *
    * @param orgUnitId the org unit whose mission managers to collect; never {@code null}
-   * @return the mission-manager user ids; never {@code null}, possibly empty
+   * @return the mission-manager user ids; never {@code null}, empty for a deactivated unit
    */
   @Query(
       """
       SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND
-      m.isMissionManager = true
+      m.isMissionManager = true AND m.id.orgUnitId IN
+      (SELECT o.id FROM OrgUnit o WHERE o.active = true)
       """)
   Set<UUID> findMissionManagerUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**
    * Returns the ids of users who hold exactly the given {@link MembershipRole} on the given org
-   * unit. Backs the org-unit bank seam's reverse resolution of a bank account's <em>responsible
-   * holder(s)</em> (REQ-BANK-034) for the notification engine — the {@code STAFFELLEITER} of a
-   * Staffel, the {@code SK_LEAD} of a Spezialkommando, the {@code BEREICHSLEITER} of a Bereich, the
-   * {@code OL_MEMBER}s of the Organisationsleitung — without a current-principal context (the
-   * after-commit notification thread has none).
+   * unit, whether the unit is active or not: the stored seats behind the org-unit bank seam's
+   * reverse resolution of a bank account's <em>responsible holder(s)</em> (REQ-BANK-034) — the
+   * {@code STAFFELLEITER} of a Staffel, the {@code SK_LEAD} of a Spezialkommando, the {@code
+   * BEREICHSLEITER} of a Bereich, the {@code OL_MEMBER}s of the Organisationsleitung — without a
+   * current-principal context (the after-commit notification thread has none). The audit of a
+   * holder change compares these; a notice leaves a deactivated unit's seats out itself
+   * (REQ-ORG-032).
    *
    * @param orgUnitId the org unit whose role holders to collect; never {@code null}
    * @param role the membership role to match; never {@code null}
@@ -208,7 +246,7 @@ public interface OrgUnitMembershipRepository
 
   /**
    * Batch variant of {@link #findUserIdsByOrgUnitAndRole(UUID, MembershipRole)}: the users holding
-   * {@code role} on any of the given org units, in one statement (REQ-DATA-003).
+   * {@code role} on any of the given org units, active or not, in one statement (REQ-DATA-003).
    *
    * @param orgUnitIds the org units to collect role holders of; never {@code null}, never empty
    * @param role the membership role to match; never {@code null}
@@ -223,39 +261,64 @@ public interface OrgUnitMembershipRepository
       @Param("orgUnitIds") Collection<UUID> orgUnitIds, @Param("role") MembershipRole role);
 
   /**
-   * Returns the users holding the given {@link MembershipRole} on any org unit — for {@code
-   * OL_MEMBER}, every member of the Organisationsleitung, the top-band KRT approver (REQ-BANK-047).
+   * The users holding {@code role} on any of the given org units that is active, in one statement:
+   * the seat holders a notice addresses, since a deactivated unit's seats notify nobody
+   * (REQ-DATA-003, REQ-ORG-032).
+   *
+   * @param orgUnitIds the org units to collect role holders of; never {@code null}, never empty
+   * @param role the membership role to match; never {@code null}
+   * @return the matching user ids, each once; never {@code null}, possibly empty
+   */
+  @Query(
+      """
+      SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId IN :orgUnitIds
+      AND m.role = :role AND m.id.orgUnitId IN (SELECT o.id FROM OrgUnit o WHERE o.active = true)
+      """)
+  Set<UUID> findUserIdsByActiveOrgUnitIdsAndRole(
+      @Param("orgUnitIds") Collection<UUID> orgUnitIds, @Param("role") MembershipRole role);
+
+  /**
+   * Returns the users holding the given {@link MembershipRole} on any active org unit — for {@code
+   * OL_MEMBER}, every member of the Organisationsleitung, the top-band KRT approver (REQ-BANK-047,
+   * REQ-ORG-032).
    *
    * @param role the membership role to match; never {@code null}
    * @return the matching user ids, each once; never {@code null}, possibly empty
    */
-  @Query("SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.role = :role")
+  @Query(
+      """
+      SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.role = :role AND m.id.orgUnitId
+      IN (SELECT o.id FROM OrgUnit o WHERE o.active = true)
+      """)
   Set<UUID> findUserIdsByRole(@Param("role") MembershipRole role);
 
   /**
-   * Returns the members who hold a leadership seat in the given org unit, that is every member
-   * whose rank is not plain {@code MEMBER} ({@link MembershipRole#confersOwnLevelOversight()}).
-   * Backs {@code UNIT_LEADERSHIP}.
+   * Returns the members who hold a leadership seat in the given org unit while it is active, that
+   * is every member whose rank is not plain {@code MEMBER} ({@link
+   * MembershipRole#confersOwnLevelOversight()}). Backs {@code UNIT_LEADERSHIP} (REQ-ORG-032).
    *
    * @param orgUnitId the org unit
-   * @return the seat holders' user ids; never {@code null}, possibly empty
+   * @return the seat holders' user ids; never {@code null}, empty for a deactivated unit
    */
   @Query(
       """
       SELECT m.id.userId FROM OrgUnitMembership m WHERE m.id.orgUnitId = :orgUnitId AND m.role <>
-      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER
+      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER AND m.id.orgUnitId IN
+      (SELECT o.id FROM OrgUnit o WHERE o.active = true)
       """)
   Set<UUID> findLeadershipUserIdsByOrgUnit(@Param("orgUnitId") UUID orgUnitId);
 
   /**
-   * Returns every member who holds a leadership seat in any org unit. Backs {@code SEAT_HOLDERS}.
+   * Returns every member who holds a leadership seat in any active org unit. Backs {@code
+   * SEAT_HOLDERS} (REQ-ORG-032).
    *
    * @return the distinct seat holders' user ids; never {@code null}, possibly empty
    */
   @Query(
       """
       SELECT DISTINCT m.id.userId FROM OrgUnitMembership m WHERE m.role <>
-      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER
+      de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER AND m.id.orgUnitId IN
+      (SELECT o.id FROM OrgUnit o WHERE o.active = true)
       """)
   Set<UUID> findAllLeadershipUserIds();
 

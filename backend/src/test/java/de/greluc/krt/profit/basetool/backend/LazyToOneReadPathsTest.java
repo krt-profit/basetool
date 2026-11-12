@@ -232,7 +232,6 @@ class LazyToOneReadPathsTest {
     endpoints.put(
         "GET /refinery-orders/{id}", s -> "/api/v1/refinery-orders/" + s.orderIds.getFirst());
     endpoints.put("GET /refinery-orders/my-orders", s -> "/api/v1/refinery-orders/my-orders");
-    endpoints.put("GET /hangar/ships", s -> "/api/v1/hangar/ships?page=0&size=50");
     endpoints.put("GET /hangar/my-ships", s -> "/api/v1/hangar/my-ships");
     endpoints.put("GET /inventory/my-inventory", s -> "/api/v1/inventory/my-inventory");
     endpoints.put("GET /inventory/all", s -> "/api/v1/inventory/all?page=0&size=50");

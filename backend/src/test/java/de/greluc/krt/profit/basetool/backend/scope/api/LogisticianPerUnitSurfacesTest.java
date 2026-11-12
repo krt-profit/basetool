@@ -150,6 +150,7 @@ class LogisticianPerUnitSurfacesTest {
       RequestScopeResolver resolver = mock(RequestScopeResolver.class);
       when(resolver.currentScopePredicate()).thenReturn(caller.scope());
       UUID pin = caller.scope().activeOrgUnitId();
+      when(resolver.currentPin()).thenReturn(Optional.ofNullable(pin));
       when(resolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(caller.grants());
       when(resolver.currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN))
           .thenReturn(
@@ -200,18 +201,27 @@ class LogisticianPerUnitSurfacesTest {
   @MethodSource("callers")
   void refineryOrdersOfAUnitNeedALogisticianGrantInThatUnit(Caller caller) {
     RefineryOrderRepository orders = mock(RefineryOrderRepository.class);
+    Chain chain = new Chain(caller);
     RefineryAccessPolicy policy =
-        new RefineryAccessPolicy(new Chain(caller).accessGateService, orders, null);
+        new RefineryAccessPolicy(chain.accessGateService, chain.authHelper, orders, null);
 
-    assertReaches(
-        caller,
-        unit -> {
-          UUID id = UUID.randomUUID();
-          RefineryOrder order = new RefineryOrder();
-          order.setOwningOrgUnit(unit(unit));
-          when(orders.findById(id)).thenReturn(Optional.of(order));
-          return policy.isLogisticianOfOrder(id);
-        });
+    assertReaches(caller, unit -> policy.isLogisticianOfOrder(orderOf(orders, unit)));
+    assertReaches(caller, unit -> policy.canEditRefineryOrder(orderOf(orders, unit)));
+  }
+
+  /**
+   * Registers a refinery order of {@code unit} that the caller does not own.
+   *
+   * @param orders the mocked repository that returns the order
+   * @param unit the order's owning unit
+   * @return the order's id
+   */
+  private static UUID orderOf(RefineryOrderRepository orders, UUID unit) {
+    UUID id = UUID.randomUUID();
+    RefineryOrder order = new RefineryOrder();
+    order.setOwningOrgUnit(unit(unit));
+    when(orders.findById(id)).thenReturn(Optional.of(order));
+    return id;
   }
 
   @ParameterizedTest
@@ -242,10 +252,11 @@ class LogisticianPerUnitSurfacesTest {
 
   @ParameterizedTest
   @MethodSource("callers")
-  void anOwnerlessRowIsReservedToAdmins(Caller caller) {
+  void anOwnerlessRowIsReservedToAdminsWithoutAPin(Caller caller) {
     AccessGateService accessGateService = new Chain(caller).accessGateService;
 
-    assertThat(accessGateService.canActAsLogisticianInOwner(null)).isEqualTo(caller.admin());
+    assertThat(accessGateService.canActAsLogisticianInOwner(null))
+        .isEqualTo(caller.admin() && caller.scope().activeOrgUnitId() == null);
   }
 
   @ParameterizedTest

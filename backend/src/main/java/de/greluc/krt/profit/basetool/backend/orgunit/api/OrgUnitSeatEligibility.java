@@ -22,16 +22,19 @@ package de.greluc.krt.profit.basetool.backend.orgunit.api;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * The eligibility rules {@link OrgUnitMembershipService} checks before it writes a seat or a
- * Staffel membership: the silo rule of REQ-ORG-017 and the {@code KRT Member} precondition of
- * REQ-SEC-015.
+ * The eligibility rules of seats and memberships: the silo rule of REQ-ORG-017 and the {@code KRT
+ * Member} precondition of REQ-SEC-015. {@link OrgUnitMembershipService} checks them before it
+ * writes a seat or a Staffel membership; every notification recipient derived from a membership
+ * passes {@link #krtMembersAmong(Collection)}.
  */
 @Component
 @RequiredArgsConstructor
@@ -71,8 +74,34 @@ public class OrgUnitSeatEligibility {
    * @throws LeadershipSeatRequiresKrtMemberException if the user does not hold {@code KRT Member}
    */
   public void requireKrtMember(@NotNull UUID userId) {
-    if (!userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER))) {
+    if (!holdsKrtMember(userId)) {
       throw new LeadershipSeatRequiresKrtMemberException();
     }
+  }
+
+  /**
+   * Whether the user holds the stored {@code KRT Member} role, without which none of their
+   * memberships confers anything (REQ-SEC-015, ADR-0373).
+   *
+   * @param userId the user to check; never {@code null}
+   * @return {@code true} iff the user holds {@code KRT Member}
+   */
+  public boolean holdsKrtMember(@NotNull UUID userId) {
+    return userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER));
+  }
+
+  /**
+   * Keeps those of the given members who hold the stored {@code KRT Member} role, the only members
+   * a seat, a membership or a Logistiker or Einsatzleiter flag confers anything on (REQ-SEC-015,
+   * ADR-0373); one query for the whole set (REQ-DATA-003).
+   *
+   * @param userIds the members to check; never {@code null}
+   * @return the {@code KRT Member} holders among them; never {@code null}, empty for no member
+   */
+  @NotNull
+  public Set<UUID> krtMembersAmong(@NotNull Collection<UUID> userIds) {
+    return userIds.isEmpty()
+        ? Set.of()
+        : userRepository.findRoleHoldersAmong(userIds, Roles.KRT_MEMBER);
   }
 }

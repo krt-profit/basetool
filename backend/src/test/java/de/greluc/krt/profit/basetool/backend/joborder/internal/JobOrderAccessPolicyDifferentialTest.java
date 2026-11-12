@@ -35,8 +35,6 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -207,6 +205,7 @@ class JobOrderAccessPolicyDifferentialTest {
       AuthHelperService authHelper = mock(AuthHelperService.class);
       when(authHelper.isAuthenticated()).thenReturn(true);
       when(authHelper.isAdmin()).thenReturn(caller.admin());
+      when(authHelper.holdsKrtMember()).thenReturn(true);
       when(authHelper.isMemberOrAbove()).thenReturn(true);
       when(authHelper.isLogisticianOrAbove()).thenReturn(caller.logistician());
       when(authHelper.currentUserId()).thenReturn(Optional.of(callerId));
@@ -220,6 +219,7 @@ class JobOrderAccessPolicyDifferentialTest {
       }
       OrgUnitMembershipRepository memberships = mock(OrgUnitMembershipRepository.class);
       when(memberships.findAllByIdUserId(callerId)).thenReturn(rows);
+      when(memberships.findAllOnActiveOrgUnitsByIdUserId(callerId)).thenReturn(rows);
       when(memberships.findAllByIdUserIdAndKind(any(), any()))
           .thenReturn(rows.stream().filter(r -> r.getKind() == OrgUnitKind.SQUADRON).toList());
 
@@ -237,6 +237,7 @@ class JobOrderAccessPolicyDifferentialTest {
             return ids;
           });
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
+      when(orgUnits.existsByIdAndActiveTrue(any())).thenReturn(true);
       when(orgUnits.countProfitEligibleByIdIn(anyCollection()))
           .thenReturn(caller.profitEligible() ? 1L : 0L);
 
@@ -274,13 +275,10 @@ class JobOrderAccessPolicyDifferentialTest {
         request.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, caller.pin().toString());
       }
       RequestScopeResolver resolver =
-          new RequestScopeResolver(
-              authHelper,
-              memberships,
-              orgUnits,
-              cascade,
-              new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
-              request);
+          new RequestScopeResolver(authHelper, memberships, orgUnits, cascade, request);
+      assertThat(resolver.currentMemberOrgUnitIds())
+          .as("the caller's memberships reach the resolver")
+          .containsAll(caller.memberships());
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
       scopeHub =
           new ScopeHubJobOrderGates(
@@ -370,7 +368,10 @@ class JobOrderAccessPolicyDifferentialTest {
 
     private boolean requester(JobOrder order) {
       var requesting = order.getRequestingOrgUnit();
-      return requesting != null && resolver.currentUserIsMemberOfOrgUnit(requesting.getId());
+      return requesting != null
+          && resolver
+              .currentDirectMembershipOrgUnitIdsInActiveContext()
+              .contains(requesting.getId());
     }
   }
 }

@@ -25,6 +25,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -76,9 +77,10 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Pins the operation module's externally visible contract: the scope and participant gates of
- * {@code /api/v1/operations/{id}/**} per caller, and the delete that detaches the linked missions
- * without touching their section counters and records {@code OPERATION_DELETED} in the same
- * transaction (REQ-AUDIT-001).
+ * {@code /api/v1/operations/{id}/**} per caller, the operation picker that lists only what the
+ * caller may edit and the mission link that needs the same right (REQ-MISSION-034), and the delete
+ * that detaches the linked missions without touching their section counters and records {@code
+ * OPERATION_DELETED} in the same transaction (REQ-AUDIT-001).
  */
 @SpringBootTest
 @Transactional
@@ -253,7 +255,8 @@ class OperationModuleContractTest {
   }
 
   @Test
-  void theScopedListAndThePerRowGateAdmitTheSameOperations() throws Exception {
+  void theReadGateKeepsBothEscapesButThePickerListsOnlyTheOperationsTheCallerMayEdit()
+      throws Exception {
     User caller = user("op-list-member", home);
     Operation own = operation(home);
     Operation foreignOnly = operation(foreign);
@@ -266,37 +269,68 @@ class OperationModuleContractTest {
     entityManager.flush();
     Set<UUID> created =
         Set.of(own.getId(), foreignOnly.getId(), foreignJoined.getId(), ownerless.getId());
+    RequestPostProcessor member = as(caller, "ROLE_KRT_MEMBER");
+    RequestPostProcessor homeManager =
+        jwt()
+            .jwt(builder -> builder.subject(caller.getId().toString()))
+            .authorities(
+                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                new OrgUnitContextualAuthority("MISSION_MANAGER", home.getId()));
 
-    String body =
-        mockMvc
-            .perform(get(OPERATIONS + "lookup").with(as(caller, "ROLE_KRT_MEMBER")))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-    Set<UUID> listed = new HashSet<>();
-    for (JsonNode node : objectMapper.readTree(body)) {
-      UUID id = UUID.fromString(node.get("id").asString());
-      if (created.contains(id)) {
-        listed.add(id);
-      }
-    }
     Set<UUID> admitted = new HashSet<>();
     for (UUID id : created) {
       int status =
-          mockMvc
-              .perform(get(OPERATIONS + id).with(as(caller, "ROLE_KRT_MEMBER")))
-              .andReturn()
-              .getResponse()
-              .getStatus();
+          mockMvc.perform(get(OPERATIONS + id).with(member)).andReturn().getResponse().getStatus();
       if (status == HttpStatus.OK.value()) {
         admitted.add(id);
       }
     }
 
-    assertThat(listed).isEqualTo(admitted);
     assertThat(admitted)
         .containsExactlyInAnyOrder(own.getId(), foreignJoined.getId(), ownerless.getId());
+    assertThat(pickerOf(member, created)).isEmpty();
+    assertThat(pickerOf(homeManager, created)).containsExactly(own.getId());
+  }
+
+  @Test
+  void aMissionManagerOfTheOwningUnitLinksAMissionButAParticipantWhoReadsTheOperationMayNot()
+      throws Exception {
+    User manager = user("op-link-manager", home);
+    User participant = user("op-link-participant", foreign);
+    Operation operation = operation(home);
+    MissionParticipant row = new MissionParticipant();
+    row.setMission(mission(operation));
+    row.setUser(participant);
+    missionParticipantRepository.save(row);
+    entityManager.flush();
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    RequestPostProcessor homeManager =
+        jwt()
+            .jwt(builder -> builder.subject(manager.getId().toString()))
+            .authorities(
+                new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                new OrgUnitContextualAuthority("MISSION_MANAGER", home.getId()));
+
+    mockMvc
+        .perform(createMission("Linked " + tag, operation).with(homeManager))
+        .andExpect(status().isOk());
+    entityManager.flush();
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT operation_id FROM mission WHERE name = ?", UUID.class, "Linked " + tag))
+        .isEqualTo(operation.getId());
+
+    mockMvc
+        .perform(get(OPERATIONS + operation.getId()).with(as(participant, "ROLE_KRT_MEMBER")))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(
+            createMission("Refused " + tag, operation).with(as(participant, "ROLE_KRT_MEMBER")))
+        .andExpect(status().isForbidden());
+    assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM mission WHERE name = ?", Long.class, "Refused " + tag))
+        .isZero();
   }
 
   @Test
@@ -308,6 +342,24 @@ class OperationModuleContractTest {
             withoutTransaction.executeWithoutResult(
                 _ -> missionCommands.detachFromOperation(UUID.randomUUID())))
         .isInstanceOf(IllegalTransactionStateException.class);
+  }
+
+  private Set<UUID> pickerOf(RequestPostProcessor caller, Set<UUID> created) throws Exception {
+    String body =
+        mockMvc
+            .perform(get(OPERATIONS + "lookup").with(caller))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    Set<UUID> listed = new HashSet<>();
+    for (JsonNode node : objectMapper.readTree(body)) {
+      UUID id = UUID.fromString(node.get("id").asString());
+      if (created.contains(id)) {
+        listed.add(id);
+      }
+    }
+    return listed;
   }
 
   private Map<String, Object> counters(UUID missionId) {
@@ -322,6 +374,12 @@ class OperationModuleContractTest {
         OPERATIONS + id + "/finances",
         OPERATIONS + id + "/finance-summary",
         OPERATIONS + id + "/payouts");
+  }
+
+  private static MockHttpServletRequestBuilder createMission(String name, Operation operation) {
+    return post("/api/v1/missions")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"name\":\"" + name + "\",\"operationId\":\"" + operation.getId() + "\"}");
   }
 
   private static MockHttpServletRequestBuilder update(Operation operation) {

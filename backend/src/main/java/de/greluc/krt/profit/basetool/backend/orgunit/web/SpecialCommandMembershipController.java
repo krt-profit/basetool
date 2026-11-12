@@ -46,13 +46,31 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST surface for membership management on a single Spezialkommando.
  *
- * <p>Member-list mutations require {@code canManageMembers} (ADMIN or Lead of this SK); the Lead
- * toggle requires ADMIN or the parent Bereichsleiter, so a Lead cannot appoint Leads.
+ * <p>The list and the add require {@code canManageMembers} (ADMIN or Lead of this SK); a row's
+ * flags and its removal require {@code canManageMember}, which keeps a non-admin Lead off their own
+ * row and off a Lead's row; the Lead toggle requires ADMIN or the parent Bereichsleiter, so a Lead
+ * cannot appoint Leads. Every endpoint acts only on an SK inside the active context (REQ-ORG-032).
  */
 @RestController
 @RequestMapping("/api/v1/special-commands/{id}/members")
 @RequiredArgsConstructor
 public class SpecialCommandMembershipController {
+
+  /**
+   * Gate of the SK read, the roster list and the add: an admin or the SK's lead, for an SK inside
+   * the active context (REQ-ORG-005, REQ-ORG-032).
+   */
+  public static final String ROSTER_ACCESS =
+      "@specialCommandSecurityService.canManageMembers(#id, authentication)"
+          + " and @requestScopeResolver.isInActiveContext(#id)";
+
+  /**
+   * Gate of a roster row's flags and its removal: an admin, or the SK's lead for another member's
+   * row that holds no lead seat, for an SK inside the active context (REQ-ROLE-004, REQ-ORG-032).
+   */
+  private static final String ROSTER_ROW_ACCESS =
+      "@specialCommandSecurityService.canManageMember(#id, #userId, authentication)"
+          + " and @requestScopeResolver.isInActiveContext(#id)";
 
   private final OrgUnitMembershipService membershipService;
   private final OrgUnitMembershipQueryService membershipQueryService;
@@ -66,7 +84,7 @@ public class SpecialCommandMembershipController {
    * @return the membership list; possibly empty if no member has been added yet.
    */
   @GetMapping
-  @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")
+  @PreAuthorize(ROSTER_ACCESS)
   @Operation(
       summary = "List Spezialkommando members",
       description = "Returns every membership row of the given Spezialkommando.")
@@ -76,7 +94,8 @@ public class SpecialCommandMembershipController {
         responseCode = "403",
         description =
             "Caller is neither ADMIN nor Lead of this Spezialkommando — see"
-                + " SpecialCommandSecurityService.canManageMembers."),
+                + " SpecialCommandSecurityService.canManageMembers — or the Spezialkommando lies"
+                + " outside the active context."),
     @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
   })
   public List<OrgUnitMembershipDto> listMembers(@PathVariable @NotNull UUID id) {
@@ -91,7 +110,7 @@ public class SpecialCommandMembershipController {
    * @return the persisted membership DTO with role flags defaulted to {@code false}.
    */
   @PostMapping("/{userId}")
-  @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")
+  @PreAuthorize(ROSTER_ACCESS)
   @Operation(
       summary = "Add a member to a Spezialkommando",
       description =
@@ -101,7 +120,9 @@ public class SpecialCommandMembershipController {
     @ApiResponse(responseCode = "200", description = "Member added."),
     @ApiResponse(
         responseCode = "403",
-        description = "Caller is neither ADMIN nor Lead of this Spezialkommando."),
+        description =
+            "Caller is neither ADMIN nor Lead of this Spezialkommando, or the Spezialkommando"
+                + " lies outside the active context."),
     @ApiResponse(
         responseCode = "404",
         description = "No Spezialkommando matches the given id, or the user does not exist."),
@@ -113,21 +134,27 @@ public class SpecialCommandMembershipController {
   }
 
   /**
-   * Removes the given user from the given Spezialkommando. ADMIN or Lead-of-this-SK only.
+   * Removes the given user from the given Spezialkommando: ADMIN any row, the Lead of this SK only
+   * another member's row that holds no lead seat.
    *
    * @param id Spezialkommando id.
    * @param userId user to remove.
    */
   @DeleteMapping("/{userId}")
-  @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")
+  @PreAuthorize(ROSTER_ROW_ACCESS)
   @Operation(
       summary = "Remove a member from a Spezialkommando",
-      description = "Removes the given user's membership row. ADMIN or Lead-of-this-SK only.")
+      description =
+          "Removes the given user's membership row. ADMIN, or the Lead of this SK for another"
+              + " member's row that holds no lead seat.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Member removed."),
     @ApiResponse(
         responseCode = "403",
-        description = "Caller is neither ADMIN nor Lead of this Spezialkommando."),
+        description =
+            "Caller is neither ADMIN nor Lead of this Spezialkommando, a non-admin targets their"
+                + " own row or a Lead's row, or the Spezialkommando lies outside the active"
+                + " context."),
     @ApiResponse(
         responseCode = "404",
         description =
@@ -138,8 +165,9 @@ public class SpecialCommandMembershipController {
   }
 
   /**
-   * Flips the per-membership Logistician / Mission Manager flags. ADMIN or Lead-of-this-SK only.
-   * Each flag is independent; clients send only the fields they want to change.
+   * Flips the per-membership Logistician / Mission Manager flags: ADMIN on any row, the Lead of
+   * this SK only on another member's row that holds no lead seat. Each flag is independent; clients
+   * send only the fields they want to change.
    *
    * @param id Spezialkommando id.
    * @param userId user whose membership to patch.
@@ -147,19 +175,22 @@ public class SpecialCommandMembershipController {
    * @return the persisted membership DTO with the bumped version.
    */
   @PatchMapping("/{userId}")
-  @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")
+  @PreAuthorize(ROSTER_ROW_ACCESS)
   @Operation(
       summary = "Patch per-membership role flags",
       description =
-          "Flips is_logistician and / or is_mission_manager on the membership row. ADMIN or"
-              + " Lead-of-this-SK only. is_lead is NOT patchable through this endpoint — see the"
-              + " dedicated /lead endpoint.")
+          "Flips is_logistician and / or is_mission_manager on the membership row. ADMIN, or the"
+              + " Lead of this SK for another member's row that holds no lead seat. is_lead is NOT"
+              + " patchable through this endpoint — see the dedicated /lead endpoint.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Flags patched."),
     @ApiResponse(responseCode = "400", description = "Validation error on the inbound payload."),
     @ApiResponse(
         responseCode = "403",
-        description = "Caller is neither ADMIN nor Lead of this Spezialkommando."),
+        description =
+            "Caller is neither ADMIN nor Lead of this Spezialkommando, a non-admin targets their"
+                + " own row or a Lead's row, or the Spezialkommando lies outside the active"
+                + " context."),
     @ApiResponse(
         responseCode = "404",
         description =
@@ -177,7 +208,8 @@ public class SpecialCommandMembershipController {
 
   /**
    * Toggles the {@code is_lead} flag on a membership row. Allowed for an admin or the
-   * Bereichsleiter of the SK's parent Bereich, never for an SK Lead (REQ-ROLE-004).
+   * Bereichsleiter of the SK's parent Bereich, never for an SK Lead (REQ-ROLE-004), and only for an
+   * SK inside the active context (REQ-ORG-032).
    *
    * @param id Spezialkommando id.
    * @param userId user whose membership to update.
@@ -186,10 +218,11 @@ public class SpecialCommandMembershipController {
    */
   @PatchMapping("/{userId}/lead")
   @PreAuthorize(
-      "hasRole('"
+      "(hasRole('"
           + Roles.ADMIN
           + "') or (@orgRoleManagementSecurityService.canAppointSkLead(#id, authentication) and"
-          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication))")
+          + " @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication)))"
+          + " and @requestScopeResolver.isInActiveContext(#id)")
   @Operation(
       summary = "Toggle the SK-Lead flag on a membership",
       description =
@@ -201,7 +234,9 @@ public class SpecialCommandMembershipController {
     @ApiResponse(responseCode = "400", description = "Validation error on the inbound payload."),
     @ApiResponse(
         responseCode = "403",
-        description = "Caller is neither admin nor the Bereichsleiter of the SK's parent Bereich."),
+        description =
+            "Caller is neither admin nor the Bereichsleiter of the SK's parent Bereich, or the"
+                + " Spezialkommando lies outside the active context."),
     @ApiResponse(
         responseCode = "404",
         description =

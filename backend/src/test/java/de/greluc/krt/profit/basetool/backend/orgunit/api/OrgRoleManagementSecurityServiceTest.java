@@ -45,8 +45,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Unit tests for {@link OrgRoleManagementSecurityService} (REQ-ROLE-004): the strictly-higher-tier
- * rule, parent-Bereich scoping from the persisted edge, and that {@code isAdmin()} is never
- * consulted.
+ * rule, parent-Bereich scoping from the persisted edge, that a seat counts only while the caller
+ * holds {@code KRT Member} (REQ-SEC-015), and that {@code isAdmin()} is never consulted.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgRoleManagementSecurityServiceTest {
@@ -101,8 +101,32 @@ class OrgRoleManagementSecurityServiceTest {
   }
 
   private void callerIs(UUID orgUnitId, MembershipRole role) {
+    callerHolds(List.of(membership(callerId, orgUnitId, role)));
+  }
+
+  /**
+   * Makes the caller a {@code KRT Member} holding exactly the given membership rows.
+   *
+   * @param memberships the caller's membership rows
+   */
+  private void callerHolds(List<OrgUnitMembership> memberships) {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId))
+    when(authHelperService.holdsKrtMember()).thenReturn(true);
+    when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(callerId)).thenReturn(memberships);
+  }
+
+  /**
+   * Gives the caller the seat but no {@code KRT Member}, so the seat must confer nothing; the rows
+   * are stubbed leniently because a verdict must not read them.
+   *
+   * @param orgUnitId the unit of the retained seat
+   * @param role the rank of the retained seat
+   */
+  private void callerKeepsSeatWithoutKrtMember(UUID orgUnitId, MembershipRole role) {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    when(authHelperService.holdsKrtMember()).thenReturn(false);
+    lenient()
+        .when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(callerId))
         .thenReturn(List.of(membership(callerId, orgUnitId, role)));
   }
 
@@ -123,8 +147,7 @@ class OrgRoleManagementSecurityServiceTest {
     UUID bereichId = UUID.randomUUID();
     when(orgUnitRepository.findById(squadronId))
         .thenReturn(Optional.of(squadronUnder(squadronId, bereich(bereichId))));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
+    callerIs(squadronId, MembershipRole.STAFFELLEITER);
 
     assertFalse(service.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, authed));
   }
@@ -140,8 +163,7 @@ class OrgRoleManagementSecurityServiceTest {
   @Test
   void kommandoleiter_appointedByForeignStaffelleiter_denied() {
     UUID squadronId = UUID.randomUUID();
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
+    callerIs(UUID.randomUUID(), MembershipRole.STAFFELLEITER);
 
     assertFalse(service.canAssignSquadronRank(squadronId, MembershipRole.KOMMANDOLEITER, authed));
   }
@@ -175,19 +197,50 @@ class OrgRoleManagementSecurityServiceTest {
   void bereichsleiter_appointedByPureOlMember_allowed() {
     UUID bereichId = UUID.randomUUID();
     UUID olId = UUID.randomUUID();
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId))
-        .thenReturn(List.of(membership(callerId, olId, MembershipRole.OL_MEMBER)));
+    when(orgUnitRepository.existsByIdAndActiveTrue(bereichId)).thenReturn(true);
+    callerIs(olId, MembershipRole.OL_MEMBER);
 
     assertTrue(service.canAppointBereichRole(bereichId, BereichLeadershipRole.LEITER, authed));
   }
 
   @Test
+  void anOlMemberAppointsAndRemovesNoBereichsleiterOfADeactivatedBereich() {
+    UUID bereichId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, bereichId)))
+        .thenReturn(Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSLEITER)));
+    when(orgUnitRepository.existsByIdAndActiveTrue(bereichId)).thenReturn(false);
+    callerIs(UUID.randomUUID(), MembershipRole.OL_MEMBER);
+
+    assertFalse(service.canAppointBereichRole(bereichId, BereichLeadershipRole.LEITER, authed));
+    assertFalse(service.canRemoveBereichRole(bereichId, targetUser, authed));
+  }
+
+  @Test
+  void aParentBereichsleiterAppointsNothingInADeactivatedChild() {
+    UUID squadronId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    UUID bereichId = UUID.randomUUID();
+    Squadron retiredStaffel = squadronUnder(squadronId, bereich(bereichId));
+    retiredStaffel.setActive(false);
+    SpecialCommand retiredSk = skUnder(skId, bereich(bereichId));
+    retiredSk.setActive(false);
+    when(orgUnitRepository.findById(squadronId)).thenReturn(Optional.of(retiredStaffel));
+    when(orgUnitRepository.findById(skId)).thenReturn(Optional.of(retiredSk));
+    lenient().when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
+    lenient().when(authHelperService.holdsKrtMember()).thenReturn(true);
+    lenient()
+        .when(membershipRepository.findAllOnActiveOrgUnitsByIdUserId(callerId))
+        .thenReturn(List.of(membership(callerId, bereichId, MembershipRole.BEREICHSLEITER)));
+
+    assertFalse(service.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, authed));
+    assertFalse(service.canAppointSkLead(skId, authed));
+  }
+
+  @Test
   void bereichsleiter_cannotBeAppointedByABereichsleiter_noSelfPromotion() {
     UUID bereichId = UUID.randomUUID();
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId))
-        .thenReturn(List.of(membership(callerId, bereichId, MembershipRole.BEREICHSLEITER)));
+    callerIs(bereichId, MembershipRole.BEREICHSLEITER);
 
     assertFalse(service.canAppointBereichRole(bereichId, BereichLeadershipRole.LEITER, authed));
   }
@@ -203,8 +256,7 @@ class OrgRoleManagementSecurityServiceTest {
   @Test
   void koordinator_appointedByForeignBereichsleiter_denied() {
     UUID bereichId = UUID.randomUUID();
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
+    callerIs(UUID.randomUUID(), MembershipRole.BEREICHSLEITER);
 
     assertFalse(service.canAppointBereichRole(bereichId, BereichLeadershipRole.OPERATOR, authed));
   }
@@ -226,8 +278,7 @@ class OrgRoleManagementSecurityServiceTest {
     UUID bereichId = UUID.randomUUID();
     when(orgUnitRepository.findById(skId))
         .thenReturn(Optional.of(skUnder(skId, bereich(bereichId))));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
+    callerIs(UUID.randomUUID(), MembershipRole.BEREICHSLEITER);
 
     assertFalse(service.canAppointSkLead(skId, authed));
   }
@@ -251,15 +302,65 @@ class OrgRoleManagementSecurityServiceTest {
   }
 
   @Test
+  void staffelleiterWithoutKrtMember_assignsNoRankAndManagesNoKommandoGroup() {
+    UUID squadronId = UUID.randomUUID();
+    UUID groupId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    when(kommandoGroupRepository.findById(groupId))
+        .thenReturn(Optional.of(kommandoGroupOf(squadronId)));
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, squadronId)))
+        .thenReturn(Optional.of(membership(targetUser, squadronId, MembershipRole.ENSIGN)));
+    callerKeepsSeatWithoutKrtMember(squadronId, MembershipRole.STAFFELLEITER);
+
+    assertFalse(service.canAssignSquadronRank(squadronId, MembershipRole.KOMMANDOLEITER, authed));
+    assertFalse(service.canRemoveSquadronRank(squadronId, targetUser, authed));
+    assertFalse(service.canManageKommandoGroups(squadronId, authed));
+    assertFalse(service.canManageKommandoGroup(groupId, authed));
+  }
+
+  @Test
+  void bereichsleiterWithoutKrtMember_appointsNobodyBelowTheBereich() {
+    UUID bereichId = UUID.randomUUID();
+    UUID squadronId = UUID.randomUUID();
+    UUID skId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    when(orgUnitRepository.findById(squadronId))
+        .thenReturn(Optional.of(squadronUnder(squadronId, bereich(bereichId))));
+    when(orgUnitRepository.findById(skId))
+        .thenReturn(Optional.of(skUnder(skId, bereich(bereichId))));
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, bereichId)))
+        .thenReturn(
+            Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSKOORDINATOR)));
+    callerKeepsSeatWithoutKrtMember(bereichId, MembershipRole.BEREICHSLEITER);
+
+    assertFalse(service.canAssignSquadronRank(squadronId, MembershipRole.STAFFELLEITER, authed));
+    assertFalse(service.canAppointSkLead(skId, authed));
+    assertFalse(
+        service.canAppointBereichRole(bereichId, BereichLeadershipRole.KOORDINATOR, authed));
+    assertFalse(service.canRemoveBereichRole(bereichId, targetUser, authed));
+  }
+
+  @Test
+  void olMemberWithoutKrtMember_appointsAndRemovesNoBereichsleiter() {
+    UUID bereichId = UUID.randomUUID();
+    UUID targetUser = UUID.randomUUID();
+    when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, bereichId)))
+        .thenReturn(Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSLEITER)));
+    callerKeepsSeatWithoutKrtMember(UUID.randomUUID(), MembershipRole.OL_MEMBER);
+
+    assertFalse(service.canAppointBereichRole(bereichId, BereichLeadershipRole.LEITER, authed));
+    assertFalse(service.canRemoveBereichRole(bereichId, targetUser, authed));
+  }
+
+  @Test
   void removeBereichRole_bereichsleiterRemovableByPureOlMember_allowed() {
     UUID bereichId = UUID.randomUUID();
     UUID targetUser = UUID.randomUUID();
     UUID olId = UUID.randomUUID();
     when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, bereichId)))
         .thenReturn(Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSLEITER)));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId))
-        .thenReturn(List.of(membership(callerId, olId, MembershipRole.OL_MEMBER)));
+    when(orgUnitRepository.existsByIdAndActiveTrue(bereichId)).thenReturn(true);
+    callerIs(olId, MembershipRole.OL_MEMBER);
 
     assertTrue(service.canRemoveBereichRole(bereichId, targetUser, authed));
   }
@@ -283,8 +384,7 @@ class OrgRoleManagementSecurityServiceTest {
     when(membershipRepository.findById(new OrgUnitMembershipId(targetUser, bereichId)))
         .thenReturn(
             Optional.of(membership(targetUser, bereichId, MembershipRole.BEREICHSOPERATOR)));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
+    callerIs(UUID.randomUUID(), MembershipRole.BEREICHSLEITER);
 
     assertFalse(service.canRemoveBereichRole(bereichId, targetUser, authed));
   }
@@ -306,8 +406,7 @@ class OrgRoleManagementSecurityServiceTest {
     UUID squadronId = UUID.randomUUID();
     when(kommandoGroupRepository.findById(groupId))
         .thenReturn(Optional.of(kommandoGroupOf(squadronId)));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
+    callerIs(UUID.randomUUID(), MembershipRole.STAFFELLEITER);
 
     assertFalse(service.canManageKommandoGroup(groupId, authed));
   }
@@ -343,8 +442,7 @@ class OrgRoleManagementSecurityServiceTest {
         .thenReturn(Optional.of(membership(targetUser, squadronId, MembershipRole.STAFFELLEITER)));
     when(orgUnitRepository.findById(squadronId))
         .thenReturn(Optional.of(squadronUnder(squadronId, bereich(bereichId))));
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
-    when(membershipRepository.findAllByIdUserId(callerId)).thenReturn(List.of());
+    callerIs(squadronId, MembershipRole.STAFFELLEITER);
 
     assertFalse(service.canRemoveSquadronRank(squadronId, targetUser, authed));
   }
@@ -366,7 +464,7 @@ class OrgRoleManagementSecurityServiceTest {
       RequestContextHolder.resetRequestAttributes();
     }
 
-    verify(membershipRepository, times(1)).findAllByIdUserId(callerId);
+    verify(membershipRepository, times(1)).findAllOnActiveOrgUnitsByIdUserId(callerId);
   }
 
   @Test

@@ -41,14 +41,17 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <ul>
  *   <li>A Bereichsleitung membership ({@link MembershipRole#isAreaRank()}) reaches the Bereich and
- *       its direct children.
- *   <li>An Organisationsleitung membership ({@link MembershipRole#OL_MEMBER}) reaches every org
- *       unit.
+ *       its active direct children.
+ *   <li>An Organisationsleitung membership ({@link MembershipRole#OL_MEMBER}) reaches every active
+ *       org unit.
  *   <li>Every other membership reaches only its own org unit.
  * </ul>
  *
- * <p>The reach is always a concrete set of ids, never an admin-all marker, so the cascade never
- * grants admin rights. Results are memoised per request in a {@link RequestMemo}.
+ * <p>Callers pass the memberships that confer anything, those on active units ({@link
+ * OrgUnitMembershipRepository#findAllOnActiveOrgUnitsByIdUserId(java.util.UUID)}), so a deactivated
+ * unit is reached neither directly nor by a cascade (REQ-ORG-032). The reach is always a concrete
+ * set of ids, never an admin-all marker, so the cascade never grants admin rights. Results are
+ * memoised per request in a {@link RequestMemo}.
  */
 @Service
 @RequiredArgsConstructor
@@ -117,8 +120,9 @@ public class OrgUnitCascadeService {
    * which the JWT converter mints contextual {@code LOGISTICIAN@<id>} / {@code
    * MISSION_MANAGER@<id>} authorities.
    *
-   * <p>An OL membership yields every org-unit id; a Bereich leadership membership yields the
-   * Bereich and its direct children; no leadership yields the empty set. Memoised per request.
+   * <p>An OL membership yields every active org-unit id; a Bereich leadership membership yields the
+   * Bereich and its active direct children; no leadership yields the empty set (REQ-ORG-032).
+   * Memoised per request.
    *
    * @param memberships the caller's membership rows; never {@code null}.
    * @return the cascaded officer-equivalent reach; never {@code null}, possibly empty,
@@ -151,14 +155,14 @@ public class OrgUnitCascadeService {
       @NotNull Collection<OrgUnitMembership> memberships) {
     boolean olReach = memberships.stream().anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER);
     if (olReach) {
-      return new LinkedHashSet<>(orgUnitRepository.findAllOrgUnitIds());
+      return new LinkedHashSet<>(orgUnitRepository.findAllActiveOrgUnitIds());
     }
     Set<UUID> reach = new LinkedHashSet<>();
     for (OrgUnitMembership m : memberships) {
       if (m.getRole().isAreaRank()) {
         UUID bereichId = m.getId().getOrgUnitId();
         reach.add(bereichId);
-        reach.addAll(orgUnitRepository.findChildOrgUnitIds(bereichId));
+        reach.addAll(orgUnitRepository.findActiveChildOrgUnitIds(bereichId));
       }
     }
     return reach;
@@ -166,9 +170,10 @@ public class OrgUnitCascadeService {
 
   /**
    * Resolves the org units a role grant held in {@code grantUnitIds} reaches below those units: a
-   * grant in the Organisationsleitung reaches every org unit, a grant in a Bereich the Staffeln and
-   * Spezialkommandos below it, a grant in any other unit nothing further (REQ-SEC-005). The units
-   * in {@code grantUnitIds} themselves are not part of the result. Memoised per request.
+   * grant in the Organisationsleitung reaches every active org unit, a grant in a Bereich the
+   * active Staffeln and Spezialkommandos below it, a grant in any other unit nothing further
+   * (REQ-SEC-005, REQ-ORG-032). The units in {@code grantUnitIds} themselves are not part of the
+   * result. Memoised per request.
    *
    * <p>The one resolution behind every per-unit Logistician and Mission Manager gate and list
    * scope, for the request's principal and for the exchange's acting member alike.
@@ -221,9 +226,9 @@ public class OrgUnitCascadeService {
   @NotNull
   private Set<UUID> computeUnitsBelow(@NotNull Set<UUID> grantUnitIds) {
     if (!orgUnitRepository.findOrganisationsleitungIdsAmong(grantUnitIds).isEmpty()) {
-      return new LinkedHashSet<>(orgUnitRepository.findAllOrgUnitIds());
+      return new LinkedHashSet<>(orgUnitRepository.findAllActiveOrgUnitIds());
     }
-    return new LinkedHashSet<>(orgUnitRepository.findChildOrgUnitIdsIn(grantUnitIds));
+    return new LinkedHashSet<>(orgUnitRepository.findActiveChildOrgUnitIdsIn(grantUnitIds));
   }
 
   /**

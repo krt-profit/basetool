@@ -21,9 +21,7 @@ package de.greluc.krt.profit.basetool.backend;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
@@ -194,30 +192,5 @@ class MissionUnitCrewTest {
     org.junit.jupiter.api.Assertions.assertEquals(1, updatedUnit.getCrew().size());
     org.junit.jupiter.api.Assertions.assertEquals(
         "Guest Pilot", updatedUnit.getCrew().iterator().next().getParticipant().getGuestName());
-  }
-
-  @Test
-  void testGetAllShips_Officer_Allowed() throws Exception {
-    mockMvc
-        .perform(
-            get("/api/v1/hangar/ships")
-                .with(
-                    jwt()
-                        .jwt(builder -> builder.subject(officerUser.getId().toString()))
-                        .authorities(
-                            new SimpleGrantedAuthority("ROLE_OFFICER"),
-                            new OrgUnitContextualAuthority("MISSION_MANAGER", Squadron.IRIDIUM_ID),
-                            new SimpleGrantedAuthority("USER_MANAGE"),
-                            new SimpleGrantedAuthority("MISSION_MANAGE"),
-                            new SimpleGrantedAuthority("HANGAR_MANAGE"),
-                            new SimpleGrantedAuthority("REFINERY_MANAGE"),
-                            new SimpleGrantedAuthority("HANGAR_READ"))))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content[?(@.name == 'Test Ship Crew')]").exists());
-  }
-
-  @Test
-  void testGetAllShips_Member_Forbidden() throws Exception {
-    mockMvc.perform(get("/api/v1/hangar/ships")).andExpect(status().isForbidden());
   }
 }

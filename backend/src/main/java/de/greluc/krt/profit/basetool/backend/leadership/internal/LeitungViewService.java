@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.leadership.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.BereichLeadershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroup;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.KommandoGroupDto;
@@ -42,8 +41,10 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -59,10 +60,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Visibility follows the caller's leadership ranks — a Staffel or SK rank shows its own unit, an
  * area rank its Bereich with the Bereich's Staffeln and SKs, an OL membership every unit — so a
- * plain member receives empty lists. A pin narrows the view to the pinned unit and the units its
- * seat reaches, and to nothing when the pin is outside the caller's units. The capability flags
- * alone decide what may be changed; appointments are written through separate, individually
- * authorized endpoints.
+ * plain member receives empty lists. A pin narrows the view, an admin's included, to exactly the
+ * pinned unit, and to nothing when the pin is outside the caller's units (REQ-ORG-032). The
+ * capability flags alone decide what may be changed; appointments are written through separate,
+ * individually authorized endpoints.
  */
 @Service
 @RequiredArgsConstructor
@@ -82,7 +83,8 @@ public class LeitungViewService {
   /**
    * Builds the caller's Leitung view: the OL(s), Bereiche, Staffeln and Spezialkommandos they lead
    * or that lie below a unit they lead, each with the capability flags of the delegated verdicts.
-   * An admin sees every unit; tier lists are empty for a caller without a leadership rank.
+   * An admin sees every unit, or the pinned one; tier lists are empty for a caller without a
+   * leadership rank.
    *
    * @param authentication the current authentication, forwarded to the delegated verdicts; never
    *     {@code null}.
@@ -92,8 +94,7 @@ public class LeitungViewService {
   public LeitungViewDto buildView(@NotNull Authentication authentication) {
     boolean admin = authHelperService.isAdmin();
     UUID callerId = authHelperService.currentUserId().orElse(null);
-    Set<UUID> visible =
-        admin ? Set.of() : requestScopeResolver.narrowToPin(visibleOrgUnitIds(callerId));
+    Predicate<UUID> shown = shownUnits(admin, callerId);
 
     List<OrgUnit> leadership = sortedByName(orgUnitRepository.findActiveOrganisationsleitung());
     List<OrgUnit> areas = sortedByName(orgUnitRepository.findActiveBereiche());
@@ -101,14 +102,14 @@ public class LeitungViewService {
     List<UUID> visibleIds =
         Stream.of(leadership, areas, units)
             .flatMap(List::stream)
-            .filter(unit -> admin || visible.contains(unit.getId()))
             .map(OrgUnit::getId)
+            .filter(shown)
             .toList();
     List<UUID> squadronIds =
         units.stream()
-            .filter(unit ->
-                unit.getKind() == OrgUnitKind.SQUADRON && (admin || visible.contains(unit.getId())))
+            .filter(unit -> unit.getKind() == OrgUnitKind.SQUADRON)
             .map(OrgUnit::getId)
+            .filter(shown)
             .toList();
     Map<UUID, List<OrgUnitMembership>> memberships =
         visibleIds.isEmpty()
@@ -123,14 +124,14 @@ public class LeitungViewService {
 
     List<LeitungUnitDto> ols = new ArrayList<>();
     for (OrgUnit ol : leadership) {
-      if (admin || visible.contains(ol.getId())) {
+      if (shown.test(ol.getId())) {
         ols.add(unit(ol, admin, false, callerId, memberships, groups));
       }
     }
 
     List<LeitungUnitDto> bereiche = new ArrayList<>();
     for (OrgUnit bereich : areas) {
-      if (!admin && !visible.contains(bereich.getId())) {
+      if (!shown.test(bereich.getId())) {
         continue;
       }
       boolean canAppointLead =
@@ -147,7 +148,7 @@ public class LeitungViewService {
     List<LeitungUnitDto> squadrons = new ArrayList<>();
     List<LeitungUnitDto> specialCommands = new ArrayList<>();
     for (OrgUnit unit : units) {
-      if (!admin && !visible.contains(unit.getId())) {
+      if (!shown.test(unit.getId())) {
         continue;
       }
       if (unit.getKind() == OrgUnitKind.SQUADRON) {
@@ -172,21 +173,37 @@ public class LeitungViewService {
   }
 
   /**
-   * The org units a non-admin caller leads: every unit they hold a leadership rank on, plus the
-   * cascade of an area rank (the Bereich's Staffeln and SKs) or an OL membership (every unit); none
-   * unless the caller holds {@code KRT Member} (REQ-SEC-015).
+   * The units the view shows inside the active context (REQ-ORG-032): for an admin every unit, or
+   * only the pinned one; for anyone else the units they lead, narrowed to the pin.
+   *
+   * @param admin whether the caller is an admin
+   * @param callerId the caller's account id, or {@code null} for an unidentifiable caller
+   * @return the test whether a unit is shown; never {@code null}
+   */
+  @NotNull
+  private Predicate<UUID> shownUnits(boolean admin, @Nullable UUID callerId) {
+    Optional<UUID> pin = requestScopeResolver.currentPin();
+    if (admin) {
+      return pin.<Predicate<UUID>>map(pinned -> pinned::equals).orElse(_ -> true);
+    }
+    return requestScopeResolver.narrowToPin(visibleOrgUnitIds(callerId))::contains;
+  }
+
+  /**
+   * The org units a non-admin caller leads: every active unit they hold a leadership rank on, plus
+   * the cascade of an area rank (the Bereich's active Staffeln and SKs) or an OL membership (every
+   * active unit); none unless the caller holds {@code KRT Member} (REQ-SEC-015, REQ-ORG-032).
    *
    * @param callerId the caller's account id, or {@code null} for an unidentifiable caller.
    * @return the visible org-unit ids; empty for a caller without a leadership rank.
    */
   @NotNull
   private Set<UUID> visibleOrgUnitIds(@Nullable UUID callerId) {
-    if (callerId == null
-        || !authHelperService.hasReachableRole(Roles.authority(Roles.KRT_MEMBER))) {
+    if (callerId == null || !authHelperService.holdsKrtMember()) {
       return Set.of();
     }
     List<OrgUnitMembership> leaderships =
-        membershipRepository.findAllByIdUserId(callerId).stream()
+        membershipRepository.findAllOnActiveOrgUnitsByIdUserId(callerId).stream()
             .filter(m -> m.getRole() != null && m.getRole().confersOwnLevelOversight())
             .toList();
     Set<UUID> visible = new HashSet<>(cascadeService.cascadedOfficerReach(leaderships));

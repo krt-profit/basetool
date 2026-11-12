@@ -24,7 +24,6 @@ import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandDto;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandMapper;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandSecurityService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
@@ -114,8 +113,9 @@ public class SpecialCommandController {
   /**
    * Returns a single Spezialkommando by id, active or not, for the SK member-management page.
    *
-   * <p>Gated by {@link SpecialCommandSecurityService#canManageMembers}: an admin reads any SK, a
-   * non-admin only an SK where they hold {@code SK_LEAD}.
+   * <p>Gated like the roster ({@link SpecialCommandMembershipController#ROSTER_ACCESS}): an admin
+   * reads any SK, a non-admin only an SK where they hold {@code SK_LEAD}, and only an SK inside the
+   * active context.
    *
    * @param id Spezialkommando id.
    * @return the matching DTO.
@@ -123,7 +123,7 @@ public class SpecialCommandController {
    *     caller is an admin.
    */
   @GetMapping("/{id}")
-  @PreAuthorize("@specialCommandSecurityService.canManageMembers(#id, authentication)")
+  @PreAuthorize(SpecialCommandMembershipController.ROSTER_ACCESS)
   @Operation(
       summary = "Get a Spezialkommando by id",
       description =
@@ -135,7 +135,8 @@ public class SpecialCommandController {
         responseCode = "403",
         description =
             "Caller is neither ADMIN nor Lead of this Spezialkommando — see"
-                + " SpecialCommandSecurityService.canManageMembers."),
+                + " SpecialCommandSecurityService.canManageMembers — or the Spezialkommando lies"
+                + " outside the active context."),
     @ApiResponse(responseCode = "404", description = "No Spezialkommando matches the given id.")
   })
   public SpecialCommandDto getSpecialCommand(@PathVariable @NotNull UUID id) {

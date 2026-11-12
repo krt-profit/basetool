@@ -98,7 +98,8 @@ class SupplyStatsServiceTest {
   void aManagerSeesOnlyTheirOwnUnitsAndNoDonorList() {
     when(accessPolicy.canReadStats()).thenReturn(true);
     when(accessPolicy.isGoverningLeadership()).thenReturn(false);
-    when(accessPolicy.managedUnitIds()).thenReturn(Set.of(mine.getId()));
+    when(accessPolicy.managedUnits())
+        .thenReturn(new SupplyManagedUnits(false, Set.of(mine.getId())));
     when(orgUnitRepository.findAll()).thenReturn(List.of(mine, other));
     when(donationRepository.amountsByUnitMonthAndEntry(any(), any(), any()))
         .thenReturn(
@@ -129,7 +130,7 @@ class SupplyStatsServiceTest {
     donor.setId(UUID.randomUUID());
     donor.setDisplayName("Zed");
     when(accessPolicy.isGoverningLeadership()).thenReturn(true);
-    when(accessPolicy.managedUnitIds()).thenReturn(Set.of());
+    when(accessPolicy.managedUnits()).thenReturn(new SupplyManagedUnits(false, Set.of()));
     when(orgUnitRepository.findAll()).thenReturn(List.of(mine, other));
     when(donationRepository.amountsByUnitMonthAndEntry(any(), any(), any())).thenReturn(List.of());
     when(donationRepository.statsByUnitAndMonth(any(), any(), any()))
@@ -150,7 +151,7 @@ class SupplyStatsServiceTest {
   void theSpanIsClampedToAtLeastOneAndAtMostThirtySixMonths() {
     when(accessPolicy.canReadStats()).thenReturn(true);
     when(accessPolicy.isGoverningLeadership()).thenReturn(true);
-    when(accessPolicy.managedUnitIds()).thenReturn(Set.of());
+    when(accessPolicy.managedUnits()).thenReturn(new SupplyManagedUnits(false, Set.of()));
     when(orgUnitRepository.findAll()).thenReturn(List.of());
     when(donationRepository.amountsByUnitMonthAndEntry(any(), any(), any())).thenReturn(List.of());
     when(donationRepository.statsByUnitAndMonth(any(), any(), any())).thenReturn(List.of());

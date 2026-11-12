@@ -56,20 +56,28 @@ final class BankAccessJudgement {
   private final BereichRepository bereichRepository;
   private final OrgUnitRepository orgUnitRepository;
 
-  /** Whether the actor reaches {@code ADMIN}, who views every account. */
+  /**
+   * Whether the actor reaches {@code ADMIN}, who views and configures every account but the
+   * org-unit and Bereich accounts outside the pin (REQ-ORG-032).
+   */
   private final boolean admin;
 
   /**
-   * Whether the actor's seats confer anything: only while the actor holds {@code KRT Member}
-   * (REQ-SEC-015); a retained seat then grants no oversight, holder, approver or tier right.
+   * Whether the actor's memberships confer anything: only while the actor holds {@code KRT Member}
+   * (REQ-SEC-015); a retained seat or plain membership then grants no oversight, holder, approver,
+   * member-grant or tier right.
    */
-  private final boolean seatsConfer;
+  private final boolean membershipsConfer;
 
   /**
    * The org units whose accounts the actor views by oversight: the officer reach of a {@code KRT
-   * Member}, narrowed to the pin alone when the pin lies in it (REQ-BANK-021).
+   * Member}, narrowed to the pin alone when the pin lies in it and to nothing when it does not
+   * (REQ-BANK-021, REQ-ORG-032).
    */
   private final Set<UUID> viewScope;
+
+  /** The honoured active org unit, or {@code null}; an org-unit account outside it stays hidden. */
+  @Nullable private final UUID pin;
 
   /** The child org units per Bereich, read on first use. */
   private final Map<UUID, List<UUID>> childrenByBereich = new HashMap<>();
@@ -97,9 +105,10 @@ final class BankAccessJudgement {
     this.bereichRepository = bereichRepository;
     this.orgUnitRepository = orgUnitRepository;
     this.admin = staffRights.admin();
-    this.seatsConfer = seatsConfer(actor);
-    Set<UUID> oversight = seatsConfer ? actor.officerReach() : Set.of();
-    this.viewScope = pin != null && oversight.contains(pin) ? Set.of(pin) : oversight;
+    this.membershipsConfer = membershipsConfer(actor);
+    this.pin = pin;
+    Set<UUID> oversight = membershipsConfer ? actor.officerReach() : Set.of();
+    this.viewScope = pin == null ? oversight : oversight.contains(pin) ? Set.of(pin) : Set.of();
   }
 
   /**
@@ -132,11 +141,15 @@ final class BankAccessJudgement {
     addIf(rights, view, BankAccountRight.VIEW);
     addIf(rights, request, BankAccountRight.REQUEST);
     addIf(rights, holder, BankAccountRight.RESPONSIBLE_HOLDER);
-    addIf(rights, canSetTarget(account, holder), BankAccountRight.SET_TARGET);
-    addIf(rights, canConfigureVisibility(account, holder), BankAccountRight.CONFIGURE_VISIBILITY);
+    boolean inContext = inContext(account);
+    addIf(rights, canSetTarget(account, holder, inContext), BankAccountRight.SET_TARGET);
     addIf(
         rights,
-        canConfigureApprovalLimits(account, holder),
+        canConfigureVisibility(account, holder, inContext),
+        BankAccountRight.CONFIGURE_VISIBILITY);
+    addIf(
+        rights,
+        canConfigureApprovalLimits(account, holder, inContext),
         BankAccountRight.CONFIGURE_APPROVAL_LIMITS);
     UUID accountId = account.getId();
     addIf(rights, staffRights.canSee(accountId), BankAccountRight.STAFF_VIEW);
@@ -161,9 +174,11 @@ final class BankAccessJudgement {
 
   /**
    * Whether the actor views the account on the org-unit side (REQ-BANK-021, REQ-BANK-037): an
-   * administrator every account; an org-unit or Bereich account its overseers and grantees; the KRT
-   * account its overseers and every member; the cartel bank account a {@code PROFIT}
-   * Bereichsleiter; a Sonderkonto the OL, every Bereichsleiter and its grantees.
+   * org-unit or Bereich account its overseers, its grantees and an administrator, and under a pin
+   * only when the pinned unit owns it (REQ-ORG-032); the KRT account its overseers and every
+   * member; the cartel bank account a {@code PROFIT} Bereichsleiter; a Sonderkonto the OL, every
+   * Bereichsleiter and its grantees. An administrator views every account but the org-unit and
+   * Bereich accounts outside the active context ({@link #inContext(BankAccount)}).
    *
    * @param account the account
    * @param viewGrants the account's view grants, read only when needed
@@ -171,26 +186,56 @@ final class BankAccessJudgement {
    */
   boolean canView(
       @NotNull BankAccount account, @NotNull Supplier<List<BankAccountViewGrant>> viewGrants) {
-    if (admin) {
-      return true;
-    }
     UUID owner = owningOrgUnitId(account);
     return switch (account.getType()) {
       case ORG_UNIT, AREA ->
-          owner != null
-              && (viewScope.contains(owner) || matchesOrgUnitGrant(owner, viewGrants.get()));
-      case CARTEL -> (owner != null && viewScope.contains(owner)) || isMemberOrAbove();
-      case CARTEL_BANK -> isProfitBereichsleiter();
+          admin
+              ? inContext(account)
+              : owner != null
+                  && inPinnedContext(owner)
+                  && (viewScope.contains(owner) || matchesOrgUnitGrant(owner, viewGrants.get()));
+      case CARTEL -> admin || (owner != null && viewScope.contains(owner)) || isMemberOrAbove();
+      case CARTEL_BANK -> admin || isProfitBereichsleiter();
       case SPECIAL ->
-          holdsSeat(MembershipRole.OL_MEMBER)
+          admin
+              || holdsSeat(MembershipRole.OL_MEMBER)
               || holdsSeat(MembershipRole.BEREICHSLEITER)
               || matchesSpecialGrant(viewGrants.get());
     };
   }
 
   /**
-   * Whether the actor is the account's derived responsible holder (REQ-BANK-034): the Staffelleiter
-   * or SK lead of an org-unit account, the Bereichsleiter of a Bereich account, an OL member for
+   * Whether an org-unit or Bereich account of {@code owner} lies in the active context: always
+   * without a pin, otherwise only the pinned unit's own account (REQ-ORG-032).
+   *
+   * @param owner the account's owning org unit
+   * @return {@code true} iff the account is in the active context
+   */
+  private boolean inPinnedContext(@NotNull UUID owner) {
+    return pin == null || pin.equals(owner);
+  }
+
+  /**
+   * Whether the account lies in the active context (REQ-ORG-032): an org-unit or Bereich account
+   * when no unit is pinned or the pinned unit owns it, so one without an owning unit (a legacy
+   * Bereich account named only by its area) only without a pin; the KRT, cartel bank and
+   * Sonderkonto accounts always, since they belong to the whole organisation.
+   *
+   * @param account the account
+   * @return {@code true} iff the actor's org-unit-side rights may act on the account
+   */
+  boolean inContext(@NotNull BankAccount account) {
+    UUID owner = owningOrgUnitId(account);
+    return switch (account.getType()) {
+      case ORG_UNIT, AREA -> owner == null ? pin == null : inPinnedContext(owner);
+      case CARTEL, CARTEL_BANK, SPECIAL -> true;
+    };
+  }
+
+  /**
+   * Whether the actor is the account's derived responsible holder (REQ-BANK-034) in the active
+   * context: the Staffelleiter or SK lead of an org-unit account and the Bereichsleiter of a
+   * Bereich account, each only while that unit is not pinned away (REQ-ORG-032); an OL member for
    * the KRT account, a {@code PROFIT} Bereichsleiter for the cartel bank account; a Sonderkonto has
    * none.
    *
@@ -201,7 +246,7 @@ final class BankAccessJudgement {
     UUID owner = owningOrgUnitId(account);
     return switch (account.getType()) {
       case ORG_UNIT -> {
-        if (owner == null) {
+        if (owner == null || !inPinnedContext(owner)) {
           yield false;
         }
         MembershipRole holderRole =
@@ -210,7 +255,10 @@ final class BankAccessJudgement {
                 : MembershipRole.STAFFELLEITER;
         yield holdsSeatOn(owner, holderRole);
       }
-      case AREA -> owner != null && holdsSeatOn(owner, MembershipRole.BEREICHSLEITER);
+      case AREA ->
+          owner != null
+              && inPinnedContext(owner)
+              && holdsSeatOn(owner, MembershipRole.BEREICHSLEITER);
       case CARTEL -> holdsSeat(MembershipRole.OL_MEMBER);
       case CARTEL_BANK -> isProfitBereichsleiter();
       case SPECIAL -> false;
@@ -261,7 +309,7 @@ final class BankAccessJudgement {
           switch (limit.getGranteeKind()) {
             case MEMBERSHIP_ROLE -> holdsSeatOn(owner, limit.getRoleCode());
             case AREA_MEMBERS -> isMemberOfAreaCascade(owner);
-            case ALL_MEMBERS -> actor.isMemberOf(owner);
+            case ALL_MEMBERS -> isMemberOf(owner);
             case USER -> false;
           };
       if (matches) {
@@ -273,15 +321,17 @@ final class BankAccessJudgement {
 
   /**
    * Whether the actor may set the balance target from the org-unit side (REQ-BANK-036): an
-   * administrator, or the responsible holder of any account but a Sonderkonto.
+   * administrator on an account in the active context (REQ-ORG-032), or the responsible holder of
+   * any account but a Sonderkonto.
    *
    * @param account the account
    * @param holder whether the actor is its responsible holder
+   * @param inContext whether the account lies in the active context
    * @return {@code true} iff the actor may set the target
    */
-  private boolean canSetTarget(@NotNull BankAccount account, boolean holder) {
+  private boolean canSetTarget(@NotNull BankAccount account, boolean holder, boolean inContext) {
     if (admin) {
-      return true;
+      return inContext;
     }
     return switch (account.getType()) {
       case ORG_UNIT, AREA, CARTEL, CARTEL_BANK -> holder;
@@ -292,15 +342,18 @@ final class BankAccessJudgement {
   /**
    * Whether the actor may configure the view grants (REQ-BANK-035): the responsible holder of an
    * org-unit or Bereich account, an OL member or the Bankleitung for a Sonderkonto, an
-   * administrator wherever visibility is configurable.
+   * administrator wherever visibility is configurable on an account in the active context
+   * (REQ-ORG-032).
    *
    * @param account the account
    * @param holder whether the actor is its responsible holder
+   * @param inContext whether the account lies in the active context
    * @return {@code true} iff the actor may add or remove view grants
    */
-  private boolean canConfigureVisibility(@NotNull BankAccount account, boolean holder) {
+  private boolean canConfigureVisibility(
+      @NotNull BankAccount account, boolean holder, boolean inContext) {
     if (admin) {
-      return visibilityConfigurable(account.getType());
+      return inContext && visibilityConfigurable(account.getType());
     }
     return switch (account.getType()) {
       case ORG_UNIT, AREA -> holder;
@@ -311,15 +364,20 @@ final class BankAccessJudgement {
 
   /**
    * Whether the actor may set or clear approval limits (REQ-BANK-041): on an org-unit or Bereich
-   * account, its responsible holder, the Bankleitung or an administrator.
+   * account, its responsible holder, the Bankleitung under any pin, or an administrator on an
+   * account in the active context (REQ-ORG-032).
    *
    * @param account the account
    * @param holder whether the actor is its responsible holder
+   * @param inContext whether the account lies in the active context
    * @return {@code true} iff the actor may configure approval limits
    */
-  private boolean canConfigureApprovalLimits(@NotNull BankAccount account, boolean holder) {
+  private boolean canConfigureApprovalLimits(
+      @NotNull BankAccount account, boolean holder, boolean inContext) {
+    // An administrator also reaches BANK_MANAGEMENT through the role hierarchy, so the admin rule
+    // decides alone and the pin-free Bankleitung right never applies to one.
     return BankApprovalLimitService.audienceLimitsSupported(account.getType())
-        && (admin || staffRights.management() || holder);
+        && (admin ? inContext : staffRights.management() || holder);
   }
 
   /**
@@ -349,7 +407,7 @@ final class BankAccessJudgement {
       boolean match =
           switch (grant.getGranteeKind()) {
             case MEMBERSHIP_ROLE -> holdsSeatOn(owner, grant.getRoleCode());
-            case ALL_MEMBERS -> actor.isMemberOf(owner);
+            case ALL_MEMBERS -> isMemberOf(owner);
             case AREA_MEMBERS -> isMemberOfAreaCascade(owner);
             case USER -> actor.is(grant.getGranteeUserId());
           };
@@ -413,7 +471,7 @@ final class BankAccessJudgement {
    * @return {@code true} iff the actor holds the seat there as a {@code KRT Member}
    */
   private boolean holdsSeatOn(@NotNull UUID orgUnitId, @NotNull MembershipRole role) {
-    return seatsConfer && actor.holdsSeatOn(orgUnitId, role);
+    return membershipsConfer && actor.holdsSeatOn(orgUnitId, role);
   }
 
   /**
@@ -423,17 +481,29 @@ final class BankAccessJudgement {
    * @return {@code true} iff the actor holds the seat as a {@code KRT Member}
    */
   private boolean holdsSeat(@NotNull MembershipRole role) {
-    return seatsConfer && actor.holdsSeat(role);
+    return membershipsConfer && actor.holdsSeat(role);
   }
 
   /**
-   * Whether the actor's seats confer any bank right: only while the actor holds {@code KRT Member};
-   * a seat retained after losing it confers nothing (REQ-SEC-015).
+   * Whether the actor is a member of the org unit and the membership confers anything, the {@code
+   * ALL_MEMBERS} grant and tier (REQ-BANK-035, REQ-SEC-015).
+   *
+   * @param orgUnitId the org unit
+   * @return {@code true} iff the actor is a {@code KRT Member} with a membership on the unit
+   */
+  private boolean isMemberOf(@NotNull UUID orgUnitId) {
+    return membershipsConfer && actor.isMemberOf(orgUnitId);
+  }
+
+  /**
+   * Whether the actor's memberships confer any bank right, seats and plain memberships alike: only
+   * while the actor holds {@code KRT Member}; a membership retained after losing it confers nothing
+   * (REQ-SEC-015).
    *
    * @param actor the actor
-   * @return {@code true} iff the actor's seats count
+   * @return {@code true} iff the actor's memberships count
    */
-  static boolean seatsConfer(@NotNull BankActor actor) {
+  static boolean membershipsConfer(@NotNull BankActor actor) {
     return actor.holds(Roles.KRT_MEMBER);
   }
 
@@ -455,13 +525,17 @@ final class BankAccessJudgement {
   }
 
   /**
-   * Whether the actor is a member of the Bereich or of one of its child units, the {@code
-   * AREA_MEMBERS} grant and tier (REQ-BANK-048).
+   * Whether the actor is a member of the Bereich or of one of its child units and the membership
+   * confers anything, the {@code AREA_MEMBERS} grant and tier (REQ-BANK-048, REQ-SEC-015).
    *
    * @param bereichId the owning Bereich
-   * @return {@code true} iff a direct membership is the Bereich or a child of it
+   * @return {@code true} iff the actor is a {@code KRT Member} and a direct membership is the
+   *     Bereich or a child of it
    */
   private boolean isMemberOfAreaCascade(@NotNull UUID bereichId) {
+    if (!membershipsConfer) {
+      return false;
+    }
     List<UUID> children =
         childrenByBereich.computeIfAbsent(bereichId, orgUnitRepository::findChildOrgUnitIds);
     return isMemberOfAreaCascade(bereichId, actor.memberOrgUnitIds(), children);

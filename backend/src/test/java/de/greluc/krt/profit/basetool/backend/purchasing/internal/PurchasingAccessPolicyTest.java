@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.purchasing.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -375,14 +376,16 @@ class PurchasingAccessPolicyTest {
 
   @Test
   void managedUnitsAreTheLogisticianGrantsOfTheCaller() {
-    when(requestScopeResolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of(UNIT));
+    when(requestScopeResolver.currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN))
+        .thenReturn(Set.of(UNIT));
 
     assertThat(policy.managedUnitIds()).containsExactly(UNIT);
   }
 
   @Test
   void noGrantManagesNoUnit() {
-    when(requestScopeResolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of());
+    when(requestScopeResolver.currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN))
+        .thenReturn(Set.of());
 
     assertThat(policy.managedUnitIds()).isEmpty();
   }
@@ -409,6 +412,26 @@ class PurchasingAccessPolicyTest {
 
     assertThat(policy.canReadReport()).isTrue();
     assertThat(policy.canReadPartnerNotes()).isFalse();
+  }
+
+  /**
+   * The „Bericht" tab must not depend on the pinned unit (ADR-0329): a Logistician pinned to a unit
+   * they do not manage keeps the report, whose deals then follow the active context.
+   */
+  @Test
+  void aLogisticianPinnedToAnotherUnitStillReadsTheReport() {
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(CALLER));
+    when(delegateRepository.findFirstByUserIdAndRevokedAtIsNull(CALLER))
+        .thenReturn(Optional.empty());
+    noLeadership();
+    noBankRole();
+    when(requestScopeResolver.currentGrantedOrgUnitIds(Roles.LOGISTICIAN)).thenReturn(Set.of(UNIT));
+    lenient()
+        .when(requestScopeResolver.currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN))
+        .thenReturn(Set.of());
+
+    assertThat(policy.canReadReport()).isTrue();
+    assertThat(policy.managedUnitIds()).isEmpty();
   }
 
   @Test

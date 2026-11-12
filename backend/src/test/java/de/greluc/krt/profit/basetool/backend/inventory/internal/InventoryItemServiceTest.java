@@ -192,7 +192,6 @@ class InventoryItemServiceTest {
     assertEquals(List.of(da, db), result);
     verify(inventoryItemRepository)
         .findByMissionIdScoped(missionId, true, null, java.util.Set.of());
-    verify(inventoryItemRepository, never()).findByMissionId(missionId);
   }
 
   @Test

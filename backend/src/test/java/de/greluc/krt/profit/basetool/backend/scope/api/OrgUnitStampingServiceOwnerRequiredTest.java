@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import java.util.List;
@@ -53,6 +54,7 @@ class OrgUnitStampingServiceOwnerRequiredTest {
   @Mock private AuthHelperService authHelper;
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
+  @Mock private OrgUnitSeatEligibility seatEligibility;
 
   private OrgUnitStampingService service;
   private User targetUser;
@@ -65,7 +67,8 @@ class OrgUnitStampingServiceOwnerRequiredTest {
             accessGateService,
             authHelper,
             orgUnitMembershipRepository,
-            orgUnitRepository);
+            orgUnitRepository,
+            seatEligibility);
 
     targetUser = new User();
     targetUser.setId(UUID.randomUUID());
@@ -89,7 +92,7 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @Test
   void theSquadronPickerRefusesWithTheStableOwnerRequiredCode() {
-    when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentPin()).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.resolveSquadronForPickerOutput(targetUser, null))
         .isInstanceOf(OwnerOrgUnitRequiredException.class)
@@ -99,7 +102,7 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @Test
   void theOrgUnitPickerRefusesWithTheStableOwnerRequiredCode() {
-    when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentPin()).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.resolveOrgUnitForPickerOutput(targetUser, null))
         .isInstanceOf(OwnerOrgUnitRequiredException.class)
@@ -109,7 +112,7 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @Test
   void theRefusalStaysA400AndIsNotAConflictOrAPermissionFailure() {
-    when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.empty());
+    when(requestScopeResolver.currentPin()).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.resolveOrgUnitForPickerOutput(targetUser, null))
         .isInstanceOf(OwnerOrgUnitRequiredException.class)
@@ -122,7 +125,7 @@ class OrgUnitStampingServiceOwnerRequiredTest {
     UUID pinned = UUID.randomUUID();
     when(orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId()))
         .thenReturn(List.of(membership(pinned), membership(UUID.randomUUID())));
-    when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.of(pinned));
+    when(requestScopeResolver.currentPin()).thenReturn(Optional.of(pinned));
     Squadron squadron = new Squadron();
     squadron.setId(pinned);
     when(orgUnitRepository.findById(pinned)).thenReturn(Optional.of(squadron));

@@ -26,6 +26,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,17 +52,20 @@ public class BankBookingRequestViewService {
    *
    * @param actor the reading member
    * @param requestId the request
+   * @param pin the active org unit the approver role is judged in, or {@code null} for the whole
+   *     reach
    * @return the request with the actor's roles on it
    * @throws NotFoundException when the request is unknown or the actor may not see it
    */
   @NotNull
   @Transactional(readOnly = true)
-  public BankBookingRequestViewDto view(@NotNull BankActor actor, @NotNull UUID requestId) {
+  public BankBookingRequestViewDto view(
+      @NotNull BankActor actor, @NotNull UUID requestId, @Nullable UUID pin) {
     BankBookingRequest request = Entities.require(requestRepository.findById(requestId), NOT_FOUND);
     BankStaffRights rights = policy.staffRights(actor);
     boolean own = policy.ownsRequest(actor, request);
     boolean staff = rights.canSee(request.getAccount().getId());
-    boolean approver = policy.approves(actor, request);
+    boolean approver = policy.approves(actor, request, pin);
     if (!own && !staff && !approver) {
       throw new NotFoundException(NOT_FOUND);
     }

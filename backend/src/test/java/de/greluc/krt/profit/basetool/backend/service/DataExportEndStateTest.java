@@ -238,6 +238,13 @@ class DataExportEndStateTest {
             + " VALUES (?, ?, 'SQUADRON', 'MEMBER')",
         other.getId(),
         Squadron.IRIDIUM_ID);
+    jdbc.update(
+        "INSERT INTO member_active_org_unit (user_id, org_unit_id) VALUES (?, ?)",
+        s,
+        Squadron.IRIDIUM_ID);
+    jdbc.update(
+        "INSERT INTO member_active_org_unit (user_id, org_unit_id) VALUES (?, NULL)",
+        other.getId());
 
     Role role = new Role();
     role.setName("ZZZ Export Role");
