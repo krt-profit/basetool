@@ -34,7 +34,7 @@
         </div>
         <div id="members-results" class="unit-tabpanel" role="tabpanel" aria-labelledby="sk-tab-members">
         <th:block th:fragment="membersResults">
-            <th:block th:replace="~{orgunit/organisation/unit-detail :: skRoster(skId=${specialCommand.id()}, members=${members}, showFlags=true, canLead=${canToggleLead}, canRemove=true, leadMode='admin', selfUserId=null, admin=true, refreshUrl=${'/organisation/special-commands/' + specialCommand.id()}, refreshContainer='#members-results', refreshFragment='members')}"></th:block>
+            <th:block th:replace="~{orgunit/organisation/unit-detail :: skRoster(skId=${specialCommand.id()}, members=${members}, showFlags=true, canLead=${canToggleLead}, canRemove=true, leadMode='admin', selfUserId=${selfUserId}, admin=${canToggleLead}, refreshUrl=${'/organisation/special-commands/' + specialCommand.id()}, refreshContainer='#members-results', refreshFragment='members')}"></th:block>
         </th:block>
         </div>
     </div>

@@ -32,7 +32,8 @@ import org.jetbrains.annotations.Nullable;
  * @param kind the unit's kind
  * @param mayRaiseNeeds whether the unit raises needs
  * @param acceptsDonations whether the unit accepts donations
- * @param canManage whether the caller leads the unit or is one of its Logisticians
+ * @param canManage whether the caller manages the unit's needs and donations inside the active
+ *     context (REQ-SUP-003)
  * @param version the setting's version, {@code null} while the unit has no setting row
  */
 public record SupplyUnitDto(

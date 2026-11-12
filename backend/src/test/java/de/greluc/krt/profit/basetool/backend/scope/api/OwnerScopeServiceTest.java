@@ -19,47 +19,35 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
-import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for {@link OwnerScopeService}: the {@code SquadronVisibility} adapter forwards to the
- * scope kernel, and the Logistician-in-owner guard refuses a caller without that reach.
+ * Unit tests for {@link OwnerScopeService}: the Logistician-in-owner guard refuses a caller without
+ * that reach in the owning unit.
  */
 @ExtendWith(MockitoExtension.class)
 class OwnerScopeServiceTest {
 
   private static final UUID UNIT = UUID.randomUUID();
 
-  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private AccessGateService accessGateService;
 
-  @InjectMocks private OwnerScopeService service;
+  private OwnerScopeService service;
 
-  @Test
-  void canSeeSquadronAsksTheAccessGate() {
-    when(accessGateService.canSeeSquadron(UNIT)).thenReturn(true);
-
-    assertThat(service.canSeeSquadron(UNIT)).isTrue();
-  }
-
-  @Test
-  void currentUserListScopeSquadronIdsComesFromTheResolver() {
-    when(requestScopeResolver.currentUserListScopeSquadronIds()).thenReturn(Set.of(UNIT));
-
-    assertThat(service.currentUserListScopeSquadronIds()).containsExactly(UNIT);
+  @BeforeEach
+  void setUp() {
+    service = new OwnerScopeService(accessGateService);
   }
 
   @Test

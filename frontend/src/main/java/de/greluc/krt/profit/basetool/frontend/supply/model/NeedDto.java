@@ -28,7 +28,7 @@ import java.util.UUID;
 /**
  * Frontend mirror of the backend {@code NeedDto}; must match it field for field. The maximum unit
  * price, the purchased amount and the UEX reference price are absent for a caller who may not read
- * them.
+ * them; the job-order link and the linked order for a caller who does not manage the raising unit.
  *
  * @param id the need
  * @param orgUnitId the raising unit
@@ -49,7 +49,8 @@ import java.util.UUID;
  * @param maxUnitPrice the highest unit price a deal may pay, or {@code null} when not readable
  * @param purchasedAmount the part covered by accepted deliveries, or {@code null}
  * @param uexReferencePrice the average UEX buy price, or {@code null}
- * @param jobOrderId the job order the need feeds, or {@code null}
+ * @param jobOrderId the job order the need feeds, or {@code null} when the caller does not manage
+ *     the unit or the need is unlinked
  * @param jobOrder the linked order with its coverage of the need, or {@code null} when the caller
  *     does not manage the unit or the need is closed or unlinked
  * @param canManage whether the caller manages the raising unit's needs

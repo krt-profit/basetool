@@ -2,6 +2,10 @@
 
 - **Status:** Accepted — implemented. Phase 3 (#696) delivered the aggregate scope + authorities;
   the `currentOversightScope()` half landed in Phase 6 (#699). See *Implementation note*.
+  **Amended by [ADR-0374](0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)**
+  (2026-11-11): the cascade holds only while its holder has `KRT Member`, and a mission or operation
+  created without a pick is stamped on the honoured pin, a unit below the leader's own included
+  (REQ-ORG-032).
 - **Date:** 2026-06-19
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-ORG-015 · REQ-SEC-015 · ADR-0025 · REQ-ORG-011 (#701) · ADR-0024 (#702) · issue #692 · #696

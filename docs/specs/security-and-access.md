@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** AUTH/SEC · **Related ADRs:** [ADR-0001](../adr/0001-frontend-confidential-oauth2-client.md) · **Role matrix:** [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)
 
 # Security & access control
@@ -176,6 +176,11 @@ fixture rules, an unknown manager) · **Code:** test-only, `AuthorizationMatrix`
 
 ### REQ-SEC-003 — Architectural invariants (ArchUnit-enforced)
 
+> [!note] Amended 2026-11-12 (ADR-0269) — three `permitAll()` handlers
+> The `permitAll()` bullet counted `GET /api/v1/app/version-policy`, removed with the app floor
+> (REQ-API-020, superseded); it names the three handlers that remain and the rule by its current
+> name, `permitAllIsDeclaredOnlyOnThePublicEndpoints`.
+
 The following must always hold and are enforced as ArchUnit rules in
 [`ArchitectureTest`](../../backend/src/test/java/de/greluc/krt/profit/basetool/backend/ArchitectureTest.java)
 (backend) and its [frontend](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/ArchitectureTest.java)
@@ -196,8 +201,8 @@ equivalents — a new violation fails `./gradlew test`:
   by `thePublicByDesignAllowListNamesOnlyControllersThatExist`); the ingest module holds every
   controller and every `@PostMapping` to it (`everyRestControllerShouldBeAuthorisationAnnotated`,
   `everyPostMappingShouldBeAuthorisationAnnotated`).
-- `permitAll()` appears on exactly four backend handlers — the two anonymous reads, the Keycloak SPI
-  precheck and `/error` (`permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`, REQ-SEC-052).
+- `permitAll()` appears on exactly three backend handlers — the anonymous terms read, the Keycloak
+  SPI precheck and `/error` (`permitAllIsDeclaredOnlyOnThePublicEndpoints`, REQ-SEC-052).
 - Staffel-scoped services wire a scope-kernel service or `AuthHelperService`
   (`staffelScopedServicesMustWireOwnerScopeOrAuthHelper`), and peer-readable mission endpoints run
   the peer redaction (`peerReadableMissionEndpointsMustRedactPii`, REQ-SEC-007). Write endpoints of
@@ -395,7 +400,9 @@ the bank side `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE` — and deliberately **n
 - **Officer reach replaces the role.** It is derived per org unit from the caller's leadership
   seats (REQ-ROLE-002) and evaluated against the **owning unit of the target** (mission, job order,
   ship, …); lists are filtered to the caller's officer units. An admin passes every
-  officer check. No token, realm role or per-membership flag grants it.
+  officer check within their own scope — every unit unpinned, the pinned unit pinned — and one on
+  a target without an owning unit only without a pin (REQ-ORG-032). No token, realm role or
+  per-membership flag grants it.
 - **Membership rights rest on `KRT_MEMBER`.** The member-list URL rules and `MEMBER_OR_ABOVE` no
   longer list `OFFICER`; the oversight scope no longer adds every squadron membership of a role
   holder.
@@ -451,10 +458,14 @@ Spezialkommandos below it, a grant in the Organisationsleitung covers every unit
 or Spezialkommando covers that unit alone. The cascade is resolved once, for direct flags and seats
 alike, by `OrgUnitCascadeService#unitsBelow` behind
 `RequestScopeResolver#currentGrantedOrgUnitIds(role)`; every per-unit gate and list scope reads that
-set (`hasRoleInOrgUnit`, `canActAsLogisticianIn`, `currentLogisticianScope`,
-`canManageMissionsOf`, the supply and purchasing managed units, the exchange's
-`findLogisticianOrgUnitIds`), never the raw contextual authorities. A pin must lie in the covered
-set; a pin outside it covers nothing. Admins are unrestricted. The aggregate access checks read the
+set inside the active context (`currentGrantedOrgUnitIdsInActiveContext(role)`:
+`hasRoleInOrgUnit`, `canActAsLogisticianIn`, `currentLogisticianScope`, `canManageMissionsOf`, the
+supply and purchasing managed units), the exchange's `findLogisticianOrgUnitIds` and the supply and
+purchasing tab decisions (ADR-0329) the whole set, never the raw contextual authorities. A pin
+covers exactly the pinned unit when it lies in the set — a Bereich or Organisationsleitung pin is
+that unit alone, not the units below it — and nothing when it does not (REQ-ORG-032). An admin
+passes within their own scope: every unit unpinned, the pinned unit pinned. The aggregate access
+checks read the
 same set: a Logistician grant covering a unit also opens the read and edit of that unit's Lager rows
 and refinery orders and the read of its job orders, and a Mission Manager grant the read of its
 internal missions and operations (`AccessGateService#canSeeSquadronAsGrantee`, `permitsOwnedRow` with
@@ -470,22 +481,28 @@ upcoming-missions widget stay on the own units (REQ-MISSION-008). **Enforced by:
 
 Mission Manager powers apply **per unit**: a grant in unit A (own flag, an officer rank, or the
 cascaded reach of a Bereich or Organisationsleitung grant) manages A's missions and operations and
-those of the units below A, and nothing else. A mission or operation **without an owning unit** is managed only by a caller with a
-Mission Manager grant in an Organisationsleitung or Bereich unit (or an admin); a squadron Mission
-Manager does not manage it. Creating an operation requires the grant in the unit the operation is
-stamped to. Finance edits and the owner change of an ownerless mission stay admin-only (REQ-SEC-065).
+those of the units below A, and nothing else; under a pin only the pinned unit's (REQ-ORG-032). A mission or operation **without an owning unit** is managed only by a caller with a
+Mission Manager grant in an Organisationsleitung or Bereich unit of the active context (or an admin
+without a pin); a squadron Mission Manager does not manage it. An admin manages within their own
+scope as well: every mission and operation unpinned, under a pin only the pinned unit's
+(`MissionAccessPolicy`, REQ-ORG-032); a mission's owner and co-managers keep managing it under any
+pin. Creating an operation requires the grant in the unit the operation is stamped to. Finance
+edits and the owner change of an ownerless mission stay with an admin without a pin, beside the
+entry's own participant and the mission's owner (REQ-SEC-065).
 `isMissionManagerOrAbove` is pin-aware: the grant in the pinned unit, or in any unit when none is
 pinned (`RequestScopeResolver#canActAsMissionManagerInActiveContext()`); the frontend gates read it
 through `MissionManagerGate`. **Enforced by:** `ScopeKernelTest.MissionManagerGateTests`,
-`MissionAccessPolicyGateTest`, `OperationServiceTest`, `MeControllerTest`, `MissionManagerGateTest`.
+`MissionAccessPolicyGateTest`, `MissionAccessPolicyPinnedAdminTest`, `OperationServiceTest`,
+`MeControllerTest`, `MissionManagerGateTest`.
 
 **A Logistician grant is per unit.** A contextual `LOGISTICIAN@unit` authority (own membership flag,
 lead or seat-derived reach) gives reads, lists and actions of **that unit** only; a plain membership
 of another unit never adds Logistician powers there, and grants in A and C give exactly A and C
-(unpinned: their union; pinned: the pinned unit only if it lies in them, cascade included). The flat
+(unpinned: their union, cascade included; pinned: the pinned unit alone, only if it lies in them). The flat
 `ROLE_LOGISTICIAN` stays a coarse gate and decides nothing on a target by itself. The per-target
 decision is `AccessGateService.canActAsLogisticianIn(unit)` (the Logistician grant set of the active
-context contains the unit; a target without a unit is reserved to admins), the list decision is
+context contains the unit; a target without a unit is reserved to an admin without a pin), the list
+decision is
 `currentLogisticianScope()`. It governs the Lager rows of other members (allocation, note,
 delivered, stolen, book-out, personal rebook, the stock viewer's `canEdit`), the job-order writes
 and handover reports (the responsible unit, SK-queue orders included), the earmarks, the squadron a
@@ -1257,19 +1274,38 @@ equivalent to (REQ-SEC-004). Every leadership seat yields it, through the one re
   without it is refused with `409 LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER` — every seat-writing path of
   `OrgUnitMembershipService`: Bereich rank, OL seat, Grand Admiral, SK lead, squadron rank. A seat
   whose holder loses it later stays in place and confers nothing (REQ-ORG-029): the
-  authority converter then mints no rank-derived `LOGISTICIAN` / `MISSION_MANAGER` authority, flat
-  or contextual, and no cascaded one; only the explicit `is_logistician` / `is_mission_manager`
-  flags stay in force. The same holds wherever else a rank is read: the exchange's Logistician
+  authority converter then mints no membership-derived `LOGISTICIAN` / `MISSION_MANAGER` authority,
+  flat or contextual, and no cascaded one — neither from the rank nor from the explicit
+  `is_logistician` / `is_mission_manager` flags, which confer nothing without `KRT Member` either
+  (owner decision, REQ-ORG-032). The same holds wherever else a membership is read: the reach and
+  the switcher, the effective Logistiker and Einsatzleiter flags of the user DTO the frontend
+  mirrors into its session (`UserMapper`, `UserMapperTest`), the exchange's Logistician
   units (`OrgUnitMembershipQueryService#findLogisticianOrgUnitIds`), the oversight scope of the
-  blueprint overview and the org-unit bank balances, the Leitung page, and every seat-derived bank
+  blueprint overview and the org-unit bank balances, the Leitung page and the delegated
+  appointment, Kommandogruppe and SK-roster verdicts behind it (`OrgRoleManagementSecurityService`,
+  `SpecialCommandSecurityService`, REQ-ROLE-004), and every seat-derived bank
   right on the web and the exchange (REQ-BANK-034): the responsible holder with its approval
   exemption and configuration rights, the OL's KRT-account and Sonderkonto rights and top-band
-  approval, and the seat-bucket view grants and approval tiers.
+  approval, the seat-bucket and member view grants, and the approval tiers — and every notification
+  recipient a membership yields: unit leadership, seat holders, SK leads, the Logistiker and
+  Einsatzleiter flags, the responsible holders and the OL approvers (REQ-NOTIF-024).
   **Enforced by:** `RetainedSeatWithoutKrtMemberIntegrationTest`,
-  `CustomJwtGrantedAuthoritiesConverterTest`, `BankAccessRulesTest` (`*WithoutKrtMember*`).
+  `CustomJwtGrantedAuthoritiesConverterTest`, `RequestScopeResolverPinRuleTest`,
+  `BankAccessRulesTest`, `OrgRoleManagementSecurityServiceTest` and
+  `SpecialCommandSecurityServiceTest` (`*WithoutKrtMember*`), `SpecialCommandRosterGateIntegrationTest`,
+  `RecipientDirectoriesTest`, `NotificationRecipientQueriesIntegrationTest`.
 - **Bank management confers no officer reach.** It keeps only its `BANK_*` rights (REQ-BANK-007).
 
-**Where it is read.** The scope kernel answers `AccessGateService#canActAsOfficerIn(orgUnitId)` (admin passes), `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches.
+**Where it is read.** The scope kernel answers `AccessGateService#canActAsOfficerIn(orgUnitId)`, `#currentOfficerOrgUnitIds()` and `#canActAsOfficerInActiveContext()`. `canActAsOfficerIn` decides inside the active context (REQ-ORG-032): under a pin only the pinned unit, a Bereich or OL pin that unit alone; an admin passes within their own scope (every unit unpinned, the pinned unit pinned). A target without an owning unit (`canActAsOfficerInOwner`, and likewise the Logistician and Mission Manager gates) passes only an admin without a pin. Every officer gate reads them; no gate reads `OFFICER` and no `OFFICER@<unit>` authority exists. A seat holder reaches `LOGISTICIAN` and `MISSION_MANAGER` through the seat, scoped to the units the seat reaches. The reach the scope and the switcher use — direct memberships and the leadership cascade — exists only while the holder keeps `KRT Member` as well.
+
+**One check of `KRT Member`.** Whether a caller's memberships confer anything is answered in one
+place, `AuthHelperService#holdsKrtMember()`: the role `KRT Member`, directly or through the role
+hierarchy, or the exchange marker of an acting member who holds it (REQ-XCH-009). The scope
+resolver, the switcher list, the owner picker, the Leitung page and the SK and org-role security
+services read it; the owner or creator of a new row is judged by their stored role (REQ-ORG-004).
+**Enforced by:** `AuthHelperServiceTest`, `RequestScopeResolverPinRuleTest`,
+`SpecialCommandSecurityServiceTest`, `OrgRoleManagementSecurityServiceTest`,
+`MemberMembershipControllerTest`.
 
 **Enforced by:** `ScopeKernelTest` (`OfficerReachTests`: reach per seat kind, none from a
 membership without a seat, none without `KRT Member`, admin pass, pinned / unpinned context),
@@ -1368,16 +1404,19 @@ with the token. **Migration:** V177, undone by `V239`. **Security audit:** findi
 > **Renumbered 2026-09-22:** this requirement was `REQ-SEC-019` until 2026-09-22; that id also named the Discord-link indicator in member management in [`discord-integration.md`](discord-integration.md), which keeps it.
 
 `MissionFinanceEntry` edit/delete (`PUT`/`DELETE /api/v1/missions/{missionId}/finance-entries/{entryId}`) gates on
-`MissionAccessPolicy.canEditFinanceEntry`. `canEditFinanceEntry` passes for an admin, for a caller
-with **officer reach in the mission's owning unit** (REQ-SEC-015, ADR-0300), and on the self-edit path
-of the entry owner (a linked participant who is still a registered participant). A seat in another
-unit, or a plain membership of the owning unit, does not pass. A mission without an owning unit has no
-unit to reach in, so its officer-only writes are reserved to admins.
+`MissionAccessPolicy.canEditFinanceEntry`. `canEditFinanceEntry` passes for a caller with
+**officer reach in the mission's owning unit** inside the active context (REQ-SEC-015, ADR-0300,
+REQ-ORG-032), which an admin holds within their own scope (every unit unpinned, the pinned unit
+pinned), and on the self-edit path of the entry owner (a linked participant who is still a
+registered participant), under any pin. A seat in another unit, or a plain membership of the
+owning unit, does not pass. A mission without an owning unit has no unit to reach in, so its
+officer-only writes are reserved to an admin without a pin.
 
-The mission owner change (`canChangeOwner`: the current owner, an admin, or officer reach in the
-mission's owning unit) and the reset of an operation's payout status to unpaid
-(`OperationAccessPolicy#canClearPayout`: an admin or officer reach in the operation's owning unit)
-follow the same rule on the target's owning unit; every other mission manager keeps setting the mark.
+The mission owner change (`canChangeOwner`: the current owner, or officer reach in the mission's
+owning unit) and the reset of an operation's payout status to unpaid
+(`OperationAccessPolicy#canClearPayout`: officer reach in the operation's owning unit) follow the
+same rule on the target's owning unit, an admin's pass included; every other mission manager keeps
+setting the mark.
 The frontend offers the unpaid reset from the pin-aware `hasOfficerReach` flag and leaves the
 per-operation decision to the backend.
 
@@ -1385,12 +1424,15 @@ per-operation decision to the backend.
 
 - [x] A caller with a seat in unit A is denied (403) editing/deleting a finance entry, changing the
   owner of a mission, or clearing a payout mark of unit B.
-- [x] A caller with a seat in the owning unit, an admin, and the entry owner-participant are allowed.
-- [x] A plain member of the owning unit is denied; an ownerless target is admin-only.
+- [x] A caller with a seat in the owning unit, an admin within their own scope, and the entry
+  owner-participant are allowed; an admin pinned to another unit is denied.
+- [x] A plain member of the owning unit is denied; an ownerless target is left to an admin without
+  a pin.
 
 **Enforced by:** `MissionAccessPolicyGateTest`
 (`canEditFinanceEntry_SeatInOwningUnit_*`, `…_SeatInOtherUnit_*`, `…_PlainMemberOfOwningUnit_*`,
-`…_Admin_*`, `…_OwnerStillParticipant_*`, `canChangeOwner_Seat*`),
+`…_AdminOutsideTheActiveContext_*`, `…_OwnerStillParticipant_*`, `canChangeOwner_Seat*`,
+`canChangeOwner_AdminOutsideTheActiveContext_*`), `MissionAccessPolicyPinnedAdminTest`,
 `OperationAccessPolicyClearPayoutTest`, `OperationPayoutPaidOutSecurityTest`,
 `OperationPageControllerMvcTest` · **Related:** REQ-SEC-015, ADR-0300. **Security audit:** finding H1.
 
@@ -1447,6 +1489,10 @@ finding L3.
 [`discord-integration.md`](discord-integration.md); this requirement continues the series at the
 next free number.)
 
+> [!note] Amended 2026-11-12 (ADR-0268) — three vhosts include the limiter
+> The API vhost is gone, so the frontend, ingest and Grafana vhosts are the ones that include
+> `limits.conf`, and the zone table no longer lists an API vhost.
+
 > [!important] Since ADR-0162 the whole edge is version-controlled, not just this snippet
 > The word "version-controlled" in this requirement was written when it was the exception: the
 > limiter lived in `docker/maintenance/nginx/`, while Force SSL, HSTS, Block-Common-Exploits and the
@@ -1461,14 +1507,14 @@ Every public vhost at the edge carries a **version-controlled** per-IP safety
 net: `limit_req` (50 r/s sustained, burst 150, `nodelay`) and `limit_conn` (500
 concurrent connections) keyed on the real client IP (`$krt_limit_key`: the full IPv4 address, or an
 IPv6 client's `/64` network prefix). `docker/edge/conf.d/00-maps.conf` defines the zones and
-`docker/edge/include/limits.conf` applies them; the frontend, ingest, Grafana and API vhosts each
+`docker/edge/include/limits.conf` applies them; the frontend, ingest and Grafana vhosts each
 include it. The values are
 flood/brute-force **ceilings**, not fairness limits — a legitimate worst-case page load fits
 inside the burst. Three zones share the key (ADR-0256):
 
 | Zone | Applies to | Rate | Burst |
 | --- | --- | --- | --- |
-| `krt_req_perip` | every vhost (pages, fragments, API, ingest, Grafana, Keycloak pages) | 50 r/s | 150 |
+| `krt_req_perip` | every vhost (pages, fragments, ingest, Grafana, Keycloak pages) | 50 r/s | 150 |
 | `krt_static_perip` | the frontend's static asset trees `/js/`, `/css/`, `/fonts/`, `/images/`, `/logos/` | 200 r/s | 600 |
 | `krt_token_perip` | the Keycloak token endpoint | 20 r/s | 10 |
 
@@ -2243,6 +2289,10 @@ policies and profiles kept · **Code:** `scripts/provision-keycloak-realm.py` (`
 
 ### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
 
+> [!note] Amended 2026-11-12 (ADR-0268) — the public API vhost is gone
+> The paragraph on the intermediary a public API vhost made plausible is past tense: the vhost is
+> removed and the backend is internal-only. The classification and its gate are unchanged.
+
 > [!note] Amended 2026-10-17 (#2673) — two families leave with their operations
 > `/api/v1/live-sync/**` leaves the `no-store` list with the bridge (ADR-0274) and `/api/v1/app/**`
 > leaves the revalidatable list with the app floor (REQ-API-020, superseded): 33 `no-store` families
@@ -2327,8 +2377,8 @@ corporate middlebox, a shared proxy or a browser disk cache would be holding dat
 outlive the response.
 
 While the backend was reachable only from the frontend across an internal network there was no
-intermediary for the header to talk to. A public API vhost makes one plausible, which is what turns
-this from theory into a control.
+intermediary for the header to talk to. The public API vhost made one plausible (ADR-0135), which
+is what turned this from theory into a control; it is removed (ADR-0268).
 
 The scope MUST be matched against the **decoded** path (REQ-SEC-029), so an encoded spelling such as
 `/api/v1/%62ank/accounts` cannot fall back into the weaker directive. The list is maintained in code
@@ -2383,6 +2433,11 @@ answer from it identically for seventeen paths.
 
 ### REQ-SEC-032 — The anonymous surface MUST NOT be an amplification lever
 
+> [!note] Amended 2026-11-12 (ADR-0269) — one anonymous read is left
+> `GET /api/v1/app/version-policy` is removed with the app floor (REQ-API-020, superseded), so the
+> note of 2026-09-06 below counts one anonymous read where it counted two; the lesson it states is
+> unchanged.
+
 > [!note] Amended 2026-10-17 (ADR-0272, #2673) — the limiter stays, and its reason is now a smaller
 > one
 > Both rate limiters are **kept**. The per-IP budget was written when the API vhost put `/api/v1` on
@@ -2400,15 +2455,15 @@ answer from it identically for seventeen paths.
 
 > [!note] Amended 2026-09-06 (ADR-0159) — the lesson outlived the surface
 > There is no anonymous surface left to bound: `AnonymousPageSizeFilter` and its page-size ceiling
-> are gone, and no paginated endpoint answers an unauthenticated caller. The two that do
-> (REQ-SEC-052) are unpaginated, and the per-IP limiter bounds them.
+> are gone, and no paginated endpoint answers an unauthenticated caller. The one that does
+> (REQ-SEC-052) is unpaginated, and the per-IP limiter bounds it.
 >
 > **The verb-agnostic lesson below is the part that stays load-bearing.** A tightening placed above
 > an all-verb `permitAll` must itself be all-verb, or the rule underneath grants every verb the
 > tightening does not claim — that is how a `HEAD` once ran the material price matrix query
-> anonymously and returned its `Content-Length`. The two remaining anonymous reads are `GET`-scoped
-> on purpose, and `AnonymousSurfaceSweepTest` issues a `HEAD` against every `GET` mapping for
-> exactly this reason.
+> anonymously and returned its `Content-Length`. The remaining anonymous read is `GET`-scoped on
+> purpose, and `AnonymousSurfaceSweepTest` issues a `HEAD` against every `GET` mapping for exactly
+> this reason.
 >
 > The `basetool_http_error_total{code="PAGE_SIZE_TOO_LARGE"}` label value disappears with the
 > filter (REQ-OBS-011's bounded-label review).
@@ -3350,6 +3405,10 @@ stock's Logistician:
 
 ### REQ-SEC-040 — Guest redaction MUST reach every nested user, not only the participants
 
+> [!note] Amended 2026-11-12 (ADR-0269) — one blind spot fewer to name
+> The paragraph on what did not catch the leak also named `ExternalContractTest`, which froze
+> `assignedUnits` only as a top-level field name; the test went with the app, and the clause with it.
+
 > [!note] Amended 2026-09-22 — the rule outlived the guest audience (ADR-0159)
 > The heading keeps its original wording so the id stays searchable. Since ADR-0159 the redactor is
 > `MissionPeerRedactor`, its passes are `cleanup…ForPeer` (`cleanupUserForPeer`,
@@ -3372,10 +3431,9 @@ unit with an assigned ship always carried one. The owner is now reduced to the p
 tuple by the same `cleanupUserForGuest` (now `cleanupUserForPeer`) pass every other nested user
 goes through.
 
-Note what did **not** catch this, because the same blind spots apply to the next nested record:
+Note what did **not** catch this, because the same blind spot applies to the next nested record:
 `anonymousReadableMissionEndpointsMustRedactGuestPii` (now `peerReadableMissionEndpointsMustRedactPii`)
-asserts that a redaction method is *called*, never that the redaction is *complete*; and `ExternalContractTest` froze
-`assignedUnits` only as a top-level field name and never inspected the nested shape.
+asserts that a redaction method is *called*, never that the redaction is *complete*.
 
 **Acceptance**
 
@@ -3427,9 +3485,10 @@ invisible from the anonymous surface.
 ### REQ-SEC-042 — Booking into a mission ledger is a write, and is gated like one
 
 `POST /api/v1/missions/{missionId}/finance-entries` MUST be authorized by `MissionAccessPolicy#canCreateFinanceEntry`:
-a caller who may manage the mission (ADMIN; a MISSION_MANAGER grant in the mission's owning unit,
-REQ-SEC-005; the owner or a co-manager) may book for any of its participants, and every other member
-may book **only against their own participant row** on that mission.
+a caller who may manage the mission (a MISSION_MANAGER grant in the mission's owning unit inside
+the active context, REQ-SEC-005, which an admin holds within their own scope, REQ-ORG-032; the owner
+or a co-manager) may book for any of its participants, and every other member may book **only
+against their own participant row** on that mission.
 
 It MUST NOT be gated on `MissionAccessPolicy#canSeeMission`, which deliberately grants the
 cross-squadron **public escape** on a non-internal mission. That is the correct rule for a read and
@@ -3482,11 +3541,14 @@ and detail pages map to a message naming the mission field.
 - [x] Saving an order with its mission unchanged does not re-check participation.
 - [x] Clearing the mission is always allowed.
 
+A mission's own link to an operation is the same kind of write and needs `canEditOperation` of the
+target operation (REQ-MISSION-034).
+
 **Enforced by:** `MissionAccessPolicyGateTest`, `MissionFinanceEntryControllerSecurityTest`,
 `RefineryOrderServiceLifecycleTest`, `RefineryOrderTest`, `RefineryOrderFailureToastTest` ·
 **Code:** `MissionAccessPolicy#canCreateFinanceEntry`,
 `MissionFinanceEntryController#createFinanceEntry`, `RefineryOrderService#resolveMissionForOwner` ·
-**Related:** REQ-SEC-006, REQ-SEC-009
+**Related:** REQ-SEC-006, REQ-SEC-009, REQ-MISSION-034
 
 ### REQ-SEC-045 — A login binds a session to the token's own subject, never to a callsign
 
@@ -3613,6 +3675,12 @@ order), `UserAccountMergeServiceTest`, `UserAccountMergeCoverageTest`, `UserReas
 `DiscordRegistrationAdminController#merge` ·
 **Related:** REQ-SEC-045, ADR-0142 point 5, REQ-DATA-008, REQ-AUDIT-001
 
+#### Amendment (REQ-ORG-031)
+
+The member's stored choice of the active org unit (`member_active_org_unit.user_id`,
+`ActiveOrgUnitChoiceUserReassignment`, position 70) stays with the source account: the surviving
+account keeps its own choice, because a choice is not a belonging that can be held twice.
+
 #### Amendment (ADR-0298)
 
 > **Status: shipped** (ADR-0298, ADR-0299, map #2800). The root row, the favourites, the hidden
@@ -3730,12 +3798,19 @@ the same name; an admin reads `true`, an anonymous or unresolved caller `false`.
 „Bedarf & Spenden" or „Ankauf". Each is `false` while its surface is off; otherwise the owning
 module decides it through its `api` seam (`SupplyTabAccess`, `PurchasingTabAccess`) with the access
 policy the read behind the tab enforces — the rules are tabulated in REQ-UI-026. None depends on
-the pinned unit. An admin reads the backend's answer, not `true`, because each also needs its
-surface on (and the incoming tab an active unit that accepts donations). The flags steer the
-navigation, the tab bars and the quick access only; every read behind a tab re-checks.
+the pinned unit, because a flag that reads false counts as a lost right and deletes the member's
+stored favourite, phone slot and start page of that tab (REQ-UI-032): the supply flags read the
+units the caller manages in any context (`SupplyAccessPolicy#managedUnitsInAnyContext`, every unit
+for an admin), and `PurchasingAccessPolicy#canReadReport` counts the managers of every unit. What
+the pages behind the tabs list follows the active context (REQ-ORG-032, REQ-SUP-003, REQ-PUR-021).
+An admin reads the backend's answer, not `true`, because each also needs its surface on (and the
+incoming tab an active unit that accepts donations). The flags steer the navigation, the tab bars
+and the quick access only; every read behind a tab re-checks.
 
 **Enforced by:** `MeControllerTest` (`getCapabilities_*TabFlags*`, `getLayout_carriesTheSameTabFlags`),
-`SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `MeLayoutSingleTransactionTest`
+`SupplyTabAccessServiceTest`, `PurchasingTabAccessServiceTest`, `SupplyAccessPolicyTest`,
+`PurchasingAccessPolicyTest` (no tab right depends on the pinned unit),
+`MeLayoutSingleTransactionTest`
 
 #### Officer reach in the capabilities (ADR-0300)
 
@@ -3758,8 +3833,10 @@ navigation, the tab bars and the quick access only; every read behind a tab re-c
 tells a lost seat from a pin outside it), `hasOfficerReach`, `canOpenLeitung`,
 `canSeeHangarOwnerDetails`, `canManageJobOrders` and `canManageMissionFinance`, each the answer of
 `RequestScopeResolver#canActAsOfficerInActiveContext()` (and `isMissionManagerOrAbove`, the answer of `canActAsMissionManagerInActiveContext()`, REQ-SEC-005);
-the pin is the raw `X-Active-Org-Unit-Id` header, so a non-admin's home Staffel does not count as a
-pin. The frontend's `CapabilityFlagsAdvice` exposes each as a model attribute of the same name
+the pin is the honoured pin of REQ-ORG-032 (`RequestScopeResolver#currentPin()`): any other
+`X-Active-Org-Unit-Id` header — stale, foreign, unknown, inactive or malformed — counts as no pin,
+and a non-admin's home Staffel is never one. The frontend's `CapabilityFlagsAdvice` exposes each
+as a model attribute of the same name
 (fail-closed `false`, admin `true`). The navigation registry gates the Leitung entry on
 `canOpenLeitung`, and the sidebar's
 role badge reads `hasOfficerReach`; the bank member search, the profit calculation and the
@@ -3778,7 +3855,8 @@ ADR-0300
 
 `GET /api/v1/org-units/me/switchable` returns every active org unit an **admin** may pin, and for **everyone
 else** the units they belong to plus the ones a Bereich or OL seat reaches (`OrgUnitCascadeService`,
-REQ-ORG-015 — a materialised id set, never an admin-all marker). All four kinds in both branches,
+REQ-ORG-015 — a materialised id set, never an admin-all marker), and nothing while they lack
+`KRT Member` (`AuthHelperService#holdsKrtMember()`, REQ-ORG-032). All four kinds in both branches,
 ordered top-down: OL → Bereich → Staffel → SK, then by name.
 
 **Because the branch was duplicated.** The web frontend's `OrgUnitContextAdvice` had it
@@ -3829,6 +3907,8 @@ hierarchy that no gate would have caught, because both answers are individually 
   (`MeControllerTest`, `OrgUnitMembershipQueryServiceTest#listAllPinnableOptions_…`).
 - [x] A non-admin gets their reach and never the catalogue — and specifically the drill-down reach,
   not the direct-membership list (`MeControllerTest`).
+- [x] A caller without `KRT Member` is offered no unit
+  (`MeControllerTest#getPinnableOrgUnits_withoutKrtMemberNoUnitIsPinnable`).
 - [x] A member whose only seat is a plain `MEMBER` row on a Bereich is offered that Bereich
   (`OrgUnitMembershipQueryServiceTest#listPickerOptionsWithDescendants_plainBereichMember_…`);
   verified against the test stack 2026-09-01.
@@ -4291,6 +4371,12 @@ one is a `400` instead of the `500` an unguarded `UUID.fromString` produced. **E
 
 ### REQ-SEC-052 — No anonymous surface beyond the landing page and the enumerated infrastructure paths
 
+> [!note] Amended 2026-11-12 (ADR-0269) — the body counts one anonymous read
+> The backend table loses its `GET /api/v1/app/version-policy` row, removed with the app floor
+> (REQ-API-020, superseded). The `HEAD` paragraph and the acceptance lines count what remains: one
+> anonymous read, three `permitAll()` methods and one operation with `security: []`; the ArchUnit
+> rule appears under its current name.
+
 > [!note] Amended 2026-10-17 (#2673) — the backend's half is one `/api/v1` read
 > `GET /api/v1/app/version-policy` is gone with the app floor (REQ-API-020, superseded), so the
 > backend's anonymous `/api/v1` surface is `GET /api/v1/terms/document` alone, beside
@@ -4381,13 +4467,12 @@ a method gate.
 
 |                   Path                    |                                                                                                                             Why it stays                                                                                                                              |
 |-------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GET /api/v1/app/version-policy`          | The forced-update gate (REQ-API-010). A version gate that only answers after a login is silent in exactly the case it exists for: an app too old to log in must still learn that it is too old. Three integers and a public release URL.                              |
 | `GET /api/v1/terms/document`              | The Terms-of-Use wording (ADR-0138 / REQ-SEC-028). A document everyone must read before agreeing to anything cannot require having agreed, and the same text is already on the public `/terms` page.                                                                  |
 | `/internal/**`                            | The Keycloak SPI's account-existence precheck (REQ-SEC-022) — machine-to-machine behind a constant-time shared-secret header, `401` without it. Keycloak sits outside the resource server's trust boundary and carries no JWT to gate on. Not an anonymous data path. |
 | `/actuator/health`, `/actuator/health/**` | The container health check on the local stacks; in prod Actuator lives on the internal management port (ADR-0134).                                                                                                                                                    |
 | `/error`                                  | Spring's error dispatch.                                                                                                                                                                                                                                              |
 
-**Both anonymous reads are `GET`-scoped**, so a `HEAD` on either falls to the authenticated
+**The anonymous read is `GET`-scoped**, so a `HEAD` on it falls to the authenticated
 catch-all and answers `401`. That is deliberate and it is the REQ-SEC-032 lesson: Spring Security
 compares the verb with `String.equals`, so a method-scoped tightening placed above an all-verb
 `permitAll` grants every verb it does not claim — which is how a `HEAD` once ran the material price
@@ -4420,11 +4505,12 @@ because it is anonymous access in the brief's sense.
 
 - [x] Every mapping the dispatcher knows refuses a caller with no token, except the four paths above
   — asserted by enumerating `RequestMappingHandlerMapping`, not by listing paths somebody thought of.
-- [x] Every `GET` is additionally issued as `HEAD`, and the two `GET`-scoped reads answer `401` to it.
-- [x] Exactly four methods declare `@PreAuthorize("permitAll()")` — the two anonymous reads, the SPI
+- [x] Every `GET` is additionally issued as `HEAD`, and the `GET`-scoped anonymous read answers `401`
+  to it.
+- [x] Exactly three methods declare `@PreAuthorize("permitAll()")` — the anonymous read, the SPI
   precheck and `BasetoolErrorController#handleError` (added 2026-09-07, when the rule learned to see
-  `@RequestMapping`); a fifth fails the build.
-- [x] Exactly two OpenAPI operations declare `security: []`, and no operation references a security
+  `@RequestMapping`); a fourth fails the build.
+- [x] Exactly one OpenAPI operation declares `security: []`, and no operation references a security
   scheme the document does not define.
 - [x] The landing page mints no session and makes no backend call: `getSession(false) == null`, no
   `__Host-SESSION` (formerly `SESSION`) cookie, `verifyNoInteractions(backendApiClient)`.
@@ -4435,7 +4521,7 @@ because it is anonymous access in the brief's sense.
 `EndpointEnumerationTest` (the enumeration both sweeps ask the dispatcher with, shared since #1804 —
 a defect there would turn both guards green at once, so it is tested on its own rather than only
 through them) ·
-`ArchitectureTest#permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`,
+`ArchitectureTest#permitAllIsDeclaredOnlyOnThePublicEndpoints`,
 `#readEndpointsMustDeclareAnAuthorisationAnnotation` · `OpenApiAnonymousOperationsTest` ·
 `RouteGateSnapshotTest` (the frontend: every handler carries a gate except the nine public ones,
 REQ-FE-025) ·
@@ -4449,6 +4535,11 @@ the nightly `edge-deny-probe.yml` (the same statuses from outside the host) · *
 ---
 
 ### REQ-SEC-053 — Every account is at least a member; a role-less token is refused
+
+> [!note] Amended 2026-11-12 (ADR-0269) — two exempt paths
+> The acceptance line counted `GET /api/v1/app/version-policy` among the paths a role-less token
+> still reaches; it is removed with the app floor (REQ-API-020, superseded), and the line counts the
+> two the rule names.
 
 There is no role below member. The seeded `GUEST` role is gone (`V239`), and with it the state it
 represented — an authenticated caller with an **empty authority set**.
@@ -4482,7 +4573,10 @@ the member surface for both:
 - **A departed member who keeps a bank role**: an admin withdrew KRT Member, which is a departure
   (`MemberDepartedEvent`). Neither bank role is in `Roles.MEMBER_OR_ABOVE` nor reaches one through
   the role hierarchy, so the member gates refuse that account; it keeps only what the bank role
-  grants. An account left with no role is refused `NO_ROLE`.
+  grants. Its memberships stay in place but confer nothing, the explicit Logistiker and
+  Einsatzleiter flags included, so no `LOGISTICIAN` or `MISSION_MANAGER` authority sneaks past
+  those gates and the scope reaches no unit on the `isAuthenticated()` reads either (REQ-SEC-015,
+  REQ-ORG-032). An account left with no role is refused `NO_ROLE`.
 
 **The member-surface role gates sit on the handlers, not only in the URL rules.** The twelve
 squadron-wide `InventoryItemController` handlers (the aggregated, material, game-item, `/all`,
@@ -4509,7 +4603,7 @@ covers the path, so the annotation is the only gate; `GameItemControllerTest` ev
 
 - [x] An approved account holding no stored role is refused `403 NO_ROLE` on `/api/v1/users/me`,
   on the JWT path and through `ActingMemberFilter`.
-- [x] The three exempt paths still answer such a token.
+- [x] The two exempt paths still answer such a token.
 - [x] A sync run writes no role, so a member keeps every stored role (REQ-SEC-088).
 - [x] `V239` leaves no `GUEST` role, no `user_roles` row for it, and logs the affected user ids
   before deleting — identifiers, not identities.
@@ -6155,18 +6249,28 @@ second pattern already matches it, so the first was removed without a change in 
 
 ### REQ-SEC-080 — Gate exemptions are exact sets of real paths
 
+> [!note] Corrected 2026-11-12 — the acting-member set is not counted
+> The acting-member bullet counted seventeen paths; `ActingMemberFilter.ACTING_PATHS` holds 29 and
+> grows with every exchange mapping, so the bullet names the set by its rule, and
+> `FilterExemptionSetsTest` pins the list.
+
+> [!note] Amended 2026-11-12 (ADR-0269) — the version policy leaves both exemption lists
+> `GET /api/v1/app/version-policy` is removed with the app floor (REQ-API-020, superseded), so the
+> pending-approval and the terms-acceptance lists below no longer name it; each is the set its
+> filter holds.
+
 Three filters decide by path which requests they leave alone, and each list MUST be an exact set of
 literal paths, each naming a real mapping:
 
 - **Pending approval and role-less** (`PendingApprovalAccessFilter`):
-  `/api/v1/users/me/registration-status`, `/api/v1/app/version-policy`, `/api/v1/terms/document`.
+  `/api/v1/users/me/registration-status`, `/api/v1/terms/document`.
 - **Terms acceptance** (`TermsAcceptanceAccessFilter`): `/api/v1/terms/document`,
-  `/api/v1/terms/status`, `/api/v1/terms/acceptance`, `/api/v1/users/me/registration-status`,
-  `/api/v1/app/version-policy`. This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`,
-  under which a future `/api/v1/terms/admin` would have escaped the gate; for the three mappings
-  under `/api/v1/terms` the behaviour is identical.
-- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the seventeen exchange paths the ingest
-  gateway may act on; every mapping under `/api/v1/exchange` is one of them.
+  `/api/v1/terms/status`, `/api/v1/terms/acceptance`, `/api/v1/users/me/registration-status`.
+  This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`, under which a future
+  `/api/v1/terms/admin` would have escaped the gate; for the three mappings under `/api/v1/terms`
+  the behaviour is identical.
+- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the exchange paths the ingest gateway may
+  act on; every mapping under `/api/v1/exchange` is one of them.
 
 A new mapping under `/api/v1/terms` fails the test until it is listed as exempt or as gated by
 consent.

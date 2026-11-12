@@ -123,9 +123,7 @@ class PagedFindersNoCollectionFetchTest {
       entityManager.clear();
 
       assertUnfetched(userRepository.findAll(PAGE).getContent(), User::getRoles);
-      assertUnfetched(userRepository.findAllScoped(null, PAGE).getContent(), User::getRoles);
-      assertUnfetched(
-          userRepository.searchScoped("paged-", null, PAGE).getContent(), User::getRoles);
+      assertUnfetched(userRepository.searchByName("paged-", PAGE).getContent(), User::getRoles);
       assertUnfetched(
           userRepository
               .findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(

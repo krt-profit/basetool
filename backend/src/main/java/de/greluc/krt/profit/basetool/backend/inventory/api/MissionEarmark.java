@@ -28,8 +28,18 @@ import org.jetbrains.annotations.Nullable;
  * What the Lager shows of a mission its stock is earmarked to.
  *
  * @param id the mission
- * @param name the mission's name
+ * @param name the mission's name, or {@code null} for a caller who may not read the mission
  * @param plannedStartTime the mission's planned start, or {@code null}
  */
 public record MissionEarmark(
-    @NotNull UUID id, @Nullable String name, @Nullable Instant plannedStartTime) {}
+    @NotNull UUID id, @Nullable String name, @Nullable Instant plannedStartTime) {
+
+  /**
+   * Returns this earmark as a caller who may not read the mission is shown it (REQ-INV-027).
+   *
+   * @return the earmark with the mission's id alone
+   */
+  public @NotNull MissionEarmark withoutDetails() {
+    return new MissionEarmark(id, null, null);
+  }
+}

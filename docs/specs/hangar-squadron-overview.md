@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md)
 
 # Unit hangar overview (Org-Einheitsübersicht) — pagination, scope & server-side filter
@@ -101,12 +101,15 @@ An **active unit pin** still narrows the overview to the pinned unit for every c
 decision) — the cross-unit/OL widening applies only when no unit is pinned, exactly like every other
 scoped surface. The per-ship owner/location/fitted drill-down is gated by officer reach in the ship's owning
 unit (REQ-SEC-015), so a member without it sees the complete counts but not the per-owner breakdown;
-a Bereich or OL seat holder gets the breakdown for the units its reach covers.
+a Bereich or OL seat holder gets the breakdown for the units its reach covers. No other hangar read
+hands that breakdown out: `/my-ships` serves the caller's own ships, `/admin/users/{userId}/ships`
+an admin, and the hangar API has no list of every ship in scope.
 
-A ship created through the exchange (REQ-XCH-017) belongs to the member's single direct membership,
-or to no unit for a member of none or of several (owner decision 2026-09-27), and a ship without a
-unit is counted only by the OL widening and an admin until the member assigns one. It then enters
-these scopes like a ship created in the web.
+A ship created through the exchange without a named unit (REQ-XCH-017) belongs to the member's only
+stampable unit — a direct membership on an active unit, while the member holds the stored role
+`KRT Member` (REQ-ORG-032) —, or to no unit for a member with none or several (owner decision
+2026-09-27), and a ship without a unit is counted only by the OL widening and an admin until the
+member assigns one. It then enters these scopes like a ship created in the web.
 
 **Acceptance**
 
@@ -117,12 +120,18 @@ these scopes like a ship created in the web.
 - [ ] The OL widening grants no `isAdmin()` and no `hasRole('ADMIN')` carve-out — every other scoped
   list / `can*` gate still routes OL through `currentScopePredicate()`.
 - [ ] With a single unit pinned, every caller (incl. OL) sees only the pinned unit's ships.
+- [x] Another member's owner, location and fitted leave the hangar API only through this
+  drill-down and the admin member hangar; there is no list of every ship in scope.
 
-**Enforced by:** `ScopeKernelTest` (`CurrentUnitOverviewScopeTests`), `HangarServiceTest` ·
-**Code:** `RequestScopeResolver#currentUnitOverviewScope`, `HangarService#getSquadronOverview`,
+**Enforced by:** `ScopeKernelTest` (`CurrentUnitOverviewScopeTests`), `HangarServiceTest`,
+`AuthorizationMatrixTest`, `HangarUserEndpointsSecurityTest` · **Code:**
+`RequestScopeResolver#currentUnitOverviewScope`, `HangarService#getSquadronOverview`,
 `ShipRepository#countShipsByType` · **ADR:**
 [ADR-0048](../adr/0048-ol-sees-every-ship-in-the-unit-overview.md) · amends
 [REQ-ORG-015](org-unit-tenancy.md) · **Issues:** —
+
+*Amended 2026-11-11:* `GET /api/v1/hangar/ships`, which listed every ship in scope with its owner,
+location and fitted flag behind `HANGAR_READ` alone and had no caller, is removed.
 
 ### REQ-HANGAR-013 — The unit overview updates in place when a unit's ships change
 

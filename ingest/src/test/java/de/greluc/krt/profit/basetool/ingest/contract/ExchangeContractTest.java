@@ -262,8 +262,9 @@ class ExchangeContractTest {
     Path baseline = Path.of(baselineDir);
     Assumptions.assumeTrue(
         !baselineDir.isBlank() && Files.isDirectory(baseline) && !jsonFiles(baseline).isEmpty(),
-        "no -Dexchange.baseline pointing at the previous release's v1 schemas; the release carries"
-            + " none yet, so there is nothing to stay compatible with");
+        "the previous release's v1 schemas are not in -Dexchange.baseline; CI's \"Fetch the"
+            + " previous release's exchange schemas\" step puts them into"
+            + " ingest/build/exchange-baseline (REQ-XCH-026)");
     List<String> breaking = new ArrayList<>();
     for (Path released : jsonFiles(baseline)) {
       Path current = SCHEMAS.resolve(released.getFileName().toString());

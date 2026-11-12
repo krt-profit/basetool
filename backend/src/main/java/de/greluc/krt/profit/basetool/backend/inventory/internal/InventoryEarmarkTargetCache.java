@@ -31,6 +31,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.engine.spi.SessionImplementor;
 import org.jetbrains.annotations.NotNull;
@@ -43,6 +45,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * The Lager's per-transaction memo of its earmark targets (plan §7.5 P3-5d): the first miss loads
  * every mission or job order the Lager rows of the persistence context are earmarked to in one
  * read, so a page of rows costs one lookup, not one per row (REQ-DATA-003).
+ *
+ * <p>A mission is memoised twice, as the write and undo paths look it up and as the caller is shown
+ * it, so the answer of a write never shows what its own lookup read.
  */
 @Component
 @RequiredArgsConstructor
@@ -55,47 +60,64 @@ public class InventoryEarmarkTargetCache implements InventoryEarmarkLookup {
 
   @Override
   public @Nullable MissionEarmark mission(@NotNull UUID missionId) {
-    Map<UUID, Optional<MissionEarmark>> memo = memoObject().missions;
-    if (!memo.containsKey(missionId)) {
-      Set<UUID> wanted = new LinkedHashSet<>(earmarkedMissionsInContext());
-      wanted.add(missionId);
-      wanted.removeAll(memo.keySet());
-      Map<UUID, MissionEarmark> found = missions.missions(wanted);
-      for (UUID id : wanted) {
-        memo.put(id, Optional.ofNullable(found.get(id)));
-      }
-    }
-    return Objects.requireNonNull(memo.get(missionId)).orElse(null);
+    return memoised(
+        memoObject().missions, missionId, this::earmarkedMissionsInContext, missions::missions);
+  }
+
+  @Override
+  public @Nullable MissionEarmark shownMission(@NotNull UUID missionId) {
+    return memoised(
+        memoObject().shownMissions,
+        missionId,
+        this::earmarkedMissionsInContext,
+        missions::shownMissions);
   }
 
   @Override
   public @Nullable JobOrderEarmark jobOrder(@NotNull UUID jobOrderId) {
-    Map<UUID, Optional<JobOrderEarmark>> memo = memoObject().jobOrders;
-    if (!memo.containsKey(jobOrderId)) {
-      Set<UUID> wanted = new LinkedHashSet<>(earmarkedJobOrdersInContext());
-      wanted.add(jobOrderId);
-      wanted.removeAll(memo.keySet());
-      Map<UUID, JobOrderEarmark> found = jobOrders.jobOrders(wanted);
-      for (UUID id : wanted) {
-        memo.put(id, Optional.ofNullable(found.get(id)));
-      }
-    }
-    return Objects.requireNonNull(memo.get(jobOrderId)).orElse(null);
+    return memoised(
+        memoObject().jobOrders,
+        jobOrderId,
+        this::earmarkedJobOrdersInContext,
+        jobOrders::jobOrders);
   }
 
   @Override
   public @Nullable DonationEarmark donation(@NotNull UUID donationId) {
-    Map<UUID, Optional<DonationEarmark>> memo = memoObject().donations;
-    if (!memo.containsKey(donationId)) {
-      Set<UUID> wanted = new LinkedHashSet<>(earmarkedDonationsInContext());
-      wanted.add(donationId);
+    return memoised(
+        memoObject().donations,
+        donationId,
+        this::earmarkedDonationsInContext,
+        donations::donations);
+  }
+
+  /**
+   * Returns one target from the transaction's memo; a miss loads it together with every target of
+   * the same kind the persistence context's earmarks name and the memo does not hold yet, in one
+   * read.
+   *
+   * @param memo the transaction's memo of this kind of target, an empty value for an unknown one
+   * @param id the target
+   * @param earmarked the targets the persistence context's earmarks of this kind name
+   * @param load the owning module's read of several targets
+   * @param <T> the kind of target
+   * @return the target, or {@code null} when it does not exist
+   */
+  private static <T> @Nullable T memoised(
+      @NotNull Map<UUID, Optional<T>> memo,
+      @NotNull UUID id,
+      @NotNull Supplier<Set<UUID>> earmarked,
+      @NotNull Function<Set<UUID>, Map<UUID, T>> load) {
+    if (!memo.containsKey(id)) {
+      Set<UUID> wanted = new LinkedHashSet<>(earmarked.get());
+      wanted.add(id);
       wanted.removeAll(memo.keySet());
-      Map<UUID, DonationEarmark> found = donations.donations(wanted);
-      for (UUID id : wanted) {
-        memo.put(id, Optional.ofNullable(found.get(id)));
+      Map<UUID, T> found = load.apply(wanted);
+      for (UUID loaded : wanted) {
+        memo.put(loaded, Optional.ofNullable(found.get(loaded)));
       }
     }
-    return Objects.requireNonNull(memo.get(donationId)).orElse(null);
+    return Objects.requireNonNull(memo.get(id)).orElse(null);
   }
 
   private Set<UUID> earmarkedDonationsInContext() {
@@ -187,6 +209,9 @@ public class InventoryEarmarkTargetCache implements InventoryEarmarkLookup {
 
     /** The looked-up missions by id, empty for an unknown one. */
     private final Map<UUID, Optional<MissionEarmark>> missions = new HashMap<>();
+
+    /** The missions as the caller is shown them, by id, empty for an unknown one. */
+    private final Map<UUID, Optional<MissionEarmark>> shownMissions = new HashMap<>();
 
     /** The looked-up job orders by id, empty for an unknown one. */
     private final Map<UUID, Optional<JobOrderEarmark>> jobOrders = new HashMap<>();

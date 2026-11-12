@@ -56,6 +56,14 @@ public final class MetricNames {
   public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
 
   /**
+   * Counter {@code basetool_livesync_reauthorize_total}, tags {@code topic_class} and {@code
+   * outcome} ({@link #OUTCOME_ALLOWED} / {@link #REAUTHORIZE_EVICTED} / {@link
+   * #REAUTHORIZE_INDETERMINATE} / {@link #REAUTHORIZE_TOKEN_EXPIRED}): the re-check of one room a
+   * {@code /ws/sync} socket holds whose class needs a check (REQ-FE-015).
+   */
+  public static final String LIVESYNC_REAUTHORIZE = "basetool.livesync.reauthorize";
+
+  /**
    * Counter {@code basetool_livesync_socket_rejected_total}, tag {@code reason}: a {@code /ws/sync}
    * socket refused at connect (ADR-0094). Carries no {@code topic_class}.
    */
@@ -429,7 +437,10 @@ public final class MetricNames {
    */
   public static final String DROPPED_SECTION_FILTERED = "section_filtered";
 
-  /** Live-sync subscribe outcome: the subscribe was authorized (or failed open on a transient). */
+  /**
+   * Live-sync outcome: a subscribe was authorized (or failed open on a transient), or a joined room
+   * passed its re-check on {@link #LIVESYNC_REAUTHORIZE}.
+   */
   public static final String OUTCOME_ALLOWED = "allowed";
 
   /**
@@ -452,6 +463,24 @@ public final class MetricNames {
    * permission verdict.
    */
   public static final String SUBSCRIBE_DENY_INDETERMINATE = "indeterminate";
+
+  /**
+   * Re-check outcome on {@link #LIVESYNC_REAUTHORIZE}: an explicit denial took the socket out of
+   * the room and sent it the terminal {@code denied} frame.
+   */
+  public static final String REAUTHORIZE_EVICTED = "evicted";
+
+  /**
+   * Re-check outcome on {@link #LIVESYNC_REAUTHORIZE}: the check reached no verdict (a 5xx, a
+   * timeout, a failing probe or a saturated executor), so the room stays until the next check.
+   */
+  public static final String REAUTHORIZE_INDETERMINATE = "indeterminate";
+
+  /**
+   * Re-check outcome on {@link #LIVESYNC_REAUTHORIZE}: the socket's captured token had lapsed or a
+   * probe saw it rejected, and the socket was closed with {@code 4401} for a fresh handshake.
+   */
+  public static final String REAUTHORIZE_TOKEN_EXPIRED = "token_expired";
 
   /**
    * Socket-rejected reason: the user already holds the maximum concurrent {@code /ws/sync} sockets.

@@ -209,7 +209,8 @@ section above.
 | **TargetDown** | A **non-probe** scrape target is down. For a container: `${SYSTEMCTL} status <svc>.service`. For `node`, `alloy` or `podman-exporter`: the host service (`systemctl status prometheus-node-exporter alloy`, or `${SYSTEMCTL} status prometheus-podman-exporter`). Blackbox `/probe` jobs are deliberately excluded — there `up==0` is a scrape-timeout artifact; a real probe failure is `probe_success==0` and pages via `BlackboxProbeFailed` / `EdgeIpv6Unreachable` / `DnsResolutionFailed` / `CertificateExpiringSoon` instead. Only `blackbox-exporter` (self `/metrics`) firing here means the exporter itself is down. |
 | **BlackboxProbeFailed** | An HTTPS liveness probe failed. Curl the endpoint from outside and from the host; check the edge (`${SYSTEMCTL} status edge.service`), the host front end (`systemctl status haproxy`), the certificate and upstream health. If it fails from inside only, check the public-name aliases (ADR-0196): a rootless container cannot reach its own host through the public address. |
 | **EdgeIpv6Unreachable** | A public vhost answers over IPv4 but not IPv6. Check the AAAA record and the front end's v6 listener; `curl -6` from an IPv6-capable host. If it answers from outside, the probe path itself is broken: the v6 alias and pasta's v6 guest mapping (`basetool_host_public_name_aliases_v6`, `basetool_host_pasta_map_guest_addrs`) — the 2026-09-22 false positive. |
-| **DnsResolutionFailed** | The public DNS probe against 1.1.1.1 failed — the apex or the API vhost is not resolving an A/AAAA record. Check the zone (`dig A`/`dig AAAA profit-base.online @1.1.1.1`). |
+| **DnsResolutionFailed** | The public DNS probe against 1.1.1.1 failed — the apex is not resolving its A/AAAA record. Check the zone (`dig A`/`dig AAAA profit-base.online @1.1.1.1`). |
+| **PublicApiHostResolvesAgain** | The retired API host `api.profit-base.online` carries an address record again while the apex resolves (ADR-0268). Check the zone at the DNS provider, then `docker/edge/conf.d` for a re-added vhost and the backend's networks for a re-joined edge network. |
 | **HostDiskCritical / HostDiskWarning** | Disk filling. Find the largest consumers (`du -xh /var/lib/basetool --max-depth 2`, `journalctl --disk-usage`, `sudo -u basetool podman system df`). Reclaim images with the cleanup job (`systemctl start basetool-container-cleanup.service`); **never** `podman volume prune` — it removes the named `edge-certs` / `edge-acme-state` volumes (ADR-0194). Critical = act now; the monitoring stores share `/var/lib/basetool` with both PGDATA directories. |
 | **HostInodesCritical** | **CRITICAL.** A filesystem has used more than 90 % of its inodes — writes fail with free space left. Look for directories with many small files (`find /var/lib/basetool -xdev -type d -size +1M`, the journal, container storage) and reclaim them the same way as disk space above. |
 | **HostMemoryLow** | Under 10 % of host memory available for 10 minutes; the next spike risks the OOM killer, which sacrifices Grafana/Tempo first by design. Read dashboard `01-host` and the container memory panels on `02` to find the grower. |
@@ -314,7 +315,7 @@ section above.
 | **OnBehalfOfRefusedSpike** | The backend keeps refusing an `X-Ingest-On-Behalf-Of` header from a caller that is not on the gateway allowlist (`reason="not_a_gateway"`). Either `BASETOOL_INGEST_GATEWAY_CLIENT_IDS` does not match the gateway's real client id — then uploads fail too — or somebody is probing for impersonation. Check the gateway's own token first, then the access log for the source. |
 | **ActingMemberNotLiveRefused** | The gateway keeps naming a member the backend will not act for — unknown locally, or gone from the last Keycloak roster. Usually an offboarded member's connected application still running: find them by the correlationId in the backend log. If the refused subjects vary, somebody is enumerating user ids; the source is in the access log. |
 | **OnBehalfOfWithoutAuthenticatedCaller** | For 30 minutes `ActingMemberFilter` refused on-behalf-of requests that reached it with no authenticated caller. If uploads fail too, suspect the security filter order (`SecurityConfig` against ADR-0129) or silent authentication failures; if they work, an unauthenticated caller is sending the header — check the access log. |
-| **ApiUnknownClient** | A token whose `azp` names no known client drove `/api/**` for 10 minutes. Either a first-party client was added to the realm without `app.monitoring.api-clients.known-client-ids`, or something unapproved uses the API — identify it from Keycloak's client sessions and `{app="edge"}` for the api vhost. The label stays `other` by design. |
+| **ApiUnknownClient** | A token whose `azp` names no known client drove `/api/**` for 10 minutes. Either a first-party client was added to the realm without `app.monitoring.api-clients.known-client-ids`, or something unapproved uses the API — identify it from Keycloak's client sessions and the frontend's and gateway's access logs. The label stays `other` by design. |
 | **OptimisticLockConflictSpike** | A likely locking regression. Check recent deploys; look for a coarse lock or a missed `data-version` propagation on the affected surface. |
 | **IdentityProviderUnavailable** | The app is re-mapping unreachable-Keycloak-JWKS failures to 503. Check Keycloak reachability / DNS before 5xx surfaces to users. The ingest gateway's 503 for a full DPoP replay store is subtracted (its auth-failure reason `dpop_store_full`); `IngestDpopReplayCacheFull` covers that. |
 | **Http5xxRateHigh / HttpLatencyP95High / LogbackErrorSpike** | One application returns more than 1 % 5xx, answers its p95 slower than 2 s, or logs ERRORs above 0.2/s, for 10 minutes. Check the last deploy first, then the application's ERROR lines in Loki (the `level` label) and dashboard `03`; a matching `CircuitBreakerOpen` or `HikariPoolPending` names the dependency. |
@@ -440,9 +441,10 @@ e-mail, not Alertmanager.
 
 ## Dashboard 07: navigation and quick access
 
-Panels 92 to 96 of `07-basetool-operations.json` watch the navigation and the quick access
-(REQ-UI-032, REQ-UI-033, REQ-OBS-011); `NavigationEndpointsErroring` and `QuickAccessSearchSlow`
-alert on them.
+Panels 92 to 96 and 108 of `07-basetool-operations.json` watch the navigation, the quick access and
+the active org unit switcher (REQ-UI-032, REQ-UI-033, REQ-ORG-031, REQ-OBS-011).
+`NavigationEndpointsErroring` and `QuickAccessSearchSlow` alert on the navigation and the quick
+access; the switches are a usage trend without an alert.
 
 | Panel | Query | Reads as |
 | --- | --- | --- |
@@ -451,6 +453,7 @@ alert on them.
 | 94 Navigation endpoints 5xx rate | `http_server_requests_seconds_count` on `/api/v1/navigation/*`, `/navigation/*`, `/dashboard/*` | Server errors of the preference and dashboard routes. |
 | 95 Quick-access searches/hour | `basetool_quick_access_search_total` by `kind`, `outcome` | Entity searches per type; `error` failed closed, `timeout` missed the 2 s cap. |
 | 96 Quick-access search p95 | `http_server_requests_seconds_bucket` on `/quick-access/search` | 95th percentile of the entity search. |
+| 108 Active org unit switches/hour | `basetool_active_org_unit_choice_writes_total` by `target` | Stored changes of the active org unit, to one unit (`unit`) or to all of a member's units (`all`); counted, not audited. |
 
 ## Operating procedures
 

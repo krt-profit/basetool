@@ -9,7 +9,7 @@
 
 ## Akteur
 
-`test-admin` (ADMIN) — legt über die Rollenhierarchie jede Operation an, bearbeitet und löscht sie. Die Live-Sync-Tests nutzen zwei Browser-Kontexte desselben Nutzers, also zwei getrennte `/ws/sync`-Sockets.
+`test-admin` (ADMIN) — legt ohne gewählte Einheit jede Operation an, bearbeitet und löscht sie (mit gewählter Einheit nur die dieser Einheit, REQ-ORG-032). Die Live-Sync-Tests nutzen zwei Browser-Kontexte desselben Nutzers, also zwei getrennte `/ws/sync`-Sockets.
 
 ## Vorbedingungen
 

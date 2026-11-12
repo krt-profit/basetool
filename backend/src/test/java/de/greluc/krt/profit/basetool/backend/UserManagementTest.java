@@ -94,7 +94,7 @@ class UserManagementTest {
         .perform(
             get("/api/v1/users").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content[?(@.username=='testmember')]").exists());
+        .andExpect(jsonPath("$.totalElements").value(Math.toIntExact(userRepository.count())));
   }
 
   @Test
@@ -119,7 +119,7 @@ class UserManagementTest {
                             new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
                             new SimpleGrantedAuthority("USER_MANAGE"))))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content[?(@.username=='testmember')]").exists());
+        .andExpect(jsonPath("$.totalElements").value(Math.toIntExact(userRepository.count())));
   }
 
   @Test

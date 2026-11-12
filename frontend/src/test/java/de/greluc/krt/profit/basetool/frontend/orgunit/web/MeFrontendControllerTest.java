@@ -21,14 +21,22 @@ package de.greluc.krt.profit.basetool.frontend.orgunit.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.ActiveOrgUnitChoiceRequest;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.ActiveOrgUnitChoiceResponse;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,14 +53,20 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Tests the active-OrgUnit switcher endpoint {@code POST /me/active-org-unit} (FE-SEC-02): the
- * {@code _referer} redirect target is honoured only as a same-origin path, and a malformed {@code
- * orgUnitId} yields {@code 400}.
+ * Tests the active-OrgUnit switcher endpoint {@code POST /me/active-org-unit}: the {@code _referer}
+ * redirect target is honoured only as a same-origin path (FE-SEC-02), a malformed {@code orgUnitId}
+ * yields {@code 400}, and every switch is stored in the backend, refused without a change, or kept
+ * for the session when the backend cannot store it (REQ-ORG-031).
  */
 @SpringBootTest
 class MeFrontendControllerTest {
 
   private static final String ENDPOINT = "/me/active-org-unit";
+
+  private static final String ACTIVE_CHOICE = "/api/v1/org-units/me/active-choice";
+
+  private static final Class<ActiveOrgUnitChoiceResponse> CHOICE_RESPONSE =
+      ActiveOrgUnitChoiceResponse.class;
 
   private MockMvc mockMvc;
 
@@ -143,6 +157,91 @@ class MeFrontendControllerTest {
                 .with(csrf()))
         .andExpect(redirectedUrl("/missions"));
     assertNull(session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY));
+  }
+
+  @Test
+  @WithMockUser
+  void aSwitchIsStoredAndTheSessionPinsWhatTheBackendStored() throws Exception {
+    UUID chosen = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq(ACTIVE_CHOICE), any(ActiveOrgUnitChoiceRequest.class), eq(CHOICE_RESPONSE)))
+        .thenReturn(new ActiveOrgUnitChoiceResponse(chosen, 3L));
+    MockHttpSession session = new MockHttpSession();
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .session(session)
+                .param("orgUnitId", chosen.toString())
+                .param("_referer", "/inventory")
+                .with(csrf()))
+        .andExpect(redirectedUrl("/inventory"))
+        .andExpect(flash().attribute("successToast", "orgUnit.switcher.activated"));
+
+    verify(backendApiClient)
+        .put(ACTIVE_CHOICE, new ActiveOrgUnitChoiceRequest(chosen, null), CHOICE_RESPONSE);
+    assertEquals(
+        chosen.toString(), session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY));
+  }
+
+  @Test
+  @WithMockUser
+  void choosingAllOrgUnitsIsStoredAndClearsThePin() throws Exception {
+    when(backendApiClient.put(
+            eq(ACTIVE_CHOICE), any(ActiveOrgUnitChoiceRequest.class), eq(CHOICE_RESPONSE)))
+        .thenReturn(new ActiveOrgUnitChoiceResponse(null, 4L));
+    MockHttpSession session = new MockHttpSession();
+    session.setAttribute(
+        ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, UUID.randomUUID().toString());
+
+    mockMvc
+        .perform(post(ENDPOINT).session(session).param("orgUnitId", "").with(csrf()))
+        .andExpect(flash().attribute("successToast", "orgUnit.switcher.cleared"));
+
+    verify(backendApiClient)
+        .put(ACTIVE_CHOICE, new ActiveOrgUnitChoiceRequest(null, null), CHOICE_RESPONSE);
+    assertNull(session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY));
+  }
+
+  @Test
+  @WithMockUser
+  void aUnitTheBackendRefusesLeavesTheSessionUnchanged() throws Exception {
+    UUID previous = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq(ACTIVE_CHOICE), any(ActiveOrgUnitChoiceRequest.class), eq(CHOICE_RESPONSE)))
+        .thenThrow(new BackendServiceException("not selectable", null, 400));
+    MockHttpSession session = new MockHttpSession();
+    session.setAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, previous.toString());
+
+    mockMvc
+        .perform(
+            post(ENDPOINT)
+                .session(session)
+                .param("orgUnitId", UUID.randomUUID().toString())
+                .with(csrf()))
+        .andExpect(redirectedUrl("/"))
+        .andExpect(flash().attribute("errorToast", "orgUnit.switcher.rejected"));
+
+    assertEquals(
+        previous.toString(),
+        session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY));
+  }
+
+  @Test
+  @WithMockUser
+  void aSwitchTheBackendCannotStoreStillAppliesToTheSession() throws Exception {
+    UUID chosen = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq(ACTIVE_CHOICE), any(ActiveOrgUnitChoiceRequest.class), eq(CHOICE_RESPONSE)))
+        .thenThrow(new BackendServiceException("backend down", null, 503));
+    MockHttpSession session = new MockHttpSession();
+
+    mockMvc
+        .perform(post(ENDPOINT).session(session).param("orgUnitId", chosen.toString()).with(csrf()))
+        .andExpect(flash().attribute("errorToast", "orgUnit.switcher.notStored"));
+
+    assertEquals(
+        chosen.toString(), session.getAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY));
   }
 
   @Test

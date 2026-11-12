@@ -202,21 +202,6 @@ public interface InventoryItemRepository
   Optional<InventoryItem> findByIdForAllocationWrite(@Param("id") UUID id);
 
   /**
-   * Lists every inventory row, shared and personal, linked to {@code missionId}, without org-unit
-   * scoping.
-   *
-   * @param missionId the mission whose linked inventory to load; never {@code null}.
-   * @return the mission's inventory rows; never {@code null}, possibly empty.
-   */
-  @EntityGraph(attributePaths = {"material", "location", "user"})
-  @Query(
-      """
-      SELECT i FROM InventoryItem i WHERE EXISTS (SELECT 1 FROM InventoryMissionAllocation ma
-      WHERE ma.inventoryItem = i AND ma.missionId = :missionId)
-      """)
-  List<InventoryItem> findByMissionId(@Param("missionId") UUID missionId);
-
-  /**
    * Lists the inventory rows linked to {@code missionId} within the caller's org-unit scope; used
    * by the mission-detail "Lagereinträge" panel (REQ-ORG-003).
    *
@@ -263,9 +248,6 @@ public interface InventoryItemRepository
       """)
   List<OwnedStockSlice> sumOwnedStockByMaterialAndQuality(@Param("userId") UUID userId);
 
-  /** Derived Spring-Data query - returns entities matching {@code MaterialAndPersonalFalse}. */
-  Page<InventoryItem> findByMaterialAndPersonalFalse(Material material, Pageable pageable);
-
   /**
    * Pages the non-personal stock rows of one material within the caller's org-unit scope, for the
    * per-material drilldown.
@@ -304,9 +286,6 @@ public interface InventoryItemRepository
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
       Pageable pageable);
 
-  /** Derived Spring-Data query - returns entities matching {@code PersonalFalse}. */
-  Page<InventoryItem> findByPersonalFalse(Pageable pageable);
-
   /**
    * Pages non-personal material rows within the caller's org-unit scope, with optional material,
    * location, job-order, mission and minimum-quality filters, each switched by its flag.
@@ -336,35 +315,6 @@ public interface InventoryItemRepository
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
-      Pageable pageable);
-
-  /**
-   * Pages the material rows owned by {@code :user} with the same optional filters as {@link
-   * #findGlobalByFilters}.
-   */
-  @EntityGraph(attributePaths = {"material", "location", "user", "owningOrgUnit"})
-  @Query(
-      """
-      SELECT i FROM InventoryItem i WHERE i.user = :user AND i.material IS NOT NULL AND
-      (:hasMaterials = false OR
-      i.material.id IN :materialIds) AND (:minQuality IS NULL OR i.quality >= :minQuality)
-      AND (:hasJobOrders = false OR EXISTS (SELECT 1 FROM InventoryJobOrderAllocation ja
-      WHERE ja.inventoryItem = i AND ja.jobOrderId IN :jobOrderIds)) AND (:hasMissions =
-      false OR EXISTS (SELECT 1 FROM InventoryMissionAllocation ma WHERE ma.inventoryItem =
-      i AND ma.missionId IN :missionIds))
-      AND (:hasLocations = false OR i.location.id IN :locationIds)
-      """)
-  Page<InventoryItem> findUserByFilters(
-      @Param("user") User user,
-      @Param("hasMaterials") boolean hasMaterials,
-      @Param("materialIds") @Nullable List<UUID> materialIds,
-      @Param("hasLocations") boolean hasLocations,
-      @Param("locationIds") @Nullable List<UUID> locationIds,
-      @Param("minQuality") @Nullable Integer minQuality,
-      @Param("hasJobOrders") boolean hasJobOrders,
-      @Param("jobOrderIds") @Nullable List<UUID> jobOrderIds,
-      @Param("hasMissions") boolean hasMissions,
-      @Param("missionIds") @Nullable List<UUID> missionIds,
       Pageable pageable);
 
   /**
@@ -453,9 +403,10 @@ public interface InventoryItemRepository
    * Aggregates the user's filtered material stock into one {@link InventoryStackAggregate} per
    * stock identity; entries load via {@link #findUserStackEntries}.
    *
-   * <p>Same filters as {@link #findUserByFilters}, plus {@code personalOnly} / {@code
-   * nonPersonalOnly} to narrow to private or shared rows. The item variant is {@link
-   * InventoryItemViewRepository#findUserItemStacks}.
+   * <p>Optional material, location, minimum-quality, job-order and mission filters, each switched
+   * by its flag, plus {@code personalOnly} / {@code nonPersonalOnly} to narrow to private or shared
+   * rows and {@code stolenOnly} / {@code nonStolenOnly} to stock marked „gestohlen" or not. The
+   * item variant is {@link InventoryItemViewRepository#findUserItemStacks}.
    */
   @Query(
       """

@@ -89,6 +89,16 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   long countInActiveProfitHierarchyByIdIn(@Param("ids") Collection<UUID> ids);
 
   /**
+   * Whether an active org unit of any kind has the given id; an admin may pin exactly these units
+   * (REQ-ORG-032).
+   *
+   * @param id the org-unit id; never {@code null}
+   * @return {@code true} iff the unit exists and is active
+   */
+  @Query("SELECT COUNT(o) > 0 FROM OrgUnit o WHERE o.id = :id AND o.active = true")
+  boolean existsByIdAndActiveTrue(@Param("id") UUID id);
+
+  /**
    * Loads every active {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron Squadron}
    * and {@link de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand SpecialCommand},
    * for the Leitung view (REQ-ROLE-004).
@@ -110,9 +120,8 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   List<OrgUnit> findByParentOrgUnitId(@Param("parentOrgUnitId") UUID parentOrgUnitId);
 
   /**
-   * Id-only projection of {@link #findByParentOrgUnitId(UUID)}, used by {@link
-   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService} to expand a Bereich to
-   * its units (REQ-ORG-015).
+   * Id-only projection of {@link #findByParentOrgUnitId(UUID)}: every direct child, deactivated
+   * ones included.
    *
    * @param parentOrgUnitId the parent org unit whose direct child ids to load; never {@code null}.
    * @return the direct child org-unit ids in arbitrary order; never {@code null}, possibly empty.
@@ -121,17 +130,30 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   List<UUID> findChildOrgUnitIds(@Param("parentOrgUnitId") UUID parentOrgUnitId);
 
   /**
-   * Returns the id of every org unit of every kind, including parentless ones; the
+   * Returns the ids of the active direct children of a unit, which {@link
+   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService} expands a Bereich to
+   * (REQ-ORG-015); a deactivated unit is reached by no cascade (REQ-ORG-032).
+   *
+   * @param parentOrgUnitId the parent org unit whose active child ids to load; never {@code null}.
+   * @return the active direct child org-unit ids in arbitrary order; never {@code null}, possibly
+   *     empty.
+   */
+  @Query("SELECT o.id FROM OrgUnit o WHERE o.parent.id = :parentOrgUnitId AND o.active = true")
+  List<UUID> findActiveChildOrgUnitIds(@Param("parentOrgUnitId") UUID parentOrgUnitId);
+
+  /**
+   * Returns the id of every active org unit of every kind, including parentless ones; the
    * Organisationsleitung reach in {@link
-   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService} (REQ-ORG-015).
+   * de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService} (REQ-ORG-015), which a
+   * deactivated unit leaves (REQ-ORG-032).
    *
    * <p>Materialised as concrete ids, never as an admin-all marker, so OL reach never inherits the
    * admin carve-outs.
    *
-   * @return every org-unit id in arbitrary order; never {@code null}, possibly empty.
+   * @return every active org-unit id in arbitrary order; never {@code null}, possibly empty.
    */
-  @Query("SELECT o.id FROM OrgUnit o")
-  List<UUID> findAllOrgUnitIds();
+  @Query("SELECT o.id FROM OrgUnit o WHERE o.active = true")
+  List<UUID> findAllActiveOrgUnitIds();
 
   /**
    * Narrows {@code ids} to the leadership units among them: the Organisationsleitung and every
@@ -157,14 +179,16 @@ public interface OrgUnitRepository extends JpaRepository<OrgUnit, UUID> {
   List<UUID> findOrganisationsleitungIdsAmong(@Param("ids") Collection<UUID> ids);
 
   /**
-   * Id-only batch form of {@link #findChildOrgUnitIds(UUID)}: the direct children of any of {@code
-   * parentOrgUnitIds}.
+   * Batch form of {@link #findActiveChildOrgUnitIds(UUID)}: the active direct children of any of
+   * {@code parentOrgUnitIds}.
    *
    * @param parentOrgUnitIds the parent org-unit ids; never {@code null}
-   * @return the direct child org-unit ids in arbitrary order; never {@code null}, possibly empty
+   * @return the active direct child org-unit ids in arbitrary order; never {@code null}, possibly
+   *     empty
    */
-  @Query("SELECT o.id FROM OrgUnit o WHERE o.parent.id IN :parentOrgUnitIds")
-  List<UUID> findChildOrgUnitIdsIn(@Param("parentOrgUnitIds") Collection<UUID> parentOrgUnitIds);
+  @Query("SELECT o.id FROM OrgUnit o WHERE o.parent.id IN :parentOrgUnitIds AND o.active = true")
+  List<UUID> findActiveChildOrgUnitIdsIn(
+      @Param("parentOrgUnitIds") Collection<UUID> parentOrgUnitIds);
 
   /**
    * Loads every active {@link de.greluc.krt.profit.basetool.backend.orgunit.api.Bereich} for the

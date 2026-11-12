@@ -251,7 +251,7 @@ class NavigationRenderMvcTest {
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(
             new LayoutContextLoader.MeLayoutResponse(
-                null, List.of(), CapabilitiesResponse.NONE, 7L));
+                null, null, List.of(), CapabilitiesResponse.NONE, 7L));
     String unread = render(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
 
     assertThat(section(HEADER, quiet))

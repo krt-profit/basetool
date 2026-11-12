@@ -468,8 +468,7 @@ class MissionServiceTest {
     caller.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
-        .thenReturn(home);
+    when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, null)).thenReturn(home);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
@@ -488,8 +487,7 @@ class MissionServiceTest {
     caller.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
-        .thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, null)).thenReturn(null);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 
     Mission saved =
@@ -518,8 +516,7 @@ class MissionServiceTest {
     User caller = new User();
     caller.setId(UUID.randomUUID());
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
-        .thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, null)).thenReturn(null);
 
     assertThrows(
         de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class,
@@ -557,7 +554,7 @@ class MissionServiceTest {
     picked.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, picked.getId()))
+    when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, picked.getId()))
         .thenReturn(picked);
     when(missionRepository.save(any(Mission.class))).thenAnswer(i -> i.getArguments()[0]);
 

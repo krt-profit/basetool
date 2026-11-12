@@ -1,6 +1,6 @@
 # ADR-0006 — Operation visibility for mission participants
 
-- **Status:** Accepted — **narrowed by [ADR-0150](0150-the-participant-escape-does-not-open-the-operation-ledger.md)** (2026-08-30): the participant escape opens the operation, not its ledger
+- **Status:** Accepted — **narrowed by [ADR-0150](0150-the-participant-escape-does-not-open-the-operation-ledger.md)** (2026-08-30): the participant escape opens the operation, not its ledger; **narrowed by [ADR-0374](0374-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): the escape no longer reaches the mission's operation picker, which lists only the operations the caller may edit (REQ-MISSION-034)
 - **Date:** 2026-06-09
 - **Deciders:** Repository owner (@greluc)
 - **Related:** [ADR-0005](0005-ownerless-leadership-operations.md) · spec [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003/009` · issue #500

@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.MissionListDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.ParticipantForm;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UnitForm;
+import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefinerySettingsDto;
@@ -147,11 +148,25 @@ public class MissionPageController {
    */
   private final ParallelPageLoader parallelPageLoader;
 
-  private void addOperationsToModel(Model model) {
-    List<OperationReferenceDto> operations =
+  /**
+   * Adds the operation picker's options: the operations the caller may link a mission to, followed
+   * by the mission's current operation when it is not one of them, so saving the core section keeps
+   * that link (REQ-MISSION-034).
+   *
+   * @param model the view model receiving {@code operationsList}
+   * @param current the operation the mission belongs to, or {@code null} on the create page and for
+   *     a mission without one
+   */
+  private void addOperationsToModel(@NotNull Model model, @Nullable OperationDto current) {
+    List<OperationReferenceDto> linkable =
         SectionFallback.load(
             log, "operation-references", missionClient::operationReferences, List.of());
-    model.addAttribute("operationsList", operations);
+    List<OperationReferenceDto> options =
+        new ArrayList<>(Objects.requireNonNullElse(linkable, List.of()));
+    if (current != null && options.stream().noneMatch(option -> current.id().equals(option.id()))) {
+      options.add(new OperationReferenceDto(current.id(), current.name()));
+    }
+    model.addAttribute("operationsList", options);
   }
 
   /**
@@ -468,7 +483,7 @@ public class MissionPageController {
     model.addAttribute("authUserId", CurrentUser.userIdText(principal));
     addFormsToModel(model, principal, fullRender);
     if (fullRender) {
-      addOperationsToModel(model);
+      addOperationsToModel(model, mission.operation());
     }
 
     model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
@@ -568,7 +583,7 @@ public class MissionPageController {
             null, null, null, true, true, null, null, null, null, 0, 0, null, null, null, null, 0L,
             List.of(), 0L, List.of(), 0L, null, 0L));
     addFormsToModel(model, principal, true);
-    addOperationsToModel(model);
+    addOperationsToModel(model, null);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
     return "mission/mission-detail";
   }

@@ -1,5 +1,5 @@
-> **Doc type:** Living spec - complete MATERIAL/ITEM reading and requester need editing. Last reviewed: 2026-11-09.
-> **Owner area:** ORDERS · **Related ADRs:** ADR-0091, ADR-0356
+> **Doc type:** Living spec - complete MATERIAL/ITEM reading and requester need editing. Last reviewed: 2026-11-12.
+> **Owner area:** ORDERS · **Related ADRs:** ADR-0091, ADR-0356, ADR-0374
 
 # Requesting-unit JobOrder access
 
@@ -23,6 +23,10 @@ reports, and the linked-stock owner/location. The DTO has no reduced-requester f
 the current requesting-unit writer's capability to edit remaining need. Ordinary membership
 grants reading. An observed former requesting unit retains concrete order read through current
 legitimate unit reach.
+
+The requesting units follow the active org unit (REQ-ORG-032): with a unit selected, the requested
+scope, the detail and the requester edits cover the orders that unit placed; under „Alle meine
+Org-Einheiten" those of every unit the caller's memberships and grants reach.
 
 The producer panel retains REQ-ORDERS-016's independent viewer gate. Unreadable mission names and
 planned start remain anonymous in linked stock. Unrelated Inventory, private Bank data and the
@@ -50,7 +54,7 @@ do not introduce a separate user mutation or a new notification audience.
 - [ ] Post-partial requester edits preserve booked production, delivery and history.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest`,
-`JobOrderAssigneeGrantIntegrationTest`, `JobOrderMissionAllocationRedactorTest`,
+`JobOrderAssigneeGrantIntegrationTest`, `MissionEarmarkTargetsTest`,
 `OrdersDetailPatternRenderTest` and `JobOrderResponsibilityRecoveryMvcTest` cover current reading
 and capability boundaries, including safe post-partial requester edits.
 

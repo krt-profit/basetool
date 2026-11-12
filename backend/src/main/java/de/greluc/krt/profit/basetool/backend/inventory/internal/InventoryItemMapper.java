@@ -135,7 +135,8 @@ public abstract class InventoryItemMapper {
 
   /**
    * Maps one mission slice to its outbound chip DTO, flattening the earmarked mission to its id,
-   * name and planned start.
+   * name and planned start as the caller is shown them: without name and planned start for a
+   * mission the caller may not read (REQ-INV-027).
    *
    * @param allocation the mission slice; {@code null} returns {@code null}.
    * @return the populated slice DTO.
@@ -149,7 +150,7 @@ public abstract class InventoryItemMapper {
     MissionEarmark mission =
         allocation.getMissionId() == null
             ? null
-            : earmarkTargets.mission(allocation.getMissionId());
+            : earmarkTargets.shownMission(allocation.getMissionId());
     return new MissionAllocationDto(
         allocation.getMissionId(),
         mission == null ? null : mission.name(),

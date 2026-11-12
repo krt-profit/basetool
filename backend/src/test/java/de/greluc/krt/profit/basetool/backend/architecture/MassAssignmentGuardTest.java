@@ -78,6 +78,7 @@ import de.greluc.krt.profit.basetool.backend.purchasing.internal.ResumePurchasin
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderCreateRequest;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderStoreItemDto;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.scope.web.ActiveOrgUnitChoiceController.ActiveOrgUnitChoiceRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.CreateNeedRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.PledgeRequest;
 import de.greluc.krt.profit.basetool.backend.supply.internal.RecordDonationRequest;
@@ -215,6 +216,13 @@ class MassAssignmentGuardTest {
                       + " scoped by the caller's reach",
                   "status",
                   "the status filter option of a widget, not a lifecycle state")),
+          Map.entry(
+              ActiveOrgUnitChoiceRequest.class,
+              Map.of(
+                  "orgUnitId",
+                  "the member's choice of the active context, accepted by"
+                      + " ActiveOrgUnitChoices.choose only when RequestScopeResolver.isSelectable"
+                      + " holds (REQ-ORG-031)")),
           Map.entry(
               ReassignResponsibleOrgUnitRequest.class,
               Map.of("responsibleOrgUnitId", JOB_ORDER_UNITS)),

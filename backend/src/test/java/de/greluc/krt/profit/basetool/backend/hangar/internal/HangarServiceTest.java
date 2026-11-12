@@ -381,13 +381,13 @@ class HangarServiceTest {
     ship.setId(shipId);
     ship.setShipType(type);
     HangarService spied = org.mockito.Mockito.spy(hangarService);
-    org.mockito.Mockito.doReturn(ship).when(spied).addShip(any(), any());
     org.mockito.Mockito.doReturn(ship).when(spied).updateShip(any(), any(), any());
     org.mockito.Mockito.doReturn(0).when(spied).deleteShip(any(), any());
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
     when(userService.currentActor()).thenReturn(ACTOR);
     ShipRequestDto dto =
         new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null);
+    stubAdminAddFor(member, dto, ship);
 
     spied.addShipByAdmin(member, dto);
     spied.updateShipByAdmin(member, shipId, dto);
@@ -410,14 +410,54 @@ class HangarServiceTest {
     ShipType type = new ShipType();
     type.setName("Cutlass Black");
     ship.setShipType(type);
-    HangarService spied = org.mockito.Mockito.spy(hangarService);
-    org.mockito.Mockito.doReturn(ship).when(spied).addShip(any(), any());
     when(userService.currentActor()).thenReturn(ACTOR);
+    ShipRequestDto dto =
+        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null);
+    stubAdminAddFor(ACTOR.id(), dto, ship);
 
-    spied.addShipByAdmin(
-        ACTOR.id(), new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null));
+    hangarService.addShipByAdmin(ACTOR.id(), dto);
 
     verify(eventPublisher, never()).publishEvent(any(Object.class));
+  }
+
+  @Test
+  void anAdminsShipForAMemberTakesTheUnitFromTheMembersMembershipsOnly() {
+    UUID member = UUID.randomUUID();
+    UUID picked = UUID.randomUUID();
+    Ship ship = new Ship();
+    ShipType type = new ShipType();
+    type.setName("Cutlass Black");
+    ship.setShipType(type);
+    when(userService.currentActor()).thenReturn(ACTOR);
+    ShipRequestDto dto =
+        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, picked);
+    User owner = stubAdminAddFor(member, dto, ship);
+
+    hangarService.addShipByAdmin(member, dto);
+
+    verify(orgUnitStampingService).resolveOrgUnitForAdminOnBehalf(owner, picked);
+    verify(orgUnitStampingService, never()).resolveOrgUnitForPickerOutputNullable(any(), any());
+  }
+
+  /**
+   * Stubs the create path of an admin's add for a member: the member, the unit resolved from the
+   * member's memberships (none here), the ship type and the save, which returns {@code saved}.
+   *
+   * @param memberId the hangar's owner
+   * @param dto the add request
+   * @param saved the ship the save returns
+   * @return the stubbed member
+   */
+  private User stubAdminAddFor(UUID memberId, ShipRequestDto dto, Ship saved) {
+    User owner = new User();
+    owner.setId(memberId);
+    when(userRepository.findPlainById(memberId)).thenReturn(Optional.of(owner));
+    when(orgUnitStampingService.resolveOrgUnitForAdminOnBehalf(owner, dto.owningOrgUnitId()))
+        .thenReturn(null);
+    when(shipTypeRepository.findById(dto.shipTypeId()))
+        .thenReturn(Optional.of(saved.getShipType()));
+    when(shipRepository.save(any(Ship.class))).thenReturn(saved);
+    return owner;
   }
 
   @Test

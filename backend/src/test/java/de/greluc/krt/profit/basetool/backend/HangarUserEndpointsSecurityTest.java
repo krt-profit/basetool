@@ -109,6 +109,26 @@ class HangarUserEndpointsSecurityTest {
         .andExpect(status().isOk());
   }
 
+  /**
+   * The ship collection takes writes only: a member with the seeded hangar authorities gets 405 on
+   * a read of it, since the hangar API lists no ships beyond the own hangar, the unit overview and
+   * the admin member hangar (REQ-HANGAR-003).
+   */
+  @Test
+  void testShipCollection_NoListRead() throws Exception {
+    mockMvc
+        .perform(
+            get("/api/v1/hangar/ships")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(user.getId().toString()))
+                        .authorities(
+                            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                            new SimpleGrantedAuthority("HANGAR_READ"),
+                            new SimpleGrantedAuthority("HANGAR_WRITE"))))
+        .andExpect(status().isMethodNotAllowed());
+  }
+
   @Test
   void testMyReadiness_NoHangarAuthorityAllowed() throws Exception {
     mockMvc

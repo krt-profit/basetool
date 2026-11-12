@@ -312,9 +312,9 @@ class RefineryOrderTenancyE2eTest {
 
   /**
    * The per-resource owner gate: a member of the order's own squadron who is neither the owner nor
-   * a logistician still cannot edit it (the org gate passes, the service owner check rejects with
-   * 403). {@code orderA} is owned by {@code test-admin}; {@code test-member} shares Staffel A but
-   * is a plain member.
+   * a logistician cannot edit it; the edit gate admits only the owner and a logistician of the
+   * order's unit and rejects with 403 (REQ-REFINERY-019). {@code orderA} is owned by {@code
+   * test-admin}; {@code test-member} shares Staffel A but is a plain member.
    */
   @Test
   void sameSquadronNonOwnerCannotEdit() {

@@ -6,7 +6,7 @@
 ## Context & goal
 
 Issue #2414 tells the right people about two organisational facts that were visible only on a page: a
-leadership seat holder without the Keycloak role `KRT Member`, which every seat requires, and a member
+leadership seat holder without the Basetool role `KRT Member`, which every seat requires, and a member
 who left the organisation. Both notices are published after the commit, carry only a member's display name, a unit's
 name and coded words, and have a seeded, admin-editable rule. Each can be muted (REQ-NOTIF-027).
 
@@ -14,7 +14,7 @@ name and coded words, and have a seeded, admin-editable rule. Each can be muted 
 
 ### REQ-ORG-029 — A leadership seat holder without KRT Member tells the admins
 
-Every leadership seat requires the Keycloak role `KRT Member` (REQ-ROLE-002), and a seat confers
+Every leadership seat requires the Basetool role `KRT Member` (REQ-ROLE-002, ADR-0355), and a seat confers
 officer reach only while its holder has it (ADR-0300). A member **holds a seat** when any of their
 memberships is not a plain member (`OrgUnitMembershipRepository#existsLeadershipSeat`). The admin
 notice reports the one inconsistency that can still drift: a seat holder without `KRT Member`. An

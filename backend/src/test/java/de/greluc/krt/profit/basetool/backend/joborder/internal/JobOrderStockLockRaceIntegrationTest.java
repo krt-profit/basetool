@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
@@ -72,6 +73,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -94,6 +96,7 @@ class JobOrderStockLockRaceIntegrationTest {
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private RoleRepository roleRepository;
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private OrgUnitRepository orgUnitRepository;
   @Autowired private OrgUnitMembershipRepository memberships;
@@ -131,6 +134,7 @@ class JobOrderStockLockRaceIntegrationTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("order-lock-" + tag);
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     logistician = userRepository.save(user);
     createdProfitRoot = orgUnitRepository.findActiveProfitRootIds().isEmpty();
     var profit = ProfitHierarchyFixtures.persistedProfitArea(orgUnitRepository);
@@ -346,6 +350,7 @@ class JobOrderStockLockRaceIntegrationTest {
           var original =
               (JwtAuthenticationToken) Objects.requireNonNull(context.getAuthentication());
           var authorities = new ArrayList<>(original.getAuthorities());
+          authorities.add(new SimpleGrantedAuthority(Roles.authority(Roles.KRT_MEMBER)));
           authorities.add(new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitId));
           context.setAuthentication(new JwtAuthenticationToken(original.getToken(), authorities));
           try {

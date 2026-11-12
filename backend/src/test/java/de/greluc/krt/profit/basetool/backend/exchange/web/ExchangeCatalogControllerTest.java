@@ -166,6 +166,7 @@ class ExchangeCatalogControllerTest {
     assertThat(seen)
         .containsExactlyInAnyOrder(
             "ROLE_EXCHANGE_MEMBER",
+            "XCH_KRT_MEMBER",
             "XCH_CAPABILITY:exchange.blueprints.read",
             "XCH_CAPABILITY:exchange.connect");
     assertThat(clients).containsExactly("versekit-test");

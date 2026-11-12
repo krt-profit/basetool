@@ -47,15 +47,20 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Proves under real contention that same-section writers to a mission produce exactly one winner
  * and 409s for the rest, while writers to different sections both succeed.
+ *
+ * <p>Each worker runs inside a request of its own, as the mission gates read the active context.
  */
 @SpringBootTest
 class MissionSectionLockConcurrencyTest {
@@ -220,10 +225,13 @@ class MissionSectionLockConcurrencyTest {
                   return;
                 }
                 SecurityContextHolder.getContext().setAuthentication(RACER);
+                RequestContextHolder.setRequestAttributes(
+                    new ServletRequestAttributes(new MockHttpServletRequest()));
                 try {
                   action.accept(index);
                 } finally {
                   SecurityContextHolder.clearContext();
+                  RequestContextHolder.resetRequestAttributes();
                 }
                 successes.incrementAndGet();
               } catch (ObjectOptimisticLockingFailureException conflict) {

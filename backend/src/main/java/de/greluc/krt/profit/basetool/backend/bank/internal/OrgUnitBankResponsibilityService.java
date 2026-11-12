@@ -36,13 +36,11 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,8 +67,9 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
   private final ApplicationEventPublisher eventPublisher;
 
   /**
-   * Resolves the user ids of an account's responsible holders (REQ-BANK-034), used to notify them
-   * of booking requests (REQ-BANK-026).
+   * Resolves the seat holders responsible for an account (REQ-BANK-034) from the stored seats,
+   * whether their unit is active or not, unfiltered by role: the audit diff of a holder change and
+   * the hand-over read it as is. A notice reads {@link #resolveNotifiedResponsibleHolderUserIds}.
    *
    * <p>Staffelkonto: its {@code STAFFELLEITER}; SK-Konto: its {@code SK_LEAD}; Bereichskonto: its
    * {@code BEREICHSLEITER}; {@code CARTEL}: every {@code OL_MEMBER}; {@code CARTEL_BANK}: the
@@ -83,34 +82,61 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
   @NotNull
   @Transactional(readOnly = true)
   public Set<UUID> resolveResponsibleHolderUserIds(@NotNull UUID accountId) {
-    BankAccount account = bankAccountRepository.findById(accountId).orElse(null);
-    if (account == null) {
+    return bankAccountRepository
+        .findById(accountId)
+        .map(account -> responsibleHolders(account, false))
+        .orElse(Set.of());
+  }
+
+  /**
+   * Resolves the responsible holders a notice about an account addresses: those of {@link
+   * #resolveResponsibleHolderUserIds} whose seat is on an active unit, so the account of a
+   * deactivated unit notifies none of its seat holders (REQ-BANK-034, REQ-ORG-032). The
+   * notification directory then keeps only those holding {@code KRT Member} (REQ-NOTIF-024).
+   *
+   * @param accountId the account whose notified holders to resolve
+   * @return the notified holders' user ids; never {@code null}, empty for a deactivated owning
+   *     unit, a Sonderkonto, an unlinked account or a missing account
+   */
+  @NotNull
+  @Transactional(readOnly = true)
+  public Set<UUID> resolveNotifiedResponsibleHolderUserIds(@NotNull UUID accountId) {
+    return bankAccountRepository
+        .findById(accountId)
+        .map(account -> responsibleHolders(account, true))
+        .orElse(Set.of());
+  }
+
+  /**
+   * Resolves the responsible holders of an account by its type.
+   *
+   * @param account the account
+   * @param activeUnitsOnly whether only seats on active units count
+   * @return the responsible holders' user ids; never {@code null}, possibly empty
+   */
+  @NotNull
+  private Set<UUID> responsibleHolders(@NotNull BankAccount account, boolean activeUnitsOnly) {
+    if (account.getType() == BankAccountType.CARTEL_BANK) {
+      return resolveCartelBankResponsibleHolders(activeUnitsOnly);
+    }
+    OrgUnit owner = account.getOrgUnit();
+    if (owner == null || (activeUnitsOnly && !owner.isActive())) {
       return Set.of();
     }
-    UUID owner = owningOrgUnitId(account);
     return switch (account.getType()) {
-      case ORG_UNIT -> {
-        if (owner == null) {
-          yield Set.of();
-        }
-        MembershipRole holderRole =
-            Objects.requireNonNull(account.getOrgUnit()).getKind() == OrgUnitKind.SPECIAL_COMMAND
-                ? MembershipRole.SK_LEAD
-                : MembershipRole.STAFFELLEITER;
-        yield orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(owner, holderRole);
-      }
+      case ORG_UNIT ->
+          orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+              owner.getId(),
+              owner.getKind() == OrgUnitKind.SPECIAL_COMMAND
+                  ? MembershipRole.SK_LEAD
+                  : MembershipRole.STAFFELLEITER);
       case AREA ->
-          owner == null
-              ? Set.of()
-              : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
-                  owner, MembershipRole.BEREICHSLEITER);
+          orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+              owner.getId(), MembershipRole.BEREICHSLEITER);
       case CARTEL ->
-          owner == null
-              ? Set.of()
-              : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
-                  owner, MembershipRole.OL_MEMBER);
-      case CARTEL_BANK -> resolveCartelBankResponsibleHolders();
-      case SPECIAL -> Set.of();
+          orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
+              owner.getId(), MembershipRole.OL_MEMBER);
+      case CARTEL_BANK, SPECIAL -> Set.of();
     };
   }
 
@@ -119,12 +145,16 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
    * BEREICHSLEITER} of every {@code Department.PROFIT} Bereich, unioned. The reverse of {@code
    * OrgUnitBankAccessService#isProfitBereichsleiter}.
    *
+   * @param activeUnitsOnly whether only the active Profit Bereiche count
    * @return the Profit-Bereichsleiter user ids; never {@code null}, possibly empty
    */
   @NotNull
-  private Set<UUID> resolveCartelBankResponsibleHolders() {
+  private Set<UUID> resolveCartelBankResponsibleHolders(boolean activeUnitsOnly) {
     List<UUID> profitBereichIds =
-        bereichRepository.findByDepartment(Department.PROFIT).stream().map(Bereich::getId).toList();
+        bereichRepository.findByDepartment(Department.PROFIT).stream()
+            .filter(bereich -> !activeUnitsOnly || bereich.isActive())
+            .map(Bereich::getId)
+            .toList();
     if (profitBereichIds.isEmpty()) {
       return Set.of();
     }
@@ -308,16 +338,5 @@ public class OrgUnitBankResponsibilityService implements ResponsibleHolderTracke
   @NotNull
   private static String joinResponsibleIds(@NotNull Set<UUID> ids) {
     return ids.stream().map(UUID::toString).sorted().collect(Collectors.joining(","));
-  }
-
-  /**
-   * The owning org-unit id of an account, or {@code null} when it has none.
-   *
-   * @param account the account
-   * @return the owning org-unit id, or {@code null}
-   */
-  @Nullable
-  private static UUID owningOrgUnitId(@NotNull BankAccount account) {
-    return account.getOrgUnit() == null ? null : account.getOrgUnit().getId();
   }
 }

@@ -126,7 +126,7 @@ class OperationServiceTest {
     UUID pickedOrgUnitId = picked.getId();
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, pickedOrgUnitId))
+    when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, pickedOrgUnitId))
         .thenReturn(picked);
     when(accessGateService.canManageMissionsOf(pickedOrgUnitId)).thenReturn(true);
     when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -146,8 +146,7 @@ class OperationServiceTest {
     caller.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
-        .thenReturn(null);
+    when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, null)).thenReturn(null);
     when(accessGateService.canManageMissionsOf(null)).thenReturn(true);
     when(operationRepository.save(any(Operation.class))).thenAnswer(i -> i.getArguments()[0]);
 
@@ -170,7 +169,7 @@ class OperationServiceTest {
     stamped.setId(UUID.randomUUID());
 
     when(userService.getCurrentUser()).thenReturn(Optional.of(caller));
-    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
+    when(orgUnitStampingService.resolveOrgUnitForUnitOwnedAggregate(caller, null))
         .thenReturn(stamped);
     when(accessGateService.canManageMissionsOf(stamped.getId())).thenReturn(false);
 

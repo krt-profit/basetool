@@ -54,7 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
  * The approval-needed notice end to end against Postgres (REQ-NOTIF-033, REQ-BANK-041): the seeded
  * rules tell the required approver that their approval is needed instead of the generic new-request
  * notice, clear it once the request is approved, decided or withdrawn, raise it again when the
- * approval is revoked, and re-decide it on a correction. Runs in a rolled-back transaction.
+ * approval is revoked, and re-decide it on a correction. The generic notice reaches a grantee only
+ * while they hold Bank Employee (REQ-BANK-009). Runs in a rolled-back transaction.
  */
 @SpringBootTest
 @Transactional
@@ -64,6 +65,8 @@ class ApprovalNeededNoticeIntegrationTest {
   private static final UUID MANAGER = UUID.fromString("44444444-4444-4444-4444-4444444531c2");
   private static final UUID GRANTEE = UUID.fromString("44444444-4444-4444-4444-4444444531c3");
   private static final UUID APPROVER = UUID.fromString("44444444-4444-4444-4444-4444444531c4");
+  private static final UUID FORMER_EMPLOYEE =
+      UUID.fromString("44444444-4444-4444-4444-4444444531c5");
   private static final BigDecimal AMOUNT = new BigDecimal("2500000");
 
   @Autowired private NotificationCreationService creationService;
@@ -79,9 +82,11 @@ class ApprovalNeededNoticeIntegrationTest {
   @BeforeEach
   void seed() {
     Role management = roleRepository.findByNameIgnoreCase("Bank Management").orElseThrow();
+    Role employee = roleRepository.findByNameIgnoreCase("Bank Employee").orElseThrow();
     user(REQUESTER, "approval-requester", Set.of());
     user(MANAGER, "approval-manager", Set.of(management));
-    User grantee = user(GRANTEE, "approval-grantee", Set.of());
+    User grantee = user(GRANTEE, "approval-grantee", Set.of(employee));
+    User formerEmployee = user(FORMER_EMPLOYEE, "approval-former-employee", Set.of());
     user(APPROVER, "approval-approver", Set.of(management));
     account = new BankAccount();
     account.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));
@@ -89,8 +94,13 @@ class ApprovalNeededNoticeIntegrationTest {
     account.setType(BankAccountType.SPECIAL);
     account.setStatus(BankAccountStatus.ACTIVE);
     account = accountRepository.saveAndFlush(account);
+    grantOnTheAccount(grantee);
+    grantOnTheAccount(formerEmployee);
+  }
+
+  private void grantOnTheAccount(User grantee) {
     BankAccountGrant grant = new BankAccountGrant();
-    grant.setId(new BankAccountGrantId(GRANTEE, account.getId()));
+    grant.setId(new BankAccountGrantId(grantee.getId(), account.getId()));
     grant.setUser(grantee);
     grant.setAccount(account);
     grant.setCanWithdraw(true);
@@ -184,6 +194,14 @@ class ApprovalNeededNoticeIntegrationTest {
     created(pendingRequest(false));
 
     assertThat(inbox(MANAGER)).containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+  }
+
+  @Test
+  void theInertGrantOfAFormerBankEmployeeNotifiesNobody() {
+    created(pendingRequest(false));
+
+    assertThat(inbox(GRANTEE)).containsExactly(NotificationType.BANK_BOOKING_REQUEST_CREATED);
+    assertThat(inbox(FORMER_EMPLOYEE)).isEmpty();
   }
 
   @Test

@@ -172,8 +172,8 @@ public class OperationController {
   }
 
   /**
-   * Slim id + name projection of every operation visible to the caller, sorted by name, for the
-   * mission-detail operation picker.
+   * Slim id + name projection of the operations the caller may link a mission to, which are the
+   * operations they may edit, sorted by name, for the mission's operation picker (REQ-MISSION-034).
    *
    * @return slim reference DTOs for the operation picker
    */
@@ -182,9 +182,12 @@ public class OperationController {
   @Operation(
       summary = "Lookup operations",
       description =
-          "Returns a slim id + name reference list of every operation in the caller's squadron"
-              + " scope, sorted by name. Designed for dropdowns and typeaheads where the full"
-              + " OperationDto payload is overkill.")
+          "Returns a slim id + name reference list of the operations the caller may link a"
+              + " mission to, sorted by name: those they may edit (a Mission Manager grant in the"
+              + " owning unit inside the active context; for an ownerless operation one in an"
+              + " Organisationsleitung or Bereich unit; for an admin every operation of their own"
+              + " scope). Designed for the mission's operation"
+              + " picker, where the full OperationDto payload is overkill.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Reference list returned."),
     @ApiResponse(responseCode = "401", description = "Caller is not authenticated.")

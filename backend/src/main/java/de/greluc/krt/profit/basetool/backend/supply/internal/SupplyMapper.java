@@ -68,18 +68,16 @@ public class SupplyMapper {
    * What a page of needs is mapped against.
    *
    * @param units the raising units by id
-   * @param admin whether the caller is an admin
    * @param leadership whether the caller belongs to the governing leadership
-   * @param managed the units the caller manages explicitly
+   * @param managed the units the caller manages
    * @param delegate whether the caller reads the purchase fields of every need
    * @param orders the linked orders' coverage by order id, loaded only for the needs the caller
    *     manages
    */
   record NeedContext(
       Map<UUID, OrgUnit> units,
-      boolean admin,
       boolean leadership,
-      Set<UUID> managed,
+      SupplyManagedUnits managed,
       boolean delegate,
       Map<UUID, OrderCoverage> orders) {
 
@@ -87,10 +85,10 @@ public class SupplyMapper {
      * Whether the caller manages the needs of a unit.
      *
      * @param unitId the unit
-     * @return {@code true} for an admin, a manager of the unit or the governing leadership
+     * @return {@code true} when the unit is among the caller's managed units
      */
     boolean manages(UUID unitId) {
-      return admin || managed.contains(unitId);
+      return managed.contains(unitId);
     }
 
     /**
@@ -110,9 +108,9 @@ public class SupplyMapper {
    * @param units the receiving units by id
    * @param donors the donors by id
    * @param caller the caller, or {@code null}
-   * @param admin whether the caller is an admin
+   * @param admin whether the caller is an admin, who sees every donor and may withdraw any pledge
    * @param leadership whether the caller belongs to the governing leadership
-   * @param managed the units the caller manages explicitly
+   * @param managed the units the caller manages
    */
   record DonationContext(
       Map<UUID, OrgUnit> units,
@@ -120,16 +118,16 @@ public class SupplyMapper {
       @Nullable UUID caller,
       boolean admin,
       boolean leadership,
-      Set<UUID> managed) {
+      SupplyManagedUnits managed) {
 
     /**
      * Whether the caller manages the donations of a unit.
      *
      * @param unitId the unit
-     * @return {@code true} for an admin or a manager of the unit
+     * @return {@code true} when the unit is among the caller's managed units
      */
     boolean manages(UUID unitId) {
-      return admin || managed.contains(unitId);
+      return managed.contains(unitId);
     }
   }
 
@@ -144,19 +142,16 @@ public class SupplyMapper {
     Set<UUID> unitIds = needs.stream().map(SupplyNeed::getOrgUnitId).collect(Collectors.toSet());
     boolean leadership = accessPolicy.isGoverningLeadership();
     boolean delegate = !leadership && !needs.isEmpty() && accessPolicy.isTradeDelegate();
-    boolean admin = accessPolicy.isAdmin();
-    Set<UUID> managed = accessPolicy.managedUnitIds();
+    SupplyManagedUnits managed = accessPolicy.managedUnits();
     Set<UUID> orderIds = new HashSet<>();
     for (SupplyNeed need : needs) {
-      if (need.getJobOrderId() != null
-          && isLive(need.getStatus())
-          && (admin || managed.contains(need.getOrgUnitId()))) {
-        orderIds.add(need.getJobOrderId());
+      UUID orderId = shownOrderId(need, managed);
+      if (orderId != null) {
+        orderIds.add(orderId);
       }
     }
     return new NeedContext(
         unitsById(unitIds),
-        admin,
         leadership,
         managed,
         delegate,
@@ -191,7 +186,7 @@ public class SupplyMapper {
         authHelperService.currentUserId().orElse(null),
         accessPolicy.isAdmin(),
         accessPolicy.isGoverningLeadership(),
-        accessPolicy.managedUnitIds());
+        accessPolicy.managedUnits());
   }
 
   private Map<UUID, OrgUnit> unitsById(Set<UUID> ids) {
@@ -207,11 +202,13 @@ public class SupplyMapper {
    *
    * @param need the need, with its catalogue entry and tier loaded
    * @param context the page context
-   * @return the DTO, with the purchase fields only for a caller who may read them
+   * @return the DTO, with the purchase fields only for a caller who may read them and the job-order
+   *     link only for a caller who manages the raising unit (REQ-SUP-023)
    */
   @NotNull
   NeedDto toDto(@NotNull SupplyNeed need, @NotNull NeedContext context) {
     OrgUnit unit = context.units().get(need.getOrgUnitId());
+    boolean manages = context.manages(need.getOrgUnitId());
     boolean purchaseFields = context.seesPurchase(need.getOrgUnitId());
     Material material = need.getMaterial();
     return new NeedDto(
@@ -233,9 +230,9 @@ public class SupplyMapper {
         purchaseFields ? need.getMaxUnitPrice() : null,
         purchaseFields && need.isPurchasable() ? need.getPurchasedAmount() : null,
         purchaseFields && need.isPurchasable() && material != null ? material.getPriceBuy() : null,
-        need.getJobOrderId(),
+        manages ? need.getJobOrderId() : null,
         linkedOrder(need, context),
-        context.manages(need.getOrgUnitId()),
+        manages,
         need.getVersion(),
         need.getCreatedAt());
   }
@@ -291,8 +288,8 @@ public class SupplyMapper {
    */
   private static @Nullable NeedOrderDto linkedOrder(
       @NotNull SupplyNeed need, @NotNull NeedContext context) {
-    UUID orderId = need.getJobOrderId();
-    if (orderId == null || !isLive(need.getStatus()) || !context.manages(need.getOrgUnitId())) {
+    UUID orderId = shownOrderId(need, context.managed());
+    if (orderId == null) {
       return null;
     }
     OrderCoverage order = context.orders().get(orderId);
@@ -309,6 +306,22 @@ public class SupplyMapper {
         order.status(),
         bucket == null ? null : bucket.requiredAmount(),
         bucket == null ? null : bucket.bookedAmount());
+  }
+
+  /**
+   * Names the order whose coverage a need shows (REQ-SUP-023): its linked order while the need is
+   * live and the caller manages the raising unit. The page context loads exactly these orders.
+   *
+   * @param need the need
+   * @param managed the caller's managed units
+   * @return the order's id, or {@code null} when the need is closed, unlinked or not managed by the
+   *     caller
+   */
+  private static @Nullable UUID shownOrderId(
+      @NotNull SupplyNeed need, @NotNull SupplyManagedUnits managed) {
+    return isLive(need.getStatus()) && managed.contains(need.getOrgUnitId())
+        ? need.getJobOrderId()
+        : null;
   }
 
   /**

@@ -41,7 +41,6 @@ import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationResp
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.UserMapper;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,7 +69,6 @@ class HangarControllerTest {
   @Mock private HangarImportService hangarImportService;
   @Mock private UserService userService;
   @Mock private ShipMapper shipMapper;
-  @Mock private UserMapper userMapper;
   @Mock private HangarAccessPolicy hangarAccessPolicy;
 
   private HangarController controller;
@@ -79,12 +77,7 @@ class HangarControllerTest {
   void setUp() {
     controller =
         new HangarController(
-            hangarService,
-            hangarImportService,
-            userService,
-            shipMapper,
-            userMapper,
-            hangarAccessPolicy);
+            hangarService, hangarImportService, userService, shipMapper, hangarAccessPolicy);
   }
 
   private static ShipDto shipDto(String name) {
@@ -170,24 +163,6 @@ class HangarControllerTest {
 
     verify(hangarService)
         .getMyShipsFiltered(eq(ownerId), isNull(), eq(Boolean.FALSE), any(Pageable.class));
-  }
-
-  @Test
-  void getAllShips_wrapsPageThroughMapper() {
-    Ship s = new Ship();
-    ShipDto d = shipDto("Carrack");
-    Page<Ship> page =
-        new PageImpl<>(
-            List.of(s), PageRequest.of(0, 20, org.springframework.data.domain.Sort.by("name")), 1);
-    when(hangarService.getAllShips(any(Pageable.class))).thenReturn(page);
-    when(shipMapper.toDto(s)).thenReturn(d);
-
-    PageResponse<ShipDto> result = controller.getAllShips(0, 20, "name,asc");
-
-    assertThat(result.content()).containsExactly(d);
-    assertThat(result.sort()).isNotEmpty();
-    verify(hangarService).getAllShips(any(Pageable.class));
-    verify(shipMapper, never()).toOwnerDto(any());
   }
 
   @Test

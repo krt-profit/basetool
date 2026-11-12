@@ -56,7 +56,7 @@
                         <th th:text="#{mission.name}">Name</th>
                         <th class="cell-status" th:text="#{mission.status}">Status</th>
                         <th th:text="#{mission.planned_start}">Planned Start</th>
-                        <th th:if="${isAllSquadronsMode}" th:text="#{mission.owning_squadron}">Staffel</th>
+                        <th th:text="#{mission.owning_squadron}">Staffel</th>
                         <th class="num" th:text="#{mission.list.registeredHeader}">Angemeldet</th>
                         <th class="cell-actions"><span class="visually-hidden" th:text="#{general.open}">Open</span></th>
                     </tr>
@@ -82,7 +82,7 @@
                                            : (${days == 0} ? #{list.relative.today}
                                            : (${days > 0} ? #{list.relative.inDays(${days})} : #{list.relative.daysAgo(${-days})}))">in 5 Tagen</span>
                         </td>
-                        <td th:if="${isAllSquadronsMode}" th:attr="data-label=#{mission.owning_squadron}">
+                        <td th:attr="data-label=#{mission.owning_squadron}">
                             <span th:if="${m.owningSquadron != null}" class="squadron-badge"
                                   th:title="${m.owningSquadron.name()}"
                                   th:text="${m.owningSquadron.shorthand()}">ALP</span>

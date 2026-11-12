@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.RefiningMethodDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryGoodDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderCountsDto;
@@ -63,7 +64,8 @@ import org.springframework.web.context.WebApplicationContext;
 /**
  * Renders the refinery list on the list pattern (REQ-UI-027, REQ-REFINERY-019): page head with one
  * primary action, the run segment with counters, search and own-orders switch, the yield / refinery
- * / done / owner columns with a progress bar, ready rows marked and storable, and the empty state.
+ * / done / owner / unit columns with a progress bar, ready rows marked and storable, and the empty
+ * state.
  */
 @SpringBootTest
 class RefineryOrdersListPatternRenderTest {
@@ -227,6 +229,47 @@ class RefineryOrdersListPatternRenderTest {
   private static @NotNull PageResponse<RefineryOrderListDto> onlyOrder(
       @NotNull RefineryOrderListDto order) {
     return new PageResponse<>(List.of(order), 0, 50, 1L, 1, List.of());
+  }
+
+  /**
+   * Every row names its owning unit, so the own orders show where each one belongs whatever unit is
+   * selected (REQ-ORG-032): the unit's shorthand, or a muted dash for an order without a unit.
+   */
+  @Test
+  void marksEveryRowWithItsUnit() throws Exception {
+    RefineryOrderListDto withoutUnit =
+        order(READY_ID, 120, 60, "Quantanium-Erz", "Quantanium", true);
+    RefineryOrderListDto inHel =
+        new RefineryOrderListDto(
+            RUNNING_ID,
+            withoutUnit.owner(),
+            withoutUnit.location(),
+            null,
+            withoutUnit.startedAt(),
+            withoutUnit.durationMinutes(),
+            0d,
+            0d,
+            0d,
+            0d,
+            withoutUnit.refiningMethod(),
+            "OPEN",
+            withoutUnit.goods(),
+            new SquadronReferenceDto(UUID.randomUUID(), "Hel", "HEL"),
+            1L,
+            true,
+            null);
+
+    String html =
+        render(new PageResponse<>(List.of(withoutUnit, inHel), 0, 50, 2L, 1, List.of()), "");
+
+    assertThat(html)
+        .contains(">Einheit<")
+        .containsPattern(
+            "data-testid=\"refinery-order-unit\"[^>]*>\\s*<span class=\"squadron-badge\""
+                + "\\s+title=\"Hel\">HEL</span>")
+        .containsPattern(
+            "data-testid=\"refinery-order-unit\"[^>]*>\\s*"
+                + "<span class=\"squadron-badge squadron-badge-muted\">");
   }
 
   /** The list renders on the pattern: head, segment with counters, columns, ready row first. */

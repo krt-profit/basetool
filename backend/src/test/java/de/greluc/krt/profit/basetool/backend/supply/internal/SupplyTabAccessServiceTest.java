@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.supply.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -31,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import de.greluc.krt.profit.basetool.backend.supply.api.NeedPriceAudience;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyTabAccess.SupplyTabGrants;
 import java.util.List;
@@ -45,8 +47,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
 /**
- * The supply tabs of the layout read follow the incoming-donations page and the statistics gate
- * (REQ-UI-026, REQ-SUP-013), through the real {@link SupplyAccessPolicy}.
+ * The supply tabs of the layout read follow the units the caller manages and the statistics gate
+ * (REQ-UI-026, REQ-SUP-013), whatever unit is pinned (ADR-0329), through the real {@link
+ * SupplyAccessPolicy} and {@link AccessGateService}.
  */
 @ExtendWith(MockitoExtension.class)
 class SupplyTabAccessServiceTest {
@@ -58,7 +61,6 @@ class SupplyTabAccessServiceTest {
   @Mock private SupplyUnitSettingRepository settingRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private RequestScopeResolver requestScopeResolver;
-  @Mock private AccessGateService accessGateService;
   @Mock private AuthHelperService authHelperService;
   @Mock private ObjectProvider<NeedPriceAudience> priceAudiences;
 
@@ -69,7 +71,7 @@ class SupplyTabAccessServiceTest {
     SupplyAccessPolicy policy =
         new SupplyAccessPolicy(
             requestScopeResolver,
-            accessGateService,
+            new AccessGateService(requestScopeResolver, authHelperService),
             authHelperService,
             settingsService,
             priceAudiences);
@@ -98,9 +100,26 @@ class SupplyTabAccessServiceTest {
         .thenReturn(managed);
   }
 
+  /** A pin on a unit the caller does not manage leaves nothing in the active context. */
+  private void pinnedToAnUnmanagedUnit() {
+    lenient()
+        .when(
+            requestScopeResolver.currentGrantedOrgUnitIdsInActiveContext(
+                SupplyAccessPolicy.UNIT_MANAGER_ROLE))
+        .thenReturn(Set.of());
+    lenient()
+        .when(requestScopeResolver.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, OTHER, Set.of()));
+  }
+
   private void noLeadership() {
     when(requestScopeResolver.currentUserIsOlMember()).thenReturn(false);
     when(settingsService.governingAreaId()).thenReturn(Optional.empty());
+  }
+
+  private void admin() {
+    when(settingsService.isEnabled()).thenReturn(true);
+    when(authHelperService.isAdmin()).thenReturn(true);
   }
 
   @Test
@@ -117,7 +136,7 @@ class SupplyTabAccessServiceTest {
     member(Set.of(MANAGED));
     noLeadership();
     when(settingRepository.findByAcceptsDonationsTrue()).thenReturn(List.of(accepting(MANAGED)));
-    when(orgUnitRepository.findAllById(List.of(MANAGED))).thenReturn(List.of(unit(MANAGED, true)));
+    when(orgUnitRepository.findAllById(Set.of(MANAGED))).thenReturn(List.of(unit(MANAGED, true)));
 
     assertThat(service.current()).isEqualTo(new SupplyTabGrants(true, true));
   }
@@ -138,7 +157,7 @@ class SupplyTabAccessServiceTest {
     member(Set.of(MANAGED));
     noLeadership();
     when(settingRepository.findByAcceptsDonationsTrue()).thenReturn(List.of(accepting(MANAGED)));
-    when(orgUnitRepository.findAllById(List.of(MANAGED))).thenReturn(List.of(unit(MANAGED, false)));
+    when(orgUnitRepository.findAllById(Set.of(MANAGED))).thenReturn(List.of(unit(MANAGED, false)));
 
     assertThat(service.current().incoming()).isFalse();
   }
@@ -163,10 +182,34 @@ class SupplyTabAccessServiceTest {
 
   @Test
   void anAdminReachesEveryActiveAcceptingUnit() {
-    when(settingsService.isEnabled()).thenReturn(true);
-    when(authHelperService.isAdmin()).thenReturn(true);
+    admin();
     when(settingRepository.findByAcceptsDonationsTrue()).thenReturn(List.of(accepting(OTHER)));
-    when(orgUnitRepository.findAllById(List.of(OTHER))).thenReturn(List.of(unit(OTHER, true)));
+    when(orgUnitRepository.findAllById(Set.of(OTHER))).thenReturn(List.of(unit(OTHER, true)));
+
+    assertThat(service.current()).isEqualTo(new SupplyTabGrants(true, true));
+  }
+
+  /**
+   * A tab flag that read the pin would count as a lost right and delete the member's stored
+   * favourite, phone slot or start page of the tab (ADR-0329).
+   */
+  @Test
+  void aManagerPinnedToAUnitTheyDoNotManageKeepsBothTabs() {
+    member(Set.of(MANAGED));
+    noLeadership();
+    pinnedToAnUnmanagedUnit();
+    when(settingRepository.findByAcceptsDonationsTrue()).thenReturn(List.of(accepting(MANAGED)));
+    when(orgUnitRepository.findAllById(Set.of(MANAGED))).thenReturn(List.of(unit(MANAGED, true)));
+
+    assertThat(service.current()).isEqualTo(new SupplyTabGrants(true, true));
+  }
+
+  @Test
+  void anAdminPinnedToAnotherUnitKeepsBothTabs() {
+    admin();
+    pinnedToAnUnmanagedUnit();
+    when(settingRepository.findByAcceptsDonationsTrue()).thenReturn(List.of(accepting(MANAGED)));
+    when(orgUnitRepository.findAllById(Set.of(MANAGED))).thenReturn(List.of(unit(MANAGED, true)));
 
     assertThat(service.current()).isEqualTo(new SupplyTabGrants(true, true));
   }

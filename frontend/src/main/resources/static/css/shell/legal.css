@@ -74,6 +74,10 @@
         font-size: var(--fs-sm);
     }
 
+    .legal-toc__sub li::marker {
+        color: var(--color-primary);
+    }
+
     .legal-toc__sub li + li {
         margin-top: var(--space-1);
     }

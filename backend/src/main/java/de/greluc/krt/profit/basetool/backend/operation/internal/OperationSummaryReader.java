@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionOperationSummary;
+import de.greluc.krt.profit.basetool.backend.mission.api.OperationLinkability;
 import de.greluc.krt.profit.basetool.backend.mission.api.OperationSummaryProvider;
 import java.util.Collection;
 import java.util.HashMap;
@@ -30,12 +31,16 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Tells the mission module the name, status and owner of the operations its missions belong to. */
+/**
+ * Tells the mission module the name, status and owner of the operations its missions belong to, and
+ * whether the caller may link a mission to an operation, by the operation edit rule.
+ */
 @Component
 @RequiredArgsConstructor
 public class OperationSummaryReader implements OperationSummaryProvider {
 
   private final OperationRepository operationRepository;
+  private final OperationAccessPolicy operationAccessPolicy;
 
   @Override
   @Transactional(readOnly = true)
@@ -48,5 +53,17 @@ public class OperationSummaryReader implements OperationSummaryProvider {
       byId.put(summary.id(), summary);
     }
     return byId;
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public @NotNull OperationLinkability linkability(@NotNull UUID operationId) {
+    return operationRepository
+        .findById(operationId)
+        .map(operation ->
+            operationAccessPolicy.canEdit(operation)
+                ? OperationLinkability.LINKABLE
+                : OperationLinkability.NOT_LINKABLE)
+        .orElse(OperationLinkability.NO_SUCH_OPERATION);
   }
 }

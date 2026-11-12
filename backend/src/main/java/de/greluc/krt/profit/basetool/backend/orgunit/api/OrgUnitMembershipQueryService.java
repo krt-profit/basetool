@@ -153,7 +153,9 @@ public class OrgUnitMembershipQueryService {
    * Lists the user's Staffel and Spezialkommando memberships as picker options, Staffel first then
    * SKs by name; backs {@code GET /api/v1/users/{userId}/memberships}.
    *
-   * <p>Bereich and OL memberships, and rows whose stored kind disagrees with the org unit, are
+   * <p>Lists the stored memberships, those on deactivated units included, for the administration's
+   * member views (REQ-ORG-032); the pickers read {@link #listDirectMembershipOptions(UUID)}.
+   * Bereich and OL memberships, and rows whose stored kind disagrees with the org unit, are
    * skipped. An unknown user yields an empty list.
    *
    * @param userId the user whose memberships to enumerate; never {@code null}.
@@ -186,20 +188,16 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Returns the org-unit ids the user is a direct member of, across all kinds and without the
-   * leadership cascade.
+   * Returns the active org-unit ids the user is a direct member of, across all kinds and without
+   * the leadership cascade: a membership on a deactivated unit confers nothing (REQ-ORG-032).
    *
    * @param userId the user whose direct memberships to enumerate; never {@code null}.
-   * @return the org-unit ids of the user's direct memberships across all kinds; never {@code null},
-   *     possibly empty.
+   * @return the org-unit ids of the user's direct memberships on active units across all kinds;
+   *     never {@code null}, possibly empty.
    */
   @NotNull
   public Set<UUID> findDirectMembershipOrgUnitIds(@NotNull UUID userId) {
-    Set<UUID> ids = new LinkedHashSet<>();
-    for (OrgUnitMembership row : membershipRepository.findAllByIdUserId(userId)) {
-      ids.add(row.getId().getOrgUnitId());
-    }
-    return ids;
+    return membershipRepository.findActiveOrgUnitIdsByUserId(userId);
   }
 
   /**
@@ -233,12 +231,12 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Batched {@link #listDirectMembershipOptions(UUID)}: each user's direct memberships across all
-   * four kinds as named picker options in the same order, read in two queries for the whole set
-   * (REQ-DATA-003, REQ-XCH-054).
+   * Batched {@link #listDirectMembershipOptions(UUID)}: each user's direct memberships on active
+   * units across all four kinds as named picker options in the same order, read in two queries for
+   * the whole set (REQ-DATA-003, REQ-XCH-054, REQ-ORG-032).
    *
    * @param userIds the users; never {@code null}.
-   * @return the options per user; a user without a direct membership is absent.
+   * @return the options per user; a user without a direct membership on an active unit is absent.
    */
   @NotNull
   public Map<UUID, List<OrgUnitMembershipOptionDto>> listDirectMembershipOptionsByUser(
@@ -257,7 +255,7 @@ public class OrgUnitMembershipQueryService {
     Map<UUID, List<OrgUnitMembershipOptionDto>> options = new HashMap<>();
     for (OrgUnitMembership row : rows) {
       OrgUnit unit = units.get(row.getId().getOrgUnitId());
-      if (unit != null) {
+      if (unit != null && unit.isActive()) {
         options
             .computeIfAbsent(row.getId().getUserId(), _ -> new ArrayList<>())
             .add(toOption(unit));
@@ -269,25 +267,28 @@ public class OrgUnitMembershipQueryService {
 
   /**
    * Returns the org-unit ids in which the user is a Logistician: the units whose membership makes
-   * them one by {@link OrgUnitMembership#isLogisticianOfOwnUnit(boolean)}, plus the units below a
-   * Bereich or Organisationsleitung they are one of (REQ-SEC-005, REQ-XCH-043). A rank counts only
-   * while the user holds {@code KRT Member}; the explicit flag always does (REQ-SEC-015).
+   * them one by {@link OrgUnitMembership#isLogisticianOfOwnUnit()}, plus the units below a Bereich
+   * or Organisationsleitung they are one of (REQ-SEC-005, REQ-XCH-043). Without {@code KRT Member}
+   * no membership confers it, flag and rank alike (REQ-SEC-015), and a membership on a deactivated
+   * unit confers it neither (REQ-ORG-032).
    *
    * @param userId the user whose memberships to read; never {@code null}.
    * @return the org-unit ids; never {@code null}, possibly empty.
    */
   @NotNull
   public Set<UUID> findLogisticianOrgUnitIds(@NotNull UUID userId) {
-    boolean seatsConfer = userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER));
+    if (!userRepository.hasAnyRoleCode(userId, List.of(Roles.KRT_MEMBER))) {
+      return Set.of();
+    }
     return orgUnitCascadeService.grantedUnits(
-        membershipRepository.findAllByIdUserId(userId),
-        membership -> membership.isLogisticianOfOwnUnit(seatsConfer));
+        membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId),
+        OrgUnitMembership::isLogisticianOfOwnUnit);
   }
 
   /**
-   * Lists the user's direct memberships across all four kinds as named picker options, ordered OL,
-   * Bereich, Staffel, SK and then by name, so the first element is the primary unit. Backs the bank
-   * counterparty org-unit picker (REQ-BANK-044).
+   * Lists the user's direct memberships on active units across all four kinds as named picker
+   * options, ordered OL, Bereich, Staffel, SK and then by name, so the first element is the primary
+   * unit. Backs the bank counterparty org-unit picker (REQ-BANK-044, REQ-ORG-032).
    *
    * @param userId the user whose direct memberships to enumerate; never {@code null}.
    * @return picker-friendly DTOs across all four kinds; never {@code null}, possibly empty.
@@ -313,7 +314,8 @@ public class OrgUnitMembershipQueryService {
    * #listDirectMembershipOptions(UUID)} (REQ-BANK-044).
    *
    * @param userId the user whose primary membership to resolve; never {@code null}.
-   * @return the primary org-unit id, or empty when the user has no direct membership at all.
+   * @return the primary org-unit id, or empty when the user has no direct membership on an active
+   *     unit.
    */
   public Optional<UUID> findPrimaryDirectMembershipOrgUnitId(@NotNull UUID userId) {
     return listDirectMembershipOptions(userId).stream()
@@ -349,35 +351,33 @@ public class OrgUnitMembershipQueryService {
   }
 
   /**
-   * Lists the owning-org-unit picker options: the caller's direct memberships plus the cascaded
-   * leadership reach from {@link OrgUnitCascadeService#expandWithDescendants(java.util.Collection)}
-   * (REQ-ORG-016).
+   * Lists the owning-org-unit picker options and the units of the active-context switcher: the
+   * user's direct memberships on active units plus the cascaded leadership reach from {@link
+   * OrgUnitCascadeService#expandWithDescendants(java.util.Collection)} (REQ-ORG-016, REQ-ORG-032).
+   * Deactivated units are left out, and a membership on one reaches nothing. A caller without
+   * {@code KRT Member} reaches no unit (ADR-0300), so the callers ask only for a member.
    *
-   * <p>Without a leadership membership this equals {@link #listOptionsForUser(UUID)}. Options may
-   * include Bereich and OL entries and are sorted OL, Bereich, Staffel, SK, then by name.
+   * <p>Options may include Bereich and OL entries and are sorted OL, Bereich, Staffel, SK, then by
+   * name.
    *
-   * @param userId the caller whose reachable org units to enumerate; never {@code null}.
+   * @param userId the user whose reachable org units to enumerate; never {@code null}
    * @return picker-friendly DTOs across all reachable kinds; never {@code null}, possibly empty
-   *     when the caller has no membership at all.
+   *     when the user has no membership at all
    */
   @NotNull
   public List<OrgUnitMembershipOptionDto> listPickerOptionsWithDescendants(@NotNull UUID userId) {
-    List<OrgUnitMembership> rows = membershipRepository.findAllByIdUserId(userId);
+    List<OrgUnitMembership> rows = membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId);
     if (rows.isEmpty()) {
       return List.of();
     }
     Set<UUID> reach = orgUnitCascadeService.expandWithDescendants(rows);
     List<OrgUnitMembershipOptionDto> options = new ArrayList<>(reach.size());
     for (OrgUnit orgUnit : orgUnitRepository.findAllById(reach)) {
-      options.add(
-          new OrgUnitMembershipOptionDto(
-              orgUnit.getId(), orgUnit.getName(), orgUnit.getShorthand(), orgUnit.getKind()));
+      if (orgUnit.isActive()) {
+        options.add(toOption(orgUnit));
+      }
     }
-    options.sort(
-        Comparator.<OrgUnitMembershipOptionDto, Integer>comparing(o -> pickerKindOrder(o.kind()))
-            .thenComparing(
-                o -> o.orgUnitName() == null ? "" : o.orgUnitName(),
-                String.CASE_INSENSITIVE_ORDER));
+    options.sort(pickerOrder());
     return options;
   }
 

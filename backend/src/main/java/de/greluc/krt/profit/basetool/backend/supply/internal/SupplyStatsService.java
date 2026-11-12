@@ -98,7 +98,7 @@ public class SupplyStatsService {
           .add(new SupplyStatsDto.EntryAmount(row.entry(), row.amount()));
     }
     boolean leadership = accessPolicy.isGoverningLeadership();
-    Set<UUID> managed = accessPolicy.managedUnitIds();
+    SupplyManagedUnits managed = accessPolicy.managedUnits();
     List<SupplyStatsDto.UnitMonth> units = new ArrayList<>();
     for (DonationStatRow row : donationRepository.statsByUnitAndMonth(RECEIVED, from, to)) {
       if (!leadership && !managed.contains(row.unitId())) {

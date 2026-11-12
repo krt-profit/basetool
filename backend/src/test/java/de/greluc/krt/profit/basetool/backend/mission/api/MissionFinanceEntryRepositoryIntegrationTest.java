@@ -130,10 +130,10 @@ class MissionFinanceEntryRepositoryIntegrationTest {
   }
 
   @Test
-  void findAllReferenceScoped_withStatusRecencyBound_parsesAndExecutes() {
+  void findAllEditableReference_withStatusRecencyBound_parsesAndExecutes() {
     assertThat(
-            operationRepository.findAllReferenceScoped(
-                true, null, List.of(), false, null, Instant.now()))
+            operationRepository.findAllEditableReference(
+                true, null, List.of(), false, Instant.now()))
         .isNotNull();
   }
 

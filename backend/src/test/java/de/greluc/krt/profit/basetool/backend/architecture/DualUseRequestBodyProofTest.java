@@ -40,8 +40,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.SpaceStationRepositor
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.StarSystemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.TerminalRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
@@ -93,6 +95,8 @@ class DualUseRequestBodyProofTest {
   @Autowired private JdbcTemplate jdbc;
 
   @Autowired private UserRepository userRepository;
+
+  @Autowired private RoleRepository roleRepository;
 
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
 
@@ -625,6 +629,7 @@ class DualUseRequestBodyProofTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername(username);
+    user.getRoles().add(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow());
     return userRepository.save(user);
   }
 

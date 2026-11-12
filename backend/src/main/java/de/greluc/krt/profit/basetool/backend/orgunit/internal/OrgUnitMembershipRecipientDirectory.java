@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.orgunit.internal;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgUnitRecipientDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterDirectory;
 import java.util.Set;
 import java.util.UUID;
@@ -28,16 +29,21 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
-/** The orgunit module's {@link OrgUnitRecipientDirectory}, reading the membership flags. */
+/**
+ * The orgunit module's {@link OrgUnitRecipientDirectory}, reading the membership ranks and flags on
+ * active org units and keeping only the members who hold {@code KRT Member}, since without it, or
+ * on a deactivated unit, no membership confers anything (REQ-SEC-015, REQ-NOTIF-024, REQ-ORG-032).
+ */
 @Service
 @RequiredArgsConstructor
 public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDirectory {
 
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
+  private final OrgUnitSeatEligibility seatEligibility;
   private final OrgUnitWriterDirectory writers;
 
   /**
-   * The members flagged as Lead of an org unit.
+   * The members flagged as Lead of an org unit who hold {@code KRT Member}.
    *
    * @param orgUnitId the org unit
    * @return their user subs; never {@code null}, possibly empty
@@ -45,11 +51,12 @@ public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDire
   @Override
   @NotNull
   public Set<UUID> leadsOf(@NotNull UUID orgUnitId) {
-    return orgUnitMembershipRepository.findLeadUserIdsByOrgUnit(orgUnitId);
+    return seatEligibility.krtMembersAmong(
+        orgUnitMembershipRepository.findLeadUserIdsByOrgUnit(orgUnitId));
   }
 
   /**
-   * The members flagged as Logistician of an org unit.
+   * The members flagged as Logistician of an org unit who hold {@code KRT Member}.
    *
    * @param orgUnitId the org unit
    * @return their user subs; never {@code null}, possibly empty
@@ -57,11 +64,12 @@ public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDire
   @Override
   @NotNull
   public Set<UUID> logisticiansOf(@NotNull UUID orgUnitId) {
-    return orgUnitMembershipRepository.findLogisticianUserIdsByOrgUnit(orgUnitId);
+    return seatEligibility.krtMembersAmong(
+        orgUnitMembershipRepository.findLogisticianUserIdsByOrgUnit(orgUnitId));
   }
 
   /**
-   * The members flagged as Mission Manager of an org unit.
+   * The members flagged as Mission Manager of an org unit who hold {@code KRT Member}.
    *
    * @param orgUnitId the org unit
    * @return their user subs; never {@code null}, possibly empty
@@ -69,11 +77,12 @@ public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDire
   @Override
   @NotNull
   public Set<UUID> missionManagersOf(@NotNull UUID orgUnitId) {
-    return orgUnitMembershipRepository.findMissionManagerUserIdsByOrgUnit(orgUnitId);
+    return seatEligibility.krtMembersAmong(
+        orgUnitMembershipRepository.findMissionManagerUserIdsByOrgUnit(orgUnitId));
   }
 
   /**
-   * The members whose rank is a leadership seat of an org unit.
+   * The members whose rank is a leadership seat of an org unit and who hold {@code KRT Member}.
    *
    * @param orgUnitId the org unit
    * @return their user subs; never {@code null}, possibly empty
@@ -81,11 +90,14 @@ public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDire
   @Override
   @NotNull
   public Set<UUID> leadershipOf(@NotNull UUID orgUnitId) {
-    return orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(orgUnitId);
+    return seatEligibility.krtMembersAmong(
+        orgUnitMembershipRepository.findLeadershipUserIdsByOrgUnit(orgUnitId));
   }
 
   /**
-   * Resolves active functional writers whose current reach includes the affected unit.
+   * Resolves the active functional writers whose current reach includes the affected unit: a
+   * Logistician flag or a seat on an active unit, each only while its holder holds {@code KRT
+   * Member} ({@link OrgUnitWriterDirectory}).
    *
    * @param orgUnitId the affected unit
    * @return current writer account ids
@@ -97,13 +109,13 @@ public class OrgUnitMembershipRecipientDirectory implements OrgUnitRecipientDire
   }
 
   /**
-   * The members who hold a leadership seat in any org unit.
+   * The members who hold a leadership seat in any org unit and {@code KRT Member}.
    *
    * @return their user subs; never {@code null}, possibly empty
    */
   @Override
   @NotNull
   public Set<UUID> allSeatHolders() {
-    return orgUnitMembershipRepository.findAllLeadershipUserIds();
+    return seatEligibility.krtMembersAmong(orgUnitMembershipRepository.findAllLeadershipUserIds());
   }
 }

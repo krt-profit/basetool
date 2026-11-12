@@ -30,11 +30,15 @@ import org.springframework.web.context.request.RequestContextHolder;
  * Memoises a value for the rest of the current HTTP request under a typed {@link Key}
  * (REQ-DATA-003).
  *
- * <p>{@link #get(HttpServletRequest, Key, Supplier)} works on a given request; {@link
- * #getIfBound(Key, Supplier)} uses the thread-bound request and returns {@code null} without one.
- * Memoised values must not be {@code null}, and must not change within the request.
+ * <p>{@link #get(HttpServletRequest, Key, Supplier)} works on a given request and computes directly
+ * where it cannot be read; {@link #getIfBound(Key, Supplier)} uses the thread-bound request and
+ * returns {@code null} without one. Memoised values must not be {@code null}, and must not change
+ * within the request.
  */
 public final class RequestMemo {
+
+  /** The attribute {@link #readable(HttpServletRequest)} reads to try the request. */
+  private static final String PROBE_ATTRIBUTE = RequestMemo.class.getName() + ".probe";
 
   private RequestMemo() {}
 
@@ -91,8 +95,29 @@ public final class RequestMemo {
   }
 
   /**
+   * Whether {@code request} can be read on the current thread: a request object always, the
+   * injected proxy of the thread-bound request only while an HTTP request is bound to the thread.
+   * Background work run as a caller has no request to read.
+   *
+   * @param request a request, or the injected proxy of the thread-bound request
+   * @return {@code true} iff the request's headers and attributes can be read
+   */
+  public static boolean readable(@NotNull HttpServletRequest request) {
+    if (RequestContextHolder.getRequestAttributes() != null) {
+      return true;
+    }
+    try {
+      request.getAttribute(PROBE_ATTRIBUTE);
+      return true;
+    } catch (IllegalStateException _) {
+      return false;
+    }
+  }
+
+  /**
    * Returns the value memoised under {@code key} on {@code request}, computing and storing it on
-   * the first call of the request.
+   * the first call of the request; where the request cannot be read ({@link
+   * #readable(HttpServletRequest)}), every call computes the value.
    *
    * @param request the request to memoise on
    * @param key the memo's key
@@ -105,6 +130,9 @@ public final class RequestMemo {
       @NotNull HttpServletRequest request,
       @NotNull Key<T> key,
       @NotNull Supplier<? extends T> compute) {
+    if (!readable(request)) {
+      return compute.get();
+    }
     T cached = key.cast(request.getAttribute(key.attribute()));
     if (cached != null) {
       return cached;

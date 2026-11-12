@@ -30,10 +30,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.OperationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionFinanceTotalsDto;
+import de.greluc.krt.profit.basetool.frontend.operation.model.OperationDto;
 import de.greluc.krt.profit.basetool.frontend.refinery.model.RefineryOrderListDto;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -44,6 +46,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -64,6 +67,8 @@ import org.springframework.web.context.WebApplicationContext;
 class MissionDetailPatternRenderTest {
 
   private static final UUID MISSION_ID = UUID.fromString("00000000-0000-0000-0000-000000000077");
+
+  private static final UUID OPERATION_ID = UUID.fromString("00000000-0000-0000-0000-000000000078");
 
   private static final Pattern MIGRATION_CLASS = Pattern.compile("class=\"[^\"]*krtm-");
 
@@ -91,13 +96,23 @@ class MissionDetailPatternRenderTest {
   }
 
   /**
-   * Stubs the mission read, the catalogs and an empty finance ledger.
+   * Stubs the mission read without an operation, the catalogs and an empty finance ledger.
    *
    * @param editable the value of both {@code canEdit} and {@code canManageManagers}
    */
   private void stubMission(boolean editable) {
+    stubMission(editable, null);
+  }
+
+  /**
+   * Stubs the mission read, the catalogs and an empty finance ledger.
+   *
+   * @param editable the value of both {@code canEdit} and {@code canManageManagers}
+   * @param operation the operation the mission embeds, or {@code null}
+   */
+  private void stubMission(boolean editable, @Nullable OperationDto operation) {
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(MISSION_ID)))
-        .thenReturn(mission(editable));
+        .thenReturn(mission(editable, operation));
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
     when(backendApiClient.get(
@@ -115,12 +130,23 @@ class MissionDetailPatternRenderTest {
   }
 
   /**
+   * Stubs the operations the backend offers the caller to link a mission to.
+   *
+   * @param linkable the operations of {@code GET /api/v1/operations/lookup}
+   */
+  private void stubLinkableOperations(@NotNull OperationReferenceDto... linkable) {
+    when(backendApiClient.get(eq("/api/v1/operations/lookup"), anyTypeRef()))
+        .thenReturn(List.of(linkable));
+  }
+
+  /**
    * An active mission with no participants, units, goals or steps.
    *
    * @param editable the value of both {@code canEdit} and {@code canManageManagers}
+   * @param operation the operation the mission embeds, or {@code null}
    * @return the mission
    */
-  private static @NotNull MissionDto mission(boolean editable) {
+  private static @NotNull MissionDto mission(boolean editable, @Nullable OperationDto operation) {
     UserReferenceDto manager =
         new UserReferenceDto(UUID.randomUUID(), "manager", null, "Test Manager", 0);
     return new MissionDto(
@@ -138,7 +164,7 @@ class MissionDetailPatternRenderTest {
         Collections.emptySet(),
         Collections.emptyList(),
         Collections.emptyList(),
-        null,
+        operation,
         null,
         Set.of(manager),
         editable,
@@ -335,6 +361,38 @@ class MissionDetailPatternRenderTest {
         .doesNotContain("data-testid=\"mission-edit-toggle\"")
         .doesNotContain("id=\"pane-verw\"")
         .doesNotContain("delete-mission-btn");
+  }
+
+  /**
+   * The mission's current operation stays a selected option with its name when the caller may not
+   * link to it, and an operation the caller may link to is offered once (REQ-MISSION-034).
+   */
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void keepsTheCurrentOperationSelectableWithoutListingItTwice() throws Exception {
+    stubMission(true, linkedOperation());
+    stubLinkableOperations();
+    String notLinkable = render("/missions/" + MISSION_ID);
+
+    assertThat(between(notLinkable, "id=\"pane-ueb\"", "id=\"pane-crew\"")).contains(">Op Nord<");
+    assertThat(between(notLinkable, "id=\"mission-operation\"", "</select>"))
+        .containsPattern(
+            "<option value=\"" + OPERATION_ID + "\"[^>]*selected[^>]*>Op Nord</option>");
+
+    stubLinkableOperations(new OperationReferenceDto(OPERATION_ID, "Op Nord"));
+    String picker =
+        between(render("/missions/" + MISSION_ID), "id=\"mission-operation\"", "</select>");
+
+    assertThat(count(picker, "value=\"" + OPERATION_ID + "\"")).isEqualTo(1);
+  }
+
+  /**
+   * The operation the mission belongs to, as the mission embeds it.
+   *
+   * @return the operation
+   */
+  private static @NotNull OperationDto linkedOperation() {
+    return new OperationDto(OPERATION_ID, "Op Nord", null, "ACTIVE", null, 1L, null, null, null);
   }
 
   /** The create page uses the page head with its back link and the numbered form sections. */

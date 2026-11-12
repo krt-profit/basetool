@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — requirements accepted by the owner, built except where a status line
 > says otherwise (epic [#2078](https://github.com/krt-profit/basetool/issues/2078)). Last reviewed:
-> 2026-10-15.
+> 2026-11-12.
 > **Owner area:** XCH · **Related ADRs:** [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md),
 > [ADR-0218](../adr/0218-exchange-sync-semantics.md),
@@ -46,6 +46,12 @@ sub-issue that implements it.
 
 ### REQ-XCH-001 — One exchange surface on the ingest gateway
 
+> [!note] Amended 2026-11-12 (ADR-0268, ADR-0269) — no allowlist to stay off
+> The backend is internal-only, so the exchange layer and the member controls have no `api.*`
+> allowlist to stay off, and the test that held them off it
+> (`ExternalContractTest.theExchangeStaysOffTheApiVhost`) went with the app. The route paragraph and
+> the acceptance line say so; git keeps the text.
+
 The exchange API is served by the ingest gateway at `/exchange/v1/**`
 (`https://ingest.profit-base.online/exchange/v1`). It offers exactly these routes:
 
@@ -84,7 +90,8 @@ Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter
 else), and no route path collides with a prefix or suffix the bot filter blocks. The backend's
 exchange layer (`/api/v1/exchange/**`) is reachable only from the gateway's service identity; the
 member controls (`/api/v1/connected-apps/**`) only from the member's own browser session. Neither
-is ever on the `api.*` allowlist (ADR-0135), and nothing of the exchange lives under `/api/v1/me/`.
+has a public route of its own, because the backend is internal-only (ADR-0268), and nothing of the
+exchange lives under `/api/v1/me/`.
 
 **Acceptance**
 
@@ -95,10 +102,9 @@ is ever on the `api.*` allowlist (ADR-0135), and nothing of the exchange lives u
   session cannot reach `/api/v1/exchange/**` (`ConnectedAppsControllerTest`: the gateway and the app
   are refused; `ExchangeCatalogControllerTest`: an `ADMIN` browser session is refused, and so is the
   gateway without an acting member).
-- [x] The `api.*` allowlist test fails if an exchange or connected-apps path is added
-  (`ExternalContractTest.theExchangeStaysOffTheApiVhost`). A line that touches `krt_api_allowed` in a
-  form the test cannot evaluate — another variable, a negation, an unquoted or multi-line rule —
-  fails it instead of being skipped; `~*` counts as case-insensitive (security review G5, I6).
+- [x] ~~The `api.*` allowlist test fails if an exchange or connected-apps path is added
+  (`ExternalContractTest.theExchangeStaysOffTheApiVhost`).~~ — moot: the API vhost and its
+  allowlist are gone (ADR-0268), and the test with them (ADR-0269).
 
 **Status:** built — WP 3.2 (#2082), WP 3.1 (#2083)
 
@@ -707,12 +713,22 @@ book onto. Both decide from the database by the rule of REQ-SEC-039 for exchange
 from a stored role and never with the admin all-scope or pin, and name no member who withholds
 their name.
 
+The fourth exception is the bank family (REQ-BXCH-001…005): it reads the accounts the member may
+view, their bookings with the counterparty names and the requests the member raised or approves,
+and raises and corrects the member's own requests. It decides through the bank's access policy from
+the database (ADR-0352), without an active-org-unit pin, since the exchange carries no active
+context (REQ-ORG-032).
+
 **How it is built** (WP 3.1). `ActingMemberFilter` keeps an explicit list of exchange routes
 next to the two ingest routes. On an exchange route the member gets
 `ActingMemberAuthorities.exchangeAuthoritiesFor`: `ROLE_EXCHANGE_MEMBER` plus one
-`XCH_CAPABILITY:<scope>` per relayed known scope, and nothing else; a member the approval or role
-gate refuses keeps exactly that gate's marker, so the gates refuse as they do for the web. The
-demand feed reads the member's memberships itself (`ExchangeDemandService`, REQ-XCH-018).
+`XCH_CAPABILITY:<scope>` per relayed known scope, and for a member who holds `KRT Member` the
+marker `XCH_KRT_MEMBER`, and nothing else; a member the approval or role gate refuses keeps exactly
+that gate's marker, so the gates refuse as they do for the web. The marker is no role and matches no
+`hasRole(...)` gate: it only tells the scope kernel that the member's memberships confer their
+reach (REQ-SEC-015, REQ-ORG-032), so a member without `KRT Member` reaches no unit on the exchange
+either (`RequestScopeResolver`, `DatabaseActingMemberAuthoritiesTest`). The demand feed reads the
+member's memberships itself (`ExchangeDemandService`, REQ-XCH-018).
 *Corrected 2026-09-27: this requirement said the acting member would also hold the memberships the
 demand feed needs, arriving with it; the feed was built without any membership authority.*
 
@@ -1221,14 +1237,17 @@ unnamed ship is sent without it, and an upsert may leave it out (owner decision 
 `upsert` sets the ship as sent: a `name` or `location` it leaves out is cleared, and only an absent
 `fitted` keeps its value. An `upsert` may name the ship's org unit as `orgUnit`, one of the member's
 direct memberships of any kind or `null` for none (#2602). A create without it puts the ship in the
-member's only direct org unit, or in none when the member has none or several, and the member can
-assign it later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner decision
-2026-09-27, `HangarService.addShipForClient`). An update without `orgUnit` keeps the stored unit, so
-an older client never clears a unit set in the web; an update that changes it also sends the ship's
-`orgUnitVersion` and goes through the Hangar's unit change, which never moves the ship's `version`;
-naming the stored unit writes nothing, even when the member has since left it. A unit outside the
-member's direct memberships rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a missing or stale
-`orgUnitVersion` with `ORG_UNIT_VERSION_CONFLICT`; the rest of the batch still applies.
+member's only stampable unit — a direct membership on an active unit, while the member holds the
+stored role `KRT Member` (REQ-ORG-032) —, or in none when the member has none or several, and the
+member can assign it later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner
+decision 2026-09-27, `HangarService.addShipForClient`,
+`OrgUnitStampingService#resolveOrgUnitForClientCreate`). An update without `orgUnit` keeps the
+stored unit, so an older client never clears a unit set in the web; an update that changes it also
+sends the ship's `orgUnitVersion` and goes through the Hangar's unit change, which never moves the
+ship's `version`; naming the stored unit writes nothing, even when the member has since left it. A
+unit outside the member's direct memberships rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a
+missing or stale `orgUnitVersion` with `ORG_UNIT_VERSION_CONFLICT`; the rest of the batch still
+applies.
 *Corrected 2026-09-27: a member of several units had the whole batch refused with
 `OWNER_ORG_UNIT_REQUIRED`.*
 
@@ -1249,6 +1268,9 @@ member's direct memberships rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a m
   `HANGAR_SHIP_ORG_UNIT_CHANGED` with the client; a foreign unit and a stale counter reject only
   their own op. *`ExchangeShipWriteControllerTest`, `ExchangeShipChangeSetJsonTest`,
   `ExchangeSchemasTest`.*
+- [x] A create without `orgUnit` counts only the member's active units and only while the member
+  holds `KRT Member`: a deactivated second unit leaves the other one stamped, and a member without
+  the role gets the ship without a unit. *`OrgUnitStampingStampableUnitsTest`.*
 
 The ship feed keys a ship by its id and sends its `version`, the ship type's id as `shipType.bt`,
 insurance as `LTI` or a number of months, and the location when it has one. A ship stored without
@@ -1689,7 +1711,7 @@ Hangar's unit change behind its current unit counter (REQ-HANGAR-009, ADR-0258, 
 earlier unit the member no longer directly belongs to is not restored — the ship keeps its current
 unit — and the entry still counts as restored. A recreated ship whose unit is not restored, or whose
 journaled state has no `orgUnit` key, is stamped like a client's create (REQ-XCH-017): the member's
-only direct org unit, or none for a member of several; an existing ship whose state has no
+only stampable unit, or none for a member with none or several; an existing ship whose state has no
 `orgUnit` key keeps its unit. Links the client made are taken back, and a
 link one of them replaced is put back only while the ship is still the member's. The restored
 entries' journal rows are marked undone, the undo is audited as `EXCHANGE_CHANGES_UNDONE` (restored
@@ -2726,13 +2748,14 @@ G-18)
 > to their clients is the exchange contract on the gateway: every backend answer validates against
 > the published v1 schemas (`ExchangeWireContractTest`, REQ-XCH-036), and those schemas only grow
 > from one release to the next (REQ-XCH-026). The tier, release-comparison and vhost lines leave
-> this requirement; git keeps the text.
+> this requirement, the app leaves the readers of `openapi.json`, and the opening paragraph counts
+> the 31 relay operations `ExchangeFence.RELAY_OPERATIONS` holds, not 20; git keeps the text.
 
-The backend operations the gateway relays to — the 20 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 31 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
-of 2026-10-02). The published `openapi.json`, which the app vendors and the frontend generates its
-test types from, holds every other operation, so a per-domain diff, the frontend's generated types
+of 2026-10-02). The published `openapi.json`, which the frontend generates its test types from,
+holds every other operation, so a per-domain diff, the frontend's generated types
 and `DtoOpenApiContractTest` never see the relay surface. The relay document is internal: it is
 never served to a client. The external contract stays the gateway's `exchange-v1.openapi.json`
 (REQ-XCH-011).

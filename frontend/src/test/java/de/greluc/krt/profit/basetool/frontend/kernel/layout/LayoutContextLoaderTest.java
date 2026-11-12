@@ -67,11 +67,11 @@ class LayoutContextLoaderTest {
   void theThreeLayoutAdvicesShareOneBackendReadPerRequest() {
     UUID home = UUID.randomUUID();
     when(authHelper.isAuthenticated()).thenReturn(true);
-    when(authHelper.isAdmin()).thenReturn(false);
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
         .thenReturn(
             new MeLayoutResponse(
                 home,
+                LayoutContextLoader.ContextKind.ORG_UNIT,
                 List.of(new OrgUnitMembershipOptionDto(home, "ALPHA", "ALP", "SQUADRON")),
                 LayoutResponses.caps(true, true, false, false),
                 3L));
@@ -132,10 +132,11 @@ class LayoutContextLoaderTest {
   void aMalformedAnswerIsNormalisedRatherThanPassedOn() {
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
-        .thenReturn(new MeLayoutResponse(null, null, null, 0L));
+        .thenReturn(new MeLayoutResponse(null, null, null, null, 0L));
 
     LayoutContext context = loader().load(new MockHttpServletRequest());
 
+    assertThat(context.activeContext()).isEqualTo(LayoutContextLoader.ContextKind.NONE);
     assertThat(context.orgUnits()).isEmpty();
     assertThat(context.capabilities()).isEqualTo(CapabilitiesResponse.NONE);
   }

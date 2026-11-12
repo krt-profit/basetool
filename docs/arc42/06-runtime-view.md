@@ -32,7 +32,11 @@ performs routinely.
 1. A controller takes the request; `@PreAuthorize` decides whether the caller may perform the
    operation at all.
 2. The **service layer** applies scope through the scope kernel (`RequestScopeResolver`, `AccessGateService`): which org units this caller may
-   see, and by which of the aggregate's scope kinds.
+   see, and by which of the aggregate's scope kinds. The active org unit the frontend relays narrows
+   that to one unit only when the caller may select it; any other pin counts as none, and without a
+   pin the caller sees all of their units (REQ-ORG-032). The stored choice is read into the session
+   at the first page request after sign-in (REQ-ORG-031); a switch stores it first, and two
+   overlapping switches of one member retry the write, so the latest wins without a conflict.
 3. The repository is asked only for what the scope allows.
 
 The order matters. Scoping in the service layer rather than the controller means every path into
@@ -58,8 +62,9 @@ missing one turns the next edit into a spurious 409.
    reload on success, which is a binding requirement, not a nicety (`REQ-FE-001…010`).
 2. The browser that made the change announces it: a `changed` frame on its one multiplexed
    **`/ws/sync`** WebSocket, naming the topic room (`mission:{id}`, …). Publishing needs no
-   subscription; only *receiving* needs an authorised subscribe. Where no browser is involved, the
-   server publishes the same frame itself.
+   subscription; only *receiving* needs an authorised subscribe, which the relay checks again for as
+   long as the socket holds the room (REQ-FE-015). Where no browser is involved, the server
+   publishes the same frame itself.
 3. The frontend relays the frame to the room's local members and onto **Redis pub/sub**
    (`basetool:livesync:changed`), so every other frontend replica reaches its own members.
 4. Each receiving client re-reads the named sections and swaps them in place.

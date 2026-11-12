@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.UserAccessPolicy;
 import java.util.UUID;
@@ -57,6 +60,7 @@ public class RefineryAccessPolicy {
       """;
 
   private final AccessGateService accessGateService;
+  private final AuthHelperService authHelper;
   private final RefineryOrderRepository refineryOrderRepository;
   private final UserAccessPolicy userAccessPolicy;
 
@@ -83,11 +87,13 @@ public class RefineryAccessPolicy {
   }
 
   /**
-   * Checks whether the caller may edit refinery order {@code orderId}, applying the owner escape
-   * (REQ-ORG-011), then the ownerless rule, then the org-unit edit scope.
+   * Checks whether the caller may edit, cancel or store refinery order {@code orderId}: the row
+   * scope admits them (owner escape of REQ-ORG-011, ownerless rule, org-unit edit scope or covering
+   * Logistician grant), and they own the order or act as Logistician of its owning unit
+   * (REQ-SEC-005). A plain member of the order's unit reads it but does not write it.
    *
    * @param orderId refinery order to inspect; never {@code null}
-   * @return {@code true} iff the caller may edit the order
+   * @return {@code true} iff the caller may edit the order; {@code false} for an unknown order
    */
   public boolean canEditRefineryOrder(@NotNull UUID orderId) {
     return refineryOrderRepository.findById(orderId).map(this::canEditRefineryOrder).orElse(false);
@@ -95,32 +101,54 @@ public class RefineryAccessPolicy {
 
   /**
    * Entity overload of {@link #canEditRefineryOrder(UUID)} for callers that already hold the order,
-   * such as the list rows.
+   * such as the list rows' {@code canEdit} flag (REQ-REFINERY-019).
    *
    * @param order the refinery order to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the order
    */
   public boolean canEditRefineryOrder(@NotNull RefineryOrder order) {
     return accessGateService.permitsOwnedRow(
-        order.getOwner(), order.getOwningOrgUnit(), true, Roles.LOGISTICIAN);
+            order.getOwner(), order.getOwningOrgUnit(), true, Roles.LOGISTICIAN)
+        && (isOwnedByCaller(order) || isLogisticianOf(order));
   }
 
   /**
    * Checks whether the caller handles refinery order {@code orderId} as Logistician: a Logistician
-   * grant in the order's owning unit inside the active scope, or an admin. An order without a unit
-   * is reserved to admins (REQ-SEC-005).
+   * grant in the order's owning unit inside the active scope, or an admin within their own scope.
+   * An order without a unit is reserved to an admin without a pin (REQ-SEC-005, REQ-ORG-032).
    *
    * @param orderId refinery order to inspect; never {@code null}
    * @return {@code true} iff the caller may act on the order as Logistician; {@code false} for an
    *     unknown order
    */
   public boolean isLogisticianOfOrder(@NotNull UUID orderId) {
-    return refineryOrderRepository
-        .findById(orderId)
-        .map(o ->
-            accessGateService.canActAsLogisticianInOwner(
-                o.getOwningOrgUnit() == null ? null : o.getOwningOrgUnit().getId()))
-        .orElse(false);
+    return refineryOrderRepository.findById(orderId).map(this::isLogisticianOf).orElse(false);
+  }
+
+  /**
+   * Whether the caller acts as Logistician in the unit that owns {@code order}, inside the active
+   * context; an admin passes within their own scope, and an order without a unit is reserved to an
+   * admin without a pin.
+   *
+   * @param order the refinery order; never {@code null}
+   * @return {@code true} iff the caller is Logistician of the order's unit in the active context,
+   *     or an admin whose scope covers it; for an order without a unit, iff the caller is an admin
+   *     without a pin
+   */
+  private boolean isLogisticianOf(@NotNull RefineryOrder order) {
+    return accessGateService.canActAsLogisticianInOwner(OrgUnit.idOf(order.getOwningOrgUnit()));
+  }
+
+  /**
+   * Whether the caller owns {@code order}.
+   *
+   * @param order the refinery order; never {@code null}
+   * @return {@code true} iff the caller is authenticated and is the order's owner
+   */
+  private boolean isOwnedByCaller(@NotNull RefineryOrder order) {
+    User owner = order.getOwner();
+    UUID ownerId = owner == null ? null : owner.getId();
+    return ownerId != null && authHelper.currentUserId().filter(ownerId::equals).isPresent();
   }
 
   /**

@@ -195,4 +195,18 @@ class PublicPathsTest {
   void aDoubleEncodedSpellingIsNotExempt(String path) {
     assertThat(PublicPaths.isGateExempt(path)).as(path).isFalse();
   }
+
+  @ParameterizedTest
+  @DisplayName("the consent page, the waiting page and its poll are pages of an access gate")
+  @ValueSource(strings = {"/terms/accept", "/pending-approval", "/pending-approval/status"})
+  void theGatePagesAreAccessGatePages(String path) {
+    assertThat(PublicPaths.isAccessGatePage(path)).as(path).isTrue();
+  }
+
+  @ParameterizedTest
+  @DisplayName("member pages and the public terms page are no access gate pages")
+  @ValueSource(strings = {"/", "/lager", "/terms", "/terms/acceptance", "/pending-approvals"})
+  void otherPagesAreNoAccessGatePages(String path) {
+    assertThat(PublicPaths.isAccessGatePage(path)).as(path).isFalse();
+  }
 }

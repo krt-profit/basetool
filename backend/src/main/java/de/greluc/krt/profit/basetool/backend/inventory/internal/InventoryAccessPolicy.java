@@ -87,8 +87,8 @@ public class InventoryAccessPolicy implements BookInPolicy {
 
   /**
    * Checks whether the caller handles Lager row {@code itemId} as Logistician: a Logistician grant
-   * in the row's owning unit inside the active scope, or an admin. A personal row without a unit is
-   * reserved to admins (REQ-SEC-005).
+   * in the row's owning unit inside the active scope, or an admin within their own scope. A
+   * personal row without a unit is reserved to an admin without a pin (REQ-SEC-005, REQ-ORG-032).
    *
    * @param itemId the row to inspect; never {@code null}
    * @return {@code true} iff the caller may act on the row as Logistician; {@code false} for an

@@ -165,7 +165,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Test
   void authorisesWithTheStoredRolesAndIgnoresTheRealmRoleClaim() {
     when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(krtMember());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     Collection<String> authorities =
         converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "Admin")).stream()
@@ -228,15 +229,16 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void convert_sameToken_memoisesAuthorities_assemblesOnce() {
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt()).thenReturn(Instant.ofEpochSecond(1_700_000_000L));
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     Collection<GrantedAuthority> first = converter.convert(jwt);
     Collection<GrantedAuthority> second = converter.convert(jwt);
 
     assertEquals(first, second, "the memoised result must equal the freshly assembled one");
     verify(userReconciliationService, times(1)).syncUser(jwt);
-    verify(orgUnitMembershipRepository, times(1)).findAllByIdUserId(USER_ID);
+    verify(orgUnitMembershipRepository, times(1)).findAllOnActiveOrgUnitsByIdUserId(USER_ID);
   }
 
   @Test
@@ -244,8 +246,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(jwt.getSubject()).thenReturn("sub-1");
     when(jwt.getIssuedAt())
         .thenReturn(Instant.ofEpochSecond(1_700_000_000L), Instant.ofEpochSecond(1_700_000_300L));
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     converter.convert(jwt);
     converter.convert(jwt);
@@ -256,8 +259,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Test
   void convert_tokenWithoutIssuedAt_bypassesCache() {
     when(jwt.getSubject()).thenReturn("sub-1");
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     converter.convert(jwt);
     converter.convert(jwt);
@@ -272,8 +276,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    */
   @Test
   void convert_refreshedTokenOfTheSameSession_isServedFromTheCache() {
-    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_300L, "KRT Member"));
@@ -288,7 +293,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     admin.setRoles(Set.of(codeRole(Roles.ADMIN), codeRole(Roles.KRT_MEMBER)));
     Jwt jwt = token("session-1", "basetool-frontend", 1_700_000_000L);
     when(userReconciliationService.syncUser(jwt)).thenReturn(admin, krtMember());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     Collection<String> before =
         converter.convert(jwt).stream().map(GrantedAuthority::getAuthority).toList();
@@ -316,7 +322,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
           return admin;
         })
         .thenReturn(krtMember());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     converter.convert(jwt);
     Collection<String> after =
@@ -330,7 +337,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   @Test
   void convert_afterAnotherMembersRolesChanged_staysServedFromTheCache() {
     when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(krtMember());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
     Jwt jwt = token("session-1", "basetool-frontend", 1_700_000_000L);
 
     converter.convert(jwt);
@@ -343,8 +351,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   /** A new login is a new Keycloak session and therefore a miss, whatever the claims say. */
   @Test
   void convert_newSession_misses() {
-    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
     converter.convert(token("session-2", "basetool-frontend", 1_700_000_000L, "KRT Member"));
@@ -358,8 +367,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    */
   @Test
   void convert_sameSessionDifferentAzp_neverShareAnEntry() {
-    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
     converter.convert(token("session-1", "another-client", 1_700_000_000L, "KRT Member"));
@@ -404,8 +414,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
    */
   @Test
   void convert_publishesHitsAndMissesUnderTheCacheMeters() {
-    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(userReconciliationService.syncUser(any(Jwt.class))).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_000L, "KRT Member"));
     converter.convert(token("session-1", "basetool-frontend", 1_700_000_300L, "KRT Member"));
@@ -456,7 +467,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void plainStaffelMember_getsNoLeadershipRolesAndNoCascade() {
     when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
     OrgUnitMembership plain = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(plain));
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of(plain));
     when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
@@ -472,7 +484,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
     OrgUnitMembership flagged = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     flagged.setLogistician(true);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(flagged));
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of(flagged));
     when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
@@ -487,7 +500,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of(lead));
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
         .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID, DESCENDANT_SK_ID));
 
@@ -507,7 +521,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     OrgUnitMembership lead = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     lead.setRole(MembershipRole.BEREICHSLEITER);
     lead.setLogistician(true);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of(lead));
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
         .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID));
 
@@ -531,7 +546,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     UUID olId = UUID.randomUUID();
     OrgUnitMembership ol = membership(olId, OrgUnitKind.ORGANISATIONSLEITUNG);
     ol.setRole(MembershipRole.OL_MEMBER);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(ol));
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of(ol));
     when(orgUnitCascadeService.cascadedOfficerReach(any()))
         .thenReturn(Set.of(olId, BEREICH_ID, DESCENDANT_STAFFEL_ID));
 
@@ -549,7 +565,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     UUID squadronId = UUID.randomUUID();
     OrgUnitMembership lead = membership(squadronId, OrgUnitKind.SQUADRON);
     lead.setRole(MembershipRole.STAFFELLEITER);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of(lead));
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of(lead));
     when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
@@ -571,39 +588,42 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     lead.setRole(MembershipRole.BEREICHSLEITER);
     OrgUnitMembership staffelleiter = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
     staffelleiter.setRole(MembershipRole.STAFFELLEITER);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID))
+    lenient()
+        .when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
         .thenReturn(List.of(lead, staffelleiter));
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
-    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
-    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    assertTrue(
-        authorities.stream().noneMatch(OrgUnitContextualAuthority.class::isInstance),
-        "no contextual authority comes from the rank");
+    assertNoMembershipDerivedAuthority(authorities);
     verifyNoInteractions(orgUnitCascadeService);
   }
 
   @Test
-  void explicitFlagsWithoutKrtMember_stillMintTheirOwnUnitAuthorities() {
+  void explicitFlagsWithoutKrtMember_mintNothingEither() {
     when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
     OrgUnitMembership logistician = membership(BEREICH_ID, OrgUnitKind.BEREICH);
     logistician.setLogistician(true);
     OrgUnitMembership missionManager = membership(DESCENDANT_STAFFEL_ID, OrgUnitKind.SQUADRON);
     missionManager.setMissionManager(true);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID))
+    lenient()
+        .when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
         .thenReturn(List.of(logistician, missionManager));
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 
-    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
-    assertTrue(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
-    assertTrue(authorities.contains(new OrgUnitContextualAuthority("LOGISTICIAN", BEREICH_ID)));
+    assertNoMembershipDerivedAuthority(authorities);
+  }
+
+  /**
+   * Asserts that no membership confers a flat or contextual Logistician or Mission Manager
+   * authority (REQ-SEC-015).
+   */
+  private static void assertNoMembershipDerivedAuthority(Collection<GrantedAuthority> authorities) {
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_LOGISTICIAN")));
+    assertFalse(authorities.contains(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER")));
     assertTrue(
-        authorities.contains(
-            new OrgUnitContextualAuthority("MISSION_MANAGER", DESCENDANT_STAFFEL_ID)));
-    assertFalse(
-        authorities.contains(new OrgUnitContextualAuthority("MISSION_MANAGER", BEREICH_ID)));
+        authorities.stream().noneMatch(OrgUnitContextualAuthority.class::isInstance),
+        "no contextual authority comes from a membership without KRT Member");
   }
 
   @Test
@@ -646,7 +666,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     pending.setApprovalStatus(ApprovalStatus.PENDING);
     User approved = krtMember();
     when(userReconciliationService.syncUser(jwt)).thenReturn(pending, approved);
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     Collection<GrantedAuthority> beforeApproval = converter.convert(jwt);
     Collection<GrantedAuthority> afterApproval = converter.convert(jwt);
@@ -662,8 +683,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
 
   @Test
   void memberlessUser_getsNoMembershipDerivedAuthorities() {
-    when(userReconciliationService.syncUser(jwt)).thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+    when(userReconciliationService.syncUser(jwt)).thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
     lenient().when(orgUnitCascadeService.cascadedOfficerReach(any())).thenReturn(Set.of());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
@@ -676,8 +698,9 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   void convert_retriesOnOptimisticLockThenSucceeds() {
     when(userReconciliationService.syncUser(jwt))
         .thenThrow(new ObjectOptimisticLockingFailureException(User.class, USER_ID))
-        .thenReturn(userWithNoRoles());
-    when(orgUnitMembershipRepository.findAllByIdUserId(USER_ID)).thenReturn(List.of());
+        .thenReturn(krtMember());
+    when(orgUnitMembershipRepository.findAllOnActiveOrgUnitsByIdUserId(USER_ID))
+        .thenReturn(List.of());
 
     Collection<GrantedAuthority> authorities = converter.convert(jwt);
 

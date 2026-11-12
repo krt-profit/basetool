@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.kernel.SquadronReferenceDto;
 import de.greluc.krt.profit.basetool.backend.platform.api.CentralMapperConfig;
 import java.util.Collection;
@@ -305,13 +306,14 @@ public abstract class UserMapper {
 
   /**
    * Resolves the effective {@code isLogistician} flag as the OR across the user's Staffel
-   * memberships (REQ-SEC-005).
+   * memberships (REQ-SEC-005); without {@code KRT Member} a flag confers nothing (REQ-SEC-015).
    *
    * @param user the user being projected; may be {@code null}
-   * @return {@code true} iff any Staffel membership carries {@code isLogistician = true}
+   * @return {@code true} iff the user holds {@code KRT Member} and any Staffel membership carries
+   *     {@code isLogistician = true}
    */
   protected Boolean resolveLogistician(User user) {
-    if (user == null || user.getId() == null) {
+    if (!membershipsConfer(user)) {
       return Boolean.FALSE;
     }
     return loadStaffelMemberships(user).stream().anyMatch(OrgUnitMembership::isLogistician);
@@ -319,16 +321,31 @@ public abstract class UserMapper {
 
   /**
    * Resolves the effective {@code isMissionManager} flag as the OR across the user's Staffel
-   * memberships.
+   * memberships; without {@code KRT Member} a flag confers nothing (REQ-SEC-015).
    *
    * @param user the user being projected; may be {@code null}
-   * @return {@code true} iff any Staffel membership carries {@code isMissionManager = true}
+   * @return {@code true} iff the user holds {@code KRT Member} and any Staffel membership carries
+   *     {@code isMissionManager = true}
    */
   protected Boolean resolveMissionManager(User user) {
-    if (user == null || user.getId() == null) {
+    if (!membershipsConfer(user)) {
       return Boolean.FALSE;
     }
     return loadStaffelMemberships(user).stream().anyMatch(OrgUnitMembership::isMissionManager);
+  }
+
+  /**
+   * Whether the user's memberships confer a flag: only while the user holds the stored role {@code
+   * KRT Member} (REQ-SEC-015, ADR-0374).
+   *
+   * @param user the user being projected; may be {@code null}
+   * @return {@code true} iff the user has an id and holds {@code KRT Member}
+   */
+  private static boolean membershipsConfer(@Nullable User user) {
+    return user != null
+        && user.getId() != null
+        && user.getRoles() != null
+        && user.getRoles().stream().anyMatch(role -> Roles.KRT_MEMBER.equals(role.getCode()));
   }
 
   /**

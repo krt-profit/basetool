@@ -19,36 +19,26 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.StaffelMembershipResolver;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 
 /**
- * Unit tests for {@link RequestScopeResolver#currentUserListScopeSquadronIds()}, using a resolver
- * built from mocks with request memoisation disabled.
+ * Unit tests for {@link RequestScopeResolver#currentScopePredicate()} on the caller's identity
+ * (REQ-SEC-052, ADR-0159): a scope question asked by a caller with no identity has no honest
+ * answer, so the resolver refuses it instead of inventing one.
  */
 @ExtendWith(MockitoExtension.class)
 class RequestScopeResolverScopeTest {
@@ -57,109 +47,38 @@ class RequestScopeResolverScopeTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
-  @Mock private StaffelMembershipResolver staffelMembershipResolver;
   @Mock private HttpServletRequest request;
 
-  @InjectMocks private RequestScopeResolver resolver;
+  private RequestScopeResolver resolver;
 
-  private static final UUID CALLER_ID = UUID.randomUUID();
-  private static final UUID SQUADRON_A_ID = UUID.randomUUID();
-  private static final UUID SQUADRON_B_ID = UUID.randomUUID();
-
-  /** Returns a Staffel membership row pointing the given user at the given org unit. */
-  private static OrgUnitMembership staffelMembership(UUID userId, UUID orgUnitId) {
-    OrgUnitMembership m = new OrgUnitMembership();
-    m.setId(new OrgUnitMembershipId(userId, orgUnitId));
-    m.setKind(OrgUnitKind.SQUADRON);
-    return m;
+  @BeforeEach
+  void setUp() {
+    resolver =
+        new RequestScopeResolver(
+            authHelper,
+            orgUnitMembershipRepository,
+            orgUnitRepository,
+            orgUnitCascadeService,
+            request);
   }
 
-  /**
-   * REQ-SEC-052 / ADR-0159: a scope question asked by a caller with no identity has no honest
-   * answer, so {@code currentScopePredicate()} refuses it instead of inventing one.
-   */
-  @Nested
-  class UnauthenticatedCallerTests {
+  @Test
+  void currentScopePredicate_unauthenticatedCaller_throwsRatherThanScopingToNothing() {
+    when(authHelper.isAuthenticated()).thenReturn(false);
 
-    @Test
-    void currentScopePredicate_unauthenticatedCaller_throwsRatherThanScopingToNothing() {
-      when(authHelper.isAuthenticated()).thenReturn(false);
+    AuthenticationCredentialsNotFoundException thrown =
+        assertThrows(
+            AuthenticationCredentialsNotFoundException.class, resolver::currentScopePredicate);
 
-      AuthenticationCredentialsNotFoundException thrown =
-          assertThrows(
-              AuthenticationCredentialsNotFoundException.class, resolver::currentScopePredicate);
-
-      assertTrue(thrown.getMessage().contains("REQ-SEC-052"));
-    }
-
-    @Test
-    void currentScopePredicate_authenticatedCaller_stillAnswers() {
-      when(authHelper.isAuthenticated()).thenReturn(true);
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      assertTrue(resolver.currentScopePredicate().adminAllScope());
-    }
+    assertTrue(thrown.getMessage().contains("REQ-SEC-052"));
   }
 
-  @Nested
-  class CurrentUserListScopeSquadronIdsTests {
+  @Test
+  void currentScopePredicate_authenticatedCaller_stillAnswers() {
+    when(authHelper.isAuthenticated()).thenReturn(true);
+    when(authHelper.isAdmin()).thenReturn(true);
+    when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
-    @Test
-    void adminNoPin_returnsNull() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      assertNull(resolver.currentUserListScopeSquadronIds());
-    }
-
-    @Test
-    void adminPin_returnsSingletonPin() {
-      when(authHelper.isAdmin()).thenReturn(true);
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-          .thenReturn(SQUADRON_B_ID.toString());
-
-      assertEquals(Set.of(SQUADRON_B_ID), resolver.currentUserListScopeSquadronIds());
-    }
-
-    @Test
-    void nonAdminTwoStaffeln_noPin_returnsUnionOfBoth() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(CALLER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(
-              List.of(
-                  staffelMembership(CALLER_ID, SQUADRON_A_ID),
-                  staffelMembership(CALLER_ID, SQUADRON_B_ID)));
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
-
-      assertEquals(
-          Set.of(SQUADRON_A_ID, SQUADRON_B_ID), resolver.currentUserListScopeSquadronIds());
-    }
-
-    @Test
-    void nonAdminTwoStaffeln_matchingPin_returnsSingleton() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(CALLER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(
-              List.of(
-                  staffelMembership(CALLER_ID, SQUADRON_A_ID),
-                  staffelMembership(CALLER_ID, SQUADRON_B_ID)));
-      when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
-          .thenReturn(SQUADRON_B_ID.toString());
-
-      assertEquals(Set.of(SQUADRON_B_ID), resolver.currentUserListScopeSquadronIds());
-    }
-
-    @Test
-    void nonAdminNoStaffel_returnsNull() {
-      when(authHelper.isAdmin()).thenReturn(false);
-      when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
-      when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(CALLER_ID, OrgUnitKind.SQUADRON))
-          .thenReturn(List.of());
-
-      assertNull(resolver.currentUserListScopeSquadronIds());
-    }
+    assertTrue(resolver.currentScopePredicate().adminAllScope());
   }
 }

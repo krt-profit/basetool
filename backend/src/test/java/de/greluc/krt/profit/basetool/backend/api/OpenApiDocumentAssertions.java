@@ -71,7 +71,9 @@ public final class OpenApiDocumentAssertions {
           Map.entry("operation", 12),
           Map.entry("orgunit", 38),
           Map.entry("personalinventory", 9),
-          Map.entry("refinery", 15));
+          Map.entry("purchasing", 33),
+          Map.entry("refinery", 15),
+          Map.entry("supply", 26));
 
   /** The one domain of the exchange's internal relay document. */
   public static final String RELAY_DOMAIN = "exchange";

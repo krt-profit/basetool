@@ -116,6 +116,22 @@ public class AuthHelperService {
   }
 
   /**
+   * Returns whether the caller's memberships confer anything (REQ-SEC-015): the current
+   * authentication holds {@code KRT Member} directly or through the role hierarchy, or acts on the
+   * exchange layer for a member who holds it ({@link Roles#EXCHANGE_KRT_MEMBER_MARKER},
+   * REQ-XCH-009). The one check of every membership-derived reach and right.
+   *
+   * @return {@code true} iff the caller's memberships confer their reach and rights
+   */
+  public boolean holdsKrtMember() {
+    Authentication auth = rawAuthentication();
+    return auth != null
+        && (hasReachableRole(Roles.authority(Roles.KRT_MEMBER))
+            || auth.getAuthorities().stream()
+                .anyMatch(a -> Roles.EXCHANGE_KRT_MEMBER_MARKER.equals(a.getAuthority())));
+  }
+
+  /**
    * Shortcut for {@link #hasReachableRole(String) hasReachableRole("ROLE_LOGISTICIAN")}. Because
    * the role hierarchy declares {@code ROLE_ADMIN > ROLE_LOGISTICIAN}, this returns {@code true}
    * for an admin and for a derived or granted logistician.

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,22 +40,24 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
- * Mockito unit tests for {@link SpecialCommandSecurityService#canManageMembers(UUID,
- * Authentication)}. Pins the three accepted paths (admin always passes, anonymous always denied,
- * lead-of-this-SK passes for that SK only) plus the relevant negative cases (non-lead member, lead
- * of a different SK, no membership row).
+ * Mockito unit tests for {@link SpecialCommandSecurityService}: {@code canManageMembers} passes an
+ * admin always, an anonymous caller never and a lead of this SK only for that SK, only with {@code
+ * KRT Member} and only while the SK is active; {@code canManageMember} keeps a non-admin lead off
+ * their own row and off a lead's row, while an admin writes every row (REQ-ORG-005, REQ-ROLE-004,
+ * REQ-SEC-015, REQ-ORG-032).
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandSecurityServiceTest {
 
+  private static final UUID SC_ALPHA = UUID.randomUUID();
+  private static final UUID USER_ID = UUID.randomUUID();
+  private static final UUID OTHER_ID = UUID.randomUUID();
+
   @Mock private AuthHelperService authHelperService;
   @Mock private OrgUnitMembershipRepository membershipRepository;
+  @Mock private OrgUnitRepository orgUnitRepository;
 
   @InjectMocks private SpecialCommandSecurityService securityService;
-
-  private static final UUID SC_ALPHA = UUID.randomUUID();
-  private static final UUID SC_BRAVO = UUID.randomUUID();
-  private static final UUID USER_ID = UUID.randomUUID();
 
   private Authentication authenticatedMember;
 
@@ -62,16 +65,39 @@ class SpecialCommandSecurityServiceTest {
   void setUp() {
     authenticatedMember =
         new UsernamePasswordAuthenticationToken(
-            "member", null, java.util.List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+            "member", null, List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
+    lenient().when(orgUnitRepository.existsByIdAndActiveTrue(SC_ALPHA)).thenReturn(true);
+  }
+
+  /**
+   * Stubs the caller as {@link #USER_ID}, a non-admin with or without {@code KRT Member}.
+   *
+   * @param krtMember whether the caller holds {@code KRT Member}
+   */
+  private void callerHoldsKrtMember(boolean krtMember) {
+    lenient().when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
+    when(authHelperService.holdsKrtMember()).thenReturn(krtMember);
+  }
+
+  /**
+   * Stubs the user's membership row on {@link #SC_ALPHA}.
+   *
+   * @param userId the member
+   * @param role the rank of the row
+   */
+  private void rowOnAlpha(UUID userId, MembershipRole role) {
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setRole(role);
+    when(membershipRepository.findById(new OrgUnitMembershipId(userId, SC_ALPHA)))
+        .thenReturn(Optional.of(membership));
   }
 
   @Test
   void anonymousAuth_returnsFalse() {
     Authentication anon =
         new AnonymousAuthenticationToken(
-            "anonymous",
-            "anonymousUser",
-            java.util.List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))) {
+            "anonymous", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))) {
           @Override
           public boolean isAuthenticated() {
             return false;
@@ -79,11 +105,13 @@ class SpecialCommandSecurityServiceTest {
         };
 
     assertFalse(securityService.canManageMembers(SC_ALPHA, anon));
+    assertFalse(securityService.canManageMember(SC_ALPHA, OTHER_ID, anon));
   }
 
   @Test
   void nullAuth_returnsFalse() {
     assertFalse(securityService.canManageMembers(SC_ALPHA, null));
+    assertFalse(securityService.canManageMember(SC_ALPHA, OTHER_ID, null));
   }
 
   @Test
@@ -95,42 +123,46 @@ class SpecialCommandSecurityServiceTest {
 
   @Test
   void nonAdmin_leadOfThisSc_passes() {
-    OrgUnitMembership lead = new OrgUnitMembership();
-    lead.setRole(MembershipRole.SK_LEAD);
-    lenient().when(authHelperService.isAdmin()).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
-    when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))
-        .thenReturn(Optional.of(lead));
+    callerHoldsKrtMember(true);
+    rowOnAlpha(USER_ID, MembershipRole.SK_LEAD);
 
     assertTrue(securityService.canManageMembers(SC_ALPHA, authenticatedMember));
   }
 
   @Test
+  void nonAdmin_leadOfADeactivatedSc_managesNothing() {
+    callerHoldsKrtMember(true);
+    rowOnAlpha(USER_ID, MembershipRole.SK_LEAD);
+    when(orgUnitRepository.existsByIdAndActiveTrue(SC_ALPHA)).thenReturn(false);
+
+    assertFalse(securityService.canManageMembers(SC_ALPHA, authenticatedMember));
+    assertFalse(securityService.canManageMember(SC_ALPHA, OTHER_ID, authenticatedMember));
+  }
+
+  @Test
+  void nonAdmin_leadOfThisScWithoutKrtMember_returnsFalse() {
+    callerHoldsKrtMember(false);
+    OrgUnitMembership lead = new OrgUnitMembership();
+    lead.setRole(MembershipRole.SK_LEAD);
+    lenient()
+        .when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))
+        .thenReturn(Optional.of(lead));
+
+    assertFalse(securityService.canManageMembers(SC_ALPHA, authenticatedMember));
+    assertFalse(securityService.canManageMember(SC_ALPHA, OTHER_ID, authenticatedMember));
+  }
+
+  @Test
   void nonAdmin_memberOfThisScButNotLead_returnsFalse() {
-    OrgUnitMembership notLead = new OrgUnitMembership();
-    notLead.setRole(MembershipRole.MEMBER);
-    lenient().when(authHelperService.isAdmin()).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
-    when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))
-        .thenReturn(Optional.of(notLead));
+    callerHoldsKrtMember(true);
+    rowOnAlpha(USER_ID, MembershipRole.MEMBER);
 
     assertFalse(securityService.canManageMembers(SC_ALPHA, authenticatedMember));
   }
 
   @Test
   void nonAdmin_leadOfDifferentSc_doesNotCarryOver() {
-    lenient().when(authHelperService.isAdmin()).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
-    when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))
-        .thenReturn(Optional.empty());
-
-    assertFalse(securityService.canManageMembers(SC_ALPHA, authenticatedMember));
-  }
-
-  @Test
-  void nonAdmin_noMembershipAtAll_returnsFalse() {
-    lenient().when(authHelperService.isAdmin()).thenReturn(false);
-    when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
+    callerHoldsKrtMember(true);
     when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))
         .thenReturn(Optional.empty());
 
@@ -143,5 +175,64 @@ class SpecialCommandSecurityServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
 
     assertFalse(securityService.canManageMembers(SC_ALPHA, authenticatedMember));
+    assertFalse(securityService.canManageMember(SC_ALPHA, OTHER_ID, authenticatedMember));
+  }
+
+  @Test
+  void canManageMember_leadOnAPlainMembersRow_passes() {
+    callerHoldsKrtMember(true);
+    rowOnAlpha(USER_ID, MembershipRole.SK_LEAD);
+    rowOnAlpha(OTHER_ID, MembershipRole.MEMBER);
+
+    assertTrue(securityService.canManageMember(SC_ALPHA, OTHER_ID, authenticatedMember));
+  }
+
+  @Test
+  void canManageMember_leadOnTheirOwnRow_returnsFalse() {
+    lenient().when(authHelperService.isAdmin()).thenReturn(false);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
+    lenient().when(authHelperService.holdsKrtMember()).thenReturn(true);
+    OrgUnitMembership lead = new OrgUnitMembership();
+    lead.setRole(MembershipRole.SK_LEAD);
+    lenient()
+        .when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))
+        .thenReturn(Optional.of(lead));
+
+    assertFalse(securityService.canManageMember(SC_ALPHA, USER_ID, authenticatedMember));
+  }
+
+  @Test
+  void canManageMember_leadOnACoLeadsRow_returnsFalse() {
+    callerHoldsKrtMember(true);
+    rowOnAlpha(USER_ID, MembershipRole.SK_LEAD);
+    rowOnAlpha(OTHER_ID, MembershipRole.SK_LEAD);
+
+    assertFalse(securityService.canManageMember(SC_ALPHA, OTHER_ID, authenticatedMember));
+  }
+
+  @Test
+  void canManageMember_leadOnAMissingRow_passesSoTheWriteAnswersNotFound() {
+    callerHoldsKrtMember(true);
+    rowOnAlpha(USER_ID, MembershipRole.SK_LEAD);
+    when(membershipRepository.findById(new OrgUnitMembershipId(OTHER_ID, SC_ALPHA)))
+        .thenReturn(Optional.empty());
+
+    assertTrue(securityService.canManageMember(SC_ALPHA, OTHER_ID, authenticatedMember));
+  }
+
+  @Test
+  void canManageMember_plainMember_returnsFalse() {
+    callerHoldsKrtMember(true);
+    rowOnAlpha(USER_ID, MembershipRole.MEMBER);
+
+    assertFalse(securityService.canManageMember(SC_ALPHA, OTHER_ID, authenticatedMember));
+  }
+
+  @Test
+  void canManageMember_admin_writesEveryRowTheirOwnAndALeadsIncluded() {
+    when(authHelperService.isAdmin()).thenReturn(true);
+
+    assertTrue(securityService.canManageMember(SC_ALPHA, OTHER_ID, authenticatedMember));
+    assertTrue(securityService.canManageMember(SC_ALPHA, USER_ID, authenticatedMember));
   }
 }
