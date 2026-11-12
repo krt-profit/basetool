@@ -51,6 +51,7 @@ class StockableItemGroupTest {
         "Gadget",
         "SalvageModifier",
         "InventoryContainer",
+        "RemovableChip",
         "Misc"
       })
   void theGroupsBookTheGearAndLootTypes(String type) {
@@ -71,7 +72,6 @@ class StockableItemGroupTest {
         "Drink",
         "Bottle",
         "Grenade",
-        "RemovableChip",
         "Currency",
         "Cargo",
         "Seat",
@@ -98,6 +98,7 @@ class StockableItemGroupTest {
         "WeaponPersonal, Large, true",
         "Misc, NULL, true",
         "Char_Armor_Helmet, Heavy, true",
+        "RemovableChip, SystemAccess, true",
         "WeaponPersonal, Grenade, false",
         "Misc, Mineable, false",
         "Paints, UNDEFINED, false",

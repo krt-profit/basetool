@@ -94,7 +94,8 @@ public class GameItemController {
       description =
           "Returns a paginated list of the game items the Lager books: every output of an"
               + " active blueprint and every item of a stocked type (weapons, armour, ship"
-              + " components, mining and salvage modules, storage containers, loot);"
+              + " components, mining and salvage modules, storage containers, access chips,"
+              + " loot);"
               + " orderable=true keeps the blueprint outputs with a resolvable material"
               + " (item-order lines), withoutBlueprint=true the stocked items no blueprint"
               + " produces; the two exclude each other. The full set and the items without a"

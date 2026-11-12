@@ -40,12 +40,12 @@ that is the output of a listed active blueprint, **and** every listed game item 
 | Ship components and weapons | every `ShipComponentType` except `Turret`, plus `GroundVehicleMissileLauncher` | — |
 | Mining and salvage modules | `MiningModifier`, `Gadget`, `SalvageModifier` | — |
 | Storage containers | `InventoryContainer` | — |
+| Access chips: comp-boards, server blades, passcode disks, keycards, data drives | `RemovableChip` | — |
 | Loot and collectibles | `Misc` | `Mineable` (materials), `Consumable` (food) |
 
 Everything else — clothing, paints, decoration, turrets, consumables (medical pens, hacking tools,
-food, drink, keycards, scrip), cargo, a ship's fixed parts and items without a known type — is
-bookable only as the output of a blueprint, so everything a job order produces stays bookable by
-hand. The item-order picker (`orderable=true`) is unchanged: outputs of an active blueprint with a
+food, drink, scrip), cargo, a ship's fixed parts and items without a known type — is bookable only
+as the output of a blueprint, so everything a job order produces stays bookable by hand. The item-order picker (`orderable=true`) is unchanged: outputs of an active blueprint with a
 resolved RESOURCE ingredient. The create path does not re-check the picker's rule, but it refuses
 an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 
@@ -62,9 +62,10 @@ an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 - [ ] Item rows merge on write (PIECE rule); the merge FOR-UPDATE group query matches
   NULL material/quality + the gameItem key (no silent no-op).
 - [x] The picker offers a Scourge Railgun (`WeaponPersonal/Large`, no blueprint), a scope, a
-  helmet, a shield, an artifact and a crafted magazine; it offers no grenade, uncrafted magazine,
-  mineable gem, medical pen, shirt, paint, turret, untyped row without a blueprint, retired or
-  hidden item, and no output of a retired recipe whose type is not stocked.
+  helmet, a shield, an artifact, a comp-board (`RemovableChip/SystemAccess`) and a crafted
+  magazine; it offers no grenade, uncrafted magazine, mineable gem, medical pen, shirt, paint,
+  turret, untyped row without a blueprint, retired or hidden item, and no output of a retired
+  recipe whose type is not stocked.
 - [x] Every `ShipComponentType` but the turret is a stocked type.
 
 **Enforced by:** `InventoryItemServiceTest` / `InventoryStockMergeTest` item cases,
