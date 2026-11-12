@@ -905,6 +905,10 @@ no-silent-cap principle).
 - **No new mutation.** Select-all is a read that feeds the existing bulk check-out
   (`POST /inventory/bulk-checkout`, REQ-INV-044); it adds no new write path and no new audit event
   (the bulk check-out's `INVENTORY_BULK_CHECKED_OUT` audit is unchanged).
+- **Every selection checkbox has a name.** A group's checkbox reads „Alle auswählen"
+  (`inventory.bulk.checkout.select.all`), an entry's „Eintrag auswählen"
+  (`inventory.bulk.checkout.select.entry`), each as `aria-label` and `title`, so a screen reader
+  announces what it ticks (WCAG 4.1.2).
 
 *Amended 2026-10-03 (website overhaul phase 3): „Alle markieren" moved into the toolbar, and the
 bulk buttons („Markierte ausbuchen", „Markierte umbuchen", „Markierte: Einheit ändern", the stolen
@@ -923,13 +927,16 @@ pair) moved into a sticky selection bar that appears only while something is mar
   filters with 400 like `…/my-inventory/grouped`.
 - [ ] Changing a filter, a modal write, or a peer refresh clears the selection (no stale id reaches
   the bulk check-out); expanding a stack after select-all shows its rows already ticked.
+- [ ] The selection checkbox of every material and game-item entry carries an accessible name, and
+  an axe scan of the open tree reports no critical or serious violation.
 
 **Enforced by:** `InventoryItemControllerTest`, `InventoryPageControllerTest`,
-`InventoryPageControllerMvcTest`, `InventoryAggregationServiceTest` · **Code:**
-`InventoryItemController#getMyEntryIds`, `InventoryAggregationService#getMyEntryIds` /
+`InventoryPageControllerMvcTest`, `InventoryAggregationServiceTest`, `LagerTreeDisclosureE2eTest` ·
+**Code:** `InventoryItemController#getMyEntryIds`, `InventoryAggregationService#getMyEntryIds` /
 `#getMyItemEntryIds`, `InventoryItemService#getMyEntryIds`,
 `InventoryItemRepository#findUserEntryIds` / `#findUserItemEntryIds`,
-`InventoryPageController#myEntryIds`, `templates/inventory/inventory-my.html`, `static/js/inventory/inventory-my.js` ·
+`InventoryPageController#myEntryIds`, `templates/inventory/inventory-my.html`,
+`templates/inventory/fragments/inventory-stack-entries.html`, `static/js/inventory/inventory-my.js` ·
 **Issues:** — · **ADR:** ADR-0104
 
 ### REQ-INV-035 — Refinery output can be stored straight into the personal pool
