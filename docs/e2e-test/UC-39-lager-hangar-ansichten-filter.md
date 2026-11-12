@@ -17,7 +17,7 @@
 - **Ortsfilter:** Bestand an zwei geseedeten Orten.
 - **Live-Sync:** eine geteilte, auftragsfähige Zeile über 100 SCU und ein Auftrag.
 - **Hangar:** so viele Schiffe, dass mehr als eine Seite entsteht.
-- **Aufklappen per Tastatur:** ein geteilter Lagereintrag eines eigenen Materials an einem eigenen Ort.
+- **Aufklappen per Tastatur:** je ein geteilter Lagereintrag zweier eigener Materialien an einem eigenen Ort.
 - Filterpanel- und Filter-Persistenz-Tests brauchen keinen Seed: die Widgets rendern auch auf leerem Stand.
 
 ## Auslöser
@@ -33,7 +33,7 @@ Der Nutzer öffnet die Lager-Ansichten oder den Hangar und filtert, klappt, blä
 5. **Live-Sync des geteilten Lagers** (#1307): beide Kontexte klappen denselben Stack auf `/inventory/all` auf; B wartet, bis `window.krtLiveSync.subscribedTopics()` `inventory` enthält. A fügt über „+ Zuordnen" einen Auftrags-Chip hinzu (`POST /inventory/{id}/allocation`); B lädt nie neu.
 6. **Filter-Persistenz** (REQ-UI-017, ADR-0120): auf `/refinery-orders` das Segment „Abgeschlossen" wählen und den Schalter „Meine Aufträge" setzen; auf `/missions` `showPast` einschalten; auf `/materialboerse` die Sortierung ändern — jeweils neu laden.
 7. **Hangar** (REQ-HANGAR-002): `/hangar?size=10` laden, eine Seite weiter blättern, dann eine Suche ohne Treffer eingeben.
-8. **Aufklappen per Tastatur** (REQ-INV-002): auf `/inventory?storage=my` vom Gruppen-Haken mit Shift+Tab auf den Pfeil der Materialgruppe gehen, mit Enter die Gruppe und mit der Leertaste ihren Stack öffnen, den offenen Baum samt geladener Einträge mit axe scannen, neu laden, dann beide Ebenen per Tastatur wieder schließen; auf 810×1080 und 375×812 die Pfeile von Gruppe und Stack vermessen. Den Gruppen-Haken einer zugeklappten Gruppe per Maus anklicken, die Gruppe und ihren Stack über die Pfeile öffnen, dann den Haken per Leertaste zweimal umschalten.
+8. **Aufklappen per Tastatur** (REQ-INV-002): auf `/inventory?storage=my` vom Gruppen-Haken mit Shift+Tab auf den Pfeil der Materialgruppe gehen, mit Enter die Gruppe und mit der Leertaste ihren Stack öffnen, den offenen Baum samt geladener Einträge mit axe scannen, neu laden, dann beide Ebenen per Tastatur wieder schließen; auf 810×1080 und 375×812 die Pfeile von Gruppe und Stack vermessen. Den Gruppen-Haken der noch nie geöffneten Gruppe per Maus anklicken, die Gruppe und ihren Stack über die Pfeile öffnen, dann den Haken per Leertaste zweimal umschalten; ein zweites Material am selben Ort liegt daneben.
 
 ## Erwartetes Ergebnis
 
@@ -43,7 +43,7 @@ Der Nutzer öffnet die Lager-Ansichten oder den Hangar und filtert, klappt, blä
 - B zeigt den neuen Chip **in place**, allein durch das Signal `inventory/[stock]`.
 - Alle drei Filterwahlen sind nach dem Reload wiederhergestellt und wirken (der `showPast`-Zustand treibt den Neuabruf der Ergebnisse).
 - Der Hangar zeigt höchstens 10 Zeilen, Paginierung und Seitengrößen-Auswahl; Blättern und Suchen tauschen die Tabelle ohne Reload, die Seitenanzeige rückt vor, die Suche ohne Treffer leert die Tabelle.
-- Der Pfeil ist eine fokussierbare Schaltfläche mit dem orangen 2-px-Fokusrahmen, deren `aria-controls` den Container nennt; `aria-expanded` folgt jedem Auf- und Zuklappen, der erste Aufruf des Stacks lädt seine Einträge, nach dem Reload sind beide Ebenen wieder offen, und axe meldet im Baum samt Einträgen nichts der Stufen `critical` oder `serious` — auch jeder Auswahlhaken eines Eintrags trägt einen Namen. Auf beiden Touch-Klassen trägt jeder Pfeil eine 44 px große Trefferfläche in einer mindestens 44 px hohen Zeile, und der Name bleibt neben ihm. Der Gruppen-Haken klappt nichts: die zugeklappte Gruppe bleibt zu, die offene bleibt offen, ein gesetzter Haken markiert den geladenen Eintrag und ein entfernter hebt die Markierung auf. Der Haken spiegelt die geladenen Einträge, auf einer Gruppe ohne geladene Einträge bleibt er deshalb nicht gesetzt.
+- Der Pfeil ist eine fokussierbare Schaltfläche mit dem orangen 2-px-Fokusrahmen, deren `aria-controls` den Container nennt; `aria-expanded` folgt jedem Auf- und Zuklappen, der erste Aufruf des Stacks lädt seine Einträge, nach dem Reload sind beide Ebenen wieder offen, und axe meldet im Baum samt Einträgen nichts der Stufen `critical` oder `serious` — auch jeder Auswahlhaken eines Eintrags trägt einen Namen. Auf beiden Touch-Klassen trägt jeder Pfeil eine 44 px große Trefferfläche in einer mindestens 44 px hohen Zeile, und der Name bleibt neben ihm. Der Gruppen-Haken klappt nichts und markiert die ganze Gruppe: auf der zugeklappten Gruppe bleibt er gesetzt, die Auswahlleiste zählt genau ihren einen Eintrag (nicht den des zweiten Materials), die Gruppe bleibt zu und kein Stack wird geladen; nach dem Öffnen ist der Eintrag schon markiert, ein entfernter Haken hebt die Markierung auf und blendet die Leiste aus, ein erneut gesetzter markiert wieder.
 
 ## Sonderfälle & Lehren
 
