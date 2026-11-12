@@ -24,6 +24,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtModal } from '/js/kernel/krt-modal.js';
 import { krtEvents } from '/js/kernel/event-delegation.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
+import { showFrontendErrorToast } from '/js/kernel/toast.js';
 
 /**
  * Looks up an element by id and returns it as the given control type; the supply templates always
@@ -67,6 +68,31 @@ export function numberOrNull(value) {
 export function textOrNull(value) {
     const trimmed = value.trim();
     return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * Resets a form and clears its searchable comboboxes, whose hidden value a native reset keeps.
+ *
+ * @param {HTMLFormElement} form the form
+ */
+export function resetForm(form) {
+    form.reset();
+    form.querySelectorAll('input').forEach((input) => {
+        if (input.krtCombobox) input.krtCombobox.setValue('');
+    });
+}
+
+/**
+ * Asks for an item when the form is set to an item and none is chosen yet.
+ *
+ * @param {boolean} isItem whether the form names an item
+ * @param {string | null} itemId the chosen item, or null
+ * @returns {boolean} whether the form may be sent
+ */
+export function itemChosen(isItem, itemId) {
+    if (!isItem || itemId !== null) return true;
+    showFrontendErrorToast(String(supplyI18n.itemRequired));
+    return false;
 }
 
 /**
@@ -229,10 +255,12 @@ export function bindFilterForm(cfg) {
  * @param {string} materialRowId the id of the material row
  * @param {string} itemRowId the id of the item row
  * @param {string[]} materialOnlyRowIds the ids of the rows only a material has, such as the quality
+ * @returns {() => void} shows the rows of the kind the select holds, for a form reset, which fires
+ *     no change event
  */
 export function bindKindToggle(kindId, materialRowId, itemRowId, materialOnlyRowIds) {
     const kind = document.getElementById(kindId);
-    if (!kind) return;
+    if (!kind) return () => {};
     /** @returns {void} */
     function apply() {
         const isMaterial = select(kindId).value === 'material';
@@ -247,6 +275,7 @@ export function bindKindToggle(kindId, materialRowId, itemRowId, materialOnlyRow
     }
     kind.addEventListener('change', apply);
     apply();
+    return apply;
 }
 
 /**
@@ -259,9 +288,12 @@ export function initPledgeModal(afterWrite) {
     const modal = document.getElementById('supply-pledge-modal');
     const form = document.getElementById('supply-pledge-form');
     if (!modal || !form) return;
-    bindKindToggle('supply-pledge-kind', 'supply-pledge-material-row', 'supply-pledge-item-row', [
-        'supply-pledge-quality-row',
-    ]);
+    const syncKind = bindKindToggle(
+        'supply-pledge-kind',
+        'supply-pledge-material-row',
+        'supply-pledge-item-row',
+        ['supply-pledge-quality-row'],
+    );
 
     const source = select('supply-pledge-source');
     const noSource = source.options[0];
@@ -364,7 +396,8 @@ export function initPledgeModal(afterWrite) {
      * @param {{ needId: string, unitId: string, entry: string }} preset the preset
      */
     function open(preset) {
-        /** @type {HTMLFormElement} */ (form).reset();
+        resetForm(/** @type {HTMLFormElement} */ (form));
+        syncKind();
         field('supply-pledge-need-id').value = preset.needId;
         const label = document.getElementById('supply-pledge-need-label');
         const catalogue = document.getElementById('supply-pledge-catalogue');
@@ -398,6 +431,8 @@ export function initPledgeModal(afterWrite) {
         event.preventDefault();
         const needId = textOrNull(field('supply-pledge-need-id').value);
         const isItem = select('supply-pledge-kind').value === 'item';
+        const itemId = textOrNull(select('supply-pledge-item').value);
+        if (!needId && !itemChosen(isItem, itemId)) return;
         const sourceId = textOrNull(source.value);
         const submitter = /** @type {HTMLButtonElement | null} */ (
             form.querySelector('button[type="submit"]')
@@ -410,8 +445,7 @@ export function initPledgeModal(afterWrite) {
                 receivingOrgUnitId: needId ? null : textOrNull(select('supply-pledge-unit').value),
                 materialId:
                     needId || isItem ? null : textOrNull(select('supply-pledge-material').value),
-                gameItemId:
-                    needId || !isItem ? null : textOrNull(select('supply-pledge-item').value),
+                gameItemId: needId || !isItem ? null : itemId,
                 quality:
                     needId || isItem || sourceId
                         ? null

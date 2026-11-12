@@ -23,7 +23,7 @@ requires it and duplicating it into further files spreads personal data for no g
 | **Members**                      | Register via Keycloak (credentials or Discord), approved by an admin                                                        |
 | **Applicants**                   | Registered but not yet decided (`PENDING`) or refused (`REJECTED`)                                                          |
 | **External trade partners** | Entered by a trade delegate as a partner of a purchasing deal; individuals by handle, organisations by name (A12) |
-| **Non-registered third parties** | Named in free-text fields by a member: external mission participants, job-order handover recipients |
+| **Non-registered third parties** | Named by a member as an external mission participant, handover recipient, aUEC holder or settlement beneficiary |
 | **Visitors**                     | Reach the landing page, Impressum, terms and privacy pages without an account — the only pages without a login (ADR-0159)  |
 
 ---
@@ -74,6 +74,12 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Retention:** for the duration of the account; on deletion the account-owned rows are purged and
   the shared aggregates are reassigned (REQ-DATA-008).
 
+- **Bank-linked aUEC attempts:** `job_order_linked_money_attempt` records submitted monetary terms,
+  reported payment, participant links and the outcome. Accountless holder and depositor names can
+  survive account deletion. A granted Art. 17 request clears the matching names while retaining
+  amounts and outcomes. Personal exports include only the subject's directly related attempts
+  and financial facts.
+
 > [!note] Added 2026-09-15 — two free-text handles nothing had named
 > `job_order_handover.recipient_handle` and `job_order_item_handover.recipient_handle` record who
 > collected material on a job order. They are **typed in by hand**, so they can name somebody with
@@ -85,8 +91,13 @@ requires it and duplicating it into further files spreads personal data for no g
 ### A3 — Banking and settlement
 
 - **Purpose:** keep the organisation's in-game ledger auditable.
-- **Data:** postings and transactions including the counterparty and the **player handle used at the
-  time of booking**, retained as a tamper-evident record.
+- **Data:** postings and transactions with their counterparties and player-handle snapshots.
+  Linked requests record the applicant and the actual depositor or payee, including a named
+  counterparty without a tool account. Authorisation records identify the deciding member and
+  custodian alongside the funding account, amount and time. The member's data export shows their
+  own participation in an authorisation. For linked requests in any state, it shows the member's
+  own roles as source, destination or funding custodian with the amount, status and dates.
+  These export sections omit other participants' identities and private notes.
 - **Legal basis:** Art. 6(1)(f) — traceability and integrity of the organisation's financial records.
 - **Where:** `bank_*`.
 - **Retention:** the link to the account is cleared on deletion; the historic handle stays in the

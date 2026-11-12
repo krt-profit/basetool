@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -44,12 +45,14 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.BookInPolicy;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItem;
@@ -65,6 +68,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -84,7 +88,10 @@ import org.springframework.security.access.AccessDeniedException;
  * guards; the stale-version 409; the depleted-row delete; and a material marked "nicht ausbuchen".
  * Every payload carries the required {@code bookIn} block (REQ-INV-032).
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class JobOrderItemProductionServiceTest {
 
   private static final long LINE_VERSION = 3L;
@@ -116,10 +123,18 @@ class JobOrderItemProductionServiceTest {
 
   @BeforeEach
   void setUp() {
+    lenient()
+        .when(inventoryItemRepository.lockRowIdsOrderById(anyCollection()))
+        .thenAnswer(invocation -> List.copyOf(invocation.<Collection<UUID>>getArgument(0)));
     service =
         new JobOrderItemProductionService(
             jobOrderRepository,
+            org.mockito.Mockito.mock(MaterialPromiseCoordinator.class),
+            org.mockito.Mockito.mock(JobOrderAccessPolicy.class),
             new InventoryStockCommands(
+                new InventoryOrderWrites(
+                    inventoryItemRepository,
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
                 inventoryItemRepository,
                 userRepository,
                 inventoryCheckoutService,
@@ -134,7 +149,8 @@ class JobOrderItemProductionServiceTest {
             userRepository,
             locationRepository,
             orgUnitStampingService,
-            authHelperService);
+            authHelperService,
+            org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class));
     orderId = UUID.randomUUID();
     lineId = UUID.randomUUID();
     inventoryId = UUID.randomUUID();
@@ -448,7 +464,7 @@ class JobOrderItemProductionServiceTest {
 
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage(JobOrderHandoverService.ERROR_QUALITY_BELOW_FLOOR);
+        .hasMessage(JobOrderStockErrors.QUALITY_BELOW_FLOOR);
     assertThat(line.getManufacturedAmount()).isZero();
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
@@ -489,7 +505,7 @@ class JobOrderItemProductionServiceTest {
 
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER);
+        .hasMessage(JobOrderStockErrors.ITEM_NOT_LINKED_TO_ORDER);
     verify(inventoryItemRepository, never()).save(any());
     verify(inventoryItemRepository, never()).delete(any());
   }
@@ -643,7 +659,6 @@ class JobOrderItemProductionServiceTest {
     assertThat(slice.getJobOrderId()).isEqualTo(order.getId());
     assertThat(slice.getAmount()).isEqualTo(2.0);
     assertThat(slice.getDelivered()).isFalse();
-    verify(orgUnitStampingService).resolveOrgUnitForPickerOutputNullable(owner, orgUnitId);
     org.mockito.InOrder callOrder = inOrder(inventoryItemRepository, inventoryCheckoutService);
     callOrder.verify(inventoryItemRepository).save(stockRow);
     callOrder.verify(inventoryCheckoutService).mergeStockIfRequested(stockRow, false);
@@ -793,7 +808,6 @@ class JobOrderItemProductionServiceTest {
     verify(inventoryItemRepository).save(captor.capture());
     assertThat(captor.getValue().getUser()).isSameAs(actor);
     verify(userRepository, never()).findById(any());
-    verify(orgUnitStampingService).resolveOrgUnitForPickerOutputNullable(actor, null);
   }
 
   @Test
@@ -878,7 +892,6 @@ class JobOrderItemProductionServiceTest {
 
     service.bookProduction(orderId, lineId, dto);
 
-    verify(bookInPolicy).mayBookInFor(ownerId);
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());

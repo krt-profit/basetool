@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.scope.api;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.Role;
@@ -34,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import java.time.Instant;
@@ -63,6 +66,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @SpringBootTest
 class RetainedSeatWithoutKrtMemberIntegrationTest {
 
+  @Autowired private OrgUnitRepository orgUnitRepository;
+
   @Autowired private CustomJwtGrantedAuthoritiesConverter converter;
   @Autowired private AccessGateService accessGateService;
   @Autowired private RequestScopeResolver requestScopeResolver;
@@ -89,7 +94,7 @@ class RetainedSeatWithoutKrtMemberIntegrationTest {
     Squadron staffel = new Squadron();
     staffel.setName("Seat-Staffel-" + tag);
     staffel.setShorthand("SS" + tag);
-    staffel.setProfitEligible(true);
+    withinProfit(staffel, persistedProfitArea(orgUnitRepository));
     staffel.setParent(area);
     squadron = squadronRepository.save(staffel);
   }

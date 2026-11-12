@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Caller-aware seam the stock mappers use to fill the viewer-dependent {@code canEdit} field of
- * inventory-item and job-order DTOs.
+ * inventory-item DTOs.
  *
  * <p>Inverts the {@code mapper} to {@code service} dependency like {@link MissionViewerAccess}
  * (ADR-0047); the Lager implements it.
@@ -44,11 +44,11 @@ public interface StockViewerAccess {
   boolean mayEditInventoryItem(UUID inventoryItemId, @Nullable UUID ownerId);
 
   /**
-   * Reports whether the current caller may edit one job order, applying both the {@code
-   * LOGISTICIAN} role and the org-unit scope check the write endpoints enforce.
+   * Reports full ordinary write authority for current scalar stock ownership.
    *
-   * @param jobOrderId the order to test.
-   * @return {@code true} iff the current caller may edit it.
+   * @param ownerId actual current per-user owner, or null when absent
+   * @param owningOrgUnitId actual current owning pool, or null for ownerless stock
+   * @return whether both current Inventory action gates permit the write
    */
-  boolean mayEditJobOrder(UUID jobOrderId);
+  boolean mayEditInventoryIdentity(@Nullable UUID ownerId, @Nullable UUID owningOrgUnitId);
 }

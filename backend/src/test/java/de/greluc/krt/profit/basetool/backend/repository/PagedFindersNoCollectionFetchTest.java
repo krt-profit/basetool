@@ -160,6 +160,7 @@ class PagedFindersNoCollectionFetchTest {
                   null,
                   Set.of(),
                   new UUID(0L, 0L),
+                  java.util.List.of(JobOrderType.values()),
                   PAGE)
               .getContent();
       assertUnfetched(scoped, JobOrder::getMaterials);
@@ -167,7 +168,8 @@ class PagedFindersNoCollectionFetchTest {
       assertUnfetched(scoped, JobOrder::getHandovers);
       assertUnfetched(
           jobOrderRepository
-              .findRequestedOrders(statuses, Set.of(staffel.getId()), PAGE)
+              .findRequestedOrders(
+                  statuses, Set.of(staffel.getId()), java.util.List.of(JobOrderType.values()), PAGE)
               .getContent(),
           JobOrder::getMaterials);
     });

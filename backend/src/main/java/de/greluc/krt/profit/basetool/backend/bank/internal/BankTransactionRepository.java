@@ -19,9 +19,12 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import jakarta.persistence.LockModeType;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -36,6 +39,16 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface BankTransactionRepository extends JpaRepository<BankTransaction, UUID> {
+
+  /**
+   * Serialises reversals of one original before checking whether a reversal already exists.
+   *
+   * @param id the original transaction id
+   * @return the locked original, or empty when it does not exist
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT t FROM BankTransaction t WHERE t.id = :id")
+  Optional<BankTransaction> findByIdForUpdate(@Param("id") UUID id);
 
   /**
    * Probes whether a transaction has already been reversed — the pre-check behind the stable 409

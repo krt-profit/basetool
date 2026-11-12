@@ -1,92 +1,312 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
-> **Owner area:** ORDERS · **Related ADRs:** ADR-0092
+> **Doc type:** Living spec. Last reviewed: 2026-11-11.
+> **Owner area:** ORDERS · **Related ADRs:** ADR-0360 (amends ADR-0092)
 
-# Material claims (Eintragungen) on Spezialkommando orders
+# Material promises within Staffel participation
 
 ## Context & goal
 
-A **material claim** ("Eintragung") records that a profit squadron signs up to deliver a partial
-quantity of one material bucket on a **public Spezialkommando (SK) job order** (Job-Order rework
-#340, Phase 4 / #344). A claim is keyed on the aggregated bucket
-`(job_order, material, quality tier)` so the same flow serves both order kinds (a `MATERIAL`
-order buckets its material lines by their tier, an `ITEM` order sums its per-item material
-requirements per tier; tiers: REQ-ORDERS-036). The payload names the tier by its code in
-`qualityRequirement`, case-insensitively; a code the order does not use is a 400. Claims are **signal-only** — they record intent and never move inventory.
-
-The claim domain shipped code-only; this spec captures its load-bearing invariants and, in
-particular, makes the **no-overclaim** rule a concurrency-safe requirement after an audit found it
-was not enforced across squadrons under concurrent first claims.
-
-The invariants live in `MaterialClaimService`; the row is `material_claim` (V131) with a unique index
-`uq_material_claim_tier_bucket_org_unit` on `(job_order_id, material_id, quality_tier_id,
-claiming_org_unit_id)` (V264, REQ-ORDERS-036).
+A material claim (Eintragung) is a Staffel's still-outstanding announced contribution to a
+MATERIAL or ITEM order's material/quality requirement. It belongs to the single participation
+of [REQ-ORDERS-051](orders-core.md); there is no second support registration. Support can exist
+without a quantity, and one participation may carry promises for several requirements.
+This accepted target replaces the signal-only, SK-only claim model and the original-total ITEM
+claim denominator. Support and responsibility changes use the shared order workflow.
+The owner-approved decisions are [material quantities](https://github.com/krt-profit/basetool/issues/3207)
+and [technical contracts](https://github.com/krt-profit/basetool/issues/3202).
 
 ## Requirements
 
-### REQ-ORDERS-024 — A bucket's claims never overclaim, concurrently or otherwise
+### REQ-ORDERS-024 — Outstanding material promises fit uncovered demand and credit real provision once
 
-For every material bucket of an SK order, the sum of all squadrons' claim amounts MUST never exceed
-the bucket's required amount. A claim upsert that would push the bucket's total over the requirement
-is rejected (HTTP 400). This holds regardless of which squadron claims, whether the claim is a first
-sign-up or an amount edit, and **regardless of concurrency**.
+**Meaning and capacity.** A promise is neither physical stock nor delivered material nor an
+immutable original quantity. For each material/quality bucket, let D be outstanding material
+demand, S the matching current order-earmarked stock, and P the sum of active outstanding
+promises. Capacity is max(0, D − S), and 0 <= P <= capacity must hold at commit, including concurrent
+changes and the first promise in an empty set.
 
-Because the sum is a **cross-row aggregate across squadrons**, the unique index (which keys per
-`(bucket, claiming squadron)`) cannot protect it: two **different** squadrons lodging their first
-claim on the same bucket at the same instant would each read a zero already-claimed sum under
-Postgres `READ COMMITTED` (the other's uncommitted INSERT is invisible), both pass the guard, and
-both commit — the two rows never collide, so the claim upsert's own `REQUIRES_NEW` retry (which only
-catches a same-`(bucket, squadron)` unique / `@Version` violation) never fires.
+MATERIAL D is its remaining requested quantity. ITEM D is the material needed for items not yet
+manufactured, changing the intentional full-original-order denominator in REQ-ORDERS-025.
+Existing manufactured, skipped-consumption and delivered counters and safe edit bounds remain.
+Use the established quality-floor allocation (REQ-ORDERS-036/-037): each physical stock quantity
+covers at most one bucket. Current quality coverage is not historical evidence of a Staffel's
+contribution. aUEC promises have their own money rules; this does not impose a material cap on them.
 
-The invariant is therefore serialized with a **`PESSIMISTIC_WRITE` row lock on the order** — the
-claims' aggregate root — taken **before** the already-claimed sum is read
-(`JobOrderRepository.lockForClaimUpsert`, ADR-0092). Claimants of one order serialize on that row,
-so the loser of a first-claim race reads the winner's **committed** claim and its guard rejects the
-overclaim; unrelated orders and unrelated buckets of other orders are never blocked. The existing
-`REQUIRES_NEW` retry is retained as a defense-in-depth backstop for the same-row race the order lock
-does not serialize (an upsert whose row is deleted by a concurrent withdrawal between find and save).
+**Explicit provision credit.** A genuine suitable provision earmarked to the order may fulfill
+an explicitly selected Staffel's matching open promise once, within the lesser of its open
+amount and the genuinely provided quantity. Record attribution in the ordinary stock
+provision/allocation action. The responsible-unit writer or affected Staffel's writer may do
+this with the required inventory rights. The recorder, stock owner, recipient, memberships or
+executing-Staffel snapshot do not infer the credited Staffel. Excess/unattributed stock is allowed
+under inventory rules; it creates no fictitious promise or fulfillment of a foreign promise.
 
-The claim domain's other invariants are unchanged and remain enforced in `MaterialClaimService`:
-claims are allowed **only on non-terminal SK orders**; a squadron holds **at most one claim per
-bucket** (a repeat post updates its row rather than duplicating, backed by the unique index); only a
-**profit-eligible squadron** may claim; and the claim permission matrix (own-squadron
-logistician/officer, or a logistician/lead of the responsible SK) gates every mutation, in the active
-context like every role power (REQ-ORG-032): an admin passes both branches for the units their
-context covers, every unit unpinned and the pinned unit pinned.
-Claims are reconciled inside the transaction that changes the order, deleting through the repository
-so the order's `@Version` is never bumped: an order edit that removes a bucket withdraws the claims on
-it (`withdrawOrphanedClaimsWithinTransaction`), and an SK → squadron reassignment, which makes the
-order private, withdraws all of its claims (`withdrawAllForOrderWithinTransaction`); the count is
-folded into the parent edit's / reassignment's audit event. A direct upsert or withdrawal is audited
-as `JOB_ORDER_CLAIM_UPSERTED` / `JOB_ORDER_CLAIM_WITHDRAWN` (REQ-AUDIT-001).
+The ordinary stock action's optional promise picker reads backend-authorized open targets from
+`GET /api/v1/orders/{jobOrderId}/claims/provision-options`, using the declared material and
+supplied quality even before a stock row exists. The backend checks the concrete order read and
+current claim-workflow grants, valid responsibility, lifecycle and eligible claiming Staffel;
+only matching quality floors and positive active promises are offered with their independent
+versions. The frontend renders these typed choices. Selecting one grants no write permission:
+the final stock action revalidates current Inventory and contribution authority, suitability,
+open quantity, once-only physical evidence and observed versions within its transaction.
+
+The same physical quantity cannot be credited again through relocation, release/relinking,
+row merge/removal, dynamic quality redistribution, manufacture or final handover. Genuine new
+provision is a new fact. A promise itself creates or moves no inventory. Historical contribution
+credit is durable evidence separate from the current coverage projection.
+
+An ordinary undo of an older journal remains available under REQ-XCH-022 even when that journal
+cannot prove the restored quantity's physical identity. The restored stock covers current demand,
+but an unproven restored portion is ineligible for any new Staffel contribution credit. Do not
+invent a fresh provision identity or ask for an extra member action. Preserve exact known
+composition when available; ordinary new manual provision remains a distinct new fact.
+
+**One coherent adjustment.** Apply the stock provision, allowed explicit credit, capacity
+calculation and necessary proportional reductions atomically. Credit the selected promise
+first, then reduce any remaining promises that exceed changed capacity. Do not proportionally
+cut and then credit the same quantity again. A legitimate demand or stock change, including
+an authorized requester demand edit, may cause derived reductions without a new approval from
+each Staffel. This gives no arbitrary manual foreign-promise write authority.
+
+Proportional reductions mean no longer needed, not contribution fulfilled. Preserve old/new
+amounts and reason. Floor exact proportional quotas to valid quanta (whole PIECE or 0.001 SCU),
+then give remaining quanta by descending fractional remainder, breaking ties by stable immutable
+participation identity. The resulting sum equals the reduced capacity in valid quanta, never
+exceeds it and never increases an individual promise. Repeated inputs give the same result.
+Zero open quantity does not withdraw the Staffel's whole participation.
+
+Exact quantum calculations must also preserve those quanta when stored in an amount field. If the
+numeric representation cannot express the required result, reject the whole mutation through
+ordinary numeric validation and retain the current facts and versions. Do not round a calculated
+promise above capacity or introduce an additional business quantity limit.
+
+If a bucket disappears, its capacity becomes zero and its open promises end while history remains.
+Do not silently move an old quality promise to a new bucket. Increasing need/capacity never grows
+reduced promises or revives ended ones; new/increased promises require their normal deliberate
+write action.
+
+**True later changes and false facts.** Correctly credited past provision remains a contribution
+when stock is genuinely consumed, released or lost. Current uncovered demand may rise without
+creating a new obligation for that Staffel. Manufacture and delivery do not credit that contribution
+a second time; skipped material consumption is not proof of provision.
+
+If the original provision or attribution was false, correct connected stock, promise and credit
+facts together. Restore the wrongly removed amount only for a still-running promise and within
+current capacity; no negative quantity or ended-promise revival is allowed. Connected later
+records may require the agreed connected correction rather than an isolated inverse. A true
+stock loss is not a correction of a truthful historic contribution.
+The same ordinary correction action also corrects a falsely recorded original supplied quality.
+Retain its prior observed value, or its explicit unknown status, and the corrected declared value
+in history. Apply the resulting truthful historical credit and prescribed promise/capacity
+consequences together under current affected-data authority and scoped versions. A genuine later
+quality change is a separate fact and must be preserved. Current stock quality alone neither
+proves the original quality nor authorizes blindly resetting retained stock. Change retained
+physical quality only through its known connected facts and current Inventory rights/versions.
+Consumption does not by itself prevent correction of the historical quality/credit fact and does
+not authorize production reversal. Correcting quality does not turn an unknown historical total
+or composition into observed quantity evidence. This adds no material substitution or correction
+of other original provision fields.
+
+Historical original-quality correction leaves current physical quality unchanged unless the
+actor explicitly selects a currently editable retained portion in the same action and declares
+that its current quality is also false. The server shows the known receipt intersection, such as
+3 within a merged row of 7, and changes only those intervals under current Inventory rights and
+selected row versions. It preserves unrelated physical evidence, other receipts and current
+allocation, donation and merge rules. Empty selection keeps the historical correction available
+after consumption or without Inventory access. Equality with today's quality or another receipt's
+historical quality does not establish a quality timeline or cause automatic propagation.
+
+Original-quality inputs follow the standard localized integer control (REQ-UI-037). Their
+canonical numeric declaration is used by choice queries, correction payloads and asynchronous
+response guards; formatting the same value on blur leaves the current choice refresh usable.
+
+**Correction ownership and known quantity.** A provision's actual declared quantity is distinct
+from its credit clipped to an open promise. Retain the actual known composition, including any
+uncredited excess, separately from current truthful attribution and immutable processed-once
+quantity. Correcting actual provision 4 to 3 when only 3 were credited removes the uncredited
+quantity first. If that quantity was later truthfully credited through another receipt, correct
+every known intersecting credit in the same transaction, including credits on another order.
+Every affected order must have valid current responsibility and the actor must currently be
+allowed to correct its affected contribution. Inaccessible or changed connected facts fail
+atomically; no extra manual approval or client version is required for prescribed consequences.
+
+A historical attribution-only correction changes JobOrder facts. A responsible-unit writer may
+coordinate it; otherwise current grants for both the original and selected target Staffel are
+required. The original Staffel's writer may remove its own false attribution. No obsolete
+Inventory authority snapshot is reconstructed when stock is untouched. An existing ended matching
+target may receive corrected historical credit while both promises remain ended; this neither
+creates support nor restores open quantity. A writer for only the new target cannot relabel
+another Staffel's historical contribution.
+
+A physical correction additionally requires current Inventory authority and observed row versions
+for the retained connected stock it changes. Correction options check that authority before
+returning any row identity, version or label. Apply the full ordinary Inventory action predicate;
+order correction authority, stock read access or ordinary membership alone grants no stock write.
+`InventoryMaterialQualityCorrectionIntegrationTest` proves a readable but noneditable stock row
+and correctable receipt still deny physical quantity correction atomically. A relocated or merged retained quantity remains
+correctable through its known origins. An explicitly declared upward correction from recorded 3
+to actual original 4 uses the same correction action and a selected retained connected row: admit
+only the additional 1 as a new known physical quantity and apply once-only credit to that delta.
+This does not turn a genuinely later provision into a correction or revive an ended promise.
+If an exact downward inverse requires fully consumed quantity or production reversal, reject
+that isolated physical correction with 409; attribution-only correction remains available. This
+is the existing production-reversal boundary, not a general prohibition on historical correction.
+
+**Authority and lifecycle.** The shared contextual writers, single participation, fixed Profit
+boundary and strict invalid-responsibility gate in REQ-ORDERS-050/-055 apply. The writers follow
+the active org unit like every role power (REQ-ORG-032): an admin acts for the units their context
+covers, every unit unpinned and the pinned unit pinned. A Staffel has at most
+one active promise per bucket; repeated editing addresses that same promise with the required
+scoped version. Meaningful concurrent amount edits must not be silently retried as last-writer-wins.
+Terminal rejection/completion/cancellation, support withdrawal and ineligibility end open promises
+without deleting past contributions. Ineligibility also ends active Staffel participation even when
+it has no open promises or only retained ended contributions; this mandatory prerequisite is part
+of the current material workflow. Historical read remains concrete and current-unit scoped. Neither
+returning eligibility nor reopening revives support or promises. Terminal completion alone does not
+end an otherwise eligible participation. Explicit support enrollment/withdrawal remains the shared
+workflow defined in REQ-ORDERS-051. Reopening does not revive ended promises.
+
+**Concurrency and boundaries.** Guard capacity at order-plus-material scope spanning all of that
+material's quality buckets; overlapping quality stock makes a single bucket or Staffel row too
+narrow. Every relevant demand, stock-allocation, promise, attribution and correction mutation
+participates, including initial inserts. Use independently scoped client versions and the
+deterministic common resource-lock protocol; do not prescribe the legacy whole-order claim lock
+as the new default. Inventory owns stock and its grants, JobOrder owns promise/capacity/credit;
+synchronous narrow APIs keep their shared invariants in the same transaction. Exact SQL and
+implementation classes remain implementation choices under ADR-0360 and REQ-ORDERS-046.
+
+ITEM fulfillment uses a separate per-order section guard before requested/manufactured/delivered
+snapshots and before material, physical and queue resources. Handover, item replacement and ITEM
+deletion share that completion boundary; unrelated editable sections keep their own versions.
+Ordinary writers declare their first nonempty complete material set once. Hierarchy maintenance
+may process independent order sets sequentially only while its owning transaction holds an
+exclusive hierarchy lock acquired first. A later shared-to-exclusive upgrade grants no such
+ordering exemption; ordinary writers, including unlinked stock writers, wait before physical locks.
+
+Historical quantity restoration additionally serializes its complete initially possible added
+evidence set after material guards and before physical lots. Known origins and real legacy journal
+references are distinct typed identities; deduplicate and order their advisory keys consistently.
+Re-read global quantity presence and placement after those guards and after lot locking, and
+validate final interval uniqueness before restoring anything. Read-only calling-policy checks may
+narrow unchanged declarations in order before each resimulation; later checks cannot reintroduce
+dropped operations, and the complete original plan and final proofs still apply. A newly required
+identity or physical resource conflicts instead of extending the plan late. Refused observations and
+genuine new manual provision acquire no fictitious restoration identity. This narrow transaction-owned protocol
+prevents two complete undo actions from both recreating the same temporarily absent quantity.
+
+Reading a persisted stock row's unstamped complete quantity composition derives its deterministic
+row-based origin without changing stored JSON or the row version. Only an actual stock write
+persists that composition; read projections and journal snapshots preserve the caller's observed
+version.
+
+**Migration and history.** Migrate only verifiable historical unit credit. Existing stock without
+such evidence reduces capacity as unattributed coverage and may cause proportional reduction.
+Do not reconstruct contribution from today's ownership, membership, intent or executing Staffel.
+Missing history remains missing. Distinguish real credit, derived reduction/requirement ending,
+false-fact correction, later true stock changes and manual promise changes in readable history
+and privacy-safe audit. In-place and peer updates refresh affected stock/capacity/promise views.
+Audit, notices and bounded monitoring follow their canonical contracts.
+
+Legacy records that prove only a credited subset remain explicitly marked as such. Their credited
+quantity and requirement quality floor are lower-bound facts, not proof of the full actual
+provision or its original quality. Do not present these as observed truth or permit a physical
+quantity correction that relies on those unknown facts. New ordinary provision captures the
+actual declared quantity, quality and known composition; historical label corrections retain the
+legacy evidence distinction.
 
 **Acceptance**
 
-- [ ] Two different squadrons racing their first claim of 70 on a 100 bucket end with exactly one
-  committed claim (70) and the other caller rejected with an overclaim HTTP 400; the committed
-  row-sum never exceeds 100.
-- [ ] Two logisticians of the **same** squadron racing the first claim on one bucket both succeed
-  (last-writer-wins) and collapse to exactly one row — no 500, no overclaim.
-- [ ] A single claim that alone exceeds the bucket's required amount is rejected (HTTP 400).
-- [ ] A claim upsert on one bucket does not block a concurrent claim on an unrelated order.
-- [ ] Removing a bucket from an order withdraws the claims on that bucket; reassigning an SK order to
-  a squadron withdraws all its claims — neither bumps the order's `version`.
+All amounts below are SCU unless stated otherwise. Alternative rows start from the stated initial
+case rather than accumulating every alternative.
 
-**Enforced by:** `MaterialClaimConcurrencyTest`
-(`firstClaimRace_differentSquadrons_neverOverclaims`, `firstClaimRace_sameSquadron_*`),
-`MaterialClaimServiceTest` (overclaim rejection + `UpsertClaimConcurrencyTests`) · **Code:**
-`MaterialClaimService.upsertClaim` / `upsertClaimWithinTransaction` /
-`withdrawOrphanedClaimsWithinTransaction` / `withdrawAllForOrderWithinTransaction`,
-`JobOrderRepository.lockForClaimUpsert`, `MaterialClaimController`
-(`/api/v1/orders/{jobOrderId}/claims`) · **Issues:** #344 · **ADR:** ADR-0092
+| Case | Demand D | Stock S | Open A / B | Historical credit | Meaning |
+| --- | ---: | ---: | --- | --- | --- |
+| Initial | 10 | 0 | 4 / 6 | 0 | Capacity 10 |
+| A explicitly provides 3 | 10 | 3 | 1 / 6 | A: 3 | Credit before capacity cut |
+| Those 3 are relocated | 10 | 3 | 1 / 6 | A: 3 | No repeat credit |
+| Those 3 are handed over on MATERIAL, or consumed by ITEM manufacture reducing need by 3 | 7 | 0 | 1 / 6 | A: 3 | No second contribution |
+| Initial, then 3 unattributed stock | 10 | 3 | 2.8 / 4.2 | 0 | No longer needed, not supplied by A/B |
+| Initial, then demand reduced to 6 | 6 | 0 | 2.4 / 3.6 | 0 | Proportional reduction |
+| Correct credited provision 3 to actual 2 | 10 | 2 | 2 / 6 | A: 2 | Connected false-fact correction |
+| Genuine provision 3 later lost | 10 | 0 | 1 / 6 | A: 3 | Gap 3, no revived obligation |
+
+- [ ] Each example holds atomically and a duplicate/relocation/relink/quality change cannot repeat credit.
+- [ ] PIECE promises 4/6 reduced to capacity 6 become 2/4; ties use immutable participation identity.
+- [ ] Concurrent first claims, stock and demand changes across overlapping quality tiers cannot
+  leave negative or over-capacity promises; unrelated materials/orders retain independent versions.
+- [ ] Manufacture without a credited provision adjusts demand/capacity but does not fulfill a promise.
+- [ ] Excess provision cannot create a negative promise, foreign credit or invented new obligation.
+- [ ] Requester need changes cause only prescribed derived cuts, without extra Staffel approval.
+- [ ] Removing/changing a bucket preserves credit/history without duplicate participation.
+- [ ] False-fact correction differs from genuine later loss and never revives an ended promise.
+- [ ] The same correction action fixes false original supplied quality, preserves genuine later
+  quality changes and unknown quantity evidence, and retains prior/corrected history without
+  production reversal or ended-promise revival.
+- [ ] Ineligible/terminal/reopened cases obey shared write and participation boundaries.
+- [ ] Legacy stock covers demand without fabricated contribution attribution.
+
+**Enforced by:** `MaterialClaimConcurrencyTest`, `MaterialProvisionAuthorityIntegrationTest`
+and `MaterialOrderResourcePlanningIntegrationTest` cover the database, current authority and
+resource-planning cases described in the implementation notes below.
+**Issues:** #3207, #3202, #3203 · **ADR:** ADR-0360, amending ADR-0092
 
 ## Out of scope
 
-- Moving inventory — claims are signal-only; delivery is the handover flow.
-- Reworking the same-`(bucket, squadron)` last-writer-wins retry — it is retained unchanged as a
-  backstop (ADR-0092); this change adds the cross-squadron aggregate guard on top of it.
-- A per-bucket lock finer than the per-order lock — claiming is a low-frequency human action, and
-  the brief per-order serialization never 409s a user (see ADR-0092, alternatives).
+Money, new material bank accounts/ledgers, a second enrollment or approval process, automatic
+attribution from a recorder/owner, production reversal and a general settlement workflow.
+Actual inventory ownership and ordinary stock permissions stay with Inventory.
 
 ## Open questions
 
-None.
+None for the approved quantity and original-quality contracts.
+
+The existing explicit administrator hard-delete of a MATERIAL/ITEM order (REQ-ORDERS-042) removes
+its dependent active and ended claim rows in the same transaction after the responsibility guard.
+The normal `JOB_ORDER_DELETED` audit survives. Automatic eligibility ending remains distinct: it
+retains every promise fact and never deletes its history.
+
+`GET /api/v1/orders/{jobOrderId}/claims/claiming-options` returns eligible Staffeln whose promises
+the caller can write on the readable order. The current responsible unit and the selected
+Staffel each use their contextual writer grant. The responsible Staffel is absent from new
+support and promise options. An open contribution retained when a Staffel becomes responsible
+can still receive explicit suitable provision. Inventory continues to check the stock action.
+
+Explicit participation uses `GET /api/v1/orders/{id}/participations` and `PUT` or `DELETE`
+on the same collection with the selected unit id. The first promise uses that same participation.
+Withdrawing support requires the observed participation version and ends its open promises in the
+same transaction. `JobOrderHierarchyAuthorityIntegrationTest`, `MaterialClaimConcurrencyTest` and
+`MaterialProvisionAuthorityIntegrationTest` cover current actor and participation behavior.
+
+## Material implementation foundation
+
+The current implementation groups all material-quality promises of one order/Staffel under
+`JobOrderParticipation`. Empty or fulfilled open amounts do not end support. Outstanding capacity
+uses unmanufactured ITEM demand and the canonical once-only quality coverage. The material guard
+spans every quality tier; Inventory plans actual source/destination scopes before lot/row locks
+and rejects a changed plan instead of acquiring another guard after stock locks.
+MATERIAL demand replacement uses the same planned editor for responsible-side and requester
+edits. It captures immutable requested material lines, includes newly requested materials and
+exact removed-material stock rows in its initial plan, and rechecks current authority, order
+version and resource identities after locking. A changed plan conflicts before the mutation.
+`MaterialOrderResourcePlanningIntegrationTest` observes a real new-material allocation waiting
+for the demand transaction, then checks both committed operations and retained old promise
+history through public boundaries.
+
+`CreateClaimDto.version` is absent for a first promise and mandatory for an existing quantity edit.
+Duplicate first creation conflicts; meaningful edits do not retry as last-writer-wins. A repeated
+current-version save of the same canonical amount is a true no-op: it preserves the contribution
+version, history and existing personal association. Stale versions still conflict before that
+no-op decision. A repeated already-cleared historical attribution also preserves its contribution
+and receipt facts after current authority and scoped-version checks. The returned claim version
+includes its flushed history change. An explicit `provision` selection in the ordinary
+Inventory allocation/check-in payload identifies a matching permitted promise and its version.
+Only the action's genuinely new quantity budget can create credit; unchanged allocation relabelling
+has no new budget. Inventory carries exact known physical origin intervals through transforms;
+JobOrder keeps processed intervals independently of deletable stock, allocation and order rows.
+No legacy stock creates inferred Staffel performance.
+
+Focused checks establish independent version conflicts/no-ops, exact SCU/PIECE proportional cuts,
+credit before necessary cuts, connected quantity/attribution corrections, retained receipt history,
+historical original-quality correction and corrected-quality attribution choices. Public tests also
+cover current Inventory write authority, terminal preparation, simultaneous ITEM completion,
+administrative stock release/relink without repeat credit and transaction-owned exclusive startup
+maintenance. Immutable migration validation, privacy export, history rendering and grouped notice
+proofs accompany those paths. Integrated runtime acceptance is recorded against REQ-ORDERS-024.

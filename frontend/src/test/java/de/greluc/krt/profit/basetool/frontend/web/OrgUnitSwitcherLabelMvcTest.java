@@ -59,10 +59,10 @@ class OrgUnitSwitcherLabelMvcTest {
       "(?s).*<option value=\"\"\\s+selected=\"selected\">Alle meine Org-Einheiten</option>.*";
 
   private static final OrgUnitMembershipOptionDto HEL =
-      new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Hel", "HEL", "SQUADRON", true);
+      new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Hel", "HEL", "SQUADRON");
 
   private static final OrgUnitMembershipOptionDto ARGON =
-      new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Argon", "ARG", "SPECIAL_COMMAND", true);
+      new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Argon", "ARG", "SPECIAL_COMMAND");
 
   @Autowired private WebApplicationContext context;
 
@@ -79,10 +79,9 @@ class OrgUnitSwitcherLabelMvcTest {
         .thenReturn(
             LayoutResponses.orgUnits(
                 List.of(
+                    new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON"),
                     new OrgUnitMembershipOptionDto(
-                        UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON", true),
-                    new OrgUnitMembershipOptionDto(
-                        UUID.randomUUID(), "VANGUARD", "VGD", "SQUADRON", true))));
+                        UUID.randomUUID(), "VANGUARD", "VGD", "SQUADRON"))));
   }
 
   @Test

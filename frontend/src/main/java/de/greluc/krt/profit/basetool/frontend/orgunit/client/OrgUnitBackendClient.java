@@ -28,14 +28,13 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.model.BereichDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.MembershipLeadToggleRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitNodeDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitParentResponse;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitParentUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrganisationsleitungCreateRequest;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrganisationsleitungDto;
 import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandDto;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SpecialCommandProfitEligibleToggleRequest;
-import de.greluc.krt.profit.basetool.frontend.orgunit.model.SquadronProfitEligibleToggleRequest;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -46,9 +45,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * Typed backend client of the org-unit domain: the org hierarchy (REQ-ORG-014), the admin
- * Spezialkommando lifecycle, the SK member roster (REQ-ORG-005), the admin squadron and SK toggles
- * and the caller's stored active org unit (REQ-ORG-031), over {@link BackendApiClient} (plan §5.9,
- * ADR-0032). Catalogue evictions stay with the caller.
+ * Spezialkommando lifecycle, the SK member roster (REQ-ORG-005), the admin squadron and SK toggles,
+ * current Profit responsibility and the caller's stored active org unit (REQ-ORG-031), over {@link
+ * BackendApiClient} (plan §5.9, ADR-0032). Catalogue evictions stay with the caller.
  */
 @Service
 @RequiredArgsConstructor
@@ -77,6 +76,9 @@ public class OrgUnitBackendClient {
 
   private static final ParameterizedTypeReference<List<OrgUnitMembershipDto>> MEMBER_LIST =
       new ParameterizedTypeReference<>() {};
+
+  private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
+      RESPONSIBLE_OPTIONS = new ParameterizedTypeReference<>() {};
 
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
@@ -272,25 +274,12 @@ public class OrgUnitBackendClient {
   }
 
   /**
-   * Sets whether a Spezialkommando may process Job Orders.
+   * Reads the currently eligible responsible units from the actual Profit hierarchy.
    *
-   * @param id the Spezialkommando
-   * @param request the new flag
+   * @return active Profit Bereich, Staffeln and Spezialkommandos, or null without a response body
    */
-  public void setSpecialCommandProfitEligible(
-      @NotNull UUID id, @NotNull SpecialCommandProfitEligibleToggleRequest request) {
-    backendApiClient.patch(
-        "/api/v1/special-commands/{id}/profit-eligible", request, Void.class, id);
-  }
-
-  /**
-   * Sets whether a squadron may process Job Orders.
-   *
-   * @param id the squadron
-   * @param request the new flag
-   */
-  public void setSquadronProfitEligible(
-      @NotNull UUID id, @NotNull SquadronProfitEligibleToggleRequest request) {
-    backendApiClient.patch("/api/v1/squadrons/{id}/profit-eligible", request, Void.class, id);
+  @Nullable
+  public List<OrgUnitMembershipOptionDto> profitResponsibleOrgUnits() {
+    return backendApiClient.get("/api/v1/org-units/profit-responsible", RESPONSIBLE_OPTIONS);
   }
 }

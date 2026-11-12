@@ -82,7 +82,7 @@ import org.mockito.quality.Strictness;
  * Pins that the exchange's anonymised org demand (REQ-XCH-018) equals the web's Materialbedarf
  * (REQ-ORDERS-034) for the same orders: per material and quality floor, summed over the member's
  * units, the exchange's open quantity is the web's {@code required - booked} clamped at zero, and a
- * fully covered bucket is absent from the exchange. Both are withheld by the same job-order gate.
+ * fully covered bucket is absent from the exchange. Each surface retains its own visibility gate.
  */
 @ExtendWith(MockitoExtension.class)
 class ExchangeDemandParityTest {
@@ -131,7 +131,9 @@ class ExchangeDemandParityTest {
             requirementResolver,
             stockProjectionService,
             materialClaimService,
-            squadronMapper);
+            squadronMapper,
+            org.mockito.Mockito.mock(
+                de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService.class));
     stock = mock(OrderLinkedStockIndex.class, withSettings().strictness(Strictness.LENIENT));
     lenient()
         .when(stock.bookedFor(any(), anyList()))
@@ -185,6 +187,8 @@ class ExchangeDemandParityTest {
   @Test
   void theJobOrderGateWithholdsTheDemandOnBothSurfaces() {
     when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+    when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
 
     MaterialDemandOverviewDto overview = web.getMaterialDemandOverview();
     ExchangeOrgDemandDto demand = exchange.demand(MEMBER, false);
@@ -291,7 +295,7 @@ class ExchangeDemandParityTest {
     when(requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN))
         .thenReturn(new ScopePredicate(false, null, units));
     when(jobOrderRepository.findScopedOrdersWithMaterialRequirements(
-            any(), eq(false), eq(null), eq(units)))
+            any(), eq(true), eq(null), eq(units), org.mockito.ArgumentMatchers.any()))
         .thenReturn(list);
   }
 

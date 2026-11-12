@@ -401,7 +401,9 @@ GET /api/v1/operations/{id}/payouts | OperationController#getOperationPayouts | 
 PUT /api/v1/operations/{id}/payouts/paid-out | OperationController#setPayoutStatus | pre=@operationAccessPolicy.canEditOperation(#id) and (#dto.paidOut() or @operationAccessPolicy.canClearPayout(#id)) | url=anyRequest -> authenticated
 GET /api/v1/orders | JobOrderController#getAllJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders | JobOrderController#createJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/auec | JobOrderMoneyController#createMoneyOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/by-number | JobOrderNumberLookupController#findByNumber | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/create-options | JobOrderCreateOptionsController#current | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/orders/items | JobOrderController#createItemJobOrder | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/lookup | JobOrderController#lookupJobOrders | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/material-demand | JobOrderMaterialController#getMaterialDemand | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -409,37 +411,77 @@ GET /api/v1/orders/material-demand/summary | JobOrderMaterialDemandSummaryContro
 GET /api/v1/orders/requested | JobOrderController#getRequestedJobOrders | pre=isAuthenticated() and @requestScopeResolver.canViewOwnJobOrders() | url=anyRequest -> authenticated
 GET /api/v1/orders/settings | JobOrderSettingsController#settings | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id} | JobOrderController#deleteJobOrder | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-GET /api/v1/orders/{id} | JobOrderController#getJobOrderById | pre=isAuthenticated() and (@jobOrderAccessPolicy.canSeeJobOrder(#id) or @jobOrderAccessPolicy.canSeeJobOrderAsRequester(#id)) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id} | JobOrderController#updateJobOrder | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
+GET /api/v1/orders/{id} | JobOrderController#getJobOrderById | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id} | JobOrderController#updateJobOrder | pre=isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/allocations/orphaned | JobOrderMaterialController#getOrphanedLinkedInventory | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-DELETE /api/v1/orders/{id}/allocations/{inventoryItemId} | JobOrderMaterialController#unlinkInventoryItem | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{id}/allocations/{inventoryItemId} | JobOrderMaterialController#unlinkInventoryItem | pre=isAuthenticated() and @jobOrderAccessPolicy.canReleaseJobOrderEarmarks(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/assignee-candidates | JobOrderAssigneeController#searchAssigneeCandidates | pre=isAuthenticated() and @jobOrderAccessPolicy.canManageAssignees(#id) | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id}/assignees/{userId} | JobOrderAssigneeController#removeAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-POST /api/v1/orders/{id}/assignees/{userId} | JobOrderAssigneeController#addAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/assignees/{userId} | JobOrderAssigneeController#addAssignee | pre=isAuthenticated() and @jobOrderAccessPolicy.canManageAssignees(#id) | url=anyRequest -> authenticated
 DELETE /api/v1/orders/{id}/assignees/{userId}/note | JobOrderAssigneeController#deleteAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/assignees/{userId}/note | JobOrderAssigneeController#setAssigneeNote | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-PATCH /api/v1/orders/{id}/blueprint-variant-counting | JobOrderController#updateBlueprintVariantCounting | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
-POST /api/v1/orders/{id}/handovers | JobOrderHandoverController#createHandover | pre=(hasRole('LOGISTICIAN') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/blueprint-variant-counting | JobOrderController#updateBlueprintVariantCounting | pre=isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/handovers | JobOrderHandoverController#createHandover | pre=isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/item-blueprint-owners | JobOrderMaterialController#getItemBlueprintOwners | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrderBlueprintOwners(#id) | url=anyRequest -> authenticated
-POST /api/v1/orders/{id}/item-handovers | JobOrderHandoverController#createItemHandover | pre=(hasRole('LOGISTICIAN') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id}/items | JobOrderController#updateItemJobOrder | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/item-handovers | JobOrderHandoverController#createItemHandover | pre=isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id) | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/items | JobOrderController#updateItemJobOrder | pre=isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/items/requested | JobOrderController#updateItemJobOrderAsRequester | pre=isAuthenticated() | url=anyRequest -> authenticated
-POST /api/v1/orders/{id}/items/{itemId}/production | JobOrderHandoverController#bookProduction | pre=(hasRole('LOGISTICIAN') or hasRole('ADMIN')) and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/items/{itemId}/production | JobOrderHandoverController#bookProduction | pre=isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/materials/{matId}/attribution | JobOrderMaterialController#getStockAttributionForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
 GET /api/v1/orders/{id}/materials/{matId}/inventory | JobOrderMaterialController#getInventoryItemsForJobOrderMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id}/priority | JobOrderController#updateJobOrderPriority | pre=hasRole('LOGISTICIAN') and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money | JobOrderMoneyController#getMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/bank-accounts | JobOrderMoneyController#bankAccounts | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/corrections | JobOrderMoneyCorrectionController#record | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/corrections/preview | JobOrderMoneyCorrectionController#preview | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/holder-candidates | JobOrderMoneyController#holderCandidates | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/holders/identity-candidates | JobOrderMoneyHolderIdentityController#candidates | pre=isAuthenticated() | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/money/holders/{holder}/identity | JobOrderMoneyHolderIdentityController#change | pre=isAuthenticated() | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/money/information | JobOrderMoneyController#updateInformation | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/movement-candidates | JobOrderMoneyController#movementCandidates | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/movements | JobOrderMoneyController#recordMovement | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/movements/preview | JobOrderMoneyController#previewMovement | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/movements/reassignment | JobOrderMoneyReassignmentController#record | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/movements/reassignment/destination | JobOrderMoneyReassignmentController#destination | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/movements/reassignment/preview | JobOrderMoneyReassignmentController#preview | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/movements/settlement | JobOrderMoneySettlementController#record | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/movements/settlement/candidates | JobOrderMoneySettlementController#candidates | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/movements/settlement/preview | JobOrderMoneySettlementController#preview | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/operations/{operation} | JobOrderMoneyController#getMoneyOutcome | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/operations/{operation}/bank-replacement | JobOrderMoneyController#getBankRepair | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/operations/{operation}/bank-replacement | JobOrderMoneyController#replaceBankAttempt | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/operations/{operation}/bank-replacement/preview | JobOrderMoneyController#previewBankRepair | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/provisions | JobOrderMoneyController#provideMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/provisions/preview | JobOrderMoneyController#previewMoney | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/recipient-candidates | JobOrderMoneyController#recipientCandidates | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/orders/{id}/money/recipients | JobOrderMoneyController#designateRecipient | pre=isAuthenticated() | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{id}/money/recipients/{recipient} | JobOrderMoneyController#retireRecipient | pre=isAuthenticated() | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/money/recipients/{recipient}/identity | JobOrderMoneyRecipientIdentityController#correct | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/money/recipients/{recipient}/identity-candidates | JobOrderMoneyRecipientIdentityController#candidates | pre=isAuthenticated() | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/money/target | JobOrderMoneyController#updateTarget | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/orders/{id}/participations | JobOrderSupportController#support | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id) | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{id}/participations/{unitId} | JobOrderSupportController#withdraw | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/participations/{unitId} | JobOrderSupportController#enroll | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/participations/{unitId}/money-commitment | JobOrderSupportController#putMoneyCommitment | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/priority | JobOrderController#updateJobOrderPriority | pre=isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id) | url=anyRequest -> authenticated
 PUT /api/v1/orders/{id}/requested | JobOrderController#updateJobOrderAsRequester | pre=isAuthenticated() | url=anyRequest -> authenticated
-PATCH /api/v1/orders/{id}/responsible-org-unit | JobOrderController#reassignResponsibleOrgUnit | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
-PUT /api/v1/orders/{id}/status | JobOrderController#updateJobOrderStatus | pre=hasRole('LOGISTICIAN') | url=anyRequest -> authenticated
+PATCH /api/v1/orders/{id}/responsible-org-unit | JobOrderController#reassignResponsibleOrgUnit | pre=isAuthenticated() | url=anyRequest -> authenticated
+PUT /api/v1/orders/{id}/status | JobOrderController#updateJobOrderStatus | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#getClaimBuckets | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
-POST /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#upsertClaim | pre=hasRole('LOGISTICIAN') and @requestScopeResolver.canViewJobOrders() | url=anyRequest -> authenticated
-DELETE /api/v1/orders/{jobOrderId}/claims/{claimId} | MaterialClaimController#withdrawClaim | pre=hasRole('LOGISTICIAN') and @requestScopeResolver.canViewJobOrders() | url=anyRequest -> authenticated
-POST /api/v1/orders/{jobOrderId}/handovers/report/preview | JobOrderHandoverController#previewHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
-GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report | JobOrderHandoverController#downloadHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
-GET /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report | JobOrderHandoverController#downloadItemHandoverReport | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+POST /api/v1/orders/{jobOrderId}/claims | MaterialClaimController#upsertClaim | pre=isAuthenticated() and @materialClaimAuthority.canWritePromise(#jobOrderId, #dto.claimingOrgUnitId) | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/claims/claiming-options | MaterialClaimController#claimingOptions | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/claims/history | MaterialContributionController#history | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/claims/provision-options | MaterialContributionController#provisionOptions | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/claims/provisions/{provisionId}/attribution-options | MaterialContributionController#attributionOptions | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+POST /api/v1/orders/{jobOrderId}/claims/provisions/{provisionId}/correction | MaterialContributionController#correct | pre=isAuthenticated() and @materialProvisionOptions.mayCorrectProvision(#jobOrderId, #provisionId) | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/claims/provisions/{provisionId}/correction-options | MaterialContributionController#correctionOptions | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/claims/provisions/{provisionId}/quality-options | MaterialContributionController#qualityOptions | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{jobOrderId}/claims/{claimId} | MaterialClaimController#withdrawClaim | pre=isAuthenticated() and @materialClaimAuthority.canWithdrawPromise(#jobOrderId, #claimId) | url=anyRequest -> authenticated
+POST /api/v1/orders/{jobOrderId}/handovers/report/preview | JobOrderHandoverController#previewHandoverReport | pre=isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report | JobOrderHandoverController#downloadHandoverReport | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
+GET /api/v1/orders/{jobOrderId}/item-handovers/{handoverId}/report | JobOrderHandoverController#downloadItemHandoverReport | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/item-stock | JobOrderItemStockController#getItemStock | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
 GET /api/v1/orders/{jobOrderId}/material-collection | MaterialCollectionController#getMaterialCollection | pre=isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId) | url=anyRequest -> authenticated
-DELETE /api/v1/orders/{jobOrderId}/materials/{materialId} | JobOrderMaterialController#unlinkMaterial | pre=hasAnyRole('LOGISTICIAN', 'ADMIN') | url=anyRequest -> authenticated
+DELETE /api/v1/orders/{jobOrderId}/materials/{materialId} | JobOrderMaterialController#unlinkMaterial | pre=isAuthenticated() and @jobOrderAccessPolicy.canReleaseJobOrderEarmarks(#jobOrderId) | url=anyRequest -> authenticated
 GET /api/v1/org-units | OrgHierarchyController#listOrgUnits | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/org-units/active | OrgUnitController#listActiveOrgUnits | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/org-units/active-all-kinds | OrgUnitController#listActiveOrgUnitsAllKinds | pre=isAuthenticated() | url=anyRequest -> authenticated
@@ -463,6 +505,7 @@ DELETE /api/v1/org-units/organisationsleitung/{id}/grand-admiral | OrgHierarchyC
 PUT /api/v1/org-units/organisationsleitung/{id}/grand-admiral | OrgHierarchyController#setGrandAdmiral | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/org-units/organisationsleitung/{id}/members | OrgHierarchyController#addOlMember | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/org-units/organisationsleitung/{id}/members/{userId} | OrgHierarchyController#removeOlMember | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
+GET /api/v1/org-units/profit-responsible | OrgUnitController#listProfitResponsibleOrgUnits | pre=isAuthenticated() | url=anyRequest -> authenticated
 PATCH /api/v1/org-units/{id}/parent | OrgHierarchyController#setParent | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/outposts | OutpostController#getAllOutposts | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/outposts/{id} | OutpostController#getOutpost | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
@@ -581,14 +624,12 @@ DELETE /api/v1/special-commands/{id}/members/{userId} | SpecialCommandMembership
 PATCH /api/v1/special-commands/{id}/members/{userId} | SpecialCommandMembershipController#patchFlags | pre=@specialCommandSecurityService.canManageMember(#id, #userId, authentication) and @requestScopeResolver.isInActiveContext(#id) | url=anyRequest -> authenticated
 POST /api/v1/special-commands/{id}/members/{userId} | SpecialCommandMembershipController#addMember | pre=@specialCommandSecurityService.canManageMembers(#id, authentication) and @requestScopeResolver.isInActiveContext(#id) | url=anyRequest -> authenticated
 PATCH /api/v1/special-commands/{id}/members/{userId}/lead | SpecialCommandMembershipController#toggleLead | pre=(hasRole('ADMIN') or (@orgRoleManagementSecurityService.canAppointSkLead(#id, authentication) and @orgRoleManagementSecurityService.targetsAnotherUser(#userId, authentication))) and @requestScopeResolver.isInActiveContext(#id) | url=anyRequest -> authenticated
-PATCH /api/v1/special-commands/{id}/profit-eligible | SpecialCommandController#setProfitEligible | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/squadrons | SquadronController#getAllSquadrons | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/squadrons | SquadronController#createSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 DELETE /api/v1/squadrons/{id} | SquadronController#deleteSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PUT /api/v1/squadrons/{id} | SquadronController#updateSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 POST /api/v1/squadrons/{id}/activate | SquadronController#activateSquadron | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 PATCH /api/v1/squadrons/{id}/members/{userId} | SquadronMembershipController#patchFlags | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
-PATCH /api/v1/squadrons/{id}/profit-eligible | SquadronController#setProfitEligible | pre=hasRole('ADMIN') | url=anyRequest -> authenticated
 GET /api/v1/squadrons/{squadronId}/kommando-groups | KommandoGroupController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/squadrons/{squadronId}/kommando-groups | KommandoGroupController#create | pre=(hasRole('ADMIN') or @orgRoleManagementSecurityService.canManageKommandoGroups(#squadronId, authentication)) and @requestScopeResolver.isInActiveContext(#squadronId) | url=anyRequest -> authenticated
 DELETE /api/v1/squadrons/{squadronId}/kommando-groups/{groupId} | KommandoGroupController#delete | pre=(hasRole('ADMIN') or @orgRoleManagementSecurityService.canManageKommandoGroup(#groupId, authentication)) and @requestScopeResolver.isInActiveContext(#squadronId) | url=anyRequest -> authenticated

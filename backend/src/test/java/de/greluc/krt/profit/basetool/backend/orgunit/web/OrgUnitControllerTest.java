@@ -50,8 +50,7 @@ class OrgUnitControllerTest {
   @Test
   void listActiveOrgUnits_delegatesToService() {
     OrgUnitMembershipOptionDto option =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "ALPHA", "ALP", OrgUnitKind.SQUADRON, true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", OrgUnitKind.SQUADRON);
     when(orgUnitMembershipQueryService.listAllActiveOptions()).thenReturn(List.of(option));
 
     List<OrgUnitMembershipOptionDto> result = controller.listActiveOrgUnits();
@@ -71,8 +70,7 @@ class OrgUnitControllerTest {
   @Test
   void listActiveOrgUnitsAllKinds_delegatesToService() {
     OrgUnitMembershipOptionDto bereich =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Profit", "PRF", OrgUnitKind.BEREICH, false);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Profit", "PRF", OrgUnitKind.BEREICH);
     when(orgUnitMembershipQueryService.listAllActiveOrgUnitOptionsAllKinds())
         .thenReturn(List.of(bereich));
 

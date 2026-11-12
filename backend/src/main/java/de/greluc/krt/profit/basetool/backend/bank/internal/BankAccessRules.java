@@ -227,7 +227,7 @@ public class BankAccessRules implements BankAccessPolicy {
   BankAdmission.Admitted routeCorrection(
       @NotNull BankActor actor, @NotNull BankBookingRequest request, @NotNull BigDecimal amount) {
     BankAccount account = request.getAccount();
-    if (request.getType() == BankBookingRequestType.DEPOSIT) {
+    if (account == null || request.getType() == BankBookingRequestType.DEPOSIT) {
       return BankAdmission.Admitted.UNROUTED;
     }
     if (request.getPurposeKind() != null) {
@@ -366,12 +366,16 @@ public class BankAccessRules implements BankAccessPolicy {
    * @param actor the actor
    * @param request the request
    * @param pin the active org unit as sent, or {@code null} for the whole reach
-   * @return {@code true} iff the actor acts on its approval
+   * @return {@code true} iff the actor acts on its approval; {@code false} for a request without an
+   *     account
    */
   boolean mayApprove(
       @NotNull BankActor actor, @NotNull BankBookingRequest request, @Nullable UUID pin) {
-    BankAccessJudgement judgement = judgement(actor, pin);
     BankAccount account = request.getAccount();
+    if (account == null) {
+      return false;
+    }
+    BankAccessJudgement judgement = judgement(actor, pin);
     return judgement.inContext(account)
         && staffRights(actor)
             .mayApprove(request.getRequiredApprover(), judgement.isResponsibleHolder(account));
@@ -474,13 +478,17 @@ public class BankAccessRules implements BankAccessPolicy {
    * @param actor the actor
    * @param request the request
    * @param pin the active org unit as sent, or {@code null} for the whole reach
-   * @return {@code true} iff the actor is one of the request's approvers
+   * @return {@code true} iff the actor is one of the request's approvers; {@code false} for a
+   *     request without an account
    */
   boolean approves(
       @NotNull BankActor actor, @NotNull BankBookingRequest request, @Nullable UUID pin) {
+    BankAccount account = request.getAccount();
+    if (account == null) {
+      return false;
+    }
     BankAccessJudgement judgement = judgement(actor, pin);
     BankStaffRights rights = staffRights(actor);
-    BankAccount account = request.getAccount();
     boolean holds = rights.admin() || judgement.isResponsibleHolder(account);
     return judgement.inContext(account)
         && !rights.boundByFourEyes(request.getRequestedBy())
@@ -567,8 +575,9 @@ public class BankAccessRules implements BankAccessPolicy {
      * @return {@code true} iff the actor is one of the request's approvers
      */
     boolean approves(@NotNull BankBookingRequest request) {
-      UUID accountId = request.getAccount().getId();
-      return !rights.boundByFourEyes(request.getRequestedBy())
+      UUID accountId = request.accountId();
+      return accountId != null
+          && !rights.boundByFourEyes(request.getRequestedBy())
           && candidateAccountIds.contains(accountId)
           && shows(request.getRequiredApprover(), accountId);
     }

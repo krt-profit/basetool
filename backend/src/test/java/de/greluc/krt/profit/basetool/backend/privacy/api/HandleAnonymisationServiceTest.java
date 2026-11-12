@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderHandoverRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyPrivacy;
 import de.greluc.krt.profit.basetool.backend.kernel.HandleAnonymisation;
 import java.util.List;
 import java.util.UUID;
@@ -81,6 +82,7 @@ class HandleAnonymisationServiceTest {
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
   @Mock private BankHolderRepository bankHolderRepository;
   @Mock private JobOrderRepository jobOrderRepository;
+  @Mock private JobOrderMoneyPrivacy moneyPrivacy;
   @Mock private AuditService auditService;
   @Mock private BankAuditService bankAuditService;
 
@@ -92,7 +94,8 @@ class HandleAnonymisationServiceTest {
         new HandleAnonymisationService(
             List.of(
                 new JobOrderHandleAnonymisation(
-                    jobOrderRepository, jobOrderHandoverRepository, jobOrderItemHandoverRepository),
+                    jobOrderRepository, jobOrderHandoverRepository,
+                    jobOrderItemHandoverRepository, moneyPrivacy),
                 new BankHandleAnonymisation(
                     bankAuditEventRepository,
                     bankTransactionRepository,

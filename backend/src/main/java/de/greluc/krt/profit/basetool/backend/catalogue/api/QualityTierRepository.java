@@ -70,4 +70,17 @@ public interface QualityTierRepository extends JpaRepository<QualityTier, UUID> 
       FROM QualityTier t WHERE t.id = :tierId
       """)
   Long countReferences(@Param("tierId") UUID tierId);
+
+  /**
+   * Reads the current quality catalogue without reusing managed tier state after a lock wait.
+   *
+   * @return immutable selection and label facts in catalogue identity order
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierSelection$Tier(
+        t.id, t.code, t.minQuality, t.labelDe, t.labelEn, t.sortOrder, t.active, t.version)
+      FROM QualityTier t ORDER BY t.id
+      """)
+  List<QualityTierSelection.Tier> findSelectionFacts();
 }

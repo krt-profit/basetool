@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
@@ -63,7 +64,10 @@ import org.springframework.security.access.AccessDeniedException;
  * of the identity, a split never undercuts a Materialbörse offer or the earmarks, a single row is
  * marked only by its owner or a logistician, and a selection takes only the caller's own rows.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryStolenMarkServiceTest {
 
   private static final UUID CALLER = UUID.randomUUID();
@@ -90,6 +94,8 @@ class InventoryStolenMarkServiceTest {
    */
   private InventoryStolenMarkService serviceWith(boolean enabled) {
     return new InventoryStolenMarkService(
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
         inventoryItemRepository,
         new MaterialExchangeStockOfferLookup(materialExchangeOfferRepository),
         stockChangeObserver,

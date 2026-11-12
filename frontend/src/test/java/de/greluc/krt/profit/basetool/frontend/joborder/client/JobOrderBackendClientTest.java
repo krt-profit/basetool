@@ -37,9 +37,12 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemHandove
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.WriteMoneyCommitmentDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendClientHarness;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -78,6 +81,29 @@ class JobOrderBackendClientTest {
   }
 
   @Test
+  void responsibilityTransferRetainsTheRecoveredOrderAndCurrentAuthority() {
+    backend.answerJson(
+        "{\"id\":\""
+            + ORDER
+            + "\",\"displayId\":77,"
+            + "\"responsibilityInvalid\":false,\"originalProfitBoundaryUnknown\":true,"
+            + "\"canEdit\":false,\"canTransferResponsibility\":true}");
+
+    var result =
+        client.transferResponsibility(ORDER, new ReassignResponsibleOrgUnitRequest(SQUADRON, 6L));
+
+    assertThat(result.id()).isEqualTo(ORDER);
+    assertThat(result.displayId()).isEqualTo(77);
+    assertThat(result.responsibilityInvalid()).isFalse();
+    assertThat(result.originalProfitBoundaryUnknown()).isTrue();
+    assertThat(result.canTransferResponsibility()).isTrue();
+    backend.expect(
+        "PATCH",
+        "/api/v1/orders/" + ORDER + "/responsible-org-unit",
+        "{\"responsibleOrgUnitId\":\"" + SQUADRON + "\",\"version\":6}");
+  }
+
+  @Test
   void orderListCarriesScopeStatusesAndSquadrons() {
     backend.answerJson(EMPTY_PAGE);
     backend.answerJson(EMPTY_PAGE);
@@ -85,10 +111,18 @@ class JobOrderBackendClientTest {
     backend.answerJson(EMPTY_PAGE);
 
     client.orders(
-        OrderListScope.ALL, 2, 100, List.of("OPEN", "IN_PROGRESS"), List.of(SQUADRON, OTHER));
-    client.orders(OrderListScope.MINE, 0, 50, List.of("COMPLETED"), List.of(SQUADRON));
-    client.orders(OrderListScope.TO_PROCESS, 1, 200, List.of("OPEN"), List.of(SQUADRON));
-    client.orders(OrderListScope.ASSIGNED, 0, 100, List.of("OPEN"), List.of(SQUADRON));
+        OrderListScope.ALL,
+        2,
+        100,
+        List.of("OPEN", "IN_PROGRESS"),
+        List.of(SQUADRON, OTHER),
+        java.util.List.of());
+    client.orders(
+        OrderListScope.MINE, 0, 50, List.of("COMPLETED"), List.of(SQUADRON), java.util.List.of());
+    client.orders(
+        OrderListScope.TO_PROCESS, 1, 200, List.of("OPEN"), List.of(SQUADRON), java.util.List.of());
+    client.orders(
+        OrderListScope.ASSIGNED, 0, 100, List.of("OPEN"), List.of(SQUADRON), java.util.List.of());
 
     backend.expect(
         "GET",
@@ -131,6 +165,32 @@ class JobOrderBackendClientTest {
 
     backend.expect("GET", "/api/v1/orders/material-demand/summary?limit=5");
     backend.expect("GET", "/api/v1/orders/material-demand/summary?limit=10&orgUnitId=" + SQUADRON);
+  }
+
+  @Test
+  void creationOptionsPreserveTheBackendCapabilityAndPerSideWriterFlags() {
+    backend.answerJson(
+        """
+        {"canCreate":true,
+         "responsibleOptions":[{"orgUnitId":"00000000-0000-0000-0000-000000000185",
+           "orgUnitName":"Profit unit","shorthand":"P","kind":"BEREICH","canWrite":false}],
+         "requestingOptions":[{"orgUnitId":"00000000-0000-0000-0000-000000000186",
+           "orgUnitName":"Requesting unit","shorthand":"Q","kind":"SQUADRON","canWrite":true}],
+         "suggestedResponsibleOrgUnitId":"00000000-0000-0000-0000-000000000185",
+         "suggestedRequestingOrgUnitId":"00000000-0000-0000-0000-000000000186"}
+        """);
+
+    var options = client.createOptions();
+
+    assertThat(options).isNotNull();
+    assertThat(options.canCreate()).isTrue();
+    assertThat(options.responsibleOptions())
+        .singleElement()
+        .satisfies(option -> assertThat(option.canWrite()).isFalse());
+    assertThat(options.requestingOptions())
+        .singleElement()
+        .satisfies(option -> assertThat(option.canWrite()).isTrue());
+    backend.expect("GET", "/api/v1/orders/create-options");
   }
 
   @Test
@@ -202,9 +262,43 @@ class JobOrderBackendClientTest {
     backend.expect("GET", "/api/v1/locations/lookup");
   }
 
+  /**
+   * Preserves participation identity and the observed withdrawal version across the typed client.
+   */
+  @Test
+  void supportReadsAndWritesUseTheSameParticipation() {
+    backend.answerJson(
+        """
+        {"participations":[],"enrollmentOptions":[]}
+        """);
+    backend.answerEmpty();
+    backend.answerEmpty();
+
+    assertThat(client.support(ORDER).participations()).isEmpty();
+    client.enrollSupport(ORDER, SQUADRON);
+    client.withdrawSupport(ORDER, SQUADRON, 9L);
+
+    String supportPath = "/api/v1/orders/" + ORDER + "/participations";
+    backend.expect("GET", supportPath);
+    backend.expect("PUT", supportPath + "/" + SQUADRON, null);
+    backend.expect("DELETE", supportPath + "/" + SQUADRON + "?version=9", null);
+  }
+
+  @Test
+  void moneyCommitmentWritesKeepTheUnitAndObservedOccurrence() {
+    backend.answerEmpty();
+
+    client.putMoneyCommitment(ORDER, SQUADRON, new WriteMoneyCommitmentDto("6000000", OTHER, 9L));
+
+    backend.expect(
+        "PUT",
+        "/api/v1/orders/" + ORDER + "/participations/" + SQUADRON + "/money-commitment",
+        "{\"amount\":\"6000000\",\"commitmentId\":\"%s\",\"version\":9}".formatted(OTHER));
+  }
+
   @Test
   void orderWrites() {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 9; i++) {
       backend.answerJson("{}");
     }
     backend.answerEmpty();
@@ -235,6 +329,7 @@ class JobOrderBackendClientTest {
 
     client.createItemOrder(itemOrder);
     client.updateItemOrder(ORDER, itemOrder);
+    client.updateItemOrderAsRequester(ORDER, itemOrder);
     client.createOrder(materialOrder);
     client.updateOrder(ORDER, materialOrder);
     client.updateOrderAsRequester(ORDER, materialOrder);
@@ -265,6 +360,7 @@ class JobOrderBackendClientTest {
             + "\",\"minQuality\":500,\"amount\":12.5}],\"version\":3}";
     backend.expect("POST", "/api/v1/orders/items", itemBody);
     backend.expect("PUT", "/api/v1/orders/" + ORDER + "/items", itemBody);
+    backend.expect("PUT", "/api/v1/orders/" + ORDER + "/items/requested", itemBody);
     backend.expect("POST", "/api/v1/orders", materialBody);
     backend.expect("PUT", "/api/v1/orders/" + ORDER, materialBody);
     backend.expect("PUT", "/api/v1/orders/" + ORDER + "/requested", materialBody);
@@ -279,6 +375,19 @@ class JobOrderBackendClientTest {
   }
 
   @Test
+  void claimingOptionsRetainTheBackendAuthorityAndOrderSpecificRoute() {
+    backend.answerJson(
+        "[{\"orgUnitId\":\""
+            + SQUADRON
+            + "\",\"orgUnitName\":\"Alpha\",\"orgUnitShorthand\":\"ALP\",\"kind\":\"SQUADRON\"}]");
+
+    assertThat(client.claimingOptions(ORDER))
+        .containsExactly(new OrgUnitMembershipOptionDto(SQUADRON, "Alpha", "ALP", "SQUADRON"));
+
+    backend.expect("GET", "/api/v1/orders/" + ORDER + "/claims/claiming-options", null);
+  }
+
+  @Test
   void claimsAndAssignees() {
     backend.answerJson("{}");
     backend.answerEmpty();
@@ -288,8 +397,8 @@ class JobOrderBackendClientTest {
     backend.answerJson("{}");
     backend.answerJson("{}");
 
-    client.upsertClaim(ORDER, new CreateClaimDto(MATERIAL, "B", SQUADRON, 4.0));
-    client.withdrawClaim(ORDER, OTHER);
+    client.upsertClaim(ORDER, new CreateClaimDto(MATERIAL, "B", SQUADRON, 4.0, null));
+    client.withdrawClaim(ORDER, OTHER, 7L);
     client.addAssignee(ORDER, OTHER);
     client.removeAssignee(ORDER, OTHER);
     client.setAssigneeNote(ORDER, OTHER, new AssigneeNoteRequest("Abends ab 20 Uhr", 4L));
@@ -303,8 +412,8 @@ class JobOrderBackendClientTest {
             + MATERIAL
             + "\",\"qualityRequirement\":\"B\",\"claimingOrgUnitId\":\""
             + SQUADRON
-            + "\",\"amount\":4.0}");
-    backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/claims/" + OTHER, null);
+            + "\",\"amount\":4.0,\"version\":null}");
+    backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/claims/" + OTHER + "?version=7", null);
     backend.expect("POST", "/api/v1/orders/" + ORDER + "/assignees/" + OTHER, null);
     backend.expect("DELETE", "/api/v1/orders/" + ORDER + "/assignees/" + OTHER, null);
     backend.expect(

@@ -21,8 +21,11 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargetPolicy;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthority;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuthorityFlags;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderScope;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderVisibility;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
@@ -30,31 +33,27 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The job-order module's access policy: the read and edit gates of an order, of its owner panels
- * and of the requester side, evaluated on the scope kernel (plan §5.4, ADR-0236). It also decides
- * the Lager's earmarked stock of an order ({@link EarmarkTargetPolicy}) and answers other modules'
- * scope question on an order ({@link JobOrderVisibility}).
- *
- * <p>The list-side half of the scope rule is {@link JobOrderScope#PREDICATE}; the queue list adds
- * the assignee grant beside it ({@code JobOrderRepository#findScopedJobOrders}), so list and gate
- * widen together.
- *
- * <p>{@link JobOrderEditor} asks {@link #canEdit} on the loaded order; the remaining endpoints
- * invoke the id-based gates from SpEL as {@code @jobOrderAccessPolicy}. Unknown ids are refused.
- * The queue capability itself ({@code canViewJobOrders}) stays with the scope kernel, which the
- * identity and exchange modules ask too. Read-only transactional.
+ * Resolves complete order reading, independent producer visibility and current write capabilities.
  */
 @Service(JobOrderAccessPolicy.BEAN_NAME)
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibility {
+public class JobOrderAccessPolicy
+    implements EarmarkTargetPolicy, JobOrderVisibility, JobOrderAuthority {
 
   /** The bean name the {@code @PreAuthorize} expressions reference. */
   public static final String BEAN_NAME = "jobOrderAccessPolicy";
@@ -63,13 +62,13 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
   private final AccessGateService accessGateService;
   private final AuthHelperService authHelper;
   private final JobOrderRepository jobOrderRepository;
-  private final JobOrderHandoverRepository jobOrderHandoverRepository;
-  private final JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
+  private final JobOrderResponsibilityGuard responsibilityGuard;
+  private final JobOrderUnitReadHistoryRepository unitReadHistory;
+  private final JobOrderParticipationRepository participations;
 
   /**
-   * Checks whether the caller may read job order {@code jobOrderId}: the caller holds an assignee
-   * entry on it (REQ-ORDERS-047), or sees it within the tenancy scope ({@link
-   * #canSeeJobOrderInScope}).
+   * Checks complete current order reading, including personal and observed unit relationships
+   * (REQ-ORDERS-052).
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may read the order
@@ -84,8 +83,21 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
    * @param order the order to inspect; never {@code null}
    * @return {@code true} iff the caller may read the order
    */
+  @Override
   public boolean canSeeJobOrder(@NotNull JobOrder order) {
-    return isAssigneeRow(order) || canSeeJobOrderInScope(order);
+    return isAssigneeRow(order)
+        || (!authHelper.isAdmin() && requestScopeResolver.canViewJobOrders())
+        || requestScopeResolver.currentScopePredicate().adminAllScope()
+        || (order.getResponsibleOrgUnit() != null
+            && accessGateService.canSeeSquadronAsGrantee(
+                order.getResponsibleOrgUnit().getId(), Roles.LOGISTICIAN))
+        || isOrderRequesterRow(order)
+        || hasHistoricalUnitRead(order)
+        || (order.getType() == JobOrderType.AUEC
+            && authHelper
+                .currentUserId()
+                .map(caller -> jobOrderRepository.hasMoneyPersonalReadGrant(order.getId(), caller))
+                .orElse(false));
   }
 
   /**
@@ -125,14 +137,51 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
   }
 
   /**
-   * Checks whether the caller may edit job order {@code jobOrderId}: like {@link
-   * #canSeeJobOrderInScope} with the edit scope; the assignee grant opens no edit.
+   * Checks the current responsible-unit writer and valid responsibility for processing.
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the order
    */
   public boolean canEditJobOrder(@NotNull UUID jobOrderId) {
     return jobOrderRepository.findById(jobOrderId).map(this::canEditJobOrderRow).orElse(false);
+  }
+
+  /**
+   * Checks the caller's current responsible-unit grant for an earmark release.
+   *
+   * @param orderId the order whose earmark is released
+   * @return whether the caller holds the current responsible-unit grant
+   */
+  public boolean canReleaseJobOrderEarmarks(@NotNull UUID orderId) {
+    return jobOrderRepository.findById(orderId).map(this::canTransferResponsibility).orElse(false);
+  }
+
+  /**
+   * Checks current permission to record fulfillment for the concrete order.
+   *
+   * @param orderId the order to process
+   * @return whether the responsible-unit writer may record fulfillment
+   */
+  public boolean canFulfillJobOrder(@NotNull UUID orderId) {
+    return jobOrderRepository
+        .findById(orderId)
+        .filter(order -> order.getStatus() != JobOrderStatus.CANCELLED)
+        .map(this::canEditJobOrderRow)
+        .orElse(false);
+  }
+
+  /**
+   * Rechecks current processing authority on the managed order before recording fulfillment.
+   *
+   * @param order the order with current status and responsibility
+   * @throws AccessDeniedException when fulfillment is cancelled or the actor lacks the unit grant
+   */
+  public void assertCanFulfill(@NotNull JobOrder order) {
+    responsibilityGuard.assertWritable(order);
+    if (order.getStatus() == JobOrderStatus.CANCELLED || !canTransferResponsibility(order)) {
+      throw new AccessDeniedException(
+          "Caller may not record fulfillment for order " + order.getId());
+    }
   }
 
   /**
@@ -143,26 +192,29 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
    * @return {@code true} iff the caller passes the gate
    */
   public boolean canEdit(@NotNull JobOrder order, @NotNull JobOrderGate gate) {
+    if (gate == JobOrderGate.TRANSFER) {
+      return canTransferResponsibility(order);
+    }
+    if (responsibilityInvalid(order)) {
+      return false;
+    }
     return switch (gate) {
-      case EDIT -> canEditJobOrderRow(order);
-      case REQUESTER -> isOrderRequesterRow(order) && !orderHasAnyDelivery(order.getId());
+      case TRANSFER -> canTransferResponsibility(order);
+      case ADMIN_DELETE -> authHelper.isAdmin();
+      case EDIT, STATUS -> canEditJobOrderRow(order);
+      case SUPPORT ->
+          canTransferResponsibility(order)
+              || accessGateService.canActAsLogisticianInActiveContext();
+      case CANCEL -> canTransferResponsibility(order) || isRequesterWriter(order);
+      case SET_OPEN ->
+          canTransferResponsibility(order)
+              || (order.getStatus() == JobOrderStatus.CANCELLED && isRequesterWriter(order));
+      case REQUESTER -> isRequesterWriter(order);
     };
   }
 
   /**
-   * Checks whether the caller may read job order {@code jobOrderId} as a member of the org unit
-   * that placed it (REQ-ORDERS-023), independent of the profit eligibility.
-   *
-   * @param jobOrderId the order to inspect; never {@code null}
-   * @return {@code true} iff the caller belongs to the requesting org unit
-   */
-  public boolean canSeeJobOrderAsRequester(@NotNull UUID jobOrderId) {
-    return jobOrderRepository.findById(jobOrderId).map(this::isOrderRequesterRow).orElse(false);
-  }
-
-  /**
-   * Checks whether the caller may edit job order {@code jobOrderId} as its requester: a member of
-   * the requesting org unit, while nothing has been delivered yet (REQ-ORDERS-023).
+   * Checks current requesting-unit authority to edit remaining need (REQ-ORDERS-023).
    *
    * @param jobOrderId the order to inspect; never {@code null}
    * @return {@code true} iff the caller may edit the order as its requester
@@ -203,6 +255,65 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
     return canEditJobOrder(jobOrderId);
   }
 
+  @Override
+  public Map<UUID, JobOrderAuthorityFlags> authorityFor(@NotNull Collection<JobOrder> orders) {
+    if (orders.isEmpty()) {
+      return Map.of();
+    }
+    Set<UUID> validIds = responsibilityGuard.validOrderIds(orders);
+    Map<UUID, JobOrderAuthorityFlags> flags = new LinkedHashMap<>();
+    for (JobOrder order : orders) {
+      boolean mayTransfer = canTransferResponsibility(order);
+      boolean valid = validIds.contains(order.getId());
+      boolean requesterWriter = valid && isRequesterWriter(order);
+      boolean mayManageCancellation = valid && (mayTransfer || requesterWriter);
+      flags.put(
+          order.getId(),
+          new JobOrderAuthorityFlags(
+              !valid,
+              valid && mayTransfer,
+              mayTransfer,
+              requesterWriter,
+              mayManageCancellation && order.getStatus().isActive(),
+              mayManageCancellation && order.getStatus() == JobOrderStatus.CANCELLED));
+    }
+    return Collections.unmodifiableMap(flags);
+  }
+
+  @Override
+  public boolean responsibilityInvalid(@NotNull JobOrder order) {
+    return !responsibilityGuard.isValid(order);
+  }
+
+  @Override
+  public boolean canTransferResponsibility(@NotNull JobOrder order) {
+    return accessGateService.canActAsLogisticianInOwner(
+        OrgUnit.idOf(order.getResponsibleOrgUnit()));
+  }
+
+  /**
+   * Checks the current writer of either proposed side before creation.
+   *
+   * @param responsible the proposed responsible unit
+   * @param requesting the requesting unit
+   * @return whether the caller currently writes either side
+   */
+  public boolean canCreate(OrgUnit responsible, OrgUnit requesting) {
+    return accessGateService.canActAsLogisticianIn(responsible.getId())
+        || accessGateService.canActAsLogisticianIn(requesting.getId());
+  }
+
+  private boolean hasHistoricalUnitRead(@NotNull JobOrder order) {
+    ScopePredicate scope = requestScopeResolver.currentScopePredicateGranting(Roles.LOGISTICIAN);
+    Set<UUID> units =
+        scope.activeOrgUnitId() == null
+            ? scope.memberOrgUnitIds()
+            : Set.of(scope.activeOrgUnitId());
+    return !units.isEmpty()
+        && (unitReadHistory.existsByJobOrderIdAndOrgUnitIdIn(order.getId(), units)
+            || participations.existsByJobOrderIdAndClaimingOrgUnitIdIn(order.getId(), units));
+  }
+
   private boolean isAssigneeRow(@NotNull JobOrder order) {
     return authHelper
         .currentUserId()
@@ -217,7 +328,7 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
    * without one is reserved to an admin without a pin.
    */
   private boolean canEditJobOrderRow(@NotNull JobOrder order) {
-    if (!requestScopeResolver.canViewJobOrders()) {
+    if (responsibilityInvalid(order)) {
       return false;
     }
     OrgUnit responsible = order.getResponsibleOrgUnit();
@@ -228,13 +339,11 @@ public class JobOrderAccessPolicy implements EarmarkTargetPolicy, JobOrderVisibi
   private boolean isOrderRequesterRow(@NotNull JobOrder order) {
     OrgUnit requesting = order.getRequestingOrgUnit();
     return requesting != null
-        && requestScopeResolver
-            .currentDirectMembershipOrgUnitIdsInActiveContext()
-            .contains(requesting.getId());
+        && accessGateService.canSeeSquadronAsGrantee(requesting.getId(), Roles.LOGISTICIAN);
   }
 
-  private boolean orderHasAnyDelivery(@NotNull UUID jobOrderId) {
-    return jobOrderHandoverRepository.existsByJobOrderId(jobOrderId)
-        || jobOrderItemHandoverRepository.existsByJobOrderId(jobOrderId);
+  private boolean isRequesterWriter(@NotNull JobOrder order) {
+    OrgUnit requesting = order.getRequestingOrgUnit();
+    return requesting != null && accessGateService.canActAsLogisticianIn(requesting.getId());
   }
 }

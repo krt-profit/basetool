@@ -196,9 +196,9 @@ class DashboardRenderMvcTest {
   @DisplayName("in „Alle meine Org-Einheiten“ a widget of any own unit loads and the head says so")
   void theUnionOfTheOwnUnitsKeepsEveryOwnUnitsWidget() throws Exception {
     OrgUnitMembershipOptionDto hel =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Hel", "HEL", "SQUADRON", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Hel", "HEL", "SQUADRON");
     OrgUnitMembershipOptionDto argon =
-        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Argon", "ARG", "SPECIAL_COMMAND", true);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Argon", "ARG", "SPECIAL_COMMAND");
     stored(
         true,
         2,

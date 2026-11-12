@@ -1107,7 +1107,21 @@ function swap(opts) {
                 });
                 return false;
             }
+            const openDetails = Array.from(
+                container.querySelectorAll('details[data-preserve-open][id][open]'),
+                (details) => details.id,
+            );
             setTrustedHtml(container, html);
+            for (const id of openDetails) {
+                const details = document.getElementById(id);
+                if (
+                    details instanceof HTMLDetailsElement &&
+                    container.contains(details) &&
+                    details.hasAttribute('data-preserve-open')
+                ) {
+                    details.open = true;
+                }
+            }
             bindSwapAnchorInterception(container, opts);
             document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
             if (opts.history) {

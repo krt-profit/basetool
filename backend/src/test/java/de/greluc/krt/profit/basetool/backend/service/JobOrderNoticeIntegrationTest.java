@@ -30,9 +30,11 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderNotices
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.Notification;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
@@ -42,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -117,7 +120,15 @@ class JobOrderNoticeIntegrationTest {
   @Test
   void aFinishedOrderTellsTheLogisticianOfTheRequestingUnitButNotTheActor() {
     creationService.createFromEvent(
-        JobOrderNotices.finished(orderId, 12, "Ada", IRIDIUM, "IRI", "COMPLETED", ACTING));
+        JobOrderNotices.finished(
+            orderId,
+            12,
+            "Ada",
+            Map.of(NotificationContextRole.REQUESTING, IRIDIUM),
+            "IRI",
+            "COMPLETED",
+            Set.of(),
+            ACTOR));
 
     assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_FINISHED);
     assertThat(inbox(ACTOR)).isEmpty();
@@ -126,7 +137,15 @@ class JobOrderNoticeIntegrationTest {
   @Test
   void aFlaggedLogisticianWithoutKrtMemberIsNotTold() {
     creationService.createFromEvent(
-        JobOrderNotices.finished(orderId, 12, "Ada", IRIDIUM, "IRI", "COMPLETED", ACTING));
+        JobOrderNotices.finished(
+            orderId,
+            12,
+            "Ada",
+            Map.of(NotificationContextRole.REQUESTING, IRIDIUM),
+            "IRI",
+            "COMPLETED",
+            Set.of(),
+            ACTOR));
 
     assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_FINISHED);
     assertThat(inbox(FORMER_LOGISTICIAN)).isEmpty();
@@ -135,7 +154,15 @@ class JobOrderNoticeIntegrationTest {
   @Test
   void aDeletedOrderIsTaggedSoItsNoticeHasNoPageToLink() {
     creationService.createFromEvent(
-        JobOrderNotices.finished(orderId, 12, "Ada", IRIDIUM, "IRI", "DELETED", ACTING));
+        JobOrderNotices.finished(
+            orderId,
+            12,
+            "Ada",
+            Map.of(NotificationContextRole.REQUESTING, IRIDIUM),
+            "IRI",
+            "DELETED",
+            Set.of(),
+            ACTOR));
 
     assertThat(
             notificationRepository
@@ -146,9 +173,9 @@ class JobOrderNoticeIntegrationTest {
   }
 
   @Test
-  void anOrderWithoutARequestingUnitTellsNobodyAboutItsEnd() {
+  void anOrderWithoutAnyUnitOrAssigneeTellsNobodyAboutItsEnd() {
     creationService.createFromEvent(
-        JobOrderNotices.finished(orderId, 12, "Ada", null, null, "REJECTED", ACTING));
+        JobOrderNotices.finished(orderId, 12, "Ada", Map.of(), null, "REJECTED", Set.of(), ACTOR));
 
     assertThat(inbox(LOGISTICIAN)).isEmpty();
   }
@@ -164,7 +191,15 @@ class JobOrderNoticeIntegrationTest {
             .build());
 
     creationService.createFromEvent(
-        JobOrderNotices.reassigned(orderId, 12, "Ada", "KRT", IRIDIUM, "IRI", ACTING));
+        JobOrderNotices.reassigned(
+            orderId,
+            12,
+            "Ada",
+            "KRT",
+            "IRI",
+            Map.of(NotificationContextRole.RESPONSIBLE, IRIDIUM),
+            new NotificationRevision(0, 1),
+            ACTOR));
 
     assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_REASSIGNED);
   }
@@ -181,10 +216,16 @@ class JobOrderNoticeIntegrationTest {
   }
 
   @Test
-  void aWithdrawnClaimTellsTheMemberWhoMadeIt() {
+  void anAutomaticPromiseEndingRetainsItsExistingNoticePolicy() {
     creationService.createFromEvent(
-        JobOrderNotices.claimWithdrawn(
-            orderId, 12, "Ada", ASSIGNEE, "Quantanium", "ORDER_CHANGED", ACTING));
+        JobOrderNotices.promisesEnded(
+            orderId,
+            12,
+            "Ada",
+            Set.of(ASSIGNEE),
+            "Quantanium",
+            JobOrderNotices.AutomaticEndingReason.ORDER_CHANGED,
+            ACTING));
 
     assertThat(inbox(ASSIGNEE)).containsExactly(NotificationType.JOB_ORDER_CLAIM_WITHDRAWN);
     assertThat(inbox(LOGISTICIAN)).isEmpty();

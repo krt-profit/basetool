@@ -179,6 +179,28 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
       @Param("resource") String resource,
       @Param("entityKey") String entityKey);
 
+  /**
+   * Returns the latest retained feed epoch of every requested key in one scalar batch.
+   *
+   * @param userId the member
+   * @param resource the existing feed resource name
+   * @param entityKeys the nonempty physical key selection
+   * @return current latest positions; a missing key retains the ordinary changed-afterwards result
+   */
+  @Query(
+      value =
+          """
+          SELECT DISTINCT ON (entity_key) entity_key AS entityKey, tx AS tx, seq AS seq
+          FROM exchange_change
+          WHERE user_id = :userId AND resource = :resource AND entity_key IN (:entityKeys)
+          ORDER BY entity_key, tx DESC, seq DESC
+          """,
+      nativeQuery = true)
+  List<ChangedKey> findLatestForKeys(
+      @Param("userId") UUID userId,
+      @Param("resource") String resource,
+      @Param("entityKeys") Collection<String> entityKeys);
+
   /** A feed position as a native query returns it. */
   interface Position {
 

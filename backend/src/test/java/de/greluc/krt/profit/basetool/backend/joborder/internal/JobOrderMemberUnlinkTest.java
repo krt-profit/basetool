@@ -39,6 +39,7 @@ class JobOrderMemberUnlinkTest {
 
   @Mock private JobOrderRepository jobOrderRepository;
   @Mock private MaterialClaimRepository materialClaimRepository;
+  @Mock private JobOrderMoneyPrivacy moneyPrivacy;
 
   @InjectMocks private JobOrderMemberUnlink participant;
 
@@ -55,9 +56,10 @@ class JobOrderMemberUnlinkTest {
   void removesTheAssigneeSeatsThenClearsTheClaimStamps() {
     assertThat(participant.erase(userId, adminId)).isEmpty();
 
-    InOrder order = inOrder(jobOrderRepository, materialClaimRepository);
+    InOrder order = inOrder(moneyPrivacy, jobOrderRepository, materialClaimRepository);
+    order.verify(moneyPrivacy).unlink(userId);
     order.verify(jobOrderRepository).removeAssignee(userId);
     order.verify(materialClaimRepository).unlinkClaimedByUser(userId);
-    verifyNoMoreInteractions(jobOrderRepository, materialClaimRepository);
+    verifyNoMoreInteractions(moneyPrivacy, jobOrderRepository, materialClaimRepository);
   }
 }

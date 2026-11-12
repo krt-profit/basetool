@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -48,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationCauseCollector;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
@@ -121,13 +123,21 @@ class BankBookingRequestServiceTest {
             approvalLimitRepository,
             bereichRepository,
             orgUnitRepository);
+    var creation =
+        new BankRequestCreation(
+            requestRepository,
+            bankAuditService,
+            userRepository,
+            eventPublisher,
+            mock(BankLinkedRequestLiveSync.class));
     service =
         new BankBookingRequestService(
             requestRepository,
             accountRepository,
             holderRepository,
             transactionRepository,
-            bankLedgerService,
+            creation,
+            new BankRequestPostings(bankLedgerService, orgUnitMembershipQueryService),
             bankCaller,
             policy,
             bankAuditService,
@@ -136,7 +146,12 @@ class BankBookingRequestServiceTest {
             orgUnitMembershipQueryService,
             eventPublisher,
             purposeObservers,
-            new BankRequestClientNames(clientDirectory));
+            new BankRequestClientNames(clientDirectory),
+            mock(BankLinkedDecisions.class),
+            mock(BankLinkedBookings.class),
+            mock(BankLinkedRequestLiveSync.class),
+            mock(NotificationCauseCollector.class),
+            new BankRequestConfirmation(creation, bankAuditService));
   }
 
   @Test
@@ -255,6 +270,12 @@ class BankBookingRequestServiceTest {
 
     assertThat(result.getTotalElements()).isZero();
     verify(requestRepository, never()).findByRequestedByAndStatusIn(any(), any(), any());
+  }
+
+  private static BankTransaction transaction(UUID id) {
+    BankTransaction transaction = new BankTransaction();
+    transaction.setId(id);
+    return transaction;
   }
 
   private static BankAccount account(UUID id) {
@@ -380,8 +401,7 @@ class BankBookingRequestServiceTest {
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
         .thenReturn(
             List.of(
-                new OrgUnitMembershipOptionDto(
-                    orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON, true)));
+                new OrgUnitMembershipOptionDto(orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON)));
     when(requestRepository.save(any(BankBookingRequest.class)))
         .thenAnswer(invocation -> {
           BankBookingRequest saved = invocation.getArgument(0);
@@ -1108,8 +1128,7 @@ class BankBookingRequestServiceTest {
     holder.setHandle("greluc");
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
-    BankTransaction tx = new BankTransaction();
-    when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(transaction(txId)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(decider)).thenReturn(Optional.of(new User()));
     UUID requesterOrgUnit = UUID.randomUUID();
@@ -1168,7 +1187,7 @@ class BankBookingRequestServiceTest {
     holder.setHandle("greluc");
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
-    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(transaction(txId)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
 
     service.confirm(requestId, holderId, null, false, "Bar uebergeben, Zeuge: greluc", 0L);
@@ -1203,8 +1222,7 @@ class BankBookingRequestServiceTest {
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(recipientId))
         .thenReturn(
             List.of(
-                new OrgUnitMembershipOptionDto(
-                    orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON, true)));
+                new OrgUnitMembershipOptionDto(orgUnitId, "ALPHA", "ALP", OrgUnitKind.SQUADRON)));
 
     service.confirm(requestId, holderId, null, false, null, 0L);
 
@@ -1300,7 +1318,7 @@ class BankBookingRequestServiceTest {
     holder.setHandle("greluc");
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
-    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(transaction(txId)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
   }
 
@@ -1326,7 +1344,7 @@ class BankBookingRequestServiceTest {
     holder.setHandle("greluc");
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
-    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(transaction(txId)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(decider)).thenReturn(Optional.of(new User()));
 
@@ -1541,7 +1559,7 @@ class BankBookingRequestServiceTest {
     holder.setHandle("greluc");
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
-    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(transaction(txId)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
   }
@@ -1585,7 +1603,7 @@ class BankBookingRequestServiceTest {
     holder.setHandle("greluc");
     holder.setActive(true);
     when(holderRepository.findById(holderId)).thenReturn(Optional.of(holder));
-    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(transaction(txId)));
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
 
     BankBookingRequestDto dto = service.confirm(requestId, holderId, null, false, null, 0L);
@@ -1753,7 +1771,7 @@ class BankBookingRequestServiceTest {
     holder.setHandle("greluc");
     holder.setActive(true);
     when(holderRepository.findById(sourceHolder)).thenReturn(Optional.of(holder));
-    when(transactionRepository.findById(txId)).thenReturn(Optional.of(new BankTransaction()));
+    when(transactionRepository.findById(txId)).thenReturn(Optional.of(transaction(txId)));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(decider));
     when(userRepository.findById(any())).thenReturn(Optional.of(new User()));
 

@@ -65,6 +65,7 @@ public class BankUserReassignment extends OwnedRowsReassignment {
             "bank_audit_event.actor_user_id",
             "bank_audit_event.target_user_id",
             "bank_account_grant.granted_by",
+            "bank_authorisation.authorised_by",
             "bank_booking_request.requested_by",
             "bank_booking_request.decided_by",
             "bank_booking_request.owner_approval_granted_by",

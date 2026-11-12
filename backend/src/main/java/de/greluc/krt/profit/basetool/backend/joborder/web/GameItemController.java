@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.PaginationUtil;
@@ -71,39 +72,55 @@ public class GameItemController {
   private final JobOrderItemService jobOrderItemService;
 
   /**
-   * Pages the game items that are the output of at least one active blueprint, or only those
-   * orderable as item-order lines.
+   * Pages the game items bookable as Lager item stock (every blueprint output and every item of a
+   * stocked type, REQ-INV-029), only those orderable as item-order lines, or only the stocked items
+   * no blueprint produces (ADR-0372).
    *
    * @param q optional case-insensitive item-name filter
-   * @param orderable {@code true} narrows to items with at least one resolvable material
+   * @param orderable {@code true} narrows to blueprint outputs with at least one resolvable
+   *     material
+   * @param withoutBlueprint {@code true} narrows to the stocked items no active blueprint produces
    * @param page zero-based page index
    * @param size page size
    * @param sort sort spec (whitelist: {@code name}, {@code id}; the default appends {@code id} as a
    *     tiebreaker)
    * @return paged game-item references
+   * @throws BadRequestException when both narrowings are asked for
    */
   @GetMapping("/game-items")
   @PreAuthorize(GAME_ITEM_ACCESS)
   @Operation(
       summary = "List game items",
       description =
-          "Returns a paginated list of game items that are the output of at least one active"
-              + " blueprint; orderable=true keeps those with a resolvable material (item-order"
-              + " lines). The full set needs ADMIN, LOGISTICIAN or KRT_MEMBER, the"
-              + " orderable subset any login.")
+          "Returns a paginated list of the game items the Lager books: every output of an"
+              + " active blueprint and every item of a stocked type (weapons, armour, ship"
+              + " components, mining and salvage modules, storage containers, loot);"
+              + " orderable=true keeps the blueprint outputs with a resolvable material"
+              + " (item-order lines), withoutBlueprint=true the stocked items no blueprint"
+              + " produces; the two exclude each other. The full set and the items without a"
+              + " blueprint need ADMIN, LOGISTICIAN or KRT_MEMBER, the orderable subset any"
+              + " login.")
   @Transactional(readOnly = true)
   public PageResponse<InventoryGameItemReferenceDto> getGameItems(
       @RequestParam(required = false) String q,
       @RequestParam(required = false, defaultValue = "false") boolean orderable,
+      @RequestParam(required = false, defaultValue = "false") boolean withoutBlueprint,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
       @RequestParam(required = false, defaultValue = "name,asc;id,asc") String sort) {
+    if (orderable && withoutBlueprint) {
+      throw new BadRequestException("orderable and withoutBlueprint exclude each other.");
+    }
     Pageable pageable =
         PaginationUtil.createPageRequest(page, size, sort, Set.of("name", "id"), "name");
-    Page<InventoryGameItemReferenceDto> p =
-        orderable
-            ? stockItemCatalogue.findOrderableItems(q, pageable)
-            : stockItemCatalogue.findBookableItems(q, pageable);
+    Page<InventoryGameItemReferenceDto> p;
+    if (orderable) {
+      p = stockItemCatalogue.findOrderableItems(q, pageable);
+    } else if (withoutBlueprint) {
+      p = stockItemCatalogue.findBookableItemsWithoutBlueprint(q, pageable);
+    } else {
+      p = stockItemCatalogue.findBookableItems(q, pageable);
+    }
     return PageResponse.of(p);
   }
 

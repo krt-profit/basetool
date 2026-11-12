@@ -1,5 +1,7 @@
 # 11. Risks and technical debt
 
+> **JobOrder scope limits:** [aUEC holdings](../specs/orders-auec.md) are manually reported order-purpose amounts. The workflow relies on the player to verify the in-game wallet and record actual transfers. [Optional Bank attribution](../specs/orders-auec-bank.md) has its own custody and reservation scope.
+
 Each item says what it costs and what closing it involves. Nothing here is a vague "could be
 cleaner" — an entry earns its place by naming a failure that can actually happen.
 

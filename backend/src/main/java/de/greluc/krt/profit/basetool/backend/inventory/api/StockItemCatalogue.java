@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -40,6 +41,27 @@ public interface StockItemCatalogue {
   @NotNull
   Page<InventoryGameItemReferenceDto> findBookableItems(
       @Nullable String search, @NotNull Pageable pageable);
+
+  /**
+   * Pages the game items the Lager books through their type alone, those no active blueprint
+   * produces, optionally filtered by name (ADR-0372).
+   *
+   * @param search case-insensitive name substring, or {@code null}/blank for no filter
+   * @param pageable page request (whitelisted {@code name} / {@code id} sort)
+   * @return a page of stocked game-item references without a blueprint
+   */
+  @NotNull
+  Page<InventoryGameItemReferenceDto> findBookableItemsWithoutBlueprint(
+      @Nullable String search, @NotNull Pageable pageable);
+
+  /**
+   * Tells whether the Lager books an item through its type, regardless of any blueprint
+   * (REQ-INV-029).
+   *
+   * @param item the catalogue item
+   * @return {@code true} when a stocked item group covers the item's type and sub-type
+   */
+  boolean isStockedByType(@NotNull GameItem item);
 
   /**
    * Pages the game items orderable as job-order item lines, optionally filtered by name.

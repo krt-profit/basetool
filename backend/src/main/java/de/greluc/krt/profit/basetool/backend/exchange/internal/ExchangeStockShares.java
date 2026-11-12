@@ -24,10 +24,10 @@ import static de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeOp
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -44,8 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Moves a member's stock of a lot between personal and a unit's pool for a client's {@code share}
- * and {@code unshare}, and back for an undo, through the Lager's rebooking (REQ-XCH-016, ADR-0278).
- * The caller holds the member's lot lock.
+ * and {@code unshare}, through the Lager's rebooking (REQ-XCH-016, ADR-0278). The caller holds the
+ * member's lot lock.
  */
 @Service
 @RequiredArgsConstructor
@@ -63,7 +63,6 @@ public class ExchangeStockShares {
   /** The refusal of a rebooking that would leave a row below its Materialbörse offer. */
   static final String STOCK_OFFERED = "STOCK_OFFERED";
 
-  private final RebookCommands rebookCommands;
   private final ExchangeJournalService journalService;
 
   /**
@@ -113,27 +112,26 @@ public class ExchangeStockShares {
    *
    * @param caller the client, installation and member
    * @param batch the change set's id
+   * @param step the actual admitted operation index within this batch
    * @param move the share or unshare
    * @param dryRun whether to write nothing
+   * @param quantity actual complete before/after evidence, or null for a refused or dry move
    * @return the Lager's refusal as a per-op reason, or {@code null} when the move ran or would run
    */
   @Transactional(propagation = Propagation.MANDATORY)
-  public @Nullable String run(
-      @NotNull ExchangeCaller caller, @NotNull UUID batch, @NotNull Move move, boolean dryRun) {
-    RebookCommands.RebookOutcome outcome =
-        rebookCommands.rebook(
-            new RebookCommands.Rebook(
-                caller.member(),
-                move.lot(),
-                move.orgUnitId(),
-                move.direction(),
-                move.amount().doubleValue()),
-            dryRun);
-    RebookCommands.RebookRefusal refusal = outcome.refusal();
+  public @Nullable String record(
+      @NotNull ExchangeCaller caller,
+      @NotNull UUID batch,
+      int step,
+      @NotNull Move move,
+      boolean dryRun,
+      @Nullable RebookCommands.RebookRefusal refusal,
+      @Nullable StockLotWritePlans.QuantityChange quantity) {
     if (refusal != null) {
       return reason(refusal);
     }
     if (!dryRun) {
+      var actualQuantity = Objects.requireNonNull(quantity);
       boolean share = move.direction() == RebookCommands.RebookDirection.TO_POOL;
       journalService.record(
           caller,
@@ -141,61 +139,19 @@ public class ExchangeStockShares {
           share ? ExchangeJournalAction.STOCK_SHARE : ExchangeJournalAction.STOCK_UNSHARE,
           move.key(),
           false,
-          ExchangeStockJournal.State.of(move.total(), move.unit()).toJournal(),
+          ExchangeStockJournal.State.of(move.total(), move.unit(), actualQuantity.before(), step)
+              .toJournal(),
           ExchangeStockJournal.State.moved(
-                  move.total(), move.unit(), move.orgUnitId(), share, move.amount())
+                  move.total(),
+                  move.unit(),
+                  move.orgUnitId(),
+                  share,
+                  move.amount(),
+                  actualQuantity.after(),
+                  step)
               .toJournal());
     }
     return null;
-  }
-
-  /**
-   * Sets a lot's pools back for an undo, all or nothing: a positive amount moves the pool's stock
-   * back to personal, a negative one moves personal stock back into the pool.
-   *
-   * @param member the member
-   * @param lot the lot
-   * @param pools the net amount the client moved into each pool
-   * @return whether every pool could be set back; {@code false} writes nothing
-   * @throws IllegalStateException when the Lager refuses a move it accepted in the dry run
-   */
-  @Transactional(propagation = Propagation.MANDATORY)
-  public boolean takeBack(
-      @NotNull UUID member, @NotNull StockLot lot, @NotNull Map<UUID, BigDecimal> pools) {
-    List<RebookCommands.Rebook> toPersonal = new ArrayList<>();
-    List<RebookCommands.Rebook> toPool = new ArrayList<>();
-    pools.forEach((pool, amount) -> {
-      if (amount.signum() > 0) {
-        toPersonal.add(
-            new RebookCommands.Rebook(
-                member,
-                lot,
-                pool,
-                RebookCommands.RebookDirection.TO_PERSONAL,
-                amount.doubleValue()));
-      } else if (amount.signum() < 0) {
-        toPool.add(
-            new RebookCommands.Rebook(
-                member,
-                lot,
-                pool,
-                RebookCommands.RebookDirection.TO_POOL,
-                amount.negate().doubleValue()));
-      }
-    });
-    List<RebookCommands.Rebook> rebooks = new ArrayList<>(toPersonal);
-    rebooks.addAll(toPool);
-    for (RebookCommands.Rebook rebook : rebooks) {
-      if (rebookCommands.rebook(rebook, true).refusal() != null) {
-        return false;
-      }
-    }
-    for (RebookCommands.Rebook rebook : rebooks) {
-      if (rebookCommands.rebook(rebook, false).refusal() != null) {
-        throw new IllegalStateException("The Lager refused a take-back it had accepted");
-      }
-    }
-    return true;
   }
 
   /**

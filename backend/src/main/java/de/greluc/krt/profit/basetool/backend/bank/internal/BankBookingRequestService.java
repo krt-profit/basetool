@@ -26,23 +26,25 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedAttempt;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedEffectHandler.Action;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankLinkedOutcome;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurpose;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
 import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCancelledEvent;
-import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestConfirmedEvent;
-import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestRejectedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankBookingRequestUpdatedEvent;
 import de.greluc.krt.profit.basetool.backend.bank.api.events.BankNotices;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationCauseCollector;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
@@ -51,7 +53,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
@@ -70,14 +71,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Lifecycle engine for confirm-before-post bank booking requests (REQ-BANK-022/-023).
- *
- * <p>Org-unit-blind: it consults only bank roles and grants (REQ-BANK-008), while {@link
- * OrgUnitBankRequestService} handles requester-side authorization. A {@code PENDING} request moves
- * no money; only {@link #confirm} books it through {@link BankLedgerService}. Every decision locks
- * the request row and checks its {@code @Version}.
- */
+/** Manages the lifecycle of versioned Bank booking requests (REQ-BANK-022/-023). */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -88,7 +82,8 @@ public class BankBookingRequestService {
   private final BankAccountRepository accountRepository;
   private final BankHolderRepository holderRepository;
   private final BankTransactionRepository transactionRepository;
-  private final BankLedgerService bankLedgerService;
+  private final BankRequestCreation creation;
+  private final BankRequestPostings ordinaryPostings;
   private final BankCaller bankCaller;
   private final BankAccessRules policy;
   private final BankAuditService bankAuditService;
@@ -98,12 +93,14 @@ public class BankBookingRequestService {
   private final ApplicationEventPublisher eventPublisher;
   private final ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
   private final BankRequestClientNames clientNames;
+  private final BankLinkedDecisions linkedDecisions;
+  private final BankLinkedBookings linkedBookings;
+  private final BankLinkedRequestLiveSync linkedLiveSync;
+  private final NotificationCauseCollector notificationCauses;
+  private final BankRequestConfirmation confirmation;
 
   /**
-   * Persists a new {@code PENDING} booking request, audits it and fires the notification event
-   * (REQ-BANK-022/-026). Enforces only the bank-domain rules; the caller has already checked
-   * visibility and resolved the approval snapshot. The request is stamped with the draft's explicit
-   * requester, never with the security context's caller (ADR-0352).
+   * Persists, audits and announces a pending request for the explicit applicant in the draft.
    *
    * @param draft the requester, the payload and the approval snapshot
    * @return the created request
@@ -152,7 +149,7 @@ public class BankBookingRequestService {
             type, draft.counterpartyUserId(), draft.counterpartyOrgUnitId()));
     request.setStatus(BankBookingRequestStatus.PENDING);
     UUID requesterSub = draft.requester().userId();
-    String requesterHandle = resolveHandle(requesterSub);
+    String requesterHandle = creation.resolveHandle(requesterSub);
     request.setRequestedBy(requesterSub);
     request.setRequesterHandle(requesterHandle);
     BankAdmission.Admitted routing = draft.routing();
@@ -168,32 +165,7 @@ public class BankBookingRequestService {
     BankRequestOrigin origin = draft.origin();
     request.setClientId(origin == null ? null : origin.clientId());
     request.setIdempotencyKey(origin == null ? null : origin.idempotencyKey());
-    BankBookingRequest saved = requestRepository.save(request);
-
-    bankAuditService.record(
-        BankAuditEventType.BOOKING_REQUEST_CREATED,
-        account.getId(),
-        null,
-        requesterSub,
-        type
-            + " request "
-            + plain(draft.amount())
-            + " aUEC "
-            + shortId(saved.getId())
-            + (requiresOwnerApproval ? " (needs approval)" : ""));
-
-    OrgUnit orgUnit = account.getOrgUnit();
-    eventPublisher.publishEvent(
-        new BankBookingRequestCreatedEvent(
-            saved.getId(),
-            account.getId(),
-            type,
-            draft.amount(),
-            account.getAccountNo(),
-            requesterHandle,
-            orgUnit == null ? null : orgUnit.getShorthand(),
-            requesterSub));
-    return toDto(saved);
+    return toDto(creation.saveAndAnnounce(request));
   }
 
   /**
@@ -224,33 +196,6 @@ public class BankBookingRequestService {
     }
     return RegisteredCounterpartyResolver.resolve(
         userRepository, orgUnitMembershipQueryService, userId, orgUnitId);
-  }
-
-  /**
-   * Resolves the org unit to stamp on a confirmed booking for the counterparty (REQ-BANK-055): the
-   * stored choice while it is still one of the counterparty's memberships, else their current
-   * primary unit, else none.
-   *
-   * @param request the request being confirmed
-   * @param counterpartyId the resolved counterparty (the named Empf&auml;nger, else the requester),
-   *     or {@code null} when the request carries neither
-   * @return the org unit to record, or {@code null}
-   */
-  @Nullable
-  private UUID confirmCounterpartyOrgUnitId(
-      @NotNull BankBookingRequest request, @Nullable UUID counterpartyId) {
-    if (counterpartyId == null) {
-      return null;
-    }
-    UUID stored = request.getCounterpartyOrgUnitId();
-    if (stored != null
-        && orgUnitMembershipQueryService.listDirectMembershipOptions(counterpartyId).stream()
-            .anyMatch(option -> option.orgUnitId().equals(stored))) {
-      return stored;
-    }
-    return orgUnitMembershipQueryService
-        .findPrimaryDirectMembershipOrgUnitId(counterpartyId)
-        .orElse(null);
   }
 
   /**
@@ -311,10 +256,14 @@ public class BankBookingRequestService {
           BankConflictException.CODE_BANK_REQUEST_ALREADY_APPROVED,
           "An approved request can no longer be edited; cancel it and raise a new one");
     }
+    if (request.getLinkedAttempt() != null) {
+      throw new BadRequestException("Linked Bank terms must be corrected through their purpose");
+    }
     PurposeBoundCorrections.requireTermsKept(request, update);
     BankBookingRequestType type = request.getType();
+    BankAccount account = Objects.requireNonNull(request.getAccount());
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
-      BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
+      BankBookingGuards.requireDebitJustification(account, update.justification());
     }
     applyTargetAccount(request, type, update.targetAccountId());
     UUID counterpartyId = update.counterpartyUserId();
@@ -331,16 +280,15 @@ public class BankBookingRequestService {
 
     bankAuditService.record(
         BankAuditEventType.BOOKING_REQUEST_UPDATED,
-        request.getAccount().getId(),
+        account.getId(),
         null,
         request.getRequestedBy(),
         "edited request "
-            + shortId(request.getId())
+            + request.shortId()
             + " to "
             + plain(update.amount())
             + " aUEC"
             + (requiresOwnerApproval ? " (needs approval)" : ""));
-    BankAccount account = request.getAccount();
     OrgUnit orgUnit = account.getOrgUnit();
     eventPublisher.publishEvent(
         new BankBookingRequestUpdatedEvent(
@@ -382,7 +330,7 @@ public class BankBookingRequestService {
     if (targetAccountId == null) {
       throw new BadRequestException("A transfer request requires a destination account");
     }
-    if (targetAccountId.equals(request.getAccount().getId())) {
+    if (targetAccountId.equals(request.accountId())) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_SELF_TRANSFER,
           "Source and destination account of a transfer must differ");
@@ -438,24 +386,48 @@ public class BankBookingRequestService {
   @Transactional
   public BankBookingRequestDto cancelOwn(
       @Nullable UUID requester, @NotNull UUID requestId, long version) {
+    BankLinkedDecisions.Prepared linked =
+        linkedDecisions.forRequest(requestId, Action.CANCEL, null);
+    return cancelOwnRequest(requester, requestId, version, linked);
+  }
+
+  /**
+   * Cancels an ordinary Exchange request for its explicit actor.
+   *
+   * @param requester the admitted Exchange actor
+   * @param requestId the request to cancel
+   * @param version the echoed version
+   * @return the cancelled request
+   */
+  @NotNull
+  @Transactional
+  BankBookingRequestDto cancelOwnExchange(
+      @Nullable UUID requester, @NotNull UUID requestId, long version) {
+    return cancelOwnRequest(requester, requestId, version, null);
+  }
+
+  /**
+   * Cancels the actor's request under the row lock and its prepared purpose, when present.
+   *
+   * @param requester the owner whose request may be cancelled
+   * @param requestId the request to cancel
+   * @param version the echoed version
+   * @param linked the prepared linked owner, if any
+   * @return the cancelled request
+   */
+  @NotNull
+  private BankBookingRequestDto cancelOwnRequest(
+      @Nullable UUID requester,
+      @NotNull UUID requestId,
+      long version,
+      @Nullable BankLinkedDecisions.Prepared linked) {
     BankBookingRequest request = lockRequest(requestId);
-    if (!policy.ownsRequest(requester, request)) {
+    if (!policy.ownsRequest(requester, request)
+        || (linked == null && request.getLinkedAttempt() != null)) {
       throw new NotFoundException("Booking request not found");
     }
     requireVersion(request, version);
-    requirePending(request);
-    request.setStatus(BankBookingRequestStatus.CANCELLED);
-    request.setDecidedAt(Instant.now());
-    bankAuditService.record(
-        BankAuditEventType.BOOKING_REQUEST_CANCELLED,
-        request.getAccount().getId(),
-        null,
-        request.getRequestedBy(),
-        "cancelled request " + shortId(request.getId()));
-    eventPublisher.publishEvent(
-        new BankBookingRequestCancelledEvent(
-            request.getId(), request.getAccount().getId(), request.getRequestedBy()));
-    notifyPurposeObserver(request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
+    cancel(request, request.getRequestedBy(), linked);
     return toDto(request);
   }
 
@@ -472,22 +444,102 @@ public class BankBookingRequestService {
   @Transactional(propagation = Propagation.MANDATORY)
   public void cancelForPurpose(@NotNull UUID requestId, @NotNull BankPurposeKind kind) {
     BankBookingRequest request = lockRequest(requestId);
-    if (request.getPurposeKind() != kind) {
+    if (request.getPurposeKind() != kind || request.getLinkedAttempt() != null) {
       throw new NotFoundException("Booking request not found");
     }
+    cancel(request, authHelperService.currentUserId().orElse(null), null);
+  }
+
+  /**
+   * Cancels the exact request on behalf of its required linked handler.
+   *
+   * @param requestId the request to cancel
+   * @param attempt the exact attempt and purpose
+   * @param action the ordinary or already-guarded terminal cancellation
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  void cancelLinked(
+      @NotNull UUID requestId, @NotNull BankLinkedAttempt attempt, @NotNull Action action) {
+    BankLinkedDecisions.Prepared linked =
+        Objects.requireNonNull(linkedDecisions.forRequest(requestId, action, attempt));
+    cancel(lockRequest(requestId), linked.actor(), linked);
+  }
+
+  /**
+   * Locks the exact failed request before a replacement can acquire accounts.
+   *
+   * @param requestId the failed request
+   * @param attempt its exact linked identity
+   * @return the failed request retaining the original payment evidence
+   */
+  @NotNull
+  @Transactional(propagation = Propagation.MANDATORY)
+  BankBookingRequest replacementSource(
+      @NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
+    return requireFailedAttempt(lockRequest(requestId), attempt);
+  }
+
+  /**
+   * Reads the exact failed attempt and its retained terms for a replacement quote.
+   *
+   * @param requestId the failed request
+   * @param attempt its exact linked identity
+   * @return the failed request's retained evidence
+   */
+  @NotNull
+  BankBookingRequest previewReplacementSource(
+      @NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
+    return requireFailedAttempt(
+        Entities.require(requestRepository.findById(requestId), "Booking request not found"),
+        attempt);
+  }
+
+  private static BankBookingRequest requireFailedAttempt(
+      BankBookingRequest request, BankLinkedAttempt attempt) {
+    BankLinkedAttemptRecord previous = request.getLinkedAttempt();
+    if (previous == null
+        || !previous.getId().equals(attempt.id())
+        || previous.getPurposeKind() != attempt.purpose().kind()
+        || !previous.getPurposeRef().equals(attempt.purpose().ref())) {
+      throw new NotFoundException("Booking request not found");
+    }
+    if (request.getStatus() != BankBookingRequestStatus.REJECTED
+        && request.getStatus() != BankBookingRequestStatus.CANCELLED) {
+      throw new BusinessConflictException(
+          "Only a rejected or cancelled Bank request can be replaced");
+    }
+    return request;
+  }
+
+  /**
+   * Cancels a locked request and applies its synchronous outcome.
+   *
+   * @param request the pending request
+   * @param actor the authenticated actor
+   * @param linked the prepared linked handler, if any
+   */
+  private void cancel(
+      @NotNull BankBookingRequest request,
+      @Nullable UUID actor,
+      @Nullable BankLinkedDecisions.Prepared linked) {
     requirePending(request);
-    UUID actor = authHelperService.currentUserId().orElse(null);
     request.setStatus(BankBookingRequestStatus.CANCELLED);
     request.setDecidedAt(Instant.now());
     bankAuditService.record(
         BankAuditEventType.BOOKING_REQUEST_CANCELLED,
-        request.getAccount().getId(),
+        request.accountId(),
         null,
         actor,
-        "cancelled request " + shortId(request.getId()));
-    eventPublisher.publishEvent(
-        new BankBookingRequestCancelledEvent(request.getId(), request.getAccount().getId(), actor));
-    notifyPurposeObserver(request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
+        "cancelled request " + request.shortId());
+    var event = new BankBookingRequestCancelledEvent(request.getId(), request.accountId(), actor);
+    if (linked != null) {
+      notificationCauses.append(request.getId(), List.of(event));
+      linked.complete(new BankLinkedOutcome.Cancelled(request.getId()));
+      linkedLiveSync.changed();
+    } else {
+      eventPublisher.publishEvent(event);
+      notifyPurposeObserver(request, (observer, ref) -> observer.onCancelled(request.getId(), ref));
+    }
   }
 
   /**
@@ -572,7 +624,7 @@ public class BankBookingRequestService {
     if (rights.management()) {
       return requestRepository.findByStatusIn(statuses, pageable);
     }
-    if (rights.grantedAccountIds().isEmpty()) {
+    if (!rights.staff()) {
       return Page.empty(pageable);
     }
     return requestRepository.findByStatusInAndAccountIdIn(
@@ -621,119 +673,85 @@ public class BankBookingRequestService {
   @Transactional
   public BankBookingRequestDto confirm(
       @NotNull UUID requestId,
-      @NotNull UUID holderId,
+      @Nullable UUID holderId,
       @Nullable UUID destinationHolderId,
       boolean ownerApprovalConfirmed,
       @Nullable String staffNote,
       long version) {
+    BankLinkedDecisions.Prepared linked =
+        linkedDecisions.forRequest(requestId, Action.CONFIRM, null);
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     requirePending(request);
-    BankStaffRights rights = staffRights();
+    if (linked != null) {
+      linkedBookings.lockConfirmationAccounts(request);
+    } else if (holderId == null) {
+      throw new BadRequestException("A custodian is required for an ordinary Bank request");
+    }
+    BankStaffRights rights = linked == null ? staffRights() : linkedDecisions.rights();
     requireSecondPerson(request, rights);
     BankOverLimitConfirmGate.require(request, ownerApprovalConfirmed, staffNote);
-    UUID accountId = request.getAccount().getId();
-    if (!rights.canBook(request.getType(), accountId)) {
+    if (!rights.canBook(request.getType(), request.accountId())) {
       throw new AccessDeniedException(
           "The caller lacks the bank capability to confirm this request");
     }
 
-    UUID namedCounterparty = request.getCounterpartyUserId();
-    UUID requesterId = namedCounterparty != null ? namedCounterparty : request.getRequestedBy();
-    UUID counterpartyOrgUnitId = confirmCounterpartyOrgUnitId(request, requesterId);
-
+    if (linked != null) {
+      return confirmLinked(request, holderId, destinationHolderId, staffNote, linked);
+    }
+    UUID ordinaryHolderId = Objects.requireNonNull(holderId);
     BankTransactionDto booked =
-        switch (request.getType()) {
-          case DEPOSIT ->
-              bankLedgerService.bookDeposit(
-                  new BankDepositRequest(
-                      accountId,
-                      holderId,
-                      request.getAmount(),
-                      request.getNote(),
-                      staffNote,
-                      request.isSplitEnabled(),
-                      request.getSplitPercent(),
-                      requesterId,
-                      counterpartyOrgUnitId,
-                      null));
-          case WITHDRAWAL ->
-              bankLedgerService.bookWithdrawal(
-                  new BankWithdrawalRequest(
-                      accountId,
-                      holderId,
-                      request.getAmount(),
-                      request.getNote(),
-                      request.getJustification(),
-                      staffNote,
-                      requesterId,
-                      counterpartyOrgUnitId,
-                      false,
-                      null));
-          case TRANSFER -> {
-            BankAccount target = request.getTargetAccount();
-            if (target == null || destinationHolderId == null) {
-              throw new NotFoundException(
-                  "A transfer confirmation requires the destination account and holder");
-            }
-            yield bankLedgerService.bookTransfer(
-                new BankTransferRequest(
-                    accountId,
-                    holderId,
-                    target.getId(),
-                    destinationHolderId,
-                    request.getAmount(),
-                    request.getNote(),
-                    request.getJustification(),
-                    staffNote,
-                    false),
-                true);
-          }
-        };
-
+        ordinaryPostings.book(request, ordinaryHolderId, destinationHolderId, staffNote);
     BankHolder holder =
-        Entities.require(holderRepository.findById(holderId), "Bank holder not found");
+        Entities.require(holderRepository.findById(ordinaryHolderId), "Bank holder not found");
     BankTransaction transaction =
         Entities.require(transactionRepository.findById(booked.id()), "Bank transaction not found");
     UUID decider = authHelperService.currentUserId().orElse(null);
-    request.setHolder(holder);
-    request.setResultingTransaction(transaction);
-    request.setStatus(BankBookingRequestStatus.CONFIRMED);
-    request.setStaffNote(staffNote);
-    request.setDecidedBy(decider);
-    request.setDeciderHandle(resolveHandle(decider));
-    request.setDecidedAt(Instant.now());
-
-    bankAuditService.record(
-        BankAuditEventType.BOOKING_REQUEST_CONFIRMED,
-        accountId,
-        booked.id(),
-        request.getRequestedBy(),
-        "confirmed "
-            + request.getType()
-            + " request "
-            + shortId(request.getId())
-            + " @"
-            + holder.getHandle());
-    if (request.isRequiresOwnerApproval()) {
-      bankAuditService.record(
-          BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED,
-          accountId,
-          booked.id(),
-          request.getRequestedBy(),
-          "owner approval confirmed for request " + shortId(request.getId()));
-    }
     eventPublisher.publishEvent(
-        new BankBookingRequestConfirmedEvent(
-            request.getId(),
-            request.getAccount().getId(),
-            request.getAccount().getAccountNo(),
-            request.getAmount(),
-            request.getRequestedBy(),
-            decider));
+        confirmation.record(request, holder, transaction, staffNote, decider));
     notifyPurposeObserver(
         request,
         (observer, ref) -> observer.onConfirmed(request.getId(), ref, transaction.getId()));
+    return toDto(request);
+  }
+
+  /**
+   * Confirms fixed linked terms with the prepared owner in the same transaction.
+   *
+   * @param request the pending request
+   * @param holderId the echoed source holder
+   * @param destinationHolderId the echoed destination holder
+   * @param staffNote the private staff note
+   * @param linked the prepared linked owner
+   * @return the confirmed request
+   */
+  @NotNull
+  private BankBookingRequestDto confirmLinked(
+      @NotNull BankBookingRequest request,
+      @Nullable UUID holderId,
+      @Nullable UUID destinationHolderId,
+      @Nullable String staffNote,
+      @NotNull BankLinkedDecisions.Prepared linked) {
+    var confirmed =
+        linkedBookings.confirm(request, holderId, destinationHolderId, staffNote, linked.actor());
+    BankLinkedOutcome outcome = confirmed.outcome();
+    BankTransaction transaction = null;
+    UUID causeId;
+    if (outcome instanceof BankLinkedOutcome.Posted posted) {
+      causeId = posted.transactionId();
+      transaction =
+          Entities.require(transactionRepository.findById(causeId), "Bank transaction not found");
+    } else if (outcome instanceof BankLinkedOutcome.Authorised authorised) {
+      causeId = authorised.authorisationId();
+      request.setAuthorisationId(causeId);
+    } else {
+      throw new IllegalStateException("A confirmed request requires a final Bank outcome");
+    }
+    notificationCauses.appendPreferred(
+        causeId,
+        confirmation.record(request, confirmed.holder(), transaction, staffNote, linked.actor()));
+    linked.complete(outcome);
+    linkedLiveSync.changed();
     return toDto(request);
   }
 
@@ -755,35 +773,45 @@ public class BankBookingRequestService {
   @Transactional
   public BankBookingRequestDto reject(
       @NotNull UUID requestId, @NotNull String reason, long version) {
+    BankLinkedDecisions.Prepared linked =
+        linkedDecisions.forRequest(requestId, Action.REJECT, null);
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     requirePending(request);
-    UUID accountId = request.getAccount().getId();
-    if (!staffRights().canSee(accountId)) {
-      throw new AccessDeniedException("The caller may not see the request's account");
+    UUID accountId = request.accountId();
+    BankStaffRights rights = linked == null ? staffRights() : linkedDecisions.rights();
+    if (accountId == null ? !rights.staff() : !rights.canSee(accountId)) {
+      throw new AccessDeniedException("The caller may not see the request");
     }
     UUID decider = authHelperService.currentUserId().orElse(null);
     request.setStatus(BankBookingRequestStatus.REJECTED);
     request.setRejectReason(reason);
     request.setDecidedBy(decider);
-    request.setDeciderHandle(resolveHandle(decider));
+    request.setDeciderHandle(creation.resolveHandle(decider));
     request.setDecidedAt(Instant.now());
     bankAuditService.record(
         BankAuditEventType.BOOKING_REQUEST_REJECTED,
         accountId,
         null,
         request.getRequestedBy(),
-        "rejected request " + shortId(request.getId()));
-    eventPublisher.publishEvent(
+        "rejected request " + request.shortId());
+    var event =
         new BankBookingRequestRejectedEvent(
             request.getId(),
-            request.getAccount().getId(),
-            request.getAccount().getAccountNo(),
+            accountId,
+            request.accountNo(),
             request.getAmount(),
             reason,
             request.getRequestedBy(),
-            decider));
-    notifyPurposeObserver(request, (observer, ref) -> observer.onRejected(request.getId(), ref));
+            decider);
+    if (linked != null) {
+      notificationCauses.appendPreferred(request.getId(), event);
+      linked.complete(new BankLinkedOutcome.Rejected(request.getId()));
+      linkedLiveSync.changed();
+    } else {
+      eventPublisher.publishEvent(event);
+      notifyPurposeObserver(request, (observer, ref) -> observer.onRejected(request.getId(), ref));
+    }
     return toDto(request);
   }
 
@@ -807,44 +835,46 @@ public class BankBookingRequestService {
     if (granted) {
       requireSecondPerson(request, staffRights());
     }
-    if (granted && !request.isRequiresOwnerApproval()) {
+    BankAccount account = request.getAccount();
+    if (account == null || (granted && !request.isRequiresOwnerApproval())) {
       throw new BadRequestException(
           "This request does not require the responsible holder's approval");
     }
     UUID actor = authHelperService.currentUserId().orElse(null);
     request.setOwnerApprovalGranted(granted);
     request.setOwnerApprovalGrantedBy(granted ? actor : null);
-    request.setOwnerApprovalGrantedByHandle(granted ? resolveHandle(actor) : null);
+    request.setOwnerApprovalGrantedByHandle(granted ? creation.resolveHandle(actor) : null);
     request.setOwnerApprovalGrantedAt(granted ? Instant.now() : null);
     bankAuditService.record(
         granted
             ? BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_GRANTED
             : BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_REVOKED,
-        request.getAccount().getId(),
+        account.getId(),
         null,
         request.getRequestedBy(),
-        (granted ? "granted" : "revoked")
-            + " owner approval for request "
-            + shortId(request.getId()));
+        (granted ? "granted" : "revoked") + " owner approval for request " + request.shortId());
     eventPublisher.publishEvent(
         granted
             ? BankNotices.approved(
                 request.getId(),
-                request.getAccount().getId(),
+                account.getId(),
                 request.getRequestedBy(),
                 request.getType(),
                 request.getAmount(),
-                request.getAccount().getAccountNo(),
+                account.getAccountNo(),
                 Objects.requireNonNull(request.getOwnerApprovalGrantedByHandle()),
                 actor)
             : BankNotices.approvalRevoked(
                 request.getId(),
-                request.getAccount().getId(),
+                account.getId(),
                 request.getType(),
                 request.getAmount(),
-                request.getAccount().getAccountNo(),
+                account.getAccountNo(),
                 request.getRequesterHandle(),
                 actor));
+    if (request.getLinkedAttempt() != null) {
+      linkedLiveSync.changed();
+    }
     return toDto(request);
   }
 
@@ -918,20 +948,6 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Snapshots a user's effective name for the requester/decider handle column, falling back to a
-   * neutral marker when the user cannot be resolved (never a PII leak).
-   *
-   * @param userId the user id, possibly {@code null}
-   * @return the effective name, or {@code "unknown"}
-   */
-  private String resolveHandle(@Nullable UUID userId) {
-    return Optional.ofNullable(userId)
-        .flatMap(userRepository::findById)
-        .map(User::getEffectiveName)
-        .orElse("unknown");
-  }
-
-  /**
    * Maps a request entity to its wire shape on a read that does not judge the caller's confirm
    * capability, so {@code callerMayConfirm} is {@code null}.
    *
@@ -954,17 +970,5 @@ public class BankBookingRequestService {
   private Page<BankBookingRequestDto> toDtos(@NotNull Page<BankBookingRequest> page) {
     Function<BankBookingRequest, String> names = clientNames.forRequests(page.getContent());
     return page.map(request -> BankBookingRequestDtos.of(request, names.apply(request), null));
-  }
-
-  /**
-   * Shortens an id to its first hex group for compact audit details.
-   *
-   * @param id the id
-   * @return the first id segment
-   */
-  private static String shortId(@NotNull UUID id) {
-    String s = id.toString();
-    int dash = s.indexOf('-');
-    return dash < 0 ? s : s.substring(0, dash);
   }
 }

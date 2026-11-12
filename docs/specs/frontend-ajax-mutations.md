@@ -70,6 +70,10 @@ on hand-wired `sendChanged`/`createReceiver` is migrated with the next change th
 
 ### REQ-FE-001 — No full-page reload on a successful mutation
 
+> **Approved planned JobOrder amendment (not implemented):** The planned central JobOrder page keeps ordinary saves and peer changes in place for all authorised unit/personal readers. Create-to-detail navigation remains the intentional exception; financial uncertainty does not justify reload/reposting. See [the approved shared JobOrder contract](orders-core.md) and [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 A create / update / delete / toggle / reorder interaction must update only the changed DOM nodes and
 must not navigate the document (no `window.location.reload()`, no redirect-follow) on success. The
 **only** sanctioned reloads are (1) the optimistic-lock conflict path, where the user explicitly
@@ -324,6 +328,10 @@ the trusted-helper call sites · **Code:** `escape-html.js`, `krt-fetch.js` (`se
 
 ### REQ-FE-003 — `syncVersion` propagates the optimistic-lock version
 
+> **Approved planned JobOrder amendment (not implemented):** Propagate the new JobOrder scoped versions to every related action, with a version tied to the independently edited owner rather than the screen. An unrelated holder provision must not invalidate a note/target draft. Same-operation outcome recovery is distinct from a fresh versioned edit; see [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 On a successful write whose response carries a `version`, `krtFetch` writes that value to the
 target container **and every descendant `[data-version]`**, so the user's next action on the same
 aggregate sends the fresh version and does not 409. When propagation cannot be made complete in
@@ -414,6 +422,10 @@ change (ADR-0012).
 `CsrfTokenController`, `krt-fetch.js` (`krtCsrf.refresh`, retry path) · **Issues:** #572
 
 ### REQ-FE-005 — Lists / filters / pagination are in-place fragment swaps
+
+> **Approved planned JobOrder amendment (not implemented):** The four JobOrder views and kind filter use the approved shared read model and retain useful view/filter return state. Supporting units and linked holder/payee relationships must be reflected in server-scoped lists and their live refresh, not only the detail page. See [the approved shared JobOrder contract](orders-core.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 Filtering, sorting and paginating a list use `krtFetch.swap`, which loads the controller's
 `?fragment=results` HTML fragment into the results container and intercepts in-container pagination
@@ -994,6 +1006,10 @@ ADR-0069, ADR-0094
 
 ### REQ-FE-011 — User-selection fields are searchable comboboxes (username + display name)
 
+> **Approved planned JobOrder amendment (not implemented):** JobOrder person selection is explicit and action-authorised, with a named unlinked route for accountless Kartell members. Raw-name equality neither silently links an account nor grants access. Reuse the established searchable-field interaction without a separate holder administration prerequisite; see [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 As the member base grows, plain `<select>` dropdowns of users become unusable. **Every field that
 lets a user pick a registered user/member must be a searchable combobox** rendered by
 [`krt-searchable-select.js`](../../frontend/src/main/resources/static/js/kernel/krt-searchable-select.js),
@@ -1264,6 +1280,10 @@ both.
 snapshot + `markDirtySections`) · **Issue:** #1136
 
 ### REQ-FE-015 — Tool-wide live peer sync over topic rooms on one multiplexed WebSocket
+
+> **Approved planned JobOrder amendment (not implemented):** Extend JobOrder room/list admission to the approved requester, supporter, holder/payee and assignee read relationships. Backend publication, relay allow-lists and receiving section maps remain in parity and honour current access. Dirty relevant input is protected under REQ-FE-024; see [the approved shared JobOrder contract](orders-core.md) and [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 REQ-FE-010's contract — a peer's change appears on every other viewer's screen without a manual
 reload, with only opaque section keys on the wire — applies **tool-wide**, to every surface where
@@ -1725,7 +1745,8 @@ expects to scroll that list rather than guess a search term. The open-ended cata
 game items, bank accounts) keep the 50-row default and rely on the hint. The marker
 values are registered in `krt-catalog-search.js`: `remote-materials`,
 `remote-materials-joborder` (orders lines), `remote-materials-raw` (refinery inputs),
-`remote-locations`, and `remote-game-items` (the inventory item mode's bookable-item picker — the
+`remote-locations`, and `remote-game-items` (the bookable-item picker of the inventory item mode,
+the minimum stock levels and the supply need, pledge and recorded-donation forms — the
 one **authenticated** relay, `GET /inventory/item-search`, onto the role-gated (full set) backend
 `/api/v1/game-items`, REQ-INV-029; its options and the orders item picker's are labelled with a
 component's size, grade and class, REQ-INV-064). Each marker carries its kind-specific default
@@ -1739,8 +1760,11 @@ programmatic fills use `krtCombobox.setValue(value, label, data?)` — in remote
 material + location pickers and its item-mode game-item picker, the job-order create/edit material
 lines (server-rendered **and** JS-built rows), the refinery create/details input-material pickers,
 the Umbuchen target-location pickers, the production modal's book-in location picker
-(REQ-INV-032), the `/inventory/material` navigate select and the admin material-alias pickers; the
-orders item picker already used the component's `remoteSource` API.
+(REQ-INV-032), the `/inventory/material` navigate select, the admin material-alias pickers and the
+supply need, pledge and recorded-donation item pickers (REQ-SUP-003); the orders item picker
+already used the component's `remoteSource` API. A native `form.reset()` keeps a combobox's hidden
+value while it empties the visible text, so a form that resets before it opens clears its
+comboboxes through `setValue('')` as well (the supply forms' `resetForm`).
 
 **Free-text terms cross the frontend→backend hop as URI-template variables, encoded exactly once
 (binding).** A page-controller relay that forwards a free-text search term (`q` / `query` /
@@ -2321,6 +2345,10 @@ over `FrontendPageRoutes.CORE_SMOKE`) · **Code:** `kernel/fragments/head.html`,
 (page JavaScript in static modules), ADR-0125
 
 ### REQ-FE-024 — Only an edited data form arms the unsaved-changes guard
+
+> **Approved planned JobOrder amendment (not implemented):** For the planned JobOrder flows preserve unsent input only within the open form during relevant peer changes/conflicts; there is no durable unsubmitted-draft manager. Keep refreshed basis separate from dirty input and require deliberate conflict resolution. Submitted operation identity/result recovery survives reload independently, and never repeats a game payment or creates a second attempt merely after a lost response. See [the approved aUEC contract](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 `unsaved-changes.js`, loaded on every page with the sidebar, warns before a link leaves a page whose
 form holds edits nobody submitted: it opens the „Ungespeicherte Änderungen" dialog instead of

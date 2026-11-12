@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { toggleTransferOnlyControl } from '/js/bank/bank-controls.js';
+import { toggleRequiredPicker } from '/js/bank/bank-controls.js';
 import {
     toggleSplitRow,
     updateJustificationRequired,
@@ -73,7 +73,7 @@ export function syncRequestTypeRows(select) {
     const row = /** @type {HTMLElement | null} */ (
         form.querySelector('[data-request-transfer-only]')
     );
-    toggleTransferOnlyControl(row, isTransfer);
+    toggleRequiredPicker(row, isTransfer);
     const splitBlock = /** @type {HTMLElement | null} */ (
         form.querySelector('[data-split-deposit-only]')
     );

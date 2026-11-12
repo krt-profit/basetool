@@ -21,11 +21,12 @@ package de.greluc.krt.profit.basetool.frontend.bank.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Write payload for a bank employee confirming a pending booking request (REQ-BANK-023).
  *
- * @param holderId the holder recorded for the booking
+ * @param holderId the recorded custodian, absent for an account-only transfer or authorisation
  * @param destinationHolderId the destination holder of a transfer, or {@code null}
  * @param ownerApprovalConfirmed the attestation that the responsible holder approved; {@code null}
  *     counts as {@code false}
@@ -34,7 +35,7 @@ import java.util.UUID;
  */
 @DtoMirror
 public record ConfirmBankBookingRequest(
-    UUID holderId,
+    @Nullable UUID holderId,
     UUID destinationHolderId,
     Boolean ownerApprovalConfirmed,
     String staffNote,

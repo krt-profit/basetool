@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -38,9 +40,12 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgHierarchyService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
@@ -61,8 +66,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Walks the job-order assignee grant over HTTP across two units (REQ-ORDERS-047, ADR-0301).
@@ -73,6 +81,8 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class JobOrderAssigneeGrantIntegrationTest {
 
+  @Autowired private OrgUnitRepository orgUnitRepository;
+
   private static final String ORDERS = "/api/v1/orders/";
 
   @Autowired private WebApplicationContext context;
@@ -82,6 +92,9 @@ class JobOrderAssigneeGrantIntegrationTest {
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private DataSource dataSource;
+  @Autowired private OrgHierarchyService hierarchy;
+
+  private final JsonMapper json = JsonMapper.builder().build();
 
   private MockMvc mockMvc;
   private UUID orderId;
@@ -141,7 +154,7 @@ class JobOrderAssigneeGrantIntegrationTest {
 
     as(get(ORDERS + orderId), assigneeId, "ROLE_KRT_MEMBER")
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.redacted").value(false))
+        .andExpect(jsonPath("$.redacted").doesNotExist())
         .andExpect(jsonPath("$.canEdit").value(false));
     as(get(ORDERS + orderId), unitMateId, "ROLE_KRT_MEMBER").andExpect(status().isForbidden());
     assertThat(lastAuditEventType()).isEqualTo(AuditEventType.JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED);
@@ -154,7 +167,7 @@ class JobOrderAssigneeGrantIntegrationTest {
     as(
             put(ORDERS + orderId + "/status")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"IN_PROGRESS\",\"version\":" + orderVersion() + "}"),
+                .content("{\"status\":\"IN_PROGRESS\",\"version\":" + lifecycleVersion() + "}"),
             assigneeId,
             "ROLE_LOGISTICIAN")
         .andExpect(status().isForbidden());
@@ -188,7 +201,7 @@ class JobOrderAssigneeGrantIntegrationTest {
     as(
             put(ORDERS + orderId + "/status")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"COMPLETED\",\"version\":" + orderVersion() + "}"),
+                .content("{\"status\":\"COMPLETED\",\"version\":" + lifecycleVersion() + "}"),
             adminId,
             "ROLE_ADMIN")
         .andExpect(status().isOk());
@@ -322,7 +335,7 @@ class JobOrderAssigneeGrantIntegrationTest {
   }
 
   @Test
-  void aLogisticianOfAnotherUnitWhoIsAMemberOfTheOrdersUnitMayNotAssignOthers() throws Exception {
+  void aLogisticianOfAnotherUnitCannotEnrollAnyoneIncludingThemselves() throws Exception {
     GrantedAuthority logisticianOfB = new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitBId);
 
     as(post(ORDERS + orderId + "/assignees/" + unitMateId), unitAMemberId, logisticianOfB)
@@ -330,7 +343,7 @@ class JobOrderAssigneeGrantIntegrationTest {
     as(get(ORDERS + orderId + "/assignee-candidates"), unitAMemberId, logisticianOfB)
         .andExpect(status().isForbidden());
     as(post(ORDERS + orderId + "/assignees/" + unitAMemberId), unitAMemberId, logisticianOfB)
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
   }
 
   @Test
@@ -340,6 +353,70 @@ class JobOrderAssigneeGrantIntegrationTest {
             unitAMemberId,
             new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitAId))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  @Transactional
+  void aCurrentWriterOfAnotherUnitCannotReorderTheTargetEvenAsItsMember() throws Exception {
+    JobOrder target = jobOrderRepository.findById(orderId).orElseThrow();
+    target.setPriority(2);
+    jobOrderRepository.saveAndFlush(target);
+    JsonNode before = orderAsAdmin(orderId);
+
+    as(
+            put(ORDERS + orderId + "/priority").param("priority", "1"),
+            unitAMemberId,
+            new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitBId))
+        .andExpect(status().isForbidden());
+
+    assertThat(orderAsAdmin(orderId)).isEqualTo(before);
+  }
+
+  @Test
+  @Transactional
+  void reorderingAValidTargetPreservesAnInvalidNeighborsPriorityAndVersion() throws Exception {
+    Squadron invalidUnit = squadronRepository.findById(unitBId).orElseThrow();
+    hierarchy.setParent(
+        unitBId, persistedProfitArea(orgUnitRepository).getId(), invalidUnit.getVersion());
+    JobOrder invalidNeighbor = prioritizedOrder(invalidUnit, 2);
+    JobOrder target = jobOrderRepository.findById(orderId).orElseThrow();
+    target.setPriority(3);
+    jobOrderRepository.saveAndFlush(target);
+    JobOrder validNeighbor = prioritizedOrder(target.getResponsibleOrgUnit(), 1);
+    hierarchy.setParent(unitBId, null, invalidUnit.getVersion());
+    JsonNode invalidBefore = orderAsAdmin(invalidNeighbor.getId());
+    assertThat(invalidBefore.get("responsibilityInvalid").asBoolean()).isTrue();
+    assertThat(invalidBefore.get("priority").asInt()).isEqualTo(2);
+
+    as(
+            put(ORDERS + orderId + "/priority").param("priority", "1"),
+            unitAMemberId,
+            new OrgUnitContextualAuthority(Roles.LOGISTICIAN, unitAId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.priority").value(1));
+
+    assertThat(orderAsAdmin(invalidNeighbor.getId())).isEqualTo(invalidBefore);
+    assertThat(orderAsAdmin(validNeighbor.getId()).get("priority").asInt()).isGreaterThan(1);
+  }
+
+  private JobOrder prioritizedOrder(OrgUnit unit, int priority) {
+    return jobOrderRepository.saveAndFlush(
+        JobOrder.builder()
+            .responsibleOrgUnit(unit)
+            .requestingOrgUnit(unit)
+            .handle("priority-test")
+            .status(JobOrderStatus.OPEN)
+            .priority(priority)
+            .build());
+  }
+
+  private JsonNode orderAsAdmin(UUID id) throws Exception {
+    return json.readTree(
+        as(get(ORDERS + id), adminId, "ROLE_ADMIN")
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
   }
 
   private ResultActions as(MockHttpServletRequestBuilder request, UUID userId, String role)
@@ -362,6 +439,10 @@ class JobOrderAssigneeGrantIntegrationTest {
             .accept(MediaType.APPLICATION_JSON));
   }
 
+  private long lifecycleVersion() {
+    return jobOrderRepository.findById(orderId).orElseThrow().getLifecycleVersion();
+  }
+
   private long orderVersion() {
     return jobOrderRepository.findById(orderId).orElseThrow().getVersion();
   }
@@ -376,11 +457,13 @@ class JobOrderAssigneeGrantIntegrationTest {
                 orderId));
   }
 
-  private Squadron newSquadron(String name, String shorthand, boolean profitEligible) {
+  private Squadron newSquadron(String name, String shorthand, boolean insideProfit) {
     Squadron s = new Squadron();
     s.setName(name);
     s.setShorthand(shorthand);
-    s.setProfitEligible(profitEligible);
+    if (insideProfit) {
+      withinProfit(s, persistedProfitArea(orgUnitRepository));
+    }
     return squadronRepository.save(s);
   }
 

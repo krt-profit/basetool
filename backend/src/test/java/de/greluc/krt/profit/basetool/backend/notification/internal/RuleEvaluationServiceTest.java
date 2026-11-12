@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleSe
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.SelectorKind;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.math.BigDecimal;
 import java.util.List;
@@ -72,7 +73,8 @@ class RuleEvaluationServiceTest {
         "ALP",
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
         "MATERIAL",
-        actorSub);
+        actorSub,
+        new NotificationRevision(0, 0));
   }
 
   private static NotificationRule ruleWithOfficerAndAdmin(boolean excludeActor) {
@@ -333,7 +335,8 @@ class RuleEvaluationServiceTest {
             "ALP",
             null,
             "MATERIAL",
-            ACTOR);
+            ACTOR,
+            new NotificationRevision(0, 0));
     NotificationRule rule =
         jobOrderRule(
             NotificationType.JOB_ORDER_CREATED,

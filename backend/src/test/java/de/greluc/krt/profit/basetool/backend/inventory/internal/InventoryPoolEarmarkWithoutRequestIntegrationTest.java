@@ -22,23 +22,26 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCaller;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeJournalAction;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeJournalService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkChange;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkDimension;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocation;
-import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolEntryState;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolEntryChange;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolOutcome;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRestore;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRestoreResult;
-import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockLotWritePlans;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,6 +82,8 @@ class InventoryPoolEarmarkWithoutRequestIntegrationTest {
   private static final double EARMARKED = 4.0;
 
   @Autowired private PoolEntryCommands poolEntryCommands;
+  @Autowired private StockLotWritePlans lotPlans;
+  @Autowired private ExchangeJournalService journal;
   @Autowired private AuthHelperService authHelperService;
   @Autowired private TransactionTemplate transactionTemplate;
   @Autowired private UserRepository userRepository;
@@ -122,6 +128,7 @@ class InventoryPoolEarmarkWithoutRequestIntegrationTest {
   void tearDown() {
     entries.forEach(id -> jdbc.update("DELETE FROM audit_event WHERE subject_id = ?", id));
     for (UUID id : users) {
+      jdbc.update("DELETE FROM exchange_journal WHERE user_id = ?", id);
       jdbc.update("DELETE FROM notification WHERE recipient_user_id = ?", id);
       jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", id);
       jdbc.update("DELETE FROM org_unit_membership WHERE user_id = ?", id);
@@ -136,16 +143,25 @@ class InventoryPoolEarmarkWithoutRequestIntegrationTest {
   @Test
   void anAdminsUndoSetsBackAnEarmarkOnAnInternalMissionOfThePool() throws Exception {
     UUID mission = internalMission(pool, "Secret-Op-" + UUID.randomUUID());
-    UUID entry = stock(6);
-    PoolEntryState asLeft = state(entry, 6, Map.of());
-    PoolEntryState before = state(entry, 10, Map.of(mission, EARMARKED));
+    UUID entry = stock(10);
+    PoolEntryChange added = earmark(entry, 0, EarmarkChange.ADD, mission, EARMARKED);
+    PoolEntryChange removed =
+        earmark(
+            entry, Objects.requireNonNull(added.after()).version(), EarmarkChange.REMOVE, mission, null);
+    StockLotWritePlans.EntryRestore undo =
+        new StockLotWritePlans.EntryRestore(
+            0, journaled(entry, removed), new PoolRestore(entry, removed.after(), removed.before()));
 
     List<PoolRestoreResult> results =
         withoutRequest(
             caller(admin, Roles.ADMIN),
-            () ->
-                poolEntryCommands.restore(
-                    Map.of(), List.of(new PoolRestore(entry, asLeft, before))));
+            () -> {
+              var prepared =
+                  lotPlans.prepareLotBatch(
+                      writer, List.of(), List.of(undo), List.of(undo), List.of());
+              var confirmed = lotPlans.confirmLotBatch(prepared, List.of(undo), List.of(), false);
+              return lotPlans.executePreparedEntryRestores(confirmed);
+            });
 
     assertThat(results).containsExactly(PoolRestoreResult.RESTORED);
     assertThat(amountOf(entry)).isEqualTo(10);
@@ -235,24 +251,65 @@ class InventoryPoolEarmarkWithoutRequestIntegrationTest {
   }
 
   /**
-   * Builds a journaled state of a seeded entry of the holder in the pool.
+   * Writes a mission earmark on an entry as the pool's Logistician, as a connected application of
+   * theirs writes it, in a committed transaction of its own.
    *
    * @param entry the entry
-   * @param amount its amount
-   * @param missionEarmarks its mission earmarks by mission
-   * @return the state at version 0, without job-order earmarks
+   * @param version the entry's version the write names
+   * @param change whether the earmark is added or removed
+   * @param mission the mission
+   * @param amount the earmarked amount, or {@code null} for a removal
+   * @return the entry's change
+   * @throws Exception when the write fails or does not end in time
    */
-  private @NotNull PoolEntryState state(
-      @NotNull UUID entry, double amount, @NotNull Map<UUID, Double> missionEarmarks) {
-    return new PoolEntryState(
-        entry,
-        holder,
-        pool,
-        StockLot.key(material, null, location, QUALITY, false),
-        amount,
-        0,
-        Map.of(),
-        missionEarmarks);
+  private @NotNull PoolEntryChange earmark(
+      @NotNull UUID entry,
+      long version,
+      @NotNull EarmarkChange change,
+      @NotNull UUID mission,
+      @Nullable Double amount)
+      throws Exception {
+    PoolOutcome outcome =
+        withoutRequest(
+            caller(writer, Roles.KRT_MEMBER),
+            () ->
+                poolEntryCommands.allocate(
+                    new PoolAllocation(
+                        entry,
+                        pool,
+                        version,
+                        change,
+                        EarmarkDimension.MISSION,
+                        mission,
+                        amount,
+                        amount == null ? null : QuantityType.SCU.name()),
+                    false));
+    assertThat(outcome.refusal()).isNull();
+    return outcome.changes().getFirst();
+  }
+
+  /**
+   * Journals the Logistician's earmark removal as their connected application's write, the entry a
+   * bulk undo names.
+   *
+   * @param entry the entry
+   * @param removal the removal's change
+   * @return the journal entry's id
+   */
+  private @NotNull UUID journaled(@NotNull UUID entry, @NotNull PoolEntryChange removal) {
+    return Objects.requireNonNull(
+        transactionTemplate.execute(
+            _ ->
+                journal
+                    .record(
+                        new ExchangeCaller(writer, "pool-earmark", "pool-earmark-installation"),
+                        UUID.randomUUID(),
+                        ExchangeJournalAction.ORG_STOCK_EARMARK_REMOVE,
+                        entry.toString(),
+                        false,
+                        removal.before(),
+                        removal.after())
+                    .getId()));
   }
 
   /**

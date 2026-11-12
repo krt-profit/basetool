@@ -265,11 +265,11 @@ public class AccessGateService {
    * Access check for a personal row without an owning org unit: allowed for an admin without an
    * active pin and for the row's own owner.
    *
-   * @param owner the row's per-user owner; {@code null} denies all non-admin access
+   * @param ownerId the row's per-user owner; {@code null} denies all non-admin access
    * @return {@code true} iff the caller may see or edit the row
    */
-  private boolean canAccessOwnerlessPersonalRow(@Nullable User owner) {
-    return isAdminWithoutPin() || isCurrentUserOwner(owner);
+  private boolean canAccessOwnerlessPersonalRow(@Nullable UUID ownerId) {
+    return isAdminWithoutPin() || isCurrentUserOwner(ownerId);
   }
 
   /**
@@ -286,15 +286,13 @@ public class AccessGateService {
 
   /**
    * Checks whether the caller is the row's per-user owner, comparing {@link
-   * AuthHelperService#currentUserId()} with {@code owner.getId()}.
+   * AuthHelperService#currentUserId()} with the actual owner identity.
    *
-   * @param owner the row's per-user owner; {@code null} never matches
+   * @param ownerId the row's per-user owner; {@code null} never matches
    * @return {@code true} iff the caller is that owner
    */
-  private boolean isCurrentUserOwner(@Nullable User owner) {
-    return owner != null
-        && owner.getId() != null
-        && authHelper.currentUserId().map(uid -> uid.equals(owner.getId())).orElse(false);
+  private boolean isCurrentUserOwner(@Nullable UUID ownerId) {
+    return ownerId != null && authHelper.currentUserId().map(ownerId::equals).orElse(false);
   }
 
   /**
@@ -308,10 +306,8 @@ public class AccessGateService {
    * @return {@code true} iff the caller may access the row
    */
   public boolean permitsOwnedRow(@Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit) {
-    return isCurrentUserOwner(owner)
-        || (orgUnit == null
-            ? canAccessOwnerlessPersonalRow(owner)
-            : (edit ? canEditSquadron(orgUnit.getId()) : canSeeSquadron(orgUnit.getId())));
+    return permitsOwnedIdentity(
+        owner == null ? null : owner.getId(), orgUnit == null ? null : orgUnit.getId(), edit);
   }
 
   /**
@@ -327,7 +323,41 @@ public class AccessGateService {
    */
   public boolean permitsOwnedRow(
       @Nullable User owner, @Nullable OrgUnit orgUnit, boolean edit, @NotNull String roleName) {
-    return permitsOwnedRow(owner, orgUnit, edit)
-        || (orgUnit != null && holdsCoveringGrant(orgUnit.getId(), roleName));
+    return permitsOwnedIdentity(
+        owner == null ? null : owner.getId(),
+        orgUnit == null ? null : orgUnit.getId(),
+        edit,
+        roleName);
+  }
+
+  /**
+   * Checks the owner escape and ordinary org-unit scope using current scalar row identities.
+   *
+   * @param ownerId the current per-user owner, or null
+   * @param orgUnitId the current owning unit, or null for ownerless stock
+   * @param edit whether the caller needs write access
+   * @return whether the actual identity is permitted in the current scope
+   */
+  public boolean permitsOwnedIdentity(
+      @Nullable UUID ownerId, @Nullable UUID orgUnitId, boolean edit) {
+    return isCurrentUserOwner(ownerId)
+        || (orgUnitId == null
+            ? canAccessOwnerlessPersonalRow(ownerId)
+            : (edit ? canEditSquadron(orgUnitId) : canSeeSquadron(orgUnitId)));
+  }
+
+  /**
+   * Widens the current scalar identity scope by its contextual role grant.
+   *
+   * @param ownerId the current per-user owner, or null
+   * @param orgUnitId the current owning unit, or null for ownerless stock
+   * @param edit whether the caller needs write access
+   * @param roleName the contextual role of the owning surface
+   * @return whether the current owner scope or role grant permits access
+   */
+  public boolean permitsOwnedIdentity(
+      @Nullable UUID ownerId, @Nullable UUID orgUnitId, boolean edit, @NotNull String roleName) {
+    return permitsOwnedIdentity(ownerId, orgUnitId, edit)
+        || (orgUnitId != null && holdsCoveringGrant(orgUnitId, roleName));
   }
 }

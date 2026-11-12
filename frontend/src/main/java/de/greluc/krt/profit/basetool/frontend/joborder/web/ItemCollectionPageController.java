@@ -88,6 +88,8 @@ public class ItemCollectionPageController {
       log.warn("Could not load locations: {}", e.getMessage());
     }
 
+    var order = jobOrderClient.order(jobOrderId);
+    model.addAttribute("responsibilityInvalid", order == null || order.responsibilityInvalid());
     model.addAttribute("jobOrderId", jobOrderId);
     List<ItemCollectionGroup> itemGroups =
         ItemCollectionGroup.of(itemStock == null ? List.of() : itemStock);

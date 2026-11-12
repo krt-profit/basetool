@@ -55,6 +55,9 @@ public enum LiveSyncTopicClass {
   /** A job-order detail page, keyed by the order identity. */
   ORDER("order", true, "order_detail"),
 
+  /** The shared order queue and cross-order demand views. */
+  ORDERS_QUEUE("orders", false, "orders_queue"),
+
   /** Shared supply needs, personal donations and aggregate statistics. */
   SUPPLY_NEEDS("supply-needs", false, "supply_needs"),
 
@@ -160,6 +163,8 @@ public enum LiveSyncTopicClass {
       case ORDER ->
           Set.of(
               "header",
+              "actions",
+              "dialogs",
               "kpi",
               "materials",
               "aggregated",
@@ -169,7 +174,10 @@ public enum LiveSyncTopicClass {
               "item-handovers",
               "item-handover-lines",
               "blueprint-owners",
-              "assignees");
+              "assignees",
+              "participations",
+              "money");
+      case ORDERS_QUEUE -> Set.of("queue", "demand");
       case SUPPLY_NEEDS -> Set.of("needs", "mine", "stats");
       case SUPPLY_DONATIONS -> Set.of("donations");
       case PURCHASING_DEALS -> Set.of("deals");

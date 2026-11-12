@@ -24,12 +24,15 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.MaterialDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.AssigneeNoteRequest;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimBucketDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.ClaimDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateClaimDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.HandoverReportPreviewRequestDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeCandidateDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverCreateDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
@@ -41,13 +44,16 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemProduct
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockGroupDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderNumberHitDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSettingsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderSupportDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.LinkedStockAttributionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionEntryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialDemandSummaryDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.OrderListScope;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignResponsibleOrgUnitRequest;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderBlueprintCountingDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderStatusDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.WriteMoneyCommitmentDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
@@ -125,8 +131,101 @@ public class JobOrderBackendClient {
   private static final ParameterizedTypeReference<List<JobOrderNumberHitDto>> LIST_OF_NUMBER_HIT =
       new ParameterizedTypeReference<>() {};
 
+  /** Current promise buckets used by the ordinary Inventory provision picker. */
+  private static final ParameterizedTypeReference<List<ClaimBucketDto>> LIST_OF_CLAIM_BUCKET =
+      new ParameterizedTypeReference<>() {};
+
+  /**
+   * Reads current open promise buckets for a concrete readable order.
+   *
+   * @param id the order
+   * @return current buckets, or null when no response body was sent
+   */
+  @Nullable
+  public List<ClaimBucketDto> claimBuckets(@NotNull UUID id) {
+    return backendApiClient.get("/api/v1/orders/{id}/claims", LIST_OF_CLAIM_BUCKET, id);
+  }
+
   /** Sends every call through the one filter chain and error mapping. */
   private final BackendApiClient backendApiClient;
+
+  /**
+   * Reads current creation capability and the permitted choices of both unit sides.
+   *
+   * @return the backend projection, absent when its body is empty
+   */
+  public @Nullable JobOrderCreateOptionsDto createOptions() {
+    return backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class);
+  }
+
+  /**
+   * Transfers responsibility to a currently eligible unit, including invalid-order recovery.
+   *
+   * @param id the order
+   * @param request the target unit
+   * @return the updated order, or null when no response body was sent
+   */
+  @Nullable
+  public JobOrderDto transferResponsibility(
+      @NotNull UUID id, @NotNull ReassignResponsibleOrgUnitRequest request) {
+    return backendApiClient.patch(
+        "/api/v1/orders/{id}/responsible-org-unit", request, JobOrderDto.class, id);
+  }
+
+  /**
+   * Reads visible Staffel participation and authorized enrollment choices.
+   *
+   * @param id the readable order
+   * @return the support projection, or null when the backend sends no body
+   */
+  @Nullable
+  public JobOrderSupportDto support(@NotNull UUID id) {
+    return backendApiClient.get("/api/v1/orders/{id}/participations", JobOrderSupportDto.class, id);
+  }
+
+  /**
+   * Enrolls a Staffel as a supporter of an order.
+   *
+   * @param id the order receiving support
+   * @param unitId the eligible Staffel
+   */
+  public void enrollSupport(@NotNull UUID id, @NotNull UUID unitId) {
+    backendApiClient.put(
+        "/api/v1/orders/{id}/participations/{unitId}", null, Void.class, id, unitId);
+  }
+
+  /**
+   * Records or revises a unit's outstanding aUEC commitment.
+   *
+   * @param id the order receiving the contribution
+   * @param unitId the contributing unit
+   * @param input the amount and observed commitment occurrence
+   */
+  public void putMoneyCommitment(
+      @NotNull UUID id, @NotNull UUID unitId, @NotNull WriteMoneyCommitmentDto input) {
+    backendApiClient.put(
+        "/api/v1/orders/{id}/participations/{unitId}/money-commitment",
+        input,
+        Void.class,
+        id,
+        unitId);
+  }
+
+  /**
+   * Ends a Staffel's participation and open promises at the observed version.
+   *
+   * @param id the supported order
+   * @param unitId the supporting Staffel
+   * @param version the observed participation version
+   */
+  public void withdrawSupport(@NotNull UUID id, @NotNull UUID unitId, @Nullable Long version) {
+    backendApiClient.delete(
+        "/api/v1/orders/{id}/participations/{unitId}?version={version}",
+        Void.class,
+        id,
+        unitId,
+        version);
+  }
 
   /**
    * Reads one page of the order list, sorted by priority.
@@ -136,6 +235,7 @@ public class JobOrderBackendClient {
    * @param size the page size
    * @param statuses the status filter, never empty
    * @param squadronIds the squadron filter, empty for all squadrons
+   * @param types implemented kinds, empty for all
    * @return the page, or {@code null} when the backend sent no body
    */
   @Nullable
@@ -144,8 +244,9 @@ public class JobOrderBackendClient {
       int page,
       int size,
       @NotNull List<String> statuses,
-      @NotNull List<UUID> squadronIds) {
-    return readOrders(scope, page, size, statuses, squadronIds, null);
+      @NotNull List<UUID> squadronIds,
+      @NotNull List<String> types) {
+    return readOrders(scope, page, size, statuses, squadronIds, null, types);
   }
 
   /**
@@ -159,7 +260,8 @@ public class JobOrderBackendClient {
   @Nullable
   public PageResponse<JobOrderDto> ordersToProcess(
       @Nullable UUID orgUnitId, int size, @NotNull List<String> statuses) {
-    return readOrders(OrderListScope.TO_PROCESS, 0, size, statuses, List.of(), orgUnitId);
+    return readOrders(
+        OrderListScope.TO_PROCESS, 0, size, statuses, List.of(), orgUnitId, List.of());
   }
 
   @Nullable
@@ -169,7 +271,8 @@ public class JobOrderBackendClient {
       int size,
       @NotNull List<String> statuses,
       @NotNull List<UUID> squadronIds,
-      @Nullable UUID orgUnitId) {
+      @Nullable UUID orgUnitId,
+      @NotNull List<String> types) {
     StringBuilder uri =
         new StringBuilder(
                 scope == OrderListScope.MINE ? "/api/v1/orders/requested" : "/api/v1/orders")
@@ -196,6 +299,10 @@ public class JobOrderBackendClient {
         uriVariables.add(sid);
       }
     }
+    for (String kind : types) {
+      uri.append("&type={type}");
+      uriVariables.add(kind);
+    }
     if (orgUnitId != null) {
       uri.append("&orgUnitId={orgUnitId}");
       uriVariables.add(orgUnitId);
@@ -214,7 +321,7 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Reads one job order, redacted by the backend for a requester-only caller.
+   * Reads one complete permitted job order.
    *
    * @param id the order
    * @return the order, or {@code null} when the backend sent no body
@@ -394,7 +501,7 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Reads the cached active Staffeln and Spezialkommandos with their profit-eligibility flag.
+   * Reads the cached active Staffeln and Spezialkommandos for the requesting picker.
    *
    * @return the options, or {@code null} when the backend sent no body
    */
@@ -405,7 +512,7 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Reads the cached active org units of all four kinds with their profit-eligibility flag.
+   * Reads the cached active org units of all four kinds for the requesting picker.
    *
    * @return the options, or {@code null} when the backend sent no body
    */
@@ -503,6 +610,19 @@ public class JobOrderBackendClient {
   }
 
   /**
+   * Updates the requesting unit's item need and comment.
+   *
+   * @param id the order
+   * @param dto the item lines, comment and observed need version
+   * @return the updated order, or null when the backend sends no body
+   */
+  @Nullable
+  public JobOrderDto updateItemOrderAsRequester(
+      @NotNull UUID id, @NotNull CreateJobOrderItemRequestDto dto) {
+    return backendApiClient.put("/api/v1/orders/{id}/items/requested", dto, JobOrderDto.class, id);
+  }
+
+  /**
    * Creates a material order.
    *
    * @param dto the order with its materials
@@ -511,6 +631,17 @@ public class JobOrderBackendClient {
   @Nullable
   public JobOrderDto createOrder(@NotNull CreateJobOrderDto dto) {
     return backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class);
+  }
+
+  /**
+   * Creates an aUEC order with its exact net target.
+   *
+   * @param dto the shared creation fields and target
+   * @return the created order, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public JobOrderDto createAuecOrder(@NotNull CreateAuecJobOrderDto dto) {
+    return backendApiClient.post("/api/v1/orders/auec", dto, JobOrderDto.class);
   }
 
   /**
@@ -530,7 +661,7 @@ public class JobOrderBackendClient {
    *
    * @param id the order
    * @param dto the comment, materials and the version it replaces
-   * @return the updated redacted order, or {@code null} when the backend sent no body
+   * @return the complete updated order, or {@code null} when the backend sent no body
    */
   @Nullable
   public JobOrderDto updateOrderAsRequester(@NotNull UUID id, @NotNull CreateJobOrderDto dto) {
@@ -577,6 +708,18 @@ public class JobOrderBackendClient {
   }
 
   /**
+   * Reads the squadrons whose claims the caller may manage on this order.
+   *
+   * @param id the order
+   * @return the permitted claiming squadrons, or null when no response body was sent
+   */
+  @Nullable
+  public List<OrgUnitMembershipOptionDto> claimingOptions(@NotNull UUID id) {
+    return backendApiClient.get(
+        "/api/v1/orders/{id}/claims/claiming-options", LIST_OF_ORG_UNIT_MEMBERSHIP_OPTION, id);
+  }
+
+  /**
    * Creates or updates a material claim on an order.
    *
    * @param id the order
@@ -589,13 +732,15 @@ public class JobOrderBackendClient {
   }
 
   /**
-   * Withdraws a material claim.
+   * Withdraws a versioned material promise while retaining its contribution history.
    *
    * @param id the order
    * @param claimId the claim
+   * @param version the observed contribution version; absence relays the backend conflict
    */
-  public void withdrawClaim(@NotNull UUID id, @NotNull UUID claimId) {
-    backendApiClient.delete("/api/v1/orders/{id}/claims/{claimId}", Void.class, id, claimId);
+  public void withdrawClaim(@NotNull UUID id, @NotNull UUID claimId, @Nullable Long version) {
+    backendApiClient.delete(
+        "/api/v1/orders/{id}/claims/{claimId}?version={version}", Void.class, id, claimId, version);
   }
 
   /**

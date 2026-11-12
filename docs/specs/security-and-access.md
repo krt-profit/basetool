@@ -127,6 +127,15 @@ every frontend `@PreAuthorize` with a literal role are migrated the same way.
 
 ### REQ-SEC-074 — Who may call an operation is pinned in one reviewed file
 
+> **JobOrder command scope:** The authorization matrix covers the Bank-free settlement, correction,
+> identity maintenance and recovery endpoints. Their service gates use the current order scope.
+> Both orders must have valid responsibility and the actor must hold current authority on each
+> side of a paired movement or correction. Outcome recovery checks current readership. See
+> [shared order rules](orders-core.md), [aUEC orders](orders-auec.md) and the planned
+> [Bank integration contract](orders-auec-bank.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 The gate of a backend operation can live in a `SecurityConfig` URL rule, a controller
 `@PreAuthorize` and a service `@PreAuthorize`; a move or re-cut can drop any of them while every
 other test stays green. The **authorization matrix**
@@ -623,6 +632,10 @@ no longer limited to a caller who may manage the mission.
 > the exemptions the rule keeps.
 
 ### REQ-SEC-009 — The member surface
+
+> **Approved planned JobOrder amendment (not implemented):** The approved shared JobOrder access replacement is [the approved shared JobOrder contract](orders-core.md): actual active Profit hierarchy, direct Profit-Bereich responsibility, full relevant order reads for the agreed unit/personal audiences, and contextual unit writers. Remove the independent Staffel/SK flag and requester redaction/freeze only in that planned scope. Invalid responsibility permits reading/transfer only; personal read relationships do not grant general writes, unrelated inventory, blueprint ownership, private bank data or Admin audit.
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 Every caller of the tool is a **member**. There is no cohort below that: an anonymous caller reaches
 only the paths REQ-SEC-052 enumerates, and an authenticated token that maps to no application role is
@@ -3561,6 +3574,14 @@ unbounded and PII (REQ-OBS-011). The `UserCallsignCollision` alert is the second
 
 ### REQ-SEC-046 — Merging two accounts of one member is an admin decision, and it moves belongings only
 
+> **JobOrder account merge:** The job-order participant carries the current holder and recipient links
+> to the surviving account. When both accounts have a holder on the same order, the source becomes
+> an alias of the survivor. Recorded actors, original financial references and both effective
+> amounts remain in the history. A separate linked financial correction resolves double-reported
+> money. See [aUEC orders](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 A login whose subject matches no row must never adopt an account found by callsign (ADR-0142
 point 5, #1639). Removing that silent inheritance is right — but the outcome it produced was not
 always *wrong*, only unsafe because nobody chose it. Left without a remedy, a member who ends up
@@ -3695,10 +3716,11 @@ client did exactly that and hid the Lager write actions, the Auftrag write actio
 Operation's payout confirmation from admins and officers the server would have permitted — a
 defect no server test could see, because the server was answering correctly the whole time.
 
-**A row flag carries the endpoint's whole rule, not half of it.** `JobOrderController`'s writes gate
-on `hasRole('LOGISTICIAN') and canEditJobOrder(#id)`; a flag built on the scope half alone would
-offer editing to a plain member whose own Staffel owns the order, which the endpoint refuses.
-`StockViewerAccess#mayEditJobOrder` therefore answers with both halves.
+**A row flag carries the endpoint's whole rule.** `JobOrderAuthority` computes each order's edit,
+requester-edit and responsibility-transfer flags from the current contextual writer authority and
+actual Profit hierarchy. An invalid responsibility disables ordinary edits while preserving a valid
+transfer by the current responsible writer. `JobOrderMapper` reads that batch-capable leaf interface;
+`InventoryItemMapper` reads `StockViewerAccess#mayEditInventoryItem` for inventory rows.
 
 > [!note] Amended 2026-10-04 — the Lager row flag answers both gates too
 > `InventoryItemDto.canEdit` was built on `canEditInventoryItem` alone, the scope half: a plain
@@ -3711,18 +3733,18 @@ offer editing to a plain member whose own Staffel owns the order, which the endp
 > row's owner or `isLogisticianOrAbove()`. The web read the flag only where both already held, so it
 > renders unchanged.
 
-**The mapper reaches the gate through a leaf interface** (`StockViewerAccess` in `mapper`,
-implemented by the Lager's `inventory.internal.StockViewerAccessService`; in `inventory.api` until P4-1 and in `support` until P1-9 split that package on 2026-10-04), for the ADR-0047 reason `MissionViewerAccess` already exists: a
-`mapper → service` edge would close a package cycle, and mappers may touch neither
-`SecurityContextHolder` (ArchUnit `mapperLayerShouldNotReachIntoSecurityContext`) nor the service
-layer directly.
+**Mappers reach the gate through domain-owned leaf interfaces:** `JobOrderAuthority` in
+`joborder.api`, `StockViewerAccess` in `inventory.api` and `MissionViewerAccess` for missions. Their
+owning access policies compute the flags without a mapper reaching the service layer or
+`SecurityContextHolder` (ArchUnit `mapperLayerShouldNotReachIntoSecurityContext`). Order list
+projections resolve authority in a batch.
 
 **Acceptance**
 
 - [x] The three capability flags resolve through the hierarchy, so an admin reads `true` for all
   three and an officer for the first two (`MeControllerTest`).
-- [x] The job-order row flag is false for a caller who passes the scope check but holds no
-  Logistician-or-above role.
+- [x] The job-order row flag is false without the current contextual writer authority or with invalid
+  responsibility; the separate transfer flag permits authorised recovery.
 - [x] The Lager row flag is false for a caller who passes the scope check on another member's row
   but holds no Logistician-or-above role, and true for that row's owner and for a Logistician in
   scope.
@@ -3731,7 +3753,7 @@ layer directly.
 
 **Enforced by:** `MeControllerTest`, `StockViewerAccessServiceTest`, `InventoryItemMapperTest` ·
 **Code:** `MeController`, `StockViewerAccess`, `StockViewerAccessService`,
-`EarmarkTargetPolicy#mayEditJobOrderEarmarks` (implemented by `JobOrderAccessPolicy`),
+`JobOrderAuthority` (implemented by `JobOrderAccessPolicy`),
 `InventoryAccessPolicy#canEditInventoryItem`, `InventoryItemMapper`,
 `JobOrderMapper` · **Related:** REQ-SEC-046, ADR-0047
 
@@ -4806,6 +4828,13 @@ Preparing third-party name scrubbing reads only user identifiers and the four su
 `HandleSpellings` name columns through an identity projection. It does not load complete user
 entities; the subject's protected spellings and all third-party redaction remain identical.
 
+The aUEC export includes the subject's holder links and related identity history, directly related
+money operations and corrections, requester designations and recorded target amendments. A corrected
+payee is associated with their payment. The wrongly selected account can receive its own identity
+record without receiving the payment through that link. The [aUEC contract](orders-auec.md) owns
+participant-visible history.
+The [planned Bank coupling](orders-auec-bank.md) owns later Bank access rules.
+
 Every member MUST be able to export their own data from the application, and an admin MUST be able
 to export another account's for a request from somebody who cannot sign in.
 
@@ -4872,6 +4901,23 @@ read it as it stands; it is the same document as the compact serialisation.
 > from rows it reduces to counts, because a `COUNT(*)` variant per section would double the
 > statement registry, put the PDF's counts on a different query and moment from the JSON's, and
 > hand the two export coverage gates statements they do not check.
+
+The `materialClaims` section selects only contributions directly linked by
+`claimed_by_user_id`. It includes stored promise and credited amounts, ordered contribution changes
+and directly linked receipt facts: receipt identity, credited amount, quantity evidence, creation
+instant, verified quality floor and retained original/corrected declarations. The physical total
+appears only when fully observed. Exact original supplied quality appears only when explicitly
+known, independently of quantity evidence: a declared quality correction can make quality known
+while a legacy total and composition remain unknown. A credited lower bound never claims an
+observed physical total. Missing older declarations remain missing; corrections retain their
+actual before/after quantity scope, quality knowledge and explicit unit attribution.
+Receipts are matched by both order and contribution identity. The projection does not read current
+private stock, disclose source rows or physical provenance, or infer a person from unit membership,
+ownership or recorded names. Explicit order deletion removes its claim rows and their personal
+association; independent once-only physical evidence contains no person identifier and is not
+exported as a personal performance history. Existing deletion and retention rules remain unchanged.
+`DataExportMaterialClaimSectionIntegrationTest` covers active and ended facts, corrections,
+independent quality/quantity evidence, foreign-record exclusion and removal of the personal link.
 
 **What the sections cover beyond the core tables.** The account section lists the optional RSI
 handle, and as a name spelling it is scrubbed from other members' free text (REQ-SEC-072); the
@@ -5251,6 +5297,12 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 
 ### REQ-SEC-060 — Admin Personensuche across every free-text surface
 
+> **JobOrder money names:** The job-order search participant registers holder and recipient labels,
+> submitted accountless names and holder identity history. Exact account selection uses a separately
+> authorised picker. Personensuche remains an administrator action. See [aUEC orders](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 An admin MUST be able to find **every** place a given name appears, case-insensitively, across every
 free-text surface of the application.
 
@@ -5475,12 +5527,18 @@ from a statute rather than from operational taste.
 
 ### REQ-SEC-062 — A granted Art. 17 request anonymises the surviving handle snapshots
 
+> **JobOrder money history:** The job-order participant anonymises surviving monetary name snapshots
+> under this contract. Account deletion clears active links and retained account references. The
+> order keeps operation IDs and amounts for the effective balance. Activity audit has its own
+> retention policy. See [aUEC orders](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 When an admin grants the member's wish, the member's handle MUST be replaced by a sentinel in
 **every** place a handle snapshot survives an account deletion. Rows are **not** removed and no fact
 about what happened is altered — only the name goes.
 
-**Twelve columns in eight statements**, and the reason it is all of them: erasing eleven reads as a
-completed erasure while still naming the person on the twelfth. The union of
+**Registered snapshot columns.** The union of
 `HandleAnonymisationParticipant#columns()` over the registered participants is the authoritative
 list; `HandleAnonymisationCoverageTest` holds it equal to the `ANONYMISED` dispositions of
 `HandleErasureCoverage` and to the live schema.
@@ -5504,6 +5562,9 @@ tables.
 | `job_order.handle`                                                        | **the whole text, case-insensitively** — no id beside it    |
 | `job_order_handover.recipient_handle`                                     | likewise                                                    |
 | `job_order_item_handover.recipient_handle`                                | likewise                                                    |
+| `job_order_money_holder.accountless_name` and `job_order_money_recipient.accountless_name` | attributed account or whole spelling, according to the record |
+| `job_order_money_holder_change.previous_name` and `name` | attributed account or whole spelling, according to the record |
+| `job_order_money_operation.selected_accountless_name` | attributed holder or whole spelling, according to the recorded purpose |
 
 **Every statement is a whole-value comparison or an id match — never a substring rewrite.** Three
 substring `REPLACE` statements over `audit_event.details`, `bank_audit_event.details` and
@@ -5514,7 +5575,7 @@ irreversibly rewrite the amount annotation on the whole financial trail. A name 
 payloads is now an admin's manual step, found through the Personensuche (REQ-SEC-060) and classified
 as such in `HandleErasureCoverage`.
 
-**The text-matched columns have no user id at all**: a handover recipient or a job-order contact is
+**Some snapshots have no account reference.** A handover recipient or a job-order contact is
 typed in by hand and may name somebody with no account. So the match is on the text and must ignore
 case, because whoever typed it was not copying from a roster. That also makes them the only targets
 reachable for an *already deleted* account — and it can over-match, since a handle is not a unique
@@ -6031,6 +6092,14 @@ data lands on the main profile; the Basetool never discloses the stored handle t
 REQ-XCH-031, REQ-SEC-046, REQ-SEC-058, REQ-SEC-060, REQ-SEC-061, REQ-SEC-062
 
 ### REQ-SEC-077 — A request body never carries what the server manages
+
+> **JobOrder money commands:** The Bank-free command bodies carry the chosen action, selected
+> references, economic terms and observed revisions. The server determines effective balances,
+> authority, lifecycle and history. A connected correction names the original operations and their
+> revised terms. The server derives the resulting balances and any reciprocal purpose leg.
+> See [aUEC orders](orders-auec.md).
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
 
 Mass assignment is closed by structure, not by the care of each mapper:
 

@@ -213,6 +213,7 @@ public class OrgUnitBankRequestService {
                   : "A non-transfer request must not carry a destination account";
           case TRANSFER ->
               targetAccountId != null ? null : "A transfer request requires a destination account";
+          case HOLDER_TRANSFER, AUTHORISATION -> "This request type requires a linked Bank command";
         };
     if (refusal != null) {
       throw new BadRequestException(refusal);
@@ -362,6 +363,9 @@ public class OrgUnitBankRequestService {
             bankBookingRequestRepository.findById(requestId), "Booking request not found");
     if (!policy.ownsRequest(actor, existing)) {
       throw new NotFoundException("Booking request not found");
+    }
+    if (existing.getLinkedAttempt() != null) {
+      throw new BadRequestException("Linked Bank terms must be corrected through their purpose");
     }
     BankAdmission.Admitted routing = policy.routeCorrection(actor, existing, request.amount());
     return bankBookingRequestService.updateOwn(

@@ -489,6 +489,9 @@ public class SupplyNeedService {
     need.setOrderCoveredNotifiedAt(null);
     JobOrder order =
         Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
+    if (!order.getType().usesStock()) {
+      throw new BadRequestException("orders.kind.stock.required");
+    }
     if (order.getResponsibleOrgUnit() == null
         || !need.getOrgUnitId().equals(order.getResponsibleOrgUnit().getId())) {
       throw new BadRequestException("The job order belongs to another unit");

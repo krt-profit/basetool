@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.backend.joborder.web;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserDtoRedaction;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderDto;
-import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterialDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderAccessPolicy;
@@ -41,7 +41,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -70,11 +69,9 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface over the job-order aggregate (the request-and-fulfill queue): create, list, read,
  * update and delete.
  *
- * <p>Reads and mutations are limited to the caller's visibility scope via {@code
- * @accessGateService}: SK-responsible orders are public, squadron-responsible orders private to
- * that squadron and admins. Creation needs a login only (ADR-0149); other mutations require
- * LOGISTICIAN or above, delete requires ADMIN. Handovers live in {@link
- * JobOrderHandoverController}, materials and linked stock in {@link JobOrderMaterialController}.
+ * <p>Reads use the shared permitted order set; each command checks its current contextual or
+ * personal authority independently. Handovers live in {@link JobOrderHandoverController}, materials
+ * and linked stock in {@link JobOrderMaterialController}.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -86,8 +83,7 @@ public class JobOrderController {
   private final JobOrderAccessPolicy jobOrderAccessPolicy;
 
   /**
-   * Creates a new job order; any logged-in member may file one, and its visibility follows {@code
-   * canSeeJobOrder} (REQ-ORG-003).
+   * Creates an order through a current contextual writer of either proposed unit.
    *
    * @param dto create payload
    * @return the persisted DTO
@@ -96,7 +92,7 @@ public class JobOrderController {
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
       summary = "Create a new job order",
-      description = "Creates a job order. Requires an authenticated member (ADR-0149).")
+      description = "Creates a job order through a current writer of either proposed unit.")
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto createJobOrder(@RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.createJobOrder(dto);
@@ -122,67 +118,6 @@ public class JobOrderController {
   }
 
   /**
-   * Redacts a job-order DTO for a requester-only viewer (REQ-ORDERS-023): drops assignees, the
-   * materials summary, handovers and per-line collection progress, and keeps the editable lines,
-   * comment, org units, status and {@code version}.
-   *
-   * @param dto the full job-order DTO
-   * @return the redacted DTO safe for a requester-only viewer
-   */
-  @NotNull
-  private JobOrderDto cleanupJobOrderForRequester(@NotNull JobOrderDto dto) {
-    return new JobOrderDto(
-        dto.id(),
-        dto.displayId(),
-        dto.responsibleOrgUnit(),
-        dto.requestingOrgUnit(),
-        dto.handle(),
-        dto.comment(),
-        dto.priority(),
-        dto.status(),
-        dto.type(),
-        dto.countBlueprintsWithVariants(),
-        redactMaterialProgress(dto.materials()),
-        dto.items(),
-        Collections.emptyList(),
-        Collections.emptyList(),
-        Collections.emptyList(),
-        Collections.emptyList(),
-        dto.createdAt(),
-        dto.version(),
-        dto.canEdit(),
-        false,
-        true);
-  }
-
-  /**
-   * Strips {@code currentStock}, {@code claims} and {@code openAmount} from each material line,
-   * keeping id, material, min-quality, amount and version.
-   *
-   * @param materials the material lines, possibly {@code null}
-   * @return the material lines with their progress fields nulled/emptied; never {@code null}
-   */
-  private static List<JobOrderMaterialDto> redactMaterialProgress(
-      List<JobOrderMaterialDto> materials) {
-    if (materials == null) {
-      return Collections.emptyList();
-    }
-    return materials.stream()
-        .map(m ->
-            new JobOrderMaterialDto(
-                m.id(),
-                m.material(),
-                m.minQuality(),
-                m.qualityTier(),
-                m.amount(),
-                null,
-                Collections.emptyList(),
-                null,
-                m.version()))
-        .toList();
-  }
-
-  /**
    * Paged job-order list, by default sorted by {@code priority,asc}, limited to the caller's
    * visibility scope. {@code squadronId} can only narrow that scope, never widen it.
    *
@@ -199,17 +134,17 @@ public class JobOrderController {
    * @param page zero-based page index
    * @param size page size
    * @param sort sort spec (whitelisted: {@code priority}, {@code createdAt})
+   * @param type optional kind filter; absent means all implemented kinds
    * @return paged job-order DTOs visible to the caller
    */
   @GetMapping
   @Operation(
       summary = "Get all job orders",
       description =
-          "Returns a paginated list of job orders. toProcess=true keeps only the orders whose"
-              + " profit-eligible responsible unit is one of the caller's own units; orgUnitId"
-              + " narrows that to one of them."
-              + " assignedToMe=true lists the orders the caller is an assignee of; it combines with"
-              + " neither toProcess nor squadronId.")
+          "Returns a paginated list of permitted job orders. toProcess=true keeps orders of"
+              + " current responsible or active supporting units in the caller's context and reach;"
+              + " orgUnitId narrows that to one of them. assignedToMe=true lists the orders the"
+              + " caller is an assignee of; it combines with neither toProcess nor squadronId.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getAllJobOrders(
@@ -220,7 +155,8 @@ public class JobOrderController {
       @RequestParam(required = false) UUID orgUnitId,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
-      @RequestParam(required = false, defaultValue = "priority,asc") String sort) {
+      @RequestParam(required = false, defaultValue = "priority,asc") String sort,
+      @RequestParam(required = false) List<JobOrderType> type) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
@@ -229,57 +165,58 @@ public class JobOrderController {
         throw new BadRequestException(
             "assignedToMe combines with neither toProcess nor squadronId");
       }
-      return PageResponse.of(jobOrderQueryService.getAssignedJobOrders(status, pageable));
+      return PageResponse.of(jobOrderQueryService.getAssignedJobOrders(status, type, pageable));
     }
     Page<JobOrderDto> p =
-        jobOrderQueryService.getAllJobOrders(status, squadronId, toProcess, orgUnitId, pageable);
+        jobOrderQueryService.getAllJobOrders(
+            status, squadronId, toProcess, orgUnitId, type, pageable);
     return PageResponse.of(p);
   }
 
   /**
-   * Paged, requester-redacted list of the orders the caller's own org unit(s) requested, the "Meine
+   * Paged, complete list of the orders the caller's own org unit(s) requested, the "Meine
    * Auftr&auml;ge" list (REQ-ORDERS-023). Independent of the profit-gated main queue.
    *
    * @param status optional status filter (logical OR across values)
    * @param page zero-based page index
    * @param size page size
    * @param sort sort spec (whitelisted: {@code priority}, {@code createdAt})
-   * @return paged, requester-redacted job-order DTOs the caller's org unit(s) requested
+   * @param type optional kind filter; absent means all implemented kinds
+   * @return paged, complete job-order DTOs the caller's org unit(s) requested
    */
   @GetMapping("/requested")
   @Operation(
       summary = "Get my requested job orders",
       description =
           "Returns a paginated list of the orders the caller's own org unit(s) requested"
-              + " (Auftraggeber view), redacted (no Bearbeiter / no materials summary).")
+              + " with complete permitted order facts.")
   @PreAuthorize("isAuthenticated() and @requestScopeResolver.canViewOwnJobOrders()")
   @Transactional(readOnly = true)
   public PageResponse<JobOrderDto> getRequestedJobOrders(
       @RequestParam(required = false) List<JobOrderStatus> status,
       @RequestParam(required = false, defaultValue = "0") int page,
       @RequestParam(required = false, defaultValue = "20") int size,
-      @RequestParam(required = false, defaultValue = "priority,asc") String sort) {
+      @RequestParam(required = false, defaultValue = "priority,asc") String sort,
+      @RequestParam(required = false) List<JobOrderType> type) {
     Pageable pageable =
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("priority", "createdAt"), "priority");
-    Page<JobOrderDto> p = jobOrderQueryService.getRequestedJobOrders(status, pageable);
-    return PageResponse.of(p.map(this::cleanupJobOrderForRequester));
+    Page<JobOrderDto> p = jobOrderQueryService.getRequestedJobOrders(status, type, pageable);
+    return PageResponse.of(p);
   }
 
   /**
-   * Returns an id-and-label projection of the non-terminal job orders for typeaheads, optionally
-   * with each order's outstanding per-material need (REQ-INV-039).
+   * Returns non-terminal material and item order references for stock pickers.
    *
    * @param withNeeds whether to include each order's outstanding per-material need
-   * @return active job orders as reference DTOs
+   * @return active material and item orders as reference DTOs
    */
   @GetMapping("/lookup")
   @Operation(
-      summary = "Lookup active job orders",
+      summary = "Lookup active job orders for stock pickers",
       description =
-          "Returns a reference list of active job orders. With withNeeds=true every order also"
-              + " carries its outstanding need per material bucket, for the Lager allocation"
-              + " pickers.")
+          "Returns active material and item orders. With withNeeds=true each order also carries"
+              + " its outstanding need per material bucket.")
   @PreAuthorize("isAuthenticated()")
   @Transactional(readOnly = true)
   public List<JobOrderReferenceDto> lookupJobOrders(
@@ -298,34 +235,29 @@ public class JobOrderController {
   @Operation(
       summary = "Get job order by ID",
       description = "Returns a job order and calculates the current material stock.")
-  @PreAuthorize(
-      "isAuthenticated() and (@jobOrderAccessPolicy.canSeeJobOrder(#id) or"
-          + " @jobOrderAccessPolicy.canSeeJobOrderAsRequester(#id))")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
     JobOrderDto dto = jobOrderQueryService.getJobOrderById(id);
-    JobOrderDto tiered =
-        dto.redacted()
-            ? cleanupJobOrderForRequester(dto)
-            : dto.withCanManageAssignees(jobOrderAccessPolicy.canManageAssignees(id));
+    JobOrderDto tiered = dto.withCanManageAssignees(jobOrderAccessPolicy.canManageAssignees(id));
     return tiered.withAssignees(toPeerShapedAssignees(tiered.assignees()));
   }
 
   /**
-   * Updates the status; a transition to a terminal state (COMPLETED, REJECTED) also atomically
-   * unlinks every inventory item pointing at the order.
+   * Updates the status; a transition to a terminal state (COMPLETED, REJECTED, CANCELLED) also
+   * atomically unlinks every inventory item pointing at the order.
    *
    * @param id job-order id
-   * @param dto status payload (carries the expected version)
+   * @param dto target status and the observed lifecycle version
    * @return the persisted DTO
    */
   @PutMapping("/{id}/status")
   @Operation(
       summary = "Update job order status",
       description =
-          "Updates the status of a job order. For terminal statuses (COMPLETED, REJECTED), all"
-              + " linked inventory items are unlinked atomically. Requires the current version for"
-              + " optimistic locking.")
+          "Updates the status of a job order. For terminal statuses (COMPLETED, REJECTED,"
+              + " CANCELLED), all linked inventory items are unlinked atomically. Requires the"
+              + " current version for optimistic locking.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Status updated successfully"),
     @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
@@ -334,7 +266,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("isAuthenticated()")
   public JobOrderDto updateJobOrderStatus(
       @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderStatusDto dto) {
     return jobOrderService.updateJobOrderStatus(id, dto);
@@ -353,8 +285,7 @@ public class JobOrderController {
   @Operation(
       summary = "Update job order priority",
       description = "Updates priority and shifts others.")
-  @PreAuthorize(
-      "hasRole('" + Roles.LOGISTICIAN + "') and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrderPriority(@PathVariable UUID id, @RequestParam Integer priority) {
     return jobOrderService.updateJobOrderPriority(id, priority);
   }
@@ -368,7 +299,7 @@ public class JobOrderController {
    */
   @PutMapping("/{id}")
   @Operation(summary = "Update job order", description = "Updates job order details and materials.")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.updateJobOrder(id, dto);
@@ -400,37 +331,34 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateItemJobOrder(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.updateItemJobOrder(id, dto);
   }
 
   /**
-   * Requester-side edit of a MATERIAL order's lines and comment by a member of the requesting org
-   * unit, allowed only while nothing is delivered (REQ-ORDERS-023). Notifies the processing unit's
-   * leads.
+   * Edits remaining MATERIAL need and the requester comment without changing recorded handovers.
    *
    * @param id job-order id
    * @param dto the new material lines + comment (carries the expected version)
-   * @return the redacted, persisted DTO
+   * @return the complete, persisted DTO
    */
   @NotNull
   @PutMapping("/{id}/requested")
   @Operation(
       summary = "Requester edit of a material order",
       description =
-          "Lets a member of the order's requesting org unit change quantities, add/remove"
-              + " not-yet-delivered materials and edit the comment. Only while the order has no"
-              + " delivery yet.")
+          "Lets a current requesting-unit writer update the remaining material need and comment."
+              + " Retains booked deliveries and their history.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Order updated"),
     @ApiResponse(
         responseCode = "400",
-        description = "Not a material order, or already has a delivery"),
+        description = "The order kind or remaining material need is invalid"),
     @ApiResponse(
         responseCode = "403",
-        description = "Caller is not a member of the order's requesting org unit"),
+        description = "Caller lacks current requesting-unit write authority"),
     @ApiResponse(responseCode = "404", description = "Order or material not found"),
     @ApiResponse(
         responseCode = "409",
@@ -439,7 +367,7 @@ public class JobOrderController {
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto updateJobOrderAsRequester(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderDto dto) {
-    return cleanupJobOrderForRequester(jobOrderService.updateJobOrderAsRequester(id, dto));
+    return jobOrderService.updateJobOrderAsRequester(id, dto);
   }
 
   /**
@@ -448,23 +376,23 @@ public class JobOrderController {
    *
    * @param id job-order id
    * @param dto the new item lines + comment (carries the expected version)
-   * @return the redacted, persisted DTO
+   * @return the complete, persisted DTO
    */
   @NotNull
   @PutMapping("/{id}/items/requested")
   @Operation(
       summary = "Requester edit of an item order",
       description =
-          "Lets a member of the order's requesting org unit replace the ordered items and edit the"
-              + " comment. Only while the order has no delivery yet.")
+          "Lets a current requesting-unit writer edit item quantities and the comment."
+              + " Preserves item identity and booked production and delivery.")
   @ApiResponses({
     @ApiResponse(responseCode = "200", description = "Order updated"),
     @ApiResponse(
         responseCode = "400",
-        description = "Not an item order, already has a delivery, or an invalid blueprint choice"),
+        description = "The order kind, requested item changes or blueprint choice is invalid"),
     @ApiResponse(
         responseCode = "403",
-        description = "Caller is not a member of the order's requesting org unit"),
+        description = "Caller lacks current requesting-unit write authority"),
     @ApiResponse(responseCode = "404", description = "Order, item or blueprint not found"),
     @ApiResponse(
         responseCode = "409",
@@ -473,7 +401,7 @@ public class JobOrderController {
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto updateItemJobOrderAsRequester(
       @PathVariable UUID id, @RequestBody @Valid CreateJobOrderItemRequestDto dto) {
-    return cleanupJobOrderForRequester(jobOrderService.updateItemJobOrderAsRequester(id, dto));
+    return jobOrderService.updateItemJobOrderAsRequester(id, dto);
   }
 
   /**
@@ -500,7 +428,7 @@ public class JobOrderController {
         responseCode = "409",
         description = "Conflict – optimistic locking failure (version mismatch)")
   })
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canEditJobOrder(#id)")
   public JobOrderDto updateBlueprintVariantCounting(
       @PathVariable UUID id, @NotNull @RequestBody @Valid UpdateJobOrderBlueprintCountingDto dto) {
     return jobOrderService.updateBlueprintVariantCounting(
@@ -508,9 +436,7 @@ public class JobOrderController {
   }
 
   /**
-   * Reassigns the responsible (processing) org unit of an order. Admins may reassign freely to any
-   * profit-eligible org unit; a squadron logistician/officer may only escalate their own squadron's
-   * order to a Spezialkommando. The detailed permission rule is enforced in the service.
+   * Transfers responsibility immediately through the current responsible-unit writer gate.
    *
    * @param id job-order id
    * @param body the target responsible org unit id
@@ -520,21 +446,23 @@ public class JobOrderController {
   @Operation(
       summary = "Reassign responsible org unit",
       description =
-          "Changes which org unit processes the order. Admin: free to any profit-eligible org unit;"
-              + " squadron logistician/officer: escalate own squadron's order to an SK only.")
-  @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
+          "A current responsible-unit writer transfers immediately to an eligible Profit unit,"
+              + " including recovery from invalid responsibility, without moving stock.")
+  @PreAuthorize("isAuthenticated()")
   public JobOrderDto reassignResponsibleOrgUnit(
       @PathVariable UUID id, @NotNull @RequestBody @Valid ReassignResponsibleOrgUnitRequest body) {
-    return jobOrderService.reassignResponsibleOrgUnit(id, body.responsibleOrgUnitId());
+    return jobOrderService.reassignResponsibleOrgUnit(
+        id, body.responsibleOrgUnitId(), body.version());
   }
 
   /**
    * Request body for the responsible-org-unit reassignment endpoint.
    *
-   * @param responsibleOrgUnitId the target profit-eligible org unit id (required)
+   * @param responsibleOrgUnitId the target active Profit-hierarchy org unit id
+   * @param version the observed responsibility revision
    */
   public record ReassignResponsibleOrgUnitRequest(
-      @jakarta.validation.constraints.NotNull UUID responsibleOrgUnitId) {}
+      @jakarta.validation.constraints.NotNull UUID responsibleOrgUnitId, Long version) {}
 
   /**
    * ADMIN-only delete. Surviving orders' priorities shift up to keep the queue contiguous.

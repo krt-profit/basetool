@@ -114,7 +114,7 @@ class SpecialCommandMembersPageControllerMvcTest {
   private void stubSpecialCommandWith(OrgUnitMembershipDto... roster) {
     when(backendApiClient.get(
             eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
-        .thenReturn(new SpecialCommandDto(skId, "Detail SK", "DSK", "desc", true, false, 0L));
+        .thenReturn(new SpecialCommandDto(skId, "Detail SK", "DSK", "desc", true, 0L));
     when(backendApiClient.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
         .thenReturn(List.of(roster));
   }

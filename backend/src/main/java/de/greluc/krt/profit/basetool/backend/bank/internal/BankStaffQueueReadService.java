@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffQueueReads;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
@@ -28,6 +29,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -39,10 +41,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Serves {@link BankStaffQueueReads} from the pending requests through the policy ({@link
- * BankAccessRules}): {@code open} is the web staff queue's set ({@link
- * BankBookingRequestService#listQueue}), {@code toApprove} the requests whose "approval needed"
- * notice goes to the actor ({@link OrgUnitBankRecipientDirectory#requiredApproversOf}).
+ * Serves the connected-application queue from eligible pending requests through the Bank policy.
+ * {@code open} follows staff visibility and {@code toApprove} follows approval notice routing.
  */
 @Service
 @RequiredArgsConstructor
@@ -70,7 +70,9 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
       return Optional.empty();
     }
     List<BankBookingRequest> pending =
-        requestRepository.findAllByStatus(BankBookingRequestStatus.PENDING).stream()
+        requestRepository
+            .findExchangeByStatus(BankBookingRequestStatus.PENDING, BankPurposeKind.AUEC_ORDER)
+            .stream()
             .sorted(Comparator.comparing(BankStaffQueueReadService::key, ORDER))
             .toList();
     List<BankBookingRequest> open =
@@ -127,7 +129,7 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
    */
   private static boolean inStaffQueue(
       @NotNull BankBookingRequest request, @NotNull BankStaffRights rights) {
-    return rights.canSee(request.getAccount().getId());
+    return rights.canSee(Objects.requireNonNull(request.getAccount()).getId());
   }
 
   /**
@@ -206,7 +208,7 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
       @NotNull Stream<BankBookingRequest> delivered, @NotNull BankStaffRights rights) {
     List<UUID> visible =
         delivered
-            .map(request -> request.getAccount().getId())
+            .map(request -> Objects.requireNonNull(request.getAccount()).getId())
             .filter(rights::canSee)
             .distinct()
             .toList();
@@ -233,7 +235,7 @@ public class BankStaffQueueReadService implements BankStaffQueueReads {
       @NotNull BankBookingRequest request,
       @NotNull BankStaffRights rights,
       @NotNull Map<UUID, BigDecimal> balances) {
-    BankAccount account = request.getAccount();
+    BankAccount account = Objects.requireNonNull(request.getAccount());
     OrgUnit orgUnit = account.getOrgUnit();
     BankAccount target = request.getTargetAccount();
     return new Item(

@@ -252,6 +252,7 @@ section above.
 | **BankLedgerIntegrityViolation** | **CRITICAL.** Investigate the ledger before any further bank mutation. Reconcile balances and identify the divergent entry first. |
 | **BankLedgerIntegritySweepStale** | **CRITICAL.** The hourly bank integrity sweep stopped running — while stale the violations gauge is frozen and `BankLedgerIntegrityViolation` cannot fire. Restart the sweep / backend and confirm it succeeds before trusting a clean reading. |
 | **JobOrderItemBlueprintDrift** | The integrity sweep found ordered-item lines whose blueprint no longer produces the ordered item — an SC-Wiki re-sync re-pointed it after the order was placed, so those orders show a foreign recipe. The backend log names each order; re-saving an affected order re-derives its lines. |
+| **JobOrderLinkedMoneyContradiction** | A committed linked attempt disagrees with its effective order fact. Inspect the owning-domain audit and attempt history. |
 | **JobOrderIntegritySweepStale** | The hourly job-order integrity sweep has not succeeded for 6 hours; while it is stale `JobOrderItemBlueprintDrift` cannot fire. Check the backend scheduler log for the `job_order_integrity` task and restore it before trusting a "no drift" reading. |
 | **UserSyncStale** | The Keycloak → basetool user sync has not succeeded recently. Check the sync job logs and Keycloak reachability. |
 | **ExternalSyncStale** | A UEX/SC-Wiki catalogue sync has not succeeded in >48h. Check `/admin/sync-reports`, the upstream API and the backend sync logs; correlate with `ExternalFetchErrors` and `ScWikiStepFailing`. A fire that resolves on its own within minutes is not staleness: check `changes(process_start_time_seconds[1h])` for a restart. |
@@ -439,7 +440,7 @@ e-mail, not Alertmanager.
 
 ## Dashboard 07: navigation and quick access
 
-Panels 92 to 96 and 102 of `07-basetool-operations.json` watch the navigation, the quick access and
+Panels 92 to 96 and 108 of `07-basetool-operations.json` watch the navigation, the quick access and
 the active org unit switcher (REQ-UI-032, REQ-UI-033, REQ-ORG-031, REQ-OBS-011).
 `NavigationEndpointsErroring` and `QuickAccessSearchSlow` alert on the navigation and the quick
 access; the switches are a usage trend without an alert.
@@ -451,7 +452,7 @@ access; the switches are a usage trend without an alert.
 | 94 Navigation endpoints 5xx rate | `http_server_requests_seconds_count` on `/api/v1/navigation/*`, `/navigation/*`, `/dashboard/*` | Server errors of the preference and dashboard routes. |
 | 95 Quick-access searches/hour | `basetool_quick_access_search_total` by `kind`, `outcome` | Entity searches per type; `error` failed closed, `timeout` missed the 2 s cap. |
 | 96 Quick-access search p95 | `http_server_requests_seconds_bucket` on `/quick-access/search` | 95th percentile of the entity search. |
-| 102 Active org unit switches/hour | `basetool_active_org_unit_choice_writes_total` by `target` | Stored changes of the active org unit, to one unit (`unit`) or to all of a member's units (`all`); counted, not audited. |
+| 108 Active org unit switches/hour | `basetool_active_org_unit_choice_writes_total` by `target` | Stored changes of the active org unit, to one unit (`unit`) or to all of a member's units (`all`); counted, not audited. |
 
 ## Operating procedures
 

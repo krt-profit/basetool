@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -150,7 +151,7 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
   @NotNull
   private Set<UUID> approversOf(@NotNull BankBookingRequest request) {
     BankRequestApprover approver = request.getRequiredApprover();
-    UUID accountId = request.getAccount().getId();
+    UUID accountId = Objects.requireNonNull(request.getAccount()).getId();
     return switch (approver) {
       case RESPONSIBLE_HOLDER -> responsibleHoldersOf(accountId);
       case BANK_MANAGEMENT -> roleRecipientDirectory.holdersOfRole(Roles.BANK_MANAGEMENT);

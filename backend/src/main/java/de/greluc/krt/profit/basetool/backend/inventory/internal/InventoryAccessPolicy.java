@@ -80,8 +80,8 @@ public class InventoryAccessPolicy implements BookInPolicy {
     return inventoryItemRepository
         .findById(itemId)
         .map(i ->
-            accessGateService.permitsOwnedRow(
-                i.getUser(), i.getOwningOrgUnit(), true, Roles.LOGISTICIAN))
+            canEditInventoryIdentity(
+                i.getUser() == null ? null : i.getUser().getId(), owningUnitId(i)))
         .orElse(false);
   }
 
@@ -97,7 +97,7 @@ public class InventoryAccessPolicy implements BookInPolicy {
   public boolean isLogisticianOfItem(@NotNull UUID itemId) {
     return inventoryItemRepository
         .findById(itemId)
-        .map(i -> accessGateService.canActAsLogisticianInOwner(owningUnitId(i)))
+        .map(i -> isLogisticianOfOwner(owningUnitId(i)))
         .orElse(false);
   }
 
@@ -127,5 +127,16 @@ public class InventoryAccessPolicy implements BookInPolicy {
   @Override
   public boolean mayBookInFor(@NotNull UUID ownerUserId) {
     return canManageUserInventory(ownerUserId);
+  }
+
+  /** Applies the ordinary Inventory edit scope to current scalar owner and pool identities. */
+  boolean canEditInventoryIdentity(@Nullable UUID ownerId, @Nullable UUID owningOrgUnitId) {
+    return accessGateService.permitsOwnedIdentity(
+        ownerId, owningOrgUnitId, true, Roles.LOGISTICIAN);
+  }
+
+  /** Applies the ordinary contextual Logistician gate to the current owning pool. */
+  boolean isLogisticianOfOwner(@Nullable UUID owningOrgUnitId) {
+    return accessGateService.canActAsLogisticianInOwner(owningOrgUnitId);
   }
 }

@@ -735,28 +735,25 @@ centralised:
   its return type diverges (`Optional<T>` for a unique name, `List<GameItem>` for
   `GameItemRepository`, whose `name` is not unique), and a base interface method can only declare one
   return type.
-- **One `static final String` JPQL fragment per aggregate, beside the aggregate's repository** (since 2026-10-12, option B1 confirmed by the owner): `mission.api.MissionScope#PREDICATE`, `hangar.api.ShipScope#TRIPLE`, `joborder.api.JobOrderScope#PREDICATE` and `inventory.api.InventoryScope#TRIPLE` (the Materialbörse's offer repository splices the Lager's, so it is published), and `RefineryAccessPolicy#REFINERY_ORDER_SCOPE_TRIPLE` and `OperationAccessPolicy#OPERATION_SCOPE_PREDICATE` inside their access policies (their repositories are `internal`). `ScopeSpecifications` is gone. The fragments are
+- **One `static final String` JPQL fragment per aggregate, beside the aggregate's repository** (since 2026-10-12, option B1 confirmed by the owner): `mission.api.MissionScope#PREDICATE`, `hangar.api.ShipScope#TRIPLE`, `joborder.api.JobOrderScope#READ_PREDICATE` and `inventory.api.InventoryScope#TRIPLE` (the Materialbörse's offer repository splices the Lager's, so it is published), and `RefineryAccessPolicy#REFINERY_ORDER_SCOPE_TRIPLE` and `OperationAccessPolicy#OPERATION_SCOPE_PREDICATE` inside their access policies (their repositories are `internal`). `ScopeSpecifications` is gone. The fragments are
   referenced from each repository's `@Query` value via compile-time constant-expression concatenation
   (JLS 15.28/4.12.4 — the same technique REQ-SEC-002a's `Roles.X` constants use inside
   `@PreAuthorize`, since an annotation value cannot invoke a method). The alias is baked into each
   constant (`o`/`m`/`s`/`r`/`i`) rather than parameterized — a compile-time constant cannot accept a
   runtime substitution — so this is a handful of named per-aggregate constants, not one generic
-  template. The three aggregates with an escape tail beyond the plain triple (Operation's
-  ownerless-leadership + mission-participant escapes, Mission's cross-staffel public escape, JobOrder's
-  SK-public-queue escape — REQ-ORG-003) carry the tail baked into their own constant; the three
-  strict-staffel aggregates (Ship, RefineryOrder, InventoryItem) use the plain triple unchanged.
-  The module's access policy cites its fragment, so the list query and the per-row gate sit next to each other (plan section 5.4).
+  template. Operation and Mission carry their aggregate-specific scope conditions in their own
+  constants. Ship, RefineryOrder and InventoryItem use the strict unit triple. The shared JobOrder
+  read predicate follows [the order workspace rules](orders-core.md), including current personal
+  holder and recipient links under [the aUEC contract](orders-auec.md). The list query and
+  per-row gate cite the same aggregate scope.
 
-Both are **read-only, wire-format-preserving refactors**: every migrated `@Query` value is
-byte-for-byte the same JPQL the compiler previously inlined, so the multi-tenant scope semantics of
-REQ-ORG-002/003 are unchanged. Neither introduces `JpaSpecificationExecutor` — every scoped query in
-this codebase is a hand-written `@Query`, not a `Specification`, and there was no behavioural reason
-to switch.
+The lookup and scope extractions preserve the wire format. Scoped repository queries use the
+aggregate's hand-written `@Query` fragment.
 
 **Acceptance**: `LookupTableRepository`'s exists-pair is exercised by every existing
 `*RepositoryTest`/service test that already covered the 8 migrated repositories' duplicate-name
 checks. The six scope fragments are pinned byte for byte by `ScopeFragmentsGoldenTest` against
-`scope/scope-fragments.txt`, which was recorded before the fragments moved. For each of the six aggregates a parity test
+`scope/scope-fragments.txt`, which records the current approved fragments. For each of the six aggregates a parity test
 (`ShipScopeParityTest`, `InventoryScopeParityTest`, `RefineryScopeParityTest`, `OperationScopeParityTest`, `MissionScopeParityTest`,
 `JobOrderScopeParityTest`) runs the list query against the real schema and the row gate over the nine callers of the access-policy
 differential tests (`ScopeParityCallers`): the list never shows a row the gate refuses, and the two agree on every row another member
@@ -1135,7 +1132,7 @@ load-bearing: Hibernate renders a `LIKE` without an `ESCAPE` clause on PostgreSQ
 `like … escape ''`, which switches the escape character off, so an escaped `\%` then matches a
 literal backslash and the search finds nothing. `ILIKE` behaves the same way and takes the same
 clause. Every JPQL `LIKE`/`ILIKE` whose caller escapes follows both halves: the blueprint-backed
-catalogue searches, the location, material, user, mission, operation and ship searches, the
+catalogue searches, the Lager item picker, the location, material, user, mission, operation and ship searches, the
 squadron ship overview, the Materialbörse offer and request boards, and the releasable-stock picker.
 `BankAccountRepository` is the one deliberate exception (REQ-BANK, `bank.md`): its caller does not
 escape, so `%` and `_` act as wildcards on that bank-employee-gated read, and it carries no
@@ -1145,7 +1142,8 @@ are unaffected, because they do not go through the HQL `like` rendering.
 **Acceptance**
 
 - [x] `%` and `_` in a blueprint product, orderable-item or bookable-item search match literally
-  (`BlueprintRepositoryLikeEscapeTest`); the three service callers escape their input.
+  (`BlueprintRepositoryLikeEscapeTest`, `InventoryBookableItemsTest`); the three service callers
+  escape their input.
 - [x] The same holds for every other escaping JPQL query, and an ordinary fragment still matches:
   `LikeEscapeCatalogRepositoriesDataTest` (location, material picker and price overview, mission,
   operation), `UserDirectoryQueriesDataTest`, `ShipRepositoryPersonalHangarTest` (own hangar and
@@ -1176,7 +1174,7 @@ pass the migration and fail every later write to `personal_blueprint`, `default_
 `inventory_item` or `ship`; the migration that renames a column recreates the functions that name
 it.
 
-The ownership map, 124 tables. Its machine-readable copy is
+The machine-readable ownership map is
 `backend/src/test/resources/architecture/table-ownership.txt`, which the test reads; a new table is
 added to both. `deletion_request` sits with identity, as do the GDPR classes once the transitional
 `privacy` module dissolves (plan §7.6).
@@ -1198,7 +1196,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `inventory` | 4 | `inventory_item`, `inventory_item_donation_allocation`, `inventory_item_job_order_allocation`, `inventory_item_mission_allocation` |
 | `mission` | 12 | `mission`, `mission_crew`, `mission_crew_job_types`, `mission_finance_entry`, `mission_frequency`, `mission_managers`, `mission_objective`, `mission_ownership`, `mission_participant`, `mission_participant_org_unit`, `mission_step`, `mission_unit` |
 | `refinery` | 2 | `refinery_good`, `refinery_order` |
-| `joborder` | 10 | `job_order`, `job_order_assignees`, `job_order_handover`, `job_order_handover_item`, `job_order_item`, `job_order_item_handover`, `job_order_item_handover_entry`, `job_order_item_material`, `job_order_material`, `material_claim` |
+| `joborder` | 24 | `job_order`, `job_order_assignees`, `job_order_handover`, `job_order_handover_item`, `job_order_item`, `job_order_item_handover`, `job_order_item_handover_entry`, `job_order_item_material`, `job_order_material`, `job_order_money_commitment`, `job_order_money_commitment_change`, `job_order_money_correction_entry`, `job_order_money_holder`, `job_order_money_holder_change`, `job_order_money_operation`, `job_order_money_recipient`, `job_order_money_refused_attempt`, `job_order_money_target`, `job_order_money_target_change`, `job_order_participation`, `job_order_unit_read_history`, `material_claim`, `material_provision_credit`, `material_provision_fragment` |
 | `materialexchange` | 4 | `material_exchange_interest`, `material_exchange_offer`, `material_exchange_request`, `material_exchange_request_interest` |
 | `operation` | 2 | `operation`, `operation_payout_status` |
 | `bank` | 10 | `bank_account`, `bank_account_approval_limit`, `bank_account_grant`, `bank_account_view_grant`, `bank_audit_event`, `bank_booking_request`, `bank_holder`, `bank_holder_posting`, `bank_posting`, `bank_transaction` |

@@ -162,8 +162,9 @@ public record BankActor(
     public boolean allows(@NotNull BankBookingRequestType type) {
       return switch (type) {
         case DEPOSIT -> canDeposit;
-        case WITHDRAWAL -> canWithdraw;
+        case WITHDRAWAL, AUTHORISATION -> canWithdraw;
         case TRANSFER -> canTransfer;
+        case HOLDER_TRANSFER -> false;
       };
     }
   }

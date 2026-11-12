@@ -29,10 +29,8 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The booking requests a member raised, through any channel, for the member's own view
- * (REQ-BANK-022, REQ-BXCH-003). Only the requester's own rows are read, so no access decision is
- * needed; staff notes, staff identities, counterparties and purposes are never part of a value.
- * Must run inside a transaction.
+ * The member's own booking requests in the connected-client scope (REQ-BXCH-003). Projections omit
+ * staff notes, staff identities, counterparties and purposes.
  */
 public interface BankOwnRequestReads {
 

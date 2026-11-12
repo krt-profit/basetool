@@ -44,7 +44,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
-import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * The Lager row mapper (REQ-INV-027, REQ-INV-029): the earmark chips as the caller is shown them,
@@ -61,7 +60,7 @@ class InventoryItemMapperTest {
         }
 
         @Override
-        public boolean mayEditJobOrder(java.util.UUID jobOrderId) {
+        public boolean mayEditInventoryIdentity(UUID ownerId, UUID owningOrgUnitId) {
           return true;
         }
       };
@@ -73,7 +72,7 @@ class InventoryItemMapperTest {
     mapper =
         new InventoryItemMapperImpl(
             Mappers.getMapper(UserMapper.class), Mappers.getMapper(SquadronMapper.class));
-    ReflectionTestUtils.setField(mapper, "stockAccess", ALWAYS_ALLOWED);
+    mapper.setStockAccess(ALWAYS_ALLOWED);
   }
 
   @Test
@@ -226,9 +225,7 @@ class InventoryItemMapperTest {
     UUID itemId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     UUID[] asked = new UUID[2];
-    ReflectionTestUtils.setField(
-        mapper,
-        "stockAccess",
+    mapper.setStockAccess(
         new StockViewerAccess() {
           @Override
           public boolean mayEditInventoryItem(UUID inventoryItemId, UUID rowOwnerId) {
@@ -238,8 +235,8 @@ class InventoryItemMapperTest {
           }
 
           @Override
-          public boolean mayEditJobOrder(UUID jobOrderId) {
-            return true;
+          public boolean mayEditInventoryIdentity(UUID rowOwnerId, UUID owningOrgUnitId) {
+            return false;
           }
         });
     User owner = new User();
@@ -261,9 +258,7 @@ class InventoryItemMapperTest {
 
   @Test
   void toDto_canEdit_shouldBeFalseForAnUnsavedRowWithoutAskingTheGate() {
-    ReflectionTestUtils.setField(
-        mapper,
-        "stockAccess",
+    mapper.setStockAccess(
         new StockViewerAccess() {
           @Override
           public boolean mayEditInventoryItem(UUID inventoryItemId, UUID ownerId) {
@@ -271,8 +266,8 @@ class InventoryItemMapperTest {
           }
 
           @Override
-          public boolean mayEditJobOrder(UUID jobOrderId) {
-            return true;
+          public boolean mayEditInventoryIdentity(UUID ownerId, UUID owningOrgUnitId) {
+            throw new AssertionError("an id-less row must not reach the gate");
           }
         });
     InventoryItem item = new InventoryItem();

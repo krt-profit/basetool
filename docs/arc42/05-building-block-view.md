@@ -1,5 +1,7 @@
 # 5. Building block view
 
+> **JobOrder implementation scope:** All order kinds use the existing Profit hierarchy and shared workspace. [REQ-ORDERS-024](../specs/orders-material-claims.md) owns material contribution verification. The JobOrder module owns [aUEC operation identity, ledger effects and corrections](../specs/orders-auec.md) and uses `admin.api.TransferFeePolicy` for exact fees. The [optional Bank adapter](../specs/orders-auec-bank.md) joins `JobOrderBankPort` and `JobOrderBankEffects` with Bank's public linked-payment interfaces in the existing application composition.
+
 ## 5.1 Level 1 — the whitebox of the whole system
 
 ```
@@ -144,16 +146,16 @@ mappers no other module needs) and `<module>.web` (controllers and their REST DT
 | Module | `api` | `internal` | `web` |
 | --- | --- | --- | --- |
 | `dashboard` | — (publishes nothing) | `Announcement`, `AnnouncementRepository`, `AnnouncementService` | `AnnouncementController`, `AnnouncementDto`, `AnnouncementMapper` |
-| `admin` | `SystemSettings` (setting read, system flag write) | `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records | `SystemSettingController`, `SystemController`, `PingResponse` |
+| `admin` | `SystemSettings` (setting read, system flag write), `TransferFeePolicy` with immutable `RateSnapshot` (ADR-0358) | `ConfiguredTransferFeePolicy` (one rate parser, explicit-basis whole-aUEC fees), `SystemSetting`, its repository, `SystemSettingService`, `SystemSettingMapper`, the setting records | `SystemSettingController`, `SystemController`, `PingResponse` |
 | `exchange` | `ActingMemberAuthorities`, `IngestGatewayProperties`, the problem codes and the two events | the relay services, gates, mirrors and feed readers, the 14 entities and 10 repositories, `ActingMemberFilter`, the change-source transaction manager, the sandbox guard, the retention tasks; the relay wire records in `internal.dto` | the eight relay controllers under `/api/v1/exchange`, the registry and bulk-undo administration, `ConnectedAppsController` |
 | `personalinventory` | — (publishes nothing; the account deletion reaches the module through its `UserErasureParticipant`) | `PersonalInventoryItem`, `PersonalInventoryLocationType`, the repository (with the selectable-location queries of REQ-P4K-039), `PersonalInventoryItemService`, the mapper and records, `PersonalInventoryLocationOption` | `PersonalInventoryController`, `AdminPersonalInventoryController` |
 | `navigation` | — (a leaf: publishes nothing, since the frontend reaches it over REST; the account deletion reaches the rows through the `app_user` cascade) | `NavigationPreferences` (the per-member root), the repository, `NavigationPreferencesService` and its transactional `Writer`, the metrics and gauge, the export section and merge participant, the request and response records | `NavigationPreferencesController` |
-| `bank` | `BankConflictException`, `BankProblemCode`, `BankAmounts`, `BankBookingRequestType`, the booking-request events, and the access policy `BankAccessPolicy` with `BankActor`, `BankActors` and its decision types (ADR-0352) | the Kartellbank (entities, ledger, booking requests, audit trail, PDF formats, ledger task), the policy's implementation `BankAccessRules`, and the org-unit side behind `OrgUnitBankAccessService` | the eight Kartellbank controllers, `OrgUnitBankController` |
+| `bank` | `BankConflictException`, `BankProblemCode`, `BankAmounts`, `BankBookingRequestType`, the booking-request events, `BankLinkedPayments` and `BankLinkedEffectHandler` ([ADR-0357](../adr/0357-optional-auec-bank-effects-use-a-thin-composition-adapter.md)), and the access policy `BankAccessPolicy` with `BankActor`, `BankActors` and its decision types (ADR-0352) | the Kartellbank (entities, ledger, booking requests, audit trail, PDF formats, ledger task), the policy's implementation `BankAccessRules`, and the org-unit side behind `OrgUnitBankAccessService` | the eight Kartellbank controllers, `OrgUnitBankController` |
 | `supply` | the need and donation status enums, `SupplyProblemCode` and its exception, `NeedPriceAudience` (the SPI `purchasing` implements) and the notices | `SupplyNeed`, `SupplyDonation`, `SupplyUnitSetting`, their repositories, the need, donation, settings, unit-setting and stats services, `SupplyAccessPolicy`, `SupplyMapper`, `SupplyBusinessGauges` and the export, erasure, merge and person-search participants | `SupplyNeedController`, `SupplyDonationController`, `SupplyStatsController`, `SupplyStateController`, `SupplyAdminController` |
 | `purchasing` | the deal, tranche, delivery, partner, risk-class and pause vocabulary, `PurchasingProblemCode` and its exception, and the notices | the settings, delegate, partner, pause, deal, tranche, delivery, settlement, state and report services, `PurchasingAccessPolicy`, `PurchasingDealAssembler`, the nine entities and their repositories, the bank and need observers, `SettlementOverdueNoticeProducer`, `PurchasingBusinessGauges` and the export, merge and person-search participants | the deal, partner, delegate, report, state and admin controllers under `/api/v1/purchasing` |
 | `materialexchange` | the two after-commit events | the offer and request entities, repositories and DTOs, the board services, `MaterialExchangeOfferRatchet` (the Lager's `StockChangeObserver`) and `MaterialExchangeStockOfferLookup` (its `StockOfferLookup`) | `MaterialExchangeController`, `MaterialRequestController` |
 | `refinery` | `RefineryDraftBuilder` (the exchange's refinery draft), the screenshot-extract and draft records, the problem codes | `RefineryOrderService` (create, update and cancel), `RefineryOrderQueryService` (the reads, also the blueprint craftability's `CraftabilityYieldSource`), `RefineryOrderStoreService` (completion), `RefineryImportService`, `RefineryAccessPolicy`, the import settings and the store requests, `RefineryMissionFinance` (the mission's `MissionFinanceContributor`), `MissionRefineryOrderRelease` (the mission's `MissionDeletionObserver`) and `RefineryOrderMissionCache` (the per-transaction memo behind `mapper.RefineryOrderMissionLookup`) | `RefineryOrderController`, `RefineryImportController` |
-| `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderEditor` (the edit module every order edit runs through, ADR-0287), `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the integrity task, its own repositories and the request DTOs | `JobOrderController`, `JobOrderHandoverController`, `JobOrderMaterialController`, `MaterialClaimController`, `MaterialCollectionController`, `JobOrderItemStockController` |
+| `joborder` | the problem codes, `ProductionAllocationException`, `JobOrderAuditLabel`, the order events | the order, item, production, handover, claim (also the stock projection's `ClaimBucketSource`) and demand services, `JobOrderEditor` (common order edits, ADR-0287), material promise/provision coordination and authorized provision-choice projection ([REQ-ORDERS-024](../specs/orders-material-claims.md)), Bank-free money commands, ledger and identity history ([REQ-ORDERS-057…067](../specs/orders-auec.md)), `JobOrderAccessPolicy` (also the Lager's `EarmarkTargetPolicy`), the integrity task, its own repositories and the request DTOs | `JobOrderController`, `JobOrderHandoverController`, `JobOrderMaterialController`, `JobOrderSupportController`, `MaterialClaimController`, `MaterialContributionController`, `MaterialCollectionController`, `JobOrderItemStockController`, the order money controllers |
 | `mission` | `MissionCommands` (`detachFromOperation`), the read SPI `OperationSummaryProvider` (the operation module implements it), `MissionFinanceContributor` and `MissionDeletionObserver` (the refinery module implements them), `MissionReferences` (the refinery reads a mission's reference through it) | the mission, structure, participant, timeline and finance services, `MissionEditor` (the edit module every timeline, roster and structure edit runs through, ADR-0287), `MissionAccessPolicy`, the viewer-access service, the section counters, the peer redaction, the hangar's `ShipDeletionObserver` and the catalogue's `JobTypeDesignationObserver` implementations, `MissionOperationSummaryCache` (the per-transaction memo behind `mapper.MissionOperationLookup`), its own repositories and the request DTOs | `MissionController` (calls the mission, timeline, participant and structure services for their sections, ADR-0286), `MissionFinanceEntryController` |
 | `leadership` | — (publishes nothing) | `LeitungViewService` and the Leitung DTOs (ADR-0331) | `LeitungController` (`/api/v1/leadership`) |
 
@@ -260,7 +262,7 @@ request and read DTOs. `inventory.api` publishes what other modules use: `StockC
 (the exchange's lots, the stock earmarked to a job order as `LinkedStockRow` or Lager DTOs, the rows the
 Materialbörse offers), `StockItemCatalogue`, `InventoryItemDto` with its two allocation DTOs and the
 projection rows. The other modules see a Lager row as `StockRow`, a read-only live view of the managed row (getters, the two reservation sums and the order slice), and change it only through `StockCommands`, which take the row's id and act on the managed instance the caller already holds, so locks, the persistence context and the optimistic version are the row's own. The three entities (`InventoryItem`, which implements `StockRow`, and the two allocations) lie in `inventory.internal` with `InventoryAllocations` and `InventoryAuditLabels` (P4-1 part 3, option A2, confirmed by the owner 2026-10-12; `StockWriteOwnershipTest`, `StockRowViewCharacterisationTest`, `ExchangeStockWritePathCharacterisationTest`). Four more
-seams lie in `inventory.api` as well: `StockViewerAccess` (the caller's `canEdit`, read by `JobOrderMapper`), `OrderLinkedStockRows` (the material rows
+seams lie in `inventory.api` as well: `StockViewerAccess` (inventory row authority, read by `InventoryItemMapper`), `OrderLinkedStockRows` (the material rows
 the job order's stock projection reads), and the records the job-order and mission repositories return, `JobOrderEarmark` and `MissionEarmark`.
 
 The blueprint moved in part since P4-2: the five controllers sit in `blueprint.web`, and
@@ -317,7 +319,8 @@ The platform modules reach the domains only through SPIs they own and the domain
 | `audit.api.ActorHandleResolver` | the actor handle an audit row snapshots | identity (`UserActorHandleResolver`) |
 | `audit.api.RetentionParticipant` | the audit trails outside the audit module that the retention run also purges, after the activity domains | bank (`BankAuditService`) |
 | `notification.api.RoleRecipientDirectory` | global-role holders, role holders within an org unit, the catalogue spelling of a role code | identity (`UserRoleRecipientDirectory`) |
-| `notification.api.OrgUnitRecipientDirectory` | the Lead, Logistician and Mission Manager flags of an org unit | orgunit (`OrgUnitMembershipRecipientDirectory`) |
+| `notification.api.OrgUnitRecipientDirectory` | org-unit appointments, leadership and current functional writers | orgunit (`OrgUnitMembershipRecipientDirectory`) |
+| `notification.api.NotificationCauseGuard` | whether an actionable event and its cleanup still apply before grouped Inbox delivery ([ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)) | joborder (`JobOrderActionNoticeGuard`) |
 | `notification.api.AccountRecipientDirectory` | grant holders and responsible holders of a bank account | bank, org-unit side (`OrgUnitBankRecipientDirectory`) |
 | `platform.api.ActiveOrgUnitProvider` (platform) | the org unit for the `orgUnitId` MDC field | scope (`ScopeActiveOrgUnitProvider`) |
 | `platform.api.ClientDirectory` | whether a client id is a configured ingest gateway or a registered exchange client, for the bounded client label | exchange (`ExchangeClientDirectory`) |
@@ -532,11 +535,11 @@ identity Prometheus sends (ADR-0265, REQ-OBS-005). Rules, dashboards and probes:
 
 `catalogue.internal.ItemReconciliationIndex` holds scalar source identity candidates;
 `ItemReconciliationService` validates and locks a verified pair and calls the owner-implemented
-`catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply
-and purchasing update only their own references and emit their own audit/live events. The
-catalogue archives both original item/price/stat sets in `game_item_redirect` before retiring
-the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical ids
-have a separate reference seam for bulk reads.
+`catalogue.api.GameItemReassignmentParticipant` SPI. Inventory, job orders, blueprints, supply,
+purchasing and the Materialbörse update only their own references and emit their own audit/live
+events. The catalogue archives both original item/price/stat sets in `game_item_redirect` before
+retiring the duplicate. Repository identity lookups resolve retained ids, while preloaded canonical
+ids have a separate reference seam for bulk reads.
 
 `ScWikiRequestExecutor` owns pacing/retry transport, `ScWikiClient` owns the scoped game build,
 and `SyncChunkWriter` owns isolated application transactions. `SyncRunService` persists attempt
@@ -544,3 +547,29 @@ outcomes separately from anomaly reports; the frontend's sync report reader join
 Typed API enrichment records keep source units and relationship loading state at the boundary.
 See [ADR-0349](../adr/0349-external-catalogue-identity-presence-and-application.md) and
 [REQ-DATA-032…038](../specs/data-persistence.md).
+
+The JobOrder hierarchy foundation uses `orgunit.api.ProfitHierarchyService` for actual eligibility
+and shared/exclusive transaction coordination. `OrgUnitEligibilityObserver` synchronously maintains
+promise eligibility under organisational changes. Inventory owns `OrderLinkedStockWriteObserver`;
+JobOrder supplies its responsibility prerequisite without moving stock ownership or granting order
+editing rights. [REQ-ORDERS-050/-053/-055](../specs/orders-core.md) and
+[ADR-0356](../adr/0356-job-orders-use-profit-hierarchy-responsibility-and-participation.md) own the rules.
+
+`joborder.internal.JobOrderEligibilityStartup` performs the initial pre-readiness reconciliation in
+bounded order-ID/claim pages through the same audited maintenance. Order projections expose distinct
+processing, requester-edit, fulfillment and recovery decisions through `JobOrderAuthority`. The
+editor checks the current action authority under the order's write locks. Lifecycle and
+responsibility have separate observed versions.
+
+The participation service and claim commands share the same order/Staffel enrollment. The workspace
+projects the eligible participation and claim choices for each action. Remaining-need edits retain
+line identities and booked delivery or manufacture.
+
+Material contribution coordination keeps the domain direction unchanged. Inventory owns physical
+quantity provenance, `StockQuantityCorrections` and `OrderLinkedStockWriteObserver`; JobOrder
+implements the observer and owns `MaterialPromiseCoordinator`, provision credit and contribution
+history. Complete stock resource plans precede physical locks. Ordinary provision and connected
+false-fact corrections join the same transaction through those narrow APIs, without moving
+Inventory authority into JobOrder. [REQ-ORDERS-024](../specs/orders-material-claims.md) and
+[ADR-0360](../adr/0360-material-promises-track-uncovered-demand-and-explicit-provision.md) own
+quantity, correction and evidence rules.

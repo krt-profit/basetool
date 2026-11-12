@@ -146,6 +146,39 @@ class DatabaseIndexMigrationTest {
         jdbc, "exchange_change", "idx_exchange_change_resource_key", "resource", "entity_key");
     assertIndexDefContains(
         jdbc, "exchange_journal", "idx_exchange_journal_resource_key", "resource", "entity_key");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_money_holder_change",
+        "idx_job_order_money_holder_change_target",
+        "(order_id, target_holder_id)");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_money_recipient",
+        "idx_job_order_money_recipient_corrected_into",
+        "(order_id, corrected_into_id)");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_money_recipient",
+        "idx_job_order_money_recipient_corrects",
+        "create unique index",
+        "(order_id, corrects_id)");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_linked_money_attempt",
+        "idx_order_linked_money_active",
+        "create unique index",
+        "(order_id, operation_id)",
+        "where active");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_linked_money_attempt",
+        "idx_order_attempt_account_holding",
+        "(order_id, account_holding_id, holding_bank_account_id)");
+    assertIndexDefContains(
+        jdbc,
+        "job_order_money_operation",
+        "idx_order_operation_account_holding",
+        "(order_id, account_holding_id)");
   }
 
   private static void assertIndexExists(JdbcTemplate jdbc, String table, String indexName) {

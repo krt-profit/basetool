@@ -78,6 +78,7 @@ class ItemInventoryOperationsE2eTest {
   private static String opsHubLocId;
 
   private static String einbuchenGameItemId;
+  private static String railgunGameItemId;
   private static String opsGameItemId;
   private static String opsItemRowId;
   private static String syncGameItemId;
@@ -91,9 +92,9 @@ class ItemInventoryOperationsE2eTest {
 
   /**
    * Launches the browser, performs the single shared login, and (ephemeral stack only) seeds the
-   * IRIDIUM membership, a shared source location, one bookable game item per scenario, the item
-   * rows the modal and live-sync flows operate on, and the ITEM + MATERIAL order pair the
-   * allocation-gate scenario filters between.
+   * IRIDIUM membership, a shared source location, one bookable game item per scenario (one of them
+   * a weapon without a blueprint), the item rows the modal and live-sync flows operate on, and the
+   * ITEM + MATERIAL order pair the allocation-gate scenario filters between.
    */
   @BeforeAll
   static void setUp() {
@@ -112,6 +113,7 @@ class ItemInventoryOperationsE2eTest {
         seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Item Ingredient Mat");
 
     einbuchenGameItemId = seeder.seedOrderableItem("E2E Item Einbuchen Widget", ingredientMatId);
+    railgunGameItemId = seeder.seedStockableItem("E2E Item Railgun", "WeaponPersonal", "Large");
 
     opsGameItemId = seeder.seedOrderableItem("E2E Item Ops Widget", ingredientMatId);
     opsItemRowId =
@@ -156,40 +158,63 @@ class ItemInventoryOperationsE2eTest {
     assumeTrue(STACK.managesStack(), "needs the JDBC-seeded bookable game-item catalog");
     runFlow(
         "item-inventory-einbuchen",
-        page -> {
-          E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
-          page.waitForLoadState();
+        page -> bookInThreeAndOpen(page, einbuchenGameItemId, "Einbuchen Widget"));
+  }
 
-          page.getByTestId("segment-inventoryCatalogMode-item").click();
-          E2eSupport.selectComboboxByValue(
-              page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"),
-              einbuchenGameItemId);
-          E2eSupport.selectComboboxFirstOption(
-              page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"));
-          page.locator("#amount").fill("3");
+  /**
+   * Einbuchen in item mode offers a heavy weapon no blueprint produces, a stocked type of the Lager
+   * (REQ-INV-029, ADR-0370), and books it in like a crafted item.
+   */
+  @Test
+  void einbuchenBooksAWeaponWithoutABlueprint() {
+    assumeTrue(STACK.managesStack(), "needs the JDBC-seeded bookable game-item catalog");
+    runFlow(
+        "item-inventory-einbuchen-no-blueprint",
+        page -> bookInThreeAndOpen(page, railgunGameItemId, "Item Railgun"));
+  }
 
-          double before = totalAmount(myItemStacks(einbuchenGameItemId));
-          page.evaluate(
-              "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
-                  + " 'none'; } }");
-          page.waitForResponse(
-              r -> r.url().contains("/inventory/input") && "POST".equals(r.request().method()),
-              () -> page.locator("form[action$='/inventory/input'] button[type='submit']").click());
-          assertEquals(
-              3.0,
-              totalAmount(myItemStacks(einbuchenGameItemId)) - before,
-              AMOUNT_DELTA,
-              "the booked-in whole amount must add to the widget's item stock");
+  /**
+   * Books three units of a game item in through Einbuchen in item mode, asserts the stock grew by
+   * them, and opens the new row in the {@code /inventory?storage=my&view=items} tree.
+   *
+   * @param page the page
+   * @param gameItemId the item to book in
+   * @param searchText the part of the item's name typed into the item picker
+   */
+  private static void bookInThreeAndOpen(Page page, String gameItemId, String searchText) {
+    E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
+    page.waitForLoadState();
 
-          page.waitForURL(url -> url.contains("storage=my"));
+    page.getByTestId("segment-inventoryCatalogMode-item").click();
+    E2eSupport.selectComboboxByValue(
+        page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"),
+        gameItemId,
+        searchText);
+    E2eSupport.selectComboboxFirstOption(
+        page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"));
+    page.locator("#amount").fill("3");
 
-          JsonObject row = findMyItemRow(einbuchenGameItemId);
-          openMyItemViewToEntry(
-              page,
-              einbuchenGameItemId,
-              row.getAsJsonObject("location").get("id").getAsString(),
-              row.get("id").getAsString());
-        });
+    double before = totalAmount(myItemStacks(gameItemId));
+    page.evaluate(
+        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+            + " 'none'; } }");
+    page.waitForResponse(
+        r -> r.url().contains("/inventory/input") && "POST".equals(r.request().method()),
+        () -> page.locator("form[action$='/inventory/input'] button[type='submit']").click());
+    assertEquals(
+        3.0,
+        totalAmount(myItemStacks(gameItemId)) - before,
+        AMOUNT_DELTA,
+        "the booked-in whole amount must add to the item's stock");
+
+    page.waitForURL(url -> url.contains("storage=my"));
+
+    JsonObject row = findMyItemRow(gameItemId);
+    openMyItemViewToEntry(
+        page,
+        gameItemId,
+        row.getAsJsonObject("location").get("id").getAsString(),
+        row.get("id").getAsString());
   }
 
   /**

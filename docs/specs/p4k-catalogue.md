@@ -412,7 +412,7 @@ prices and terminals.
 
 A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
 set. The pickers that filter it: the Lager and item-order item pickers
-(`BlueprintRepository.findItemsWithActiveBlueprint`, `findOrderableItems`), the blueprint pickers,
+(`GameItemRepository.findStockable`, `BlueprintRepository.findOrderableItems`), the blueprint pickers,
 the ship-type, manufacturer and material pickers and searches. A blueprint recipe leaves the product
 search, the product-key resolution of a new personal blueprint, default blueprint, Materialbörse
 offer or request, the name and Wiki-key matches of the imports and the exchange's catalogue
@@ -429,7 +429,9 @@ item, or edits an entry that keeps one, answers `400` with code `CATALOGUE_ITEM_
 property `gameItemId`, and writes nothing; the user picks another item. This covers a Lager item
 stock booked in (REQ-INV-029), a minimum stock level set or changed (REQ-INV-067), a need raised or
 edited (REQ-SUP-003), a donation pledged or recorded (REQ-SUP-007, REQ-SUP-011), an item-order line
-added or edited (REQ-ORDERS-032) and a trade deal created or edited for a need (REQ-PUR-007). Reads,
+added or edited (REQ-ORDERS-032), a trade deal created or edited for a need (REQ-PUR-007) and a
+Materialbörse item offer or request named by its catalogue row (REQ-MARKET-012, REQ-MARKET-014,
+REQ-MARKET-015). Reads,
 lists, deletes, withdrawals and the state changes of an existing entry (pause, resume, receive,
 decline) stay open. Every such write resolves the item through `SelectableGameItems` in
 `catalogue.api`; the JPQL queries that keep only listed items and recipes concatenate
@@ -455,8 +457,8 @@ are all retired answers as unknown there.
 **Enforced by:** `P4kStampedRowVisibilityTest`, `JobOrderItemDetailRenderTest`,
 `SelectableGameItemsTest`, `SelectableBlueprintsTest`, `StockLevelIntegrationTest`, `SupplyNeedServiceTest`,
 `SupplyDonationServiceTest`, `JobOrderItemServiceTest`, `InventoryItemServiceTest`,
-`PurchasingDealServiceTest`, `GlobalExceptionHandlerTest` (frontend), `krt-fetch-read.test.mjs`,
-`ExchangeStockWriteControllerTest`, `ExchangeOrgStockWriteControllerTest`,
+`PurchasingDealServiceTest`, `MaterialExchangeServiceTest`, `GlobalExceptionHandlerTest` (frontend),
+`krt-fetch-read.test.mjs`, `ExchangeStockWriteControllerTest`, `ExchangeOrgStockWriteControllerTest`,
 `ExchangeGoldenAnswerTest` (ingest)
 · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
@@ -810,6 +812,7 @@ and every value sent back to the server stay on `name`. Admin pages where an adm
 name, and the file exports (the handover report PDF, the purchasing CSV), show `name`.
 
 **Enforced by:** `P4kNamesTest`, `LocalisedNamesTest`, `:frontend:testLocalisedNameJs`,
+`:frontend:testCatalogueAdminJs`,
 `ShipTypeMapperTest`, `ShipDataPageControllerMvcTest`, `ItemPickerLabelsTest`,
 `ItemReconciliationServiceTest` ·
 **ADR:** [ADR-0338](../adr/0338-the-p4k-catalogue-leads-a-manufacturers-identity-name-and-description.md) · **Issues:** #2890

@@ -174,7 +174,7 @@ public final class ScopeParityCallers {
       request.addHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER, caller.pin().toString());
     }
     OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
-    when(orgUnits.countProfitEligibleByIdIn(anyCollection())).thenReturn(1L);
+    when(orgUnits.countInActiveProfitHierarchyByIdIn(anyCollection())).thenReturn(1L);
     when(orgUnits.existsByIdAndActiveTrue(any())).thenReturn(true);
     RequestScopeResolver resolver =
         new RequestScopeResolver(authHelper, memberships, orgUnits, cascade, request);

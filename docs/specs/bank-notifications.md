@@ -1,5 +1,9 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-09.
 > **Owner area:** BANK · **Related ADRs:** [ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md)
+
+> **Status:** Linked aUEC outcomes use grouped Bank and Order notices with the existing approval
+> tasks and mute preferences. The composition evidence is tracked in
+> [REQ-ORDERS-076](orders-auec-bank.md#req-orders-076---integration-preserves-access-evidence-and-external-boundaries).
 
 # Bank notifications
 
@@ -14,6 +18,10 @@ and has a seeded, admin-editable rule. Each can be muted (REQ-NOTIF-027).
 ## Requirements
 
 ### REQ-BANK-057 — An approved request is ready to confirm
+
+> Linked authorisation requests use the same readiness path and ADR-0353 attestation.
+> A holder-transfer request goes directly to the Bank queue. The account-owner step applies to
+> the linked actions that require it.
 
 `BankBookingRequestService#applyOwnerApprovalWithinTransaction` (reached by
 `OrgUnitBankRequestService#grantOwnerApproval`) publishes `BANK_BOOKING_REQUEST_APPROVED` when the
@@ -35,6 +43,11 @@ REQ-NOTIF-025) and leaves every other grantee's alone.
 
 ### REQ-BANK-059 — A direct booking by bank staff tells the members it affects
 
+> **Linked aUEC outcomes:** Bank and Order notices use one logical outcome per recipient.
+> Approval tasks retain their own lifecycle. Success notices follow the existing mute and
+> priority rules. A later staff decision uses the staff actor. Order notices carry the permitted
+> order facts under REQ-ORDERS-073/-075/-076.
+
 `BankBookingController` (withdrawal, transfer, reversal) and `BankHolderController` (holder transfer)
 call `BankDirectBookingNotifier` after the ledger booked; the ledger itself publishes nothing, because
 confirming a request books through it and already has its own notice. A withdrawal with a member
@@ -44,6 +57,14 @@ withdrawal, a transfer's source account and every account leg of a reversal publ
 `BANK_ACCOUNT_DEBITED` (the account's responsible holders, `ACCOUNT_RESPONSIBLE`; coded `debitCode`
 `WITHDRAWAL`, `TRANSFER` or `REVERSAL`). Deposits are never announced, because a split deposit fans out
 over every squadron account. A booking that an over-limit request replaced announces nothing.
+
+The linked Bank command publishes direct booking notices in its transaction. A direct no-ledger
+authorisation emits `BANK_FUNDS_AUTHORISED` for the funding account's responsible holders, with
+the authorised amount and the deciding employee. Its rule excludes that employee and honours
+per-type muting. A linked request uses the ordinary request lifecycle, with the actual decider and
+without a second direct notice. A holder-transfer request reaches Bank management under the
+existing request-created rule and appears in the ordinary Bank staff queue. It has no account
+grantee or approval task.
 
 ### REQ-BANK-060 — A deactivated holder who still holds money tells the bank management
 
@@ -62,7 +83,14 @@ holder's handle and the balance. The notice goes when the holder is reactivated 
 - [x] A holder without money, a reactivated holder and an emptied holder have no standing notice.
 - [x] The default rules exist, are enabled, and use the intended selector kinds.
 
-**Enforced by:** `BankNoticeIntegrationTest`, `BankDirectBookingNotifierTest`,
+**Approved target acceptance - not implemented**
+
+- [ ] New linked requests retain necessary approval/readiness tasks and remove stale prompts under current access.
+- [ ] One logical Bank/order outcome reaches each recipient once across overlapping roles; a muted outcome is not recreated as order success.
+- [ ] Direct/requested/no-ledger/replay/rollback paths produce truthful, nonduplicated notices.
+- [ ] Staff decisions use their real actor and disclose no private approval/staff note through order notices.
+
+**Baseline enforced by:** `BankNoticeIntegrationTest`, `BankDirectBookingNotifierTest`,
 `BankBookingRequestServiceTest` (`applyOwnerApprovalWithinTransaction_…`), `BankGrantServiceTest`,
 `BankHolderReconciliationServiceTest`, `BankHolderServiceTest`, `BankPostingWriterNoticeTest`,
 `SeededNotificationRulesIntegrationTest`, `NotificationPageControllerTest` (`targetOf_…`) ·

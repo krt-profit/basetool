@@ -49,6 +49,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterDirectory;
 import de.greluc.krt.profit.basetool.backend.orgunit.internal.OrgUnitMembershipRecipientDirectory;
 import java.util.Collection;
 import java.util.HashSet;
@@ -98,7 +99,10 @@ class RecipientDirectoriesTest {
     OrgUnitSeatEligibility seatEligibility =
         new OrgUnitSeatEligibility(orgUnitMembershipRepository, userRepository);
     OrgUnitMembershipRecipientDirectory orgUnits =
-        new OrgUnitMembershipRecipientDirectory(orgUnitMembershipRepository, seatEligibility);
+        new OrgUnitMembershipRecipientDirectory(
+            orgUnitMembershipRepository,
+            seatEligibility,
+            new OrgUnitWriterDirectory(orgUnitMembershipRepository));
     OrgUnitBankRecipientDirectory accounts =
         new OrgUnitBankRecipientDirectory(
             bankAccountGrantRepository,

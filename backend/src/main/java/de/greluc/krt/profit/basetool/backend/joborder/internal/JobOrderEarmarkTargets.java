@@ -21,13 +21,18 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.EarmarkTargets;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -35,10 +40,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Tells the Lager the running number of the job orders its stock is earmarked to and what an order
- * requires. The requirement reads answer only for an order the caller sees within the tenancy scope
- * ({@link JobOrderAccessPolicy#canSeeJobOrderInScope}), so a Lager earmark never names an order of
- * a foreign org unit (REQ-ORDERS-018, REQ-ORG-003).
+ * Exposes readable order identities and requirements to Inventory without granting stock authority.
  */
 @Component
 @RequiredArgsConstructor
@@ -64,20 +66,63 @@ public class JobOrderEarmarkTargets implements EarmarkTargets.JobOrders {
   @Override
   @Transactional(readOnly = true)
   public @Nullable Set<UUID> requiredMaterialIds(@NotNull UUID jobOrderId) {
-    return jobOrderRepository
-        .findById(jobOrderId)
-        .filter(jobOrderAccessPolicy::canSeeJobOrderInScope)
-        .map(jobOrderItemService::requiredMaterialIds)
-        .orElse(null);
+    return requirementsOf(
+        jobOrderId, this::ordinaryEarmarkAllowed, jobOrderItemService::requiredMaterialIds);
   }
 
   @Override
   @Transactional(readOnly = true)
   public @Nullable Set<UUID> requiredGameItemIds(@NotNull UUID jobOrderId) {
+    return requirementsOf(
+        jobOrderId, this::ordinaryEarmarkAllowed, jobOrderItemService::requiredGameItemIds);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public @Nullable Set<UUID> requiredMaterialIdsInScope(@NotNull UUID jobOrderId) {
+    return requirementsOf(
+        jobOrderId, this::poolEarmarkAllowed, jobOrderItemService::requiredMaterialIds);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public @Nullable Set<UUID> requiredGameItemIdsInScope(@NotNull UUID jobOrderId) {
+    return requirementsOf(
+        jobOrderId, this::poolEarmarkAllowed, jobOrderItemService::requiredGameItemIds);
+  }
+
+  private boolean ordinaryEarmarkAllowed(JobOrder order) {
+    if (!jobOrderAccessPolicy.canSeeJobOrder(order)) {
+      return false;
+    }
+    if (order.getStatus() == JobOrderStatus.CANCELLED) {
+      throw new BadRequestException("error.job_order.earmark.cancelled");
+    }
+    return true;
+  }
+
+  private boolean poolEarmarkAllowed(JobOrder order) {
+    return order.getStatus() != JobOrderStatus.CANCELLED
+        && jobOrderAccessPolicy.canSeeJobOrderInScope(order);
+  }
+
+  /**
+   * Reads attachment requirements after checking the target's scope and status.
+   *
+   * @param jobOrderId the job order
+   * @param visibility the caller's required read contract
+   * @param requirements the material or item requirements
+   * @return the requirements, or {@code null} for an unknown or unreadable order
+   */
+  private @Nullable Set<UUID> requirementsOf(
+      @NotNull UUID jobOrderId,
+      @NotNull Predicate<JobOrder> visibility,
+      @NotNull Function<JobOrder, Set<UUID>> requirements) {
     return jobOrderRepository
         .findById(jobOrderId)
-        .filter(jobOrderAccessPolicy::canSeeJobOrderInScope)
-        .map(jobOrderItemService::requiredGameItemIds)
+        .filter(order -> order.getType().usesStock())
+        .filter(visibility)
+        .map(requirements)
         .orElse(null);
   }
 }

@@ -1,6 +1,7 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
-> **Owner area:** INV / ORDERS · **Related ADRs:** ADR-0101 (builds on ADR-0098/0099); design
-> context in [`docs/archive/DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md).
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-11.
+> **Owner area:** INV / ORDERS · **Related ADRs:** ADR-0101 (builds on ADR-0098/0099), ADR-0370
+> (the bookable items); design context in
+> [`docs/archive/DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md).
 
 # Inventory — game-item stock rows (Items im Lager)
 
@@ -22,11 +23,31 @@ An `InventoryItem` row references **exactly one** catalog entry: a `Material` (w
 `quality` 0–1000) or a `GameItem` (with `quality IS NULL`). Game-item rows hold
 **positive whole-unit** amounts, follow the PIECE auto-merge rule of REQ-INV-026, and
 their stack identity is `user · gameItem · location · personal · owningOrgUnit` (no
-quality dimension). Only items that are the output of ≥ 1 active blueprint are bookable:
-the Lager item picker (`GET /api/v1/game-items`, `InventoryItemCatalogService`)
-offers only those (the catalog predicate is deliberately a superset of the order picker's
-RESOURCE-ingredient requirement, which the same read serves with `orderable=true`); the create path itself does not re-check it, but it refuses an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013). Tenancy, owner escape, audit and append-only
-semantics are identical to material rows.
+quality dimension). Tenancy, owner escape, audit and append-only semantics are identical to
+material rows.
+
+**Bookable items (ADR-0370).** The Lager item picker (`GET /api/v1/game-items`,
+`InventoryItemCatalogService`, `GameItemRepository.findStockable`) offers every listed game item
+that is the output of a listed active blueprint, **and** every listed game item whose P4K type
+(`GameItem#wikiType`, the SC Wiki filling a gap) belongs to a `StockableItemGroup`:
+
+| Group | P4K types | Sub-types left out |
+|---|---|---|
+| FPS weapons, knives, multi-tools | `WeaponPersonal` | `Grenade` (grenades, flares) |
+| Weapon attachments | `WeaponAttachment` | `Magazine`, `Missile` (ammunition) |
+| Armour | `Char_Armor_Helmet`, `_Torso`, `_Arms`, `_Legs`, `_Backpack`, `_Undersuit` | — |
+| Jetpacks | `Suit` | — |
+| Ship components and weapons | every `ShipComponentType` except `Turret`, plus `GroundVehicleMissileLauncher` | — |
+| Mining and salvage modules | `MiningModifier`, `Gadget`, `SalvageModifier` | — |
+| Storage containers | `InventoryContainer` | — |
+| Loot and collectibles | `Misc` | `Mineable` (materials), `Consumable` (food) |
+
+Everything else — clothing, paints, decoration, turrets, consumables (medical pens, hacking tools,
+food, drink, keycards, scrip), cargo, a ship's fixed parts and items without a known type — is
+bookable only as the output of a blueprint, so everything a job order produces stays bookable by
+hand. The item-order picker (`orderable=true`) is unchanged: outputs of an active blueprint with a
+resolved RESOURCE ingredient. The create path does not re-check the picker's rule, but it refuses
+an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 
 **Acceptance**
 
@@ -40,11 +61,18 @@ semantics are identical to material rows.
   item row present.
 - [ ] Item rows merge on write (PIECE rule); the merge FOR-UPDATE group query matches
   NULL material/quality + the gameItem key (no silent no-op).
+- [x] The picker offers a Scourge Railgun (`WeaponPersonal/Large`, no blueprint), a scope, a
+  helmet, a shield, an artifact and a crafted magazine; it offers no grenade, uncrafted magazine,
+  mineable gem, medical pen, shirt, paint, turret, untyped row without a blueprint, retired or
+  hidden item, and no output of a retired recipe whose type is not stocked.
+- [x] Every `ShipComponentType` but the turret is a stocked type.
 
 **Enforced by:** `InventoryItemServiceTest` / `InventoryStockMergeTest` item cases,
-`ValidQuantityAmountValidatorTest` · **Code:** `InventoryItem`, V220,
-`ValidQuantityAmountValidator`, `InventoryItemRepository`, `InventoryItemCatalogService` ·
-**Issues:** —
+`ValidQuantityAmountValidatorTest`, `InventoryBookableItemsTest`, `StockableItemGroupTest`,
+`InventoryItemCatalogServiceTest`, `ItemInventoryOperationsE2eTest`
+(`einbuchenBooksAWeaponWithoutABlueprint`) · **Code:** `InventoryItem`, V220,
+`ValidQuantityAmountValidator`, `InventoryItemRepository`, `InventoryItemCatalogService`,
+`StockableItemGroup`, `GameItemRepository#findStockable` · **Issues:** —
 
 ### REQ-INV-030 — Separate Material / Items views on the Lager surfaces
 
@@ -351,7 +379,7 @@ parameters (ADR-0290).
 
 ## Out of scope
 
-Non-blueprint items and the "Mein Inventar" boundary (design §11). Materialbörse stock-backed
+The "Mein Inventar" boundary (design §11). Materialbörse stock-backed
 item offers (design §8) shipped as REQ-MARKET-014 ([`materialboerse.md`](materialboerse.md)) —
 including the Mein-Lager Items-view "Für Börse freigeben" leaf toggle (see REQ-INV-030). The
 order-detail item-stock panel shipped as REQ-ORDERS-028 and delivery-consumes-earmarked-stock

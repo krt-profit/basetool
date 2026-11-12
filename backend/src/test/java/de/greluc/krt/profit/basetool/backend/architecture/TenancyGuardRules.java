@@ -25,6 +25,7 @@ import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.domain.JavaMethodReference;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.platform.api.ObserverSpi;
@@ -129,6 +130,39 @@ final class TenancyGuardRules {
     @NotNull
     public String toString() {
       return controller.getSimpleName() + "#" + method;
+    }
+  }
+
+  /**
+   * Identifies one public mutation gateway by its exact declared method signature.
+   *
+   * @param owner the declaring class
+   * @param method the declared method name
+   * @param parameterTypes the complete erased parameter signature
+   */
+  record ScopeGateway(Class<?> owner, String method, List<Class<?>> parameterTypes) {
+    ScopeGateway {
+      parameterTypes = List.copyOf(parameterTypes);
+    }
+
+    /** Matches only the declared owner, method and complete parameter signature. */
+    boolean matches(JavaMethod candidate) {
+      return owner.getName().equals(candidate.getOwner().getName())
+          && method.equals(candidate.getName())
+          && parameterTypes.stream()
+              .map(Class::getName)
+              .toList()
+              .equals(candidate.getRawParameterTypes().stream().map(JavaClass::getName).toList());
+    }
+
+    @Override
+    public String toString() {
+      return owner.getSimpleName()
+          + "#"
+          + method
+          + "("
+          + String.join(",", parameterTypes.stream().map(Class::getSimpleName).toList())
+          + ")";
     }
   }
 
@@ -341,6 +375,18 @@ final class TenancyGuardRules {
     return false;
   }
 
+  /** Checks tenant writes using only the ordinary bounded delegation search. */
+  @NotNull
+  static GateReport writeGateReport(
+      @NotNull JavaClasses classes,
+      @NotNull Set<Class<?>> tenantData,
+      @NotNull Set<Class<?>> scopeGateTypes,
+      @NotNull Map<HandlerKey, String> serviceGated,
+      @NotNull Map<HandlerKey, String> notTenantWrites) {
+    return writeGateReport(
+        classes, tenantData, scopeGateTypes, serviceGated, notTenantWrites, Set.of());
+  }
+
   /**
    * Checks that every write handler with a {@code UUID} path variable, on a controller that injects
    * a writer of tenant data or of the org-unit tree, gates on the scope service.
@@ -358,6 +404,7 @@ final class TenancyGuardRules {
    * @param scopeGateTypes the scope services whose {@code can*} methods and SpEL bean names count
    * @param serviceGated handlers whose scope check lives in the service layer, with the reason
    * @param notTenantWrites handlers that write no tenant data although selected, with the reason
+   * @param authoritativeGateways exact public mutation contracts requiring their own scope check
    * @return the selection and one message per violation
    */
   @NotNull
@@ -366,7 +413,8 @@ final class TenancyGuardRules {
       @NotNull Set<Class<?>> tenantData,
       @NotNull Set<Class<?>> scopeGateTypes,
       @NotNull Map<HandlerKey, String> serviceGated,
-      @NotNull Map<HandlerKey, String> notTenantWrites) {
+      @NotNull Map<HandlerKey, String> notTenantWrites,
+      @NotNull Set<ScopeGateway> authoritativeGateways) {
     Map<String, Class<?>> guardedRepositories = guardedRepositories(classes, tenantData);
     Set<String> writers = writersOf(classes, guardedRepositories);
     SpelScopeGate gate = new SpelScopeGate(scopeGateTypes);
@@ -378,6 +426,8 @@ final class TenancyGuardRules {
     Set<Class<?>> controllers = new LinkedHashSet<>();
     Set<HandlerKey> handlers = new LinkedHashSet<>();
     List<String> violations = new ArrayList<>();
+    Set<JavaMethod> verifiedGateways =
+        verifiedScopeGateways(classes, authoritativeGateways, gate, scopeTypeNames, violations);
     for (JavaClass javaClass : classes) {
       if (javaClass.isInterface() || !javaClass.isAnnotatedWith(RestController.class)) {
         continue;
@@ -414,7 +464,8 @@ final class TenancyGuardRules {
         }
         if (serviceGated.containsKey(key)) {
           JavaMethod javaMethod = javaClass.getMethod(method.getName(), method.getParameterTypes());
-          if (reachesScopeCheck(javaMethod, 0, new HashSet<>(), gate, scopeTypeNames)) {
+          if (reachesScopeCheck(
+              javaMethod, 0, new HashSet<>(), gate, scopeTypeNames, verifiedGateways)) {
             continue;
           }
           violations.add(
@@ -502,6 +553,33 @@ final class TenancyGuardRules {
     return writers;
   }
 
+  /** Resolves only public gateways whose own bodies reach a current scope gate. */
+  private static Set<JavaMethod> verifiedScopeGateways(
+      JavaClasses classes,
+      Set<ScopeGateway> gateways,
+      SpelScopeGate gate,
+      Set<String> scopeTypeNames,
+      List<String> violations) {
+    Set<JavaMethod> verified = new HashSet<>();
+    for (ScopeGateway gateway : gateways) {
+      List<JavaMethod> matches =
+          classes.stream()
+              .filter(type -> type.getName().equals(gateway.owner().getName()))
+              .flatMap(type -> type.getMethods().stream())
+              .filter(gateway::matches)
+              .toList();
+      if (matches.size() != 1 || !matches.getFirst().getModifiers().contains(JavaModifier.PUBLIC)) {
+        violations.add("Scope gateway " + gateway + " is unresolved or not public");
+      } else if (!reachesScopeCheck(
+          matches.getFirst(), 0, new HashSet<>(), gate, scopeTypeNames, Set.of())) {
+        violations.add("Scope gateway " + gateway + " has no reachable scope check");
+      } else {
+        verified.add(matches.getFirst());
+      }
+    }
+    return verified;
+  }
+
   /**
    * Whether an interface is a module's published command API: a {@code …Commands} type in an {@code
    * api} package (plan §5.3).
@@ -555,7 +633,8 @@ final class TenancyGuardRules {
       int depth,
       Set<String> visited,
       SpelScopeGate gate,
-      Set<String> scopeTypeNames) {
+      Set<String> scopeTypeNames,
+      Set<JavaMethod> verifiedGateways) {
     if (depth > MAX_DELEGATION_DEPTH || !visited.add(method.getFullName())) {
       return false;
     }
@@ -576,14 +655,14 @@ final class TenancyGuardRules {
         continue;
       }
       for (JavaMethod target : call.getTarget().resolveMember().stream().toList()) {
-        if (hasScopeGatedPreAuthorize(target, gate)) {
+        if (verifiedGateways.contains(target) || hasScopeGatedPreAuthorize(target, gate)) {
           return true;
         }
         next.add(target);
       }
     }
     for (JavaMethod target : next) {
-      if (reachesScopeCheck(target, depth + 1, visited, gate, scopeTypeNames)) {
+      if (reachesScopeCheck(target, depth + 1, visited, gate, scopeTypeNames, verifiedGateways)) {
         return true;
       }
     }

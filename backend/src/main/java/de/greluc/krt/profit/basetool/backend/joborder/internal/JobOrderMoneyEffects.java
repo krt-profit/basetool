@@ -1,0 +1,222 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.joborder.internal;
+
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderMoneyMovedEvent;
+import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderMoneyProvisionedEvent;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
+import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationCause;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Component;
+
+/** Registers committed money invalidations and targeted participant notices. */
+@Component
+@RequiredArgsConstructor
+class JobOrderMoneyEffects {
+
+  static final List<String> LIFECYCLE_SECTIONS =
+      List.of("money", "header", "actions", "dialogs", "kpi", "participations");
+
+  private final LiveSyncPublisher live;
+  private final ApplicationEventPublisher events;
+  private final JobOrderChangeEffects orderEffects;
+
+  void provisionRecorded(
+      JobOrder order,
+      JobOrderMoneyHolder holder,
+      JobOrderMoneyOperation attempt,
+      UUID actor,
+      boolean started,
+      boolean newLinkedHolder) {
+    live.publishAfterCommit(
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
+        started ? LIFECYCLE_SECTIONS : List.of("money"));
+    if (started || newLinkedHolder) {
+      live.publishAfterCommit(
+          LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
+    }
+    UUID recipient = holder.getUserId();
+    if (recipient == null || recipient.equals(actor)) {
+      return;
+    }
+    boolean grouped =
+        attempt.getCommitmentId() != null || orderEffects.hasLinkedCause(order.getId());
+    var notice =
+        new JobOrderMoneyProvisionedEvent(
+            order.getId(),
+            attempt.personalHolderId(),
+            recipient,
+            actor,
+            grouped,
+            order.getDisplayId());
+    if (grouped) {
+      orderEffects.publish(notice);
+    } else {
+      events.publishEvent(
+          new NotificationCause(Objects.requireNonNull(attempt.getId()), List.of(notice)));
+    }
+  }
+
+  void reassignmentRecorded(
+      JobOrder source,
+      JobOrder destination,
+      JobOrderMoneyOperation outflow,
+      @Nullable UUID account,
+      UUID actor,
+      boolean destinationStarted,
+      boolean newLinkedHolder) {
+    movementRecorded(source, outflow, account, null, actor, false, false);
+    publishMoney(destination, destinationStarted, newLinkedHolder);
+  }
+
+  void accountMoneyChanged(JobOrder order, boolean lifecycleChanged) {
+    publishMoney(order, lifecycleChanged, false);
+  }
+
+  void linkedAttemptChanged(JobOrder order, boolean participantAdded) {
+    publishMoney(order, false, participantAdded);
+  }
+
+  void designationChanged(JobOrder order, boolean linked) {
+    publishMoney(order, false, linked);
+  }
+
+  void movementRecorded(
+      JobOrder order,
+      JobOrderMoneyOperation fact,
+      @Nullable UUID source,
+      @Nullable UUID recipient,
+      UUID actor,
+      boolean lifecycleChanged,
+      boolean newLinkedHolder) {
+    publishMoney(order, lifecycleChanged, newLinkedHolder);
+    boolean grouped =
+        orderEffects.hasLinkedCause(order.getId())
+            || order.getStatus() == JobOrderStatus.COMPLETED
+            || fact.getCommitmentId() != null
+            || (lifecycleChanged && fact.getKind() == JobOrderMoneyKind.REQUESTER_RETURN);
+    List<NotificationEvent> notices = new ArrayList<>();
+    if (source != null && !source.equals(actor)) {
+      notices.add(
+          new JobOrderMoneyMovedEvent(
+              order.getId(),
+              fact.getKind() == JobOrderMoneyKind.REQUESTER_RETURN ? null : fact.getHolderId(),
+              fact.getKind() == JobOrderMoneyKind.REQUESTER_RETURN ? fact.getRecipientId() : null,
+              source,
+              actor,
+              source,
+              recipient,
+              grouped,
+              order.getDisplayId()));
+    }
+    if (recipient != null && !recipient.equals(actor) && !recipient.equals(source)) {
+      notices.add(
+          new JobOrderMoneyMovedEvent(
+              order.getId(),
+              fact.getDestinationHolderId(),
+              fact.getRecipientId(),
+              recipient,
+              actor,
+              source,
+              recipient,
+              grouped,
+              order.getDisplayId()));
+    }
+    if (grouped) {
+      notices.forEach(orderEffects::publish);
+    } else if (!notices.isEmpty()) {
+      events.publishEvent(new NotificationCause(Objects.requireNonNull(fact.getId()), notices));
+    }
+  }
+
+  void correctionRecorded(
+      JobOrder order,
+      Collection<CorrectionParty> parties,
+      JobOrderMoneyOperation fact,
+      UUID actor,
+      boolean lifecycleChanged,
+      boolean affectsRecipients,
+      boolean affectsCredit) {
+    publishMoney(order, lifecycleChanged, affectsRecipients);
+    boolean grouped =
+        lifecycleChanged || affectsCredit || orderEffects.hasLinkedCause(order.getId());
+    var affected = new HashSet<UUID>();
+    List<NotificationEvent> notices = new ArrayList<>();
+    for (var party : parties) {
+      UUID account = party.accountId();
+      if (!account.equals(actor) && affected.add(account)) {
+        notices.add(
+            new JobOrderMoneyMovedEvent(
+                order.getId(),
+                party.holderId(),
+                party.recipientId(),
+                account,
+                actor,
+                account,
+                null,
+                grouped,
+                order.getDisplayId()));
+      }
+    }
+    if (grouped) {
+      notices.forEach(orderEffects::publish);
+    } else if (!notices.isEmpty()) {
+      events.publishEvent(new NotificationCause(Objects.requireNonNull(fact.getId()), notices));
+    }
+  }
+
+  /** Current linked participant whose financial history changed. */
+  record CorrectionParty(@Nullable UUID holderId, @Nullable UUID recipientId, UUID accountId) {}
+
+  void targetChanged(JobOrder order) {
+    publishMoney(order, false, true);
+  }
+
+  void informationChanged(JobOrder order) {
+    live.publishAfterCommit(
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
+        List.of("money", "header", "details", "dialogs"));
+    live.publishAfterCommit(
+        LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
+  }
+
+  private void publishMoney(JobOrder order, boolean lifecycleChanged, boolean membershipChanged) {
+    live.publishAfterCommit(
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
+        lifecycleChanged ? LIFECYCLE_SECTIONS : List.of("money"));
+    if (lifecycleChanged || membershipChanged) {
+      live.publishAfterCommit(
+          LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
+    }
+  }
+}

@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
@@ -58,7 +59,10 @@ import org.springframework.security.access.AccessDeniedException;
  * a direct membership or no unit as target, no event when nothing changes, and the merge rules
  * applied after the change.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryOrgUnitChangeServiceTest {
 
   private static final UUID CALLER = UUID.randomUUID();
@@ -78,6 +82,9 @@ class InventoryOrgUnitChangeServiceTest {
   void setUp() {
     service =
         new InventoryOrgUnitChangeService(
+            new InventoryOrderWrites(
+                inventoryItemRepository,
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
             inventoryItemRepository,
             orgUnitRepository,
             membershipQueryService,

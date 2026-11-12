@@ -1531,8 +1531,8 @@ class InventoryPageControllerMvcTest {
     UUID sk = UUID.randomUUID();
     stubInputPageWithOwnerOptions(
         List.of(
-            new OrgUnitMembershipOptionDto(staffel, "ALPHA", "ALP", "SQUADRON", true),
-            new OrgUnitMembershipOptionDto(sk, "Bergbau", "BB", "SPECIAL_COMMAND", true)));
+            new OrgUnitMembershipOptionDto(staffel, "ALPHA", "ALP", "SQUADRON"),
+            new OrgUnitMembershipOptionDto(sk, "Bergbau", "BB", "SPECIAL_COMMAND")));
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
         .thenReturn(LayoutResponses.activeOrgUnit(sk));
 
@@ -1565,8 +1565,8 @@ class InventoryPageControllerMvcTest {
   void viewInputPage_ShouldAskForAnOwnerChoiceWithoutAnActiveOrgUnit() throws Exception {
     stubInputPageWithOwnerOptions(
         List.of(
-            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON", true),
-            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Bergbau", "BB", "SQUADRON", true)));
+            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON"),
+            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "Bergbau", "BB", "SQUADRON")));
 
     mockMvc
         .perform(get("/inventory/input"))
@@ -1591,8 +1591,7 @@ class InventoryPageControllerMvcTest {
   @WithMockUser(roles = "LOGISTICIAN")
   void viewInputPage_ShouldKeepAHiddenOwnerPickerOnTheOnBehalfForm() throws Exception {
     stubInputPageWithOwnerOptions(
-        List.of(
-            new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON", true)));
+        List.of(new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", "SQUADRON")));
 
     mockMvc
         .perform(get("/inventory/input").param("source", "admin"))

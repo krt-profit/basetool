@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActors;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
@@ -30,7 +30,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.scope.api.MemberRoleCodes;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -81,27 +81,37 @@ class DatabaseBankActors implements BankActors {
    */
   @NotNull
   private BankActor load(@NotNull UUID userId, @NotNull Set<String> dropped) {
-    Optional<User> user = userRepository.findById(userId);
-    if (user.isEmpty()) {
+    List<UserRepository.StoredAuthority> authorities = userRepository.findStoredAuthorities(userId);
+    if (authorities.isEmpty()) {
       return BankActor.NOBODY;
     }
     List<OrgUnitMembership> memberships =
         membershipRepository.findAllOnActiveOrgUnitsByIdUserId(userId);
     Set<String> stored =
-        MemberRoleCodes.of(user.get(), memberships).stream()
-            .filter(code -> !dropped.contains(code))
-            .collect(Collectors.toUnmodifiableSet());
+        authorities.getFirst().getApprovalStatus() == ApprovalStatus.ACTIVE
+            ? MemberRoleCodes.fromStoredRoles(
+                authorities.stream()
+                    .map(UserRepository.StoredAuthority::getRoleCode)
+                    .filter(Objects::nonNull)
+                    .toList(),
+                memberships)
+            : Set.of();
     Map<UUID, BankActor.Grant> grants =
-        grantRepository.findByUserId(userId).stream()
+        grantRepository.findActorGrants(userId).stream()
             .collect(
                 Collectors.toUnmodifiableMap(
-                    grant -> grant.getId().getAccountId(),
+                    BankAccountGrantRepository.ActorGrant::getAccountId,
                     grant ->
                         new BankActor.Grant(
-                            grant.isCanDeposit(), grant.isCanWithdraw(), grant.isCanTransfer())));
+                            grant.getCanDeposit(),
+                            grant.getCanWithdraw(),
+                            grant.getCanTransfer())));
     return new BankActor(
         userId,
-        reachable(stored),
+        reachable(
+            stored.stream()
+                .filter(code -> !dropped.contains(code))
+                .collect(Collectors.toUnmodifiableSet())),
         memberships.stream()
             .map(m -> new BankActor.Seat(m.getId().getOrgUnitId(), m.getRole()))
             .toList(),

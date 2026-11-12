@@ -426,7 +426,9 @@ row to merge with exists, asking `GET /api/v1/inventory/merge-candidates` (relay
 exactly as the create does (auto-stamp, active-context pin), counts with the merge key and offer
 exclusion below, takes no lock, answers `false` where the booking itself would be refused, and
 needs the on-behalf scope of REQ-SEC-005 to probe another member. Hiding the checkbox unticks it; a
-probe that fails shows it, so the opt-in is never lost to an outage.
+probe that fails shows it, so the opt-in is never lost to an outage. This read remains usable outside
+a stock-write transaction and does not acquire the order-write prerequisite; the public endpoint is
+covered by `InventoryJobOrderScopeIntegrationTest.mergePreviewAnswersBeforeAnyStockBooking`.
 
 The **merge identity** is the **physical** stack key (Variante C, REQ-INV-027): owner · material ·
 location · quality · `personal` · owning org-unit pool (a `NULL` pool matches `NULL`) · `stolen`;
@@ -570,6 +572,22 @@ its localized problem `detail` is shown to the user (the throw sites carry
 `GlobalExceptionHandler#resolveDetail`), not swallowed into a generic failure toast. Each mutation is audited
 (`INVENTORY_ALLOCATION_ADDED` / `_CHANGED` / `_REMOVED`, REQ-AUDIT-001). The entry's `@Version` is the
 single optimistic-lock token for its allocations (an inverse-side slice change force-increments it).
+Single and bulk releases, including releases caused by job-order state changes or deletion,
+retain the physical stock and advance only entries whose slices actually change. Each removed
+slice receives its Inventory removal audit in the same transaction. Repeating a release with
+nothing left to remove changes neither the entry version nor its removal audit. Releasing
+slices must keep unrelated managed aggregates usable for the rest of the surrounding transaction.
+
+Server-derived default reduction plans take the unassigned remainder first. For `PIECE`, the
+remaining deduction is apportioned in whole units: floor the exact proportional quotas, then
+assign residual units by descending fractional remainder, with immutable target identity as the
+tie break. Each deduction stays within its slice and the sum equals the required tagged deduction.
+The `SCU` default retains its three-decimal shares and final-tag rounding. A rounded share may
+not exceed the required tagged deduction still outstanding. If the final tag cannot absorb a
+rounding shortfall, only that residual is redistributed within the existing slices' remaining
+capacities. The resulting tagged sum equals the required deduction, and a physical split preserves
+every target's total allocation while keeping both portions within R5. Valid rounded plans retain
+their existing shares. Explicit deduct-from plans retain their ordinary validation and choice.
 
 **Game-item rows (REQ-INV-031).** A **game-item** stock row
 ([`inventory-items.md`](inventory-items.md)) allocates only to qualifying `ITEM` orders whose
@@ -1346,10 +1364,11 @@ The shared "Globales Lager" page (`/inventory/all`) offers an admin a **"Globale
 entry in the page head's „⋯" menu (since 2026-10-03, website overhaul phase 3; it was a button in
 the action bar above the table) behind a danger confirmation modal. It deletes every **non-personal** Lager row inside the
 caller's current org-unit scope; personal rows (`personal = true`) are never touched. The wipe
-first locks those rows (`PESSIMISTIC_WRITE`, ascending id), then audits the Materialbörse offers on
-exactly the locked rows (REQ-MARKET-013) and deletes exactly them in one statement, so a row booked
-into the scope while the wipe runs survives it and no offer appears on a locked row in between
-(ADR-0362). The scope is the standard predicate triple
+captures the matching row ids, plans their order, material and stock resources, and locks the
+captured rows with `PESSIMISTIC_WRITE` in ascending id order. It rechecks scope under those locks and
+audits the Materialbörse offers (REQ-MARKET-013) on the same subset it deletes by id in one
+statement. Rows that enter the scope after selection survive (ADR-0362).
+The scope is the standard predicate triple
 ([`org-unit-tenancy.md`](org-unit-tenancy.md) REQ-ORG-003): an admin in all-scope wipes the shared
 stock of every org unit, an admin pinned to one org unit wipes only that unit's. The rows' job-order
 / mission allocations and any Materialbörse offer they back go with them through the
@@ -1382,7 +1401,8 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
 `InventoryDeleteAllProxyControllerTest` (backend 403 propagated) — the two `hasRole('ADMIN')` gates
 themselves are not yet pinned by a test · **Code:**
 `InventoryItemController#deleteAllGlobalInventory`, `InventoryCheckoutService#deleteAllGlobalInventory`,
-`InventoryItemRepository#lockNonPersonalIdsInScope` / `#deleteAllByIdIn`, `InventoryDeleteAllProxyController`,
+`InventoryRowLockRepository#findNonPersonalIdsInScope` / `#deleteAllByIdIn`,
+`InventoryOrderWrites#prepareWrites`, `InventoryDeleteAllProxyController`,
 `templates/inventory/inventory-admin.html`, `static/js/inventory/inventory-admin.js` · **Issues:** #3261 · **ADR:** ADR-0362
 
 ### REQ-INV-052 — A member can change the org unit of their own personal row afterwards

@@ -72,7 +72,7 @@
                                            th:text="#{inventory.stockLevels.action.order}">Auftrag anlegen</a>
                                         <a class="btn btn-outline btn-xs" data-testid="stock-level-need"
                                            th:if="${needRaisingUnitIds.contains(l.orgUnit().id())}"
-                                           th:href="${l.material() != null} ? @{/supply/needs(needUnit=${l.orgUnit().id()},needMaterial=${l.material().id()},needTier=${l.qualityTier() != null ? l.qualityTier().id() : ''},needAmount=${l.shortfall()})} : @{/supply/needs(needUnit=${l.orgUnit().id()},needItem=${l.gameItem().id()},needAmount=${l.shortfall()})}"
+                                           th:href="${l.material() != null} ? @{/supply/needs(needUnit=${l.orgUnit().id()},needMaterial=${l.material().id()},needTier=${l.qualityTier() != null ? l.qualityTier().id() : ''},needAmount=${l.shortfall()})} : @{/supply/needs(needUnit=${l.orgUnit().id()},needItem=${l.gameItem().id()},needItemName=${l.entryDisplayName(#locale)},needAmount=${l.shortfall()})}"
                                            th:text="#{inventory.stockLevels.action.need}">Bedarf anlegen</a>
                                     </th:block>
                                     <button type="button" class="btn btn-ghost btn-icon" data-trigger="stock-level-edit" data-testid="stock-level-edit"

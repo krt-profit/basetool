@@ -103,11 +103,19 @@ class JobOrderPageStatusFilterTest extends JobOrderPageMvcTestBase {
     assertThat(requestedStatuses()).containsExactly("OPEN", "IN_PROGRESS");
   }
 
+  /** Includes cancelled orders when their queue filter is selected. */
   @Test
   @WithMockUser
-  void viewOrders_withMultipleValidStatusParams_passesThemThrough() throws Exception {
-    mockMvc.perform(get("/orders").param("status", "OPEN", "COMPLETED")).andExpect(status().isOk());
+  void viewOrders_withCancelledAndOpenStatuses_keepsBothFilters() throws Exception {
+    String html =
+        mockMvc
+            .perform(get("/orders").param("status", "OPEN", "CANCELLED"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
 
-    assertThat(requestedStatuses()).containsExactly("OPEN", "COMPLETED");
+    assertThat(requestedStatuses()).containsExactly("OPEN", "CANCELLED");
+    assertThat(html).containsPattern("name=\"status\" value=\"CANCELLED\"[^>]*checked");
   }
 }

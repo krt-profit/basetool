@@ -85,8 +85,13 @@ unit (`GET /api/v1/supply/needs/job-orders`). A newly linked order must belong t
 edit sends the link back instead of clearing it (ADR-0320).
 
 The „Bedarf anlegen" shortcut of a low minimum stock level (REQ-INV-068) uses the same gate and
-opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` for a game item),
-`needTier` and `needAmount` query parameters of `/supply/needs`.
+opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` and its display name
+`needItemName` for a game item), `needTier` and `needAmount` query parameters of `/supply/needs`.
+
+**Item picker.** The need form, the pledge dialog (REQ-SUP-007) and the recorded-donation dialog
+(REQ-SUP-011) pick a game item from the items the Lager books (REQ-INV-029) through the
+server-searched picker `remote-game-items` (REQ-FE-016); no item list is preloaded, so none is cut
+off. A form set to an item asks for one before it sends, and opening a form clears its pickers.
 
 **Acceptance**
 
@@ -98,9 +103,9 @@ opens the form prefilled from the `needUnit`, `needMaterial` (or `needItem` for 
   unit there, so „Eingehende Spenden" lists none; an admin with any unit selected keeps both tabs.
 
 **Enforced by:** `SupplyNeedServiceTest` (`leadRaisesNeedAsLogistician`,
-`aNeedForAGameItemTheP4kRetiredIsRefused`), `SupplyNeedOrderRenderTest`, `SupplyAccessPolicyTest`,
-`SupplyManagedUnitsTest`, `SupplyMapperTest`, `SupplyUnitSettingServiceTest`,
-`SupplyTabAccessServiceTest`
+`aNeedForAGameItemTheP4kRetiredIsRefused`), `SupplyNeedOrderRenderTest`, `SupplyItemPickerE2eTest`,
+`SupplyAccessPolicyTest`, `SupplyManagedUnitsTest`, `SupplyMapperTest`,
+`SupplyUnitSettingServiceTest`, `SupplyTabAccessServiceTest`
 · **Code:** `supply/internal/SupplyNeedService`, `supply/internal/SupplyAccessPolicy`,
 `supply/internal/SupplyManagedUnits`, `supply/internal/SupplyTabAccessService`, `supply/needs.html`,
 `static/js/supply/supply-needs.js` · **Related:** REQ-INV-068, REQ-ROLE-002, REQ-ORG-032,
@@ -170,8 +175,11 @@ between zero and the pledged amount and a location; who manages the unit follows
 (REQ-SUP-003). In the same transaction the received amount moves into the unit's pool — from the
 earmarked row by `transferToPool`, otherwise by `bookIntoPool` — the donation becomes `RECEIVED` or
 `PARTIALLY_RECEIVED`, and the credited need's progress includes it.
-An earmarked row deleted while the receipt waits for its lock counts as gone: the amount is booked
-by `bookIntoPool` (REQ-INV-071).
+The receipt transfers from the live earmark carrier at its current quality and stolen marker.
+If that carrier disappears while the receipt waits for its lock, a fresh transaction rechecks the
+pledge and the absence of any carrier, then books the received amount into the pledge's
+destination with its original catalogue facts (REQ-INV-071). The same fallback applies when the
+original row is already absent and no live earmark exists before and after planning.
 
 **Storage place (REQ-P4K-039):** the receipt books into only a place a picker offers; a hidden or
 reference-only one is a `400` `LOCATION_NOT_OFFERED`.

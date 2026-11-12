@@ -144,9 +144,9 @@ class InventoryInputAjaxControllerTest {
 
     InventoryItemCreateDto request = captureCreateRequest();
     org.assertj.core.api.Assertions.assertThat(request.missionAllocations())
-        .containsExactly(new InventoryAllocationInput(missionId, 23d));
+        .containsExactly(new InventoryAllocationInput(missionId, 23d, null));
     org.assertj.core.api.Assertions.assertThat(request.jobOrderAllocations())
-        .containsExactly(new InventoryAllocationInput(jobOrderId, 23d));
+        .containsExactly(new InventoryAllocationInput(jobOrderId, 23d, null));
   }
 
   @Test
@@ -222,8 +222,8 @@ class InventoryInputAjaxControllerTest {
 
     org.assertj.core.api.Assertions.assertThat(captureCreateRequest().missionAllocations())
         .containsExactly(
-            new InventoryAllocationInput(firstMission, 5d),
-            new InventoryAllocationInput(secondMission, 8d));
+            new InventoryAllocationInput(firstMission, 5d, null),
+            new InventoryAllocationInput(secondMission, 8d, null));
   }
 
   @Test
@@ -247,7 +247,7 @@ class InventoryInputAjaxControllerTest {
         .andExpect(status().isOk());
 
     org.assertj.core.api.Assertions.assertThat(captureCreateRequest().missionAllocations())
-        .containsExactly(new InventoryAllocationInput(missionId, 7.5d));
+        .containsExactly(new InventoryAllocationInput(missionId, 7.5d, null));
   }
 
   @Test
@@ -295,7 +295,7 @@ class InventoryInputAjaxControllerTest {
 
     InventoryItemCreateDto request = captureCreateRequest();
     org.assertj.core.api.Assertions.assertThat(request.jobOrderAllocations())
-        .containsExactly(new InventoryAllocationInput(jobOrderId, 4d));
+        .containsExactly(new InventoryAllocationInput(jobOrderId, 4d, null));
     org.assertj.core.api.Assertions.assertThat(request.missionAllocations()).isEmpty();
   }
 
@@ -424,5 +424,31 @@ class InventoryInputAjaxControllerTest {
                 .param("source", "my"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/inventory?storage=my"));
+  }
+
+  @Test
+  @WithMockUser
+  void ordinaryCheckInRetainsTheExplicitProvisionSelectionAndObservedVersion() throws Exception {
+    UUID order = UUID.randomUUID();
+    UUID claim = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/inventory/input")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .param("materialId", MATERIAL_ID.toString())
+                .param("locationId", LOCATION_ID.toString())
+                .param("quality", "100")
+                .param("amount", "3")
+                .param("jobOrderAllocations[0].targetId", order.toString())
+                .param("jobOrderAllocations[0].provisionClaimId", claim.toString())
+                .param("jobOrderAllocations[0].provisionClaimVersion", "6"))
+        .andExpect(status().isOk());
+    var allocation = captureCreateRequest().jobOrderAllocations().getFirst();
+    org.assertj.core.api.Assertions.assertThat(allocation.amount()).isEqualTo(3d);
+    org.assertj.core.api.Assertions.assertThat(allocation.provision())
+        .isEqualTo(
+            new de.greluc.krt.profit.basetool.frontend.inventory.model.MaterialProvisionSelection(
+                claim, 6L));
   }
 }

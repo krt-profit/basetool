@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -46,6 +47,9 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   /** The first key of the open-request-cap advisory locks: {@code 'BXCH'} as a 32-bit integer. */
   int OPEN_REQUEST_CAP_LOCK_SPACE = 0x42584348;
 
+  /** Restricts connected applications to the request scope supported by the exchange. */
+  String EXCHANGE_PURPOSE = "r.purposeKind IS DISTINCT FROM :excludedPurpose";
+
   /**
    * Counts booking requests in the given status, backing the {@code
    * basetool_bank_booking_request_pending_*} queue-depth gauge (REQ-OBS-011).
@@ -56,14 +60,23 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   long countByStatus(BankBookingRequestStatus status);
 
   /**
-   * Counts one requester's requests in the given status, whichever channel raised them; the
-   * open-request cap of the exchange counts the {@code PENDING} ones (REQ-BXCH-004).
+   * Counts a requester's requests in the Exchange projection for its cap (REQ-BXCH-004).
    *
-   * @param requestedBy the requesting user's id
+   * @param requestedBy the applicant
    * @param status the lifecycle state to count
-   * @return the number of the requester's requests in that status
+   * @param excludedPurpose the purpose outside the connected-application scope
+   * @return the number of Exchange-visible requests in that state
    */
-  long countByRequestedByAndStatus(UUID requestedBy, BankBookingRequestStatus status);
+  @Query(
+      """
+      SELECT COUNT(r) FROM BankBookingRequest r
+      WHERE r.requestedBy = :requestedBy AND r.status = :status AND
+      """
+          + EXCHANGE_PURPOSE)
+  long countExchangeByRequesterAndStatus(
+      @Param("requestedBy") UUID requestedBy,
+      @Param("status") BankBookingRequestStatus status,
+      @Param("excludedPurpose") BankPurposeKind excludedPurpose);
 
   /**
    * Takes the requester's open-request-cap lock, which the transaction holds until it ends, so two
@@ -121,6 +134,11 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "targetAccount",
         "holder",
         "holder.user",
+        "linkedAttempt",
+        "requestedHolder",
+        "requestedHolder.user",
+        "requestedTargetHolder",
+        "requestedTargetHolder.user",
         "resultingTransaction"
       })
   Page<BankBookingRequest> findByRequestedByAndStatusIn(
@@ -143,11 +161,19 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    * the member's own requests (REQ-BXCH-003).
    *
    * @param requestedBy the requesting user's id
+   * @param excludedPurpose the purpose outside the connected-application scope
    * @param pageable the page size; its sort is ignored
    * @return the requests with their accounts and the source account's org unit loaded
    */
   @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
-  List<BankBookingRequest> findByRequestedByOrderByIdAsc(UUID requestedBy, Pageable pageable);
+  @Query(
+      "SELECT r FROM BankBookingRequest r WHERE r.requestedBy = :requestedBy AND "
+          + EXCHANGE_PURPOSE
+          + " ORDER BY r.id")
+  List<BankBookingRequest> findExchangeByRequester(
+      @Param("requestedBy") UUID requestedBy,
+      @Param("excludedPurpose") BankPurposeKind excludedPurpose,
+      Pageable pageable);
 
   /**
    * Returns the requests of a requester after an id in id order, a later page of the exchange
@@ -155,12 +181,21 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    *
    * @param requestedBy the requesting user's id
    * @param afterId the last request of the previous page
+   * @param excludedPurpose the purpose outside the connected-application scope
    * @param pageable the page size; its sort is ignored
    * @return the requests with their accounts and the source account's org unit loaded
    */
   @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
-  List<BankBookingRequest> findByRequestedByAndIdGreaterThanOrderByIdAsc(
-      UUID requestedBy, UUID afterId, Pageable pageable);
+  @Query(
+      "SELECT r FROM BankBookingRequest r WHERE r.requestedBy = :requestedBy AND r.id > :afterId"
+          + " AND "
+          + EXCHANGE_PURPOSE
+          + " ORDER BY r.id")
+  List<BankBookingRequest> findExchangeByRequesterAfter(
+      @Param("requestedBy") UUID requestedBy,
+      @Param("afterId") UUID afterId,
+      @Param("excludedPurpose") BankPurposeKind excludedPurpose,
+      Pageable pageable);
 
   /**
    * Returns those of the given requests a requester raised, the current state of the keys the
@@ -169,10 +204,17 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    *
    * @param requestedBy the requesting user's id
    * @param ids the request ids
+   * @param excludedPurpose the purpose outside the connected-application scope
    * @return the requester's requests among them with their accounts loaded
    */
   @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
-  List<BankBookingRequest> findByRequestedByAndIdIn(UUID requestedBy, Collection<UUID> ids);
+  @Query(
+      "SELECT r FROM BankBookingRequest r WHERE r.requestedBy = :requestedBy AND r.id IN :ids AND "
+          + EXCHANGE_PURPOSE)
+  List<BankBookingRequest> findExchangeByRequesterAndIds(
+      @Param("requestedBy") UUID requestedBy,
+      @Param("ids") Collection<UUID> ids,
+      @Param("excludedPurpose") BankPurposeKind excludedPurpose);
 
   /**
    * Returns one page of requests in the given state across all accounts, the management/admin
@@ -189,6 +231,11 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "targetAccount",
         "holder",
         "holder.user",
+        "linkedAttempt",
+        "requestedHolder",
+        "requestedHolder.user",
+        "requestedTargetHolder",
+        "requestedTargetHolder.user",
         "resultingTransaction"
       })
   Page<BankBookingRequest> findByStatus(BankBookingRequestStatus status, Pageable pageable);
@@ -209,6 +256,11 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "targetAccount",
         "holder",
         "holder.user",
+        "linkedAttempt",
+        "requestedHolder",
+        "requestedHolder.user",
+        "requestedTargetHolder",
+        "requestedTargetHolder.user",
         "resultingTransaction"
       })
   Page<BankBookingRequest> findByStatusAndAccountIdIn(
@@ -229,6 +281,11 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "targetAccount",
         "holder",
         "holder.user",
+        "linkedAttempt",
+        "requestedHolder",
+        "requestedHolder.user",
+        "requestedTargetHolder",
+        "requestedTargetHolder.user",
         "resultingTransaction"
       })
   Page<BankBookingRequest> findByStatusIn(
@@ -250,11 +307,22 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "targetAccount",
         "holder",
         "holder.user",
+        "linkedAttempt",
+        "requestedHolder",
+        "requestedHolder.user",
+        "requestedTargetHolder",
+        "requestedTargetHolder.user",
         "resultingTransaction"
       })
+  @Query(
+      """
+      SELECT r FROM BankBookingRequest r LEFT JOIN r.account a
+      WHERE r.status IN :statuses
+        AND (a.id IN :accountIds OR r.type = 'HOLDER_TRANSFER')
+      """)
   Page<BankBookingRequest> findByStatusInAndAccountIdIn(
-      Collection<BankBookingRequestStatus> statuses,
-      Collection<UUID> accountIds,
+      @Param("statuses") Collection<BankBookingRequestStatus> statuses,
+      @Param("accountIds") Collection<UUID> accountIds,
       Pageable pageable);
 
   /**
@@ -271,6 +339,11 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
         "targetAccount",
         "holder",
         "holder.user",
+        "linkedAttempt",
+        "requestedHolder",
+        "requestedHolder.user",
+        "requestedTargetHolder",
+        "requestedTargetHolder.user",
         "resultingTransaction"
       })
   List<BankBookingRequest> findByAccountIdInOrderByCreatedAtDesc(Collection<UUID> accountIds);
@@ -280,10 +353,14 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
    * (REQ-BXCH-005).
    *
    * @param status the lifecycle state (the queue passes {@code PENDING})
+   * @param excludedPurpose the purpose outside the connected-application scope
    * @return the requests with their accounts and org unit loaded
    */
   @EntityGraph(attributePaths = {"account", "account.orgUnit", "targetAccount"})
-  List<BankBookingRequest> findAllByStatus(BankBookingRequestStatus status);
+  @Query("SELECT r FROM BankBookingRequest r WHERE r.status = :status AND " + EXCHANGE_PURPOSE)
+  List<BankBookingRequest> findExchangeByStatus(
+      @Param("status") BankBookingRequestStatus status,
+      @Param("excludedPurpose") BankPurposeKind excludedPurpose);
 
   /**
    * Existence probe backing the close-account guard (REQ-BANK-025): an account with an open request

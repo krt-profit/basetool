@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
@@ -84,7 +85,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemServiceTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -115,12 +119,14 @@ class InventoryItemServiceTest {
 
   private InventoryAggregationService realAggregationService;
   private InventoryCheckoutService realCheckoutService;
+  private InventoryOrderWrites orderWrites;
 
   @BeforeEach
   void wireDelegates() {
-    lenient()
-        .when(jobOrderAccessPolicy.canSeeJobOrderInScope(any(JobOrder.class)))
-        .thenReturn(true);
+    orderWrites =
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class));
+    lenient().when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
     lenient()
         .when(stockLevelService.lowSubjects())
         .thenReturn(new LowStockSubjects(Set.of(), Set.of()));
@@ -152,6 +158,7 @@ class InventoryItemServiceTest {
             eventPublisher);
     inventoryItemService =
         new InventoryItemService(
+            orderWrites,
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -164,13 +171,27 @@ class InventoryItemServiceTest {
             orgUnitStampingService,
             inventoryAccessPolicy,
             new InventoryStockCommands(
-                null, null, null, null, null, inventoryAccessPolicy, null, null),
+                new InventoryOrderWrites(
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.inventory.internal
+                            .InventoryItemRepository.class),
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                null,
+                null,
+                null,
+                null,
+                null,
+                inventoryAccessPolicy,
+                null,
+                null),
             new JobOrderEarmarkTargets(
                 jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
             auditService,
             realAggregationService,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false),
+            new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
+                orderWrites));
   }
 
   @Test
@@ -706,6 +727,7 @@ class InventoryItemServiceTest {
   void createInventoryItem_stolenIsStoredWhenTheMarkerIsSwitchedOn() {
     InventoryItemService switchedOn =
         new InventoryItemService(
+            orderWrites,
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -718,13 +740,27 @@ class InventoryItemServiceTest {
             orgUnitStampingService,
             inventoryAccessPolicy,
             new InventoryStockCommands(
-                null, null, null, null, null, inventoryAccessPolicy, null, null),
+                new InventoryOrderWrites(
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.inventory.internal
+                            .InventoryItemRepository.class),
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                null,
+                null,
+                null,
+                null,
+                null,
+                inventoryAccessPolicy,
+                null,
+                null),
             new JobOrderEarmarkTargets(
                 jobOrderRepository, jobOrderItemService, jobOrderAccessPolicy),
             auditService,
             realAggregationService,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(true));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(true),
+            new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
+                orderWrites));
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();
@@ -787,9 +823,9 @@ class InventoryItemServiceTest {
             null,
             null,
             java.util.List.of(
-                new InventoryAllocationInput(orderAId, 3.0),
-                new InventoryAllocationInput(orderBId, 4.0)),
-            java.util.List.of(new InventoryAllocationInput(missionXId, 5.0)));
+                new InventoryAllocationInput(orderAId, 3.0, null),
+                new InventoryAllocationInput(orderBId, 4.0, null)),
+            java.util.List.of(new InventoryAllocationInput(missionXId, 5.0, null)));
 
     User user = new User();
     user.setId(userId);
@@ -856,8 +892,8 @@ class InventoryItemServiceTest {
             null,
             null,
             java.util.List.of(
-                new InventoryAllocationInput(orderAId, 8.0),
-                new InventoryAllocationInput(orderBId, 5.0)),
+                new InventoryAllocationInput(orderAId, 8.0, null),
+                new InventoryAllocationInput(orderBId, 5.0, null)),
             null);
 
     User user = new User();
@@ -906,8 +942,8 @@ class InventoryItemServiceTest {
             null,
             null,
             java.util.List.of(
-                new InventoryAllocationInput(orderAId, 3.0),
-                new InventoryAllocationInput(orderAId, 4.0)),
+                new InventoryAllocationInput(orderAId, 3.0, null),
+                new InventoryAllocationInput(orderAId, 4.0, null)),
             null);
 
     User user = new User();
@@ -951,7 +987,7 @@ class InventoryItemServiceTest {
             null,
             null,
             null,
-            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 3.0)),
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 3.0, null)),
             null);
 
     User user = new User();
@@ -1230,8 +1266,12 @@ class InventoryItemServiceTest {
     target.setId(targetUserId);
     when(inventoryAccessPolicy.mayBookInFor(targetUserId)).thenReturn(true);
     when(userRepository.findById(targetUserId)).thenReturn(Optional.of(target));
-    when(materialRepository.findById(materialId)).thenReturn(Optional.of(new Material()));
-    when(locationRepository.findById(locationId)).thenReturn(Optional.of(new Location()));
+    Material material = new Material();
+    material.setId(materialId);
+    Location location = new Location();
+    location.setId(locationId);
+    when(materialRepository.findById(materialId)).thenReturn(Optional.of(material));
+    when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
     when(inventoryItemRepository.save(any(InventoryItem.class))).thenAnswer(i -> i.getArgument(0));
 
     inventoryItemService.createInventoryItem(dto, currentUserId);
@@ -1380,7 +1420,7 @@ class InventoryItemServiceTest {
             locationId,
             null,
             null,
-            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0)));
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.0, null)));
     stubItemCreateResolution(userId, gameItemId, locationId);
 
     assertThrows(
@@ -1400,7 +1440,7 @@ class InventoryItemServiceTest {
             gameItemId,
             locationId,
             null,
-            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0, null)),
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
     JobOrder jobOrder = new JobOrder();
@@ -1425,7 +1465,7 @@ class InventoryItemServiceTest {
             gameItemId,
             locationId,
             null,
-            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0, null)),
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
     JobOrder materialOrder = new JobOrder();
@@ -1450,7 +1490,7 @@ class InventoryItemServiceTest {
             gameItemId,
             locationId,
             null,
-            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0)),
+            java.util.List.of(new InventoryAllocationInput(jobOrderId, 2.0, null)),
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
     JobOrder itemOrder = new JobOrder();
@@ -1482,7 +1522,7 @@ class InventoryItemServiceTest {
             gameItemId,
             locationId,
             null,
-            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.5)),
+            java.util.List.of(new InventoryAllocationInput(UUID.randomUUID(), 2.5, null)),
             null);
     stubItemCreateResolution(userId, gameItemId, locationId);
 
@@ -2120,7 +2160,7 @@ class InventoryItemServiceTest {
     List<UUID> locked = List.of(UUID.randomUUID());
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-    when(inventoryItemRepository.lockNonPersonalIdsInScope(true, null, java.util.Set.of()))
+    when(inventoryItemRepository.findNonPersonalIdsInScope(true, null, java.util.Set.of()))
         .thenReturn(locked);
     when(inventoryItemRepository.deleteAllByIdIn(locked)).thenReturn(42);
 
@@ -2134,7 +2174,7 @@ class InventoryItemServiceTest {
   void deleteAllGlobalInventory_onEmptyGlobalInventory_shouldReturnZero() {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, java.util.Set.of()));
-    when(inventoryItemRepository.lockNonPersonalIdsInScope(true, null, java.util.Set.of()))
+    when(inventoryItemRepository.findNonPersonalIdsInScope(true, null, java.util.Set.of()))
         .thenReturn(List.of());
 
     int removed = inventoryItemService.deleteAllGlobalInventory();
@@ -2149,14 +2189,15 @@ class InventoryItemServiceTest {
     List<UUID> locked = List.of(UUID.randomUUID());
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, scope, java.util.Set.of()));
-    when(inventoryItemRepository.lockNonPersonalIdsInScope(false, scope, java.util.Set.of()))
+    when(inventoryItemRepository.findNonPersonalIdsInScope(false, scope, java.util.Set.of()))
         .thenReturn(locked);
     when(inventoryItemRepository.deleteAllByIdIn(locked)).thenReturn(7);
 
     int removed = inventoryItemService.deleteAllGlobalInventory();
 
     assertEquals(7, removed);
-    verify(inventoryItemRepository).lockNonPersonalIdsInScope(false, scope, java.util.Set.of());
+    verify(inventoryItemRepository, org.mockito.Mockito.times(2))
+        .findNonPersonalIdsInScope(false, scope, java.util.Set.of());
   }
 
   @Test
@@ -2183,8 +2224,12 @@ class InventoryItemServiceTest {
     User user = new User();
     user.setId(userId);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(new Material()));
-    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(new Location()));
+    Material material = new Material();
+    material.setId(dto.materialId());
+    Location location = new Location();
+    location.setId(dto.locationId());
+    when(materialRepository.findById(dto.materialId())).thenReturn(Optional.of(material));
+    when(locationRepository.findById(dto.locationId())).thenReturn(Optional.of(location));
 
     Squadron resolved = new Squadron();
     resolved.setId(pickedOrgUnitId);

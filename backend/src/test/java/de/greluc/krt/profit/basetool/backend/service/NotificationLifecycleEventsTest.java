@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistra
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderClosedEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Map;
@@ -62,15 +63,16 @@ class NotificationLifecycleEventsTest {
   }
 
   @Test
-  void aClosedOrderClearsItsCreatedAndRequesterUpdateNotices() {
-    JobOrderClosedEvent event = new JobOrderClosedEvent(ID, ACTOR);
+  void aClosedOrderClearsItsOutstandingActionPrompts() {
+    UUID prompt = UUID.randomUUID();
+    JobOrderClosedEvent event =
+        new JobOrderClosedEvent(ID, ACTOR, new NotificationRevision(1, 0), Set.of(prompt));
 
     assertThat(event.eventType()).isEqualTo(NotificationEventType.JOB_ORDER_CLOSED);
     assertThat(event.entityType()).isEqualTo("JOB_ORDER");
     assertThat(event.entityId()).isEqualTo(ID);
-    assertThat(event.resolvesNotificationTypes())
-        .containsExactlyInAnyOrder(
-            NotificationType.JOB_ORDER_CREATED, NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER);
+    assertThat(event.resolvesNotificationIds()).containsExactly(prompt);
+    assertThat(event.resolvesNotificationTypes()).isEmpty();
     assertThat(event.contextOrgUnits()).isEmpty();
     assertThat(event.renderParams()).isEmpty();
   }

@@ -31,7 +31,12 @@ import java.util.UUID;
  * @param qualityRequirement the code of the bucket's quality tier
  * @param claimingOrgUnitId the squadron making the claim
  * @param amount the claimed partial quantity (strictly positive)
+ * @param version the observed claim version; absent only for a new promise
  */
 @DtoMirror
 public record CreateClaimDto(
-    UUID materialId, String qualityRequirement, UUID claimingOrgUnitId, Double amount) {}
+    UUID materialId,
+    String qualityRequirement,
+    UUID claimingOrgUnitId,
+    Double amount,
+    Long version) {}

@@ -41,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.context.WebApplicationContext;
@@ -65,6 +66,8 @@ class ExchangeBankRequestFeedTest {
   private UUID member;
   private UUID other;
   private UUID account;
+  private UUID linkedAttempt;
+  private UUID linkedHolder;
   private boolean wasEnabled;
   private boolean wasBankEnabled;
 
@@ -76,7 +79,7 @@ class ExchangeBankRequestFeedTest {
     wasBankEnabled = settings.isBankEnabled();
     relay = new BankExchangeRelay(context);
     member = user("bank-feed-member");
-    other = user("bank-feed-other");
+    other = user("bank-feed-other", Roles.BANK_MANAGEMENT);
     account = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO bank_account (id, account_no, name, type) VALUES (?, ?, 'Feed', 'SPECIAL')",
@@ -90,6 +93,10 @@ class ExchangeBankRequestFeedTest {
         "UPDATE exchange_feed_horizon SET purged_through_tx = 0, purged_through_seq = 0 WHERE id ="
             + " 1");
     jdbc.update("DELETE FROM bank_booking_request WHERE account_id = ?", account);
+    if (linkedAttempt != null) {
+      jdbc.update("DELETE FROM bank_linked_attempt WHERE id = ?", linkedAttempt);
+      jdbc.update("DELETE FROM bank_holder WHERE id = ?", linkedHolder);
+    }
     jdbc.update("DELETE FROM bank_account WHERE id = ?", account);
     jdbc.update("DELETE FROM exchange_client WHERE client_id = ?", relay.client());
     for (UUID id : List.of(member, other)) {
@@ -143,6 +150,93 @@ class ExchangeBankRequestFeedTest {
     JsonNode page = ok(relay.read(member, "/requests", Map.of("cursor", cursor)));
     assertThat(page.path("items").isEmpty()).isTrue();
     assertThat(page.path("removed").isEmpty()).isTrue();
+  }
+
+  @Test
+  void linkedRequestsStayPrivateAcrossSnapshotsAndWrites() throws Exception {
+    UUID hidden = linkedRequest();
+    UUID ordinary = request(member);
+
+    JsonNode own = ok(relay.read(member, "/requests", Map.of("limit", "1")));
+    assertThat(own.path("items")).hasSize(1);
+    assertThat(own.path("items").get(0).path("id").asString()).isEqualTo(ordinary.toString());
+    assertThat(own.path("hasMore").asBoolean()).isFalse();
+    ExchangePublishedSchemas.assertMatches(
+        "page.schema.json#/$defs/bankRequestPage", own.toString(), "the request snapshot");
+
+    JsonNode queue = ok(relay.read(other, "/queue", Map.of()));
+    assertThat(queue.toString()).contains(ordinary.toString()).doesNotContain(hidden.toString());
+    ExchangePublishedSchemas.assertMatches("bank-queue.schema.json", queue.toString(), "queue");
+
+    String path = "/requests/" + hidden;
+    MockHttpServletResponse correction =
+        relay.write(
+            HttpMethod.POST, member, path + "/correction", Map.of("amount", 150, "version", 0));
+    MockHttpServletResponse cancel =
+        relay.write(HttpMethod.POST, member, path + "/cancel", Map.of("version", 0));
+    for (MockHttpServletResponse response : List.of(correction, cancel)) {
+      assertThat(response.getStatus()).isEqualTo(404);
+      assertThat(relay.body(response).path("code").asString()).isEqualTo("NOT_FOUND");
+    }
+  }
+
+  @Test
+  void linkedRequestWritesAndAccountChangesNeverLeaveFeedTombstones() throws Exception {
+    UUID ordinary = request(member);
+    String cursor = snapshotEnd();
+
+    UUID hidden = linkedRequest();
+    jdbc.update("UPDATE bank_account SET name = 'Renamed feed account' WHERE id = ?", account);
+    jdbc.update(
+        "UPDATE bank_booking_request SET status = 'CANCELLED', decided_at = now() WHERE id = ?",
+        hidden);
+    jdbc.update("DELETE FROM bank_booking_request WHERE id = ?", hidden);
+
+    JsonNode page = ok(relay.read(member, "/requests", Map.of("cursor", cursor)));
+    assertThat(page.path("items")).hasSize(1);
+    JsonNode item = page.path("items").get(0);
+    assertThat(item.path("id").asString()).isEqualTo(ordinary.toString());
+    assertThat(item.path("account").path("name").asString()).isEqualTo("Renamed feed account");
+    assertThat(page.path("removed").isEmpty()).isTrue();
+    assertThat(page.path("hasMore").asBoolean()).isFalse();
+  }
+
+  /**
+   * Stores a committed linked request with the same type as an ordinary deposit.
+   *
+   * @return the linked request id
+   */
+  @NotNull
+  private UUID linkedRequest() {
+    linkedHolder = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO bank_holder (id, user_id, handle) VALUES (?, ?, 'fixture-custodian')",
+        linkedHolder,
+        other);
+    linkedAttempt = UUID.randomUUID();
+    UUID purpose = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO bank_linked_attempt (id, purpose_kind, purpose_ref, fee_rate, fee)
+        VALUES (?, 'AUEC_ORDER', ?, 0.005, 0)
+        """,
+        linkedAttempt,
+        purpose);
+    UUID request = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO bank_booking_request (id, account_id, type, amount, requested_by,
+                                          requester_handle, purpose_kind, purpose_ref,
+                                          linked_attempt_id, requested_holder_id, counterparty_handle)
+        VALUES (?, ?, 'DEPOSIT', 100, ?, 'bank-feed', 'AUEC_ORDER', ?, ?, ?, 'fixture-depositor')
+        """,
+        request,
+        account,
+        member,
+        purpose,
+        linkedAttempt,
+        linkedHolder);
+    return request;
   }
 
   @Test
@@ -208,16 +302,20 @@ class ExchangeBankRequestFeedTest {
    * Seeds a committed member.
    *
    * @param username the username prefix
+   * @param additionalRoles the roles held in addition to KRT member
    * @return the member's id
    */
   @NotNull
-  private UUID user(@NotNull String username) {
+  private UUID user(@NotNull String username, String... additionalRoles) {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername(username + "-" + UUID.randomUUID().toString().substring(0, 8));
     user.setApprovalStatus(ApprovalStatus.ACTIVE);
     user.setInKeycloak(true);
     user.setRoles(new HashSet<>(Set.of(roleRepository.findByCode(Roles.KRT_MEMBER).orElseThrow())));
+    for (String role : additionalRoles) {
+      user.getRoles().add(roleRepository.findByCode(role).orElseThrow());
+    }
     return userRepository.saveAndFlush(user).getId();
   }
 }

@@ -118,6 +118,9 @@
                                     <span class="cell-title" th:switch="${r.type()}">
                                         <th:block th:case="'DEPOSIT'"
                                                   th:text="(${r.counterpartyHandle() != null} ? ${@handles.display(r.counterpartyHandle())} : ${@handles.display(r.requesterHandle())}) + ' &#8594; ' + ${r.accountName()}">vexx &#8594; ALP R&uuml;cklage</th:block>
+                                        <th:block th:case="'HOLDER_TRANSFER'">
+                                            <th:block th:replace="~{bank/fragments/bank-request-linked :: holderRoute(${r})}"></th:block>
+                                        </th:block>
                                         <th:block th:case="'TRANSFER'"
                                                   th:text="${r.accountName()} + (${r.targetAccountNo() != null} ? ' &#8594; ' + ${r.targetAccountNo()} : '')">ALP Betriebskonto &#8594; KB-0002</th:block>
                                         <th:block th:case="*"
@@ -142,7 +145,7 @@
                                 <td class="num ou-open-amount">
                                     <span class="bank-amount"
                                           th:classappend="${r.type() == 'DEPOSIT'} ? ' bank-amount--pos' : (${r.type() == 'WITHDRAWAL'} ? ' bank-amount--neg' : '')"
-                                          th:text="(${r.type() == 'DEPOSIT'} ? '+ ' : '&#8722; ') + ${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')}">&#8722; 180.000</span>
+                                          th:text="(${r.type() == 'DEPOSIT'} ? '+ ' : (${r.type() == 'WITHDRAWAL' or r.type() == 'TRANSFER'} ? '&#8722; ' : '')) + ${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')}">&#8722; 180.000</span>
                                 </td>
                             </tr>
                             </tbody>
@@ -197,27 +200,35 @@
                                     </td>
                                     <td class="text-right bank-amount">
                                         <span th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
-                                        <span th:if="${r.status() == 'PENDING' and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
+                                        <th:block th:replace="~{bank/fragments/bank-request-linked :: fee(${r})}"></th:block>
+                                        <span th:if="${r.status() == 'PENDING' and r.linked() == null and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
                                               class="cell-sub" data-testid="org-unit-bank-request-gross"
                                               th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'DEFAULT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
                                     </td>
                                     <td>
                                         <span class="chip"
                                               th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
-                                              th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                                              th:text="#{__${r.statusLabelKey()}__}">Ausstehend</span>
                                         <span class="reason text-muted" th:if="${r.status() == 'REJECTED' and r.rejectReason() != null}"
                                               th:text="' &mdash; ' + ${r.rejectReason()}"></span>
                                     </td>
-                                    <td th:text="${r.holderHandle() != null} ? ${@handles.display(r.holderHandle())} : '&ndash;'">&ndash;</td>
+                                    <td>
+                                        <th:block th:if="${r.linked() != null and r.linked().destinationHolderHandle() != null}">
+                                            <th:block th:replace="~{bank/fragments/bank-request-linked :: holderRoute(${r})}"></th:block>
+                                        </th:block>
+                                        <th:block th:unless="${r.linked() != null and r.linked().destinationHolderHandle() != null}"
+                                                  th:text="${r.holderHandle() != null} ? ${@handles.display(r.holderHandle())} : '&ndash;'">&ndash;</th:block>
+                                    </td>
                                     <td><span class="utc-time" th:text="${r.createdAt()}">2026-06-17T14:02:00Z</span></td>
                                     <td class="cell-actions">
                                         <button type="button" class="btn btn-ghost btn-xs"
-                                                th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}"
+                                                th:if="${r.canEdit()}"
                                                 data-trigger="open-modal-display"
                                                 th:attr="data-modal-id='ou-req-edit-' + ${r.id()}"
                                                 data-testid="org-unit-bank-edit-btn"
                                                 th:text="#{bank.request.action.edit}">Bearbeiten</button>
                                         <form th:if="${r.status() == 'PENDING'}" class="bank-ajax-form no-track bank-inline-form" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+                                              th:attr="data-server-request-sync=${r.linked() != null ? 'true' : null}"
                                               data-endpoint="/api/proxy/org-units/bank/requests/{id}/cancel" data-method="POST">
                                             <input type="hidden" name="_id" th:value="${r.id()}">
                                             <input type="hidden" name="version" th:value="${r.version()}">
@@ -233,7 +244,8 @@
                                     <td colspan="8" class="bank-booking-detail-cell">
                                         <div class="bank-booking-detail-body">
                                             <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
-                                                <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                                <span class="bank-detail-label"
+                                                      th:text="${r.type() == 'DEPOSIT'} ? #{bank.field.counterparty.depositor} : #{bank.field.counterparty.recipient}">Empf&auml;nger</span>
                                                 <span class="bank-detail-value" data-testid="org-unit-bank-request-counterparty"
                                                       th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (ALPHA)</span>
                                             </div>
@@ -257,7 +269,7 @@
                     </div>
                 </section>
             </div>
-                <th:block th:each="r : ${ownRequests}" th:if="${r.status() == 'PENDING' and !r.ownerApprovalGranted()}">
+                <th:block th:each="r : ${ownRequests}" th:if="${r.canEdit()}">
                 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='ou-req-edit-' + ${r.id()}, titleKey='bank.request.edit.title', body=~{::ou-req-edit-body})}">
                     <th:block th:ref="ou-req-edit-body">
                         <form class="bank-ajax-form no-track" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
@@ -406,7 +418,8 @@
                                     <td th:text="#{'bank.request.type.' + ${r.type()}}">Einzahlung</td>
                                     <td class="text-right bank-amount">
                                         <span th:text="${#numbers.formatInteger(@moneyFormat.round(r.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
-                                        <span th:if="${r.status() == 'PENDING' and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
+                                        <th:block th:replace="~{bank/fragments/bank-request-linked :: fee(${r})}"></th:block>
+                                        <span th:if="${r.status() == 'PENDING' and r.linked() == null and r.type() == 'DEPOSIT' and transferFeeRate != null and transferFeeRate.signum() > 0}"
                                               class="cell-sub" data-testid="org-unit-bank-request-gross"
                                               th:text="#{bank.request.withFee(${#numbers.formatInteger(@moneyFormat.withTransferFee(r.amount(), transferFeeRate), 1, 'DEFAULT')})}">Mit Geb&uuml;hr: 5.025 aUEC</span>
                                     </td>
@@ -415,7 +428,7 @@
                                     <td>
                                         <span class="chip"
                                               th:classappend="${r.status() == 'PENDING'} ? ' chip--warning' : (${r.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
-                                              th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
+                                              th:text="#{__${r.statusLabelKey()}__}">Ausstehend</span>
                                     </td>
                                     <td>
                                         <span th:if="${!r.requiresOwnerApproval()}" class="text-muted">&ndash;</span>
@@ -424,6 +437,7 @@
                                               th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
                                         <form th:if="${r.requiresOwnerApproval() and !r.ownerApprovalGranted() and r.status() == 'PENDING'}"
                                               class="bank-ajax-form no-track bank-inline-form" data-refresh="orgUnitBank" data-livesync="bank/requestQueue orgunit-bank/orgUnitBank"
+                                              th:attr="data-server-request-sync=${r.linked() != null ? 'true' : null}"
                                               data-endpoint="/api/proxy/org-units/bank/requests/{id}/owner-approval" data-method="POST">
                                             <input type="hidden" name="_id" th:value="${r.id()}">
                                             <input type="hidden" name="version" th:value="${r.version()}">
@@ -442,7 +456,8 @@
                                     <td colspan="8" class="bank-booking-detail-cell">
                                         <div class="bank-booking-detail-body">
                                             <div class="bank-detail-item" th:if="${!#strings.isEmpty(r.counterpartyHandle())}">
-                                                <span class="bank-detail-label" th:text="#{bank.field.counterparty.recipient}">Empf&auml;nger</span>
+                                                <span class="bank-detail-label"
+                                                      th:text="${r.type() == 'DEPOSIT'} ? #{bank.field.counterparty.depositor} : #{bank.field.counterparty.recipient}">Empf&auml;nger</span>
                                                 <span class="bank-detail-value" data-testid="org-unit-bank-foreign-counterparty"
                                                       th:text="${r.counterpartyOrgUnitName() != null} ? ${@handles.display(r.counterpartyHandle())} + ' (' + ${r.counterpartyOrgUnitName()} + ')' : ${@handles.display(r.counterpartyHandle())}">greluc (ALPHA)</span>
                                             </div>

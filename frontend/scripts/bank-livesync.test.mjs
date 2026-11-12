@@ -43,11 +43,17 @@ const publishBankLiveSync = vm.runInContext('publishBankLiveSync', context);
  *
  * @param {string} spec the form's `data-livesync` value
  * @param {Record<string, { value: string, disabled?: boolean }>} fields the form's named fields
+ * @param {boolean} [serverRequestSync] whether the server publishes request updates
  * @returns {object} the fake form
  */
-function fakeForm(spec, fields) {
+function fakeForm(spec, fields, serverRequestSync = false) {
+    const attributes = { 'data-livesync': spec };
+    if (serverRequestSync) {
+        attributes['data-server-request-sync'] = '';
+    }
     return {
-        getAttribute: (name) => (name === 'data-livesync' ? spec : null),
+        getAttribute: (name) => attributes[name] ?? null,
+        hasAttribute: (name) => Object.hasOwn(attributes, name),
         querySelector: (selector) => {
             const match = /^\[name="([^"]+)"\]$/.exec(selector);
             return match && fields[match[1]] ? fields[match[1]] : null;
@@ -75,6 +81,14 @@ assert.deepEqual(
     JSON.parse(JSON.stringify(published)),
     [{ topic: 'bank', keys: ['grants', 'manage'] }],
     'a form without a picked member skips the member room',
+);
+
+published.length = 0;
+publishBankLiveSync(fakeForm('bank/requestQueue,manage orgunit-bank/orgUnitBank', {}, true));
+assert.deepEqual(
+    JSON.parse(JSON.stringify(published)),
+    [{ topic: 'bank', keys: ['manage'] }],
+    'a request form leaves request updates to the server and publishes its other sections',
 );
 
 console.log('bank-livesync tests passed');

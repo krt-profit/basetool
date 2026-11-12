@@ -31,8 +31,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param table the table name
  * @param column the column holding the {@code app_user.id}
- * @param conflictKeys the remaining columns of the unique constraint over {@code column}, or empty;
- *     a source row whose key the target already has is deleted instead of re-pointed
+ * @param conflictKeys the remaining columns of the unique constraint over {@code column}, or empty
  */
 public record OwnedRows(
     @NotNull String table, @NotNull String column, @NotNull List<String> conflictKeys) {

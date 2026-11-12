@@ -525,11 +525,12 @@ function toggleOrderMode() {
         document.querySelector('input[name="orderModeToggle"]:checked')
     );
     const mode = checked ? checked.value : 'material';
-    /** @type {HTMLElement} */ (document.getElementById('mode-material')).hidden =
-        mode !== 'material';
-    /** @type {HTMLElement} */ (document.getElementById('mode-item')).hidden = mode !== 'item';
-    setFormDisabled('mode-material', mode !== 'material');
-    setFormDisabled('mode-item', mode !== 'item');
+    for (const kind of ['material', 'item', 'auec']) {
+        const container = document.getElementById(`mode-${kind}`);
+        if (!container) continue;
+        container.hidden = mode !== kind;
+        setFormDisabled(container.id, container.hidden);
+    }
     if (mode === 'material') {
         syncMaterialRemoveButtons();
     }
@@ -862,7 +863,7 @@ krtEvents.on('click', 'orders-add-item', () => addItemLine());
  * Submits an order create or update form and follows the answer's target URL.
  *
  * @param {HTMLFormElement} form the form to submit
- * @param {string} invalidMessage the toast for a 400 answer
+ * @param {string | undefined} invalidMessage the toast for a 400 answer, if overridden
  * @param {string} failedMessage the toast for any other failure
  * @param {HTMLElement | null} submitter the control that triggered the submit
  */
@@ -873,16 +874,17 @@ function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
         toast: false,
         errorMessage: failedMessage,
         onError(status, problem) {
+            if (invalidMessage === undefined) return false;
             const retired = krtFetch.catalogueRetiredMessage(problem);
             const fallback = status === 400 ? invalidMessage : failedMessage;
             showFrontendErrorToast(retired || fallback);
             return true;
         },
         onSuccess(body) {
-            if (body && body.targetUrl) {
+            if (body && typeof body.targetUrl === 'string') {
                 window.location.assign(body.targetUrl);
             } else {
-                window.location.reload();
+                showFrontendErrorToast(failedMessage);
             }
         },
     });
@@ -916,3 +918,58 @@ if (_itemCreateForm) {
         _submitOrderCreate(_itemCreateForm, MSG_ITEM_INVALID, failed, e.submitter);
     });
 }
+
+const auecCreateForm = document.querySelector('#mode-auec form');
+if (auecCreateForm instanceof HTMLFormElement) {
+    auecCreateForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const failed = auecCreateForm.dataset.error || '';
+        _submitOrderCreate(auecCreateForm, undefined, failed, event.submitter);
+    });
+}
+
+/** Applies the backend's per-side writer flags to the creation form's paired unit pickers. */
+function initCreationUnitPairs() {
+    const container = document.querySelector('[data-creation-writer-units]');
+    if (!(container instanceof HTMLElement)) return;
+    const writable = new Set((container.dataset.creationWriterUnits || '').split(','));
+    for (const form of container.querySelectorAll('form')) {
+        const responsible = form.querySelector('select[name="responsibleOrgUnitId"]');
+        const requesting = form.querySelector('select[name="requestingOrgUnitId"]');
+        const submit = form.querySelector('button[type="submit"]');
+        if (
+            !(responsible instanceof HTMLSelectElement) ||
+            !(requesting instanceof HTMLSelectElement) ||
+            !(submit instanceof HTMLButtonElement)
+        )
+            continue;
+        if (!writable.has(responsible.value) && !writable.has(requesting.value)) {
+            responsible.value =
+                Array.from(responsible.options).find((option) => writable.has(option.value))
+                    ?.value || '';
+        }
+        /** @type {() => void} Keeps the opposite side compatible with the current selection. */
+        const sync = () => {
+            for (const option of responsible.options) {
+                option.disabled =
+                    !!option.value &&
+                    !writable.has(requesting.value) &&
+                    !writable.has(option.value);
+            }
+            for (const option of requesting.options) {
+                option.disabled =
+                    !!option.value &&
+                    !writable.has(responsible.value) &&
+                    !writable.has(option.value);
+            }
+            submit.disabled =
+                !responsible.value ||
+                !requesting.value ||
+                (!writable.has(responsible.value) && !writable.has(requesting.value));
+        };
+        responsible.addEventListener('change', sync);
+        requesting.addEventListener('change', sync);
+        sync();
+    }
+}
+initCreationUnitPairs();

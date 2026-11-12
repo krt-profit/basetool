@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -43,6 +44,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.InventoryTransferredToUserEvent;
 import de.greluc.krt.profit.basetool.backend.inventory.api.events.TransferredLot;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkRebookMode;
@@ -81,7 +83,10 @@ import org.springframework.security.access.AccessDeniedException;
  * rows already at the target are skipped and counted, while an unknown id, a foreign row or a
  * blocking earmark aborts the whole action.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryCheckoutServiceBulkRebookTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -303,6 +308,53 @@ class InventoryCheckoutServiceBulkRebookTest {
         saved.getValue().getJobOrderAllocations().getFirst().getAmount(),
         1e-9,
         "the slice moves in full with the quantity");
+  }
+
+  @Test
+  void bulkRebook_location_mergesTheWholeQuantityAndDeliveredEarmark() {
+    Location here = location(UUID.randomUUID(), "Area18");
+    Location there = location(UUID.randomUUID(), "Lorville");
+    InventoryItem source = row(UUID.randomUUID(), here, 8.0);
+    InventoryItem target = row(UUID.randomUUID(), there, 2.0);
+    target.setMaterial(source.getMaterial());
+    UUID orderId = UUID.randomUUID();
+    InventoryAllocations.addJobOrder(source, orderId, 8.0, true);
+    List<StockQuantityFragment> expected =
+        List.of(
+            source.getQuantityComposition().knownPhysical().getFirst(),
+            target.getQuantityComposition().knownPhysical().getFirst());
+    given(source);
+    when(locationRepository.findById(there.getId())).thenReturn(Optional.of(there));
+    when(inventoryItemRepository.save(any(InventoryItem.class)))
+        .thenAnswer(invocation -> {
+          InventoryItem saved = invocation.getArgument(0);
+          saved.setId(UUID.randomUUID());
+          return saved;
+        });
+    when(inventoryItemRepository.findMergeGroupForUpdate(
+            OWNER_ID,
+            source.getMaterial().getId(),
+            there.getId(),
+            source.getQuality(),
+            false,
+            false,
+            null))
+        .thenReturn(List.of(target));
+
+    checkoutService.bulkRebook(
+        new BulkRebookRequest(
+            List.of(source.getId()), BulkRebookMode.LOCATION, null, there.getId(), null, true),
+        OWNER_ID);
+
+    ArgumentCaptor<InventoryItem> survivor = ArgumentCaptor.forClass(InventoryItem.class);
+    verify(inventoryItemRepository).saveAndFlush(survivor.capture());
+    assertThat(survivor.getValue().getQuantityComposition().knownPhysical())
+        .containsExactlyInAnyOrderElementsOf(expected);
+    assertEquals(10.0, survivor.getValue().getAmount(), 1e-9);
+    assertEquals(8.0, survivor.getValue().getJobOrderAllocations().getFirst().getAmount(), 1e-9);
+    assertTrue(survivor.getValue().getJobOrderAllocations().getFirst().getDelivered());
+    verify(offerRatchet).beforeDelete(List.of(source.getId()), StockChangeReason.REBOOK);
+    verify(inventoryItemRepository).deleteAll(List.of(target));
   }
 
   @Test

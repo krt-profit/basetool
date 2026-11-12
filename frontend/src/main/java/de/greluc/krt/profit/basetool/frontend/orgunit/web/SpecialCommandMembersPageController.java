@@ -349,7 +349,6 @@ public class SpecialCommandMembersPageController {
         sc.shorthand(),
         sc.description(),
         Boolean.TRUE.equals(sc.active()),
-        Boolean.TRUE.equals(sc.isProfitEligible()),
         sc.version() == null ? 0L : sc.version());
   }
 

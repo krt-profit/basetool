@@ -57,6 +57,16 @@ public interface NotificationEvent {
   UUID actorSub();
 
   /**
+   * The originating revision used to check whether an action prompt is current.
+   *
+   * @return the observed revisions, or {@code null} when the event carries none
+   */
+  @Nullable
+  default NotificationRevision observedRevision() {
+    return null;
+  }
+
+  /**
    * The org units this event exposes by role, for {@code ORG_RELATIVE_ROLE} selector resolution.
    *
    * @return the context org units keyed by role; never {@code null}
@@ -109,6 +119,16 @@ public interface NotificationEvent {
   @Nullable
   default UUID contextRecipientUserId() {
     return null;
+  }
+
+  /**
+   * Restricts rules to the event's permitted audience when it carries private context.
+   *
+   * @param recipientUserId an account selected by a configured rule
+   * @return whether the account may receive this event's notice
+   */
+  default boolean admitsRecipient(@NotNull UUID recipientUserId) {
+    return true;
   }
 
   /**
@@ -200,6 +220,17 @@ public interface NotificationEvent {
   @NotNull
   @Unmodifiable
   default Set<NotificationType> resolvesNotificationTypes() {
+    return Set.of();
+  }
+
+  /**
+   * Exact notices about this entity that the originating transaction marks obsolete.
+   *
+   * @return the captured notice identities, or an empty set if none are captured
+   */
+  @NotNull
+  @Unmodifiable
+  default Set<UUID> resolvesNotificationIds() {
     return Set.of();
   }
 

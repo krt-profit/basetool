@@ -162,6 +162,12 @@ class ExchangeStockUnshareControllerTest {
     String cursor = snapshotEnd();
 
     change(ops(unshare(laranite, locationName(area18), squadron, "4", "10")))
+        .andExpect(response -> {
+          Exception failure = response.getResolvedException();
+          if (failure != null) {
+            throw failure;
+          }
+        })
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.applied").value(1))
         .andExpect(jsonPath("$.notApplied").value(0));

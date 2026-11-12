@@ -21,8 +21,8 @@ package de.greluc.krt.profit.basetool.backend.joborder.api.events;
 
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
-import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.util.Map;
 import java.util.Set;
@@ -32,16 +32,32 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Published when a job order is completed, rejected or deleted (REQ-NOTIF-008, REQ-NOTIF-018).
- *
- * <p>Directed at nobody: its only effect is to clear the open "new order" and "order changed by the
- * requester" items, so an inbox does not keep pointing at an order that is settled or gone.
+ * Clears outstanding order action prompts after completion, rejection, cancellation or deletion
+ * (REQ-NOTIF-008, REQ-NOTIF-018).
  *
  * @param jobOrderId the closed order; the loose entity id of the cleared items
  * @param actorSub the member who closed it, or {@code null} when none is known
+ * @param observedRevision the order revisions at closure
+ * @param resolvesNotificationIds the action prompt IDs observed under the order lock
  */
-public record JobOrderClosedEvent(@NotNull UUID jobOrderId, @Nullable UUID actorSub)
+public record JobOrderClosedEvent(
+    @NotNull UUID jobOrderId,
+    @Nullable UUID actorSub,
+    @NotNull NotificationRevision observedRevision,
+    @NotNull @Unmodifiable Set<UUID> resolvesNotificationIds)
     implements NotificationEvent {
+
+  /**
+   * Captures the immutable cleanup scope.
+   *
+   * @param jobOrderId the closed order
+   * @param actorSub the member who closed it, if known
+   * @param observedRevision the order revisions at closure
+   * @param resolvesNotificationIds the order's observed action prompt IDs
+   */
+  public JobOrderClosedEvent {
+    resolvesNotificationIds = Set.copyOf(resolvesNotificationIds);
+  }
 
   @NotNull
   @Override
@@ -73,19 +89,5 @@ public record JobOrderClosedEvent(@NotNull UUID jobOrderId, @Nullable UUID actor
   @Override
   public Map<String, String> renderParams() {
     return Map.of();
-  }
-
-  /**
-   * The order needs no more action, so its open order notices are stale.
-   *
-   * @return {@link NotificationType#JOB_ORDER_CREATED} and {@link
-   *     NotificationType#JOB_ORDER_UPDATED_BY_REQUESTER}
-   */
-  @NotNull
-  @Unmodifiable
-  @Override
-  public Set<NotificationType> resolvesNotificationTypes() {
-    return Set.of(
-        NotificationType.JOB_ORDER_CREATED, NotificationType.JOB_ORDER_UPDATED_BY_REQUESTER);
   }
 }

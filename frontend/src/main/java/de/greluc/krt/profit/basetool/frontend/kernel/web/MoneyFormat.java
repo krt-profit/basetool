@@ -20,7 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.text.NumberFormat;
+import java.util.Locale;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +35,17 @@ import org.springframework.stereotype.Component;
  */
 @Component("moneyFormat")
 public class MoneyFormat {
+
+  /**
+   * Groups canonical whole-aUEC digits without rounding.
+   *
+   * @param value the exact whole amount
+   * @param locale the display language
+   * @return the localized amount
+   */
+  public String exactWhole(@NotNull String value, @NotNull Locale locale) {
+    return NumberFormat.getIntegerInstance(locale).format(new BigInteger(value));
+  }
 
   /**
    * Rounds the given {@link BigDecimal} to scale 0 using {@link RoundingMode#HALF_UP}.

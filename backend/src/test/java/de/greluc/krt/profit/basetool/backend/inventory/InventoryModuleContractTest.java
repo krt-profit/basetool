@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -40,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
@@ -72,6 +75,8 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest
 @Transactional
 class InventoryModuleContractTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final String INVENTORY = "/api/v1/inventory";
 
@@ -225,7 +230,7 @@ class InventoryModuleContractTest {
     Squadron squadron = new Squadron();
     squadron.setName(name);
     squadron.setShorthand(shorthand);
-    squadron.setProfitEligible(true);
+    withinProfit(squadron, persistedProfitArea(orgUnitRepository));
     return squadronRepository.save(squadron);
   }
 

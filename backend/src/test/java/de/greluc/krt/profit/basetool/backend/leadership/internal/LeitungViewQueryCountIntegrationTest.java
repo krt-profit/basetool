@@ -63,7 +63,7 @@ class LeitungViewQueryCountIntegrationTest {
           .anySatisfy(unit -> {
             assertThat(unit.id()).isEqualTo(first.child());
             assertThat(unit.bereichName()).isEqualTo(first.parentName());
-            assertThat(unit.department()).isEqualTo(Department.PROFIT);
+            assertThat(unit.department()).isEqualTo(Department.FORSCHUNG);
           });
       for (int i = 1; i < 125; i++) {
         createPair();
@@ -91,7 +91,7 @@ class LeitungViewQueryCountIntegrationTest {
     parent.setName("Inactive profile area " + token);
     parent.setShorthand("P" + token);
     parent.setActive(false);
-    parent.setDepartment(Department.PROFIT);
+    parent.setDepartment(Department.FORSCHUNG);
     repository.save(parent);
     Squadron child = new Squadron();
     child.setName("Active profile squadron " + token);

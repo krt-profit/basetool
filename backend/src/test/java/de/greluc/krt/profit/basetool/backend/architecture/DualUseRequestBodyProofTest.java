@@ -390,8 +390,6 @@ class DualUseRequestBodyProofTest {
                 "FST",
                 "active",
                 true,
-                "isProfitEligible",
-                false,
                 "version",
                 7));
     UUID createdId = id(created);
@@ -431,8 +429,6 @@ class DualUseRequestBodyProofTest {
                 "FSK",
                 "active",
                 true,
-                "isProfitEligible",
-                false,
                 "version",
                 7));
     UUID createdId = id(created);

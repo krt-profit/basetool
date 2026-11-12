@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -400,6 +401,40 @@ public interface UserRepository
   @Modifying
   @Query("UPDATE User u SET u.approvedById = null WHERE u.approvedById = :adminId")
   void clearApprovedBy(@Param("adminId") @NotNull UUID adminId);
+
+  /**
+   * Reads approval and stored role codes from the current database state.
+   *
+   * @param userId the member
+   * @return one row per stored role, a row with no code for a roleless member, or no rows for an
+   *     unknown member
+   */
+  @Query(
+      """
+      SELECT u.approvalStatus AS approvalStatus, r.code AS roleCode
+      FROM User u LEFT JOIN u.roles r WHERE u.id = :userId
+      """)
+  List<StoredAuthority> findStoredAuthorities(@Param("userId") UUID userId);
+
+  /** One scalar row of a member's stored authority. */
+  interface StoredAuthority {
+
+    /**
+     * Reads the approval state.
+     *
+     * @return the current registration approval status
+     */
+    @NotNull
+    ApprovalStatus getApprovalStatus();
+
+    /**
+     * Reads the stored role.
+     *
+     * @return the role code, or {@code null} for a member with no roles
+     */
+    @Nullable
+    String getRoleCode();
+  }
 
   /**
    * Whether a member holds at least one of the given roles.

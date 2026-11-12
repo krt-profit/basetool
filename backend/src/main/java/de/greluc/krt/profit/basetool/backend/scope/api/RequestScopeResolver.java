@@ -299,8 +299,7 @@ public class RequestScopeResolver {
 
   /**
    * Returns the active org units the caller is a direct member of, without the leadership cascade,
-   * while the caller holds {@code KRT Member} (ADR-0300, REQ-ORG-032); the "own placed orders" key
-   * of the requester-side job-order access (REQ-ORDERS-023).
+   * while the caller holds {@code KRT Member} (ADR-0300, REQ-ORG-032).
    *
    * @return the caller's direct-membership org-unit ids, empty without {@code KRT Member}; never
    *     {@code null}.
@@ -318,20 +317,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@link #currentDirectMembershipOrgUnitIds()} inside the active context ({@link
-   * #narrowToPin(Set)}): the pinned unit when the caller is a direct member of it, nothing when
-   * they are not, all direct memberships when no unit is pinned (REQ-ORDERS-023, REQ-ORG-032).
-   *
-   * @return the caller's direct-membership org-unit ids in the active context, never {@code null}
-   */
-  @NotNull
-  public Set<UUID> currentDirectMembershipOrgUnitIdsInActiveContext() {
-    return narrowToPin(currentDirectMembershipOrgUnitIds());
-  }
-
-  /**
    * Whether the caller may see the job-order list and details: admins always, others only as a
-   * member of at least one profit-eligible org unit. Memoised per request.
+   * member of at least one active Profit-hierarchy org unit. Memoised per request.
    *
    * @return {@code true} iff the caller may view job orders.
    */
@@ -341,11 +328,11 @@ public class RequestScopeResolver {
 
   /**
    * Computes the {@link #canViewJobOrders()} verdict without the request-scoped memo — the admin
-   * short-circuit, the empty-membership rejection, and the profit-eligibility count. Split out so
-   * the public method only owns the caching.
+   * short-circuit, the empty-membership rejection, and the active-hierarchy count. Split out so the
+   * public method only owns the caching.
    *
-   * @return {@code true} iff the caller is an admin or a member of at least one profit-eligible org
-   *     unit.
+   * @return {@code true} iff the caller is an admin or a member of at least one active
+   *     Profit-hierarchy org unit.
    */
   private boolean resolveCanViewJobOrders() {
     if (authHelper.isAdmin()) {
@@ -355,7 +342,7 @@ public class RequestScopeResolver {
     if (memberOrgUnitIds.isEmpty()) {
       return false;
     }
-    return orgUnitRepository.countProfitEligibleByIdIn(memberOrgUnitIds) > 0;
+    return orgUnitRepository.countInActiveProfitHierarchyByIdIn(memberOrgUnitIds) > 0;
   }
 
   /**
@@ -369,7 +356,8 @@ public class RequestScopeResolver {
     if (authHelper.isAdmin()) {
       return true;
     }
-    return !currentMemberOrgUnitIds().isEmpty();
+    return !currentMemberOrgUnitIds().isEmpty()
+        || !currentGrantedOrgUnitIdsInActiveContext(Roles.LOGISTICIAN).isEmpty();
   }
 
   /**

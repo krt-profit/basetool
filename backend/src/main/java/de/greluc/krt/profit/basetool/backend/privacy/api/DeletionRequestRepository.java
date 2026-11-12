@@ -80,6 +80,15 @@ public interface DeletionRequestRepository extends JpaRepository<DeletionRequest
   Instant findOldestCreatedAtByStatus(@Param("status") DeletionRequestStatus status);
 
   /**
+   * Reads the immutable subject so account locks can precede the request row lock.
+   *
+   * @param id the request to execute
+   * @return the subject id, or empty when the request is gone
+   */
+  @Query("SELECT r.userId FROM DeletionRequest r WHERE r.id = :id")
+  Optional<UUID> findSubjectId(@Param("id") UUID id);
+
+  /**
    * Loads a request for a decision under a pessimistic write lock (REQ-SEC-061).
    *
    * <p>The execute path never updates this row, so optimistic locking cannot serialise it against a

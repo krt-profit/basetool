@@ -90,6 +90,9 @@ public final class LayoutResponses {
             false,
             false,
             false,
+            false,
+            (canViewJobOrders || canViewOwnJobOrders || canViewAssignedJobOrders),
+            canViewJobOrders,
             false),
         0L);
   }
@@ -129,6 +132,9 @@ public final class LayoutResponses {
         false,
         false,
         false,
+        false,
+        (canViewJobOrders || canViewOwnJobOrders || false),
+        canViewJobOrders,
         false);
   }
 
@@ -140,8 +146,30 @@ public final class LayoutResponses {
    */
   public static CapabilitiesResponse missionManager() {
     return new CapabilitiesResponse(
-        false, false, false, false, false, true, false, false, false, false, false, false, false,
-        false, false, false, false, false, false, false, false);
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        (false || false || false),
+        false,
+        false);
   }
 
   /**
@@ -182,7 +210,10 @@ public final class LayoutResponses {
         false,
         false,
         false,
-        false);
+        false,
+        true,
+        false,
+        true);
   }
 
   /**
@@ -222,6 +253,9 @@ public final class LayoutResponses {
         purchasingReport,
         false,
         false,
+        false,
+        (false || false || false),
+        false,
         false);
   }
 
@@ -233,6 +267,47 @@ public final class LayoutResponses {
    */
   public static MeLayoutResponse withCapabilities(CapabilitiesResponse capabilities) {
     return new MeLayoutResponse(null, null, List.of(), capabilities, 0L);
+  }
+
+  /**
+   * Copies one layout fixture with its explicit backend creation capability changed.
+   *
+   * @param layout the existing fixture
+   * @param canCreate whether the backend currently offers an authorized create pair
+   * @return the fixture with that one authoritative capability replaced
+   */
+  public static MeLayoutResponse withOrderCreation(MeLayoutResponse layout, boolean canCreate) {
+    CapabilitiesResponse caps = layout.capabilities();
+    return new MeLayoutResponse(
+        layout.activeOrgUnitId(),
+        layout.activeContext(),
+        layout.orgUnits(),
+        new CapabilitiesResponse(
+            caps.canSeeBlueprintOverview(),
+            caps.canViewJobOrders(),
+            caps.canViewOwnJobOrders(),
+            caps.canViewAssignedJobOrders(),
+            caps.isLogisticianOrAbove(),
+            caps.isMissionManagerOrAbove(),
+            caps.canMarkStolen(),
+            caps.hasOfficerReach(),
+            caps.canOpenLeitung(),
+            caps.canSeeHangarOwnerDetails(),
+            caps.canManageJobOrders(),
+            caps.canManageMissionFinance(),
+            caps.canActAsOfficerAnywhere(),
+            caps.canViewSupplyIncoming(),
+            caps.canViewSupplyStats(),
+            caps.canViewPurchasingPartners(),
+            caps.canViewPurchasingDelegates(),
+            caps.canViewPurchasingReport(),
+            caps.canViewBankStaff(),
+            caps.canManageBank(),
+            caps.isAdmin(),
+            caps.canViewOrderWorkspace(),
+            caps.canViewOrderUnitWork(),
+            canCreate),
+        layout.unreadNotifications());
   }
 
   /**
@@ -279,6 +354,9 @@ public final class LayoutResponses {
         false,
         false,
         false,
+        false,
+        false,
+        (false || false || false),
         false,
         false);
   }

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import java.math.BigDecimal;
 import java.util.Map;
@@ -49,7 +50,7 @@ import org.springframework.security.access.AccessDeniedException;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class BankLedgerServiceGuardTest {
 
-  @Mock private BankTransferFeeService transferFeeService;
+  @Mock private TransferFeePolicy transferFeePolicy;
   @Mock private BankPostingWriter writer;
   @Mock private BankBookingGuards guards;
 
@@ -85,7 +86,10 @@ class BankLedgerServiceGuardTest {
     BankHolder destinationHolder = holder();
     when(writer.requireHolder(sourceHolder.getId())).thenReturn(sourceHolder);
     when(writer.requireHolder(destinationHolder.getId())).thenReturn(destinationHolder);
-    when(transferFeeService.feeOn(new BigDecimal("1"))).thenReturn(new BigDecimal("1"));
+    when(transferFeePolicy.snapshot())
+        .thenReturn(new TransferFeePolicy.RateSnapshot(new BigDecimal("0.5")));
+    when(transferFeePolicy.feeOn(org.mockito.ArgumentMatchers.eq(new BigDecimal("1")), any()))
+        .thenReturn(new BigDecimal("1"));
     doThrow(
             new BankConflictException(
                 BankConflictException.CODE_BANK_FEE_EXCEEDS_AMOUNT,

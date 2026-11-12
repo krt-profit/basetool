@@ -87,7 +87,8 @@ public class DashboardWorkWidgetController {
             0,
             options.rows(DashboardWidgetType.ASSIGNED_ORDERS, rows),
             DashboardWidgetOptions.orderStatuses(resolved),
-            List.of());
+            List.of(),
+            java.util.List.of());
     model.addAttribute("assignedOrders", PageResponse.contentOf(page));
     model.addAttribute("assignedTotal", PageResponse.totalOf(page));
     return FRAGMENTS + "assignedOrders";

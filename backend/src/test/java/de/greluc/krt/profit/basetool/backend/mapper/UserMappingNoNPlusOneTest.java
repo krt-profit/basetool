@@ -141,12 +141,13 @@ class UserMappingNoNPlusOneTest {
 
   @Test
   void userPage_mappingIsStatementConstant_tenVersusFiftyUsers() {
+    String prefix = "perf-page-" + UUID.randomUUID() + "-";
     for (int i = 0; i < 50; i++) {
-      newMember("perf-page-" + i + "-" + UUID.randomUUID());
+      newMember(prefix + i);
     }
 
-    long tenStatements = statementsToMapUserPage(10);
-    long fiftyStatements = statementsToMapUserPage(50);
+    long tenStatements = statementsToMapUserPage(prefix, 10);
+    long fiftyStatements = statementsToMapUserPage(prefix, 50);
 
     assertEquals(
         tenStatements,
@@ -172,14 +173,16 @@ class UserMappingNoNPlusOneTest {
     return count;
   }
 
-  /** Loads one page of users cold and counts the statements of load + primed DTO mapping. */
-  private long statementsToMapUserPage(int size) {
+  /** Loads a page from one seeded population and counts load plus primed DTO mapping statements. */
+  private long statementsToMapUserPage(String prefix, int size) {
     entityManager.flush();
     entityManager.clear();
     bindRequest();
     Statistics stats = statistics();
     stats.clear();
-    Page<User> page = userRepository.findAll(PageRequest.of(0, size, Sort.by("username")));
+    Page<User> page =
+        userRepository.findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
+            prefix, prefix, PageRequest.of(0, size, Sort.by("username")));
     userMapper.primeStaffelMemberships(page.getContent());
     List<UserDto> dtos = page.map(userMapper::toDto).getContent();
     long count = stats.getPrepareStatementCount();

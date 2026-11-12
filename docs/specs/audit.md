@@ -27,6 +27,20 @@ first). The storage choice and the unified-viewer architecture are recorded in
 
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
+> **JobOrder audit scope:** The order records settlement, corrections, holder maintenance and
+> reciprocal order movements with the financial write. The activity filter and both locales
+> include the event types. Participant history is scoped to permitted order readers. Linked
+> Bank outcomes and clarification follow their owning audit rules. See the [aUEC order
+> contract](orders-auec.md) and [optional Bank contract](orders-auec-bank.md).
+>
+> **Bank audit scope:** Final debit-equivalent authority records `FUNDS_AUTHORISED` in the Bank
+> trail, with the funding account, authorisation reference and amount. A requested authorisation
+> also records the staff decision in the existing request audit. These entries commit with their
+> effects and use the existing Bank activity filter. Private staff and approval notes stay in
+> the Bank request or booking.
+>
+> The existing paragraphs and verification references below describe the current implementation baseline.
+
 > **Status: shipped** (ADR-0298, ADR-0300, ADR-0302, map #2800) for the coverage additions of the
 > amendment at the end of this requirement.
 
@@ -73,6 +87,7 @@ web, naming its client (REQ-AUDIT-005):
   books the seller-chosen per-mission `INCOME` attributions, REQ-INV-027) / **quantity-split
   assignment** (add / change amount / remove a job-order or mission allocation —
   `INVENTORY_ALLOCATION_ADDED` / `INVENTORY_ALLOCATION_CHANGED` / `INVENTORY_ALLOCATION_REMOVED`,
+  including each actual job-order slice removal in single and bulk implicit releases,
   Variante C, REQ-INV-027) / personal-marker rebooking (Umbuchung — `INVENTORY_ITEM_DEPERSONALIZED`
   for personal→shared, `INVENTORY_ITEM_PERSONALIZED` for shared→personal, REQ-INV-007) / write-time
   stock merge (`INVENTORY_ITEM_MERGED` — `PIECE` automatically, `SCU` on the per-action opt-in,
@@ -91,6 +106,12 @@ web, naming its client (REQ-AUDIT-005):
   the „gestohlen“ marker (`INVENTORY_STOLEN_MARKED` / `INVENTORY_STOLEN_UNMARKED` per row or split,
   with the amount and whether it split; a selection writes one `INVENTORY_BULK_STOLEN_CHANGED`
   summary; an unchanged row records nothing, REQ-INV-053) /
+  connected false original material quantity corrections (`INVENTORY_QUANTITY_CORRECTED`, with
+  provision identity, old/new quantity and bounded reason; ordinary true later loss stays distinct)
+  and explicitly selected current-quality corrections (`INVENTORY_QUALITY_CORRECTED` per actually
+  changed connected source portion, with provision identity, old/new quality, affected quantity and
+  actual surviving row identity; a physical quality no-op emits neither a correction row nor a
+  routine notice; the independent historical correction stays in JobOrder audit and fact history) /
   an exchange client's stock write (REQ-XCH-016: a book-in `INVENTORY_ITEM_CREATED`, a book-out the
   Lager's own `DISCARD` book-out, `INVENTORY_ITEM_CONSUMED`, a stolen flip the marker events above, each under the client's id) /
   the undo of a client's org-stock writes (`INVENTORY_ITEM_RESTORED` per shared row it removed,
@@ -119,6 +140,29 @@ web, naming its client (REQ-AUDIT-005):
   quality-tier catalogue create, update, deactivate and delete (`QUALITY_TIER_*`, REQ-ORDERS-036). A requesting-owner edit (REQ-ORDERS-023) reuses the
   existing `JOB_ORDER_UPDATED` / `JOB_ORDER_ITEM_UPDATED` / `JOB_ORDER_MATERIAL_UNLINKED` events with a
   bounded `byRequester=true` details flag (no new event type; the actor already identifies who edited).
+  Cancellation and reopening record `JOB_ORDER_STATUS_CHANGED` with the previous and next states.
+  Active Staffel support starts with `JOB_ORDER_PARTICIPATION_ENROLLED` and ends with
+  `JOB_ORDER_PARTICIPATION_ENDED`, with safe participation and unit ids and a bounded reason.
+  An accepted money provision records `JOB_ORDER_MONEY_PROVIDED` in the same transaction as the
+  durable operation, with its logical operation ID and exact amount. Linked provision and
+  movement also correlate the decision to the exact attempt. The deciding employee is the actor
+  when the Bank decision comes later. `JOB_ORDER_MONEY_BANK_DECIDED` records pending, refused,
+  withdrawn and reversed linked outcomes using the order operation ID, attempt ID and state.
+  A Bank-free movement records
+  `JOB_ORDER_MONEY_MOVED` with its logical operation ID, purpose, net amount, exact fee and explicit
+  new funds. A requester return, release, shortage or beneficiary payment uses the same event with
+  its own purpose. `JOB_ORDER_MONEY_REASSIGNED` records each order's purpose leg in the same
+  transaction. `JOB_ORDER_MONEY_CORRECTED` links a correction to its original operations, with one
+  record per affected order. `JOB_ORDER_MONEY_HOLDER_IDENTITY_CHANGED` records the identity action
+  and holder references. `JOB_ORDER_MONEY_RECIPIENT_CHANGED` records the designation ID and whether
+  it is active, or the original and replacement IDs for a correction. These details carry no names
+  or free text.
+  `JOB_ORDER_MONEY_TARGET_CHANGED` records the previous and new target. An information edit uses
+  `JOB_ORDER_UPDATED`. Automatic completion uses `JOB_ORDER_COMPLETED` in the same transaction.
+  Matching replays and pre-submission refusals record no activity audit.
+  `JOB_ORDER_MONEY_COMMITMENT_CHANGED` records the unit, commitment occurrence, before and
+  outstanding amounts, and reason. Credit and correction add the logical operation ID. The same
+  transaction records the affected occurrence and its order-visible history.
   Adding or removing an assignee who is not a direct member of the processing unit (REQ-ORDERS-047)
   records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in place of
   `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is SK-public; the assignee is the
@@ -226,15 +270,18 @@ web, naming its client (REQ-AUDIT-005):
   an item offer (both non-personal game-asset values); the anbieter is the target reference. The
   details payload carries only bounded facts — the offer `kind`, plus for a material offer the item id
   / quality / **offered amount** (and the item's current stock on release) / re-release flag and for an
-  item offer the blueprint `product` key / `qty`, and always the remark **length** — **never** the
-  remark body, the anbieter/interessent handle, or the item's location. **Requests (Gesuche)** on the
+  item offer the blueprint `product` key or the catalogue row `gameItem` (ADR-0372) / `qty`, and
+  always the remark **length** — **never** the remark body, the anbieter/interessent handle, or the
+  item's location. **Requests (Gesuche)** on the
   same board (REQ-MARKET-015…020) add five sibling event types under the same domain: request post
   (`MARKET_REQUEST_CREATED`), request edit (`MARKET_REQUEST_UPDATED`), request deactivate
   (`MARKET_REQUEST_DEACTIVATED`), fulfilment signal (`MARKET_REQUEST_INTEREST_SIGNALLED`) and its
   withdrawal (`MARKET_REQUEST_INTEREST_WITHDRAWN`), listed in the same Materialbörse viewer tab. Their
-  details carry only bounded facts — the request `kind`, the material id or blueprint `product` key,
-  the `minQuality`, the desired `amt` / `qty`, and the description **length** — never the description
-  body, the requester/supplier handle, or any location.
+  details carry only bounded facts — the request `kind`, the material id, blueprint `product` key or
+  catalogue row `gameItem`, the `minQuality`, the desired `amt` / `qty`, and the description
+  **length** — never the description body, the requester/supplier handle, or any location. A
+  catalogue reconciliation that moves an item offer or request to the surviving catalogue row writes
+  `MARKET_CATALOGUE_REASSIGNED` (see "Catalogue duplicate reconciliation" below).
 - **Hangar** (`Ship`, `AuditDomain.HANGAR`, every channel — web, app and the exchange) — ship
   create (`HANGAR_SHIP_CREATED`), edit (`HANGAR_SHIP_UPDATED`, only when a field changed; the
   details name the changed fields, never their values), org-unit change
@@ -861,6 +908,12 @@ amending [ADR-0038](../adr/0038-admin-retention-purge-of-audit-logs.md) ·
 
 ### REQ-AUDIT-007 — Audit is never an event; listeners never read the request; observers join the transaction
 
+> **JobOrder transactions:** The JobOrder composition adapter coordinates synchronous Bank and
+> stock effects in the owning business transaction. Financial mutations and their audit records
+> commit together. The transaction publishes or registers the data needed for live updates and
+> notifications. Delivery follows a successful commit. See the [aUEC order contract](orders-auec.md)
+> and [optional Bank contract](orders-auec-bank.md).
+
 REQ-AUDIT-001 holds only while the audit row is written **inside the transaction of the mutation it
 records**: an audit-insert failure must roll the mutation back. Three rules keep a well-meant
 "event" from breaking that ([plan §5.3](../archive/DOMAIN_MODULARISATION_PLAN.md)):
@@ -910,8 +963,30 @@ REQ-AUDIT-001 also covers automatic reference reassignment during the archived r
 REQ-DATA-034. Each changed row is audited in its owning transaction and existing domain:
 `INVENTORY_ITEM_CATALOGUE_REASSIGNED`, `MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED`,
 `JOB_ORDER_ITEM_CATALOGUE_REASSIGNED`, `BLUEPRINT_CATALOGUE_REASSIGNED`,
-`SUPPLY_CATALOGUE_REASSIGNED` and `PURCHASING_CATALOGUE_REASSIGNED`.
+`SUPPLY_CATALOGUE_REASSIGNED`, `PURCHASING_CATALOGUE_REASSIGNED` and
+`MARKET_CATALOGUE_REASSIGNED` (an item offer or request named by its catalogue row, ADR-0372).
 Details contain canonical/retired ids and fixed tokens; duplicate stock-floor reconciliation
 also records numeric before/after minimum and target settings. No note or member free text is
 copied into details. Unchanged rows and rolled-back attempts emit no mutation event. These
 owner-domain events do not implement or replace the planned catalogue-admin audit domain.
+
+The hierarchy foundation records every automatic ending of an ineligible legacy material promise
+as `JOB_ORDER_CLAIM_WITHDRAWN` with safe claim/unit identities and bounded reason `UNIT_INELIGIBLE`.
+An actual active-to-ended Staffel participation is recorded once as
+`JOB_ORDER_PARTICIPATION_ENDED`, including when it has no open promise. Details carry the
+participation and unit identities and the applicable reason `UNIT_INELIGIBLE`, `WITHDRAWN` or
+`BECAME_RESPONSIBLE`. Explicit enrolment and first-promise enrolment record
+`JOB_ORDER_PARTICIPATION_ENROLLED`. Existing contribution facts survive the participation
+transition. Replayed maintenance adds no second ending event.
+Responsibility transfer uses `JOB_ORDER_REASSIGNED`, preserving from/to identities and whether the
+original Profit boundary remains unknown, plus the observed valid `profitOrgUnit` identity.
+New creation records the verified root too; an unknown legacy original is never filled from it.
+Initial reconciliation uses a system actor through the same ending/audit path.
+`ORG_UNIT_PROFIT_ELIGIBILITY_CHANGED` and its labels
+remain readable for historical audit rows; no runtime mutation emits that retired switch event.
+
+Observed JobOrder unit-read relationships are retained in the same authorised create/edit
+transaction as its existing order audit event. They preserve the concrete requesting/responsible
+unit facts already observed by that command; they are not reconstructed from audit text and create
+no separate user action, financial movement or broadcast. A failed or refused edit retains no new
+relationship.

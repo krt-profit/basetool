@@ -60,6 +60,8 @@ public class JobOrderAssigneeService {
   /** Loads + persists the parent order aggregate. */
   private final JobOrderRepository jobOrderRepository;
 
+  private final JobOrderResponsibilityGuard responsibilityGuard;
+
   /** Resolves the user being added as an assignee. */
   private final UserRepository userRepository;
 
@@ -92,6 +94,7 @@ public class JobOrderAssigneeService {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
+    responsibilityGuard.assertWritable(jobOrder);
     boolean alreadyAssigned =
         jobOrder.getAssignees().stream()
             .anyMatch(a -> a.getUser() != null && a.getUser().getId().equals(userId));
@@ -134,6 +137,7 @@ public class JobOrderAssigneeService {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
+    responsibilityGuard.assertWritable(jobOrder);
     boolean removed =
         jobOrder
             .getAssignees()
@@ -216,6 +220,7 @@ public class JobOrderAssigneeService {
     JobOrder jobOrder =
         Entities.require(
             jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
+    responsibilityGuard.assertWritable(jobOrder);
     JobOrderAssignee assignee =
         Entities.require(
             jobOrder.getAssignees().stream()

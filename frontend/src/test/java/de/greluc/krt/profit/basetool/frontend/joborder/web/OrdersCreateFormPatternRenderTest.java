@@ -28,10 +28,12 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
 import de.greluc.krt.profit.basetool.frontend.support.CapabilityStubs;
+import de.greluc.krt.profit.basetool.frontend.support.OrderCreationOptionsFixtures;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -76,6 +78,9 @@ class OrdersCreateFormPatternRenderTest {
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    doReturn(OrderCreationOptionsFixtures.permitted(UUID.randomUUID()))
+        .when(backendApiClient)
+        .get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class);
     doReturn(List.of()).when(backendApiClient).getCached(any(CachedCatalog.class), anyTypeRef());
   }
 
@@ -130,8 +135,10 @@ class OrdersCreateFormPatternRenderTest {
         .contains("class=\"krt-segmented krt-segmented--block orders-create__kind\"")
         .contains("data-testid=\"order-mode-material\"")
         .contains("data-testid=\"order-mode-item\"")
+        .contains("data-testid=\"order-mode-auec\"")
         .containsPattern("name=\"orderModeToggle\" value=\"material\"[^>]*checked=\"checked\"")
-        .containsPattern("id=\"mode-item\" hidden=\"hidden\"");
+        .containsPattern("id=\"mode-item\" hidden=\"hidden\"")
+        .containsPattern("id=\"mode-auec\"[^>]*\\bhidden\\b");
     assertThat(html)
         .contains("class=\"form-layout card orders-create\"")
         .contains(">1 · Auftrag<")
@@ -159,7 +166,7 @@ class OrdersCreateFormPatternRenderTest {
     }
 
     List<String> forms = forms(html);
-    assertThat(forms).hasSize(2);
+    assertThat(forms).hasSize(3);
     for (String form : forms) {
       assertThat(form).contains("class=\"form-actions--sticky\"");
       assertThat(form.split("btn--cta", -1)).hasSize(2);
@@ -171,6 +178,26 @@ class OrdersCreateFormPatternRenderTest {
     assertThat(forms.get(1))
         .contains("data-testid=\"order-item-submit\"")
         .contains("id=\"orders-item-summary\"");
+    assertThat(forms.get(2))
+        .contains("action=\"/orders/auec\"")
+        .contains("data-testid=\"order-auec-target\"")
+        .contains("data-testid=\"order-auec-submit\"")
+        .doesNotContain("data-testid=\"order-material-select\"", "id=\"item-lines\"");
+  }
+
+  /** Opens the native aUEC form from the link rendered for browsers without JavaScript. */
+  @Test
+  @WithMockUser
+  void auecFormCanBeOpenedWithoutJavaScript() throws Exception {
+    assertThat(render("/orders/create"))
+        .containsPattern("(?s)<noscript>\\s*<a [^>]*href=\"/orders/create\\?mode=auec\"");
+
+    String html = render("/orders/create?mode=auec");
+    assertThat(html)
+        .containsPattern("name=\"orderModeToggle\" value=\"auec\"[^>]*checked=\"checked\"")
+        .contains("id=\"mode-auec\">")
+        .contains("id=\"mode-material\" hidden=\"hidden\"");
+    assertThat(forms(html).get(2)).contains("action=\"/orders/auec\"", "method=\"post\"");
   }
 
   /** The item editor hides the kind segment and the material form and saves changes. */
@@ -199,9 +226,16 @@ class OrdersCreateFormPatternRenderTest {
             List.of(),
             Instant.now(),
             1L,
+            true,
             null,
+            false,
+            false,
             null,
-            false);
+            false,
+            false,
+            false,
+            0L,
+            0L);
     doReturn(order)
         .when(backendApiClient)
         .get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(id));
@@ -217,6 +251,7 @@ class OrdersCreateFormPatternRenderTest {
         .containsPattern("id=\"item-comment-count\"[^>]*>4 / 1000<")
         .contains("/orders/" + id + "/items/update");
     List<String> forms = forms(html);
+    assertThat(forms).hasSize(2);
     assertThat(forms.get(1)).contains("Änderungen speichern").doesNotContain("Auftrag anlegen");
   }
 }

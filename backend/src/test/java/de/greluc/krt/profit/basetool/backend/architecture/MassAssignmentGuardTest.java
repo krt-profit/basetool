@@ -53,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemOrg
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPoolChangeDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.StockLevelCreateRequest;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateAuecJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateClaimDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.CreateJobOrderItemRequestDto;
@@ -281,6 +282,10 @@ class MassAssignmentGuardTest {
               Map.of(
                   "claimingOrgUnitId",
                   "the claiming unit, authorised by MaterialClaimService.assertCanManage")),
+          Map.entry(
+              CreateAuecJobOrderDto.class,
+              Map.of(
+                  "responsibleOrgUnitId", JOB_ORDER_UNITS, "requestingOrgUnitId", JOB_ORDER_UNITS)),
           Map.entry(
               CreateJobOrderDto.class,
               Map.of(

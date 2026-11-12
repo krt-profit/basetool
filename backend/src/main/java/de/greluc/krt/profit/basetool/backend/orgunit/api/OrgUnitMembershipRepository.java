@@ -333,4 +333,28 @@ public interface OrgUnitMembershipRepository
       "SELECT COUNT(m) > 0 FROM OrgUnitMembership m WHERE m.id.userId = :userId AND m.role <>"
           + " de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER")
   boolean existsLeadershipSeat(@Param("userId") UUID userId);
+
+  /**
+   * Resolves the active direct or covering functional writers of affected units: a Logistician
+   * flag or a seat on an active unit that is the target, the OL or the target's parent Bereich,
+   * each only while its holder holds {@code KRT Member} (REQ-SEC-015). A deactivated target has no
+   * writer (REQ-ORG-032).
+   *
+   * @param unitIds the units requiring coordination
+   * @return affected unit and current writer identities without unrelated administrators
+   */
+  @Query(
+      "SELECT DISTINCT new"
+          + " de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitWriterRef(target.id,"
+          + " m.id.userId) FROM OrgUnitMembership m, OrgUnit grantUnit, OrgUnit target WHERE"
+          + " target.id IN :unitIds AND target.active = true AND grantUnit.id = m.id.orgUnitId"
+          + " AND grantUnit.active = true AND m.user.approvalStatus ="
+          + " de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE AND"
+          + " m.user.inKeycloak = true AND m.user.enabledInKeycloak = true AND (m.isLogistician ="
+          + " true OR m.role <>"
+          + " de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole.MEMBER) AND EXISTS"
+          + " (SELECT r.id FROM User u JOIN u.roles r WHERE u = m.user AND r.code = 'KRT_MEMBER')"
+          + " AND (grantUnit.id = target.id OR TYPE(grantUnit) = Organisationsleitung OR"
+          + " (TYPE(grantUnit) = Bereich AND target.parent.id = grantUnit.id))")
+  List<OrgUnitWriterRef> findCurrentWritersForUnits(@Param("unitIds") Collection<UUID> unitIds);
 }

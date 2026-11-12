@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{kernel/fragments/layout :: page(pagePickers=false, pageNumbers=false, pageFocus=false, pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
 <head>
-    <title th:text="${requesterView} ? #{nav.orders.own} : #{nav.orders}">Aufträge</title>
+    <title th:text="#{nav.orders}">Aufträge</title>
     <th:block th:fragment="extraLinks">
         <link rel="stylesheet" th:href="@{/css/pages/joborder/orders-index.css}">
     </th:block>
@@ -9,10 +9,10 @@
 <body>
 <th:block th:fragment="pageContent">
 <main>
-    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='orders.list', eyebrowKey='nav.group.logistics', titleText=(${requesterView} ? #{nav.orders.own} : #{nav.orders}),
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='orders.list', eyebrowKey='nav.group.logistics', titleKey='nav.orders',
         count=${ordersPage != null ? ordersPage.totalElements() : null}, countId='orders-count', countFor='orders-results', actions=~{::orders-actions})}">
         <th:block th:ref="orders-actions">
-            <a th:href="@{/orders/create(source='index')}" class="btn btn--cta" data-testid="orders-create-link"
+            <a th:if="${canCreateJobOrders}" th:href="@{/orders/create(source='index')}" class="btn btn--cta" data-testid="orders-create-link"
                th:text="#{orders.index.new}">Neuer Auftrag</a>
         </th:block>
     </th:block>
@@ -27,6 +27,15 @@
             <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='orders-filter-panel', panelName='orders',
                 testid='orders-filter-toggle', body=~{::orders-filter-body})}">
                 <th:block th:ref="orders-filter-body">
+                    <fieldset class="orders-filter-field">
+                        <legend class="orders-filter-label" th:text="#{orders.index.type}">Typ</legend>
+                        <select id="orders-type-filter" name="type" class="krt-select" th:aria-label="#{orders.index.type}">
+                            <option value="" th:selected="${selectedTypes == null or selectedTypes.isEmpty()}" th:text="#{filter.all}">Alle</option>
+                            <option th:each="kind : ${orderKinds}" th:value="${kind.name()}"
+                                    th:selected="${selectedTypes != null and selectedTypes.contains(kind.name())}"
+                                    th:text="#{__${kind.labelKey()}__}">Typ</option>
+                        </select>
+                    </fieldset>
                     <fieldset class="orders-filter-field">
                         <legend class="orders-filter-label" th:text="#{orders.index.status}">Status</legend>
                         <div class="cluster gap-3">
@@ -45,6 +54,10 @@
                             <label class="orders-filter-check">
                                 <input type="checkbox" name="status" value="COMPLETED" th:checked="${selectedStatuses != null and selectedStatuses.contains('COMPLETED')}">
                                 <span th:text="#{status.COMPLETED}">Abgeschlossen</span>
+                            </label>
+                            <label class="orders-filter-check">
+                                <input type="checkbox" name="status" value="CANCELLED" th:checked="${selectedStatuses != null and selectedStatuses.contains('CANCELLED')}">
+                                <span th:text="#{status.CANCELLED}">Storniert</span>
                             </label>
                         </div>
                     </fieldset>
@@ -99,7 +112,7 @@
                 </thead>
                 <tbody th:with="queue=${orders.?[priority != null]}">
                 <tr th:each="order : ${orders}" data-testid="order-row"
-                    th:with="reorderable=${isLogisticianOrAbove and order.priority != null}"
+                    th:with="reorderable=${order.callerMayEdit() and order.priority != null}"
                     th:attr="data-id=${order.id}, data-priority=${order.priority}, data-reorder-name=${reorderable} ? #{orders.index.reorderName(${order.displayId})} : null"
                     th:classappend="${reorderable} ? 'draggable-row' : ''"
                     th:draggable="${reorderable} ? 'true' : 'false'">
@@ -111,6 +124,7 @@
                             <span class="cell-sub orders-meta">
                                 <th:block th:switch="${order.type}">
                                     <span th:case="'ITEM'" class="order-kind-badge order-kind-item" th:text="#{orders.kind.item}">Item</span>
+                                    <span th:case="'AUEC'" class="order-kind-badge" th:text="#{orders.kind.auec}"></span>
                                     <span th:case="*" class="order-kind-badge order-kind-material" th:text="#{orders.kind.material}">Material</span>
                                 </th:block>
                                 <span class="order-responsible-label" th:text="#{orders.index.responsible}">Bearbeitende Einheit</span>
@@ -143,6 +157,7 @@
                         <span class="cell-sub" th:text="${@handles.display(order.handle)}">Handle</span>
                     </td>
                     <td class="orders-materials-cell" th:with="matCount=${order.type == 'ITEM' ? (order.aggregatedMaterials != null ? order.aggregatedMaterials.size() : 0) : (order.materials != null ? order.materials.size() : 0)}">
+                        <th:block th:unless="${order.type == 'AUEC'}">
                         <button type="button" class="btn btn-ghost btn-xs ord-materials-toggle" data-trigger="ord-toggle-materials" th:data-order-id="${order.id}" aria-expanded="false">
                             <span class="toggle-icon" aria-hidden="true">&#9654;</span>
                             <span th:text="#{orders.index.materials}">Materialien</span>
@@ -154,7 +169,7 @@
                                 <tr>
                                     <th th:text="#{orders.material.name}">Material</th>
                                     <th class="num" th:text="#{orders.material.amount}">Gefordert</th>
-                                    <th th:unless="${ownScope}" class="num" th:text="#{orders.material.progress}">Fortschritt</th>
+                                    <th class="num" th:text="#{orders.material.progress}">Fortschritt</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -164,7 +179,7 @@
                                         <span th:case="'PIECE'" th:text="|${mat.amount != null ? #numbers.formatInteger(mat.amount, 1) : '0'} #{material.quantity.piece}|"></span>
                                         <span th:case="*" th:text="|${mat.amount != null ? #numbers.formatDecimal(mat.amount, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                                     </td>
-                                    <td th:unless="${ownScope}" class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'">0 %</td>
+                                    <td class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal(mat.amount > 0 ? (mat.currentStock >= mat.amount ? 100.0 : (mat.currentStock * 100.0 / mat.amount)) : 0, 1, 0)} + ' %'">0 %</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -174,7 +189,7 @@
                                 <tr>
                                     <th th:text="#{orders.material.name}">Material</th>
                                     <th class="num" th:text="#{orders.material.amount}">Gefordert</th>
-                                    <th th:unless="${ownScope}" class="num" th:text="#{orders.material.progress}">Fortschritt</th>
+                                    <th class="num" th:text="#{orders.material.progress}">Fortschritt</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -184,13 +199,14 @@
                                         <span th:case="'PIECE'" th:text="|${agg.totalQuantity != null ? #numbers.formatInteger(agg.totalQuantity, 1) : '0'} #{material.quantity.piece}|"></span>
                                         <span th:case="*" th:text="|${agg.totalQuantity != null ? #numbers.formatDecimal(agg.totalQuantity, 1, 'DEFAULT', 3, 'DEFAULT') : '0.000'} #{material.quantity.scu}|"></span>
                                     </td>
-                                    <td th:unless="${ownScope}" class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal((agg.totalQuantity != null and agg.totalQuantity > 0) ? ((agg.currentStock != null ? agg.currentStock : 0) >= agg.totalQuantity ? 100.0 : ((agg.currentStock != null ? agg.currentStock : 0) * 100.0 / agg.totalQuantity)) : 0, 1, 0)} + ' %'">0 %</td>
+                                    <td class="num" th:attr="data-label=#{orders.material.progress}" th:text="${#numbers.formatDecimal((agg.totalQuantity != null and agg.totalQuantity > 0) ? ((agg.currentStock != null ? agg.currentStock : 0) >= agg.totalQuantity ? 100.0 : ((agg.currentStock != null ? agg.currentStock : 0) * 100.0 / agg.totalQuantity)) : 0, 1, 0)} + ' %'">0 %</td>
                                 </tr>
                             </tbody>
                         </table>
                         <p th:if="${order.type == 'ITEM' and (order.aggregatedMaterials == null or order.aggregatedMaterials.isEmpty())}"
                            class="orders-materials-empty" th:text="#{orders.detail.aggregated.empty}">Keine Materialien abgeleitet.</p>
                         </div>
+                        </th:block>
                     </td>
                     <td class="cell-actions"><svg class="row-chevron" aria-hidden="true"><use href="#krt-icon-chevron-right"/></svg></td>
                 </tr>
@@ -206,9 +222,7 @@
         <nav th:replace="~{kernel/fragments/pagination :: pageSizePicker(pageResponse=${ordersPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
         </th:block>
     </div>
-    <th:block th:if="${isLogisticianOrAbove}">
-        <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
-    </th:block>
+    <p th:replace="~{kernel/fragments/components :: reorderLive}"></p>
     </section>
 </main>
 </th:block>
@@ -220,7 +234,7 @@
     const KRT_ORDERS_SECTION_REFRESH_ERROR = /*[[#{orders.section.refresh.error}]]*/ 'Die Liste konnte nicht aktualisiert werden. Bitte Seite neu laden.';
 </script>
 <script type="module" th:src="@{/js/joborder/orders-index.js}" th:attr="nonce=${cspNonce}"></script>
-<script th:if="${isLogisticianOrAbove}" th:inline="javascript" th:attr="nonce=${cspNonce}">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const KRT_ORDERS_REORDER_I18N = {
         success: /*[[#{success.joborder.priority}]]*/ 'Priority updated.',
         error: /*[[#{error.joborder.priority.failed}]]*/ 'Could not update priority.',
@@ -233,7 +247,7 @@
         }
     };
 </script>
-<script type="module" th:if="${isLogisticianOrAbove}" th:src="@{/js/joborder/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
+<script type="module" th:src="@{/js/joborder/orders-index-reorder.js}" th:attr="nonce=${cspNonce}"></script>
 </th:block>
 </body>
 </html>
