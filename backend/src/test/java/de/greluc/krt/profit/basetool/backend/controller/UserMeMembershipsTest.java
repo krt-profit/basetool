@@ -46,7 +46,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Tests {@code GET /api/v1/org-units/me/memberships} (REQ-API-009).
+ * Tests {@code GET /api/v1/org-units/me/memberships}.
  *
  * <ul>
  *   <li>The user id comes only from the JWT subject.

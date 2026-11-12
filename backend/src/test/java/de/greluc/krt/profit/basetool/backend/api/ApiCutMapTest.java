@@ -39,9 +39,8 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Holds the committed REST API cut map ({@code api/api-cut-map.txt}, plan §7.9) to the committed
- * OpenAPI document: every wave is either entirely still in place or entirely moved, the map names
- * the contract tier and the app's call of every operation as the document and the app call list do,
- * and no operation under a legacy root escapes the map.
+ * OpenAPI document: every wave is either entirely still in place or entirely moved, every moved
+ * operation stands at its new path, and no operation under a legacy root escapes the map.
  *
  * <p>A map line reads {@code <wave> <VERB> <old path> <new path|-> <tier> <app|->}; {@code -} as
  * the new path is a deletion.

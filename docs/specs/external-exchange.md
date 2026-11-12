@@ -46,6 +46,12 @@ sub-issue that implements it.
 
 ### REQ-XCH-001 — One exchange surface on the ingest gateway
 
+> [!note] Amended 2026-11-12 (ADR-0268, ADR-0269) — no allowlist to stay off
+> The backend is internal-only, so the exchange layer and the member controls have no `api.*`
+> allowlist to stay off, and the test that held them off it
+> (`ExternalContractTest.theExchangeStaysOffTheApiVhost`) went with the app. The route paragraph and
+> the acceptance line say so; git keeps the text.
+
 The exchange API is served by the ingest gateway at `/exchange/v1/**`
 (`https://ingest.profit-base.online/exchange/v1`). It offers exactly these routes:
 
@@ -84,7 +90,8 @@ Every route is deny-by-default, uses only `GET` or `POST` (the ingest bot filter
 else), and no route path collides with a prefix or suffix the bot filter blocks. The backend's
 exchange layer (`/api/v1/exchange/**`) is reachable only from the gateway's service identity; the
 member controls (`/api/v1/connected-apps/**`) only from the member's own browser session. Neither
-is ever on the `api.*` allowlist (ADR-0135), and nothing of the exchange lives under `/api/v1/me/`.
+has a public route of its own, because the backend is internal-only (ADR-0268), and nothing of the
+exchange lives under `/api/v1/me/`.
 
 **Acceptance**
 
@@ -95,10 +102,9 @@ is ever on the `api.*` allowlist (ADR-0135), and nothing of the exchange lives u
   session cannot reach `/api/v1/exchange/**` (`ConnectedAppsControllerTest`: the gateway and the app
   are refused; `ExchangeCatalogControllerTest`: an `ADMIN` browser session is refused, and so is the
   gateway without an acting member).
-- [x] The `api.*` allowlist test fails if an exchange or connected-apps path is added
-  (`ExternalContractTest.theExchangeStaysOffTheApiVhost`). A line that touches `krt_api_allowed` in a
-  form the test cannot evaluate — another variable, a negation, an unquoted or multi-line rule —
-  fails it instead of being skipped; `~*` counts as case-insensitive (security review G5, I6).
+- [x] ~~The `api.*` allowlist test fails if an exchange or connected-apps path is added
+  (`ExternalContractTest.theExchangeStaysOffTheApiVhost`).~~ — moot: the API vhost and its
+  allowlist are gone (ADR-0268), and the test with them (ADR-0269).
 
 **Status:** built — WP 3.2 (#2082), WP 3.1 (#2083)
 
@@ -2726,13 +2732,14 @@ G-18)
 > to their clients is the exchange contract on the gateway: every backend answer validates against
 > the published v1 schemas (`ExchangeWireContractTest`, REQ-XCH-036), and those schemas only grow
 > from one release to the next (REQ-XCH-026). The tier, release-comparison and vhost lines leave
-> this requirement; git keeps the text.
+> this requirement, the app leaves the readers of `openapi.json`, and the opening paragraph counts
+> the 31 relay operations `ExchangeFence.RELAY_OPERATIONS` holds, not 20; git keeps the text.
 
-The backend operations the gateway relays to — the 20 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 31 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
-of 2026-10-02). The published `openapi.json`, which the app vendors and the frontend generates its
-test types from, holds every other operation, so a per-domain diff, the frontend's generated types
+of 2026-10-02). The published `openapi.json`, which the frontend generates its test types from,
+holds every other operation, so a per-domain diff, the frontend's generated types
 and `DtoOpenApiContractTest` never see the relay surface. The relay document is internal: it is
 never served to a client. The external contract stays the gateway's `exchange-v1.openapi.json`
 (REQ-XCH-011).

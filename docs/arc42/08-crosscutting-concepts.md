@@ -187,10 +187,10 @@ Jakarta validation), `@Valid` on every write, RFC 7807 `problem+json` for every 
 reviewed catalogue lists opt out to 100 000), UTC everywhere, and a committed
 `openapi.json` per REST-serving module — generated with sorted keys by each module's
 `OpenApiGeneratorTest`, and CI fails a pull request whose committed document differs from the one
-its build generated. The backend's generator splits the exchange relay surface (`/api/v1/exchange/**`,
-tier T0) off into its own internal document, `exchange-relay.openapi.json`, with the same staleness
-check; `openapi.json` is what the app and the frontend read, the relay document is read only by the
-contract guards and served to no one (REQ-XCH-039, ADR-0216).
+its build generated. The backend's generator splits the exchange relay surface (`/api/v1/exchange/**`)
+off into its own internal document, `exchange-relay.openapi.json`, with the same staleness check;
+`openapi.json` is what the frontend reads, the relay document is read only by the contract guards
+and served to no one (REQ-XCH-039, ADR-0216).
 
 `/api/v1` is **evolvable in place**: an operation consumed solely by the in-repo frontend may change
 its response shape, because frontend and backend ship from one repository and promote as one digest
