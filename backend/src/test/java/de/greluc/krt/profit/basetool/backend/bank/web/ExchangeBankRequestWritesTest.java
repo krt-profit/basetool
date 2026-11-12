@@ -30,6 +30,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManager;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -189,6 +190,19 @@ class ExchangeBankRequestWritesTest {
 
     assertCode(raise(Actor.STAFFELLEITER, deposit(own, 0)), 400, "CONSTRAINT_VIOLATION");
     assertCode(raise(Actor.STAFFELLEITER, splitWithdrawal), 400, "CONSTRAINT_VIOLATION");
+  }
+
+  @Test
+  void internalRequestKindsCannotBeRaisedThroughTheRelay() throws Exception {
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    UUID requester = world.user(Actor.STAFFELLEITER);
+    long before = requestsOf(requester);
+
+    for (String kind : List.of("HOLDER_TRANSFER", "AUTHORISATION")) {
+      assertCode(raise(Actor.STAFFELLEITER, debit(kind, account, 500, null)), 400, "BAD_REQUEST");
+    }
+
+    assertThat(requestsOf(requester)).isEqualTo(before);
   }
 
   @Test

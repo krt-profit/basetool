@@ -65,7 +65,7 @@ class SpecialCommandMembersPageControllerTest {
   /** Stubs a minimal SK read plus a two-member roster delivered out of name order. */
   private void stubSkWithTwoMembers() {
     when(client.get(eq("/api/v1/special-commands/{id}"), eq(SpecialCommandDto.class), eq(skId)))
-        .thenReturn(new SpecialCommandDto(skId, "Alpha SK", "ASK", null, null, null, null));
+        .thenReturn(new SpecialCommandDto(skId, "Alpha SK", "ASK", null, null, null));
     when(client.get(eq("/api/v1/special-commands/{id}/members"), anyTypeRef(), eq(skId)))
         .thenReturn(List.of(member("zulu"), member("Alpha")));
   }

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { toggleTransferOnlyControl } from '/js/bank/bank-controls.js';
+import { toggleRequiredPicker } from '/js/bank/bank-controls.js';
 
 /**
  * Applies one request row's state to the reused bank confirmation modal on every open
@@ -35,7 +35,7 @@ export function applyConfirmModalState(trigger, modal) {
     }
     const requiresApproval = trigger.getAttribute('data-field-requiresownerapproval') === 'true';
     const alreadyGranted = trigger.getAttribute('data-field-ownerapprovalgranted') === 'true';
-    const isTransfer = trigger.getAttribute('data-field-reqtype') === 'TRANSFER';
+    const type = trigger.getAttribute('data-field-reqtype');
     const submit = /** @type {HTMLButtonElement | null} */ (
         form.querySelector('button[type="submit"]')
     );
@@ -87,10 +87,8 @@ export function applyConfirmModalState(trigger, modal) {
         justificationNotice.hidden = !present;
     }
 
-    const destRow = /** @type {HTMLElement | null} */ (
-        form.querySelector('[data-confirm-destination-holder]')
-    );
-    toggleTransferOnlyControl(destRow, isTransfer);
+    applyCustodianState(form, trigger.closest('tr'), type);
+    const isTransfer = type === 'TRANSFER';
     const holderLabel = form.querySelector('[data-confirm-holder-label]');
     if (holderLabel) {
         const text = isTransfer
@@ -100,6 +98,71 @@ export function applyConfirmModalState(trigger, modal) {
             holderLabel.textContent = text;
         }
     }
+}
+
+/**
+ * Shows the custodians relevant to the pending request and preserves its original account terms.
+ *
+ * @param {HTMLFormElement} form the confirmation form
+ * @param {HTMLTableRowElement | null} requestRow the pending request's queue row
+ * @param {string | null} type the request type
+ */
+function applyCustodianState(form, requestRow, type) {
+    const holderId = requestRow?.dataset.linkedHolderId ?? '';
+    const destinationId = requestRow?.dataset.linkedDestinationId ?? '';
+    const linked = requestRow?.dataset.linkedRequest === 'true';
+    const selectDepositCustodian = linked && type === 'DEPOSIT' && holderId === '';
+    toggleRequiredPicker(form.querySelector('[data-confirm-source-holder]'), !linked);
+    toggleRequiredPicker(
+        form.querySelector('[data-confirm-account-deposit-holder]'),
+        selectDepositCustodian,
+    );
+    toggleRequiredPicker(
+        form.querySelector('[data-confirm-destination-holder]'),
+        !linked && type === 'TRANSFER',
+    );
+    const hint = /** @type {HTMLElement} */ (form.querySelector('[data-confirm-picker-hint]'));
+    const fixed = /** @type {HTMLElement} */ (form.querySelector('[data-confirm-fixed-parties]'));
+    hint.hidden = linked && !selectDepositCustodian;
+    fixed.hidden = !linked;
+    setFixedCustodian(fixed, 'holder', holderId, requestRow?.dataset.linkedHolder ?? '');
+    setFixedCustodian(
+        fixed,
+        'destination',
+        destinationId,
+        requestRow?.dataset.linkedDestination ?? '',
+    );
+    const holderRow = /** @type {HTMLElement} */ (fixed.querySelector('[data-fixed-holder-row]'));
+    holderRow.hidden = holderId === '';
+    const destinationRow = /** @type {HTMLElement} */ (
+        fixed.querySelector('[data-fixed-destination-row]')
+    );
+    destinationRow.hidden = destinationId === '';
+    const amount = /** @type {HTMLElement} */ (fixed.querySelector('[data-fixed-amount]'));
+    amount.textContent = requestRow?.querySelector('[data-request-amount]')?.textContent ?? '';
+    const fee = /** @type {HTMLElement} */ (fixed.querySelector('[data-fixed-fee]'));
+    fee.textContent = requestRow?.querySelector('[data-linked-fee]')?.textContent ?? '';
+    fee.hidden = !fee.textContent;
+    const authorisationHint = /** @type {HTMLElement} */ (
+        fixed.querySelector('[data-fixed-authorisation-hint]')
+    );
+    authorisationHint.hidden = type !== 'AUTHORISATION';
+}
+
+/**
+ * Copies a submitted custodian to the confirmation payload and its read-only label.
+ *
+ * @param {HTMLElement} fixed the submitted party block
+ * @param {string} field the holder or destination field
+ * @param {string} id the submitted holder id
+ * @param {string} label the submitted holder's display name
+ */
+function setFixedCustodian(fixed, field, id, label) {
+    const input = /** @type {HTMLInputElement} */ (fixed.querySelector(`[data-fixed-${field}-id]`));
+    input.value = id;
+    input.disabled = id === '';
+    const name = /** @type {HTMLElement} */ (fixed.querySelector(`[data-fixed-${field}]`));
+    name.textContent = label;
 }
 
 /**

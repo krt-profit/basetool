@@ -67,6 +67,15 @@ public interface OrgUnitRecipientDirectory {
   Set<UUID> leadershipOf(@NotNull UUID orgUnitId);
 
   /**
+   * Resolves functional writers whose current leadership or Logistician grant covers the unit.
+   *
+   * @param orgUnitId the affected unit
+   * @return current writer account ids
+   */
+  @NotNull
+  Set<UUID> writersOf(@NotNull UUID orgUnitId);
+
+  /**
    * The members who hold a leadership seat in any org unit.
    *
    * @return their user subs; never {@code null}, possibly empty

@@ -1,0 +1,474 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.joborder.web;
+
+import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
+
+import de.greluc.krt.profit.basetool.frontend.joborder.client.JobOrderMoneyBackendClient;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.CorrectJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateAuecJobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.DesignateJobOrderMoneyRecipientDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderMoneyOutcome;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.MoveJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.PreviewJobOrderMoneyProvisionDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ProvideJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReassignJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.ReplaceJobOrderBankAttemptDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.SettleJobOrderMoneyDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyInformationDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateJobOrderMoneyTargetDto;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
+import java.util.Map;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Relays aUEC order commands and submitted outcome recovery. */
+@RestController
+@RequestMapping("/orders")
+@PreAuthorize("isAuthenticated()")
+@RequiredArgsConstructor
+@Slf4j
+public class JobOrderMoneyProxyController {
+
+  private final JobOrderMoneyBackendClient money;
+  private final JobOrderCreation orderCreation;
+
+  /**
+   * Creates an aUEC order from the workspace's AJAX form submission.
+   *
+   * @param form the shared order fields and exact net target
+   * @return the detail target or the propagated backend problem
+   */
+  @PostMapping(value = "/auec", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> createAuecOrderAjax(
+      @Valid @ModelAttribute("auecJobOrderForm") @NotNull CreateAuecJobOrderDto form) {
+    return relay(
+        log,
+        "create aUEC order",
+        () -> ResponseEntity.ok(Map.of("targetUrl", orderCreation.createAuecOrder(form))));
+  }
+
+  /**
+   * Offers eligible Bank references for the caller's current Order actions.
+   *
+   * @param id the order
+   * @return the scoped Bank references or the backend refusal
+   */
+  @GetMapping("/{id}/money/bank-accounts")
+  public ResponseEntity<Object> bankAccounts(@PathVariable UUID id) {
+    return relay(log, "read order Bank accounts", () -> ResponseEntity.ok(money.bankAccounts(id)));
+  }
+
+  /**
+   * Records the reported holding once for the submitted operation.
+   *
+   * @param id the order
+   * @param request the exact terms and captured version
+   * @return the recorded result or the backend refusal
+   */
+  @PostMapping("/{id}/money/provisions")
+  public ResponseEntity<Object> provide(
+      @PathVariable UUID id, @RequestBody @Valid ProvideJobOrderMoneyDto request) {
+    return relay(
+        log,
+        "record order provision",
+        () -> {
+          JobOrderMoneyOutcome outcome = money.provide(id, request);
+          return ResponseEntity.ok(outcome);
+        });
+  }
+
+  /**
+   * Projects the effect of a draft against the order's current provision authority.
+   *
+   * @param id the order
+   * @param request the proposed terms
+   * @return the backend preview or the refusal
+   */
+  @PostMapping("/{id}/money/provisions/preview")
+  public ResponseEntity<Object> preview(
+      @PathVariable UUID id, @RequestBody @Valid PreviewJobOrderMoneyProvisionDto request) {
+    return relay(
+        log, "preview order provision", () -> ResponseEntity.ok(money.preview(id, request)));
+  }
+
+  /**
+   * Offers current active accounts for an authorized on-behalf provision.
+   *
+   * @param id the order
+   * @param q the typed name fragment
+   * @return the backend candidates or the refusal
+   */
+  @GetMapping("/{id}/money/holder-candidates")
+  public ResponseEntity<Object> holderCandidates(
+      @PathVariable UUID id, @RequestParam(defaultValue = "") @Size(max = 200) String q) {
+    return relay(
+        log,
+        "search order holder accounts",
+        () -> ResponseEntity.ok(money.holderCandidates(id, q)));
+  }
+
+  /**
+   * Projects a movement against the order's current financial basis.
+   *
+   * @param id the order
+   * @param request the proposed movement
+   * @return the preview or the backend refusal
+   */
+  @PostMapping("/{id}/money/movements/preview")
+  public ResponseEntity<Object> previewMovement(
+      @PathVariable UUID id, @RequestBody @Valid MoveJobOrderMoneyDto request) {
+    return relay(
+        log,
+        "preview order money movement",
+        () -> ResponseEntity.ok(money.previewMovement(id, request)));
+  }
+
+  /**
+   * Records an actual collection or handover under one operation identity.
+   *
+   * @param id the order
+   * @param request the submitted movement
+   * @return the recorded outcome or the backend refusal
+   */
+  @PostMapping("/{id}/money/movements")
+  public ResponseEntity<Object> move(
+      @PathVariable UUID id, @RequestBody @Valid MoveJobOrderMoneyDto request) {
+    return relay(
+        log, "record order money movement", () -> ResponseEntity.ok(money.move(id, request)));
+  }
+
+  /**
+   * Relays an authorized settlement preview at the draft's observed basis.
+   *
+   * @param id the order
+   * @param request the proposed settlement
+   * @return the preview or backend refusal
+   */
+  @PostMapping("/{id}/money/movements/settlement/preview")
+  public ResponseEntity<Object> previewSettlement(
+      @PathVariable UUID id, @RequestBody @Valid SettleJobOrderMoneyDto request) {
+    return relay(
+        log,
+        "preview order settlement",
+        () -> ResponseEntity.ok(money.previewSettlement(id, request)));
+  }
+
+  /**
+   * Relays a settlement under its persistent operation identity.
+   *
+   * @param id the order
+   * @param request the submitted settlement
+   * @return the recorded outcome or backend refusal
+   */
+  @PostMapping("/{id}/money/movements/settlement")
+  public ResponseEntity<Object> settle(
+      @PathVariable UUID id, @RequestBody @Valid SettleJobOrderMoneyDto request) {
+    return relay(
+        log, "record order settlement", () -> ResponseEntity.ok(money.settle(id, request)));
+  }
+
+  /**
+   * Relays selectable accounts for an authorized beneficiary payment or requester return.
+   *
+   * @param id the order
+   * @param kind the settlement purpose
+   * @param sourceHolderId the holder paying a beneficiary, if applicable
+   * @param recipientId the returning requester designation, if applicable
+   * @param q the typed account name fragment
+   * @return account choices or the backend refusal
+   */
+  @GetMapping("/{id}/money/movements/settlement/candidates")
+  public ResponseEntity<Object> settlementCandidates(
+      @PathVariable UUID id,
+      @RequestParam String kind,
+      @RequestParam(required = false) @Nullable UUID sourceHolderId,
+      @RequestParam(required = false) @Nullable UUID recipientId,
+      @RequestParam(defaultValue = "") @Size(max = 200) String q) {
+    return relay(
+        log,
+        "search settlement accounts",
+        () ->
+            ResponseEntity.ok(
+                money.settlementCandidates(id, kind, sourceHolderId, recipientId, q)));
+  }
+
+  /**
+   * Relays the current eligible destination holder choices for the entered order number.
+   *
+   * @param id the source order
+   * @param sourceHolderId the holder reassigning funds
+   * @param number the displayed destination order number
+   * @return the eligible destination or backend refusal
+   */
+  @GetMapping("/{id}/money/movements/reassignment/destination")
+  public ResponseEntity<Object> reassignmentDestination(
+      @PathVariable UUID id, @RequestParam UUID sourceHolderId, @RequestParam @Min(1) int number) {
+    return relay(
+        log,
+        "find order purpose destination",
+        () -> ResponseEntity.ok(money.reassignmentDestination(id, sourceHolderId, number)));
+  }
+
+  /**
+   * Relays the fee-free reassignment preview at the two observed holder revisions.
+   *
+   * @param id the source order
+   * @param request the proposed reassignment
+   * @return the preview or backend refusal
+   */
+  @PostMapping("/{id}/money/movements/reassignment/preview")
+  public ResponseEntity<Object> previewReassignment(
+      @PathVariable UUID id, @RequestBody @Valid ReassignJobOrderMoneyDto request) {
+    return relay(
+        log,
+        "preview order purpose reassignment",
+        () -> ResponseEntity.ok(money.previewReassignment(id, request)));
+  }
+
+  /**
+   * Relays the paired purpose movement under its persistent operation identity.
+   *
+   * @param id the source order
+   * @param request the submitted reassignment
+   * @return the recorded source outcome or backend refusal
+   */
+  @PostMapping("/{id}/money/movements/reassignment")
+  public ResponseEntity<Object> reassign(
+      @PathVariable UUID id, @RequestBody @Valid ReassignJobOrderMoneyDto request) {
+    return relay(
+        log,
+        "record order purpose reassignment",
+        () -> ResponseEntity.ok(money.reassign(id, request)));
+  }
+
+  /**
+   * Relays a connected correction preview under current order authority.
+   *
+   * @param id the order
+   * @param request the corrected terms
+   * @return the calculated result or backend refusal
+   */
+  @PostMapping("/{id}/money/corrections/preview")
+  public ResponseEntity<Object> previewCorrection(
+      @PathVariable UUID id, @RequestBody @Valid CorrectJobOrderMoneyDto request) {
+    return relay(
+        log,
+        "preview order money correction",
+        () -> ResponseEntity.ok(money.previewCorrection(id, request)));
+  }
+
+  /**
+   * Relays a connected correction under its submitted identity.
+   *
+   * @param id the order
+   * @param request the correction and its observed basis
+   * @return the accepted result or backend refusal
+   */
+  @PostMapping("/{id}/money/corrections")
+  public ResponseEntity<Object> correct(
+      @PathVariable UUID id, @RequestBody @Valid CorrectJobOrderMoneyDto request) {
+    return relay(
+        log, "record order money correction", () -> ResponseEntity.ok(money.correct(id, request)));
+  }
+
+  /**
+   * Offers accounts for a collection from the selected holder.
+   *
+   * @param id the order
+   * @param sourceHolderId the source holder
+   * @param q the typed name fragment
+   * @return the candidates or the backend refusal
+   */
+  @GetMapping("/{id}/money/movement-candidates")
+  public ResponseEntity<Object> movementCandidates(
+      @PathVariable UUID id,
+      @RequestParam UUID sourceHolderId,
+      @RequestParam(defaultValue = "") @Size(max = 200) String q) {
+    return relay(
+        log,
+        "search movement destination accounts",
+        () -> ResponseEntity.ok(money.movementCandidates(id, sourceHolderId, q)));
+  }
+
+  /**
+   * Offers accounts for an authorized recipient designation.
+   *
+   * @param id the order
+   * @param q the typed name fragment
+   * @return the candidates or the backend refusal
+   */
+  @GetMapping("/{id}/money/recipient-candidates")
+  public ResponseEntity<Object> recipientCandidates(
+      @PathVariable UUID id, @RequestParam(defaultValue = "") @Size(max = 200) String q) {
+    return relay(
+        log,
+        "search handover recipient accounts",
+        () -> ResponseEntity.ok(money.recipientCandidates(id, q)));
+  }
+
+  /**
+   * Designates a recipient for this order.
+   *
+   * @param id the order
+   * @param request the explicit recipient selection
+   * @return the designation or the backend refusal
+   */
+  @PostMapping("/{id}/money/recipients")
+  public ResponseEntity<Object> designateRecipient(
+      @PathVariable UUID id, @RequestBody @Valid DesignateJobOrderMoneyRecipientDto request) {
+    return relay(
+        log,
+        "designate order handover recipient",
+        () ->
+            ResponseEntity.status(HttpStatus.CREATED).body(money.designateRecipient(id, request)));
+  }
+
+  /**
+   * Ends a recipient's designation while preserving existing history.
+   *
+   * @param id the order
+   * @param recipient the order-local recipient
+   * @return the backend result
+   */
+  @DeleteMapping("/{id}/money/recipients/{recipient}")
+  public ResponseEntity<Object> removeRecipient(
+      @PathVariable UUID id, @PathVariable UUID recipient) {
+    return relay(
+        log,
+        "remove order handover recipient",
+        () -> {
+          money.removeRecipient(id, recipient);
+          return ResponseEntity.noContent().build();
+        });
+  }
+
+  /**
+   * Changes the net target without editing the order information.
+   *
+   * @param id the order
+   * @param request the target and observed revision
+   * @return the updated money view or the backend refusal
+   */
+  @PatchMapping("/{id}/money/target")
+  public ResponseEntity<Object> updateTarget(
+      @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderMoneyTargetDto request) {
+    return relay(
+        log, "update order money target", () -> ResponseEntity.ok(money.updateTarget(id, request)));
+  }
+
+  /**
+   * Changes the contact and comment without editing the net target.
+   *
+   * @param id the order
+   * @param request the information and observed revision
+   * @return the updated money view or the backend refusal
+   */
+  @PatchMapping("/{id}/money/information")
+  public ResponseEntity<Object> updateInformation(
+      @PathVariable UUID id, @RequestBody @Valid UpdateJobOrderMoneyInformationDto request) {
+    return relay(
+        log,
+        "update money order information",
+        () -> ResponseEntity.ok(money.updateInformation(id, request)));
+  }
+
+  /**
+   * Reads the repair terms under current authorization.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @return the authorized repair terms
+   */
+  @GetMapping("/{id}/money/operations/{operation}/bank-replacement")
+  public ResponseEntity<Object> bankRepair(@PathVariable UUID id, @PathVariable UUID operation) {
+    return relay(
+        log, "read order Bank repair", () -> ResponseEntity.ok(money.bankRepair(id, operation)));
+  }
+
+  /**
+   * Quotes the corrected terms for the selected failed attempt.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @param request the failed revision and proposed corrections
+   * @return the exact fee and bound amount
+   */
+  @PostMapping("/{id}/money/operations/{operation}/bank-replacement/preview")
+  public ResponseEntity<Object> previewBankRepair(
+      @PathVariable UUID id,
+      @PathVariable UUID operation,
+      @RequestBody @Valid ReplaceJobOrderBankAttemptDto request) {
+    return relay(
+        log,
+        "preview order Bank repair",
+        () -> ResponseEntity.ok(money.previewBankRepair(id, operation, request)));
+  }
+
+  /**
+   * Repairs a failed Bank request without submitting a second payment.
+   *
+   * @param id the order
+   * @param operation the original logical identity
+   * @param request the failed revision and confirmed terms
+   * @return the authoritative outcome
+   */
+  @PostMapping("/{id}/money/operations/{operation}/bank-replacement")
+  public ResponseEntity<Object> replaceBankAttempt(
+      @PathVariable UUID id,
+      @PathVariable UUID operation,
+      @RequestBody @Valid ReplaceJobOrderBankAttemptDto request) {
+    return relay(
+        log,
+        "replace order Bank attempt",
+        () -> ResponseEntity.ok(money.replaceBankAttempt(id, operation, request)));
+  }
+
+  /**
+   * Looks up a submitted outcome through the backend's current authorization.
+   *
+   * @param id the order
+   * @param operation the submitted operation
+   * @return the outcome or the backend refusal
+   */
+  @GetMapping("/{id}/money/operations/{operation}")
+  public ResponseEntity<Object> outcome(@PathVariable UUID id, @PathVariable UUID operation) {
+    return relay(
+        log, "read order money outcome", () -> ResponseEntity.ok(money.outcome(id, operation)));
+  }
+}

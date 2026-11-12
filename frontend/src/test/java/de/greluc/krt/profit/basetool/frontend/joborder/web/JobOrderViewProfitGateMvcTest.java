@@ -41,10 +41,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/**
- * Verifies that a non-admin without a profit-eligible membership is redirected from the order list
- * to the create form, and from an order detail the backend refuses to the list (REQ-ORDERS-047).
- */
+/** Verifies workspace denial and the fallback after a refused detail read (REQ-ORDERS-052). */
 @SpringBootTest
 class JobOrderViewProfitGateMvcTest {
 
@@ -67,11 +64,8 @@ class JobOrderViewProfitGateMvcTest {
 
   @Test
   @WithMockUser
-  void orderList_nonProfitViewer_redirectsToCreate() throws Exception {
-    mockMvc
-        .perform(get("/orders"))
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/orders/create"));
+  void orderList_viewerWithoutWorkspace_isForbidden() throws Exception {
+    mockMvc.perform(get("/orders")).andExpect(status().isForbidden());
   }
 
   @Test

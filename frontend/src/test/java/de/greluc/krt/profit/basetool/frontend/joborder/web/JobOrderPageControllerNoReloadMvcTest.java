@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.CreateJobOrderDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderAssigneeDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderHandoverDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
@@ -136,13 +137,19 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
         version,
         canEdit,
         canManageAssignees,
-        false);
+        false,
+        false,
+        canEdit,
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void updatePriorityAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void updatePriorityAjax_WhenContextualAuthorityAccepts_RelaysAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
             eq("/api/v1/orders/{id}/priority?priority={priority}"),
@@ -187,22 +194,28 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
-  void updatePriorityAjax_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
+  void updatePriorityAjax_WhenBackendRefusesAuthority_Propagates403() throws Exception {
     UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(
+            eq("/api/v1/orders/{id}/priority?priority={priority}"),
+            isNull(),
+            eq(JobOrderDto.class),
+            eq(orderId),
+            eq(2)))
+        .thenThrow(deniedOrderWrite());
 
     mockMvc
         .perform(put("/orders/" + orderId + "/priority/ajax").param("priority", "2").with(csrf()))
-        .andExpect(status().isForbidden());
-
-    verify(backendApiClient, never()).put(any(String.class), any(), eq(JobOrderDto.class));
-    verify(backendApiClient, never())
-        .put(any(String.class), any(), eq(JobOrderDto.class), any(Object[].class));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+        .andExpect(
+            jsonPath("$.detail").value("Current unit has no write authority for this order."));
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void blueprintVariantCounting_AsLogistician_RelaysAndReturnsOrder() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void blueprintVariantCounting_WhenContextualAuthorityAccepts_RelaysAndReturnsOrder()
+      throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.patch(
             eq("/api/v1/orders/{id}/blueprint-variant-counting"),
@@ -230,8 +243,14 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
-  void blueprintVariantCounting_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
+  void blueprintVariantCounting_WhenBackendRefusesAuthority_Propagates403() throws Exception {
     UUID orderId = UUID.randomUUID();
+    when(backendApiClient.patch(
+            eq("/api/v1/orders/{id}/blueprint-variant-counting"),
+            any(),
+            eq(JobOrderDto.class),
+            eq(orderId)))
+        .thenThrow(deniedOrderWrite());
 
     mockMvc
         .perform(
@@ -239,17 +258,16 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"countBlueprintsWithVariants\":false,\"version\":5}")
                 .with(csrf()))
-        .andExpect(status().isForbidden());
-
-    verify(backendApiClient, never()).patch(any(String.class), any(), eq(JobOrderDto.class));
-    verify(backendApiClient, never())
-        .patch(any(String.class), any(), eq(JobOrderDto.class), any(Object[].class));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+        .andExpect(
+            jsonPath("$.detail").value("Current unit has no write authority for this order."));
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void unlinkInventoryItemAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void unlinkInventoryItemAjax_WhenContextualAuthorityAccepts_RelaysAndReturnsRefreshedOrder()
+      throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
@@ -290,17 +308,21 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
-  void unlinkInventoryItemAjax_AsPlainMember_Returns403WithoutCallingBackend() throws Exception {
+  void unlinkInventoryItemAjax_WhenBackendRefusesAuthority_Propagates403() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
+    doThrow(deniedOrderWrite())
+        .when(backendApiClient)
+        .delete(
+            eq("/api/v1/orders/{id}/allocations/{inventoryItemId}"),
+            eq(Void.class),
+            eq(orderId),
+            eq(invId));
 
     mockMvc
         .perform(delete("/orders/" + orderId + "/inventory/" + invId + "/unlink/ajax").with(csrf()))
-        .andExpect(status().isForbidden());
-
-    verify(backendApiClient, never()).delete(any(String.class), eq(Void.class));
-    verify(backendApiClient, never())
-        .delete(any(String.class), eq(Void.class), any(Object[].class));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
   }
 
   @Test
@@ -336,9 +358,8 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void updateOrderAjax_AsLogistician_RelaysAndReturnsOrder() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void updateOrderAjax_WhenContextualAuthorityAccepts_RelaysAndReturnsOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(eq("/api/v1/orders/{id}"), any(), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 4L));
@@ -373,8 +394,10 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
-  void updateOrderAjax_AsPlainMember_Returns403() throws Exception {
+  void updateOrderAjax_WhenBackendRefusesAuthority_Propagates403() throws Exception {
     UUID orderId = UUID.randomUUID();
+    when(backendApiClient.put(eq("/api/v1/orders/{id}"), any(), eq(JobOrderDto.class), eq(orderId)))
+        .thenThrow(deniedOrderWrite());
 
     mockMvc
         .perform(
@@ -382,7 +405,21 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(editBody(UUID.randomUUID())))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+        .andExpect(
+            jsonPath("$.detail").value("Current unit has no write authority for this order."));
+  }
+
+  private static BackendServiceException deniedOrderWrite() {
+    return new BackendServiceException(
+        "Forbidden",
+        null,
+        403,
+        "ACCESS_DENIED",
+        null,
+        List.of(),
+        "Current unit has no write authority for this order.");
   }
 
   private static String handoverBody(UUID inventoryItemId) {
@@ -393,9 +430,9 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void createHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void createHandoverAjax_WhenContextualAuthorityAccepts_RelaysAndReturnsRefreshedOrder()
+      throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 3L));
@@ -427,8 +464,11 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
-  void createHandoverAjax_AsPlainMember_Returns403() throws Exception {
+  void createHandoverAjax_WhenBackendRefusesAuthority_Propagates403() throws Exception {
     UUID orderId = UUID.randomUUID();
+    when(backendApiClient.post(
+            eq("/api/v1/orders/{id}/handovers"), any(), eq(JobOrderHandoverDto.class), eq(orderId)))
+        .thenThrow(deniedOrderWrite());
 
     mockMvc
         .perform(
@@ -440,9 +480,9 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void createItemHandoverAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void createItemHandoverAjax_WhenContextualAuthorityAccepts_RelaysAndReturnsRefreshedOrder()
+      throws Exception {
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
         .thenReturn(materialOrder(orderId, 6L));
@@ -469,9 +509,9 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   }
 
   @Test
-  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
-  void bookProductionAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
-    CapabilityStubs.logistician(backendApiClient);
+  @WithMockUser(roles = "KRT_MEMBER")
+  void bookProductionAjax_WhenContextualAuthorityAccepts_RelaysAndReturnsRefreshedOrder()
+      throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/{id}"), eq(JobOrderDto.class), eq(orderId)))
@@ -525,6 +565,8 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createOrderAjax_ValidMaterial_ReturnsNavigationTarget() throws Exception {
+    when(backendApiClient.post(eq("/api/v1/orders"), any(), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(UUID.randomUUID(), 0L));
     mockMvc
         .perform(
             post("/orders/create")
@@ -557,6 +599,8 @@ class JobOrderPageControllerNoReloadMvcTest extends JobOrderPageMvcTestBase {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createItemOrderAjax_ValidLine_ReturnsNavigationTarget() throws Exception {
+    when(backendApiClient.post(eq("/api/v1/orders/items"), any(), eq(JobOrderDto.class)))
+        .thenReturn(materialOrder(UUID.randomUUID(), 0L));
     mockMvc
         .perform(
             post("/orders/items")

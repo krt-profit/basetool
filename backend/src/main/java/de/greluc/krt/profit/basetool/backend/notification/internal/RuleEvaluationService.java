@@ -73,6 +73,7 @@ public class RuleEvaluationService {
       if (rule.isExcludeActor() && event.actorSub() != null) {
         recipients.remove(event.actorSub());
       }
+      recipients.removeIf(recipient -> !event.admitsRecipient(recipient));
       if (!recipients.isEmpty()) {
         byType.computeIfAbsent(rule.getNotificationType(), _ -> new HashSet<>()).addAll(recipients);
       }

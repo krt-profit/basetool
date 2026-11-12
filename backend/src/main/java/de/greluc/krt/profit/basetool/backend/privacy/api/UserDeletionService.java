@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ResponsibleHolderTracker;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
+import de.greluc.krt.profit.basetool.backend.platform.api.PreparedUserErasureParticipant;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserErasureParticipant.Erased;
 import java.util.Comparator;
@@ -51,6 +52,7 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 
@@ -196,6 +198,7 @@ public class UserDeletionService implements AccountErasure {
         && !isConfiguredGatewayServiceAccount(userId)) {
       throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
     }
+    prepareErasure(userId);
     if (user.getApprovalStatus() == ApprovalStatus.PENDING) {
       eventPublisher.publishEvent(new DiscordRegistrationDecidedEvent(userId, null));
     }
@@ -301,6 +304,20 @@ public class UserDeletionService implements AccountErasure {
         notificationsDeleted,
         ruleSelectorsDeleted,
         admin.getId());
+  }
+
+  /**
+   * Coordinates participant locks before a caller marks the account absent in this transaction.
+   *
+   * @param userId the account being deleted
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void prepareErasure(@NotNull UUID userId) {
+    for (UserErasureParticipant participant : inRunOrder()) {
+      if (participant instanceof PreparedUserErasureParticipant prepared) {
+        prepared.prepareErasure(userId);
+      }
+    }
   }
 
   /**

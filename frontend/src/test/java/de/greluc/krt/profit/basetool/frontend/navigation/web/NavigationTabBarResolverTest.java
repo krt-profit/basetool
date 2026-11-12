@@ -43,7 +43,7 @@ class NavigationTabBarResolverTest {
 
   private static final NavigationAccess ORDERS_QUEUE =
       new NavigationAccess(
-          Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.JOB_ORDERS));
+          Set.of("KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE, NavigationFlag.ORDER_WORKSPACE));
 
   private static final NavigationAccess ADMIN =
       new NavigationAccess(Set.of("ADMIN", "KRT_MEMBER"), Set.of(NavigationFlag.LANGUAGE_DE));
@@ -88,7 +88,7 @@ class NavigationTabBarResolverTest {
     NavigationTabBar bar = member(MEMBER, NavigationFavourites.NOT_LOADED, null, null, null);
 
     assertThat(bar.automatic()).isTrue();
-    assertThat(shown(bar)).containsExactly("missions.list", "storage.overview", "orders.create");
+    assertThat(shown(bar)).containsExactly("missions.list", "storage.overview");
     assertThat(bar.slots()).noneMatch(Slot::standIn);
   }
 
@@ -124,10 +124,10 @@ class NavigationTabBarResolverTest {
             favourites("refinery.orders"),
             "storage.overview",
             "missions.list",
-            "orders.create");
+            "hangar.overview");
 
     assertThat(bar.automatic()).isFalse();
-    assertThat(shown(bar)).containsExactly("storage.overview", "missions.list", "orders.create");
+    assertThat(shown(bar)).containsExactly("storage.overview", "missions.list", "hangar.overview");
     assertThat(bar.slots()).noneMatch(Slot::standIn);
   }
 
@@ -182,10 +182,11 @@ class NavigationTabBarResolverTest {
   @DisplayName("a deleted slot stays automatic and is no stand-in")
   void aClearedSlotIsFilledAutomatically() {
     NavigationTabBar bar =
-        member(MEMBER, NavigationFavourites.NOT_LOADED, "storage.overview", null, "orders.create");
+        member(
+            MEMBER, NavigationFavourites.NOT_LOADED, "storage.overview", null, "hangar.overview");
 
     assertThat(bar.automatic()).isFalse();
-    assertThat(shown(bar)).containsExactly("storage.overview", "missions.list", "orders.create");
+    assertThat(shown(bar)).containsExactly("storage.overview", "missions.list", "hangar.overview");
     assertThat(bar.slots().get(1).standIn()).isFalse();
   }
 

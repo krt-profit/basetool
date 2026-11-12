@@ -94,7 +94,7 @@ class SquadronControllerTest {
 
   @Test
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
-    SquadronDto dto = new SquadronDto(UUID.randomUUID(), "Alpha", "ALP", "Test", true, false, 1L);
+    SquadronDto dto = new SquadronDto(UUID.randomUUID(), "Alpha", "ALP", "Test", true, 1L);
     Page<SquadronDto> servicePage = new PageImpl<>(List.of(dto));
     when(service.getAllSquadrons(any(Pageable.class), eq(false))).thenReturn(servicePage);
 
@@ -131,11 +131,10 @@ class SquadronControllerTest {
 
   @Test
   void create_roundTripsDtoToEntityViaMapperAndBack() {
-    SquadronDto request = new SquadronDto(null, "Bravo", "BRV", "Test", true, false, null);
+    SquadronDto request = new SquadronDto(null, "Bravo", "BRV", "Test", true, null);
     Squadron entity = new Squadron();
     Squadron persisted = new Squadron();
-    SquadronDto response =
-        new SquadronDto(UUID.randomUUID(), "Bravo", "BRV", "Test", true, false, 1L);
+    SquadronDto response = new SquadronDto(UUID.randomUUID(), "Bravo", "BRV", "Test", true, 1L);
 
     when(mapper.toEntity(request)).thenReturn(entity);
     when(service.createSquadron(entity)).thenReturn(persisted);
@@ -150,9 +149,9 @@ class SquadronControllerTest {
   @Test
   void update_passesIdAndDtoDirectlyToService() {
     UUID id = UUID.randomUUID();
-    SquadronDto request = new SquadronDto(id, "Renamed", "REN", "Test", true, false, 4L);
+    SquadronDto request = new SquadronDto(id, "Renamed", "REN", "Test", true, 4L);
     Squadron persisted = new Squadron();
-    SquadronDto response = new SquadronDto(id, "Renamed", "REN", "Test", true, false, 5L);
+    SquadronDto response = new SquadronDto(id, "Renamed", "REN", "Test", true, 5L);
 
     when(service.updateSquadron(id, request)).thenReturn(persisted);
     when(mapper.toDto(persisted)).thenReturn(response);
@@ -162,22 +161,6 @@ class SquadronControllerTest {
     assertSame(response, result);
     verify(service).updateSquadron(id, request);
     verify(mapper, never()).toEntity(any(SquadronDto.class));
-  }
-
-  @Test
-  void setProfitEligible_delegatesToServiceAndMapsResult() {
-    UUID id = UUID.randomUUID();
-    Squadron persisted = new Squadron();
-    SquadronDto response = new SquadronDto(id, "Alpha", "ALP", "Test", true, true, 2L);
-    when(service.setProfitEligible(id, true)).thenReturn(persisted);
-    when(mapper.toDto(persisted)).thenReturn(response);
-
-    SquadronDto result =
-        controller.setProfitEligible(
-            id, new SquadronController.SquadronProfitEligibleToggleRequest(true));
-
-    assertSame(response, result);
-    verify(service).setProfitEligible(id, true);
   }
 
   @Test

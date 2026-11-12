@@ -33,7 +33,10 @@ import org.springframework.http.HttpStatus;
 public enum JobOrderProblemCode implements ProblemCode {
 
   /** A production booking exceeds what the order's stock holds. */
-  PRODUCTION_ALLOCATION(HttpStatus.UNPROCESSABLE_CONTENT);
+  PRODUCTION_ALLOCATION(HttpStatus.UNPROCESSABLE_CONTENT),
+
+  /** The provision identity has a durable no-effect refusal. */
+  MONEY_PROVISION_REFUSED(HttpStatus.CONFLICT);
 
   /** The status the code is answered with. */
   private final HttpStatus status;

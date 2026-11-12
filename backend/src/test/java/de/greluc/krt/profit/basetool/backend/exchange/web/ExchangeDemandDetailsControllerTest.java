@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -41,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
@@ -206,6 +208,42 @@ class ExchangeDemandDetailsControllerTest {
   }
 
   @Test
+  void anAuecOrderAndItsContextNeverEnterTheStockDemandFeed() throws Exception {
+    UUID unit = orgUnit(true);
+    joins(unit, "MEMBER", true);
+    UUID materialOrder = openOrder(unit, unit, material("Demand fixture"), 10.0, null);
+    UUID money =
+        Objects.requireNonNull(
+            transactionTemplate.execute(_ -> {
+              JobOrder order =
+                  jobOrderRepository.saveAndFlush(
+                      JobOrder.builder()
+                          .responsibleOrgUnit(orgUnitRepository.getReferenceById(unit))
+                          .requestingOrgUnit(orgUnitRepository.getReferenceById(unit))
+                          .type(JobOrderType.AUEC)
+                          .handle("private order-money contact")
+                          .comment("private order-money comment")
+                          .build());
+              jdbc.update(
+                  "INSERT INTO job_order_money_target(order_id, amount, version) VALUES (?, ?, 0)",
+                  order.getId(),
+                  100);
+              return order.getId();
+            }));
+    orders.add(money);
+    String response =
+        mockMvc
+            .perform(relayed(get(PATH), DETAILS))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.orders.length()").value(1))
+            .andExpect(jsonPath("$.orders[0].id").value(materialOrder.toString()))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(response).doesNotContain(money.toString()).doesNotContain("private order-money");
+  }
+
+  @Test
   void aStaffelleiterIsALogisticianOfTheUnit() throws Exception {
     UUID unit = orgUnit(true);
     joins(unit, "STAFFELLEITER", false);
@@ -336,18 +374,18 @@ class ExchangeDemandDetailsControllerTest {
   /**
    * Seeds an active Staffel.
    *
-   * @param profitEligible whether it is profit-eligible
+   * @param insideProfit whether it is a direct child of the designated Profit area
    * @return its id
    */
-  private @NotNull UUID orgUnit(boolean profitEligible) {
+  private @NotNull UUID orgUnit(boolean insideProfit) {
     UUID id = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO org_unit (id, kind, name, shorthand, active,"
-            + " is_profit_eligible) VALUES (?, 'SQUADRON', ?, ?, TRUE, ?)",
+            + " parent_org_unit_id) VALUES (?, 'SQUADRON', ?, ?, TRUE, ?)",
         id,
         "Unit " + id,
         "U" + id.toString().substring(0, 6),
-        profitEligible);
+        insideProfit ? persistedProfitArea(orgUnitRepository).getId() : null);
     orgUnits.add(id);
     return id;
   }

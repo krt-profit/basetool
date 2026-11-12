@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankStaffRights;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankBookingRequestDto.LinkedBankRequestDetails;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import java.util.Objects;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,7 +46,7 @@ final class BankBookingRequestDtos {
   static boolean callerMayConfirm(
       @NotNull BankBookingRequest request, @NotNull BankStaffRights rights) {
     return request.getStatus() == BankBookingRequestStatus.PENDING
-        && rights.canBook(request.getType(), request.getAccount().getId())
+        && rights.canBook(request.getType(), request.accountId())
         && !rights.boundByFourEyes(request.getRequestedBy());
   }
 
@@ -63,15 +66,19 @@ final class BankBookingRequestDtos {
       @Nullable String clientName,
       @Nullable Boolean callerMayConfirm) {
     BankAccount account = request.getAccount();
-    OrgUnit orgUnit = account.getOrgUnit();
+    OrgUnit orgUnit = account == null ? null : account.getOrgUnit();
+    boolean linked = request.getPurposeKind() == BankPurposeKind.AUEC_ORDER;
     BankHolder holder = request.getHolder();
+    if (holder == null && linked) {
+      holder = request.getRequestedHolder();
+    }
     BankTransaction transaction = request.getResultingTransaction();
     BankAccount target = request.getTargetAccount();
     return new BankBookingRequestDto(
         request.getId(),
-        account.getId(),
-        account.getAccountNo(),
-        account.getName(),
+        request.accountId(),
+        account == null ? null : account.getAccountNo(),
+        account == null ? null : account.getName(),
         orgUnit == null ? null : orgUnit.getId(),
         orgUnit == null ? null : orgUnit.getName(),
         orgUnit == null ? null : orgUnit.getShorthand(),
@@ -106,6 +113,17 @@ final class BankBookingRequestDtos {
         request.getPurposeRef(),
         clientName,
         request.getVersion(),
-        callerMayConfirm);
+        callerMayConfirm,
+        linked ? linkedDetails(request) : null);
+  }
+
+  @NotNull
+  private static LinkedBankRequestDetails linkedDetails(@NotNull BankBookingRequest request) {
+    BankHolder destination = request.getRequestedTargetHolder();
+    return new LinkedBankRequestDetails(
+        destination == null ? null : destination.getId(),
+        destination == null ? null : destination.getDisplayName(),
+        Objects.requireNonNull(request.getLinkedFee()),
+        request.getAuthorisationId());
   }
 }

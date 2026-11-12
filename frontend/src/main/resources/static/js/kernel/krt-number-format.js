@@ -49,6 +49,9 @@ export const NUMBER_GERMAN = Object.freeze({ group: '.', decimal: ',' });
 /** The most integer digits a field keeps; more cannot be represented exactly as a number. */
 export const NUMBER_MAX_INT_DIGITS = 15;
 
+/** The number-input mode for fields that preserve all whole digits. */
+export const EXACT_WHOLE_INPUT_MODE = 'exact-whole';
+
 /**
  * Finds the thousands and decimal separators of a language.
  *
@@ -244,11 +247,27 @@ export function readCanonical(raw, rules, seps) {
  */
 export function formatParts(parts, seps) {
     const sign = parts.neg ? '-' : '';
-    const grouped = parts.int.replace(/\B(?=(\d{3})+(?!\d))/g, seps.group);
+    const grouped = groupDigits(parts.int, seps.group);
     if (parts.frac === null) {
         return sign + grouped;
     }
     return `${sign}${grouped || '0'}${seps.decimal}${parts.frac}`;
+}
+
+/**
+ * Groups a string of digits in a single pass.
+ *
+ * @param {string} digits the integer digits
+ * @param {string} separator the display separator
+ * @returns {string} the grouped digits
+ */
+function groupDigits(digits, separator) {
+    const first = digits.length % 3 || 3;
+    const groups = [digits.slice(0, first)];
+    for (let offset = first; offset < digits.length; offset += 3) {
+        groups.push(digits.slice(offset, offset + 3));
+    }
+    return groups.join(separator);
 }
 
 /**

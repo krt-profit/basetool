@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto;
+import de.greluc.krt.profit.basetool.frontend.bank.model.BankBookingRequestDto.LinkedBankRequestDetails;
 import de.greluc.krt.profit.basetool.frontend.bank.model.BankTransferFeeRateDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -156,14 +157,15 @@ class BankRequestsPatternRenderTest {
       @Nullable String justification,
       boolean callerMayConfirm,
       @Nullable String clientName) {
+    boolean holderTransfer = "HOLDER_TRANSFER".equals(type);
     return new BankBookingRequestDto(
         id,
-        UUID.randomUUID(),
-        "KB-0007",
-        "ALP Betriebskonto",
-        UUID.randomUUID(),
-        "ALPHA",
-        "ALP",
+        holderTransfer ? null : UUID.randomUUID(),
+        holderTransfer ? null : "KB-0007",
+        holderTransfer ? null : "ALP Betriebskonto",
+        holderTransfer ? null : UUID.randomUUID(),
+        holderTransfer ? null : "ALPHA",
+        holderTransfer ? null : "ALP",
         type,
         new BigDecimal("600000"),
         null,
@@ -171,8 +173,8 @@ class BankRequestsPatternRenderTest {
         null,
         "PENDING",
         "talon",
-        null,
-        null,
+        holderTransfer ? UUID.randomUUID() : null,
+        holderTransfer ? "nova" : null,
         null,
         null,
         null,
@@ -195,7 +197,13 @@ class BankRequestsPatternRenderTest {
         null,
         clientName,
         3L,
-        callerMayConfirm);
+        callerMayConfirm,
+        holderTransfer
+            ? new LinkedBankRequestDetails(
+                UUID.randomUUID(), "orion", new BigDecimal("20000"), null)
+            : "AUTHORISATION".equals(type)
+                ? new LinkedBankRequestDetails(null, null, BigDecimal.ZERO, null)
+                : null);
   }
 
   /**
@@ -380,6 +388,45 @@ class BankRequestsPatternRenderTest {
     assertThat(html)
         .contains("600,000 aUEC")
         .containsPattern("data-testid=\"bank-request-gross\"[^>]*>With fee: 603,000 aUEC<");
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void listsAnAccountlessHolderTransferInTheExistingStaffQueue() throws Exception {
+    PageResponse<BankBookingRequestDto> page =
+        new PageResponse<>(
+            List.of(request(OPEN_ID, "HOLDER_TRANSFER", false, false, null, null)),
+            0,
+            200,
+            1L,
+            1,
+            List.of());
+
+    assertThat(render(page, ""))
+        .contains(">Halterumbuchung<")
+        .contains("nova", "orion", "data-linked-destination-id")
+        .contains("Transfergebühr aus der KRT-Kasse 20.000 aUEC")
+        .contains("data-testid=\"bank-request-confirm-btn\"")
+        .contains("1 warten auf dich")
+        .doesNotContain("KB-0007")
+        .doesNotContain("data-testid=\"bank-request-approval-pending\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "BANK_EMPLOYEE")
+  void marksAnAccountOnlyAuthorisationAsLinkedWithoutAFixedCustodian() throws Exception {
+    var page =
+        new PageResponse<>(
+            List.of(request(OPEN_ID, "AUTHORISATION", false, false, null, null)),
+            0,
+            200,
+            1L,
+            1,
+            List.of());
+    assertThat(render(page, ""))
+        .contains("data-linked-request=\"true\"")
+        .doesNotContain("data-linked-holder-id=")
+        .contains("data-testid=\"bank-request-confirm-btn\"");
   }
 
   /** An empty segment renders the empty state and no table. */

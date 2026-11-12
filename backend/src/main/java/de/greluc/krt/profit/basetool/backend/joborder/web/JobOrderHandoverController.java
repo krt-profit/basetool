@@ -31,7 +31,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHando
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemHandoverService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionCreateDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemProductionService;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.platform.api.PdfResponses;
 import de.greluc.krt.profit.basetool.backend.platform.api.UserZone;
 import io.swagger.v3.oas.annotations.Operation;
@@ -60,7 +59,8 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface over the handovers of a job order: material and item handovers, the production
  * booking of an ordered item line and the handover report PDFs.
  *
- * <p>Every endpoint needs LOGISTICIAN or ADMIN and edit access to the order.
+ * <p>Writes and previews require current fulfillment authority. Persisted reports use order read
+ * access.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -86,12 +86,7 @@ public class JobOrderHandoverController {
   @Operation(
       summary = "Create a job order handover",
       description = "Logs a handover of materials for this job order.")
-  @PreAuthorize(
-      "(hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id)")
   public JobOrderHandoverDto createHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderHandoverCreateDto dto) {
     return jobOrderHandoverService.createHandover(id, dto);
@@ -100,7 +95,7 @@ public class JobOrderHandoverController {
   /**
    * Records an item handover for an item order: increments each ordered line's delivered count and
    * auto-completes the order once every line is fully delivered. Same authorisation as the material
-   * handover (LOGISTICIAN+).
+   * handover.
    *
    * @param id job-order id
    * @param dto item-handover payload (per-line delivered quantities)
@@ -111,12 +106,7 @@ public class JobOrderHandoverController {
   @Operation(
       summary = "Create an item handover",
       description = "Logs a handover of produced items for this item order.")
-  @PreAuthorize(
-      "(hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id)")
   public JobOrderItemHandoverDto createItemHandover(
       @PathVariable UUID id, @RequestBody @Valid JobOrderItemHandoverCreateDto dto) {
     return jobOrderItemHandoverService.createItemHandover(id, dto);
@@ -164,12 +154,7 @@ public class JobOrderHandoverController {
         responseCode = "422",
         description = "Amount exceeds remaining-to-manufacture or consumption misses the demand.")
   })
-  @PreAuthorize(
-      "(hasRole('"
-          + Roles.LOGISTICIAN
-          + "') or hasRole('"
-          + Roles.ADMIN
-          + "')) and @jobOrderAccessPolicy.canEditJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#id)")
   public JobOrderItemDto bookProduction(
       @PathVariable UUID id,
       @PathVariable UUID itemId,
@@ -196,12 +181,7 @@ public class JobOrderHandoverController {
     @ApiResponse(responseCode = "403", description = "Forbidden"),
     @ApiResponse(responseCode = "404", description = "Job order or item handover not found")
   })
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,
@@ -235,12 +215,7 @@ public class JobOrderHandoverController {
     @ApiResponse(responseCode = "403", description = "Forbidden"),
     @ApiResponse(responseCode = "404", description = "Job order or handover not found")
   })
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#jobOrderId)")
   @Parameter(
       name = "X-User-Time-Zone",
       in = ParameterIn.HEADER,
@@ -271,12 +246,7 @@ public class JobOrderHandoverController {
     @ApiResponse(responseCode = "400", description = "Invalid request data"),
     @ApiResponse(responseCode = "403", description = "Forbidden")
   })
-  @PreAuthorize(
-      "hasAnyRole('"
-          + Roles.LOGISTICIAN
-          + "', '"
-          + Roles.ADMIN
-          + "') and @jobOrderAccessPolicy.canEditJobOrder(#jobOrderId)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canFulfillJobOrder(#jobOrderId)")
   public ResponseEntity<byte[]> previewHandoverReport(
       @PathVariable UUID jobOrderId, @RequestBody @Valid HandoverReportPreviewRequestDto dto) {
     byte[] pdf = jobOrderHandoverReportService.generateHandoverReportPreview(dto);

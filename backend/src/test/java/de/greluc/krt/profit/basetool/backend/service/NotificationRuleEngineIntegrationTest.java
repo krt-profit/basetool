@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistra
 import de.greluc.krt.profit.basetool.backend.identity.api.events.DiscordRegistrationPendingEvent;
 import de.greluc.krt.profit.basetool.backend.joborder.api.events.JobOrderCreatedEvent;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationContextRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationEventType;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRule;
@@ -38,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleSe
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.SelectorKind;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.notification.internal.NotificationCreationService;
 import de.greluc.krt.profit.basetool.backend.notification.internal.RecipientResolutionService;
@@ -75,7 +77,8 @@ class NotificationRuleEngineIntegrationTest {
         "ALP",
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
         "MATERIAL",
-        null);
+        null,
+        new NotificationRevision(0, 0));
   }
 
   @Test
@@ -88,7 +91,14 @@ class NotificationRuleEngineIntegrationTest {
     assertThat(seeded.getEventType()).isEqualTo(NotificationEventType.JOB_ORDER_CREATED);
     assertThat(seeded.getNotificationType()).isEqualTo(NotificationType.JOB_ORDER_CREATED);
     assertThat(seeded.isExcludeActor()).isTrue();
-    assertThat(seeded.getSelectors()).hasSize(4);
+    assertThat(seeded.getSelectors())
+        .allSatisfy(selector -> {
+          assertThat(selector.getKind()).isEqualTo(SelectorKind.ORG_RELATIVE_ROLE);
+          assertThat(selector.getOrgRelativeRole()).isEqualTo(OrgRelativeRole.UNIT_WRITER);
+        })
+        .extracting(NotificationRuleSelector::getContextRole)
+        .containsExactlyInAnyOrder(
+            NotificationContextRole.RESPONSIBLE, NotificationContextRole.REQUESTING);
   }
 
   @Test

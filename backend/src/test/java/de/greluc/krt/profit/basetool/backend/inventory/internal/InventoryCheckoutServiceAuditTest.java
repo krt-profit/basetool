@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -62,10 +63,13 @@ import org.springframework.context.ApplicationEventPublisher;
  * InventoryCheckoutService#deleteAllGlobalInventory}) of {@link InventoryCheckoutService}, pinning
  * the exact audit events each records.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryCheckoutServiceAuditTest {
 
-  @org.junit.jupiter.api.BeforeEach
+  @BeforeEach
   void wireCheckoutGraph() {
     service =
         InventoryCheckoutFixtures.create(
@@ -162,7 +166,7 @@ class InventoryCheckoutServiceAuditTest {
     ScopePredicate scope = new ScopePredicate(true, null, Set.of());
     List<UUID> locked = List.of(UUID.randomUUID(), UUID.randomUUID());
     when(requestScopeResolver.currentScopePredicate()).thenReturn(scope);
-    when(inventoryItemRepository.lockNonPersonalIdsInScope(true, null, Set.of()))
+    when(inventoryItemRepository.findNonPersonalIdsInScope(true, null, Set.of()))
         .thenReturn(locked);
     when(inventoryItemRepository.deleteAllByIdIn(locked)).thenReturn(42);
 
@@ -170,7 +174,9 @@ class InventoryCheckoutServiceAuditTest {
 
     assertEquals(42, removed);
     InOrder order = inOrder(inventoryItemRepository, offerRatchet);
-    order.verify(inventoryItemRepository).lockNonPersonalIdsInScope(true, null, Set.of());
+    order
+        .verify(inventoryItemRepository, org.mockito.Mockito.times(2))
+        .findNonPersonalIdsInScope(true, null, Set.of());
     order.verify(offerRatchet).beforeDelete(locked, StockChangeReason.WIPE);
     order.verify(inventoryItemRepository).deleteAllByIdIn(locked);
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);

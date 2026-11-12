@@ -28,6 +28,26 @@ public enum JobOrderGate {
   /** The caller reaches the queue and holds the edit scope of the responsible unit. */
   EDIT,
 
-  /** The caller belongs to the requesting unit and nothing has been delivered (REQ-ORDERS-023). */
-  REQUESTER
+  /** The caller is a current writer of the requesting unit (REQ-ORDERS-023). */
+  REQUESTER,
+
+  /** The responsible writer or a current Staffel writer may coordinate support. */
+  SUPPORT,
+
+  /** The responsible-unit writer may change the ordinary lifecycle status. */
+  STATUS,
+
+  /** Either current unit writer may cancel active work. */
+  CANCEL,
+
+  /**
+   * Either current unit writer may reopen a cancellation, otherwise only the responsible writer.
+   */
+  SET_OPEN,
+
+  /** Current responsible-unit authority permits recovery despite ineligible responsibility. */
+  TRANSFER,
+
+  /** The caller is an administrator independently of the queue-reading capability. */
+  ADMIN_DELETE
 }

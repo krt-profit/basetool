@@ -42,7 +42,8 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param actorSub the withdrawing requester's sub
  */
 public record BankBookingRequestCancelledEvent(
-    UUID requestId, UUID accountId, @Nullable UUID actorSub) implements BankBookingRequestEvent {
+    UUID requestId, @Nullable UUID accountId, @Nullable UUID actorSub)
+    implements BankBookingRequestEvent {
 
   @NotNull
   @Override
@@ -57,6 +58,7 @@ public record BankBookingRequestCancelledEvent(
     return Map.of();
   }
 
+  @Nullable
   @Override
   public UUID contextAccountId() {
     return accountId;

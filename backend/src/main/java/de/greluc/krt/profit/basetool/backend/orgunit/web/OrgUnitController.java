@@ -49,9 +49,18 @@ public class OrgUnitController {
   private final OrgUnitMembershipQueryService orgUnitMembershipQueryService;
 
   /**
-   * Lists every active Staffel and Spezialkommando as picker options, each with its {@code
-   * isProfitEligible} flag, for the Job Order form's requesting and responsible pickers. Carries no
-   * PII.
+   * Lists actual current Profit responsibility targets without an editable eligibility flag.
+   *
+   * @return the active Profit area and its active Staffel/SK children
+   */
+  @GetMapping("/profit-responsible")
+  @PreAuthorize("isAuthenticated()")
+  public List<OrgUnitMembershipOptionDto> listProfitResponsibleOrgUnits() {
+    return orgUnitMembershipQueryService.listProfitResponsibleOptions();
+  }
+
+  /**
+   * Lists every active Staffel and Spezialkommando as picker options without personal data.
    *
    * @return picker options sorted Staffel-first then Spezialkommandos alphabetical.
    */
@@ -61,8 +70,8 @@ public class OrgUnitController {
   @Operation(
       summary = "List every active org unit",
       description =
-          "Returns the full active Staffel + Spezialkommando catalog as picker options, each with"
-              + " its isProfitEligible flag. Drives the Job Order create form's owner-pickers — Job"
+          "Returns the full active Staffel + Spezialkommando catalog as picker options."
+              + " Drives the Job Order create form's owner-pickers — Job"
               + " Orders are cross-staffel workspaces and the picker must offer the full active"
               + " list, not the caller's memberships. Members only since REQ-SEC-052; it was open"
               + " to anonymous callers while the request form was.")

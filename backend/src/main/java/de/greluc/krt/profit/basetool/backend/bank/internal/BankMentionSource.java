@@ -78,6 +78,7 @@ public class BankMentionSource implements PersonMentionSource {
         "bank_booking_request.required_approver",
         "bank_booking_request.status",
         "bank_booking_request.type",
+        "bank_linked_attempt.purpose_kind",
         "bank_transaction.counterparty_org_unit_name",
         "bank_transaction.type");
   }

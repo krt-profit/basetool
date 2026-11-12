@@ -47,8 +47,9 @@ check, bulk update or find-or-create.** The rules it holds:
 - **Fine-grained locking, backend side**: per-section counters independent of `@Version`
   (`Mission`, `Ship.owningOrgUnitVersion`, ADR-0258); each form writes the smallest entity.
 - **Pessimistic locking for bulk reorders** (`PESSIMISTIC_WRITE` or atomic SQL).
-- **Exchange stock lots take their advisory locks first**, all up front in ascending key order,
-  through `StockCommands.lockLots` / `PoolEntryCommands.lockLots` (ADR-0229).
+- **Prepare stock resources before row locks** through `StockCommands.prepareWrites`,
+  `StockLotWritePlans` or `PoolEntryCommands.lockLots`. Follow the
+  [common resource order](../docs/agents/backend-concurrency.md) (ADR-0229/0360).
 - **`…WithinTransaction` pattern** for an intra-transaction call on the same entity
   (`@Transactional(propagation = MANDATORY)`, no own `save()`/`flush()`).
 - **Never run a `clearAutomatically` bulk update inside a loop** over items of one aggregate;

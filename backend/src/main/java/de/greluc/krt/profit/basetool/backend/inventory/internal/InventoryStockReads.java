@@ -31,10 +31,16 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderGameItemStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderMaterialStockRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.LinkedStockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialHandoverFact;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockRows;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderMaterialScope;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityProvenance;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockReads;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
+import de.greluc.krt.profit.basetool.backend.kernel.Entities;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -60,12 +66,79 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
+public class InventoryStockReads
+    implements StockReads, OrderLinkedStockRows, StockQuantityProvenance {
 
   private final InventoryItemRepository inventoryRepository;
   private final InventoryItemMapper inventoryItemMapper;
   private final InventoryStockSplitRepository splitRepository;
   private final InventoryDonationSourceRepository donationSourceRepository;
+  private final StockViewerAccess stockViewerAccess;
+  private final InventoryStockPlanningReads planningReads;
+
+  @Override
+  public @NotNull List<UUID> earmarkedRowIds(@NotNull UUID orderId) {
+    return List.copyOf(
+        inventoryRepository.findAllocationReleaseRowIds(orderId, true, List.of(), List.of()));
+  }
+
+  @Override
+  public @NotNull List<UUID> earmarkedMaterialRowIds(
+      @NotNull UUID orderId, @NotNull Collection<UUID> materialIds) {
+    return materialIds.isEmpty()
+        ? List.of()
+        : List.copyOf(
+            inventoryRepository.findAllocationReleaseRowIds(
+                orderId, false, materialIds, List.of()));
+  }
+
+  @Override
+  public @NotNull List<UUID> earmarkedGameItemRowIds(
+      @NotNull UUID orderId, @NotNull Collection<UUID> gameItemIds) {
+    return gameItemIds.isEmpty()
+        ? List.of()
+        : List.copyOf(
+            inventoryRepository.findAllocationReleaseRowIds(
+                orderId, false, List.of(), gameItemIds));
+  }
+
+  @Override
+  public @NotNull List<UUID> earmarkedItemConsumptionRowIds(
+      @NotNull UUID orderId, @NotNull Map<UUID, Double> requestedAmounts) {
+    if (requestedAmounts.isEmpty()) {
+      return List.of();
+    }
+    return InventoryItemConsumptionPrefix.select(
+            inventoryRepository.findItemConsumptionFacts(orderId, requestedAmounts.keySet()),
+            requestedAmounts)
+        .rowIds();
+  }
+
+  @Override
+  public @NotNull List<MaterialHandoverFact> materialHandoverFacts(
+      @NotNull UUID orderId, @NotNull Collection<UUID> rowIds) {
+    return rowIds.isEmpty()
+        ? List.of()
+        : List.copyOf(inventoryRepository.findMaterialHandoverFacts(orderId, rowIds));
+  }
+
+  @Override
+  public @NotNull List<UUID> donationEarmarkedRowIds(@NotNull UUID donationId) {
+    return List.copyOf(inventoryRepository.findDonationAllocationRowIds(donationId));
+  }
+
+  @Override
+  public @NotNull Map<String, List<StockRow>> lotRows(
+      @NotNull UUID holder,
+      @NotNull Collection<de.greluc.krt.profit.basetool.backend.inventory.api.StockLot> lots) {
+    return planningReads.read(holder, lots).views();
+  }
+
+  @Override
+  public @NotNull List<StockQuantityFragment> quantityOf(@NotNull UUID rowId) {
+    return Entities.require(inventoryRepository.findById(rowId), "Inventory item not found")
+        .getQuantityProvenance();
+  }
 
   @Override
   public @NotNull List<ExchangeStockLotRow> exchangeLots(
@@ -205,6 +278,14 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
   }
 
   @Override
+  public @NotNull List<OrderMaterialScope> materialScopesSharingRowsWithOrders(
+      @NotNull Collection<UUID> jobOrderIds) {
+    return jobOrderIds.isEmpty()
+        ? List.of()
+        : inventoryRepository.findMaterialScopesSharingRowsWithOrders(jobOrderIds);
+  }
+
+  @Override
   public @NotNull List<LinkedStockRow> materialRowsOfOrder(@NotNull UUID jobOrderId) {
     return inventoryRepository.findByJobOrderIdOrdered(jobOrderId).stream()
         .map(item -> linkedRow(item, jobOrderId, null))
@@ -283,7 +364,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
    * @param gameItem the row's game-item reference, or {@code null} for a material row
    * @return the stock-view row
    */
-  private static @NotNull LinkedStockRow linkedRow(
+  private @NotNull LinkedStockRow linkedRow(
       @NotNull InventoryItem item,
       @NotNull UUID jobOrderId,
       @Nullable InventoryGameItemReferenceDto gameItem) {
@@ -304,6 +385,7 @@ public class InventoryStockReads implements StockReads, OrderLinkedStockRows {
         gameItem,
         item.getAmount(),
         sliceAmount != null ? sliceAmount : item.getAmount(),
-        slice != null && Boolean.TRUE.equals(slice.getDelivered()));
+        slice != null && Boolean.TRUE.equals(slice.getDelivered()),
+        stockViewerAccess.mayEditInventoryItem(item.getId(), owner.getId()));
   }
 }

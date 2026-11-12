@@ -69,6 +69,7 @@ public class AdminNotificationRulePageController {
       List.of(
           "JOB_ORDER_CREATED",
           "JOB_ORDER_UPDATED_BY_REQUESTER",
+          "JOB_ORDER_UPDATED_BY_RESPONSIBLE",
           "BANK_BOOKING_REQUEST_CREATED",
           "BANK_BOOKING_REQUEST_CONFIRMED",
           "BANK_BOOKING_REQUEST_REJECTED",
@@ -105,9 +106,17 @@ public class AdminNotificationRulePageController {
           "OPERATION_COMPLETED_UNOWNED",
           "JOB_ORDER_REASSIGNED",
           "JOB_ORDER_FINISHED",
+          "JOB_ORDER_REOPENED",
           "JOB_ORDER_ASSIGNEE_ADDED",
           "JOB_ORDER_ASSIGNEE_REMOVED",
           "JOB_ORDER_CLAIM_WITHDRAWN",
+          "JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED",
+          "JOB_ORDER_CLARIFICATION_REQUIRED",
+          "JOB_ORDER_PARTICIPATION_CHANGED",
+          "JOB_ORDER_MONEY_PROVISIONED",
+          "JOB_ORDER_MONEY_MOVED",
+          "JOB_ORDER_MONEY_COMMITMENT_CHANGED",
+          "JOB_ORDER_CLARIFICATION_RESOLVED",
           "REFINERY_ORDER_READY",
           "REFINERY_ORDER_CHANGED_BY_OTHER",
           "REFINERY_ORDER_READY_CLEARED",
@@ -123,6 +132,7 @@ public class AdminNotificationRulePageController {
           "BANK_PAYOUT_BOOKED",
           "BANK_HOLDER_TRANSFER_BOOKED",
           "BANK_ACCOUNT_DEBITED",
+          "BANK_FUNDS_AUTHORISED",
           "BANK_HOLDER_DEACTIVATED_WITH_BALANCE",
           "BANK_HOLDER_NOTICE_CLEARED",
           "ORG_LEADERSHIP_ROLE_MISMATCH",
@@ -168,6 +178,7 @@ public class AdminNotificationRulePageController {
       List.of(
           "JOB_ORDER_CREATED",
           "JOB_ORDER_UPDATED_BY_REQUESTER",
+          "JOB_ORDER_UPDATED_BY_RESPONSIBLE",
           "BANK_BOOKING_REQUEST_CREATED",
           "BANK_BOOKING_REQUEST_CONFIRMED",
           "BANK_BOOKING_REQUEST_REJECTED",
@@ -198,8 +209,15 @@ public class AdminNotificationRulePageController {
           "OPERATION_COMPLETED",
           "JOB_ORDER_REASSIGNED",
           "JOB_ORDER_FINISHED",
+          "JOB_ORDER_REOPENED",
           "JOB_ORDER_ASSIGNED",
           "JOB_ORDER_CLAIM_WITHDRAWN",
+          "JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED",
+          "JOB_ORDER_CLARIFICATION_REQUIRED",
+          "JOB_ORDER_PARTICIPATION_CHANGED",
+          "JOB_ORDER_MONEY_PROVISIONED",
+          "JOB_ORDER_MONEY_MOVED",
+          "JOB_ORDER_MONEY_COMMITMENT_CHANGED",
           "REFINERY_ORDER_READY",
           "REFINERY_ORDER_CHANGED_BY_OTHER",
           "MATERIAL_EXCHANGE_OFFER_UNAVAILABLE",
@@ -214,6 +232,7 @@ public class AdminNotificationRulePageController {
           "BANK_PAYOUT_RECEIVED",
           "BANK_HOLDER_TRANSFER_RECEIVED",
           "BANK_ACCOUNT_DEBITED",
+          "BANK_FUNDS_AUTHORISED",
           "BANK_HOLDER_DEACTIVATED_WITH_BALANCE",
           "ORG_LEADERSHIP_ROLE_MISMATCH",
           "ORG_MEMBER_DEPARTED",
@@ -270,13 +289,15 @@ public class AdminNotificationRulePageController {
    * admin.notificationRules.selector.orgRelativeRole}.
    */
   static final List<String> ORG_RELATIVE_ROLES =
-      List.of("OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP");
+      List.of(
+          "OFFICER", "LEAD", "LOGISTICIAN", "MISSION_MANAGER", "UNIT_LEADERSHIP", "UNIT_WRITER");
 
   /**
    * {@code NotificationContextRole} codes, labelled via {@code
    * admin.notificationRules.selector.contextRole}.
    */
-  static final List<String> CONTEXT_ROLES = List.of("RESPONSIBLE", "REQUESTING");
+  static final List<String> CONTEXT_ROLES =
+      List.of("RESPONSIBLE", "REQUESTING", "PREVIOUS_RESPONSIBLE");
 
   /**
    * Global role codes a {@code ROLE} selector may name, labelled via {@code

@@ -19,9 +19,14 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,22 +40,32 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.AllocationReductionDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationDimension;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationInput;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationWriteDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItem;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgHierarchyService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -58,6 +73,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Pageable;
@@ -65,6 +83,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,14 +92,14 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * A Lager earmark names only a job order the caller sees within the tenancy scope; one of another
- * org unit is refused like an unknown id (REQ-ORDERS-018, REQ-ORG-003). A member of two Staffeln
- * earmarks the stock of one to an order of the other, which is how a cross-Staffel supply reaches
- * an order (UC-08, UC-09).
+ * Web earmarks accept commonly readable orders under independent stock ownership gates and refuse
+ * unreadable or unknown targets atomically (REQ-ORDERS-018, REQ-ORDERS-052, REQ-ORG-003).
  */
 @SpringBootTest
 @Transactional
 class InventoryJobOrderScopeIntegrationTest {
+
+  @Autowired private OrgUnitRepository orgUnitRepository;
 
   private static final String PATH = "/api/v1/inventory";
   private static final int QUALITY = 500;
@@ -95,6 +114,8 @@ class InventoryJobOrderScopeIntegrationTest {
   @Autowired private JobOrderRepository jobOrderRepository;
   @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private InventoryItemRepository inventoryItemRepository;
+  @Autowired private OrgHierarchyService hierarchy;
+  @Autowired private EntityManager entityManager;
 
   private final JsonMapper json = JsonMapper.builder().build();
 
@@ -109,12 +130,12 @@ class InventoryJobOrderScopeIntegrationTest {
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     iridium = squadronRepository.findById(Squadron.IRIDIUM_ID).orElseThrow();
-    iridium.setProfitEligible(true);
+    withinProfit(iridium, persistedProfitArea(orgUnitRepository));
     iridium = squadronRepository.save(iridium);
     foreign = new Squadron();
     foreign.setName("Lager-Foreign");
     foreign.setShorthand("LFX");
-    foreign.setProfitEligible(true);
+    withinProfit(foreign, persistedProfitArea(orgUnitRepository));
     foreign = squadronRepository.save(foreign);
 
     member = new User();
@@ -133,11 +154,27 @@ class InventoryJobOrderScopeIntegrationTest {
   }
 
   @Test
-  void createRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne() throws Exception {
-    JobOrder foreignOrder = openJobOrderNeeding(foreign);
+  void mergePreviewAnswersBeforeAnyStockBooking() throws Exception {
+    mockMvc
+        .perform(
+            get(PATH + "/merge-candidates")
+                .with(asMember())
+                .param("materialId", material.getId().toString())
+                .param("locationId", location.getId().toString())
+                .param("quality", Integer.toString(QUALITY)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.exists").value(false));
+  }
 
-    create(foreignOrder.getId()).andExpect(status().isNotFound());
-    create(UUID.randomUUID()).andExpect(status().isNotFound());
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void createRefusesAnUnreadableJobOrderLikeAnUnknownOne(boolean unknownTarget) throws Exception {
+    JobOrder foreignOrder = openJobOrderNeeding(foreign);
+    iridium.setParent(null);
+    squadronRepository.saveAndFlush(iridium);
+    UUID targetId = unknownTarget ? UUID.randomUUID() : foreignOrder.getId();
+
+    create(targetId).andExpect(status().isNotFound());
 
     assertThat(inventoryItemRepository.findMaterialRowsByUser(member, Pageable.unpaged()))
         .as("nothing is booked for a refused earmark")
@@ -145,27 +182,32 @@ class InventoryJobOrderScopeIntegrationTest {
   }
 
   @Test
-  void createEarmarksAJobOrderOfTheCallersOwnSquadron() throws Exception {
-    JobOrder ownOrder = openJobOrderNeeding(iridium);
+  void createEarmarksACommonlyReadableJobOrderOfAnotherSquadron() throws Exception {
+    JobOrder foreignOrder = openJobOrderNeeding(foreign);
 
-    create(ownOrder.getId())
+    create(foreignOrder.getId())
         .andExpect(status().isOk())
         .andExpect(
-            jsonPath("$.jobOrderAllocations[0].jobOrderId").value(ownOrder.getId().toString()));
+            jsonPath("$.jobOrderAllocations[0].jobOrderId").value(foreignOrder.getId().toString()));
   }
 
-  @Test
-  void addAllocationRefusesAJobOrderOfAnotherSquadronLikeAnUnknownOne() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void addAllocationRefusesAnUnreadableJobOrderLikeAnUnknownOne(boolean unknownTarget)
+      throws Exception {
     JobOrder foreignOrder = openJobOrderNeeding(foreign);
+    iridium.setParent(null);
+    squadronRepository.saveAndFlush(iridium);
     JsonNode row = unearmarkedRow();
     UUID id = UUID.fromString(row.get("id").asString());
     long version = row.get("version").asLong();
+    UUID targetId = unknownTarget ? UUID.randomUUID() : foreignOrder.getId();
 
-    addAllocation(id, foreignOrder.getId(), version).andExpect(status().isNotFound());
-    addAllocation(id, UUID.randomUUID(), version).andExpect(status().isNotFound());
+    addAllocation(id, targetId, version).andExpect(status().isNotFound());
 
     assertThat(inventoryItemRepository.findById(id).orElseThrow().getJobOrderAllocations())
         .isEmpty();
+    assertThat(inventoryItemRepository.findById(id).orElseThrow().getVersion()).isEqualTo(version);
   }
 
   @Test
@@ -215,6 +257,140 @@ class InventoryJobOrderScopeIntegrationTest {
     addAllocation(id, iridiumOrder.getId(), row.get("version").asLong()).andExpect(status().isOk());
   }
 
+  @ParameterizedTest
+  @EnumSource(LinkedStockMutation.class)
+  void validResponsibilityAllowsTheStockOwnerAndCurrentWriterToMutateLinkedStock(
+      LinkedStockMutation mutation) throws Exception {
+    JobOrder order = openJobOrderNeeding(iridium);
+    JsonNode row = earmarkedRow(order);
+
+    mutateLinkedStock(mutation, order.getId(), row).andExpect(status().is2xxSuccessful());
+
+    if (mutation == LinkedStockMutation.CHECKOUT) {
+      assertThat(ownRows()).noneMatch(entry -> entry.get("id").equals(row.get("id")));
+    } else {
+      JsonNode changed = ownRow(UUID.fromString(row.get("id").asString()));
+      assertThat(changed.get("amount").asDouble())
+          .isEqualTo(mutation == LinkedStockMutation.BOOK_OUT ? 4.0 : 5.0);
+      if (mutation == LinkedStockMutation.CHANGE || mutation == LinkedStockMutation.BOOK_OUT) {
+        assertThat(changed.get("jobOrderAllocations").get(0).get("amount").asDouble())
+            .isEqualTo(1.0);
+      } else {
+        assertThat(changed.get("jobOrderAllocations").isEmpty()).isTrue();
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(LinkedStockMutation.class)
+  void invalidResponsibilityRefusesLinkedStockMutationWithoutChangingStockOrAllocations(
+      LinkedStockMutation mutation) throws Exception {
+    JobOrder order = openJobOrderNeeding(iridium);
+    JsonNode row = earmarkedRow(order);
+    UUID rowId = UUID.fromString(row.get("id").asString());
+    hierarchy.setParent(iridium.getId(), null, iridium.getVersion());
+    JsonNode before = ownRow(rowId);
+    assertThat(before.get("canEdit").asBoolean()).isTrue();
+    assertThat(before.get("amount").asDouble()).isEqualTo(5.0);
+    assertThat(before.get("jobOrderAllocations").get(0).get("amount").asDouble()).isEqualTo(2.0);
+
+    mutateLinkedStock(mutation, order.getId(), before).andExpect(status().isBadRequest());
+
+    assertThat(ownRow(rowId)).isEqualTo(before);
+  }
+
+  private enum LinkedStockMutation {
+    RELEASE_ROW,
+    RELEASE_MATERIAL,
+    CHANGE,
+    REMOVE,
+    BOOK_OUT,
+    CHECKOUT
+  }
+
+  private @NotNull ResultActions mutateLinkedStock(
+      LinkedStockMutation mutation, UUID orderId, JsonNode row) throws Exception {
+    UUID rowId = UUID.fromString(row.get("id").asString());
+    long version = row.get("version").asLong();
+    InventoryAllocationWriteDto allocation =
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.JOB_ORDER, orderId, 1.0, version, null);
+    MockHttpServletRequestBuilder request =
+        switch (mutation) {
+          case RELEASE_ROW -> delete("/api/v1/orders/" + orderId + "/allocations/" + rowId);
+          case RELEASE_MATERIAL ->
+              delete("/api/v1/orders/" + orderId + "/materials/" + material.getId());
+          case CHANGE ->
+              patch(PATH + "/" + rowId + "/allocation")
+                  .content(json.writeValueAsString(allocation));
+          case REMOVE ->
+              delete(PATH + "/" + rowId + "/allocation")
+                  .content(json.writeValueAsString(allocation));
+          case BOOK_OUT ->
+              post(PATH + "/" + rowId + "/book-out")
+                  .content(
+                      json.writeValueAsString(
+                          new InventoryItemBookOutDto(
+                              1.0,
+                              null,
+                              null,
+                              CheckoutType.DISCARD,
+                              null,
+                              null,
+                              version,
+                              null,
+                              null,
+                              List.of(new AllocationReductionDto(orderId, 1.0)),
+                              null)));
+          case CHECKOUT ->
+              post(PATH + "/bulk-checkout")
+                  .content(json.writeValueAsString(new BulkCheckoutRequest(List.of(rowId))));
+        };
+    return mockMvc.perform(request.with(asCurrentWriter()).contentType(MediaType.APPLICATION_JSON));
+  }
+
+  private @NotNull JsonNode earmarkedRow(JobOrder order) throws Exception {
+    JsonNode row =
+        json.readTree(
+            create(order.getId())
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString());
+    entityManager.flush();
+    entityManager.clear();
+    return row;
+  }
+
+  private @NotNull JsonNode ownRow(UUID id) throws Exception {
+    return ownRows().stream()
+        .filter(entry -> entry.get("id").asString().equals(id.toString()))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private @NotNull List<JsonNode> ownRows() throws Exception {
+    JsonNode content =
+        json.readTree(
+                mockMvc
+                    .perform(get(PATH + "/my-inventory").with(asMember()))
+                    .andExpect(status().isOk())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsString())
+            .get("content");
+    return content.valueStream().toList();
+  }
+
+  private @NotNull RequestPostProcessor asCurrentWriter() {
+    return jwt()
+        .jwt(builder -> builder.subject(member.getId().toString()))
+        .authorities(
+            new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+            new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+            new OrgUnitContextualAuthority(Roles.LOGISTICIAN, iridium.getId()));
+  }
+
   private void joinSquadron(@NotNull Squadron squadron) {
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(member.getId(), squadron.getId()));
@@ -228,12 +404,14 @@ class InventoryJobOrderScopeIntegrationTest {
   }
 
   private @NotNull JsonNode unearmarkedRow(@NotNull OrgUnit owner) throws Exception {
-    return json.readTree(
-        create(null, owner.getId())
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString());
+    InventoryItem item = new InventoryItem();
+    item.setUser(member);
+    item.setOwningOrgUnit(owner);
+    item.setMaterial(material);
+    item.setLocation(location);
+    item.setQuality(QUALITY);
+    item.setAmount(5.0);
+    return ownRow(inventoryItemRepository.saveAndFlush(item).getId());
   }
 
   private @NotNull JobOrder openJobOrderNeeding(@NotNull OrgUnit responsible) {
@@ -260,7 +438,7 @@ class InventoryJobOrderScopeIntegrationTest {
   private @NotNull ResultActions create(@Nullable UUID jobOrderId, @NotNull UUID owningOrgUnitId)
       throws Exception {
     List<InventoryAllocationInput> allocations =
-        jobOrderId == null ? null : List.of(new InventoryAllocationInput(jobOrderId, 2.0));
+        jobOrderId == null ? null : List.of(new InventoryAllocationInput(jobOrderId, 2.0, null));
     InventoryItemCreateDto dto =
         new InventoryItemCreateDto(
             null,
@@ -288,7 +466,7 @@ class InventoryJobOrderScopeIntegrationTest {
       @NotNull UUID id, @NotNull UUID jobOrderId, long version) throws Exception {
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.JOB_ORDER, jobOrderId, 2.0, version);
+            InventoryAllocationDimension.JOB_ORDER, jobOrderId, 2.0, version, null);
     return mockMvc.perform(
         post(PATH + "/" + id + "/allocation")
             .with(asMember())

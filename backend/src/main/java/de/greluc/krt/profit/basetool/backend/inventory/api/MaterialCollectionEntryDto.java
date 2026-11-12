@@ -40,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * @param allocatedQuantity the order's share of the row
  * @param delivered whether the order's share is marked delivered
  * @param materialNameDe the material's German name, or {@code null} (REQ-P4K-023)
+ * @param canEdit whether the current caller has Inventory write authority for this row
  */
 public record MaterialCollectionEntryDto(
     UUID inventoryEntryId,
@@ -53,7 +54,8 @@ public record MaterialCollectionEntryDto(
     Double quantity,
     Double allocatedQuantity,
     boolean delivered,
-    @Nullable String materialNameDe) {
+    @Nullable String materialNameDe,
+    boolean canEdit) {
 
   /**
    * Builds an entry without a German material name.
@@ -69,6 +71,7 @@ public record MaterialCollectionEntryDto(
    * @param quantity the row's total stock
    * @param allocatedQuantity the order's share of the row
    * @param delivered whether the order's share is marked delivered
+   * @param canEdit whether the current caller has Inventory write authority for this row
    */
   public MaterialCollectionEntryDto(
       UUID inventoryEntryId,
@@ -81,7 +84,8 @@ public record MaterialCollectionEntryDto(
       @Nullable Double quality,
       Double quantity,
       Double allocatedQuantity,
-      boolean delivered) {
+      boolean delivered,
+      boolean canEdit) {
     this(
         inventoryEntryId,
         version,
@@ -94,6 +98,7 @@ public record MaterialCollectionEntryDto(
         quantity,
         allocatedQuantity,
         delivered,
-        null);
+        null,
+        canEdit);
   }
 }

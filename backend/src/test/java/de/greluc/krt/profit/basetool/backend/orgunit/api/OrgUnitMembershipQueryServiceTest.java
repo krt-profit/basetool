@@ -502,31 +502,6 @@ class OrgUnitMembershipQueryServiceTest {
   }
 
   @Test
-  void listAllActiveOptions_carriesProfitEligibleFlagPerOrgUnit() {
-    Squadron profitSquadron = new Squadron();
-    profitSquadron.setId(UUID.randomUUID());
-    profitSquadron.setName("ALPHA");
-    profitSquadron.setShorthand("ALP");
-    profitSquadron.setProfitEligible(true);
-    when(squadronRepository.findAllByActiveTrue()).thenReturn(List.of(profitSquadron));
-
-    SpecialCommand nonProfitSk = new SpecialCommand();
-    nonProfitSk.setId(UUID.randomUUID());
-    nonProfitSk.setName("Alpha");
-    nonProfitSk.setShorthand("ALF");
-    nonProfitSk.setProfitEligible(false);
-    when(specialCommandRepository.findAllByActiveTrue()).thenReturn(List.of(nonProfitSk));
-
-    List<OrgUnitMembershipOptionDto> result = queryService.listAllActiveOptions();
-
-    assertEquals(2, result.size());
-    assertEquals(OrgUnitKind.SQUADRON, result.get(0).kind());
-    assertEquals(Boolean.TRUE, result.get(0).isProfitEligible());
-    assertEquals(OrgUnitKind.SPECIAL_COMMAND, result.get(1).kind());
-    assertEquals(Boolean.FALSE, result.get(1).isProfitEligible());
-  }
-
-  @Test
   void listDirectMembershipOptions_includesBereichNotJustStaffelAndSk() {
     UUID squadronId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();

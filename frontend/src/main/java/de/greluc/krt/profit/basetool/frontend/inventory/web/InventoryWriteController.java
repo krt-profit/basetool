@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.LagerQuery;
+import de.greluc.krt.profit.basetool.frontend.inventory.model.MaterialProvisionSelection;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.UpdateDeliveredRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -294,6 +295,19 @@ public class InventoryWriteController {
   }
 
   /**
+   * Retains only the explicit contribution identity and version selected in the ordinary action.
+   *
+   * @param row the bound allocation row
+   * @return its observed provision selection, or null for unattributed stock
+   */
+  @Nullable
+  private static MaterialProvisionSelection provisionSelection(InventoryForm.AllocationRow row) {
+    return row.getProvisionClaimId() == null
+        ? null
+        : new MaterialProvisionSelection(row.getProvisionClaimId(), row.getProvisionClaimVersion());
+  }
+
+  /**
    * Maps the create form's split-at-check-in rows to backend allocation inputs (REQ-INV-027),
    * dropping rows without a target or amount.
    *
@@ -316,11 +330,17 @@ public class InventoryWriteController {
       if (entryAmount == null || entryAmount <= 0d) {
         return List.of();
       }
-      return List.of(new InventoryAllocationInput(targeted.getFirst().getTargetId(), entryAmount));
+      return List.of(
+          new InventoryAllocationInput(
+              targeted.getFirst().getTargetId(),
+              entryAmount,
+              provisionSelection(targeted.getFirst())));
     }
     return targeted.stream()
         .filter(row -> row.getAmount() != null)
-        .map(row -> new InventoryAllocationInput(row.getTargetId(), row.getAmount()))
+        .map(row ->
+            new InventoryAllocationInput(
+                row.getTargetId(), row.getAmount(), provisionSelection(row)))
         .toList();
   }
 

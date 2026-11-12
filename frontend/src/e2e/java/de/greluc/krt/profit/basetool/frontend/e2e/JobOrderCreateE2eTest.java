@@ -20,13 +20,18 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
+import java.net.URI;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -34,9 +39,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Creates a job order through the UI and verifies it appears in the order list. IRIDIUM is made
- * profit-eligible in {@link E2eStackExtension}; {@link BackendSeeder} seeds the membership and a
- * job-order material in {@link #setUp()}.
+ * Creates a job order through the UI, enters its returned detail and finds it in the shared list.
+ * IRIDIUM is made profit-eligible in {@link E2eStackExtension}; {@link BackendSeeder} seeds the
+ * membership and a job-order material in {@link #setUp()}.
  */
 @Tag("e2e")
 class JobOrderCreateE2eTest {
@@ -79,7 +84,8 @@ class JobOrderCreateE2eTest {
 
   /**
    * Fills and submits the job-order create form (responsible org-unit, requesting org-unit, contact
-   * handle, one material row) and asserts an order then appears in the order list.
+   * handle and one material row), enters its returned identity and finds that exact order in the
+   * list.
    */
   @Test
   void createsAJobOrderThroughTheUi() {
@@ -95,13 +101,37 @@ class JobOrderCreateE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
         page.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
-        page.locator("#handle").fill("E2E Contact");
+        String handle = "E2E Contact " + UUID.randomUUID();
+        page.locator("#handle").fill(handle);
         E2eSupport.selectComboboxFirstOption(page.getByTestId("order-material-select"));
         page.getByTestId("order-material-amount").fill("100");
-        E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-submit").click());
+        var created =
+            page.waitForResponse(
+                response ->
+                    response.url().endsWith("/orders/create")
+                        && "POST".equals(response.request().method()),
+                () -> page.getByTestId("order-submit").click());
+        assertEquals(200, created.status());
+        page.waitForURL(url ->
+            url.startsWith(baseUrl + "/orders/")
+                && URI.create(url).getPath().matches("/orders/[0-9a-f-]{36}"));
+        String target = URI.create(page.url()).getPath();
+        assertTrue(target.matches("/orders/[0-9a-f-]{36}"));
+        assertThat(page.locator("#order-header-results")).containsText(handle);
+        String createdId = target.substring("/orders/".length());
+        if (STACK.managesStack()) {
+          var persisted =
+              JsonParser.parseString(
+                      new BackendSeeder()
+                          .getBody(USERNAME, PASSWORD, "/api/v1/orders/" + createdId))
+                  .getAsJsonObject();
+          assertEquals(createdId, persisted.get("id").getAsString());
+          assertEquals(handle, persisted.get("handle").getAsString());
+        }
+        E2eSupport.capture(page, "joborder-created-detail");
 
         E2eSupport.navigate(page, baseUrl + "/orders");
-        assertThat(page.getByTestId("order-row").first())
+        assertThat(page.locator("[data-testid='order-row'][data-id='" + createdId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "joborder-create");

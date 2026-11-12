@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.withinProfit;
+import static de.greluc.krt.profit.basetool.backend.support.JobOrderParticipationFixtures.persistedParticipation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEvent;
@@ -51,8 +54,11 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
 import de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommandRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
@@ -92,6 +98,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Transactional
 class DataExportEndStateTest {
 
+  @Autowired private OrgUnitRepository orgUnitRepository;
+
   private static final String GOLDEN = "/privacy/personal-data-export-end-state.json";
 
   private static final String SUBJECT = "ZzzExportSubjectZzz";
@@ -117,6 +125,7 @@ class DataExportEndStateTest {
   @Autowired private PersonalBlueprintRepository personalBlueprintRepository;
   @Autowired private RefineryOrderRepository refineryOrderRepository;
   @Autowired private JobOrderRepository jobOrderRepository;
+  @Autowired private JobOrderParticipationRepository participations;
   @Autowired private MaterialClaimRepository materialClaimRepository;
   @Autowired private QualityTierRepository qualityTierRepository;
   @Autowired private AuditEventRepository auditEventRepository;
@@ -548,9 +557,81 @@ class DataExportEndStateTest {
             .material(material)
             .qualityTier(good)
             .claimingOrgUnit(squadron)
+            .participation(persistedParticipation(participations, jobOrder, squadron))
             .amount(5.0)
             .claimedByUser(subject)
             .build());
+    seedMoneyOrder(jobOrder);
+  }
+
+  private void seedMoneyOrder(JobOrder reference) {
+    UUID orderId =
+        jobOrderRepository
+            .saveAndFlush(
+                JobOrder.builder()
+                    .responsibleOrgUnit(reference.getResponsibleOrgUnit())
+                    .requestingOrgUnit(reference.getRequestingOrgUnit())
+                    .handle("export-money")
+                    .type(JobOrderType.AUEC)
+                    .status(JobOrderStatus.IN_PROGRESS)
+                    .build())
+            .getId();
+    UUID holderId = UUID.randomUUID();
+    UUID provisionId = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order_money_target (order_id, amount, version) VALUES (?, 80, 0)",
+        orderId);
+    jdbc.update(
+        "INSERT INTO job_order_money_holder (id, order_id, user_id, revision) VALUES (?, ?, ?, 4)",
+        holderId,
+        orderId,
+        subject.getId());
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_operation
+            (id, order_id, operation_id, holder_id, actor_id, selection_kind,
+             selected_accountless_name, bank_handling, amount, recorded_at)
+        VALUES (?, ?, ?, ?, ?, 'ACCOUNTLESS', ?, false, 17, now())
+        """,
+        UUID.randomUUID(),
+        orderId,
+        provisionId,
+        holderId,
+        other.getId(),
+        SUBJECT);
+    seedMoneyHolderLink(orderId, holderId);
+    UUID recipientId = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO job_order_money_recipient (id, order_id, user_id, active) VALUES (?, ?, ?,"
+            + " true)",
+        recipientId,
+        orderId,
+        subject.getId());
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_operation
+            (id, order_id, operation_id, holder_id, actor_id, selection_kind,
+             bank_handling, amount, recorded_at, kind, recipient_id, new_provision, fee_rate, fee)
+        VALUES (?, ?, ?, ?, ?, 'EXISTING', false, 3, now() + interval '2 seconds',
+             'PURPOSE_HANDOVER', ?, 0, 0, 0)
+        """,
+        UUID.randomUUID(),
+        orderId,
+        UUID.randomUUID(),
+        holderId,
+        subject.getId(),
+        recipientId);
+    seedMoneyCorrection(orderId, holderId, provisionId);
+    seedLinkedMoneyAttempt(orderId, holderId);
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_target_change
+            (id, order_id, actor_id, previous_target, target, recorded_at)
+        VALUES (?, ?, ?, 85, 80, now())
+        """,
+        UUID.randomUUID(),
+        orderId,
+        subject.getId());
   }
 
   private JobOrder jobOrder(String handle) {
@@ -558,7 +639,7 @@ class DataExportEndStateTest {
     SpecialCommand sk = new SpecialCommand();
     sk.setName("Export-SK-" + unique);
     sk.setShorthand("X" + unique);
-    sk.setProfitEligible(true);
+    withinProfit(sk, persistedProfitArea(orgUnitRepository));
     specialCommandRepository.save(sk);
     JobOrder order =
         JobOrder.builder()
@@ -571,6 +652,75 @@ class DataExportEndStateTest {
     order.addMaterial(
         JobOrderMaterial.builder().material(material).qualityTier(good).amount(10.0).build());
     return jobOrderRepository.save(order);
+  }
+
+  private void seedLinkedMoneyAttempt(UUID orderId, UUID holderId) {
+    UUID attempt = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO job_order_linked_money_attempt
+          (id, order_id, operation_id, purpose_ref, revision, active, version, kind,
+           actor_id, holder_id, selection_kind, selected_ref, amount, provision, rate,
+           actual_fee, fee_funding, source_binding, actual_payment, bank_type,
+           bank_account_id, bank_custodian_id, counterparty_name,
+           state, request_id, submitted_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, true, 0, 'PROVISION',
+                ?, ?, 'EXISTING', ?, 21, 21, 0.005,
+                0, 'DEPOSITOR', 0, true, 'DEPOSIT',
+                ?, ?, ?, 'WAITING', ?, now(), now())
+        """,
+        attempt,
+        orderId,
+        UUID.randomUUID(),
+        attempt,
+        other.getId(),
+        holderId,
+        holderId,
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        OTHER,
+        UUID.randomUUID());
+  }
+
+  private void seedMoneyHolderLink(UUID orderId, UUID holderId) {
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_holder_change
+            (id, order_id, holder_id, kind, actor_id, user_id, previous_name, recorded_at)
+        VALUES (?, ?, ?, 'LINK', ?, ?, ?, now() + interval '1 second')
+        """,
+        UUID.randomUUID(),
+        orderId,
+        holderId,
+        other.getId(),
+        subject.getId(),
+        SUBJECT);
+  }
+
+  private void seedMoneyCorrection(UUID orderId, UUID holderId, UUID provisionId) {
+    UUID correctionId = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_operation
+            (id, order_id, operation_id, holder_id, actor_id, selection_kind,
+             bank_handling, amount, recorded_at, kind)
+        VALUES (?, ?, ?, ?, ?, 'EXISTING', false, 0, now() + interval '3 seconds', 'CORRECTION')
+        """,
+        UUID.randomUUID(),
+        orderId,
+        correctionId,
+        holderId,
+        other.getId());
+    jdbc.update(
+        """
+        INSERT INTO job_order_money_correction_entry
+            (order_id, correction_operation_id, original_operation_id,
+             previous_amount, previous_provision, previous_fee, amount, provision, fee)
+        VALUES (?, ?, ?, 17, 17, 0, 16, 16, 0)
+        """,
+        orderId,
+        correctionId,
+        provisionId);
   }
 
   private void seedMarket() {
@@ -634,12 +784,51 @@ class DataExportEndStateTest {
         account,
         "ZZZ-EXPORT-1",
         "Kasse von " + OTHER);
+    UUID holder = UUID.randomUUID();
     jdbc.update(
         "INSERT INTO bank_holder (id, user_id, handle, active, role_managed)"
             + " VALUES (?, ?, ?, TRUE, FALSE)",
-        UUID.randomUUID(),
+        holder,
         subject.getId(),
         SUBJECT);
+    UUID attempt = UUID.randomUUID();
+    UUID purpose = UUID.randomUUID();
+    jdbc.update(
+        """
+        INSERT INTO bank_linked_attempt (id, purpose_kind, purpose_ref, fee_rate, fee)
+        VALUES (?, 'AUEC_ORDER', ?, 0.005, 0)
+        """,
+        attempt,
+        purpose);
+    jdbc.update(
+        """
+        INSERT INTO bank_authorisation (id, account_id, holder_id, amount, authorised_by,
+                                        authorised_at)
+        VALUES (?, ?, ?, 6000000, ?, now())
+        """,
+        attempt,
+        account,
+        holder,
+        other.getId());
+    jdbc.update(
+        """
+        INSERT INTO bank_booking_request (id, account_id, type, amount, status, requested_by,
+                                          requester_handle, purpose_kind, purpose_ref,
+                                          linked_attempt_id, requested_holder_id, holder_id,
+                                          authorisation_id, decided_at, staff_note)
+        VALUES (?, ?, 'AUTHORISATION', 6000000, 'CONFIRMED', ?, ?, 'AUEC_ORDER', ?,
+                ?, ?, ?, ?, now(), ?)
+        """,
+        UUID.randomUUID(),
+        account,
+        other.getId(),
+        OTHER,
+        purpose,
+        attempt,
+        holder,
+        holder,
+        attempt,
+        HIDDEN);
     jdbc.update(
         "INSERT INTO bank_account_view_grant (id, account_id, grantee_kind, grantee_user_id)"
             + " VALUES (?, ?, 'USER', ?)",

@@ -1,7 +1,9 @@
 # 6. Runtime view
 
-Eight scenarios. They were chosen because each one exercises a rule that is invisible in the static
-view, and because each one before the exchange's (§6.8) has burned somebody at least once.
+> [aUEC procurement](../specs/orders-auec.md) owns the order runtime. The [optional Bank coupling](../specs/orders-auec-bank.md) owns selected-account actions, delayed effects, repair and reversal.
+
+These scenarios exercise rules that are not visible in the static view. Their canonical
+requirements own behavior and verification status.
 
 ## 6.1 Sign-in
 
@@ -272,3 +274,51 @@ Authority: [REQ-DATA-032…038](../specs/data-persistence.md),
    (a resource group, or the material of a resource that joins no single commodity) is audited, and
    a hide stamps `p4k_hidden_at`, which the pickers filter like the sweep's stamp (REQ-P4K-013,
    REQ-P4K-016).
+
+## 6.12 Material provision and a connected correction
+
+1. Inventory resolves the complete set of actual source/destination rows, lots and affected
+   order/material scopes. The common lock protocol and revalidation reject a changed selection
+   instead of silently widening the action after locks.
+2. A normal stock provision may carry an explicit Staffel contribution selection. The Inventory-owned
+   observer lets JobOrder apply that credit and reconcile final uncovered demand in the same
+   transaction. Readable contribution history and privacy-safe audit accompany the effective facts.
+3. An explicit correction resolves the retained provision and all known intersecting later facts
+   before changing physical quantity. Current contribution and, where stock changes, Inventory
+   authority are rechecked for the connected action. A historical attribution-only correction
+   needs no nonexistent stock row; it does not reverse manufacture or invent a physical return.
+4. After a successful commit, affected shared views refresh through the existing live mechanisms.
+   A conflicting edit keeps its input and requires a deliberate retry. History explains the
+   correction independently of current stock placement and notification retention.
+
+The quantity/evidence contract and its acceptance status live in
+[REQ-ORDERS-024](../specs/orders-material-claims.md); this runtime map is not a second acceptance
+record.
+
+## 6.13 Order money movements, correction and response recovery
+
+1. The common creation command records the aUEC order and its independently versioned target in
+   one transaction. Reporting an own holding, selecting a linked account, or naming an accountless
+   holder begins in the order's money section. Each new applicable operation selects Bank
+   handling by default. The actor can choose Bank-free handling for that operation.
+2. The order edit acquires the involved account identity guards, then the hierarchy and order
+   write guards. It checks current authority and compares an existing accepted attempt before
+   considering the holder version of a new submission.
+3. A Bank-free movement applies the source debit, recipient credit, explicit new funds and fixed
+   fee in one booking. If a handover can reach the current target, the edit locks the priority
+   queue before its order row. The movement, lifecycle change and audit commit together.
+   Participants receive section invalidations after commit. An affected linked account can
+   receive a targeted notice.
+4. A selected-Bank operation uses the Bank's normal admission and decision. The composition
+   adapter applies the linked Order effect and both domains' audit in the decision transaction.
+   Pending requests can bind available order funds. Participants receive live updates and
+   grouped notices after commit.
+5. A purpose reassignment or its correction locks both orders in PostgreSQL ID order. A linked
+   correction appends revised effects without removing its original amounts. An actual requester
+   return uses the same net handover projection as the lifecycle decision.
+6. A browser with an unknown outcome queries the same operation after reload. The order rechecks
+   access and reconstructs exact amounts from the accepted monetary facts; current holder and actor
+   labels follow the privacy rules.
+
+See [the aUEC order contract](../specs/orders-auec.md) for settlement and correction, and the
+[Bank integration contract](../specs/orders-auec-bank.md) for coupled outcomes.

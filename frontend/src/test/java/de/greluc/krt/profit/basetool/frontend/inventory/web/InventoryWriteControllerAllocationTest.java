@@ -83,7 +83,7 @@ class InventoryWriteControllerAllocationTest {
     UUID id = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L);
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 4.0, 1L, null);
     InventoryItemDto out = sentinel();
     when(backendApiClient.post(
             "/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id))
@@ -102,7 +102,7 @@ class InventoryWriteControllerAllocationTest {
     UUID id = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 99.0, 1L);
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), 99.0, 1L, null);
     when(backendApiClient.post(
             "/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id))
         .thenThrow(
@@ -119,7 +119,7 @@ class InventoryWriteControllerAllocationTest {
     UUID id = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L);
+            InventoryAllocationDimension.MISSION, UUID.randomUUID(), 6.0, 2L, null);
     InventoryItemDto out = sentinel();
     when(backendApiClient.patch(
             "/api/v1/inventory/{id}/allocation", dto, InventoryItemDto.class, id))
@@ -138,7 +138,7 @@ class InventoryWriteControllerAllocationTest {
     UUID id = UUID.randomUUID();
     InventoryAllocationWriteDto dto =
         new InventoryAllocationWriteDto(
-            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L);
+            InventoryAllocationDimension.JOB_ORDER, UUID.randomUUID(), null, 3L, null);
     InventoryItemDto out = sentinel();
     when(backendApiClient.delete(
             eq("/api/v1/inventory/{id}/allocation"), eq(dto), eq(InventoryItemDto.class), eq(id)))

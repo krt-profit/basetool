@@ -58,7 +58,8 @@ class MaterialCollectionPageControllerTest {
         500.0,
         allocated,
         allocated,
-        delivered);
+        delivered,
+        false);
   }
 
   @Test

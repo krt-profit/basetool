@@ -19,18 +19,23 @@
 
 package de.greluc.krt.profit.basetool.backend.support;
 
+import static org.mockito.Mockito.mock;
+
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockSoldForTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryBulkRebookService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutAudits;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryEarmarkLookup;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMapper;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryTransferNoticeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
@@ -54,11 +59,16 @@ public final class InventoryCheckoutFixtures {
       OrgUnitStampingService orgUnitStampingService,
       AuditRecorder auditRecorder,
       ApplicationEventPublisher eventPublisher) {
+    var orderWrites =
+        new InventoryOrderWrites(
+            inventoryItemRepository, mock(OrderLinkedStockWriteObserver.class));
     var mergeService =
-        new InventoryMergeService(inventoryItemRepository, stockOfferLookup, auditRecorder);
+        new InventoryMergeService(
+            orderWrites, inventoryItemRepository, stockOfferLookup, auditRecorder);
     var transferNotices = new InventoryTransferNoticeService(userRepository, eventPublisher);
     var bulkService =
         new InventoryBulkRebookService(
+            orderWrites,
             inventoryItemRepository,
             userRepository,
             locationRepository,
@@ -68,6 +78,7 @@ public final class InventoryCheckoutFixtures {
             mergeService,
             transferNotices);
     return new InventoryCheckoutService(
+        orderWrites,
         inventoryItemRepository,
         userRepository,
         locationRepository,
@@ -78,6 +89,7 @@ public final class InventoryCheckoutFixtures {
         requestScopeResolver,
         orgUnitStampingService,
         auditRecorder,
+        new InventoryCheckoutAudits(auditRecorder),
         eventPublisher,
         mergeService,
         bulkService,

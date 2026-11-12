@@ -29,6 +29,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.CheckoutType;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemMap
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWrites;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockCommands;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOfferRepository;
@@ -62,7 +64,10 @@ import org.springframework.context.ApplicationEventPublisher;
  * bookOutInventoryItem}) map their DTO from {@code saveAndFlush}, so the returned {@code @Version}
  * is current and the next edit does not 409.
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryItemServiceVersionFlushTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
@@ -104,8 +109,12 @@ class InventoryItemServiceVersionFlushTest {
             orgUnitStampingService,
             auditService,
             eventPublisher);
+    InventoryOrderWrites orderWrites =
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class));
     inventoryItemService =
         new InventoryItemService(
+            orderWrites,
             inventoryItemRepository,
             userRepository,
             materialRepository,
@@ -117,12 +126,27 @@ class InventoryItemServiceVersionFlushTest {
             requestScopeResolver,
             orgUnitStampingService,
             null,
-            new InventoryStockCommands(null, null, null, null, null, null, null, null),
+            new InventoryStockCommands(
+                new InventoryOrderWrites(
+                    org.mockito.Mockito.mock(
+                        de.greluc.krt.profit.basetool.backend.inventory.internal
+                            .InventoryItemRepository.class),
+                    org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null),
             null,
             auditService,
             null,
             realCheckoutService,
-            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false));
+            new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false),
+            new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
+                orderWrites));
   }
 
   private User userWithId(UUID id) {

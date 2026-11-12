@@ -118,5 +118,11 @@ public class InventoryForm {
   public static class AllocationRow {
     private UUID targetId;
     private Double amount;
+
+    /** Explicit matching contribution selected for this ordinary check-in. */
+    private UUID provisionClaimId;
+
+    /** Observed contribution version; never inferred from the selected stock owner. */
+    private Long provisionClaimVersion;
   }
 }

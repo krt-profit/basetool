@@ -20,9 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankOwnRequestReads;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -47,9 +49,9 @@ public class BankOwnRequestReadService implements BankOwnRequestReads {
     PageRequest page = PageRequest.of(0, limit + 1);
     List<BankBookingRequest> rows =
         afterId == null
-            ? requestRepository.findByRequestedByOrderByIdAsc(requester, page)
-            : requestRepository.findByRequestedByAndIdGreaterThanOrderByIdAsc(
-                requester, afterId, page);
+            ? requestRepository.findExchangeByRequester(requester, BankPurposeKind.AUEC_ORDER, page)
+            : requestRepository.findExchangeByRequesterAfter(
+                requester, afterId, BankPurposeKind.AUEC_ORDER, page);
     boolean more = rows.size() > limit;
     return new OwnRequestPage(
         (more ? rows.subList(0, limit) : rows)
@@ -65,7 +67,9 @@ public class BankOwnRequestReadService implements BankOwnRequestReads {
     if (ids.isEmpty()) {
       return List.of();
     }
-    return requestRepository.findByRequestedByAndIdIn(requester, ids).stream()
+    return requestRepository
+        .findExchangeByRequesterAndIds(requester, ids, BankPurposeKind.AUEC_ORDER)
+        .stream()
         .map(BankOwnRequestReadService::toOwnRequest)
         .toList();
   }
@@ -83,7 +87,7 @@ public class BankOwnRequestReadService implements BankOwnRequestReads {
    */
   @NotNull
   private static OwnRequest toOwnRequest(@NotNull BankBookingRequest request) {
-    BankAccount account = request.getAccount();
+    BankAccount account = Objects.requireNonNull(request.getAccount());
     OrgUnit owner = account.getOrgUnit();
     BankAccount target = request.getTargetAccount();
     return new OwnRequest(

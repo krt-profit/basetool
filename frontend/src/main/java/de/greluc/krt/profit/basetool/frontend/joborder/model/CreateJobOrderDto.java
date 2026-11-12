@@ -26,8 +26,8 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Frontend mirror of the backend's {@code CreateJobOrderDto}. {@link #responsibleOrgUnitId} is the
- * profit-eligible Staffel or SK that processes the order; {@link #requestingOrgUnitId} is the
- * customer, which may be any org unit.
+ * eligible Profit Bereich, Staffel or SK that processes the order; {@link #requestingOrgUnitId} is
+ * the customer, which may be any org unit.
  */
 @DtoMirror
 public record CreateJobOrderDto(

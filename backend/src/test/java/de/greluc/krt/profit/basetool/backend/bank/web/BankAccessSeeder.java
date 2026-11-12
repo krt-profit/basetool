@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
+import static de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures.persistedProfitArea;
+
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
@@ -156,7 +158,8 @@ final class BankAccessSeeder {
     Organisationsleitung ol = orgUnit(new Organisationsleitung(), "OL", null, null);
     Bereich ownBereich = orgUnit(new Bereich(), "Bereich", ol, Department.SUB_RADAR);
     Bereich foreignBereich = orgUnit(new Bereich(), "Fremdbereich", ol, Department.FORSCHUNG);
-    Bereich profitBereich = orgUnit(new Bereich(), "Profit", ol, Department.PROFIT);
+    Bereich profitBereich = persistedProfitArea(orgUnitRepository);
+    profitBereich.setParent(ol);
     Squadron ownStaffel = orgUnit(new Squadron(), "Staffel", ownBereich, null);
     SpecialCommand specialCommand = orgUnit(new SpecialCommand(), "SK", ownBereich, null);
     Squadron foreignStaffel = orgUnit(new Squadron(), "Fremdstaffel", foreignBereich, null);
@@ -211,6 +214,66 @@ final class BankAccessSeeder {
         Map.of(Pin.OWN_STAFFEL, ownStaffel.getId(), Pin.OWN_BEREICH, ownBereich.getId()),
         outsider.getId());
   }
+
+  /** Seeds an isolated account, applicant, custodian and audit reader. */
+  @NotNull
+  BankAccessWorld seedLinkedOrder() {
+    User applicant = user("applicant", ApprovalStatus.ACTIVE, Set.of(role("KRT Member")));
+    User manager =
+        user("manager", ApprovalStatus.ACTIVE, Set.of(role("KRT Member"), role("Bank Management")));
+    User admin = user("audit-reader", ApprovalStatus.ACTIVE, Set.of(role("Admin")));
+    Squadron requester = orgUnit(new Squadron(), "Requester", null, null);
+    seat(applicant, requester, MembershipRole.MEMBER);
+    BankAccount account = account(BankAccountType.ORG_UNIT, "Requester", requester);
+    viewGrant(account, BankAccountViewGranteeKind.ALL_MEMBERS);
+    BankHolder holder = holder(manager, "custodian");
+    persistedProfitArea(orgUnitRepository);
+    entityManager.flush();
+    return new BankAccessWorld(
+        Map.of(
+            Actor.MEMBER,
+            applicant.getId(),
+            Actor.MANAGEMENT,
+            manager.getId(),
+            Actor.ADMIN,
+            admin.getId()),
+        Map.of(
+            Actor.MEMBER,
+            applicant.getUsername(),
+            Actor.MANAGEMENT,
+            manager.getUsername(),
+            Actor.ADMIN,
+            admin.getUsername()),
+        Map.of(Account.OWN_ORG_UNIT, account.getId()),
+        Map.of(Holder.MANAGEMENT_HOLDER, holder.getId()),
+        Map.of(),
+        Map.of(Pin.OWN_STAFFEL, requester.getId()),
+        admin.getId());
+  }
+
+  User seedLinkedOrderApprover(UUID requester) {
+    User approver = user("approver", ApprovalStatus.ACTIVE, Set.of(role("KRT Member")));
+    seat(
+        approver,
+        orgUnitRepository.findById(requester).orElseThrow(),
+        MembershipRole.STAFFELLEITER);
+    entityManager.flush();
+    return approver;
+  }
+
+  LinkedOrderAccount seedLinkedOrderAccount(UUID applicant) {
+    Squadron owner = orgUnit(new Squadron(), "Linked account owner", null, null);
+    BankAccount account = account(BankAccountType.ORG_UNIT, "Linked account", owner);
+    BankAccountViewGrant grant = new BankAccountViewGrant();
+    grant.setAccount(account);
+    grant.setGranteeKind(BankAccountViewGranteeKind.USER);
+    grant.setGranteeUserId(applicant);
+    viewGrantRepository.save(grant);
+    entityManager.flush();
+    return new LinkedOrderAccount(account.getId(), owner.getId());
+  }
+
+  record LinkedOrderAccount(UUID accountId, UUID ownerId) {}
 
   /**
    * Seeds one user per actor with the roles the actor holds.

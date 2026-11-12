@@ -129,7 +129,14 @@ class SeededNotificationRulesIntegrationTest {
             true,
             SelectorKind.ORG_RELATIVE_ROLE,
             SelectorKind.ORG_RELATIVE_ROLE,
-            SelectorKind.ORG_RELATIVE_ROLE),
+            SelectorKind.EVENT_RECIPIENTS),
+        rule(
+            NotificationEventType.JOB_ORDER_REOPENED,
+            NotificationType.JOB_ORDER_REOPENED,
+            true,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.ORG_RELATIVE_ROLE,
+            SelectorKind.EVENT_RECIPIENTS),
         rule(
             NotificationEventType.JOB_ORDER_ASSIGNEE_ADDED,
             NotificationType.JOB_ORDER_ASSIGNED,
@@ -139,7 +146,8 @@ class SeededNotificationRulesIntegrationTest {
             NotificationEventType.JOB_ORDER_CLAIM_WITHDRAWN,
             NotificationType.JOB_ORDER_CLAIM_WITHDRAWN,
             true,
-            SelectorKind.EVENT_RECIPIENT),
+            SelectorKind.EVENT_RECIPIENT,
+            SelectorKind.EVENT_RECIPIENTS),
         rule(
             NotificationEventType.REFINERY_ORDER_READY,
             NotificationType.REFINERY_ORDER_READY,
@@ -200,6 +208,11 @@ class SeededNotificationRulesIntegrationTest {
         rule(
             NotificationEventType.BANK_ACCOUNT_DEBITED,
             NotificationType.BANK_ACCOUNT_DEBITED,
+            true,
+            SelectorKind.ACCOUNT_RESPONSIBLE),
+        rule(
+            NotificationEventType.BANK_FUNDS_AUTHORISED,
+            NotificationType.BANK_FUNDS_AUTHORISED,
             true,
             SelectorKind.ACCOUNT_RESPONSIBLE),
         rule(

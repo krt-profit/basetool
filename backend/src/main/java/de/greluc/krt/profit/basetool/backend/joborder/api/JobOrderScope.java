@@ -19,33 +19,69 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
-/**
- * The JPQL scope fragment of the module's scoped aggregate (REQ-DATA-010), spliced into the
- * {@code @Query} values of the repositories that list the aggregate.
- *
- * <p>The fragment lives beside the aggregate's repository and is the list-side half of the rule
- * that {@code JobOrderAccessPolicy} enforces row by row: both widen together (plan section 5.4). It
- * is a compile-time constant, which an annotation value needs, so the class is {@code public} and
- * has no behaviour. A query that needs more than the fragment starts with a text block, appends the
- * constant and continues only with plain string literals.
- */
+/** Shared JPQL readership for web order pages, counts, lookups and material representations. */
 public final class JobOrderScope {
 
   /** Non-instantiable constant holder. */
   private JobOrderScope() {}
 
-  /**
-   * JobOrder's scope predicate (alias {@code o}): the triple against {@code responsibleOrgUnit},
-   * plus the SK-public-queue escape that shows orders of a {@code SpecialCommand} to every squadron
-   * (REQ-ORG-003).
-   */
-  public static final String PREDICATE =
+  /** Predicate for physical stock-demand, allocation and linked-need representations. */
+  public static final String STOCK_KINDS = "o.type IN ('MATERIAL', 'ITEM')";
+
+  private static final String ACTIVE_CALLER =
+      """
+      EXISTS (SELECT u.id FROM User u WHERE u.id = :callerId
+        AND u.approvalStatus = de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus.ACTIVE
+        AND u.inKeycloak = true AND u.enabledInKeycloak = true)
+      """;
+
+  /** Current linked identity predicate for the holder alias {@code h} and the caller. */
+  public static final String ACTIVE_HOLDER_LINK = "h.userId = :callerId AND " + ACTIVE_CALLER;
+
+  /** Personal readership for a money order through an active link or historical handover. */
+  public static final String MONEY_PARTICIPANT_LINK =
+      """
+      (o.type = 'AUEC' AND (
+        EXISTS (SELECT h.id FROM JobOrderMoneyHolder h WHERE h.orderId = o.id AND h.userId = :callerId)
+        OR EXISTS (SELECT r.id FROM JobOrderMoneyRecipient r WHERE r.orderId = o.id
+          AND r.correctedIntoId IS NULL
+          AND (r.active = true OR EXISTS (SELECT m.id FROM JobOrderMoneyOperation m
+            WHERE m.orderId = o.id AND (m.recipientId = r.id OR EXISTS (
+              SELECT prior.id FROM JobOrderMoneyRecipient prior
+              WHERE prior.orderId = o.id AND prior.id = m.recipientId AND prior.correctedIntoId = r.id))
+            AND NOT EXISTS (SELECT c.id FROM JobOrderMoneyCorrectionEntry c
+              WHERE c.orderId = o.id AND c.originalOperationId = m.operationId AND c.amount = 0
+                AND NOT EXISTS (SELECT later.id FROM JobOrderMoneyCorrectionEntry later
+                  WHERE later.orderId = c.orderId AND later.originalOperationId = c.originalOperationId
+                    AND later.id > c.id))))
+          AND (r.userId = :callerId OR EXISTS (SELECT h.id FROM JobOrderMoneyHolder h
+            WHERE h.orderId = o.id AND h.userId = :callerId AND
+              (h.id = r.holderId OR EXISTS (SELECT alias.id FROM JobOrderMoneyHolder alias
+                WHERE alias.id = r.holderId AND alias.mergedIntoId = h.id)))))
+      ) AND
+      """
+          + ACTIVE_CALLER
+          + ")";
+
+  /** Complete web order readership, independent of the reduced allocation and Exchange scope. */
+  public static final String READ_PREDICATE =
       """
       (
         :isAdminAllScope = true
-        OR TYPE(o.responsibleOrgUnit) = SpecialCommand
-        OR (:activeOrgUnitId IS NOT NULL AND o.responsibleOrgUnit.id = :activeOrgUnitId)
-        OR (:activeOrgUnitId IS NULL AND o.responsibleOrgUnit.id IN :memberOrgUnitIds)
-       )
-      """;
+        OR (:activeOrgUnitId IS NOT NULL AND (o.responsibleOrgUnit.id = :activeOrgUnitId
+          OR o.requestingOrgUnit.id = :activeOrgUnitId))
+        OR (:activeOrgUnitId IS NULL AND (o.responsibleOrgUnit.id IN :memberOrgUnitIds
+          OR o.requestingOrgUnit.id IN :memberOrgUnitIds))
+        OR EXISTS (SELECT h.id FROM JobOrderUnitReadHistory h WHERE h.jobOrder = o
+          AND ((:activeOrgUnitId IS NOT NULL AND h.orgUnit.id = :activeOrgUnitId)
+            OR (:activeOrgUnitId IS NULL AND h.orgUnit.id IN :memberOrgUnitIds)))
+        OR EXISTS (SELECT p.id FROM JobOrderParticipation p WHERE p.jobOrder = o
+          AND ((:activeOrgUnitId IS NOT NULL AND p.claimingOrgUnit.id = :activeOrgUnitId)
+            OR (:activeOrgUnitId IS NULL AND p.claimingOrgUnit.id IN :memberOrgUnitIds)))
+        OR EXISTS (SELECT a.id FROM JobOrderAssignee a WHERE a.jobOrder = o
+          AND a.user.id = :callerId)
+        OR
+      """
+          + MONEY_PARTICIPANT_LINK
+          + "\n)\n";
 }

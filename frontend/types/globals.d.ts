@@ -491,13 +491,16 @@ interface KrtPageSection {
     container: string;
     fragmentValue?: string;
     signal?: boolean;
+    /** Allows refreshing a section whose controls are outside any dialog. */
+    refreshWhileModalOpen?: boolean;
 }
 
 /**
  * A section's container: a CSS selector, or an object naming it; a `signal` section is never
  * deferred and never part of a refresh of every section.
  */
-type KrtSectionContainer = string | { container?: string | null; signal?: boolean };
+type KrtSectionContainer =
+    string | { container?: string | null; signal?: boolean; refreshWhileModalOpen?: boolean };
 
 /** The configuration of a receiver built by `krtLiveSync.createReceiver`. */
 interface KrtReceiverConfig {
@@ -854,6 +857,8 @@ interface KrtComboboxConfig {
     maxResults?: string | number;
     /** The on-demand option source, used instead of filtering the static list. */
     remoteSource?: KrtComboboxRemoteSource;
+    /** Requires a deliberate option choice and clears the selection when its label is edited. */
+    explicitChoice?: boolean;
 }
 
 /** The controller `krt-searchable-select.js` attaches to an enhanced combobox. */

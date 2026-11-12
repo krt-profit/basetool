@@ -62,6 +62,7 @@ class JobOrderItemStockControllerTest {
                 UUID.randomUUID(),
                 4L,
                 1L,
+                false,
                 false)));
   }
 

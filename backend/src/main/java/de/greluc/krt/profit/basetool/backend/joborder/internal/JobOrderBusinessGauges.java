@@ -43,6 +43,7 @@ public class JobOrderBusinessGauges implements BusinessGaugeSource {
   private final AtomicLong jobOrderOpen = new AtomicLong();
   private final AtomicLong jobOrderInProgress = new AtomicLong();
   private final AtomicLong jobOrderOldestAge = new AtomicLong();
+  private final AtomicLong invalidResponsibility = new AtomicLong();
 
   @Override
   public void register(@NotNull MeterRegistry registry) {
@@ -53,12 +54,15 @@ public class JobOrderBusinessGauges implements BusinessGaugeSource {
         JobOrderMetricNames.JOB_ORDER_OPEN,
         jobOrderInProgress,
         JobOrderStatus.IN_PROGRESS.name());
+    BusinessGauges.countGauge(
+        registry, JobOrderMetricNames.JOB_ORDER_INVALID_RESPONSIBILITY, invalidResponsibility);
     BusinessGauges.ageGauge(
         registry, JobOrderMetricNames.JOB_ORDER_OPEN_OLDEST_AGE, jobOrderOldestAge);
   }
 
   @Override
   public void sample() {
+    invalidResponsibility.set(jobOrderRepository.countInvalidResponsibilities());
     jobOrderOpen.set(jobOrderRepository.countByStatus(JobOrderStatus.OPEN));
     jobOrderInProgress.set(jobOrderRepository.countByStatus(JobOrderStatus.IN_PROGRESS));
     jobOrderOldestAge.set(

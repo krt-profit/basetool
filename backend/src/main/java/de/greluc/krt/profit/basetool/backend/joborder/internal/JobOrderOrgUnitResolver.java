@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -39,14 +40,16 @@ public class JobOrderOrgUnitResolver {
   /** Resolves picker output ids to managed {@link OrgUnit} entities. */
   private final OrgUnitRepository orgUnitRepository;
 
+  private final ProfitHierarchyService profitHierarchy;
+
   /**
-   * Resolves the responsible (processing) org unit of a new job order, which must be a
-   * profit-eligible Staffel or Spezialkommando.
+   * Resolves the responsible (processing) org unit of a new job order, which must be a active
+   * Profit-hierarchy Staffel or Spezialkommando.
    *
    * @param responsibleOrgUnitId picker output from the create DTO.
    * @return the resolved responsible org unit; never {@code null}.
    * @throws BadRequestException when the id is missing, does not resolve, or names a unit that is
-   *     not profit-eligible.
+   *     not active Profit-hierarchy.
    */
   @NotNull
   public OrgUnit resolveResponsibleOrgUnit(@Nullable UUID responsibleOrgUnitId) {
@@ -60,11 +63,7 @@ public class JobOrderOrgUnitResolver {
                 new BadRequestException(
                     "responsibleOrgUnitId does not resolve to a known org unit: "
                         + responsibleOrgUnitId));
-    if (!orgUnit.isProfitEligible()) {
-      throw new BadRequestException(
-          "The selected responsible org unit is not profit-eligible and cannot process orders: "
-              + responsibleOrgUnitId);
-    }
+    profitHierarchy.requireEligible(orgUnit.getId());
     return orgUnit;
   }
 

@@ -19,16 +19,27 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.api;
 
-/**
- * Discriminates the two kinds of {@link JobOrder}: a {@link #MATERIAL} order lists raw materials to
- * deliver; an {@link #ITEM} order lists finished items whose materials are derived from blueprint
- * data.
- */
+/** The exclusive fulfillment kind of a {@link JobOrder}. */
 public enum JobOrderType {
 
   /** Order requesting raw materials directly (commodity + quantity + minimum quality). */
   MATERIAL,
 
   /** Order requesting finished items; needed materials are derived from each item's blueprint. */
-  ITEM
+  ITEM,
+
+  /** Order requesting a net amount of aUEC. */
+  AUEC;
+
+  /**
+   * Identifies kinds that can accept physical material or item allocations.
+   *
+   * @return whether this order kind participates in stock fulfillment
+   */
+  public boolean usesStock() {
+    return switch (this) {
+      case MATERIAL, ITEM -> true;
+      case AUEC -> false;
+    };
+  }
 }

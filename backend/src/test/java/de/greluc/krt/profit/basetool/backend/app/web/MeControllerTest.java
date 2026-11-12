@@ -33,6 +33,8 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAssigneeLookup;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCreationOptions;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderWorkspaceAccess;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipOptionDto;
@@ -73,6 +75,10 @@ class MeControllerTest {
 
   @Mock private JobOrderAssigneeLookup jobOrderAssigneeLookup;
 
+  @Mock private JobOrderWorkspaceAccess jobOrderWorkspaceAccess;
+
+  @Mock private JobOrderCreationOptions jobOrderCreationOptions;
+
   @Mock private SupplyTabAccess supplyTabAccess;
 
   @Mock private PurchasingTabAccess purchasingTabAccess;
@@ -83,6 +89,20 @@ class MeControllerTest {
   void noTabsByDefault() {
     lenient().when(supplyTabAccess.current()).thenReturn(SupplyTabGrants.NONE);
     lenient().when(purchasingTabAccess.current()).thenReturn(PurchasingTabGrants.NONE);
+  }
+
+  @Test
+  void getCapabilities_orderViewsAndCreationFollowTheirIndependentAnswers() {
+    when(jobOrderWorkspaceAccess.canViewWorkspace()).thenReturn(true);
+    when(jobOrderWorkspaceAccess.canViewUnitWork()).thenReturn(true);
+
+    MeController.CapabilitiesResponse reader = controller.getCapabilities();
+    assertTrue(reader.canViewOrderWorkspace());
+    assertTrue(reader.canViewOrderUnitWork());
+    assertFalse(reader.canCreateJobOrders());
+
+    when(jobOrderCreationOptions.canCreate()).thenReturn(true);
+    assertTrue(controller.getCapabilities().canCreateJobOrders());
   }
 
   @Test

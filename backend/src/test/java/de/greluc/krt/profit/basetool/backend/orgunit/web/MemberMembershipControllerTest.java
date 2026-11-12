@@ -58,8 +58,7 @@ class MemberMembershipControllerTest {
   void getUserMemberships_delegatesToService() {
     UUID userId = UUID.randomUUID();
     OrgUnitMembershipOptionDto option =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "ALPHA", "ALP", OrgUnitKind.SQUADRON, false);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", OrgUnitKind.SQUADRON);
     when(orgUnitMembershipQueryService.listOptionsForUser(userId)).thenReturn(List.of(option));
 
     List<OrgUnitMembershipOptionDto> result = controller.getUserMemberships(userId, false);
@@ -74,7 +73,7 @@ class MemberMembershipControllerTest {
     UUID userId = UUID.randomUUID();
     OrgUnitMembershipOptionDto bereich =
         new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "Bereich Logistik", "LOG", OrgUnitKind.BEREICH, false);
+            UUID.randomUUID(), "Bereich Logistik", "LOG", OrgUnitKind.BEREICH);
     when(orgUnitMembershipQueryService.listDirectMembershipOptions(userId))
         .thenReturn(List.of(bereich));
 
@@ -110,8 +109,7 @@ class MemberMembershipControllerTest {
   @Test
   void getMyPickableOrgUnits_resolvesTheCallerFromTheJwt() {
     OrgUnitMembershipOptionDto option =
-        new OrgUnitMembershipOptionDto(
-            UUID.randomUUID(), "ALPHA", "ALP", OrgUnitKind.SQUADRON, false);
+        new OrgUnitMembershipOptionDto(UUID.randomUUID(), "ALPHA", "ALP", OrgUnitKind.SQUADRON);
     when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
     when(orgUnitMembershipQueryService.listPickerOptionsWithDescendants(CALLER_ID))
         .thenReturn(List.of(option));

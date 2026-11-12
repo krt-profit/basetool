@@ -1,0 +1,30 @@
+rule_files:
+  - ../alerts/business.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: only a sustained linked money contradiction raises the warning
+    interval: 1m
+    input_series:
+      - series: 'basetool_job_order_linked_money_contradictions'
+        values: '0 2x19 0'
+      - series: 'basetool_job_order_linked_money_waiting_count'
+        values: '4x21'
+      - series: 'basetool_job_order_linked_money_waiting_age_seconds'
+        values: '3600+60x21'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: JobOrderLinkedMoneyContradiction
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: JobOrderLinkedMoneyContradiction
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: 'Linked order money has 2 contradictory effect(s)'
+              description: 'Inspect the coupled decision history and owning-domain audit before making a financial correction.'
+      - eval_time: 21m
+        alertname: JobOrderLinkedMoneyContradiction
+        exp_alerts: []

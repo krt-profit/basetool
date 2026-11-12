@@ -58,21 +58,18 @@ interface InventoryRowLockRepository extends Repository<InventoryItem, UUID> {
   Optional<InventoryItem> lockById(@Param("id") UUID id);
 
   /**
-   * Locks the non-personal rows within the given org-unit scope in ascending id order, the first
-   * step of the global wipe; personal rows are never touched. Callers must enforce access first.
+   * Lists the non-personal rows in the caller's org-unit scope for wipe planning.
    *
-   * @param isAdminAllScope {@code true} for an admin without an active org unit; locks every
-   *     non-personal row
+   * @param isAdminAllScope {@code true} for an admin without an active org unit
    * @param activeOrgUnitId the single org unit the wipe is scoped to, or {@code null}
    * @param memberOrgUnitIds the caller's org units (non-admin path); empty for admins
-   * @return the ids of the locked rows, ascending
+   * @return the ids of the rows in scope, ascending
    */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
       "SELECT i.id FROM InventoryItem i WHERE i.personal = false AND "
           + InventoryScope.TRIPLE
           + " ORDER BY i.id")
-  List<UUID> lockNonPersonalIdsInScope(
+  List<UUID> findNonPersonalIdsInScope(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
@@ -82,7 +79,7 @@ interface InventoryRowLockRepository extends Repository<InventoryItem, UUID> {
    * deletion reads the offers standing on them.
    *
    * @param userId the owner
-   * @return the ids of the locked rows, ascending
+   * @return the ids of the rows in scope, ascending
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT i.id FROM InventoryItem i WHERE i.user.id = :userId ORDER BY i.id")

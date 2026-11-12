@@ -28,16 +28,15 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.app.api.SecurityConfig;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
-import de.greluc.krt.profit.basetool.backend.identity.api.Role;
-import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitCascadeService;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -70,7 +69,7 @@ class DatabaseBankActorsTest {
             SecurityConfig.roleHierarchy());
     lenient().when(membershipRepository.findAllByIdUserId(userId)).thenReturn(List.of());
     lenient().when(orgUnitCascadeService.officerReach(anyCollection())).thenReturn(Set.of());
-    lenient().when(grantRepository.findByUserId(userId)).thenReturn(List.of());
+    lenient().when(grantRepository.findActorGrants(userId)).thenReturn(List.of());
   }
 
   @Test
@@ -109,22 +108,30 @@ class DatabaseBankActorsTest {
   }
 
   @Test
+  void actorOfAKnownMemberWithoutRolesRetainsTheirIdentity() {
+    when(userRepository.findStoredAuthorities(userId))
+        .thenReturn(List.of(new Authority(ApprovalStatus.ACTIVE, null)));
+
+    BankActor actor = actors.of(userId);
+
+    assertThat(actor.userId()).isEqualTo(userId);
+    assertThat(actor.roles()).isEmpty();
+  }
+
+  @Test
   void actor_ofNoMember_isNobodyWithoutAnyRead() {
     assertThat(actors.of(null)).isSameAs(BankActor.NOBODY);
     verifyNoInteractions(userRepository, membershipRepository, grantRepository);
   }
 
   private void storeUser(ApprovalStatus status, String... roleCodes) {
-    User user = new User();
-    user.setId(userId);
-    user.setApprovalStatus(status);
-    for (String code : roleCodes) {
-      Role role = new Role();
-      role.setId((long) user.getRoles().size() + 1);
-      role.setCode(code);
-      role.setName(code);
-      user.getRoles().add(role);
-    }
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.findStoredAuthorities(userId))
+        .thenReturn(
+            Arrays.stream(roleCodes)
+                .<UserRepository.StoredAuthority>map(code -> new Authority(status, code))
+                .toList());
   }
+
+  private record Authority(ApprovalStatus getApprovalStatus, @Nullable String getRoleCode)
+      implements UserRepository.StoredAuthority {}
 }

@@ -29,8 +29,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimAuthority;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
-import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,10 +43,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/**
- * Verifies that the material-claim write endpoints forbid a LOGISTICIAN outside a profit-eligible
- * org unit and admit a profit-eligible one ({@code @requestScopeResolver.canViewJobOrders()}).
- */
+/** Verifies that promise writes require access to the exact Staffel or existing promise. */
 @SpringBootTest
 class MaterialClaimControllerSecurityTest {
 
@@ -55,18 +52,19 @@ class MaterialClaimControllerSecurityTest {
   private MockMvc mockMvc;
 
   @MockitoBean private MaterialClaimService materialClaimService;
-  @MockitoBean private RequestScopeResolver requestScopeResolver;
+  @MockitoBean private MaterialClaimAuthority materialClaimAuthority;
 
   private static final UUID ORDER_ID = UUID.randomUUID();
   private static final UUID CLAIM_ID = UUID.randomUUID();
+  private static final UUID UNIT_ID = UUID.randomUUID();
 
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  private static SimpleGrantedAuthority logistician() {
-    return new SimpleGrantedAuthority("ROLE_LOGISTICIAN");
+  private static SimpleGrantedAuthority member() {
+    return new SimpleGrantedAuthority("ROLE_KRT_MEMBER");
   }
 
   /**
@@ -78,18 +76,18 @@ class MaterialClaimControllerSecurityTest {
     return "{\"materialId\":\""
         + UUID.randomUUID()
         + "\",\"qualityRequirement\":\"GOOD\",\"claimingOrgUnitId\":\""
-        + UUID.randomUUID()
+        + UNIT_ID
         + "\",\"amount\":5.0}";
   }
 
   @Test
-  void upsertClaim_nonProfitLogistician_isForbidden() throws Exception {
-    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+  void upsertClaim_withoutSelectedStaffelAuthority_isForbidden() throws Exception {
+    when(materialClaimAuthority.canWritePromise(ORDER_ID, UNIT_ID)).thenReturn(false);
 
     mockMvc
         .perform(
             post("/api/v1/orders/{id}/claims", ORDER_ID)
-                .with(jwt().authorities(logistician()))
+                .with(jwt().authorities(member()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(validClaimBody()))
         .andExpect(status().isForbidden());
@@ -98,13 +96,13 @@ class MaterialClaimControllerSecurityTest {
   }
 
   @Test
-  void upsertClaim_profitEligibleLogistician_reachesService() throws Exception {
-    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+  void upsertClaim_withSelectedStaffelAuthority_reachesService() throws Exception {
+    when(materialClaimAuthority.canWritePromise(ORDER_ID, UNIT_ID)).thenReturn(true);
 
     mockMvc
         .perform(
             post("/api/v1/orders/{id}/claims", ORDER_ID)
-                .with(jwt().authorities(logistician()))
+                .with(jwt().authorities(member()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(validClaimBody()))
         .andExpect(status().isCreated());
@@ -113,28 +111,30 @@ class MaterialClaimControllerSecurityTest {
   }
 
   @Test
-  void withdrawClaim_nonProfitLogistician_isForbidden() throws Exception {
-    when(requestScopeResolver.canViewJobOrders()).thenReturn(false);
+  void withdrawClaim_withoutPromiseAuthority_isForbidden() throws Exception {
+    when(materialClaimAuthority.canWithdrawPromise(ORDER_ID, CLAIM_ID)).thenReturn(false);
 
     mockMvc
         .perform(
             delete("/api/v1/orders/{id}/claims/{claimId}", ORDER_ID, CLAIM_ID)
-                .with(jwt().authorities(logistician())))
+                .param("version", "7")
+                .with(jwt().authorities(member())))
         .andExpect(status().isForbidden());
 
-    verify(materialClaimService, never()).withdrawClaim(any(), any());
+    verify(materialClaimService, never()).withdrawClaim(any(), any(), any());
   }
 
   @Test
-  void withdrawClaim_profitEligibleLogistician_reachesService() throws Exception {
-    when(requestScopeResolver.canViewJobOrders()).thenReturn(true);
+  void withdrawClaim_withPromiseAuthority_reachesService() throws Exception {
+    when(materialClaimAuthority.canWithdrawPromise(ORDER_ID, CLAIM_ID)).thenReturn(true);
 
     mockMvc
         .perform(
             delete("/api/v1/orders/{id}/claims/{claimId}", ORDER_ID, CLAIM_ID)
-                .with(jwt().authorities(logistician())))
+                .param("version", "7")
+                .with(jwt().authorities(member())))
         .andExpect(status().isNoContent());
 
-    verify(materialClaimService).withdrawClaim(ORDER_ID, CLAIM_ID);
+    verify(materialClaimService).withdrawClaim(ORDER_ID, CLAIM_ID, 7L);
   }
 }

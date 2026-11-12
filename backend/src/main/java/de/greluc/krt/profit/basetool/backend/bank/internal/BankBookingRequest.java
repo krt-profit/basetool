@@ -73,8 +73,9 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
    * The (source) account the request targets; immutable. An {@code ORG_UNIT}, {@code AREA} or
    * {@code CARTEL} account (REQ-BANK-039/-040).
    */
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "account_id", nullable = false, updatable = false)
+  @Nullable
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "account_id", updatable = false)
   @ToString.Exclude
   private BankAccount account;
 
@@ -92,6 +93,28 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 16, updatable = false)
   private BankBookingRequestType type;
+
+  @Nullable
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "linked_attempt_id", updatable = false)
+  @ToString.Exclude
+  private BankLinkedAttemptRecord linkedAttempt;
+
+  @Nullable
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "requested_holder_id", updatable = false)
+  @ToString.Exclude
+  private BankHolder requestedHolder;
+
+  @Nullable
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "requested_target_holder_id", updatable = false)
+  @ToString.Exclude
+  private BankHolder requestedTargetHolder;
+
+  @Nullable
+  @Column(name = "authorisation_id")
+  private UUID authorisationId;
 
   /**
    * The requested whole-aUEC amount, strictly positive. Mutable while the request is {@code
@@ -365,5 +388,45 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   boolean namesCounterparty(@Nullable UUID userId, @Nullable UUID orgUnitId) {
     return Objects.equals(getCounterpartyUserId(), userId)
         && Objects.equals(getCounterpartyOrgUnitId(), orgUnitId);
+  }
+
+  /**
+   * Reads the frozen linked game fee.
+   *
+   * @return the fee in whole aUEC, or {@code null} for an ordinary request
+   */
+  @Nullable
+  public BigDecimal getLinkedFee() {
+    return linkedAttempt == null ? null : linkedAttempt.getFee();
+  }
+
+  /**
+   * Shortens the request id for audit details.
+   *
+   * @return the first id segment
+   */
+  String shortId() {
+    String text = id.toString();
+    return text.substring(0, text.indexOf('-'));
+  }
+
+  /**
+   * Reads the source account id, if this request concerns an account.
+   *
+   * @return the account id, or {@code null} for a custody-only request
+   */
+  @Nullable
+  public UUID accountId() {
+    return account == null ? null : account.getId();
+  }
+
+  /**
+   * Reads the source account number, if this request concerns an account.
+   *
+   * @return the account number, or {@code null} for a custody-only request
+   */
+  @Nullable
+  public String accountNo() {
+    return account == null ? null : account.getAccountNo();
   }
 }

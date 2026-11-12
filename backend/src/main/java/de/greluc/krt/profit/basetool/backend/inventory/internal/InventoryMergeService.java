@@ -25,7 +25,6 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
-import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -33,7 +32,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,8 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
 public class InventoryMergeService {
-  private static final int NOTE_MAX_LENGTH = 1000;
-  private static final String NOTE_MERGE_SEPARATOR = "\n";
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final StockOfferLookup stockOfferLookup;
   private final AuditRecorder auditRecorder;
@@ -67,6 +64,7 @@ public class InventoryMergeService {
   @Transactional(propagation = Propagation.MANDATORY)
   public InventoryItem mergeStockIfRequested(
       @NotNull InventoryItem row, boolean clientRequestedMerge) {
+    orderWrites.lockEligibility();
     final Material material = row.getMaterial();
     final boolean gameItemRow = row.getGameItem() != null;
     if (material == null && !gameItemRow) {
@@ -105,25 +103,30 @@ public class InventoryMergeService {
         stockOfferLookup.offeredRows(candidates.stream().map(InventoryItem::getId).toList());
     final List<InventoryItem> victims =
         candidates.stream().filter(candidate -> !offered.contains(candidate.getId())).toList();
+    orderWrites.validateRows(victims.stream().map(InventoryItem::getId).toList());
+    orderWrites.assertRow(row);
+    victims.forEach(orderWrites::assertRow);
     if (victims.isEmpty()) {
       return row;
     }
 
     double total = row.getAmount() != null ? row.getAmount() : 0.0;
     final Set<String> notes = new LinkedHashSet<>();
-    collectNote(notes, row.getNote());
+    InventoryStockMergeNotes.collect(notes, row.getNote());
     for (InventoryItem victim : victims) {
       total += victim.getAmount() != null ? victim.getAmount() : 0.0;
-      collectNote(notes, victim.getNote());
+      InventoryStockMergeNotes.collect(notes, victim.getNote());
+      row.mergeQuantityFrom(victim);
     }
 
     row.setAmount(ScuAmounts.roundToScuScale(total));
-    row.setNote(mergeNotes(notes));
+    row.setNote(InventoryStockMergeNotes.combined(notes));
     for (InventoryItem victim : victims) {
       InventoryAllocations.unionInto(row, victim);
     }
 
     inventoryItemRepository.deleteAll(victims);
+    orderWrites.assertRow(row);
     inventoryItemRepository.saveAndFlush(row);
 
     auditRecorder.record(
@@ -136,35 +139,5 @@ public class InventoryMergeService {
             .with("q", row.getQuality())
             .with("trigger", row.countsWholeUnits() ? "auto" : "manual"));
     return row;
-  }
-
-  /**
-   * Adds a note to the merge accumulator, trimmed to {@code null} and skipped when blank, so the
-   * merged note carries only the distinct non-empty contributions in first-seen order.
-   *
-   * @param notes the ordered accumulator of distinct notes.
-   * @param note the raw note of one folded row, possibly {@code null} or blank.
-   */
-  private static void collectNote(Set<String> notes, @Nullable String note) {
-    final String normalized = StringNormalization.trimToNull(note);
-    if (normalized != null) {
-      notes.add(normalized);
-    }
-  }
-
-  /**
-   * Joins the distinct merged notes with {@link #NOTE_MERGE_SEPARATOR}, truncating to {@link
-   * #NOTE_MAX_LENGTH} so the write never overflows the {@code inventory_item.note} column.
-   *
-   * @param notes the ordered accumulator of distinct notes.
-   * @return the combined note, or {@code null} when no folded row carried a note.
-   */
-  @Nullable
-  private static String mergeNotes(Set<String> notes) {
-    if (notes.isEmpty()) {
-      return null;
-    }
-    final String joined = String.join(NOTE_MERGE_SEPARATOR, notes);
-    return joined.length() > NOTE_MAX_LENGTH ? joined.substring(0, NOTE_MAX_LENGTH) : joined;
   }
 }

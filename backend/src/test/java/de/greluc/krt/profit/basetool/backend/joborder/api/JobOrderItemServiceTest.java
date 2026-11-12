@@ -22,12 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Blueprint;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredient;
@@ -38,25 +33,30 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTier;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierMapper;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierSelection;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierService;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredBlueprintException;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.RetiredGameItemException;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableBlueprints;
-import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentClass;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemPlanReads;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemPlans;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemServiceImpl;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.support.QualityTierFixtures;
 import java.time.Instant;
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,6 +64,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.MessageSource;
 
 /**
  * Unit tests for {@link JobOrderItemService}: blueprint-driven material derivation (amount scaling,
@@ -73,36 +74,127 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemServiceTest {
 
+  @Mock private JobOrderItemPlanReads keptReads;
+  @Mock private de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository tiers;
   @Mock private BlueprintRepository blueprintRepository;
   @Mock private GameItemRepository gameItemRepository;
   @Mock private MaterialRepository materialRepository;
   @Mock private MaterialMapper materialMapper;
   @Mock private QualityTierService qualityTierService;
+  @Mock private MessageSource messageSource;
   private JobOrderItemService service;
+  private final Map<UUID, Blueprint> recipeFixtures = new LinkedHashMap<>();
+  private final Map<UUID, GameItem> itemFixtures = new LinkedHashMap<>();
+  private final Map<UUID, Material> materialFixtures = new LinkedHashMap<>();
+  private final Map<UUID, QualityTier> tierFixtures = new LinkedHashMap<>();
+  private final Map<UUID, List<Blueprint>> outputFixtures = new LinkedHashMap<>();
+  private final Map<String, Material> bridgeFixtures = new LinkedHashMap<>();
 
   @BeforeEach
   void setUp() {
     service =
-        new JobOrderItemService(
+        new JobOrderItemServiceImpl(
             blueprintRepository,
-            new SelectableGameItems(gameItemRepository),
-            new SelectableBlueprints(blueprintRepository),
             materialRepository,
             materialMapper,
-            qualityTierService,
-            Mappers.getMapper(QualityTierMapper.class));
+            Mappers.getMapper(QualityTierMapper.class),
+            new JobOrderItemPlans(
+                blueprintRepository,
+                materialRepository,
+                qualityTierService,
+                gameItemRepository,
+                tiers,
+                keptReads),
+            messageSource);
+    givenQuality(QualityTierFixtures.none());
+    givenQuality(QualityTierFixtures.good());
     lenient()
-        .when(qualityTierService.defaultForIngredient(any()))
-        .thenAnswer(inv -> {
-          Integer q = inv.getArgument(0);
-          return q != null && q >= 650 ? QualityTierFixtures.good() : QualityTierFixtures.none();
-        });
+        .when(qualityTierService.selection())
+        .thenAnswer(_ ->
+            new QualityTierSelection(
+                tierFixtures.values().stream().map(JobOrderItemServiceTest::tierFact).toList()));
     lenient()
-        .when(qualityTierService.resolveForRequirement(any(), any(), any()))
+        .when(
+            qualityTierService.resolveForRequirement(
+                any(QualityTierSelection.class), any(), any(), any()))
         .thenAnswer(inv ->
-            "GOOD".equals(inv.getArgument(0))
-                ? QualityTierFixtures.good()
-                : QualityTierFixtures.none());
+            ((QualityTierSelection) inv.getArgument(0))
+                .requirement(inv.getArgument(1), inv.getArgument(2), inv.getArgument(3)));
+    lenient()
+        .when(blueprintRepository.findItemOrderRecipes(any()))
+        .thenAnswer(inv ->
+            recipes(inv.getArgument(0)).stream()
+                .map(recipe ->
+                    new ItemOrderRecipeFacts.Recipe(
+                        recipe.getId(),
+                        recipe.getOutputItem() == null ? null : recipe.getOutputItem().getId(),
+                        recipe.getOutputName(),
+                        recipe.getScwikiKey(),
+                        recipe.getRequiredGroupCount(),
+                        recipe.isP4kRetired(),
+                        recipe.getVersion()))
+                .toList());
+    lenient()
+        .when(blueprintRepository.findItemOrderGroups(any()))
+        .thenAnswer(inv ->
+            recipes(inv.getArgument(0)).stream()
+                .flatMap(recipe -> recipe.getRequirementGroups().stream())
+                .map(group ->
+                    new ItemOrderRecipeFacts.Group(
+                        group.getId(),
+                        group.getBlueprint().getId(),
+                        group.getOrderIndex(),
+                        group.isOptional(),
+                        group.getVersion()))
+                .toList());
+    lenient()
+        .when(blueprintRepository.findItemOrderIngredients(any()))
+        .thenAnswer(inv ->
+            recipes(inv.getArgument(0)).stream()
+                .flatMap(recipe -> recipe.getIngredients().stream())
+                .map(JobOrderItemServiceTest::ingredientFact)
+                .toList());
+    lenient()
+        .when(blueprintRepository.findItemOrderOutputs(any()))
+        .thenAnswer(inv -> outputFacts(inv.getArgument(0)));
+    lenient()
+        .when(blueprintRepository.findItemOrderDirectItems(any()))
+        .thenAnswer(inv ->
+            ids(inv.getArgument(0)).stream()
+                .map(itemFixtures::get)
+                .filter(Objects::nonNull)
+                .map(item ->
+                    new ItemOrderRecipeFacts.OrderedItem(
+                        item.getId(), item.getId(), item.isP4kRetired(), item.getVersion()))
+                .toList());
+    lenient().when(blueprintRepository.findItemOrderRetainedItems(any())).thenReturn(List.of());
+    lenient()
+        .when(materialRepository.findItemOrderBridges(any()))
+        .thenAnswer(inv -> bridgeFacts(inv.getArgument(0)));
+    lenient()
+        .when(materialRepository.findItemOrderReferences(any()))
+        .thenAnswer(inv ->
+            ids(inv.getArgument(0)).stream()
+                .map(materialFixtures::get)
+                .filter(Objects::nonNull)
+                .toList());
+    lenient()
+        .when(blueprintRepository.findAllById(any()))
+        .thenAnswer(inv -> recipes(inv.getArgument(0)));
+    lenient()
+        .when(gameItemRepository.findAllById(any()))
+        .thenAnswer(inv ->
+            ids(inv.getArgument(0)).stream()
+                .map(itemFixtures::get)
+                .filter(Objects::nonNull)
+                .toList());
+    lenient()
+        .when(tiers.findAllById(any()))
+        .thenAnswer(inv ->
+            ids(inv.getArgument(0)).stream()
+                .map(tierFixtures::get)
+                .filter(Objects::nonNull)
+                .toList());
   }
 
   @Test
@@ -201,8 +293,8 @@ class JobOrderItemServiceTest {
     blueprint.addIngredient(itemIngredient(gameItem("Scope", GameItemKind.WEAPON_ATTACHMENT), 1));
     blueprint.addIngredient(unresolvedResource(9.0));
 
-    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    givenGameItem(weapon);
+    givenRecipe(blueprint);
 
     CreateJobOrderItemLineDto line =
         new CreateJobOrderItemLineDto(
@@ -236,9 +328,9 @@ class JobOrderItemServiceTest {
     blueprint.addIngredient(resource(steel, 1.0, 700));
     QualityTier fine = QualityTierFixtures.tier("FINE", 700);
 
-    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
-    when(qualityTierService.defaultForIngredient(700)).thenReturn(fine);
+    givenGameItem(weapon);
+    givenRecipe(blueprint);
+    givenQuality(fine);
 
     JobOrderItem built =
         service.buildItemLine(
@@ -246,7 +338,6 @@ class JobOrderItemServiceTest {
                 null, weapon.getId(), blueprint.getId(), 1, List.of(), null, null));
 
     assertThat(requirementFor(built, steel).getQualityTier()).isSameAs(fine);
-    verify(qualityTierService).defaultForIngredient(700);
   }
 
   @Test
@@ -268,10 +359,9 @@ class JobOrderItemServiceTest {
             .qualityTier(legacy)
             .build());
 
-    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
-    when(qualityTierService.resolveForRequirement(eq("LEGACY"), isNull(), any()))
-        .thenReturn(legacy);
+    givenGameItem(weapon);
+    givenRecipe(blueprint);
+    givenQuality(legacy);
 
     service.applyItemLine(
         existing,
@@ -284,11 +374,6 @@ class JobOrderItemServiceTest {
             null,
             null));
 
-    verify(qualityTierService)
-        .resolveForRequirement(
-            eq("LEGACY"),
-            isNull(),
-            argThat((Collection<UUID> ids) -> ids.size() == 1 && ids.contains(legacy.getId())));
     assertThat(requirementFor(existing, steel).getQualityTier()).isSameAs(legacy);
   }
 
@@ -299,8 +384,8 @@ class JobOrderItemServiceTest {
     Blueprint blueprint = blueprint(item);
     blueprint.addIngredient(resource(bolts, 2.5, null));
 
-    when(gameItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    givenGameItem(item);
+    givenRecipe(blueprint);
 
     JobOrderItem built =
         service.buildItemLine(
@@ -317,8 +402,8 @@ class JobOrderItemServiceTest {
     Blueprint blueprint = blueprint(weapon);
     blueprint.addIngredient(resource(iron, 0.36, null));
 
-    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    givenGameItem(weapon);
+    givenRecipe(blueprint);
 
     JobOrderItem built =
         service.buildItemLine(
@@ -334,8 +419,8 @@ class JobOrderItemServiceTest {
     GameItem other = gameItem("Other", GameItemKind.WEAPON);
     Blueprint blueprint = blueprint(other);
 
-    when(gameItemRepository.findById(ordered.getId())).thenReturn(Optional.of(ordered));
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    givenGameItem(ordered);
+    givenRecipe(blueprint);
 
     CreateJobOrderItemLineDto line =
         new CreateJobOrderItemLineDto(
@@ -350,7 +435,7 @@ class JobOrderItemServiceTest {
   void buildItemLineRefusesAnItemTheP4kRetired() {
     GameItem retired = gameItem("Ballista", GameItemKind.WEAPON);
     retired.setP4kDeletedAt(Instant.now());
-    when(gameItemRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+    givenGameItem(retired);
 
     CreateJobOrderItemLineDto line =
         new CreateJobOrderItemLineDto(
@@ -365,8 +450,8 @@ class JobOrderItemServiceTest {
     GameItem weapon = gameItem("Ballista", GameItemKind.WEAPON);
     Blueprint retired = blueprint(weapon);
     retired.setP4kDeletedAt(Instant.now());
-    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
-    when(blueprintRepository.findById(retired.getId())).thenReturn(Optional.of(retired));
+    givenGameItem(weapon);
+    givenRecipe(retired);
 
     CreateJobOrderItemLineDto line =
         new CreateJobOrderItemLineDto(
@@ -385,8 +470,8 @@ class JobOrderItemServiceTest {
     existing.setGameItem(weapon);
     existing.setBlueprint(hidden);
     hidden.setP4kHiddenAt(Instant.now());
-    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
-    when(blueprintRepository.findById(hidden.getId())).thenReturn(Optional.of(hidden));
+    givenGameItem(weapon);
+    givenRecipe(hidden);
 
     assertThatThrownBy(() ->
             service.applyItemLine(
@@ -406,7 +491,7 @@ class JobOrderItemServiceTest {
     existing.setGameItem(hidden);
     existing.setBlueprint(blueprint);
     hidden.setP4kHiddenAt(Instant.now());
-    when(gameItemRepository.findById(hidden.getId())).thenReturn(Optional.of(hidden));
+    givenGameItem(hidden);
 
     assertThatThrownBy(() ->
             service.applyItemLine(
@@ -512,8 +597,8 @@ class JobOrderItemServiceTest {
     blueprint.addIngredient(itemIngredient(scope, 2));
     blueprint.addIngredient(unresolvedResource(5.0));
 
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
-    when(blueprintRepository.findByOutputItemId(scope.getId())).thenReturn(List.of());
+    givenRecipe(blueprint);
+    givenOutputs(scope, List.of());
 
     ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 3);
 
@@ -535,8 +620,8 @@ class JobOrderItemServiceTest {
     Material covering = material("Panel Covering", QuantityType.SCU);
     Material extra = material("Optional Plating", QuantityType.SCU);
     Blueprint blueprint = chooseTwoOfThreeLegs(legs, paneling, liner, covering, extra);
-    when(gameItemRepository.findById(legs.getId())).thenReturn(Optional.of(legs));
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    givenGameItem(legs);
+    givenRecipe(blueprint);
 
     JobOrderItem built =
         service.buildItemLine(
@@ -560,7 +645,7 @@ class JobOrderItemServiceTest {
     stubMapper(paneling);
     stubMapper(liner);
     Blueprint blueprint = chooseTwoOfThreeLegs(legs, paneling, liner, covering, extra);
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    givenRecipe(blueprint);
 
     ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 1);
 
@@ -614,7 +699,7 @@ class JobOrderItemServiceTest {
     Blueprint blueprint = blueprint(weapon);
     blueprint.addIngredient(resource(iron, 0.36, null));
 
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
+    givenRecipe(blueprint);
 
     ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 5);
 
@@ -631,10 +716,9 @@ class JobOrderItemServiceTest {
     Blueprint blueprint = blueprint(weapon);
     blueprint.addIngredient(itemIngredient(beradomItem, 20));
 
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
-    when(blueprintRepository.findByOutputItemId(beradomItem.getId())).thenReturn(List.of());
-    when(materialRepository.findByNameIgnoreCase("Beradom"))
-        .thenReturn(Optional.of(beradomMaterial));
+    givenRecipe(blueprint);
+    givenOutputs(beradomItem, List.of());
+    givenBridge("Beradom", beradomMaterial);
 
     ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 3);
 
@@ -652,9 +736,8 @@ class JobOrderItemServiceTest {
     Blueprint blueprint = blueprint(rifle);
     blueprint.addIngredient(itemIngredient(scope, 1));
 
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
-    when(blueprintRepository.findByOutputItemId(scope.getId()))
-        .thenReturn(List.of(blueprint(scope)));
+    givenRecipe(blueprint);
+    givenOutputs(scope, List.of(blueprint(scope)));
 
     ItemDerivationDto preview = service.deriveForPreview(blueprint.getId(), 1);
 
@@ -673,11 +756,10 @@ class JobOrderItemServiceTest {
     blueprint.addIngredient(resource(riccite, 1.5, 0));
     blueprint.addIngredient(itemIngredient(beradomItem, 20));
 
-    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
-    when(blueprintRepository.findById(blueprint.getId())).thenReturn(Optional.of(blueprint));
-    when(blueprintRepository.findByOutputItemId(beradomItem.getId())).thenReturn(List.of());
-    when(materialRepository.findByNameIgnoreCase("Beradom"))
-        .thenReturn(Optional.of(beradomMaterial));
+    givenGameItem(weapon);
+    givenRecipe(blueprint);
+    givenOutputs(beradomItem, List.of());
+    givenBridge("Beradom", beradomMaterial);
 
     JobOrderItem built =
         service.buildItemLine(
@@ -712,8 +794,8 @@ class JobOrderItemServiceTest {
             .qualityTier(QualityTierFixtures.none())
             .build());
 
-    when(gameItemRepository.findById(weapon.getId())).thenReturn(Optional.of(weapon));
-    when(blueprintRepository.findById(corrected.getId())).thenReturn(Optional.of(corrected));
+    givenGameItem(weapon);
+    givenRecipe(corrected);
 
     service.applyItemLine(
         existing,
@@ -779,6 +861,133 @@ class JobOrderItemServiceTest {
             new GameItemReferenceDto(
                 shield.getId(), "FR-66", "VEHICLE_ITEM", "SHIELD", 1, "A", "MILITARY"),
             new GameItemReferenceDto(paint.getId(), "Paint", "VEHICLE_ITEM"));
+  }
+
+  private void givenRecipe(Blueprint recipe) {
+    recipeFixtures.put(recipe.getId(), recipe);
+    if (recipe.getOutputItem() != null) {
+      itemFixtures.put(recipe.getOutputItem().getId(), recipe.getOutputItem());
+    }
+    for (BlueprintRequirementGroup group : recipe.getRequirementGroups()) {
+      if (group.getId() == null) {
+        group.setId(UUID.randomUUID());
+      }
+    }
+    for (int index = 0; index < recipe.getIngredients().size(); index++) {
+      BlueprintIngredient line = recipe.getIngredients().get(index);
+      if (line.getId() == null) {
+        line.setId(UUID.randomUUID());
+      }
+      line.setOrderIndex(index);
+      if (line.getMaterial() != null) {
+        materialFixtures.put(line.getMaterial().getId(), line.getMaterial());
+      }
+      if (line.getGameItem() != null) {
+        itemFixtures.put(line.getGameItem().getId(), line.getGameItem());
+      }
+    }
+  }
+
+  private void givenGameItem(GameItem item) {
+    itemFixtures.put(item.getId(), item);
+  }
+
+  private void givenQuality(QualityTier tier) {
+    tierFixtures.put(tier.getId(), tier);
+  }
+
+  private void givenOutputs(GameItem item, List<Blueprint> recipes) {
+    outputFixtures.put(item.getId(), recipes);
+  }
+
+  private void givenBridge(String name, Material material) {
+    bridgeFixtures.put(name, material);
+    materialFixtures.put(material.getId(), material);
+  }
+
+  private List<Blueprint> recipes(Iterable<UUID> ids) {
+    return ids(ids).stream().map(recipeFixtures::get).filter(Objects::nonNull).toList();
+  }
+
+  private static List<UUID> ids(Iterable<UUID> values) {
+    List<UUID> result = new ArrayList<>();
+    values.forEach(result::add);
+    return result;
+  }
+
+  private static QualityTierSelection.Tier tierFact(QualityTier tier) {
+    return new QualityTierSelection.Tier(
+        tier.getId(),
+        tier.getCode(),
+        tier.getMinQuality(),
+        tier.getLabelDe(),
+        tier.getLabelEn(),
+        tier.getSortOrder(),
+        tier.isActive(),
+        tier.getVersion());
+  }
+
+  private static ItemOrderRecipeFacts.Ingredient ingredientFact(BlueprintIngredient line) {
+    return new ItemOrderRecipeFacts.Ingredient(
+        line.getId(),
+        line.getBlueprint().getId(),
+        line.getOrderIndex(),
+        line.getKind(),
+        line.getRequirementGroup() == null ? null : line.getRequirementGroup().getId(),
+        line.getMaterial() == null ? null : line.getMaterial().getId(),
+        line.getMaterial() == null ? null : line.getMaterial().getQuantityType(),
+        line.getGameItem() == null ? null : line.getGameItem().getId(),
+        line.getGameItem() == null ? null : line.getGameItem().getName(),
+        line.getWikiNameSnapshot(),
+        line.getQuantityScu(),
+        line.getQuantityUnits(),
+        line.getMinQuality(),
+        line.getVersion());
+  }
+
+  private List<ItemOrderRecipeFacts.Output> outputFacts(Iterable<UUID> ids) {
+    List<ItemOrderRecipeFacts.Output> result = new ArrayList<>();
+    for (Blueprint recipe : recipes(ids)) {
+      for (BlueprintIngredient line : recipe.getIngredients()) {
+        if (line.getGameItem() != null) {
+          for (Blueprint output :
+              outputFixtures.getOrDefault(line.getGameItem().getId(), List.of())) {
+            result.add(
+                new ItemOrderRecipeFacts.Output(
+                    line.getId(),
+                    output.getId(),
+                    output.getOutputName(),
+                    output.getScwikiKey(),
+                    output.getVersion()));
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  private List<ItemOrderRecipeFacts.MaterialBridge> bridgeFacts(Iterable<UUID> ids) {
+    List<ItemOrderRecipeFacts.MaterialBridge> result = new ArrayList<>();
+    for (Blueprint recipe : recipes(ids)) {
+      for (BlueprintIngredient line : recipe.getIngredients()) {
+        if (line.getGameItem() != null) {
+          String name =
+              line.getGameItem().getName() != null
+                  ? line.getGameItem().getName()
+                  : line.getWikiNameSnapshot();
+          Material material = bridgeFixtures.get(name);
+          if (material != null) {
+            result.add(
+                new ItemOrderRecipeFacts.MaterialBridge(
+                    line.getId(),
+                    material.getId(),
+                    material.getQuantityType(),
+                    material.getVersion()));
+          }
+        }
+      }
+    }
+    return result;
   }
 
   private void stubMapper(Material material) {

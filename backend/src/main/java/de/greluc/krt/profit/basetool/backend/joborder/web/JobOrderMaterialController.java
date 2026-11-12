@@ -28,7 +28,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMissionAl
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialDemandOverviewDto;
-import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -51,8 +50,8 @@ import org.springframework.web.bind.annotation.RestController;
  * material demand, the blueprint coverage of an item order, the linked-stock reads and the unlink
  * operations.
  *
- * <p>Reads are limited to the caller's visibility of the order; unlinking needs LOGISTICIAN or
- * ADMIN.
+ * <p>Reads follow order visibility. Removing a link requires current responsible-unit write
+ * authority.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -193,17 +192,18 @@ public class JobOrderMaterialController {
               + " inventory items.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Material successfully unlinked"),
+    @ApiResponse(responseCode = "400", description = "The order has ineligible responsibility"),
     @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
     @ApiResponse(responseCode = "404", description = "Job order or material not found")
   })
-  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize(
+      "isAuthenticated() and @jobOrderAccessPolicy.canReleaseJobOrderEarmarks(#jobOrderId)")
   public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
     jobOrderService.unlinkMaterial(jobOrderId, materialId);
   }
 
   /**
-   * Removes a single inventory item from the order — sets {@code jobOrderId=null} via Hibernate
-   * dirty-checking (no bulk update, so the surrounding aggregate stays managed).
+   * Releases the order's earmark on a single inventory entry.
    *
    * @param id job-order id
    * @param inventoryItemId inventory-item id
@@ -212,15 +212,14 @@ public class JobOrderMaterialController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(
       summary = "Unlink a single inventory item from a job order",
-      description =
-          "Removes the link between a single inventory item and a job order by setting jobOrderId"
-              + " to null. Uses Hibernate dirty-checking (no bulk update).")
+      description = "Releases the order's earmark while retaining the physical inventory entry.")
   @ApiResponses({
     @ApiResponse(responseCode = "204", description = "Inventory item successfully unlinked"),
+    @ApiResponse(responseCode = "400", description = "The order has ineligible responsibility"),
     @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
     @ApiResponse(responseCode = "404", description = "Job order or inventory item not found")
   })
-  @PreAuthorize("hasAnyRole('" + Roles.LOGISTICIAN + "', '" + Roles.ADMIN + "')")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canReleaseJobOrderEarmarks(#id)")
   public void unlinkInventoryItem(@PathVariable UUID id, @PathVariable UUID inventoryItemId) {
     jobOrderService.unlinkInventoryItem(id, inventoryItemId);
   }

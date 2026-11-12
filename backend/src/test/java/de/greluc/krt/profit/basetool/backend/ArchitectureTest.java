@@ -72,10 +72,12 @@ import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAcc
 import de.greluc.krt.profit.basetool.backend.bank.internal.OrgUnitBankVisibleAccountsQuery;
 import de.greluc.krt.profit.basetool.backend.bank.web.OrgUnitBankController;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.PersonalBlueprintOverviewService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CommodityMiningData;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ItemCatalogueMetadata;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.ItemOrderRecipeFacts;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeArchetype;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationDto;
@@ -85,8 +87,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ManufacturerRefDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialCategoryDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialReferenceDto;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierSelection;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityTypeRounding;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.RecipeGroupSelection;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipCatalogueFacts;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemNamePrecedence;
@@ -136,20 +140,47 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.JobOrderAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.LegacyJournalQuantityReference;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialCollectionEntryDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.MaterialHandoverFact;
 import de.greluc.krt.profit.basetool.backend.inventory.api.MissionAllocationDto;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityEvidence;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragment;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockQuantityFragments;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockViewerAccess;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocations;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAuditLabels;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryCheckoutService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryQuantityComposition;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStockMergeNotes;
+import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemLineDto;
+import de.greluc.krt.profit.basetool.backend.joborder.api.CreateJobOrderItemMaterialDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderAuditLabel;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankEffects;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankSelection;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemPlan;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.ItemHandoverRequirement;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderFulfillmentContext;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockEntryDto;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderItemStockGroupDto;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankAccountQueries;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankAccounts;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyBankPreview;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderQueryService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderRecipeSelection;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderStockErrors;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimService;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialHandoverCalculation;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialHandoverRequirement;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialQuantityArithmetic;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.ReplaceJobOrderBankAttemptDto;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.GameMedia;
 import de.greluc.krt.profit.basetool.backend.kernel.GameText;
@@ -419,6 +450,30 @@ class ArchitectureTest {
           de.greluc.krt.profit.basetool.backend.identity.api.UserHandleProjection.class,
           IngestGatewayProperties.class,
           InventoryAllocations.class,
+          InventoryQuantityComposition.class,
+          InventoryStockMergeNotes.class,
+          MaterialQuantityArithmetic.class,
+          ItemOrderRecipeFacts.class,
+          QualityTierSelection.class,
+          RecipeGroupSelection.class,
+          BlueprintIngredientKind.class,
+          JobOrderItemPlan.class,
+          JobOrderRecipeSelection.class,
+          CreateJobOrderItemLineDto.class,
+          CreateJobOrderItemMaterialDto.class,
+          MaterialHandoverFact.class,
+          MaterialHandoverCalculation.class,
+          MaterialHandoverRequirement.class,
+          JobOrderFulfillmentContext.class,
+          JobOrderStatus.class,
+          JobOrderType.class,
+          ItemHandoverRequirement.class,
+          JobOrderStockErrors.class,
+          StockQuantityEvidence.class,
+          StockQuantityComposition.class,
+          LegacyJournalQuantityReference.class,
+          StockQuantityFragment.class,
+          StockQuantityFragments.class,
           InventoryAuditLabels.class,
           InventoryGameItemReferenceDto.class,
           InventoryItemDto.class,
@@ -563,6 +618,18 @@ class ArchitectureTest {
    * since the handle anonymisation's bank part became a participant inside the bank package.
    */
   static final Set<Class<?>> BANK_CLASSES = Set.of();
+
+  /** Exact application and Order boundary types of the linked Bank integration (ADR-0357). */
+  static final Set<Class<?>> BANK_ORDER_BOUNDARY =
+      Set.of(
+          AuecBankComposition.class,
+          JobOrderBankEffects.class,
+          JobOrderBankPort.class,
+          JobOrderBankSelection.class,
+          JobOrderMoneyBankAccountQueries.class,
+          JobOrderMoneyBankAccounts.class,
+          JobOrderMoneyBankPreview.class,
+          ReplaceJobOrderBankAttemptDto.class);
 
   /**
    * The org-unit side of the bank: classes that carry "Bank" in their name but belong to org-unit
@@ -1295,7 +1362,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 93);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 133);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);
@@ -1913,9 +1980,7 @@ class ArchitectureTest {
 
   /**
    * Every production class named after the bank is classified: a bank class, the org-unit side, the
-   * exchange side (the bank route family of the exchange module, which reaches the bank through its
-   * {@code api} only, REQ-BXCH-006), or in the bank module package, so a new bank class cannot slip
-   * past the bank rules.
+   * exchange side, the explicit Order integration boundary, or the bank module package.
    */
   @Test
   void everyBankNamedClassIsClassified() {
@@ -1932,12 +1997,13 @@ class ArchitectureTest {
         .that(selection)
         .should(
             new ArchCondition<JavaClass>(
-                "be a registered bank class, on the org-unit side, on the exchange side, or in the"
-                    + " bank module") {
+                "be a registered bank class or a classified org-unit, exchange or Order boundary"
+                    + " class") {
               @Override
               public void check(JavaClass javaClass, ConditionEvents events) {
                 if (BANK_DOMAIN.test(javaClass)
                     || EXCHANGE_DOMAIN.test(javaClass)
+                    || BANK_ORDER_BOUNDARY.stream().anyMatch(javaClass::isEquivalentTo)
                     || ORG_UNIT_BANK_SIDE.stream().anyMatch(javaClass::isEquivalentTo)) {
                   return;
                 }
@@ -1945,10 +2011,8 @@ class ArchitectureTest {
                     SimpleConditionEvent.violated(
                         javaClass,
                         javaClass.getName()
-                            + " is named after the bank but is neither in BANK_CLASSES, in"
-                            + " ORG_UNIT_BANK_SIDE nor in the exchange module; add it to the list"
-                            + " it belongs to so the bank rules see it (REQ-BANK-008,"
-                            + " REQ-BANK-019)."));
+                            + " is named after the bank and needs explicit domain classification"
+                            + " (REQ-BANK-008, REQ-BANK-019, ADR-0357)."));
               }
             });
   }

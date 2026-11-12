@@ -147,6 +147,34 @@ class OpenApiDocumentAssertionsTest {
     }
   }
 
+  /** Checks the read-only responsibility catalog and the absence of mutable eligibility routes. */
+  @Test
+  void responsibilityCatalogIsReadOnlyAndEligibilitySwitchesAreAbsent() {
+    JsonNode paths = CommittedOpenApi.published().path("paths");
+    JsonNode catalog = paths.path("/api/v1/org-units/profit-responsible");
+    assertThat(catalog.has("get")).isTrue();
+    assertThat(catalog.has("post")).isFalse();
+    assertThat(catalog.has("put")).isFalse();
+    assertThat(catalog.has("patch")).isFalse();
+    assertThat(catalog.has("delete")).isFalse();
+    assertThat(paths.has("/api/v1/squadrons/{id}/profit-eligible")).isFalse();
+    assertThat(paths.has("/api/v1/special-commands/{id}/profit-eligible")).isFalse();
+  }
+
+  /** Checks that concrete-order claim authority is exposed only as a read. */
+  @Test
+  void claimingOptionsAreAReadOnlyOrderSubresource() {
+    JsonNode options =
+        CommittedOpenApi.published()
+            .path("paths")
+            .path("/api/v1/orders/{jobOrderId}/claims/claiming-options");
+    assertThat(options.has("get")).isTrue();
+    assertThat(options.has("post")).isFalse();
+    assertThat(options.has("put")).isFalse();
+    assertThat(options.has("patch")).isFalse();
+    assertThat(options.has("delete")).isFalse();
+  }
+
   /**
    * Parses a fixture document.
    *

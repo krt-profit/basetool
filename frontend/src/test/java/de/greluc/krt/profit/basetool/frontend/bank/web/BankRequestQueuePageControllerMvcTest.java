@@ -117,7 +117,8 @@ class BankRequestQueuePageControllerMvcTest {
             null,
             null,
             0L,
-            true);
+            true,
+            null);
     PageResponse<BankBookingRequestDto> page =
         new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of());
     BankHolderDto holder =

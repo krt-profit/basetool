@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankOpenRequestCapException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankOwnRequestWrites;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -132,7 +133,7 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   @Transactional
   public Written cancel(@NotNull BankActor actor, @NotNull UUID requestId, long version) {
     ownRequest(actor, requestId);
-    bookingRequestService.cancelOwn(actor.userId(), requestId, version);
+    bookingRequestService.cancelOwnExchange(actor.userId(), requestId, version);
     return written(requestId);
   }
 
@@ -152,14 +153,14 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   }
 
   /**
-   * Refuses a request once the member holds the cap of pending requests, whichever channel raised
-   * them; the caller holds the member's open-request lock.
+   * Refuses a request at the cap of Exchange-visible pending requests under the member's lock.
    *
    * @param requester the requester's id
    * @throws BankOpenRequestCapException at or over the cap
    */
   private void requireBelowCap(@NotNull UUID requester) {
-    if (requestRepository.countByRequestedByAndStatus(requester, BankBookingRequestStatus.PENDING)
+    if (requestRepository.countExchangeByRequesterAndStatus(
+            requester, BankBookingRequestStatus.PENDING, BankPurposeKind.AUEC_ORDER)
         >= properties.openRequestCap()) {
       throw new BankOpenRequestCapException();
     }
@@ -181,7 +182,7 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   }
 
   /**
-   * Loads one of the actor's own requests.
+   * Loads one of the actor's own requests visible to connected applications.
    *
    * @param actor the requester
    * @param requestId the request
@@ -192,6 +193,7 @@ public class BankOwnRequestWriteService implements BankOwnRequestWrites {
   private BankBookingRequest ownRequest(@NotNull BankActor actor, @NotNull UUID requestId) {
     return requestRepository
         .findById(requestId)
+        .filter(request -> request.getPurposeKind() != BankPurposeKind.AUEC_ORDER)
         .filter(request -> policy.ownsRequest(actor, request))
         .orElseThrow(BankOwnRequestWriteService::notFound);
   }

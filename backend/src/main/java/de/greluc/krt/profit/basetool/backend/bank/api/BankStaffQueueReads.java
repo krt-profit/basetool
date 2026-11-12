@@ -29,10 +29,9 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The read-only bank-staff queue of an explicit {@link BankActor}, decided by {@link
- * BankAccessPolicy} on every call (REQ-BXCH-005): the pending requests the web staff queue shows
- * the actor, and the pending requests that wait for the actor's approval. Both sections run oldest
- * first. Must run inside a transaction.
+ * The read-only connected-application queue of an explicit {@link BankActor} (REQ-BXCH-005).
+ * Includes pending requests visible to the actor as staff or approver within the connected-client
+ * scope. Both sections run oldest first.
  */
 public interface BankStaffQueueReads {
 
@@ -147,7 +146,7 @@ public interface BankStaffQueueReads {
   /**
    * One snapshot page of the queue.
    *
-   * @param open the web staff queue's requests
+   * @param open the pending requests visible to staff within the connected-client scope
    * @param toApprove the requests that wait for the actor's approval
    * @param oldestOpenAt the creation instant of the oldest request in either whole section, or
    *     {@code null} when both are empty

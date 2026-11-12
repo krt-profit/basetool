@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -215,6 +216,48 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
       @Param("entityId") UUID entityId);
 
   /**
+   * Captures existing notice identities for cleanup tied to an entity revision.
+   *
+   * @param types the notice types to match
+   * @param entityType the owning entity tag
+   * @param entityId the owning entity id
+   * @return the exact notice identities
+   */
+  @Query(
+      """
+      select n.id from Notification n
+      where n.type in :types and n.entityType = :entityType and n.entityId = :entityId
+      """)
+  List<UUID> findIdsByTypeInAndEntity(
+      @Param("types") Set<NotificationType> types,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId);
+
+  /**
+   * Deletes the specified notices within their entity scope and reports the affected recipients.
+   *
+   * @param ids the captured notice identities
+   * @param entityType the owning entity tag
+   * @param entityId the owning entity id
+   * @return the recipients of the deleted notices
+   */
+  @Query(
+      value =
+          """
+          with removed as (
+            delete from notification
+            where id in (:ids) and entity_type = :entityType and entity_id = :entityId
+            returning recipient_user_id
+          )
+          select distinct recipient_user_id from removed
+          """,
+      nativeQuery = true)
+  List<UUID> deleteCapturedNoticesReturningRecipients(
+      @Param("ids") Set<UUID> ids,
+      @Param("entityType") String entityType,
+      @Param("entityId") UUID entityId);
+
+  /**
    * Deletes every notification of one of the given types tagged with the loose entity reference in
    * one atomic statement — clears the now-stale "action needed" items a lifecycle-terminating event
    * supersedes (REQ-NOTIF-018). Clears the persistence context so callers re-read fresh state.
@@ -268,4 +311,18 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
    */
   @Query(value = "SELECT pg_try_advisory_xact_lock(:key)", nativeQuery = true)
   boolean tryTimedProducerLock(@Param("key") long key);
+
+  /**
+   * Claims one logical cause before any Inbox effect in the current transaction.
+   *
+   * @param causeId the stable logical revision identity
+   * @return one for the winner, zero for an already processed cause
+   */
+  @Modifying
+  @Query(
+      value =
+          "INSERT INTO notification_cause_receipt (id) VALUES (:causeId) ON CONFLICT (id) DO"
+              + " NOTHING",
+      nativeQuery = true)
+  int claimCause(@Param("causeId") @NotNull UUID causeId);
 }

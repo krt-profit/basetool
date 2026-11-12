@@ -60,8 +60,9 @@ public class BankBookingRequestViewService {
     BankBookingRequest request = Entities.require(requestRepository.findById(requestId), NOT_FOUND);
     BankStaffRights rights = policy.staffRights(actor);
     boolean own = policy.ownsRequest(actor, request);
-    boolean staff = rights.canSee(request.getAccount().getId());
-    boolean approver = policy.approves(actor, request);
+    BankAccount account = request.getAccount();
+    boolean staff = account == null ? rights.staff() : rights.canSee(account.getId());
+    boolean approver = account != null && policy.approves(actor, request);
     if (!own && !staff && !approver) {
       throw new NotFoundException(NOT_FOUND);
     }

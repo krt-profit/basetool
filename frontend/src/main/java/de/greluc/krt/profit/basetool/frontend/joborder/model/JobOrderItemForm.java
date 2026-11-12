@@ -51,6 +51,9 @@ public class JobOrderItemForm {
   /** Optimistic-lock version (unused on create). */
   private Long version;
 
+  /** Selects the restricted requesting-unit update for an existing order. */
+  private boolean requesterEdit;
+
   /** Optional create-source marker carried through the form (mirrors {@link JobOrderForm}). */
   private String source;
 

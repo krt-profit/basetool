@@ -46,6 +46,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.BlueprintReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.SquadronReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.orgunit.model.OrgUnitMembershipOptionDto;
 import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import de.greluc.krt.profit.basetool.frontend.support.QualityTierTestData;
 import java.time.Instant;
@@ -227,7 +228,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
 
     stubDetail(orderId, userId, order);
 
@@ -343,7 +351,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -427,7 +442,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -510,7 +532,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -609,7 +638,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
 
     stubDetail(orderId, userId, order);
 
@@ -699,7 +735,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -756,7 +799,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -822,7 +872,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -902,7 +959,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
         1L,
         null,
         null,
-        false);
+        false,
+        false,
+        null,
+        false,
+        false,
+        false,
+        0L,
+        0L);
   }
 
   @Test
@@ -1093,6 +1157,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
                 UUID.randomUUID(),
                 4L,
                 3L,
+                false,
                 false)));
   }
 
@@ -1213,7 +1278,7 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             3L,
             List.of(
                 new de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemStockEntryDto(
-                    entryId, 7L, null, null, null, null, 4L, 3L, false)));
+                    entryId, 7L, null, null, null, null, 4L, 3L, false, false)));
     stubDetail(orderId, userId, oneLineItemOrder(orderId, gameItemId), List.of(withoutOwner));
 
     String html =
@@ -1392,7 +1457,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =
@@ -1462,8 +1534,22 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
-    stubDetail(orderId, userId, order);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
+    when(reader.readOrderDetail(eq(orderId), any(), any()))
+        .thenReturn(
+            logisticianDetail(order, userId)
+                .claimingOptions(
+                    List.of(
+                        new OrgUnitMembershipOptionDto(
+                            UUID.randomUUID(), "Claiming Squadron", "CS", "SQUADRON")))
+                .build());
 
     String html =
         mockMvc
@@ -1538,7 +1624,14 @@ class JobOrderItemDetailRenderTest extends JobOrderPageMvcTestBase {
             1L,
             null,
             null,
-            false);
+            false,
+            false,
+            null,
+            false,
+            false,
+            false,
+            0L,
+            0L);
     stubDetail(orderId, userId, order);
 
     String html =

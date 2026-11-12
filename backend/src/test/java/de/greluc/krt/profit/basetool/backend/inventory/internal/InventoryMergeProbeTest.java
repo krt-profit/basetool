@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
+import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
@@ -50,7 +51,10 @@ import org.springframework.security.access.AccessDeniedException;
 /**
  * Covers {@link InventoryItemService#hasMergeCandidates}, the Einbuchen merge probe (REQ-INV-026).
  */
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({
+  MockitoExtension.class,
+  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
+})
 class InventoryMergeProbeTest {
 
   private static final UUID CALLER = UUID.randomUUID();
@@ -74,7 +78,11 @@ class InventoryMergeProbeTest {
   }
 
   private InventoryItemService serviceWithStolenMarking(boolean enabled) {
+    InventoryOrderWrites orderWrites =
+        new InventoryOrderWrites(
+            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class));
     return new InventoryItemService(
+        orderWrites,
         inventoryItemRepository,
         userRepository,
         null,
@@ -86,12 +94,27 @@ class InventoryMergeProbeTest {
         requestScopeResolver,
         orgUnitStampingService,
         inventoryAccessPolicy,
-        new InventoryStockCommands(null, null, null, null, null, inventoryAccessPolicy, null, null),
+        new InventoryStockCommands(
+            new InventoryOrderWrites(
+                org.mockito.Mockito.mock(
+                    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository
+                        .class),
+                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
+            null,
+            null,
+            null,
+            null,
+            null,
+            inventoryAccessPolicy,
+            null,
+            null),
         null,
         null,
         null,
         null,
-        new InventoryProperties(enabled));
+        new InventoryProperties(enabled),
+        new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
+            orderWrites));
   }
 
   @Test

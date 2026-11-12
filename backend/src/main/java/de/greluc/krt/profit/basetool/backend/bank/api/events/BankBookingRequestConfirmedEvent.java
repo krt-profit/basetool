@@ -49,8 +49,8 @@ import org.jetbrains.annotations.Unmodifiable;
  */
 public record BankBookingRequestConfirmedEvent(
     UUID requestId,
-    UUID accountId,
-    String accountNo,
+    @Nullable UUID accountId,
+    @Nullable String accountNo,
     BigDecimal amount,
     @Nullable UUID requesterSub,
     @Nullable UUID actorSub)
@@ -75,6 +75,7 @@ public record BankBookingRequestConfirmedEvent(
     return requesterSub;
   }
 
+  @Nullable
   @Override
   public UUID contextAccountId() {
     return accountId;
@@ -89,7 +90,7 @@ public record BankBookingRequestConfirmedEvent(
   @Override
   public Map<String, String> renderParams() {
     Map<String, String> params = new LinkedHashMap<>();
-    params.put("accountNo", accountNo);
+    params.put("accountNo", accountNo == null ? "" : accountNo);
     params.put("amount", BankAmounts.plain(amount));
     return params;
   }

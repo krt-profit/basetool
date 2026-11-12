@@ -72,11 +72,11 @@
                     <span th:text="#{'bank.request.type.' + ${request.type()}}">Einzahlung</span>
                     <span class="chip"
                           th:classappend="${request.status() == 'PENDING'} ? ' chip--warning' : (${request.status() == 'CONFIRMED'} ? ' chip--success' : ' chip--muted')"
-                          th:text="#{'bank.request.status.' + ${request.status()}}">Ausstehend</span>
+                          th:text="#{__${request.statusLabelKey()}__}">Ausstehend</span>
                 </span>
                 <span class="cell-sub">
                     <span th:text="${#numbers.formatInteger(@moneyFormat.round(request.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
-                    · <span th:text="${request.accountName()}">ALF Betriebskonto</span>
+                    <th:block th:if="${request.accountName() != null}">· <span th:text="${request.accountName()}">ALF Betriebskonto</span></th:block>
                 </span>
             </a>
         </li>

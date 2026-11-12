@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.operation.internal;
 
-import de.greluc.krt.profit.basetool.backend.admin.api.SystemSettings;
+import de.greluc.krt.profit.basetool.backend.admin.api.TransferFeePolicy;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
@@ -44,7 +44,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -77,26 +76,6 @@ public class OperationPayoutService {
 
   private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
 
-  /**
-   * Key under which the in-game banking fee rate is stored in {@code system_setting}. Seeded by
-   * {@code V79__add_operation_transfer_fee_rate_setting.sql} with the documented default and
-   * editable from {@code /admin/settings} by officers and admins.
-   */
-  static final String TRANSFER_FEE_RATE_SETTING_KEY = "operation.transfer_fee_rate";
-
-  /**
-   * Transfer-fee rate (0.5%) used when the {@code operation.transfer_fee_rate} system setting is
-   * absent, blank or unparseable.
-   */
-  static final BigDecimal DEFAULT_TRANSFER_FEE_RATE = new BigDecimal("0.005");
-
-  /**
-   * Upper bound for the in-game banking fee rate. A value &gt;= 1 would deduct the entire payout
-   * (or more), which is never a legitimate Star Citizen banking fee — reject defensively and fall
-   * back to the documented default instead of zeroing out every payout silently.
-   */
-  private static final BigDecimal MAX_TRANSFER_FEE_RATE = BigDecimal.ONE;
-
   private final OperationRepository operationRepository;
   private final MissionFinanceEntryRepository financeEntryRepository;
   private final RefineryOrderFinanceReader refineryOrderFinanceReader;
@@ -104,7 +83,7 @@ public class OperationPayoutService {
   private final UserService userService;
   private final OperationAccessPolicy operationAccessPolicy;
   private final AuthHelperService authHelperService;
-  private final SystemSettings systemSettings;
+  private final TransferFeePolicy transferFeePolicy;
   private final AuditRecorder auditRecorder;
 
   /** Publishes the payout notifications after the commit (REQ-MISSION-028). */
@@ -149,7 +128,7 @@ public class OperationPayoutService {
     BigDecimal totalSum = OperationPayoutCalculator.computeTotalSum(allEntries, allOrders);
     Map<String, BigDecimal> personalExpensesByKey =
         OperationPayoutCalculator.computePersonalExpensesByParticipant(allEntries, allOrders);
-    BigDecimal transferFeeRate = resolveTransferFeeRate();
+    BigDecimal transferFeeRate = transferFeePolicy.snapshot().rate();
 
     OperationPayoutCalculator.ParticipationBreakdown breakdown =
         OperationPayoutCalculator.computeParticipationBreakdown(operation);
@@ -451,44 +430,6 @@ public class OperationPayoutService {
       return UUID.fromString(participantKey);
     } catch (IllegalArgumentException _) {
       return null;
-    }
-  }
-
-  /**
-   * Loads the transfer-fee rate from {@code system_setting}, falling back to {@link
-   * #DEFAULT_TRANSFER_FEE_RATE} with a WARN log when the value is absent, blank, not a number,
-   * negative or {@code >= 1}.
-   *
-   * @return a validated rate in {@code [0, 1)}
-   */
-  @NotNull
-  private BigDecimal resolveTransferFeeRate() {
-    Optional<String> raw = systemSettings.getSettingValue(TRANSFER_FEE_RATE_SETTING_KEY);
-    if (raw.isEmpty() || raw.get().isBlank()) {
-      log.warn(
-          "System setting '{}' is missing or blank, falling back to default {}",
-          TRANSFER_FEE_RATE_SETTING_KEY,
-          DEFAULT_TRANSFER_FEE_RATE);
-      return DEFAULT_TRANSFER_FEE_RATE;
-    }
-    try {
-      BigDecimal parsed = new BigDecimal(raw.get().trim());
-      if (parsed.signum() < 0 || parsed.compareTo(MAX_TRANSFER_FEE_RATE) >= 0) {
-        log.warn(
-            "System setting '{}'={} is out of range [0, 1), falling back to default {}",
-            TRANSFER_FEE_RATE_SETTING_KEY,
-            parsed,
-            DEFAULT_TRANSFER_FEE_RATE);
-        return DEFAULT_TRANSFER_FEE_RATE;
-      }
-      return parsed;
-    } catch (NumberFormatException _) {
-      log.warn(
-          "System setting '{}'='{}' is not a valid decimal, falling back to default {}",
-          TRANSFER_FEE_RATE_SETTING_KEY,
-          raw.get(),
-          DEFAULT_TRANSFER_FEE_RATE);
-      return DEFAULT_TRANSFER_FEE_RATE;
     }
   }
 }

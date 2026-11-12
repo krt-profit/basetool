@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeObserver;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
@@ -60,6 +61,7 @@ public class InventoryStolenMarkService {
   /** Amounts closer than this count as equal. */
   private static final double QUANTITY_EPSILON = 1e-9;
 
+  private final InventoryOrderWrites orderWrites;
   private final InventoryItemRepository inventoryItemRepository;
   private final StockOfferLookup stockOfferLookup;
   private final StockChangeObserver stockChangeObserver;
@@ -95,10 +97,14 @@ public class InventoryStolenMarkService {
       @NotNull InventoryItemStolenMarkDto dto,
       @NotNull UUID callerId,
       boolean isLogistician) {
+    orderWrites.lockEligibility();
     requireEnabled();
+    orderWrites.lockTransformRows(
+        List.of(itemId), List.of(new PoolRelocation(itemId, null, null, dto.stolen())));
     InventoryItem item =
         Entities.require(
             inventoryItemRepository.lockById(itemId), () -> "Inventory item not found: " + itemId);
+    orderWrites.validateRows(List.of(itemId));
     boolean isOwner = item.getUser() != null && callerId.equals(item.getUser().getId());
     if (!isOwner && !isLogistician) {
       throw new AccessDeniedException("You are not allowed to mark this inventory item: " + itemId);
@@ -132,7 +138,13 @@ public class InventoryStolenMarkService {
   @Transactional
   public @NotNull BulkStolenMarkResultDto bulkMark(
       @NotNull BulkStolenMarkRequest request, @NotNull UUID callerId) {
+    orderWrites.lockEligibility();
     requireEnabled();
+    orderWrites.lockTransformRows(
+        request.itemIds(),
+        request.itemIds().stream()
+            .map(id -> new PoolRelocation(id, null, null, request.stolen()))
+            .toList());
     List<UUID> orderedIds = request.itemIds().stream().distinct().sorted().toList();
     List<InventoryItem> rows = new ArrayList<>(orderedIds.size());
     for (UUID itemId : orderedIds) {
@@ -140,6 +152,7 @@ public class InventoryStolenMarkService {
           Entities.require(
               inventoryItemRepository.lockById(itemId),
               () -> "Inventory item not found: " + itemId);
+      orderWrites.validateRows(List.of(itemId));
       if (item.getUser() == null || !callerId.equals(item.getUser().getId())) {
         throw new AccessDeniedException(
             "Only the owner can mark a selection of inventory items: " + itemId);
@@ -153,6 +166,7 @@ public class InventoryStolenMarkService {
         continue;
       }
       row.setStolen(target);
+      orderWrites.assertRow(row);
       InventoryItem saved = inventoryItemRepository.saveAndFlush(row);
       inventoryCheckoutService.mergeStockIfRequested(saved, false);
       changed++;
@@ -187,6 +201,7 @@ public class InventoryStolenMarkService {
   private @NotNull InventoryItem markWholeRow(
       @NotNull InventoryItem item, boolean target, @NotNull UUID callerId) {
     item.setStolen(target);
+    orderWrites.assertRow(item);
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
     auditRecorder.record(
         target ? AuditEventType.INVENTORY_STOLEN_MARKED : AuditEventType.INVENTORY_STOLEN_UNMARKED,
@@ -215,9 +230,9 @@ public class InventoryStolenMarkService {
     if (refusal != null) {
       throw splitProblem(refusal);
     }
-    final InventoryItem savedPart =
-        inventoryItemRepository.save(
-            LotRows.split(item, amount, LotRows.Placement.of(item).withStolen(target)));
+    InventoryItem part = LotRows.split(item, amount, LotRows.Placement.of(item).withStolen(target));
+    orderWrites.assertRow(part);
+    final InventoryItem savedPart = inventoryItemRepository.save(part);
     LotRows.lower(
         inventoryItemRepository,
         stockChangeObserver,

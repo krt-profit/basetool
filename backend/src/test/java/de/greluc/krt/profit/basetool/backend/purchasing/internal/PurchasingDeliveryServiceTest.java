@@ -366,7 +366,13 @@ class PurchasingDeliveryServiceTest {
     assertThat(lot.getValue().material()).isSameAs(material);
     assertThat(lot.getValue().quality()).isEqualTo(500);
     assertThat(lot.getValue().stolen()).isFalse();
-    verify(stockCommands).lockLots(ACCEPTOR, List.of(lot.getValue().key()));
+    verify(stockCommands)
+        .prepareWrites(
+            List.of(),
+            List.of(
+                new StockCommands.StockBookInScope(
+                    ACCEPTOR, lot.getValue(), List.of(), false, UNIT, true)),
+            List.of());
     verify(supplyNeeds).creditPurchase(NEED, 10.0);
     assertThat(recorded.getStatus()).isEqualTo(DeliveryStatus.ACCEPTED);
     assertThat(recorded.getBookedRowId()).isEqualTo(BOOKED_ROW);

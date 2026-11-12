@@ -1,0 +1,771 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.controller;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QualityTierRepository;
+import de.greluc.krt.profit.basetool.backend.identity.api.User;
+import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderMaterial;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderParticipation;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
+import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderParticipationRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Department;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgHierarchyService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembership;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipId;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.SpecialCommand;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
+import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
+
+/** Verifies shared participation readership and current unit work through the public HTTP API. */
+@SpringBootTest
+@Transactional
+class JobOrderSupportReadIntegrationTest {
+  @Autowired private WebApplicationContext context;
+  @Autowired private OrgHierarchyService hierarchy;
+  @Autowired private OrgUnitRepository units;
+  @Autowired private UserRepository users;
+  @Autowired private OrgUnitMembershipRepository memberships;
+  @Autowired private JobOrderRepository orders;
+  @Autowired private JobOrderParticipationRepository participations;
+
+  @Autowired
+  private de.greluc.krt.profit.basetool.backend.joborder.internal.MaterialClaimRepository claims;
+
+  @Autowired private MaterialRepository materials;
+  @Autowired private QualityTierRepository tiers;
+
+  private MockMvc mvc;
+  private OrgUnit profit;
+  private OrgUnit responsible;
+  private Squadron support;
+  private OrgUnit requester;
+  private User caller;
+  private Material material;
+
+  @BeforeEach
+  void seed() {
+    mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    String tag = UUID.randomUUID().toString();
+    List<UUID> roots = units.findActiveProfitRootIds();
+    profit =
+        roots.isEmpty()
+            ? hierarchy.createBereich(
+                "Support profit " + tag, "SP" + tag, null, null, Department.PROFIT)
+            : units.findById(roots.getFirst()).orElseThrow();
+    SpecialCommand command = new SpecialCommand();
+    command.setName("Support processor " + tag);
+    command.setShorthand("SProc" + tag);
+    command.setParent(profit);
+    responsible = units.saveAndFlush(command);
+    support = new Squadron();
+    support.setName("Supporting squadron " + tag);
+    support.setShorthand("SS" + tag);
+    support.setParent(profit);
+    support = units.saveAndFlush(support);
+    Squadron customer = new Squadron();
+    customer.setName("Support customer " + tag);
+    customer.setShorthand("SC" + tag);
+    requester = units.saveAndFlush(customer);
+    caller = new User();
+    caller.setId(UUID.randomUUID());
+    caller.setUsername("support-reader-" + tag);
+    caller = users.saveAndFlush(caller);
+    OrgUnitMembership membership = new OrgUnitMembership();
+    membership.setId(new OrgUnitMembershipId(caller.getId(), support.getId()));
+    membership.setUser(caller);
+    membership.setKind(support.getKind());
+    membership.setJoinedAt(Instant.now());
+    memberships.saveAndFlush(membership);
+    material = new Material();
+    material.setName("Support material " + tag);
+    material.setType(MaterialType.RAW);
+    material = materials.saveAndFlush(material);
+  }
+
+  @Test
+  void aStaffelCommitmentStartsOneParticipationWithoutStartingTheMoneyOrder() throws Exception {
+    String path = "/api/v1/orders/" + createMoneyOrder();
+    String participationPath = path + "/participations";
+    String commitmentPath = participationPath + "/" + support.getId() + "/money-commitment";
+    as(get(participationPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.participations").isEmpty())
+        .andExpect(
+            jsonPath("$.moneyCommitmentOptions[0].orgUnitId").value(support.getId().toString()));
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+
+    as(get(participationPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.participations.length()").value(1))
+        .andExpect(jsonPath("$.participations[0].unit.orgUnitId").value(support.getId().toString()))
+        .andExpect(jsonPath("$.participations[0].active").value(true))
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(1))
+        .andExpect(
+            jsonPath("$.moneyCommitments[0].unit.orgUnitId").value(support.getId().toString()))
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("6000000"));
+    as(get(path), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("OPEN"));
+    as(get(path + "/money"), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("0"));
+  }
+
+  @Test
+  void onlyAnExplicitFreshProvisionCreditsTheOpenCommitmentOnce() throws Exception {
+    String path = "/api/v1/orders/" + createMoneyOrder();
+    String participationPath = path + "/participations";
+    String commitmentPath = participationPath + "/" + support.getId() + "/money-commitment";
+    as(post(path + "/assignees/" + caller.getId()), true, false).andExpect(status().isOk());
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            false,
+            false)
+        .andExpect(status().isForbidden());
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+    String commitments =
+        as(get(participationPath), false, true)
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String commitmentId =
+        com.jayway.jsonpath.JsonPath.read(commitments, "$.moneyCommitments[0].id");
+    UUID operationId = UUID.randomUUID();
+    String attributed =
+        """
+        {"operationId":"%s","amount":"4000000","bankHandling":false,
+         "holderVersion":0,"commitmentId":"%s"}
+        """
+            .formatted(operationId, commitmentId);
+    as(
+            post(path + "/money/provisions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(attributed),
+            false,
+            false)
+        .andExpect(status().isForbidden());
+    as(
+            post(path + "/money/provisions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(attributed),
+            false,
+            true)
+        .andExpect(status().isOk());
+    as(get(participationPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("2000000"));
+    as(
+            post(path + "/money/provisions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"operationId":"%s","amount":"3000000","bankHandling":false,"holderVersion":1}
+                    """
+                        .formatted(UUID.randomUUID())),
+            false,
+            true)
+        .andExpect(status().isOk());
+    as(
+            post(path + "/money/provisions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(attributed),
+            false,
+            true)
+        .andExpect(status().isOk());
+    as(
+            post(path + "/money/provisions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"operationId":"%s","amount":"4000000","bankHandling":false,"holderVersion":0}
+                    """
+                        .formatted(operationId)),
+            false,
+            true)
+        .andExpect(status().isConflict());
+    as(get(participationPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("2000000"));
+    as(get(path + "/money"), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("7000000"));
+  }
+
+  @Test
+  void withdrawingSupportEndsTheCommitmentAndReEnrollmentDoesNotReviveIt() throws Exception {
+    String path = "/api/v1/orders/" + createMoneyOrder() + "/participations";
+    String unitPath = path + "/" + support.getId();
+    String commitmentPath = unitPath + "/money-commitment";
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+    String initial =
+        as(get(path), false, true)
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String first = com.jayway.jsonpath.JsonPath.read(initial, "$.moneyCommitments[0].id");
+    Number version = com.jayway.jsonpath.JsonPath.read(initial, "$.participations[0].version");
+
+    as(delete(unitPath).param("version", version.toString()), false, true)
+        .andExpect(status().isNoContent());
+    as(put(unitPath), false, true).andExpect(status().isNoContent());
+    as(get(path), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.participations.length()").value(1))
+        .andExpect(jsonPath("$.participations[0].active").value(true))
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(1))
+        .andExpect(jsonPath("$.moneyCommitments[0].id").value(first))
+        .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists())
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].reason").value("PARTICIPATION_ENDED"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].before").value("6000000"));
+
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"18000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+    as(get(path), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(2))
+        .andExpect(jsonPath("$.moneyCommitments[0].id").value(first))
+        .andExpect(jsonPath("$.moneyCommitments[1].outstanding").value("18000000"));
+  }
+
+  @Test
+  void losingProfitEligibilityEndsTheCommitmentWithoutErasingTheContributionHistory()
+      throws Exception {
+    String path = "/api/v1/orders/" + createMoneyOrder() + "/participations";
+    as(
+            put(path + "/" + support.getId() + "/money-commitment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+
+    hierarchy.setParent(support.getId(), null, support.getVersion());
+
+    as(get(path), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.participations[0].active").value(false))
+        .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists())
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].reason").value("UNIT_INELIGIBLE"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].before").value("6000000"))
+        .andExpect(jsonPath("$.moneyCommitmentOptions").isEmpty());
+  }
+
+  @Test
+  void transferEndsTheFormerRemainderAndRetainsThePromotedCommitment() throws Exception {
+    String tag = UUID.randomUUID().toString();
+    var outgoing = new Squadron();
+    outgoing.setName("Outgoing commitment " + tag);
+    outgoing.setShorthand("OC" + tag);
+    outgoing.setParent(profit);
+    outgoing = units.saveAndFlush(outgoing);
+    String path = "/api/v1/orders/" + createMoneyOrder(outgoing);
+    String participationPath = path + "/participations";
+    String oldPath = participationPath + "/" + outgoing.getId();
+    String incomingPath = participationPath + "/" + support.getId();
+    as(
+            put(oldPath + "/money-commitment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            true,
+            false)
+        .andExpect(status().isNoContent());
+    as(
+            put(incomingPath + "/money-commitment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"3000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+    String original =
+        as(get(participationPath), true, false)
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    String outgoingCommitment =
+        com.jayway.jsonpath.JsonPath.read(original, "$.moneyCommitments[0].id");
+    String incomingCommitment =
+        com.jayway.jsonpath.JsonPath.read(original, "$.moneyCommitments[1].id");
+
+    as(
+            post(path + "/money/provisions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"operationId":"%s","amount":"4000000","bankHandling":false,
+                     "holderVersion":0,"commitmentId":"%s"}
+                    """
+                        .formatted(UUID.randomUUID(), outgoingCommitment)),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(
+            patch(path + "/responsible-org-unit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"responsibleOrgUnitId":"%s","version":0}
+                    """
+                        .formatted(support.getId())),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(get(participationPath), true, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].id").value(outgoingCommitment))
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("0"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].reason").value("CREDITED"))
+        .andExpect(
+            jsonPath("$.moneyCommitments[0].changes[2].reason").value("RESPONSIBILITY_ENDED"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[2].before").value("2000000"))
+        .andExpect(jsonPath("$.moneyCommitments[1].id").value(incomingCommitment))
+        .andExpect(jsonPath("$.moneyCommitments[1].outstanding").value("3000000"))
+        .andExpect(jsonPath("$.moneyCommitments[1].endedAt").doesNotExist())
+        .andExpect(jsonPath("$.participations[0].active").value(false));
+
+    as(put(oldPath), true, false).andExpect(status().isNoContent());
+    as(get(participationPath), true, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(2))
+        .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists());
+    as(
+            put(oldPath + "/money-commitment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"9000000\"}"),
+            true,
+            false)
+        .andExpect(status().isNoContent());
+    as(get(participationPath), true, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].id").value(outgoingCommitment))
+        .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists())
+        .andExpect(jsonPath("$.moneyCommitments[2].outstanding").value("9000000"));
+    as(get(path + "/money"), true, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.provided").value("4000000"));
+  }
+
+  @Test
+  void cancellingAndReopeningLeavesTheOpenCommitmentHistorical() throws Exception {
+    String path = "/api/v1/orders/" + createMoneyOrder();
+    String supportPath = path + "/participations";
+    String commitmentPath = supportPath + "/" + support.getId() + "/money-commitment";
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"6000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+    as(
+            put(path + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"CANCELLED\",\"version\":0}"),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(get(supportPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("0"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].reason").value("ORDER_ENDED"))
+        .andExpect(jsonPath("$.moneyCommitments[0].changes[1].before").value("6000000"));
+
+    as(
+            put(path + "/status")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"OPEN\",\"version\":1}"),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(get(supportPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(1))
+        .andExpect(jsonPath("$.moneyCommitments[0].endedAt").exists());
+    as(
+            put(commitmentPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":\"7000000\"}"),
+            false,
+            true)
+        .andExpect(status().isNoContent());
+    as(get(supportPath), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.moneyCommitments.length()").value(2))
+        .andExpect(jsonPath("$.moneyCommitments[0].outstanding").value("0"))
+        .andExpect(jsonPath("$.moneyCommitments[1].outstanding").value("7000000"));
+  }
+
+  @Test
+  void activeSupportWithNoOpenPromiseRemainsUnitWorkAndCountsBeforePagination() throws Exception {
+    JobOrder first = supported(JobOrderType.MATERIAL, true);
+    JobOrder second = supported(JobOrderType.ITEM, true);
+    supported(JobOrderType.MATERIAL, false);
+    order(JobOrderType.MATERIAL);
+
+    as(get("/api/v1/orders").param("toProcess", "true").param("size", "1"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(2))
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].canEdit").value(false));
+    as(get("/api/v1/orders").param("toProcess", "true").param("type", "ITEM"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(second.getId().toString()));
+    as(
+            get("/api/v1/orders")
+                .param("toProcess", "true")
+                .param("orgUnitId", requester.getId().toString()),
+            false,
+            false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    as(
+            get("/api/v1/orders")
+                .param("size", "1")
+                .header("X-Active-Org-Unit-Id", support.getId()),
+            true,
+            false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(3));
+    as(get("/api/v1/orders/" + first.getId() + "/claims"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].claims").isEmpty());
+    as(get("/api/v1/me/capabilities"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewOrderUnitWork").value(true));
+  }
+
+  @Test
+  void endedSupportRetainsCompleteConcreteReadThroughCurrentMembershipOnly() throws Exception {
+    JobOrder order = supported(JobOrderType.MATERIAL, false);
+    JobOrder itemOrder = supported(JobOrderType.ITEM, false);
+    JobOrder unrelated = order(JobOrderType.MATERIAL);
+    hierarchy.setParent(support.getId(), null, support.getVersion());
+    String path = "/api/v1/orders/" + order.getId();
+
+    as(get("/api/v1/orders").param("size", "1"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(2));
+    as(get("/api/v1/orders").param("page", "1").param("size", "1"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.totalElements").value(2));
+    as(get("/api/v1/orders").param("type", "ITEM"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(itemOrder.getId().toString()));
+    as(get(path), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.materials[0].currentStock").value(0.0))
+        .andExpect(jsonPath("$.canEdit").value(false))
+        .andExpect(jsonPath("$.canEditAsRequester").value(false))
+        .andExpect(jsonPath("$.canManageAssignees").value(false));
+    as(
+            get("/api/v1/orders/by-number").param("number", order.getDisplayId().toString()),
+            false,
+            false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(order.getId().toString()));
+    as(get("/api/v1/orders/lookup"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[?(@.id == '" + order.getId() + "')]").isNotEmpty())
+        .andExpect(jsonPath("$[?(@.id == '" + unrelated.getId() + "')]").isEmpty());
+    as(get("/api/v1/orders/material-demand"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.groups[0].materials[0].orders[0].jobOrderId")
+                .value(order.getId().toString()));
+    for (String suffix : List.of("/claims", "/material-collection", "/allocations/orphaned")) {
+      as(get(path + suffix), false, false).andExpect(status().isOk());
+    }
+    as(get(path + "/item-blueprint-owners"), false, false).andExpect(status().isForbidden());
+    as(get("/api/v1/orders/" + unrelated.getId()), false, false).andExpect(status().isForbidden());
+    as(post(path + "/assignees/" + caller.getId()), false, false).andExpect(status().isForbidden());
+    as(post(path + "/assignees/" + UUID.randomUUID()), false, false)
+        .andExpect(status().isForbidden());
+    as(get("/api/v1/orders").param("toProcess", "true"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    as(get("/api/v1/orders/requested"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    as(get("/api/v1/me/capabilities"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewJobOrders").value(false))
+        .andExpect(jsonPath("$.canViewOrderWorkspace").value(true))
+        .andExpect(jsonPath("$.canViewOrderUnitWork").value(false));
+
+    memberships.deleteById(new OrgUnitMembershipId(caller.getId(), support.getId()));
+    memberships.flush();
+    as(get(path), false, false).andExpect(status().isForbidden());
+    as(get("/api/v1/orders"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+  }
+
+  @Test
+  void currentContextualSupportGrantOffersUnitWorkWithoutBecomingProcessingAuthority()
+      throws Exception {
+    JobOrder order = supported(JobOrderType.MATERIAL, true);
+    JobOrder unrelated = order(JobOrderType.MATERIAL);
+    memberships.deleteById(new OrgUnitMembershipId(caller.getId(), support.getId()));
+    memberships.flush();
+    as(get("/api/v1/me/capabilities"), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewJobOrders").value(false))
+        .andExpect(jsonPath("$.canViewOrderWorkspace").value(true))
+        .andExpect(jsonPath("$.canViewOrderUnitWork").value(true));
+    as(get("/api/v1/orders").param("toProcess", "true"), false, true)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].id").value(order.getId().toString()))
+        .andExpect(jsonPath("$.content[0].canEdit").value(false));
+    as(get("/api/v1/orders/" + order.getId()), false, true).andExpect(status().isOk());
+    as(get("/api/v1/orders/" + unrelated.getId()), false, true).andExpect(status().isForbidden());
+    as(post("/api/v1/orders/" + order.getId() + "/assignees/" + caller.getId()), false, true)
+        .andExpect(status().isForbidden());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void ineligibleEmptySupportEndsUnitWorkAndPreservesItsConcreteHistory(boolean retainedClaim)
+      throws Exception {
+    JobOrder order = supported(JobOrderType.MATERIAL, true);
+    if (retainedClaim) {
+      var historical = new de.greluc.krt.profit.basetool.backend.joborder.api.MaterialClaim();
+      historical.setJobOrder(order);
+      historical.setMaterial(material);
+      historical.setQualityTier(tiers.findByMinQuality(0).orElseThrow());
+      historical.setClaimingOrgUnit(support);
+      historical.setParticipation(
+          participations
+              .findByJobOrderIdAndClaimingOrgUnitId(order.getId(), support.getId())
+              .orElseThrow());
+      historical.setAmount(0.0);
+      historical.setEndedAt(Instant.now());
+      historical.setChanges(
+          List.of(
+              new de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange(
+                  de.greluc.krt.profit.basetool.backend.joborder.api.MaterialContributionChange
+                      .Reason.REQUIREMENT_ENDED,
+                  2.0,
+                  0.0,
+                  0.0,
+                  Instant.now(),
+                  null)));
+      claims.saveAndFlush(historical);
+    }
+    as(get("/api/v1/orders").param("toProcess", "true"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1));
+    as(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/org-units/{unit}/parent", support.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"parentOrgUnitId\":null,\"version\":" + support.getVersion() + "}"),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(get("/api/v1/orders").param("toProcess", "true"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
+    as(get("/api/v1/me/capabilities"), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canViewOrderWorkspace").value(true))
+        .andExpect(jsonPath("$.canViewOrderUnitWork").value(false));
+    as(get("/api/v1/orders/" + order.getId()), false, false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.canEdit").value(false));
+    var history =
+        as(get("/api/v1/orders/" + order.getId() + "/claims/history"), false, false)
+            .andExpect(status().isOk());
+    if (retainedClaim) {
+      history
+          .andExpect(jsonPath("$[0].endedAt").isNotEmpty())
+          .andExpect(jsonPath("$[0].changes[0].reason").value("REQUIREMENT_ENDED"))
+          .andExpect(jsonPath("$[0].changes.length()").value(1));
+    } else {
+      history.andExpect(jsonPath("$.length()").value(0));
+    }
+    as(
+            get("/api/v1/audit/JOB_ORDER").param("eventType", "JOB_ORDER_PARTICIPATION_ENDED"),
+            true,
+            false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].subjectId").value(order.getId().toString()))
+        .andExpect(
+            jsonPath("$.content[0].details")
+                .value(org.hamcrest.Matchers.containsString("reason=UNIT_INELIGIBLE")))
+        .andExpect(
+            jsonPath("$.content[0].details")
+                .value(org.hamcrest.Matchers.containsString("claimingOrgUnit=" + support.getId())));
+    as(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                    "/api/v1/org-units/{unit}/parent", support.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"parentOrgUnitId\":null,\"version\":" + support.getVersion() + "}"),
+            true,
+            false)
+        .andExpect(status().isOk());
+    as(
+            get("/api/v1/audit/JOB_ORDER").param("eventType", "JOB_ORDER_PARTICIPATION_ENDED"),
+            true,
+            false)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1));
+  }
+
+  private String createMoneyOrder() throws Exception {
+    return createMoneyOrder(responsible);
+  }
+
+  private String createMoneyOrder(OrgUnit orderResponsible) throws Exception {
+    String body =
+        as(
+                post("/api/v1/orders/auec")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {"responsibleOrgUnitId":"%s","requestingOrgUnitId":"%s",
+                         "handle":"Commitment witness","target":"10000000"}
+                        """
+                            .formatted(orderResponsible.getId(), requester.getId())),
+                true,
+                false)
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    return com.jayway.jsonpath.JsonPath.read(body, "$.id");
+  }
+
+  private JobOrder supported(JobOrderType type, boolean active) {
+    JobOrder order = order(type);
+    JobOrderParticipation participation = new JobOrderParticipation();
+    participation.setJobOrder(order);
+    participation.setClaimingOrgUnit(support);
+    participation.setActive(active);
+    participations.saveAndFlush(participation);
+    return order;
+  }
+
+  private JobOrder order(JobOrderType type) {
+    JobOrder order =
+        JobOrder.builder()
+            .responsibleOrgUnit(responsible)
+            .requestingOrgUnit(requester)
+            .type(type)
+            .handle("Support read witness")
+            .build();
+    if (type == JobOrderType.MATERIAL) {
+      order.addMaterial(
+          JobOrderMaterial.builder()
+              .material(material)
+              .qualityTier(tiers.findByMinQuality(0).orElseThrow())
+              .amount(12.0)
+              .build());
+    }
+    return orders.saveAndFlush(order);
+  }
+
+  private ResultActions as(MockHttpServletRequestBuilder request, boolean admin, boolean grant)
+      throws Exception {
+    List<GrantedAuthority> authorities =
+        admin
+            ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
+            : grant
+                ? List.of(
+                    new SimpleGrantedAuthority("ROLE_KRT_MEMBER"),
+                    new SimpleGrantedAuthority("ROLE_LOGISTICIAN"),
+                    new OrgUnitContextualAuthority(Roles.LOGISTICIAN, support.getId()))
+                : List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"));
+    return mvc.perform(
+        request
+            .with(
+                jwt()
+                    .jwt(token -> token.subject(caller.getId().toString()))
+                    .authorities(authorities))
+            .accept(MediaType.APPLICATION_JSON));
+  }
+}

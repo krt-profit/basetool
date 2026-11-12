@@ -19,10 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.Allocate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.BookIn;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.BookOut;
-import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.Locks;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.Move;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.MovePool;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.Note;
@@ -30,21 +30,21 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.Pool
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.Sell;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.OrgStockPlan.Stolen;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.EarmarkDimension;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocation;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolAllocationTarget;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolBookIn;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolBookOut;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolChange;
+import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolMove;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolNote;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolOutcome;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolRelocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolSale;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands.PoolStolen;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands.StockBookInScope;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockLot;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -54,14 +54,8 @@ final class OrgStockPlan {
   private OrgStockPlan() {}
 
   /** An op the Lager decides: what it locks, runs and journals. */
-  sealed interface PoolWrite permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen, Allocate {
-
-    /**
-     * Adds the lots and entries this op touches to the batch's locks.
-     *
-     * @param locks the batch's locks
-     */
-    void lockInto(@NotNull Locks locks);
+  sealed interface PoolWrite extends ExchangeOrgStockLocks.Contributor
+      permits BookIn, BookOut, Sell, Move, MovePool, Note, Stolen, Allocate {
 
     /**
      * Hands this op to the Lager.
@@ -92,18 +86,6 @@ final class OrgStockPlan {
   }
 
   /**
-   * The lots, entries and relocations a batch locks before any op runs (ADR-0229).
-   *
-   * @param holderLots the lots the book-ins book into, by holder
-   * @param entries the entries the ops write
-   * @param relocations the lots moves and markings land in
-   */
-  record Locks(
-      @NotNull Map<UUID, List<StockLot>> holderLots,
-      @NotNull Set<UUID> entries,
-      @NotNull List<PoolRelocation> relocations) {}
-
-  /**
    * A book-in the Lager decides.
    *
    * @param request the book-in
@@ -111,11 +93,22 @@ final class OrgStockPlan {
   record BookIn(@NotNull PoolBookIn request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
+      StockLot lot = request.lot();
+      boolean merges =
+          request.mergeStock()
+              || lot.gameItem() != null
+              || (lot.material() != null && lot.material().getQuantityType() == QuantityType.PIECE);
       locks
-          .holderLots()
-          .computeIfAbsent(request.holder(), _ -> new ArrayList<>())
-          .add(request.lot());
+          .bookings()
+          .add(
+              new StockBookInScope(
+                  request.holder(),
+                  lot,
+                  request.jobOrders().stream().map(PoolEarmark::targetId).toList(),
+                  false,
+                  request.poolUnitId(),
+                  merges));
     }
 
     @Override
@@ -142,7 +135,7 @@ final class OrgStockPlan {
   record BookOut(@NotNull PoolBookOut request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.entryId());
     }
 
@@ -170,7 +163,7 @@ final class OrgStockPlan {
   record Sell(@NotNull PoolSale request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.take().entryId());
     }
 
@@ -200,7 +193,7 @@ final class OrgStockPlan {
       implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks
           .relocations()
           .add(
@@ -232,7 +225,7 @@ final class OrgStockPlan {
   record Note(@NotNull PoolNote request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.entryId());
     }
 
@@ -260,7 +253,7 @@ final class OrgStockPlan {
   record MovePool(@NotNull PoolChange request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.entryId());
     }
 
@@ -288,7 +281,7 @@ final class OrgStockPlan {
   record Stolen(@NotNull PoolStolen request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.relocations().add(new PoolRelocation(request.entryId(), null, null, request.stolen()));
     }
 
@@ -316,8 +309,13 @@ final class OrgStockPlan {
   record Allocate(@NotNull PoolAllocation request) implements PoolWrite {
 
     @Override
-    public void lockInto(@NotNull Locks locks) {
+    public void lockInto(@NotNull ExchangeOrgStockLocks locks) {
       locks.entries().add(request.entryId());
+      if (request.dimension() == EarmarkDimension.JOB_ORDER) {
+        locks
+            .allocationTargets()
+            .add(new PoolAllocationTarget(request.entryId(), request.targetId()));
+      }
     }
 
     @Override

@@ -330,7 +330,10 @@ function createReceiver(cfg) {
         if (signalSections.indexOf(sectionKey) >= 0) {
             return false;
         }
-        if (anyModalOpen()) {
+        const section = sections[sectionKey];
+        const outsideModal =
+            section !== null && typeof section === 'object' && section.refreshWhileModalOpen;
+        if (!outsideModal && anyModalOpen()) {
             return true;
         }
         const sel = sectionContainers[sectionKey];

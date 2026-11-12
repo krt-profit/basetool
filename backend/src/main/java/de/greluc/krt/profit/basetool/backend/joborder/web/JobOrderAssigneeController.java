@@ -67,8 +67,7 @@ public class JobOrderAssigneeController {
   private final UserService userService;
 
   /**
-   * Adds a user as assignee. Self-assignment works for everyone who may read the order; assigning
-   * someone else requires a Logistician of the order.
+   * Adds an assignee through the current responsible-unit writer capability.
    *
    * @param id job-order id
    * @param userId target user id
@@ -77,7 +76,7 @@ public class JobOrderAssigneeController {
    */
   @PostMapping("/{id}/assignees/{userId}")
   @Operation(summary = "Add an assignee", description = "Adds a user to the job order.")
-  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canSeeJobOrder(#id)")
+  @PreAuthorize("isAuthenticated() and @jobOrderAccessPolicy.canManageAssignees(#id)")
   public JobOrderDto addAssignee(
       @PathVariable UUID id, @PathVariable UUID userId, @AuthenticationPrincipal Jwt jwt) {
     verifyAssigneeAccess(jwt, id, userId);
@@ -107,7 +106,7 @@ public class JobOrderAssigneeController {
   }
 
   /**
-   * Removes a user as assignee. Same self-or-logistician rule as {@link #addAssignee}.
+   * Removes an own assignee entry, or another entry through responsible-unit writer authority.
    *
    * @param id job-order id
    * @param userId target user id

@@ -313,9 +313,13 @@ public class PurchasingDeliveryService {
         OfferedLocations.require(
             locationRepository.findById(request.locationId()), "Location not found");
     StockLot lot = new StockLot(deal.getMaterial(), deal.getGameItem(), location, quality, false);
-    stockCommands.lockLots(me, List.of(lot.key()));
+    OrgUnit pool = unitOf(deal);
+    stockCommands.prepareWrites(
+        List.of(),
+        List.of(new StockCommands.StockBookInScope(me, lot, List.of(), false, pool.getId(), true)),
+        List.of());
     delivery.setBookedRowId(
-        stockCommands.bookIntoPool(me, unitOf(deal), lot, accepted, StockBookingReason.PURCHASE));
+        stockCommands.bookIntoPool(me, pool, lot, accepted, StockBookingReason.PURCHASE));
     supplyNeeds.creditPurchase(deal.getNeedId(), accepted);
   }
 

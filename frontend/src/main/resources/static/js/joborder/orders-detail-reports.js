@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_UNIT_SCU, MSG_UNIT_PIECE, IS_LOGISTICIAN, ORDER_REQUESTING_SQUADRON_ID, ORDER_HANDOVER_I18N */
+/* global MSG_HANDOVER_REPORT_ERROR, MSG_HANDOVER_REPORT_VALIDATION_DATE, MSG_HANDOVER_REPORT_VALIDATION_TIME, MSG_HANDOVER_REPORT_VALIDATION_HANDLE, MSG_HANDOVER_REPORT_VALIDATION_ITEMS, MSG_OWNER, MSG_LOCATION, MSG_STOLEN, MSG_QUALITY, MSG_QUANTITY, MSG_SQUADRON, MSG_LOADING_INVENTORY, MSG_EMPTY_INVENTORY, MSG_INVENTORY_LOAD_ERROR, MSG_INVENTORY_BELOW_FLOOR, MSG_INVENTORY_PART_OF, MSG_INVENTORY_UNLINK_TOOLTIP, MSG_UNIT_SCU, MSG_UNIT_PIECE, ORDER_HANDOVER_I18N */
 
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import {
@@ -405,8 +405,11 @@ export async function toggleInventory(row) {
             return;
         }
 
-        const unlinkColHeader = IS_LOGISTICIAN ? krtHtml`<th class="od-inv-th"></th>` : '';
-        const subColspan = IS_LOGISTICIAN ? 7 : 6;
+        const orderHead = document.getElementById('order-head-meta');
+        const canUnlink = orderHead?.dataset.canFulfill === 'true';
+        const requestingUnitId = orderHead?.dataset.requestingUnitId;
+        const unlinkColHeader = canUnlink ? krtHtml`<th class="od-inv-th"></th>` : '';
+        const subColspan = canUnlink ? 7 : 6;
 
         const rows = items.map((/** @type {any} */ item) => {
             const ownerName = item.user ? item.user.effectiveName : '-';
@@ -439,8 +442,8 @@ export async function toggleInventory(row) {
             const itemSquadronName = itemSquadron ? itemSquadron.name : '';
             const isForeignSquadron =
                 itemSquadronId !== null &&
-                ORDER_REQUESTING_SQUADRON_ID !== null &&
-                itemSquadronId !== ORDER_REQUESTING_SQUADRON_ID;
+                !!requestingUnitId &&
+                itemSquadronId !== requestingUnitId;
             const rowClass = isForeignSquadron ? 'inventory-row-foreign-jobOrder' : '';
             const squadronBadgeClass = isForeignSquadron
                 ? 'squadron-badge squadron-badge-foreign'
@@ -448,7 +451,7 @@ export async function toggleInventory(row) {
             const squadronCell = itemSquadronShorthand
                 ? krtHtml`<span class="${squadronBadgeClass}" title="${itemSquadronName}">${itemSquadronShorthand}</span>`
                 : krtHtml`<span class="squadron-badge squadron-badge-muted">&mdash;</span>`;
-            const unlinkCell = IS_LOGISTICIAN
+            const unlinkCell = canUnlink
                 ? krtHtml`
                                         <td data-trigger="stop-propagation">
                                             <button type="button" class="btn btn-quiet-danger od-inv-unlink-btn"

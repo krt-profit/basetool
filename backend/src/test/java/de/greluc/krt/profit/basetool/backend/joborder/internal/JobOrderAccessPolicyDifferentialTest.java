@@ -54,20 +54,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * The differential verdict test of the job-order access policy (plan §5.4, ADR-0236): over one
- * fixture matrix of callers and orders, {@link JobOrderAccessPolicy} returns exactly the verdict of
- * the scope hub's former job-order read gates; the edit gates moved to the per-unit Logistician
- * rule ({@code LogisticianPerUnitSurfacesTest}).
- *
- * <p>{@link ScopeHubJobOrderGates} restates those gates as {@link AccessGateService} decided them
- * before they moved, on the scope kernel's primitives, so the comparison outlives their deletion.
- *
- * <p>The matrix covers an admin unpinned and pinned to either unit, members of zero, one and two
- * units, a member pinned to an own and to a foreign unit, a Bereich lead reaching a child Staffel,
- * each with and without the profit eligibility that opens the queue and with and without the
- * logistician role; orders of either unit, of the child unit, of a Spezialkommando (the SK-queue
- * escape) and without a responsible unit, each placed by either unit (the requester escape) with
- * and without a delivery, and an unknown order.
+ * Checks concrete job-order read visibility across contextual callers and requester relationships.
  */
 class JobOrderAccessPolicyDifferentialTest {
 
@@ -176,21 +163,9 @@ class JobOrderAccessPolicyDifferentialTest {
   private static List<Gate> gates() {
     return List.of(
         new Gate(
-            "canSeeJobOrder",
-            ScopeHubJobOrderGates::canSeeJobOrder,
-            JobOrderAccessPolicy::canSeeJobOrder),
-        new Gate(
             "canSeeJobOrderBlueprintOwners",
             ScopeHubJobOrderGates::canSeeJobOrderBlueprintOwners,
-            JobOrderAccessPolicy::canSeeJobOrderBlueprintOwners),
-        new Gate(
-            "canSeeJobOrderAsRequester",
-            ScopeHubJobOrderGates::canSeeJobOrderAsRequester,
-            JobOrderAccessPolicy::canSeeJobOrderAsRequester),
-        new Gate(
-            "canEditJobOrderAsRequester",
-            ScopeHubJobOrderGates::canEditJobOrderAsRequester,
-            JobOrderAccessPolicy::canEditJobOrderAsRequester));
+            JobOrderAccessPolicy::canSeeJobOrderBlueprintOwners));
   }
 
   /** One caller's freshly wired scope hub and policy over the scenario mocks. */
@@ -237,14 +212,11 @@ class JobOrderAccessPolicyDifferentialTest {
             return ids;
           });
       OrgUnitRepository orgUnits = mock(OrgUnitRepository.class);
-      when(orgUnits.countProfitEligibleByIdIn(anyCollection()))
+      when(orgUnits.countInActiveProfitHierarchyByIdIn(anyCollection()))
           .thenReturn(caller.profitEligible() ? 1L : 0L);
 
       JobOrderRepository repository = mock(JobOrderRepository.class);
-      JobOrderHandoverRepository handovers = mock(JobOrderHandoverRepository.class);
-      JobOrderItemHandoverRepository itemHandovers = mock(JobOrderItemHandoverRepository.class);
       when(repository.findById(any())).thenReturn(Optional.empty());
-      int n = 0;
       for (String responsible : List.of("A", "B", "child C", "SK", "none")) {
         for (String requesting : List.of("A", "B")) {
           for (boolean delivered : List.of(false, true)) {
@@ -254,8 +226,6 @@ class JobOrderAccessPolicyDifferentialTest {
             order.setResponsibleOrgUnit(unit(responsible));
             order.setRequestingOrgUnit(unit(requesting));
             when(repository.findById(id)).thenReturn(Optional.of(order));
-            when(handovers.existsByJobOrderId(id)).thenReturn(delivered && n % 2 == 0);
-            when(itemHandovers.existsByJobOrderId(id)).thenReturn(delivered && n % 2 == 1);
             orders.put(
                 "order of "
                     + responsible
@@ -263,7 +233,6 @@ class JobOrderAccessPolicyDifferentialTest {
                     + requesting
                     + (delivered ? " delivered" : ""),
                 id);
-            n++;
           }
         }
       }
@@ -282,12 +251,20 @@ class JobOrderAccessPolicyDifferentialTest {
               new StaffelMembershipResolver(mock(SquadronRepository.class), orgUnits),
               request);
       AccessGateService accessGateService = new AccessGateService(resolver, authHelper);
-      scopeHub =
-          new ScopeHubJobOrderGates(
-              accessGateService, resolver, repository, handovers, itemHandovers);
+      scopeHub = new ScopeHubJobOrderGates(accessGateService, resolver, repository);
       policy =
           new JobOrderAccessPolicy(
-              resolver, accessGateService, authHelper, repository, handovers, itemHandovers);
+              resolver,
+              accessGateService,
+              authHelper,
+              repository,
+              org.mockito.Mockito.mock(JobOrderResponsibilityGuard.class),
+              org.mockito.Mockito.mock(
+                  de.greluc.krt.profit.basetool.backend.joborder.internal
+                      .JobOrderUnitReadHistoryRepository.class),
+              org.mockito.Mockito.mock(
+                  de.greluc.krt.profit.basetool.backend.joborder.internal
+                      .JobOrderParticipationRepository.class));
     }
 
     private static de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit unit(String label) {
@@ -317,15 +294,11 @@ class JobOrderAccessPolicyDifferentialTest {
    * @param accessGateService the scope hub, for its org-unit gates
    * @param resolver the request scope, for the queue capability and the caller's memberships
    * @param orders the job orders
-   * @param handovers the material handovers
-   * @param itemHandovers the item handovers
    */
   private record ScopeHubJobOrderGates(
       AccessGateService accessGateService,
       RequestScopeResolver resolver,
-      JobOrderRepository orders,
-      JobOrderHandoverRepository handovers,
-      JobOrderItemHandoverRepository itemHandovers) {
+      JobOrderRepository orders) {
 
     boolean canSeeJobOrder(UUID id) {
       return orders.findById(id).map(this::row).orElse(false);
@@ -333,20 +306,6 @@ class JobOrderAccessPolicyDifferentialTest {
 
     boolean canSeeJobOrderBlueprintOwners(UUID id) {
       return responsibleVisible(id);
-    }
-
-    boolean canSeeJobOrderAsRequester(UUID id) {
-      return orders.findById(id).map(this::requester).orElse(false);
-    }
-
-    boolean canEditJobOrderAsRequester(UUID id) {
-      return orders
-          .findById(id)
-          .map(o ->
-              requester(o)
-                  && !(handovers.existsByJobOrderId(o.getId())
-                      || itemHandovers.existsByJobOrderId(o.getId())))
-          .orElse(false);
     }
 
     private boolean row(JobOrder order) {
@@ -366,11 +325,6 @@ class JobOrderAccessPolicyDifferentialTest {
           .map(JobOrder::getResponsibleOrgUnit)
           .map(responsible -> accessGateService.canSeeSquadron(responsible.getId()))
           .orElse(false);
-    }
-
-    private boolean requester(JobOrder order) {
-      var requesting = order.getRequestingOrgUnit();
-      return requesting != null && resolver.currentUserIsMemberOfOrgUnit(requesting.getId());
     }
   }
 }

@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationMuteSe
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationParamsCodec;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRepository;
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -52,11 +53,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/**
+ * Checks original notification policy, cleanup and stored fields through owning creation fixtures.
+ */
 @ExtendWith(MockitoExtension.class)
 class NotificationCreationServiceTest {
 
@@ -68,10 +71,20 @@ class NotificationCreationServiceTest {
   @Mock private NotificationParamsCodec notificationParamsCodec;
   @Mock private NotificationMuteService notificationMuteService;
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
-  @InjectMocks private NotificationCreationService service;
+  private NotificationCreationService service;
 
   @BeforeEach
   void muteNobody() {
+    service =
+        new NotificationCreationService(
+            new NotificationEventPreparation(
+                ruleEvaluationService,
+                notificationRepository,
+                notificationParamsCodec,
+                notificationMuteService),
+            notificationRepository,
+            meterRegistry,
+            List.of());
     lenient()
         .when(notificationMuteService.withoutMuted(any()))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -86,7 +99,8 @@ class NotificationCreationServiceTest {
         "ALP",
         new OrgUnitRef(UUID.randomUUID(), OrgUnitKind.SQUADRON),
         "MATERIAL",
-        null);
+        null,
+        new NotificationRevision(0, 0));
   }
 
   @Test

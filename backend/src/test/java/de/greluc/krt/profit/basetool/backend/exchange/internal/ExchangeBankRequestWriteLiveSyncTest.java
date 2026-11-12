@@ -31,7 +31,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankActor;
-import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankOwnRequestWrites;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCorrectionDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestCreateDto;
@@ -84,7 +83,7 @@ class ExchangeBankRequestWriteLiveSyncTest {
     service.raise(
         caller,
         new ExchangeBankRequestCreateDto(
-            BankBookingRequestType.DEPOSIT,
+            ExchangeBankRequestCreateDto.RequestType.DEPOSIT,
             REQUEST,
             null,
             new BigDecimal("500"),
