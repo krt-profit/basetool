@@ -2445,23 +2445,57 @@
     }
 
     .card--flush {
+        --flush-corner-top: calc(var(--radius-box) - 1px);
+        --flush-corner-bottom: calc(var(--radius-box) - 1px);
         padding: 0;
     }
 
-    .card--flush > :is(table, .data-table):first-child thead tr:first-child > th:first-child {
-        border-top-left-radius: calc(var(--radius-box) - 1px);
+    .card--flush > :is(.table-responsive, .overflow-x-auto):nth-child(1 of :not([hidden])) {
+        border-top-left-radius: var(--flush-corner-top);
+        border-top-right-radius: var(--flush-corner-top);
     }
 
-    .card--flush > :is(table, .data-table):first-child thead tr:first-child > th:last-child {
-        border-top-right-radius: calc(var(--radius-box) - 1px);
+    .card--flush > :is(.table-responsive, .overflow-x-auto):nth-last-child(1 of :not([hidden])) {
+        border-bottom-left-radius: var(--flush-corner-bottom);
+        border-bottom-right-radius: var(--flush-corner-bottom);
     }
 
-    .card--flush > :is(table, .data-table):last-child tbody tr:last-child > td:first-child {
-        border-bottom-left-radius: calc(var(--radius-box) - 1px);
+    .card--flush > table:nth-child(1 of :not([hidden])) > thead > tr:first-child > th:first-child {
+        border-top-left-radius: var(--flush-corner-top);
     }
 
-    .card--flush > :is(table, .data-table):last-child tbody tr:last-child > td:last-child {
-        border-bottom-right-radius: calc(var(--radius-box) - 1px);
+    .card--flush > table:nth-child(1 of :not([hidden])) > thead > tr:first-child > th:last-child {
+        border-top-right-radius: var(--flush-corner-top);
+    }
+
+    .card--flush
+        > table:nth-last-child(1 of :not([hidden]))
+        > tbody
+        > tr:nth-last-child(1 of :not([hidden]))
+        > td,
+    .card--flush
+        > :is(.table-responsive, .overflow-x-auto):nth-last-child(1 of :not([hidden]))
+        > table
+        > tbody
+        > tr:nth-last-child(1 of :not([hidden]))
+        > td {
+        border-bottom: 0;
+    }
+
+    .card--flush
+        > table:nth-last-child(1 of :not([hidden]))
+        > tbody
+        > tr:nth-last-child(1 of :not([hidden]))
+        > td:first-child {
+        border-bottom-left-radius: var(--flush-corner-bottom);
+    }
+
+    .card--flush
+        > table:nth-last-child(1 of :not([hidden]))
+        > tbody
+        > tr:nth-last-child(1 of :not([hidden]))
+        > td:last-child {
+        border-bottom-right-radius: var(--flush-corner-bottom);
     }
 
     .card-head {
@@ -6903,6 +6937,15 @@
     .master-row[hidden] {
         display: none;
     }
+    .master-list > .master-row:nth-child(1 of :not([hidden])) {
+        border-top-left-radius: calc(var(--radius-box) - 1px);
+        border-top-right-radius: calc(var(--radius-box) - 1px);
+    }
+    .master-list > .master-row:nth-last-child(1 of :not([hidden])) {
+        border-bottom: none;
+        border-bottom-left-radius: calc(var(--radius-box) - 1px);
+        border-bottom-right-radius: calc(var(--radius-box) - 1px);
+    }
     .detail-pane {
         background: var(--color-bg-dark-gray);
         border: var(--border-hairline);
@@ -7589,9 +7632,17 @@
         display: none;
     }
     .list-panel .card--flush {
+        --flush-corner-top: 0;
+        --flush-corner-bottom: 0;
         background-color: transparent;
         border: none;
         margin: 0;
+    }
+    .list-panel > .card--flush:nth-child(1 of :not([hidden])) {
+        --flush-corner-top: calc(var(--radius-box) - 1px);
+    }
+    .list-panel > .card--flush:nth-last-child(1 of :not([hidden])) {
+        --flush-corner-bottom: calc(var(--radius-box) - 1px);
     }
     .list-panel .pagination {
         margin: 0;
@@ -7735,6 +7786,7 @@
     .card--flush .data-table {
         margin-top: 0;
         border: 0;
+        background-color: transparent;
     }
     .card:not(.card--flush) .data-table {
         background-color: var(--surface-inset);
@@ -7898,6 +7950,31 @@
         .data-table--stack thead .sort-header {
             width: auto;
             justify-content: flex-start;
+        }
+        .card--flush
+            > .data-table--stack:nth-child(1 of :not([hidden]))
+            > thead:has(.sort-header)
+            > tr,
+        .card--flush
+            > .data-table--stack:nth-child(1 of :not([hidden]))
+            > thead:not(:has(.sort-header))
+            + tbody
+            > tr:nth-child(1 of :not([hidden])) {
+            border-top-left-radius: var(--flush-corner-top);
+            border-top-right-radius: var(--flush-corner-top);
+        }
+        .card--flush
+            > .data-table--stack:nth-last-child(1 of :not([hidden]))
+            > tbody
+            > tr:nth-last-child(1 of :not([hidden])),
+        .card--flush
+            > :is(.table-responsive, .overflow-x-auto):nth-last-child(1 of :not([hidden]))
+            > .data-table--stack
+            > tbody
+            > tr:nth-last-child(1 of :not([hidden])) {
+            border-bottom: 0;
+            border-bottom-left-radius: var(--flush-corner-bottom);
+            border-bottom-right-radius: var(--flush-corner-bottom);
         }
     }
 

@@ -278,10 +278,19 @@ triangles), thin technical markers framing content
   pagination, the menu filter, the quick-access trigger, the rail buttons); inner elements keep
   `--radius-sm` 4 px (chips, labels, badges, counters, status labels). Checkboxes and the switch
   knob take 2 px. Pills stay for squadron badges, the bell and counters, circles for radio buttons
-  and status dots, and table cells, accent bars and gauges stay square (`--radius-none`). In a
-  `.card--flush` the table head and the last row take the box corners.
+  and status dots, and table cells, accent bars and gauges stay square (`--radius-none`).
 - **A rounded container never sets `overflow: hidden`**, so popovers and autocomplete lists can
   leave it.
+- **A child never paints over its box's rounded frame.** The child that fills a frame corner
+  takes the inner radius `calc(var(--radius-box) - 1px)`, and the last visible row drops its own
+  bottom rule; visible means `:not([hidden])`. A `.card--flush` hands that radius to its content
+  through `--flush-corner-top` / `--flush-corner-bottom`: to the head and the last visible row of a
+  table it holds directly (stacked: the sort bar or the first row, and the last row), and to a
+  scroll wrapper (`.table-responsive`, `.overflow-x-auto`) that clips what it holds anyway, such
+  as the Lager's tree table. A frameless flush card inside a `.list-panel` hands on only the panel
+  corners it sits in as the first or last visible child, so a table head under a toolbar stays
+  square. A table in a flush card has no fill of its own; a `.master-list` rounds its first and
+  last visible row.
 - **HUD corner brackets** stay on `.hud-box`, the modal and the toast and follow the rounded
   corner.
 - **Box title.** `.card-head`, a leading `.card-title` and `.section-title` are a title bar:
@@ -295,6 +304,10 @@ triangles), thin technical markers framing content
   status text tint as text, a 38 % frame and a 14 % fill of it (≥ 5.2:1 on a box, ≥ 4.8:1 on a
   tile). Alerts are 8 px tiles with a 1 px tinted frame and no left bar.
 - The orange bloom glow is the only "shadow" idiom.
+
+**Enforced by:** `FlushCardCornerTest` (a flush card hands its inner radius to both edges, a
+frameless one in a list panel only to the panel corners it sits in, and every corner inside a flush
+card reads `--flush-corner-top` / `--flush-corner-bottom`); the rest by design review.
 
 ### REQ-UI-008 — No native browser dialogs
 
