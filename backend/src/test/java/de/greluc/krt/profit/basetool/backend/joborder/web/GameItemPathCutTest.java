@@ -59,8 +59,8 @@ class GameItemPathCutTest {
 
   private static final String SAMPLE_UUID = "00000000-0000-4000-8000-00000000cafe";
 
-  /** One wave-5 line of the map: verb, old path, new path, whether the operation is frozen. */
-  private record Moved(String verb, String oldPath, String newPath, boolean frozen) {}
+  /** One wave-5 line of the map: verb, old path, new path. */
+  private record Moved(String verb, String oldPath, String newPath) {}
 
   @Autowired private WebApplicationContext context;
 
@@ -199,7 +199,7 @@ class GameItemPathCutTest {
       for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\\R")) {
         String[] f = line.trim().split(" ");
         if (f.length == 6 && "5".equals(f[0])) {
-          moved.add(new Moved(f[1], f[2], f[3], "T1".equals(f[4])));
+          moved.add(new Moved(f[1], f[2], f[3]));
         }
       }
     }

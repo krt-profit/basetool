@@ -151,8 +151,8 @@ class OpenApiSchemaNamesTest {
     assertThat(ExposedTypes.collisions(byName))
         .as(
             "two exposed Java types get one schema name, and springdoc documents only one of them."
-                + " Give each an explicit @Schema(name = ...); keep the name an app build already"
-                + " knows on the one the document showed so far")
+                + " Give each an explicit @Schema(name = ...); keep the name the document showed so"
+                + " far on the type that had it")
         .isEmpty();
     assertThat(byName)
         .as("the scan reached fewer exposed types than it did when the floor was raised")

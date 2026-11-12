@@ -1484,6 +1484,10 @@ finding L3.
 [`discord-integration.md`](discord-integration.md); this requirement continues the series at the
 next free number.)
 
+> [!note] Amended 2026-11-12 (ADR-0268) — three vhosts include the limiter
+> The API vhost is gone, so the frontend, ingest and Grafana vhosts are the ones that include
+> `limits.conf`, and the zone table no longer lists an API vhost.
+
 > [!important] Since ADR-0162 the whole edge is version-controlled, not just this snippet
 > The word "version-controlled" in this requirement was written when it was the exception: the
 > limiter lived in `docker/maintenance/nginx/`, while Force SSL, HSTS, Block-Common-Exploits and the
@@ -1498,14 +1502,14 @@ Every public vhost at the edge carries a **version-controlled** per-IP safety
 net: `limit_req` (50 r/s sustained, burst 150, `nodelay`) and `limit_conn` (500
 concurrent connections) keyed on the real client IP (`$krt_limit_key`: the full IPv4 address, or an
 IPv6 client's `/64` network prefix). `docker/edge/conf.d/00-maps.conf` defines the zones and
-`docker/edge/include/limits.conf` applies them; the frontend, ingest, Grafana and API vhosts each
+`docker/edge/include/limits.conf` applies them; the frontend, ingest and Grafana vhosts each
 include it. The values are
 flood/brute-force **ceilings**, not fairness limits — a legitimate worst-case page load fits
 inside the burst. Three zones share the key (ADR-0256):
 
 | Zone | Applies to | Rate | Burst |
 | --- | --- | --- | --- |
-| `krt_req_perip` | every vhost (pages, fragments, API, ingest, Grafana, Keycloak pages) | 50 r/s | 150 |
+| `krt_req_perip` | every vhost (pages, fragments, ingest, Grafana, Keycloak pages) | 50 r/s | 150 |
 | `krt_static_perip` | the frontend's static asset trees `/js/`, `/css/`, `/fonts/`, `/images/`, `/logos/` | 200 r/s | 600 |
 | `krt_token_perip` | the Keycloak token endpoint | 20 r/s | 10 |
 
@@ -2280,6 +2284,10 @@ policies and profiles kept · **Code:** `scripts/provision-keycloak-realm.py` (`
 
 ### REQ-SEC-031 — Sensitive GET families MUST be uncacheable, not merely revalidatable
 
+> [!note] Amended 2026-11-12 (ADR-0268) — the public API vhost is gone
+> The paragraph on the intermediary a public API vhost made plausible is past tense: the vhost is
+> removed and the backend is internal-only. The classification and its gate are unchanged.
+
 > [!note] Amended 2026-10-17 (#2673) — two families leave with their operations
 > `/api/v1/live-sync/**` leaves the `no-store` list with the bridge (ADR-0274) and `/api/v1/app/**`
 > leaves the revalidatable list with the app floor (REQ-API-020, superseded): 33 `no-store` families
@@ -2364,8 +2372,8 @@ corporate middlebox, a shared proxy or a browser disk cache would be holding dat
 outlive the response.
 
 While the backend was reachable only from the frontend across an internal network there was no
-intermediary for the header to talk to. A public API vhost makes one plausible, which is what turns
-this from theory into a control.
+intermediary for the header to talk to. The public API vhost made one plausible (ADR-0135), which
+is what turned this from theory into a control; it is removed (ADR-0268).
 
 The scope MUST be matched against the **decoded** path (REQ-SEC-029), so an encoded spelling such as
 `/api/v1/%62ank/accounts` cannot fall back into the weaker directive. The list is maintained in code
@@ -3387,6 +3395,10 @@ stock's Logistician:
 
 ### REQ-SEC-040 — Guest redaction MUST reach every nested user, not only the participants
 
+> [!note] Amended 2026-11-12 (ADR-0269) — one blind spot fewer to name
+> The paragraph on what did not catch the leak also named `ExternalContractTest`, which froze
+> `assignedUnits` only as a top-level field name; the test went with the app, and the clause with it.
+
 > [!note] Amended 2026-09-22 — the rule outlived the guest audience (ADR-0159)
 > The heading keeps its original wording so the id stays searchable. Since ADR-0159 the redactor is
 > `MissionPeerRedactor`, its passes are `cleanup…ForPeer` (`cleanupUserForPeer`,
@@ -3409,10 +3421,9 @@ unit with an assigned ship always carried one. The owner is now reduced to the p
 tuple by the same `cleanupUserForGuest` (now `cleanupUserForPeer`) pass every other nested user
 goes through.
 
-Note what did **not** catch this, because the same blind spots apply to the next nested record:
+Note what did **not** catch this, because the same blind spot applies to the next nested record:
 `anonymousReadableMissionEndpointsMustRedactGuestPii` (now `peerReadableMissionEndpointsMustRedactPii`)
-asserts that a redaction method is *called*, never that the redaction is *complete*; and `ExternalContractTest` froze
-`assignedUnits` only as a top-level field name and never inspected the nested shape.
+asserts that a redaction method is *called*, never that the redaction is *complete*.
 
 **Acceptance**
 

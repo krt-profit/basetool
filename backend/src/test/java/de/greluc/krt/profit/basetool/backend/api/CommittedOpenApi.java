@@ -83,7 +83,7 @@ public final class CommittedOpenApi {
   }
 
   /**
-   * Joins both committed documents, for the guards that compare the whole frozen surface.
+   * Joins both committed documents, for the checks that read the whole API surface.
    *
    * @return the published document with the relay's paths and components added
    */

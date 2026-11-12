@@ -129,8 +129,8 @@ public final class ExchangeFence {
   }
 
   /**
-   * Joins the published and the relay document into one, for the guards that compare the whole
-   * frozen surface.
+   * Joins the published and the relay document into one, for the checks that read the whole API
+   * surface.
    *
    * @param published the published document
    * @param relay the relay document

@@ -999,8 +999,9 @@ because of real bugs that shipped. The short version:
 ### API conventions
 
 - Versioned URI paths `/api/v1/...`; a breaking change is a hard cut
-  (ADR-0234): the operation moves in place and the declared-break
-  ledger names it (REQ-API-001, REQ-API-017).
+  (ADR-0234): the operation moves or changes in place, in one release
+  with the frontend that calls it. The exchange relay operations and
+  `POST /internal/discord/account-existence` stay frozen (REQ-API-001).
 - **DTOs only at boundaries.** Never expose JPA entities. DTOs are
   records with Jakarta validation annotations on write fields.
 - `@Valid` on every `@RequestBody` for POST / PUT / PATCH.

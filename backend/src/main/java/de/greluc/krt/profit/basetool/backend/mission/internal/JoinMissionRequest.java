@@ -25,8 +25,8 @@ import java.util.UUID;
 /**
  * Optional body of {@code POST /api/v1/missions/{id}/join} carrying the caller's sign-up answers.
  *
- * <p>The body and each field are optional (REQ-API-009); {@code null} means "no answer given",
- * never "clear it". A {@code null} {@code payoutPreference} falls back to the profile default
+ * <p>The body and each field are optional (ADR-0170); {@code null} means "no answer given", never
+ * "clear it". A {@code null} {@code payoutPreference} falls back to the profile default
  * (REQ-MISSION-002), then to {@code PAYOUT}.
  *
  * @param desiredJobTypeId the Funktion the caller asks to fill, or {@code null} for no preference
