@@ -140,6 +140,9 @@ The README is the overview; everything else lives in dedicated, versioned docs:
 | [.claude/skills/das-kartell-design/README.md](.claude/skills/das-kartell-design/README.md)       | The DAS KARTELL design system (source of truth for colors, typography, components); a submodule of [`krt-profit/design-system`](https://github.com/krt-profit/design-system).                                                                                   |
 | [Profit Basetool Wiki](https://github.com/krt-profit/basetool/wiki)                              | German end-user handbook, one page per feature area.                                                                                                                                                                                                            |
 
+The shared footer links to the Basetool changelog and discussion thread in the DAS KARTELL forum.
+On phones with the tab bar, those links are at the end of the menu.
+
 ---
 
 ## Development & testing
