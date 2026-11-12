@@ -50,9 +50,9 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * Holds wave 5 of the REST API cut (job orders and game items) to the running application: the new
- * paths of the map are served, no handler answers an old path any more, the new paths demand
- * authentication and keep the gates of the operations they replace, and the old ones answer {@code
- * 404}; with the app gone there is no retired-path answer any more (ADR-0269).
+ * paths of the map are served, no handler answers an old path, the new paths demand authentication
+ * and keep the gates of the operations they replace, and every old path answers {@code 404}, or
+ * {@code 400} where a sibling pattern reads the old segment as its path variable.
  */
 @SpringBootTest
 class GameItemPathCutTest {
