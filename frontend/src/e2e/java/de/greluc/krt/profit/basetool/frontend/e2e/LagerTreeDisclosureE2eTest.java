@@ -119,7 +119,7 @@ class LagerTreeDisclosureE2eTest {
 
   /**
    * Reaches the group's chevron from its checkbox with Shift+Tab, checks its focus ring, opens the
-   * group with Enter and the stack with Space, scans the open tree's rows with axe, reloads to the
+   * group with Enter and the stack with Space, scans the open tree with axe, reloads to the
    * restored state, and closes both levels again by keyboard.
    */
   @Test
@@ -308,8 +308,8 @@ class LagerTreeDisclosureE2eTest {
   }
 
   /**
-   * Scans the group rows and stack headers of the open Lager tree with axe for WCAG A+AA and fails
-   * on a critical or serious violation; the lazily loaded entries are not part of the scan.
+   * Scans the open Lager tree, its loaded entries included, with axe for WCAG A+AA and fails on a
+   * critical or serious violation.
    *
    * @param page the page showing the open tree
    */
@@ -317,7 +317,6 @@ class LagerTreeDisclosureE2eTest {
     List<Rule> gated =
         new AxeBuilder(page)
                 .include("#inventoryTable")
-                .exclude(".stack-entries-content")
                 .withTags(AccessibilitySmokeE2eTest.WCAG_TAGS)
                 .analyze()
                 .getViolations()

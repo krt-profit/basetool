@@ -11,6 +11,8 @@
                 <input type="checkbox" class="item-checkbox inventory-item-checkbox"
                        th:data-id="${entry.id}"
                        th:data-material-id="${entry.material.id}"
+                       th:title="#{inventory.bulk.checkout.select.entry}"
+                       th:aria-label="#{inventory.bulk.checkout.select.entry}"
                        data-trigger="inv-my-update-bulk-state">
                 <span th:if="${entry.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
@@ -252,6 +254,8 @@
                 <input type="checkbox" class="item-checkbox inventory-item-checkbox"
                        th:data-id="${entry.id}"
                        th:data-game-item-id="${entry.gameItem.id}"
+                       th:title="#{inventory.bulk.checkout.select.entry}"
+                       th:aria-label="#{inventory.bulk.checkout.select.entry}"
                        data-trigger="inv-my-update-bulk-state">
                 <span th:if="${entry.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                       th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
