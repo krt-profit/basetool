@@ -89,7 +89,7 @@ the Lager's.*
 
 ### REQ-INV-002 — Group-on-read display: Material → Stack
 
-The grouped Lager views (the options „Mein Lager" and „Globales Lager" of the Lager tab,
+The grouped Lager views (the options „Mein Lager" and „Einheitslager" of the Lager tab,
 `/inventory?storage=my` and `/inventory?storage=all`, REQ-UI-026) present each material as a group
 whose stacks are computed **in SQL** (a `GROUP BY` over the stock identity) at read time. The
 nullable to-one in the stack key — `owningOrgUnit` — (and `material`, which is null on game-item
@@ -147,8 +147,19 @@ sets `aria-expanded` with the `hidden` attribute, and the kernel turns the chevr
 checkbox, which must not sit inside a button. The button shows the orange focus ring and reaches the
 touch floor through its overlay (REQ-UI-009).
 
+> **Amendment (unit naming):** the shared option is named after what it shows. Its switch
+> option, page title, page head and quick-access entry read **„Einheitslager"**
+> (`inventory.overview.global`, EN „Unit inventory"), because „Globales Lager" read as "everything
+> not personal, organisation-wide". It lists the shared (non-personal) rows of the units the caller
+> belongs to and of the units their Logistician grant reaches (REQ-ORG-003, REQ-SEC-005) — never
+> another unit's pool and never anyone's personal rows. The URLs `/inventory?storage=all` and
+> `/inventory/all`, the message keys and the quick-access entry key `storage.all` stay, so
+> bookmarks, favourites, start pages and tab-bar slots keep working.
+
 **Acceptance**
 
+- [ ] The shared option, its page title and its page head read „Einheitslager" (EN „Unit
+  inventory"), served at the unchanged `/inventory?storage=all`.
 - [ ] Rows sharing the stock identity appear as one stack row with the correct summed amount,
   amount-weighted mean quality and entry count.
 - [ ] Rows differing in any stock-identity dimension appear as separate stacks.
@@ -173,7 +184,7 @@ touch floor through its overlay (REQ-UI-009).
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
 `InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`,
 `InventoryLagerPatternRenderTest`, `LagerTreeLastRowE2eTest`, `LagerTreeDisclosureE2eTest`,
-`InventoryOperationsE2eTest`
+`InventoryOperationsE2eTest`, `PageChromeSnapshotTest`
 · **Code:** `InventoryAggregationService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
 `InventoryStackDto`, `GroupedInventoryDto`, `inventory/inventory-my.html`, `inventory/inventory-admin.html`,
@@ -1079,7 +1090,7 @@ opened by the **„Filter"** button. Both views (Material and Items) get it; onl
 form exists in the DOM (REQ-INV-030), so one popover serves both.
 
 **Both Lager pages carry the same popover**, with page-local ids: "Mein Lager" (`myFilterPanel`,
-`data-filter-panel="inventory-my"`) and the shared "Globales Lager" (`globalFilterPanel`,
+`data-filter-panel="inventory-my"`) and the shared "Einheitslager" (`globalFilterPanel`,
 `data-filter-panel="inventory-all"`). On "Mein Lager" the visibility segment „Alle · Persönlich ·
 Gemeinsam" (REQ-INV-046) sits **in the toolbar beside it**, not in the popover; the shared Lager has
 no visibility dimension. Everything else below holds verbatim on both.
@@ -1305,7 +1316,7 @@ material stack key (REQ-INV-002) and of the quality-less item stack key
 ([`inventory-items.md`](inventory-items.md) REQ-INV-029) — so everything a member holds at one place
 is spread across every material group of the tree. Before this, neither page could narrow by it: the
 filter panel (REQ-INV-037) offered Material / quality floor / Auftrag / Einsatz / the personal flags
-on "Mein Lager" and the same minus the personal flags on the shared "Globales Lager". The everyday
+on "Mein Lager" and the same minus the personal flags on the shared "Einheitslager". The everyday
 question *"what is still sitting at this station, and is it worth flying there"* therefore cost an
 expand-and-read pass over the whole tree — several fetches, because stacks are lazy and paginated
 (REQ-INV-005 / REQ-INV-033).
@@ -1378,9 +1389,9 @@ queries), `InventoryAggregationService`, `InventoryItemService`, `InventoryItemC
 `static/js/inventory/inventory-admin.js` · **Issues:** #1879 · **ADR:** — (extends REQ-INV-030 / REQ-INV-034 /
 REQ-INV-037)
 
-### REQ-INV-041 — "Globales Lager leeren": the admin-only wipe of the shared stock in scope
+### REQ-INV-041 — "Einheitslager leeren": the admin-only wipe of the shared stock in scope
 
-The shared "Globales Lager" page (`/inventory/all`) offers an admin a **"Globales Lager leeren"**
+The shared "Einheitslager" page (`/inventory/all`) offers an admin a **"Einheitslager leeren"**
 entry in the page head's „⋯" menu (since 2026-10-03, website overhaul phase 3; it was a button in
 the action bar above the table) behind a danger confirmation modal. It deletes every **non-personal** Lager row inside the
 caller's current org-unit scope; personal rows (`personal = true`) are never touched. The wipe
@@ -1655,7 +1666,7 @@ the row's `@Version` guards the write.
 
 A Logistician moves a shared entry, or a part of it, from its pool into the pool of another org unit
 its holder directly belongs to (`POST /api/v1/inventory/{id}/pool`, optimistic `version`;
-ADR-0263). In the Globales Lager each shared entry the caller may edit carries „Pool wechseln"; the
+ADR-0263). In the Einheitslager each shared entry the caller may edit carries „Pool wechseln"; the
 dialog offers the units of `GET /api/v1/inventory/{id}/pool-targets`, the amount (the whole entry by
 default) and the merge opt-in.
 
@@ -1880,7 +1891,7 @@ REQ-INV-068, REQ-NOTIF-030, REQ-SUP-003, REQ-ORDERS-036 · **Decision:** ADR-030
   version answers `409`. A level write never touches a stock row, and a stock write never bumps a
   level's version.
 - **The tab.** The storage page's tab „Mindestbestände" beside „Lager" (EN „Storage · Minimum
-  levels", REQ-UI-026); the page has only these two tabs, and „Mein Lager" / „Globales Lager" are a
+  levels", REQ-UI-026); the page has only these two tabs, and „Mein Lager" / „Einheitslager" are a
   switch inside the „Lager" tab. The tab shows one list per unit: material or item, tier, minimum,
   target, free, requested, fill ratio and status. Logisticians edit inline through `krtFetch`
   without a reload (REQ-FE-001). The aggregated Lager (`GET /inventory/aggregated` and

@@ -49,7 +49,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Render coverage of the „Niedrig" marker on a material of the global Lager tree whose minimum
+ * Render coverage of the „Niedrig" marker on a material of the Einheitslager tree whose minimum
  * stock level is low (REQ-INV-068).
  */
 @SpringBootTest

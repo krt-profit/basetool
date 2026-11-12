@@ -91,7 +91,7 @@ class InventoryMultiSelectLabelE2eTest {
     walk("/inventory?storage=my", "#myFilterPanel", "my");
   }
 
-  /** "Globales Lager" material filter: the same states, the same words. */
+  /** "Einheitslager" material filter: the same states, the same words. */
   @Test
   void globalLagerMaterialFilterSummarisesTheSelection() {
     walk("/inventory?storage=all", "#globalFilterPanel", "global");

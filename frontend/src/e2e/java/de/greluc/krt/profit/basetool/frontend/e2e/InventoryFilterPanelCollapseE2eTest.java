@@ -34,10 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies the Lager filter popovers of "Mein Lager" and "Globales Lager" in a browser
- * (REQ-INV-037, REQ-UI-027): the toggle opens and closes the popover, a reload starts closed, an
- * active filter shows its count on the toggle and as a chip, and the visibility segment stays
- * outside the count.
+ * Verifies the Lager filter popovers of "Mein Lager" and "Einheitslager" in a browser (REQ-INV-037,
+ * REQ-UI-027): the toggle opens and closes the popover, a reload starts closed, an active filter
+ * shows its count on the toggle and as a chip, and the visibility segment stays outside the count.
  */
 @Tag("e2e")
 class InventoryFilterPanelCollapseE2eTest {
@@ -171,7 +170,7 @@ class InventoryFilterPanelCollapseE2eTest {
   }
 
   /**
-   * On "Globales Lager", the same popover lifecycle holds, and an active filter shows its count on
+   * On "Einheitslager", the same popover lifecycle holds, and an active filter shows its count on
    * the toggle.
    */
   @Test

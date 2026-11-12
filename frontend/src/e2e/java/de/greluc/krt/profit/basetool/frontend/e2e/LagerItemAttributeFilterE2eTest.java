@@ -39,7 +39,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 /**
  * E2E flow for the Lager item-attribute filters (REQ-INV-063): picking component type
  * "Quantenantrieb" and size S2, or class "Militär" and size S2, narrows the items view to the S2
- * quantum drive in place, on both Mein Lager and Globales Lager, shows two chips and counts them on
+ * quantum drive in place, on both Mein Lager and Einheitslager, shows two chips and counts them on
  * the toggle, survives a revisit through the stored selection, feeds "Alle markieren", and "Alle
  * zurücksetzen" brings the other items back.
  */

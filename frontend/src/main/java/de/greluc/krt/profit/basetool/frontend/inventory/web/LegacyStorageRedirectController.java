@@ -55,7 +55,7 @@ public class LegacyStorageRedirectController {
   }
 
   /**
-   * Sends the global list path to the „Globales Lager" option of the Lager tab.
+   * Sends the global list path to the „Einheitslager" option of the Lager tab.
    *
    * @param request the request whose filter query is kept
    * @return a redirect to the Lager tab with the global list selected

@@ -213,7 +213,7 @@ class InventoryTenancyE2eTest {
         "SK-only member must not see ownerless stock");
   }
 
-  /** A user with no membership sees no shared stock at all in the global Lager-View. */
+  /** A user with no membership sees no shared stock at all in the Einheitslager view. */
   @Test
   void membershiplessUserSeesNoSharedStock() {
     assertFalse(visibleInAll(NONE_USER, NONE_PASSWORD, matAId), "membershipless sees no A stock");

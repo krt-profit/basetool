@@ -45,7 +45,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * AJAX proxies of the Globales Lager that move a shared row, or a part of it, into another pool of
+ * AJAX proxies of the Einheitslager that move a shared row, or a part of it, into another pool of
  * its holder (REQ-INV-059) and list the pools it may move into, relaying the backend status and RFC
  * 7807 {@code code}.
  */

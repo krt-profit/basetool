@@ -1020,7 +1020,7 @@ public class InventoryItemController {
   }
 
   /**
-   * Admin-only: removes every non-personal inventory item ("globales Lager leeren"). Personal
+   * Admin-only: removes every non-personal inventory item ("Einheitslager leeren"). Personal
    * entries are deliberately left untouched. Gated by {@code hasRole('ADMIN')} so neither an
    * officer nor a {@code LOGISTICIAN} can trigger the squadron-wide wipe.
    *

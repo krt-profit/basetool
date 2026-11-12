@@ -1368,7 +1368,7 @@ class InventoryPageControllerTest {
     assertTrue(urlCaptor.getValue().contains("itemClasses=STEALTH"));
   }
 
-  /** REQ-INV-040: the shared "Globales Lager" relays the same filter. */
+  /** REQ-INV-040: the shared "Einheitslager" relays the same filter. */
   @Test
   void viewAllInventory_locationFilter_forwardedToBackendAndModel() {
     Model model = new ConcurrentModel();

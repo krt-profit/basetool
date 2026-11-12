@@ -391,7 +391,7 @@ removed in #1236; every board tab now rides the `materialboard` room on `/ws/syn
 The `board` key is also sent from **outside** the board, by every Lager write that can change an
 offer: the Mein-Lager item-leaf "Für Börse freigeben" toggle (`inventory-materialboerse.js`) and the
 stock-reducing book-out / bulk check-out / (bulk) Umbuchen flows on Mein Lager (`inventory-my.js`)
-and the global Lager (`inventory-admin.js`), because those reductions ratchet or cascade-remove
+and the Einheitslager (`inventory-admin.js`), because those reductions ratchet or cascade-remove
 offers (REQ-MARKET-013, #1309). Both pages send that poke through the Lager module they share,
 `inventory-common.js` (`broadcastBoardChanged`, FE-SIMP-03).
 
