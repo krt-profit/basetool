@@ -35,21 +35,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class NavigationMetrics {
 
-  /**
-   * Counter {@code basetool_navigation_preference_writes_total{section,outcome}} — every write of a
-   * navigation preference section, by section and outcome (REQ-UI-032).
-   */
-  public static final String PREFERENCE_WRITES = "basetool.navigation.preference.writes";
-
-  /**
-   * Gauge {@code basetool_navigation_personalised_accounts{section}} — the members that hold at
-   * least one entry in a preference section (REQ-UI-032).
-   */
-  public static final String PERSONALISED_ACCOUNTS = "basetool.navigation.personalised.accounts";
-
-  /** Tag key: the preference section, bounded by {@link NavigationSection}. */
-  public static final String TAG_SECTION = "section";
-
   private final MeterRegistry meterRegistry;
 
   /** Registers the counter for every section and outcome at zero. */
@@ -75,8 +60,8 @@ public class NavigationMetrics {
 
   private Counter counter(NavigationSection section, NavigationWriteOutcome outcome) {
     return meterRegistry.counter(
-        PREFERENCE_WRITES,
-        TAG_SECTION,
+        NavigationMetricNames.PREFERENCE_WRITES,
+        NavigationMetricNames.TAG_SECTION,
         section.getTag(),
         MetricNames.TAG_OUTCOME,
         outcome.getTag());

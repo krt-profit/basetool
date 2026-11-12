@@ -378,7 +378,9 @@ public class BankAccessRules implements BankAccessPolicy {
     BankAccessJudgement judgement = judgement(actor, pin);
     return judgement.inContext(account)
         && staffRights(actor)
-            .mayApprove(request.getRequiredApprover(), judgement.isResponsibleHolder(account));
+            .mayApprove(
+                request.getRequiredApprover(),
+                usesHolderApproval(account) && judgement.isResponsibleHolder(account));
   }
 
   /**
@@ -461,7 +463,7 @@ public class BankAccessRules implements BankAccessPolicy {
         continue;
       }
       boolean holds = rights.admin() || judgement.isResponsibleHolder(account);
-      if (holds) {
+      if (holds && usesHolderApproval(account)) {
         responsible.add(account.getId());
       }
       if (isForeignRequestCandidate(rights, account, holds)) {
@@ -493,7 +495,7 @@ public class BankAccessRules implements BankAccessPolicy {
     return judgement.inContext(account)
         && !rights.boundByFourEyes(request.getRequestedBy())
         && isForeignRequestCandidate(rights, account, holds)
-        && rights.mayApprove(request.getRequiredApprover(), holds);
+        && rights.mayApprove(request.getRequiredApprover(), holds && usesHolderApproval(account));
   }
 
   /**
@@ -508,6 +510,10 @@ public class BankAccessRules implements BankAccessPolicy {
   private static boolean isForeignRequestCandidate(
       @NotNull BankStaffRights rights, @NotNull BankAccount account, boolean holds) {
     return holds || (rights.management() && account.getType() == BankAccountType.CARTEL);
+  }
+
+  private static boolean usesHolderApproval(@NotNull BankAccount account) {
+    return account.getType() != BankAccountType.CARTEL;
   }
 
   /**
@@ -548,7 +554,7 @@ public class BankAccessRules implements BankAccessPolicy {
    *
    * @param rights the actor's staff rights
    * @param candidateAccountIds the accounts whose requests are read
-   * @param responsibleAccountIds the accounts the actor is responsible holder of
+   * @param responsibleAccountIds the non-KRT accounts the actor can approve as responsible holder
    */
   record ForeignRequestScope(
       @NotNull BankStaffRights rights,
@@ -556,8 +562,8 @@ public class BankAccessRules implements BankAccessPolicy {
       @NotNull @Unmodifiable Set<UUID> responsibleAccountIds) {
 
     /**
-     * Whether a request on a candidate account shows: its band approver or, for any other request,
-     * the account's responsible holder; an administrator sees all.
+     * Whether a request on a candidate account shows: its KRT band approver or a responsible holder
+     * on another account. An administrator sees all.
      *
      * @param approver the request's approver class, or {@code null}
      * @param accountId the request's account

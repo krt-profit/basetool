@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.privacy.api;
 
+import de.greluc.krt.profit.basetool.backend.identity.api.AccountLinkReservation;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalDecision;
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.KeycloakService;
@@ -45,10 +46,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Folds an approved duplicate account into the account the member keeps (REQ-SEC-055): moves its
  * belongings and its Discord identity, then removes it.
  *
- * <p>Composes {@link UserAccountMergeService#merge}, {@link KeycloakService} and {@link
- * UserDeletionService}. Runs outside a transaction; the database work commits through {@link
- * #completeConsolidationTransactionally}, and the duplicate's Keycloak user is deleted last so a
- * retry is safe.
+ * <p>Reserves both account IDs through the Keycloak writes and any compensation. The merge commits
+ * in a separate transaction through {@link #completeConsolidationTransactionally} before the
+ * duplicate's Keycloak user is deleted.
  */
 @Service
 @RequiredArgsConstructor
@@ -60,6 +60,7 @@ public class AccountConsolidationService {
   private final UserDeletionService userDeletionService;
   private final UserApprovalEventRepository userApprovalEventRepository;
   private final KeycloakService keycloakService;
+  private final AccountLinkReservation accountLinkReservation;
 
   /**
    * This service through the Spring proxy, so {@link #completeConsolidationTransactionally}
@@ -79,12 +80,12 @@ public class AccountConsolidationService {
    * @param adminId the acting admin's id, recorded in the audit
    * @return the surviving account
    * @throws NotFoundException when either account is unknown
-   * @throws BusinessConflictException when the ids are equal, the duplicate is the admin's own
-   *     account, the target is inactive or carries a different Discord identity, or both accounts
-   *     hold a bank ledger
+   * @throws BusinessConflictException when either account is already being consolidated, the ids
+   *     are equal, the duplicate is the admin's own account, the target is inactive or carries a
+   *     different Discord identity, or both accounts hold a bank ledger
    * @throws org.springframework.dao.OptimisticLockingFailureException when the version is stale
    */
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
   @NotNull
   public User consolidate(
       @NotNull UUID duplicateId,
@@ -94,6 +95,7 @@ public class AccountConsolidationService {
     if (duplicateId.equals(targetUserId)) {
       throw new BusinessConflictException("An account cannot be consolidated into itself");
     }
+    accountLinkReservation.reserve(duplicateId, targetUserId);
     User duplicate =
         Entities.require(userRepository.findById(duplicateId), "Duplicate account not found");
     OptimisticLock.checkOptionalClient(duplicate.getVersion(), version, User.class, duplicateId);
@@ -109,21 +111,66 @@ public class AccountConsolidationService {
 
     Optional<KeycloakService.DiscordLink> link = resolveDiscordLink(duplicate);
     assertTargetCanTakeTheLink(target, link.orElse(null));
+    userAccountMergeService.assertMergeable(duplicateId, targetUserId);
     String guildNickname = duplicate.getDiscordGuildNickname();
 
-    link.ifPresent(resolved ->
-        keycloakService.linkDiscordIdentity(targetUserId, resolved.userId(), resolved.userName()));
-    User result =
-        selfProvider
-            .getObject()
-            .completeConsolidationTransactionally(
-                duplicateId,
-                targetUserId,
-                link.map(KeycloakService.DiscordLink::userId).orElse(null),
-                guildNickname,
-                adminId);
+    KeycloakService.DiscordLink resolved = link.orElse(null);
+    boolean linkCreated =
+        resolved != null
+            && keycloakService.linkDiscordIdentity(
+                targetUserId, resolved.userId(), resolved.userName());
+    User result;
+    try {
+      result =
+          selfProvider
+              .getObject()
+              .completeConsolidationTransactionally(
+                  duplicateId,
+                  targetUserId,
+                  resolved == null ? null : resolved.userId(),
+                  guildNickname,
+                  adminId);
+    } catch (RuntimeException failure) {
+      if (linkCreated) {
+        link.ifPresent(
+            created -> removeFailedConsolidationLink(duplicateId, targetUserId, created, failure));
+      }
+      throw failure;
+    }
     keycloakService.deleteUser(duplicateId);
     return result;
+  }
+
+  /**
+   * Compensates a failed database merge while the duplicate still exists.
+   *
+   * @param duplicateId the account that still owns the belongings
+   * @param targetUserId the account to detach
+   * @param link the link this consolidation created
+   * @param failure the database failure to preserve
+   */
+  private void removeFailedConsolidationLink(
+      UUID duplicateId,
+      UUID targetUserId,
+      KeycloakService.DiscordLink link,
+      RuntimeException failure) {
+    try {
+      if (userRepository.existsById(duplicateId)
+          && keycloakService
+              .readDiscordLink(targetUserId)
+              .map(current -> link.userId().equals(current.userId()))
+              .orElse(false)) {
+        keycloakService.unlinkDiscordIdentity(targetUserId);
+      }
+    } catch (RuntimeException rollbackFailure) {
+      String kind = rollbackFailure.getClass().getSimpleName();
+      log.warn(
+          "Could not detach the Discord link after a failed consolidation of {} into {} ({})",
+          duplicateId,
+          targetUserId,
+          kind);
+      failure.addSuppressed(new IllegalStateException("Discord link compensation failed: " + kind));
+    }
   }
 
   /**
@@ -180,7 +227,7 @@ public class AccountConsolidationService {
    * @return the surviving account
    * @throws NotFoundException when the target account is unknown
    */
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   @NotNull
   public User completeConsolidationTransactionally(
       @NotNull UUID duplicateId,

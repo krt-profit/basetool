@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.api;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -31,6 +32,15 @@ import org.jetbrains.annotations.NotNull;
  * <p>Owned by the notification module and implemented by the orgunit module.
  */
 public interface OrgUnitRecipientDirectory {
+
+  /**
+   * Reads the label for the unit recorded on an event.
+   *
+   * @param orgUnitId the unit
+   * @return the label when the unit still exists
+   */
+  @NotNull
+  Optional<String> unitName(@NotNull UUID orgUnitId);
 
   /**
    * The members flagged as Lead of an org unit.

@@ -203,7 +203,7 @@ class BackendFallbackReauthenticationTest {
                         new MutationResponseHelper(),
                         mock(LiveSyncLocalBus.class),
                         mock(JobOrderCreation.class))
-                    .unlinkMaterial(ID, ID, attributes);
+                    .unlinkInventoryItem(ID, ID, attributes);
         case MISSION ->
             () ->
                 new MissionFinancePageController(

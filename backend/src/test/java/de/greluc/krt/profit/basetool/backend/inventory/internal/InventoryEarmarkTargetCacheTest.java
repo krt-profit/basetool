@@ -78,7 +78,8 @@ class InventoryEarmarkTargetCacheTest {
     when(missions.shownMissions(Set.of(missionId)))
         .thenReturn(Map.of(missionId, full.withoutDetails()));
 
-    assertThat(cache.shownMission(missionId)).isEqualTo(new MissionEarmark(missionId, null, null));
+    assertThat(cache.shownMission(missionId))
+        .isEqualTo(new MissionEarmark(missionId, null, null, false));
     verify(missions, never()).missions(anyCollection());
   }
 

@@ -734,8 +734,13 @@ public class RefineryOrderPageController {
     model.addAttribute("order", orderDto);
     addOrderProgress(model, orderDto);
 
-    model.addAttribute("storeOrgUnitOptions", fetchUserOrgUnitOptions(currentUserId));
-    model.addAttribute("orderOwningOrgUnitId", orderDto.owningOrgUnitId());
+    List<OrgUnitMembershipOptionDto> storeOrgUnitOptions = fetchUserOrgUnitOptions(currentUserId);
+    model.addAttribute("storeOrgUnitOptions", storeOrgUnitOptions);
+    UUID activeOrgUnitId = (UUID) model.getAttribute("activeSquadronId");
+    UUID storeOrgUnitPreset =
+        storeOrgUnitOptions.stream().anyMatch(option -> option.orgUnitId().equals(activeOrgUnitId))
+            ? activeOrgUnitId
+            : storeOrgUnitOptions.size() == 1 ? storeOrgUnitOptions.getFirst().orgUnitId() : null;
 
     if (!model.containsAttribute("refineryOrderForm")) {
       RefineryOrderForm form = new RefineryOrderForm();
@@ -826,7 +831,7 @@ public class RefineryOrderPageController {
             if (currentUserId != null) {
               storeItem.setUserId(currentUserId);
             }
-            storeItem.setOwningOrgUnitId(orderDto.owningOrgUnitId());
+            storeItem.setOwningOrgUnitId(storeOrgUnitPreset);
             storeForm.getItems().add(storeItem);
           }
         }

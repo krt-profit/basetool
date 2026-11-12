@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.JobType;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
@@ -57,6 +58,7 @@ class MissionNotificationPublisherTest {
 
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserService userService;
+  @Mock private MissionRecipientDirectoryImpl missionRecipients;
 
   private MissionNotificationPublisher publisher;
   private Mission mission;
@@ -64,7 +66,7 @@ class MissionNotificationPublisherTest {
 
   @BeforeEach
   void setUp() {
-    publisher = new MissionNotificationPublisher(eventPublisher, userService);
+    publisher = new MissionNotificationPublisher(eventPublisher, userService, missionRecipients);
     lenient().when(userService.currentActor()).thenAnswer(invocation -> actor);
     mission = new Mission();
     mission.setId(UUID.randomUUID());
@@ -227,10 +229,7 @@ class MissionNotificationPublisherTest {
   void aDeletedMissionListsItsRegisteredParticipants() {
     mission.setParticipants(new HashSet<>(Set.of(participant(MEMBER), participant(null))));
 
-    publisher.deleted(
-        mission.getId(),
-        mission.getName(),
-        MissionNotificationPublisher.participantUserIds(mission));
+    publisher.deleted(mission, MissionNotificationPublisher.participantUserIds(mission));
 
     NotificationEvent event = published();
     assertThat(event.eventType()).isEqualTo(NotificationEventType.MISSION_DELETED);
@@ -239,6 +238,7 @@ class MissionNotificationPublisherTest {
 
   @Test
   void addingAnotherMemberNotifiesThemWithTheStampedPayoutChoice() {
+    when(missionRecipients.visibleMembers(mission, Set.of(MEMBER))).thenReturn(Set.of(MEMBER));
     publisher.participantAdded(mission, participant(MEMBER));
 
     NotificationEvent event = published();
@@ -247,6 +247,13 @@ class MissionNotificationPublisherTest {
     assertThat(event.renderParams())
         .containsEntry("payoutCode", "DONATE")
         .containsEntry("actor", "Ada");
+  }
+
+  @Test
+  void addingSomeoneWhoCannotOpenTheMissionSendsNoNotice() {
+    publisher.participantAdded(mission, participant(MEMBER));
+
+    verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.<Object>any());
   }
 
   @Test
@@ -259,11 +266,21 @@ class MissionNotificationPublisherTest {
 
   @Test
   void removingAnotherMemberNotifiesThemAndClearsTheirNotices() {
+    when(missionRecipients.visibleMembers(mission, Set.of(MEMBER))).thenReturn(Set.of(MEMBER));
     publisher.participantRemoved(mission, participant(MEMBER));
 
     NotificationEvent event = published();
     assertThat(event.eventType()).isEqualTo(NotificationEventType.MISSION_PARTICIPANT_REMOVED);
     assertThat(event.contextRecipientUserId()).isEqualTo(MEMBER);
+    assertThat(event.supersedeRecipients()).containsExactly(MEMBER);
+  }
+
+  @Test
+  void removingSomeoneWhoLostAccessClearsTheirNoticesWithoutTargetingThem() {
+    publisher.participantRemoved(mission, participant(MEMBER));
+
+    NotificationEvent event = published();
+    assertThat(event.contextRecipientUserId()).isNull();
     assertThat(event.supersedeRecipients()).containsExactly(MEMBER);
   }
 

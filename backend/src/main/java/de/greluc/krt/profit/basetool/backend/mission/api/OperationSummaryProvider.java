@@ -52,4 +52,12 @@ public interface OperationSummaryProvider {
    */
   @NotNull
   OperationLinkability linkability(@NotNull UUID operationId);
+
+  /**
+   * Checks whether the currently linked operation still has any paid-out marks.
+   *
+   * @param operationId the operation linked from the mission
+   * @return whether its links and payout inputs are frozen
+   */
+  boolean hasPaidOutPayouts(@NotNull UUID operationId);
 }

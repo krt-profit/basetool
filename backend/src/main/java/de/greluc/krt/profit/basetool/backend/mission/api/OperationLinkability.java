@@ -32,5 +32,8 @@ public enum OperationLinkability {
   NOT_LINKABLE,
 
   /** No operation has the id. */
-  NO_SUCH_OPERATION
+  NO_SUCH_OPERATION,
+
+  /** The operation's payout inputs are frozen. */
+  SETTLED
 }

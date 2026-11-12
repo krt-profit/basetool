@@ -192,7 +192,7 @@ public abstract class UserMapper {
     if (roles == null) {
       return Collections.emptySet();
     }
-    return roles.stream().flatMap(r -> r.getPermissions().stream()).collect(Collectors.toSet());
+    return roles.stream().flatMap(Role::effectivePermissions).collect(Collectors.toSet());
   }
 
   /**

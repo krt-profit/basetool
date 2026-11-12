@@ -385,7 +385,8 @@ class InventoryBackendClientTest {
     client.missions();
 
     backend.expect("GET", "/api/v1/users/" + USER);
-    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships?allKinds=true");
+    backend.expect(
+        "GET", "/api/v1/org-units/members/" + USER + "/memberships?allKinds=true&ownerPicker=true");
     backend.expect("GET", "/api/v1/org-units/me/pickable");
     backend.expect("GET", "/api/v1/users/lookup");
     backend.expect("GET", "/api/v1/materials/lookup");

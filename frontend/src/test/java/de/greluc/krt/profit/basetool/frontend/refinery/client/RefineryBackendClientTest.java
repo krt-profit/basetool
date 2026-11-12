@@ -224,7 +224,8 @@ class RefineryBackendClientTest {
 
     backend.expect("GET", "/api/v1/missions?size=1000&sort=plannedStartTime,desc");
     backend.expect("GET", "/api/v1/org-units/me/pickable");
-    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships?allKinds=true");
+    backend.expect(
+        "GET", "/api/v1/org-units/members/" + USER + "/memberships?allKinds=true&ownerPicker=true");
     backend.expect("GET", "/api/v1/users/" + USER);
     backend.expect("GET", "/api/v1/users/me");
     backend.expect("GET", "/api/v1/orders/lookup");

@@ -40,8 +40,20 @@ public interface UserReassignmentParticipant {
    *
    * @param column the column as {@code table.column}
    * @param rows the rows re-pointed
+   * @param dropped the duplicate rows removed
    */
-  record Moved(@NotNull String column, int rows) {}
+  record Moved(@NotNull String column, int rows, int dropped) {
+
+    /**
+     * Records a move with no duplicate rows removed.
+     *
+     * @param column the column as {@code table.column}
+     * @param rows the rows re-pointed
+     */
+    public Moved(@NotNull String column, int rows) {
+      this(column, rows, 0);
+    }
+  }
 
   /**
    * Returns where the participant runs, ascending; the order of the reported columns is part of the

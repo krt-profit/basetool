@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
@@ -39,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRuleSe
 import de.greluc.krt.profit.basetool.backend.notification.api.NotificationType;
 import de.greluc.krt.profit.basetool.backend.notification.api.OrgRelativeRole;
 import de.greluc.krt.profit.basetool.backend.notification.api.SelectorKind;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NotificationRevision;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import java.math.BigDecimal;
@@ -63,6 +65,15 @@ class RuleEvaluationServiceTest {
   @Mock private NotificationRuleRepository notificationRuleRepository;
   @Mock private RecipientResolutionService recipientResolutionService;
   @InjectMocks private RuleEvaluationService service;
+
+  private static NoticeEvent unownedOperation() {
+    return NoticeEvent.builder()
+        .eventType(NotificationEventType.OPERATION_COMPLETED_UNOWNED)
+        .entityId(UUID.randomUUID())
+        .entityType("OPERATION")
+        .actorSub(ACTOR)
+        .build();
+  }
 
   private static JobOrderCreatedEvent event(UUID actorSub) {
     return new JobOrderCreatedEvent(
@@ -154,10 +165,31 @@ class RuleEvaluationServiceTest {
   }
 
   @Test
+  void aPersistedBroadSelectorCannotFanOutAUnitEvent() {
+    NotificationRule rule =
+        jobOrderRule(
+            NotificationType.JOB_ORDER_CREATED,
+            false,
+            NotificationRuleSelector.builder()
+                .kind(SelectorKind.ROLE)
+                .roleCode("KRT_MEMBER")
+                .build(),
+            NotificationRuleSelector.builder().kind(SelectorKind.SEAT_HOLDERS).build(),
+            NotificationRuleSelector.builder()
+                .kind(SelectorKind.SPECIFIC_USER)
+                .userId(OFFICER_A)
+                .build());
+    givenRules(rule);
+
+    assertThat(service.resolveRecipients(event(ACTOR))).isEmpty();
+    verifyNoInteractions(recipientResolutionService);
+  }
+
+  @Test
   void specificUserSelectorResolvesToThatUser() {
     NotificationRule rule =
         NotificationRule.builder()
-            .eventType(NotificationEventType.JOB_ORDER_CREATED)
+            .eventType(NotificationEventType.OPERATION_COMPLETED_UNOWNED)
             .notificationType(NotificationType.JOB_ORDER_CREATED)
             .enabled(true)
             .excludeActor(true)
@@ -168,10 +200,10 @@ class RuleEvaluationServiceTest {
             .userId(OFFICER_A)
             .build());
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
-            NotificationEventType.JOB_ORDER_CREATED))
+            NotificationEventType.OPERATION_COMPLETED_UNOWNED))
         .thenReturn(List.of(rule));
 
-    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(event(ACTOR));
+    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(unownedOperation());
 
     assertThat(result.get(NotificationType.JOB_ORDER_CREATED)).containsExactly(OFFICER_A);
   }
@@ -426,10 +458,10 @@ class RuleEvaluationServiceTest {
                 .userId(ADMIN_B)
                 .build());
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
-            NotificationEventType.JOB_ORDER_CREATED))
+            NotificationEventType.OPERATION_COMPLETED_UNOWNED))
         .thenReturn(List.of(ruleA, ruleB));
 
-    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(event(ACTOR));
+    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(unownedOperation());
 
     assertThat(result).containsOnlyKeys(NotificationType.JOB_ORDER_CREATED);
     assertThat(result.get(NotificationType.JOB_ORDER_CREATED))
@@ -455,10 +487,10 @@ class RuleEvaluationServiceTest {
                 .userId(ADMIN_B)
                 .build());
     when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
-            NotificationEventType.JOB_ORDER_CREATED))
+            NotificationEventType.OPERATION_COMPLETED_UNOWNED))
         .thenReturn(List.of(createdRule, updatedRule));
 
-    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(event(ACTOR));
+    Map<NotificationType, Set<UUID>> result = service.resolveRecipients(unownedOperation());
 
     assertThat(result)
         .containsOnlyKeys(
@@ -634,13 +666,13 @@ class RuleEvaluationServiceTest {
 
   @Test
   void seatHoldersSelectorReachesEverySeatHolderWithoutAnEventContext() {
-    givenRules(ruleOf(SelectorKind.SEAT_HOLDERS, false));
+    when(notificationRuleRepository.findEnabledByEventTypeWithSelectors(
+            NotificationEventType.OPERATION_COMPLETED_UNOWNED))
+        .thenReturn(List.of(ruleOf(SelectorKind.SEAT_HOLDERS, false)));
     when(recipientResolutionService.resolveSeatHolders()).thenReturn(Set.of(OFFICER_A, ADMIN_B));
 
     assertThat(
-            service
-                .resolveRecipients(StubNotificationEvent.builder().build())
-                .get(NotificationType.JOB_ORDER_CREATED))
+            service.resolveRecipients(unownedOperation()).get(NotificationType.JOB_ORDER_CREATED))
         .containsExactlyInAnyOrder(OFFICER_A, ADMIN_B);
   }
 

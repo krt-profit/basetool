@@ -279,14 +279,12 @@ public class PurchasingAccessPolicy {
   }
 
   /**
-   * Whether the caller leads the unit: holds officer reach in it through a leadership seat, or is
-   * its SK lead.
+   * Whether the caller has officer reach in the unit through a leadership seat.
    *
    * @param orgUnitId the unit
    * @return {@code true} for the unit's lead
    */
   public boolean leadsUnit(@NotNull UUID orgUnitId) {
-    return accessGateService.canActAsOfficerIn(orgUnitId)
-        || accessGateService.hasRoleInOrgUnit(orgUnitId, "LEAD");
+    return accessGateService.canActAsOfficerIn(orgUnitId);
   }
 }

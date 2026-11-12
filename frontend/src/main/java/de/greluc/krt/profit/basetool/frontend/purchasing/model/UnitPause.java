@@ -31,7 +31,12 @@ import java.util.UUID;
  * @param orgUnitName the unit's name
  * @param reason why it is paused
  * @param pausedAt since when
+ * @param mayResume whether the caller may resume the unit's purchasing
  */
 @DtoMirror
 public record UnitPause(
-    UUID orgUnitId, String orgUnitName, @BackendEnumAsString String reason, Instant pausedAt) {}
+    UUID orgUnitId,
+    String orgUnitName,
+    @BackendEnumAsString String reason,
+    Instant pausedAt,
+    boolean mayResume) {}

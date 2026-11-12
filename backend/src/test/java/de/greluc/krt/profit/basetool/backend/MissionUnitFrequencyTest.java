@@ -97,6 +97,7 @@ class MissionUnitFrequencyTest {
     ship.setName("Test Ship Frequency");
     ship.setOwner(officerUser);
     ship.setShipType(shipType);
+    ship.setInsurance("LTI");
     shipRepository.save(ship);
 
     mission = new Mission();

@@ -675,12 +675,16 @@ class OperationPageControllerMvcTest {
         .thenReturn(new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null));
     when(backendApiClient.get(
             eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
-        .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of()));
+        .thenReturn(
+            new OperationPayoutSummaryDto(
+                BigDecimal.ZERO, List.of(), true, List.of("orphan_" + opId)));
 
     mockMvc
         .perform(get("/operations/" + opId).param("fragment", "payout").locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(view().name("operation/operation-detail :: payoutSection"))
+        .andExpect(content().string(containsString("data-orphaned-paid-mark=\"true\"")))
+        .andExpect(content().string(containsString("data-participant-id=\"orphan_" + opId + "\"")))
         .andExpect(content().string(not(containsString("id=\"pane-op-payout\""))));
 
     verify(backendApiClient, never())
@@ -690,6 +694,23 @@ class OperationPageControllerMvcTest {
             eq(opId));
     verify(backendApiClient, never())
         .get(contains("/api/v1/missions?operationId={id}"), anyTypeRef(), eq(opId), any(), any());
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void operationDetail_hidesAddMissionWhenPayoutInputsAreFrozen() throws Exception {
+    UUID opId = UUID.randomUUID();
+    stubDetailEndpoints(
+        opId, new OperationDto(opId, "Op", "", "PLANNED", null, 0L, null, null, null));
+    when(backendApiClient.get(
+            eq("/api/v1/operations/{id}/payouts"), eq(OperationPayoutSummaryDto.class), eq(opId)))
+        .thenReturn(new OperationPayoutSummaryDto(BigDecimal.ZERO, List.of(), true, List.of()));
+
+    mockMvc
+        .perform(get("/operations/" + opId))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("data-payout-inputs-frozen=\"true\"")))
+        .andExpect(content().string(containsString("class=\"btn btn--cta is-hidden\"")));
   }
 
   @Test

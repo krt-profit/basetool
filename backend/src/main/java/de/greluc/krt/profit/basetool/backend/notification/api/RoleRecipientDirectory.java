@@ -33,6 +33,23 @@ import org.jetbrains.annotations.NotNull;
 public interface RoleRecipientDirectory {
 
   /**
+   * Locks the role sets against concurrent role changes and reads their current eligibility.
+   *
+   * @param recipients recipients with role-dependent delivery paths
+   * @return members and bank staff within the requested set
+   */
+  @NotNull
+  RoleState lockRoleState(@NotNull Set<UUID> recipients);
+
+  /**
+   * Current role eligibility for one batch of notice recipients.
+   *
+   * @param members the recipients with KRT Member
+   * @param bankStaff the recipients with bank staff eligibility
+   */
+  record RoleState(@NotNull Set<UUID> members, @NotNull Set<UUID> bankStaff) {}
+
+  /**
    * Every holder of a global role.
    *
    * @param roleCode the stable role code, for example {@code ADMIN}

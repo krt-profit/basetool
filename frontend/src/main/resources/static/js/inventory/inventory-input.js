@@ -17,12 +17,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG, INV_OWNER_PICKER_MSG */
+/* global MSG_UNIT_PIECE, MSG_UNIT_SCU, INV_ADD_MSG, INV_ORDER_NEED_MSG */
 
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { krtScuInput } from '/js/kernel/scu-decimal-input.js';
 import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { renderOwnerPicker } from '/js/kernel/krt-owner-picker.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { refreshProvisionPicker, provisionReady } from '/js/inventory/inventory-provision.js';
 
@@ -105,10 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startOrderNeedsLiveSync();
 });
-
-/**
- * @typedef {ApiDto<'OrgUnitMembershipOptionDto'> & {orgUnitId: string}} InventoryInputOwnerOption
- */
 
 function startOrderNeedsLiveSync() {
     if (!document.getElementById('jobOrderAllocGroup')) {
@@ -352,7 +349,6 @@ function scheduleMergeProbe() {
     }, 250);
 }
 
-const OWNER_KIND_ORDER = ['ORGANISATIONSLEITUNG', 'BEREICH', 'SQUADRON', 'SPECIAL_COMMAND'];
 /** @type {{nodes: Node[], value: string, visible: boolean, required: boolean} | null} */
 let ownOwnerOptions = null;
 let ownerReloadSequence = 0;
@@ -395,82 +391,20 @@ function restoreOwnOwnerOptions() {
 }
 
 /**
- * Builds the option of one owner org unit.
- *
- * @param {InventoryInputOwnerOption} membership the org unit
- * @param {string} selectedId the id to preselect
- * @returns {HTMLOptionElement} the option
- */
-function ownerOption(membership, selectedId) {
-    const option = document.createElement('option');
-    option.value = membership.orgUnitId;
-    option.textContent = membership.orgUnitName || membership.orgUnitId;
-    option.selected = membership.orgUnitId === selectedId;
-    return option;
-}
-
-/**
- * Rebuilds the owner picker from a user's memberships.
+ * Rebuilds the owner picker from a user's stampable memberships.
  *
  * @param {unknown} memberships the answer of the memberships endpoint
  */
 function renderOwnerOptions(memberships) {
     const parts = ownerPickerParts();
     if (!parts) return;
-    /** @type {InventoryInputOwnerOption[]} */
-    const list = Array.isArray(memberships)
-        ? memberships.filter((m) => {
-              return m && m.orgUnitId;
-          })
-        : [];
-    const activeId = parts.wrapper.getAttribute('data-owner-picker-active') || '';
-    const preset =
-        list.length === 1
-            ? list[0].orgUnitId
-            : list.some((m) => {
-                    return m.orgUnitId === activeId;
-                })
-              ? activeId
-              : '';
-    const select = parts.select;
-    select.replaceChildren();
-    if (!preset) {
-        const placeholder = document.createElement('option');
-        placeholder.value = '';
-        placeholder.textContent = INV_OWNER_PICKER_MSG.placeholder;
-        select.appendChild(placeholder);
-    }
-    const kinds = OWNER_KIND_ORDER.filter((kind) => {
-        return list.some((m) => {
-            return m.kind === kind;
-        });
-    });
-    const grouped = kinds.length > 1;
-    OWNER_KIND_ORDER.forEach((kind) => {
-        const ofKind = list.filter((m) => {
-            return m.kind === kind;
-        });
-        if (!ofKind.length) return;
-        /** @type {HTMLSelectElement | HTMLOptGroupElement} */
-        let parent = select;
-        if (grouped) {
-            const group = document.createElement('optgroup');
-            group.label = INV_OWNER_PICKER_MSG[kind] || kind;
-            select.appendChild(group);
-            parent = group;
-        }
-        ofKind.forEach((m) => {
-            parent.appendChild(ownerOption(m, preset));
-        });
-    });
-    list.filter((m) => {
-        return OWNER_KIND_ORDER.indexOf(/** @type {string} */ (m.kind)) < 0;
-    }).forEach((m) => {
-        select.appendChild(ownerOption(m, preset));
-    });
-    select.value = preset;
-    const visible = list.length > 1;
-    select.required = visible && !preset;
+    const count = renderOwnerPicker(
+        parts.select,
+        memberships,
+        parts.wrapper.getAttribute('data-owner-picker-active'),
+    );
+    const visible = count > 1;
+    parts.select.required = visible && !parts.select.value;
     parts.wrapper.classList.toggle('is-hidden', !visible);
 }
 
@@ -487,7 +421,7 @@ function reloadOwnerPickerForUser() {
         return;
     }
     krtFetch
-        .getJson(`/users/${encodeURIComponent(userId)}/memberships?allKinds=true`)
+        .getJson(`/users/${encodeURIComponent(userId)}/memberships?allKinds=true&ownerPicker=true`)
         .catch(() => {
             return [];
         })

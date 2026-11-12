@@ -113,13 +113,13 @@ class SupplyOrderCoveredNoticeProducerTest {
                     need.getJobOrderId(),
                     42,
                     JobOrderStatus.IN_PROGRESS,
-                    List.of(
-                        new BucketCoverage(material.getId(), tier.getId(), required, booked)))));
+                    List.of(new BucketCoverage(material.getId(), tier.getId(), required, booked)),
+                    "New responsible unit")));
     when(orgUnitRepository.findAllById(Set.of(unit.getId()))).thenReturn(List.of(unit));
   }
 
   @Test
-  void aCoveredOrderTellsTheRaisingUnitOnce() {
+  void aTransferredCoveredOrderTellsTheRaisingUnitWithCurrentResponsibility() {
     SupplyNeed need = linkedNeed();
     loads(need, 12.4, 12.4);
     when(needRepository.markOrderCoveredNotified(need.getId(), NOW)).thenReturn(1);
@@ -138,7 +138,7 @@ class SupplyOrderCoveredNoticeProducerTest {
     assertThat(notice.contextOrgUnits().get(NotificationContextRole.RESPONSIBLE).kind())
         .isEqualTo(OrgUnitKind.SQUADRON);
     assertThat(notice.renderParams())
-        .containsEntry("unit", "Argon")
+        .containsEntry("unit", "New responsible unit")
         .containsEntry("entry", "Stileron")
         .containsEntry("order", "#42");
   }

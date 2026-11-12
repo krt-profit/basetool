@@ -5,6 +5,12 @@
 - **Deciders:** @greluc
 - **Related:** `AccessGateService.canSeeJobOrderAsRequester` / `canEditJobOrderAsRequester` · `RequestScopeResolver.isOrderRequester` / `currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders` · `JobOrderService.updateJobOrderAsRequester` / `updateItemJobOrderAsRequester` / `getRequestedJobOrders` / `replaceMaterialsWithinTransaction` · `JobOrderController` (`GET /requested`, `PUT /{id}/requested`, `PUT /{id}/items/requested`, `cleanupJobOrderForRequester`) · `JobOrderUpdatedByRequesterEvent` · V214 · REQ-ORDERS-023 · REQ-NOTIF-017 · REQ-ORG-003 · REQ-SEC-009 · ADR-0029 · #1186
 
+## Current requester scope
+
+REQ-ORDERS-023 and ADR-0374 define the current requester scope through
+`RequestScopeResolver.currentScopePredicateGranting(LOGISTICIAN)`. It uses the honoured pin or
+the caller's reachable member units. The baseline below describes the direct-membership design.
+
 ## Context
 
 A job order carries a **responsible** (processing) org unit and a **requesting** (Auftraggeber /

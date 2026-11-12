@@ -19,6 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.notification.api;
 
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * The domain trigger a {@link NotificationRule} reacts to, as opposed to the rendered {@link
  * NotificationType} the rule produces.
@@ -619,5 +623,114 @@ public enum NotificationEventType {
    * One of a member's roles was assigned or withdrawn in the Basetool (REQ-SEC-088). The default
    * rule notifies the member.
    */
-  USER_ROLE_CHANGED
+  USER_ROLE_CHANGED;
+
+  /**
+   * Checks whether a selector can address this event without crossing its subject's audience.
+   *
+   * @param kind the selector kind
+   * @param roleCode the stored role code for a role selector
+   * @param carriesUnit whether this instance explicitly identifies a subject unit
+   * @return whether the selector is permitted
+   */
+  public boolean permitsSelector(
+      @NotNull SelectorKind kind, @Nullable String roleCode, boolean carriesUnit) {
+    if (!carriesUnit && !hasScopedAudience()) {
+      return true;
+    }
+    return switch (kind) {
+      case SPECIFIC_USER, SEAT_HOLDERS -> false;
+      case ROLE -> permitsGlobalRole(roleCode);
+      case ORG_RELATIVE_ROLE,
+          ACCOUNT_GRANT,
+          ACCOUNT_RESPONSIBLE,
+          REQUEST_RESPONSIBLE,
+          REQUIRED_APPROVER,
+          MISSION_PARTICIPANTS,
+          MISSION_LEADERSHIP,
+          EVENT_RECIPIENT,
+          EVENT_RECIPIENTS,
+          EXCHANGE_CLIENT_HOLDERS ->
+          true;
+    };
+  }
+
+  private boolean permitsGlobalRole(@Nullable String roleCode) {
+    return switch (this) {
+      case BANK_BOOKING_REQUEST_CREATED,
+          BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER,
+          BANK_BOOKING_REQUEST_APPROVED,
+          PURCHASING_SETTLEMENT_OVERDUE ->
+          Roles.BANK_MANAGEMENT.equals(roleCode);
+      case JOB_ORDER_CREATED, ORG_LEADERSHIP_ROLE_MISMATCH -> Roles.ADMIN.equals(roleCode);
+      default -> false;
+    };
+  }
+
+  private boolean hasScopedAudience() {
+    return switch (this) {
+      case JOB_ORDER_CREATED,
+          JOB_ORDER_UPDATED_BY_REQUESTER,
+          JOB_ORDER_UPDATED_BY_RESPONSIBLE,
+          JOB_ORDER_CLOSED,
+          JOB_ORDER_REASSIGNED,
+          JOB_ORDER_FINISHED,
+          JOB_ORDER_REOPENED,
+          JOB_ORDER_ASSIGNEE_ADDED,
+          JOB_ORDER_ASSIGNEE_REMOVED,
+          JOB_ORDER_CLAIM_WITHDRAWN,
+          JOB_ORDER_MATERIAL_CONTRIBUTIONS_CHANGED,
+          JOB_ORDER_CLARIFICATION_REQUIRED,
+          JOB_ORDER_PARTICIPATION_CHANGED,
+          JOB_ORDER_MONEY_PROVISIONED,
+          JOB_ORDER_MONEY_MOVED,
+          JOB_ORDER_MONEY_COMMITMENT_CHANGED,
+          JOB_ORDER_CLARIFICATION_RESOLVED,
+          MISSION_RESCHEDULED,
+          MISSION_CANCELLED,
+          MISSION_DELETED,
+          MISSION_REMINDER_DUE,
+          MISSION_STARTED,
+          MISSION_CHECKED_IN,
+          MISSION_PARTICIPANT_ADDED,
+          MISSION_PARTICIPANT_REMOVED,
+          MISSION_PARTICIPANT_LEFT,
+          MISSION_NEVER_ENDED,
+          MISSION_END_RECORDED,
+          MISSION_RESPONSIBILITY_ASSIGNED,
+          OPERATION_PAYOUT_MARKED,
+          OPERATION_PAYOUT_UNMARKED,
+          OPERATION_COMPLETED,
+          INVENTORY_STOCK_LEVEL_LOW,
+          BANK_BOOKING_REQUEST_CREATED,
+          BANK_BOOKING_REQUEST_CONFIRMED,
+          BANK_BOOKING_REQUEST_REJECTED,
+          BANK_BOOKING_REQUEST_CANCELLED,
+          BANK_BOOKING_REQUEST_UPDATED_BY_REQUESTER,
+          BANK_BOOKING_REQUEST_APPROVED,
+          BANK_BOOKING_REQUEST_APPROVAL_REVOKED,
+          BANK_ACCOUNT_RESPONSIBLE_ASSIGNED,
+          BANK_ACCOUNT_DEBITED,
+          BANK_FUNDS_AUTHORISED,
+          ORG_MEMBER_DEPARTED,
+          HANGAR_SHIP_ASSIGNED_TO_UNIT,
+          HANGAR_SHIP_UNASSIGNED_FROM_UNIT,
+          HANGAR_SHIP_DELETED_FROM_MISSION,
+          SUPPLY_DONATION_PLEDGED,
+          SUPPLY_DONATION_RECEIVED,
+          SUPPLY_DONATION_DECLINED,
+          SUPPLY_DONATION_WITHDRAWN,
+          SUPPLY_NEED_ORDER_COVERED,
+          SUPPLY_NEED_CLOSED,
+          PURCHASING_NEED_RELEASED,
+          PURCHASING_NEED_CLOSED,
+          PURCHASING_DELIVERY_RECORDED,
+          PURCHASING_DELIVERY_DECIDED,
+          PURCHASING_SETTLEMENT_OVERDUE,
+          PURCHASING_PAUSED,
+          PURCHASING_RESUMED ->
+          true;
+      default -> false;
+    };
+  }
 }

@@ -19,15 +19,21 @@
 
 package de.greluc.krt.profit.basetool.backend.kernel;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.HashSet;
+import java.util.Set;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Constants for the fine-grained permission strings a {@code Role} carries in its {@code
  * permissions} collection, read back as {@code GrantedAuthority} names without {@code ROLE_}.
  *
- * <p>Values must stay byte-identical to the {@code role_permissions} rows. {@code RoleService}
- * reads the {@code public static final String} fields reflectively as the auditable permission
- * vocabulary, so this class must hold only permission values.
+ * <p>The public constants form the closed permission vocabulary stored in {@code role_permissions}.
  */
 public final class Permissions {
+
+  private static final Set<String> VOCABULARY = readVocabulary();
 
   /** Non-instantiable static-constant holder. */
   private Permissions() {}
@@ -39,4 +45,34 @@ public final class Permissions {
   public static final String MISSION_MANAGE = "MISSION_MANAGE";
   public static final String USER_MANAGE = "USER_MANAGE";
   public static final String ROLE_MANAGE = "ROLE_MANAGE";
+
+  /**
+   * Checks whether a permission belongs to the vocabulary.
+   *
+   * @param value the value to check
+   * @return whether the value matches a declared permission
+   */
+  public static boolean isKnown(@Nullable String value) {
+    return value != null && VOCABULARY.contains(value);
+  }
+
+  private static Set<String> readVocabulary() {
+    Set<String> vocabulary = new HashSet<>();
+    for (Field field : Permissions.class.getDeclaredFields()) {
+      int modifiers = field.getModifiers();
+      if (field.isSynthetic()
+          || !Modifier.isPublic(modifiers)
+          || !Modifier.isStatic(modifiers)
+          || !Modifier.isFinal(modifiers)
+          || field.getType() != String.class) {
+        continue;
+      }
+      try {
+        vocabulary.add((String) field.get(null));
+      } catch (IllegalAccessException e) {
+        throw new IllegalStateException("Cannot read permission constant " + field.getName(), e);
+      }
+    }
+    return Set.copyOf(vocabulary);
+  }
 }

@@ -133,6 +133,29 @@ class TableOwnershipTest {
   static final Map<String, Crossing> CROSS_MODULE_TRIGGERS =
       Map.ofEntries(
           Map.entry(
+              "trg_mission_operation_payout",
+              new Crossing(
+                  Set.of("operation_payout_status"),
+                  "Mission links and actual times share the operation's settlement guard"
+                      + " (ADR-0375).")),
+          Map.entry(
+              "trg_mission_finance_operation_payout",
+              new Crossing(
+                  Set.of("operation_payout_status"),
+                  "Finance entries share the linked operation's settlement guard (ADR-0375).")),
+          Map.entry(
+              "trg_participant_operation_payout",
+              new Crossing(
+                  Set.of("operation_payout_status"),
+                  "Payout-relevant participant fields share the operation's settlement guard"
+                      + " (ADR-0375).")),
+          Map.entry(
+              "trg_refinery_operation_payout",
+              new Crossing(
+                  Set.of("mission", "operation_payout_status"),
+                  "A refinery input follows its mission link to the operation's settlement guard"
+                      + " (ADR-0375).")),
+          Map.entry(
               "trg_personal_blueprint_exchange_change",
               new Crossing(
                   Set.of("exchange_change", "app_user"),

@@ -6,15 +6,19 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 
 |                                    Rolle                                     |                              Herkunft                               |                                                                                               Kurz                                                                                               |
 |------------------------------------------------------------------------------|---------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Admin**                                                                    | Keycloak-Rolle                                                      | Globaler Scope, umgeht alle OrgUnit-Checks.                                                                                                                                                      |
-| **Officer**                                                                  | Keycloak-Rolle                                                      | Erbt `LOGISTICIAN` + `MISSION_MANAGER` (Hierarchie), aber **staffel-scoped** über `canEditOrgUnit(...)`.                                                                                         |
-| **Logistician**                                                              | Kontextuell: `org_unit_membership.is_logistician`                   | Lager- & Auftragsverwaltung. Flache Rolle wird vom JWT-Konverter befördert, wenn das Flag auf *irgendeiner* Mitgliedschaft `true` ist; das Per-OrgUnit-Scoping erfolgt über `OwnerScopeService`. |
-| **Einsatzleiter** (Keycloak-Rolle `Mission Manager`, Code `MISSION_MANAGER`) | Kontextuell: `org_unit_membership.is_mission_manager`               | Einsatz-Verwaltung; gleiche Beförderungslogik.                                                                                                                                                   |
+| **Admin** | Basetool-Rolle in `user_roles` | Globaler Zugriff ohne Pin. Mit Pin gilt die aktive Einheit (REQ-ORG-032). |
+| **Offizier** | Kontextuelle Leitungsreichweite aus aktiven Mitgliedschaften | Rechte folgen dem Rang, dem Einheitenkontext und `KRT Member`. |
+| **Logistician** | Kontextuell aus einem Rang oder `org_unit_membership.is_logistician` | Lager- und Auftragsverwaltung für die zulässigen Einheiten. |
+| **Einsatzleiter** (Code `MISSION_MANAGER`) | Kontextuell aus einem Rang oder `org_unit_membership.is_mission_manager` | Einsatzverwaltung für die zulässigen Einheiten. |
 | **SK Lead**                                                                  | Kontextuell: Mitgliedschaftsrang `org_unit_membership.role = SK_LEAD` (nur auf einer SK-Zeile; seit V187 statt des Flags `is_lead`) | Darf in *diesem einen* SK Mitglieder verwalten — sonst nichts. |
-| **KRT Member**                                                               | Basis-User                                                          | `HANGAR_READ/WRITE`, `MISSION_READ`. Keine erhöhten Rechte.                                                                                                                                      |
+| **KRT Member** | Basetool-Rolle in `user_roles` | Mitgliedszugriff und Voraussetzung für mitgliedschaftsbasierte Rechte. |
 | **Kein Rollenträger** (`ROLE_NO_ROLE`)                                       | Konto ohne Anwendungsrolle                                          | Erreicht nichts — `403 NO_ROLE` vor jedem Handler (`REQ-SEC-053`). Der Vorgänger hieß `Guest` und war unauthentifiziert; ohne Anmeldung gibt es seit ADR-0159 nur Startseite und Rechtsseiten.   |
 
-**Hierarchie** (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`, `OFFICER > LOGISTICIAN`, `ADMIN > MISSION_MANAGER`, `OFFICER > MISSION_MANAGER`, `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE`. Die Bank-Rollen sind unabhängig von der Mitgliedschaft in einer OrgUnit (→ [UC-32](UC-32-kartellbank-antraege-berechtigungen.md)).
+**Hierarchie** (`SecurityConfig#roleHierarchy`): `ADMIN > LOGISTICIAN`,
+`ADMIN > MISSION_MANAGER` und `ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE`. Die Bankrollen
+sind Basetool-Rollen und werden unabhängig von der Org-Einheitsmitgliedschaft vergeben
+([UC-32](UC-32-kartellbank-antraege-berechtigungen.md)). Die Keycloak-Realm-Rolle `Admin`
+dient als Marker für den zweiten Faktor.
 
 ## Rollen × Flow-Matrix (Schreib-Operationen)
 
@@ -33,7 +37,10 @@ Diese Referenz hält die Rollen- und Tenancy-Regeln fest, auf denen die rollen- 
 | SK anlegen / umbenennen / löschen        | ✗                       | ✗                      | ✗               | ✗       | ✓     |
 | SK-Mitglieder verwalten                  | nur als **Lead** des SK | –                      | –               | ✗       | ✓     |
 
-Die Gates verbatim: Einsatz `isAuthenticated() and @authHelperService.isMemberOrAbove()`, Job Order `isAuthenticated()` (bis ADR-0149 `permitAll()` für das öffentliche Anfrageformular), Refinery Order + Inventar `isAuthenticated()` (Refinery Order für einen fremden Owner nur als Logistiker; Inventar für ein fremdes Mitglied nur mit gemeinsamem editierbarem OrgUnit-Scope, im Service gegen den Empfänger geprüft, REQ-SEC-005), Handover `(hasRole('LOGISTICIAN') or hasRole('OFFICER') or hasRole('ADMIN')) and @ownerScopeService.canEditJobOrder(#id)`, Job Order bearbeiten/Status `hasRole('LOGISTICIAN')` (+ `canEditJobOrder`), Job Order löschen `hasRole('ADMIN')`, Operation `hasRole('MISSION_MANAGER')`, SK-Lifecycle `hasRole('ADMIN')`, SK-Member-Verwaltung `@specialCommandSecurityService.canManageMembers(#id, authentication)`. Vor jedem dieser Gates weist das Backend ein Konto ohne Anwendungsrolle mit `403 NO_ROLE` ab (`REQ-SEC-053`).
+Die Backend-Gates prüfen für Einsätze den Mitgliedszugang und für die Übergabe eines Warenauftrags
+`jobOrderAccessPolicy.canFulfillJobOrder`. Bei Hangar, Lager, Raffinerie und der Verwaltung eines
+Spezialkommandos entscheidet zusätzlich der Scope der jeweiligen Aktion. Konten ohne
+Anwendungsrolle werden gemäß REQ-SEC-053 abgewiesen.
 
 ## Control-Gating je Rolle (`RolePermissionsE2eTest`)
 
@@ -41,7 +48,7 @@ Die Rollen-Matrix oben prüft im Browser [`RolePermissionsE2eTest`](../../fronte
 
 | Control (`sec:authorize`)                                          | KRT Member | Officer | Admin |
 |--------------------------------------------------------------------|------------|---------|-------|
-| Handover `order-handover-open` (`hasAnyRole('LOGISTICIAN', 'OFFICER', 'ADMIN')`) | ✗   | ✓       | —     |
+| Handover `order-handover-open` (Berechtigung am Auftrag) | ✗   | ✓       | —     |
 | Bearbeiten, Trigger des `edit-modal` (`hasRole('LOGISTICIAN')`)    | ✗          | ✓       | ✓     |
 | Löschen, `/delete`-Formular (`hasRole('ADMIN')`)                   | ✗          | ✗       | ✓     |
 

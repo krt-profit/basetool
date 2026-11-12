@@ -28,6 +28,9 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnit;
 import de.greluc.krt.profit.basetool.backend.mission.api.events.MissionNotices;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,6 +59,16 @@ public class MissionNotificationPublisher {
 
   private final ApplicationEventPublisher eventPublisher;
   private final UserService userService;
+  private final MissionRecipientDirectoryImpl missionRecipients;
+
+  private void publish(@NotNull Mission mission, @NotNull NoticeEvent notice) {
+    eventPublisher.publishEvent(notice.inOrgUnit(subjectUnit(mission)));
+  }
+
+  static @Nullable OrgUnitRef subjectUnit(@NotNull Mission mission) {
+    OrgUnit owner = mission.getOwningOrgUnit();
+    return owner == null ? null : new OrgUnitRef(owner.getId(), owner.getKind());
+  }
 
   /**
    * Announces a moved meeting time or planned start and resets the reminders for the new time.
@@ -77,7 +90,8 @@ public class MissionNotificationPublisher {
     mission.setReminder1hSentAt(null);
     Instant before = meetingMoved ? oldMeetingTime : oldPlannedStart;
     Instant after = meetingMoved ? mission.getMeetingTime() : mission.getPlannedStartTime();
-    eventPublisher.publishEvent(
+    publish(
+        mission,
         MissionNotices.rescheduled(
             mission.getId(), mission.getName(), before, after, userService.currentActor()));
   }
@@ -97,10 +111,10 @@ public class MissionNotificationPublisher {
     ActorRef actor = userService.currentActor();
     switch (status) {
       case "CANCELLED" ->
-          eventPublisher.publishEvent(
-              MissionNotices.cancelled(mission.getId(), mission.getName(), actor));
+          publish(mission, MissionNotices.cancelled(mission.getId(), mission.getName(), actor));
       case "ACTIVE" ->
-          eventPublisher.publishEvent(
+          publish(
+              mission,
               MissionNotices.started(
                   mission.getId(), mission.getName(), mission.getActualStartTime(), actor));
       case "COMPLETED" -> {
@@ -141,22 +155,22 @@ public class MissionNotificationPublisher {
       return;
     }
     mission.setNeverEndedNotifiedAt(Instant.now());
-    eventPublisher.publishEvent(
+    publish(
+        mission,
         MissionNotices.neverEnded(mission.getId(), mission.getName(), mission.getPlannedEndTime()));
   }
 
   /**
    * Announces a deleted mission to the participants captured before the delete.
    *
-   * @param missionId the deleted mission
-   * @param missionName its name
+   * @param mission the deleted mission
    * @param participantUserIds the registered participants captured before the delete
    */
-  public void deleted(
-      @NotNull UUID missionId, @NotNull String missionName, @NotNull Set<UUID> participantUserIds) {
-    eventPublisher.publishEvent(
+  public void deleted(@NotNull Mission mission, @NotNull Set<UUID> participantUserIds) {
+    publish(
+        mission,
         MissionNotices.deleted(
-            missionId, missionName, participantUserIds, userService.currentActor()));
+            mission.getId(), mission.getName(), participantUserIds, userService.currentActor()));
   }
 
   /**
@@ -168,10 +182,11 @@ public class MissionNotificationPublisher {
   public void participantAdded(@NotNull Mission mission, @NotNull MissionParticipant participant) {
     User user = participant.getUser();
     ActorRef actor = userService.currentActor();
-    if (user == null || user.getId().equals(actor.id())) {
+    if (user == null || user.getId().equals(actor.id()) || !mayNotifyParticipant(mission, user)) {
       return;
     }
-    eventPublisher.publishEvent(
+    publish(
+        mission,
         MissionNotices.participantAdded(
             mission.getId(),
             mission.getName(),
@@ -196,9 +211,14 @@ public class MissionNotificationPublisher {
     }
     ActorRef actor = userService.currentActor();
     if (!user.getId().equals(actor.id())) {
-      eventPublisher.publishEvent(
+      publish(
+          mission,
           MissionNotices.participantRemoved(
-              mission.getId(), mission.getName(), user.getId(), actor));
+              mission.getId(),
+              mission.getName(),
+              user.getId(),
+              actor,
+              mayNotifyParticipant(mission, user)));
       return;
     }
     List<String> freed = freedSlots(mission, participant);
@@ -210,7 +230,8 @@ public class MissionNotificationPublisher {
     if (freed.isEmpty() && !closeStart) {
       return;
     }
-    eventPublisher.publishEvent(
+    publish(
+        mission,
         MissionNotices.participantLeft(
             mission.getId(),
             mission.getName(),
@@ -246,7 +267,8 @@ public class MissionNotificationPublisher {
     if (recipientId.equals(actor.id())) {
       return;
     }
-    eventPublisher.publishEvent(
+    publish(
+        mission,
         MissionNotices.responsibilityAssigned(
             mission.getId(), mission.getName(), recipientId, roleCode, actor));
   }
@@ -266,7 +288,8 @@ public class MissionNotificationPublisher {
     if (ownerId.equals(actor.id())) {
       return;
     }
-    eventPublisher.publishEvent(
+    publish(
+        mission,
         MissionNotices.shipAssigned(
             unit.getId(),
             ownerId,
@@ -302,6 +325,21 @@ public class MissionNotificationPublisher {
       }
     }
     return ids;
+  }
+
+  /**
+   * Captures the readable audience before deleting a mission and its participants.
+   *
+   * @param mission the mission to delete
+   * @return the current recipients of its deletion notice
+   */
+  @NotNull
+  Set<UUID> visibleParticipantUserIds(@NotNull Mission mission) {
+    return missionRecipients.visibleMembers(mission, participantUserIds(mission));
+  }
+
+  private boolean mayNotifyParticipant(Mission mission, User user) {
+    return !missionRecipients.visibleMembers(mission, Set.of(user.getId())).isEmpty();
   }
 
   private static List<String> freedSlots(Mission mission, MissionParticipant participant) {

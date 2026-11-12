@@ -62,6 +62,7 @@ public class UserRegistrationService {
   private final UserApprovalEventRepository userApprovalEventRepository;
   private final ApplicationEventPublisher eventPublisher;
   private final KeycloakService keycloakService;
+  private final AccountLinkReservation accountLinkReservation;
   private final AccountErasure accountErasure;
 
   /** Grants KRT Member to an approved registration. */
@@ -278,10 +279,10 @@ public class UserRegistrationService {
    * identity to {@code targetUserId} in Keycloak, removes the throwaway Keycloak user and {@code
    * app_user} row, and stamps the target's {@code discord_user_id}.
    *
-   * <p>Runs outside any transaction: after moving the identity it commits the database half through
-   * {@link #completeLinkTransactionally} and deletes the throwaway Keycloak user last, so a failed
-   * attempt can be retried. The snowflake is read from Keycloak, falling back to the local {@code
-   * discord_user_id} (see {@link #resolveDiscordLink}).
+   * <p>Reserves both accounts until the move finishes. After moving the identity it commits the
+   * database half through {@link #completeLinkTransactionally} and deletes the throwaway Keycloak
+   * user last. The snowflake is read from Keycloak, with a fallback to the local {@code
+   * discord_user_id}.
    *
    * @param pendingId the pending Discord registration to link away
    * @param targetUserId the existing account to link the Discord identity into
@@ -290,18 +291,19 @@ public class UserRegistrationService {
    * @param adminId the acting admin's id (recorded in the audit)
    * @return the surviving target account, now carrying the Discord link
    * @throws NotFoundException when the pending registration or the target account is unknown
-   * @throws BusinessConflictException when the pending row is no longer PENDING, the target is not
-   *     a distinct active account or is already Discord-linked, or there is no Discord identity to
-   *     move
+   * @throws BusinessConflictException when either account is reserved, the registration is no
+   *     longer PENDING, the target is already Discord-linked or is not a distinct active account,
+   *     or there is no Discord identity to move
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
   @NotNull
   public User linkRegistrationToExistingAccount(
       @NotNull UUID pendingId,
       @NotNull UUID targetUserId,
       @Nullable Long version,
       @NotNull UUID adminId) {
+    accountLinkReservation.reserve(pendingId, targetUserId);
     User pending =
         Entities.require(userRepository.findById(pendingId), "Pending registration not found");
     OptimisticLock.checkOptionalClient(pending.getVersion(), version, User.class, pendingId);
@@ -393,7 +395,7 @@ public class UserRegistrationService {
    * @return the surviving target account, now carrying the Discord link
    * @throws NotFoundException when the target account is unknown
    */
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   @NotNull
   public User completeLinkTransactionally(
       @NotNull UUID pendingId,

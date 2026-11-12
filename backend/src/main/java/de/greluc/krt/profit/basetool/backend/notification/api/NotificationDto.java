@@ -37,6 +37,9 @@ import java.util.UUID;
  * @param version optimistic-lock version
  * @param createdAt creation timestamp
  * @param updatedAt last-modification timestamp
+ * @param orgUnitId the subject's org unit, or {@code null}
+ * @param orgUnitKind the subject unit's kind code, or {@code null}
+ * @param orgUnitName the subject unit's display name at delivery, or {@code null}
  */
 public record NotificationDto(
     UUID id,
@@ -48,4 +51,7 @@ public record NotificationDto(
     Instant readAt,
     Long version,
     Instant createdAt,
-    Instant updatedAt) {}
+    Instant updatedAt,
+    UUID orgUnitId,
+    String orgUnitKind,
+    String orgUnitName) {}

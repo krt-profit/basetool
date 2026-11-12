@@ -3648,7 +3648,14 @@ decide which side it belongs on.
 moved tables carry a unique constraint over the user column, so one member may legitimately hold a
 row on both accounts (two sign-ups for one Einsatz, the same blueprint owned twice). The source's
 row is dropped where the target already has an equivalent — safe precisely because the two accounts
-are one person, so the duplicate carries nothing the survivor lacks. `bank_holder` is unique on the
+are one person. A duplicate membership is dropped only if the survivor's row already preserves
+its rank, Kommandogruppe and capability flags. The combined memberships must satisfy REQ-ORG-017.
+An incompatible merge returns HTTP 409 before a Discord link is written to Keycloak, and the
+database merge checks the same rules again. If the database transaction fails, consolidation
+detaches the Discord link that this attempt created while the duplicate still exists. An already
+linked identity is preserved. The audit event includes dropped-row counts.
+
+`bank_holder` is unique on the
 user **alone**, so a holder on both means two ledgers; that is an accounting decision with money in
 it, and the merge aborts with `409` rather than guessing which postings belong to whom.
 
@@ -4669,10 +4676,12 @@ in the member list, so the URL names the row they clicked.
 It composes rather than reimplements. `UserAccountMergeService#merge` (`REQ-SEC-046`) decides which
 rows follow the member and which stay with the act, and refuses two bank ledgers rather than guessing;
 `KeycloakService` moves the federated identity and removes the duplicate's realm user;
-`UserDeletionService` purges the emptied row. The orchestrator is **non-transactional**, mirroring
-`REQ-SEC-026`: the Keycloak writes cannot roll back with the database, so the identity is linked
-first, the database half commits through a self-proxied method, and the duplicate's Keycloak user is
-deleted **last** — a rolled-back database half then leaves it intact for a clean re-read on retry.
+`UserDeletionService` purges the emptied row. A read-only transaction reserves both account IDs
+before preflight. A concurrent consolidation or registration link that shares either account
+returns `409` before any Keycloak call. The identity is linked after preflight, and the database
+half commits in a separate
+transaction, and the duplicate's Keycloak user is deleted last. The reservations also cover
+compensation of a link created by a failed attempt.
 
 **The ordering inside the transaction is not free choice.** `app_user.discord_user_id` is UNIQUE
 (V172), so the duplicate's row must be gone before the survivor can claim the snowflake: belongings
@@ -4699,6 +4708,8 @@ optimistic-lock version. Each is a `409`.
   no longer there.
 - [x] Self / own-account / non-active target / different-identity target / stale version are each
   refused with `409` before anything is written.
+- [x] Overlapping consolidations and registration links sharing either account return `409` before
+  calling Keycloak.
 - [x] A `LINKED` `UserApprovalEvent` is recorded against the survivor, and `merge` records its own
   `USER_MERGED` audit event (`REQ-AUDIT-001`). No PII in either.
 - [x] The roster updates in place via `krtFetch`, with no full-page reload (`REQ-FE-001`), and the
@@ -5365,7 +5376,9 @@ searched `(area, table, column, idColumn, linkKind)`, and `exemptColumns()`,
 `exemptButMayHoldNames()` and `exemptTables()` name what is left out.
 `privacy.internal.PersonMentionRegistry` orders the union by area, table and column and refuses a
 column declared twice; `PersonMentionOwnershipTest` holds each source to the module that owns the
-tables it names. It is a list rather than a reflection sweep
+tables it names. The notification module searches stored org-unit display names because a name
+can remain in an inbox after the unit is renamed. The unit-kind and role-audience codes are
+exempt. It is a list rather than a reflection sweep
 because "every column of type text" would include ~200 columns of catalogue data synced from UEX and
 the SC wiki — planet names, manufacturer nicknames, brochure URLs — which cannot name a member in
 any sense that matters and would bury the real hits.
@@ -6162,8 +6175,8 @@ Two reviewed lists hold today's deliberate exceptions, and a stale entry fails t
   components and proof do not match, so the exception is proven safe rather than frozen. The split
   follows each domain's API cut (ADR-0060).
 - **Reviewed client inputs:** components that look server-managed but are a validated choice — the
-  create-time owning unit resolved by `OrgUnitStampingService.resolveOrgUnitForPickerOutput`
-  (REQ-ORG-004), a move or rebook target, the job order's processing and customer unit, a bank
+  create-time owning unit resolved by `OrgUnitStampingService.resolveOrgUnitForPickerOutputNullable`,
+  `resolveOrgUnitForUnitOwnedAggregate` or `resolveOrgUnitForAdminOnBehalf` (REQ-ORG-004), a move or rebook target, the job order's processing and customer unit, a bank
   counterparty, an ADMIN's hierarchy choice, and the lifecycle `status` of the mission
   and operation sections, each with its reason.
 
@@ -6480,6 +6493,12 @@ Administrator edits of role permissions and descriptions submit versioned reques
 the corresponding write echoes its counter as `version`. Each write locks the role, checks the
 expected section version through `OptimisticLock`, and increments only that section. A stale
 same-section save is HTTP 409; a completed edit of the other section does not invalidate it.
+The permission replacement accepts only exact values declared in `kernel.Permissions`. An unknown
+value yields HTTP 400 with `UNKNOWN_ROLE_PERMISSION` before any write or audit event. JWT authority
+assembly and the web session's `/api/v1/users/me` projection grant only the declared permissions,
+including for roles with unrecognised values in storage. The
+[read-only vocabulary report](../../scripts/role-permission-vocabulary-report.sql) counts existing
+rows outside the vocabulary before deployment.
 
 The roles Admin, KRT Member, Bank Employee and Bank Management live in `user_roles` alone and are
 written by the Basetool itself ([ADR-0355](../adr/0355-roles-are-held-in-the-basetool-database.md)).

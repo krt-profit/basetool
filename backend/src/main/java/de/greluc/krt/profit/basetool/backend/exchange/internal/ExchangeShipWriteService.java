@@ -39,7 +39,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
-import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipQueryService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -90,7 +90,7 @@ public class ExchangeShipWriteService
   /** The refusal of bringing back a ship removed by another channel or installation. */
   static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";
 
-  /** The refusal of an org unit that is not one of the member's direct memberships. */
+  /** The refusal of an org unit outside the member's stampable units. */
   static final String ORG_UNIT_NOT_ALLOWED = ExchangeReasons.ORG_UNIT_NOT_ALLOWED;
 
   /** The refusal of a unit counter the ship no longer has. */
@@ -106,7 +106,7 @@ public class ExchangeShipWriteService
   private final ExchangeMassChangeGuard guard;
   private final ExchangeChangeSetRunner runner;
   private final ExchangeLiveSync liveSync;
-  private final OrgUnitMembershipQueryService membershipQueryService;
+  private final OrgUnitSeatEligibility seatEligibility;
 
   /**
    * Plans and applies one change set in one transaction.
@@ -232,7 +232,7 @@ public class ExchangeShipWriteService
     Set<UUID> touched = new HashSet<>();
     Set<UUID> memberships =
         ops.stream().anyMatch(op -> op.orgUnit() != null)
-            ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
+            ? seatEligibility.findStampableOrgUnitIds(caller.member())
             : Set.of();
     List<Planned<Change>> plan = new ArrayList<>();
     for (int i = 0; i < ops.size(); i++) {

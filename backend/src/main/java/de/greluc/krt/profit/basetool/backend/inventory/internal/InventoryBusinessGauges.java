@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
+import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryMetricNames;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGaugeSource;
 import de.greluc.krt.profit.basetool.backend.platform.api.BusinessGauges;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -35,16 +36,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 class InventoryBusinessGauges implements BusinessGaugeSource {
 
-  /** Gauge {@code basetool_inventory_minimum_levels_below}: minimum stock levels that are low. */
-  static final String MINIMUM_LEVELS_BELOW = "basetool.inventory.minimum.levels.below";
-
   private final StockLevelStates states;
 
   private final AtomicLong levelsBelow = new AtomicLong();
 
   @Override
   public void register(@NotNull MeterRegistry registry) {
-    BusinessGauges.countGauge(registry, MINIMUM_LEVELS_BELOW, levelsBelow);
+    BusinessGauges.countGauge(registry, InventoryMetricNames.MINIMUM_LEVELS_BELOW, levelsBelow);
   }
 
   @Override

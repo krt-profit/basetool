@@ -158,6 +158,21 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
   int deleteAllReadForRecipient(@Param("recipientUserId") UUID recipientUserId);
 
   /**
+   * Deletes notices whose recipient lost all of the original delivery paths.
+   *
+   * @param recipient the member whose roles changed
+   * @param audiences the delivery paths no longer available to the member
+   * @return the number of rows deleted
+   */
+  @Modifying
+  @Query(
+      "delete from Notification n where n.recipientUserId = :recipient and n.roleAudience in"
+          + " :audiences")
+  int deleteWithdrawnAudience(
+      @Param("recipient") UUID recipient,
+      @Param("audiences") Set<NotificationRoleAudience> audiences);
+
+  /**
    * Deletes read notifications whose read timestamp is older than the cutoff; backs the scheduled
    * retention sweep (REQ-NOTIF-009).
    *

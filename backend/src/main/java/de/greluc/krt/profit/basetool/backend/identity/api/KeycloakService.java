@@ -287,10 +287,11 @@ public class KeycloakService {
    * @param keycloakUserId the target Keycloak user id
    * @param discordSnowflake the Discord snowflake to link; never {@code null} or blank
    * @param discordUsername the Discord username stored on the link; may be {@code null} or blank
+   * @return whether the link was created by this call
    * @throws ExternalServiceException when the admin URL is unconfigured or the user is linked to a
    *     different Discord account
    */
-  public void linkDiscordIdentity(
+  public boolean linkDiscordIdentity(
       @NotNull UUID keycloakUserId,
       @NotNull String discordSnowflake,
       @Nullable String discordUsername) {
@@ -315,11 +316,12 @@ public class KeycloakService {
           .body(body)
           .retrieve()
           .toBodilessEntity();
+      return true;
     } catch (HttpClientErrorException.Conflict conflict) {
       String existing =
           fetchDiscordLink(keycloakUserId, token).map(DiscordLink::userId).orElse(null);
       if (discordSnowflake.equals(existing)) {
-        return;
+        return false;
       }
       throw new ExternalServiceException(
           "Keycloak user " + keycloakUserId + " is already linked to a different Discord account");

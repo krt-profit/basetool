@@ -470,8 +470,7 @@ class InventoryOperationsE2eTest {
 
   /**
    * Umbuchen: transfers 30 of a 100-SCU row to another location, leaving 70 at the source and a new
-   * 30-SCU stack at the destination. Also asserts the owner org-unit picker renders preset to the
-   * row's owning unit (REQ-INV-007).
+   * 30-SCU stack at the destination with the eligible active unit preselected (REQ-INV-007).
    */
   @Test
   void umbuchenTransfersStockToAnotherLocation() {

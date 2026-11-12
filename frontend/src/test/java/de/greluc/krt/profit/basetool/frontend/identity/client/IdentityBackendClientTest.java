@@ -191,13 +191,15 @@ class IdentityBackendClientTest {
     assertThat(client.user(USER).id()).isEqualTo(USER);
     assertThat(client.userRsiHandle(USER).rsiHandle()).isNull();
     assertThat(client.memberships(USER)).isEmpty();
-    assertThat(client.membershipOptions(USER, true)).isEmpty();
+    assertThat(client.membershipOptions(USER, true, false)).isEmpty();
     assertThat(client.membershipDetail(USER).memberships()).isEmpty();
 
     backend.expect("GET", "/api/v1/users/" + USER);
     backend.expect("GET", "/api/v1/users/" + USER + "/rsi-handle");
     backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships");
-    backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships?allKinds=true");
+    backend.expect(
+        "GET",
+        "/api/v1/org-units/members/" + USER + "/memberships?allKinds=true&ownerPicker=false");
     backend.expect("GET", "/api/v1/org-units/members/" + USER + "/memberships/detail");
   }
 

@@ -310,9 +310,10 @@ the account by its real name even when the Discord handle differs) and links it.
 
 Linking moves the Discord identity onto the **surviving existing account** and disposes of the
 throwaway Discord-registered account. It is orchestrated by
-`UserRegistrationService.linkRegistrationToExistingAccount` as a **non-transactional orchestrator**
-(Keycloak writes are external side-effects that cannot roll back with the DB, mirroring the
-`OperationPayoutService.setPayoutStatus` pattern):
+`UserRegistrationService.linkRegistrationToExistingAccount`. A read-only transaction reserves both
+account IDs before preflight and through the Keycloak calls. The same reservations apply to account
+consolidation (REQ-SEC-055). An overlapping request returns `409` before any Keycloak call. The
+database changes commit in a separate transaction.
 
 1. The pending row is optimistic-locked (client `version` echoed from `PendingRegistrationDto`,
    checked via `OptimisticLock.checkOptionalClient`) and must still be `PENDING` — else a `409`

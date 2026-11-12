@@ -173,32 +173,6 @@ public class JobOrderMaterialController {
   }
 
   /**
-   * Removes a material from the order and atomically unlinks every inventory item that pointed at
-   * it.
-   *
-   * @param jobOrderId job-order id
-   * @param materialId material id
-   */
-  @DeleteMapping("/{jobOrderId}/materials/{materialId}")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  @Operation(
-      summary = "Unlink a material from a job order",
-      description =
-          "Removes the link between a material and a job order, and unlinks all associated"
-              + " inventory items.")
-  @ApiResponses({
-    @ApiResponse(responseCode = "204", description = "Material successfully unlinked"),
-    @ApiResponse(responseCode = "400", description = "The order has ineligible responsibility"),
-    @ApiResponse(responseCode = "403", description = "Forbidden – insufficient role"),
-    @ApiResponse(responseCode = "404", description = "Job order or material not found")
-  })
-  @PreAuthorize(
-      "isAuthenticated() and @jobOrderAccessPolicy.canReleaseJobOrderEarmarks(#jobOrderId)")
-  public void unlinkMaterial(@PathVariable UUID jobOrderId, @PathVariable UUID materialId) {
-    jobOrderService.unlinkMaterial(jobOrderId, materialId);
-  }
-
-  /**
    * Releases the order's earmark on a single inventory entry.
    *
    * @param id job-order id

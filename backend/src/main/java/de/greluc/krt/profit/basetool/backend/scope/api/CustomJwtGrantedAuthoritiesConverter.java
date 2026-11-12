@@ -383,7 +383,7 @@ public class CustomJwtGrantedAuthoritiesConverter
                   Stream.of(
                       new SimpleGrantedAuthority(Roles.authority(MemberRoleCodes.codeOf(role))));
               Stream<GrantedAuthority> permAuth =
-                  role.getPermissions().stream().map(SimpleGrantedAuthority::new);
+                  role.effectivePermissions().map(SimpleGrantedAuthority::new);
               return Stream.concat(roleAuth, permAuth);
             })
             .collect(Collectors.toCollection(ArrayList::new));

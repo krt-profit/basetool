@@ -91,6 +91,18 @@ public class OrgUnitSeatEligibility {
   }
 
   /**
+   * Returns the active units a member may assign to their personal rows (REQ-ORG-004).
+   *
+   * @param userId the owner of the rows
+   * @return the owner's active direct memberships while they hold the stored KRT Member role
+   */
+  @NotNull
+  public Set<UUID> findStampableOrgUnitIds(@NotNull UUID userId) {
+    Set<UUID> activeOrgUnitIds = membershipRepository.findActiveOrgUnitIdsByUserId(userId);
+    return activeOrgUnitIds.isEmpty() || !holdsKrtMember(userId) ? Set.of() : activeOrgUnitIds;
+  }
+
+  /**
    * Keeps those of the given members who hold the stored {@code KRT Member} role, the only members
    * a seat, a membership or a Logistiker or Einsatzleiter flag confers anything on (REQ-SEC-015,
    * ADR-0374); one query for the whole set (REQ-DATA-003).

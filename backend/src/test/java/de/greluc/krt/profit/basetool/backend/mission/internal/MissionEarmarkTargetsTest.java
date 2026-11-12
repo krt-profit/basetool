@@ -89,7 +89,7 @@ class MissionEarmarkTargetsTest {
     assertThat(earmarks.get(open.getId()))
         .isEqualTo(new MissionEarmark(open.getId(), "Erzlauf", START));
     assertThat(earmarks.get(internal.getId()))
-        .isEqualTo(new MissionEarmark(internal.getId(), null, null));
+        .isEqualTo(new MissionEarmark(internal.getId(), null, null, false));
   }
 
   @Test

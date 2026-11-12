@@ -43,8 +43,8 @@ class NavigationMetricsTest {
       for (NavigationWriteOutcome outcome : NavigationWriteOutcome.values()) {
         assertThat(
                 registry
-                    .get(NavigationMetrics.PREFERENCE_WRITES)
-                    .tag(NavigationMetrics.TAG_SECTION, section.getTag())
+                    .get(NavigationMetricNames.PREFERENCE_WRITES)
+                    .tag(NavigationMetricNames.TAG_SECTION, section.getTag())
                     .tag(MetricNames.TAG_OUTCOME, outcome.getTag())
                     .counter()
                     .count())
@@ -96,8 +96,8 @@ class NavigationMetricsTest {
 
   private double count(NavigationWriteOutcome outcome) {
     return registry
-        .get(NavigationMetrics.PREFERENCE_WRITES)
-        .tag(NavigationMetrics.TAG_SECTION, NavigationSection.FAVOURITES.getTag())
+        .get(NavigationMetricNames.PREFERENCE_WRITES)
+        .tag(NavigationMetricNames.TAG_SECTION, NavigationSection.FAVOURITES.getTag())
         .tag(MetricNames.TAG_OUTCOME, outcome.getTag())
         .counter()
         .count();
@@ -105,8 +105,8 @@ class NavigationMetricsTest {
 
   private double gauge(NavigationSection section) {
     return registry
-        .get(NavigationMetrics.PERSONALISED_ACCOUNTS)
-        .tag(NavigationMetrics.TAG_SECTION, section.getTag())
+        .get(NavigationMetricNames.PERSONALISED_ACCOUNTS)
+        .tag(NavigationMetricNames.TAG_SECTION, section.getTag())
         .gauge()
         .value();
   }

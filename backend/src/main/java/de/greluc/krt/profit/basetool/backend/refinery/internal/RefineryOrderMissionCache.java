@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.refinery.internal;
 
+import de.greluc.krt.profit.basetool.backend.kernel.TransactionMemo;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferences;
 import jakarta.persistence.EntityManager;
@@ -50,7 +51,7 @@ public class RefineryOrderMissionCache implements RefineryOrderMissionLookup {
       return null;
     }
     Map<UUID, Optional<MissionReferenceDto>> memo =
-        RefineryTransactionMemo.bound(this, Memo.class, Memo::new).references;
+        TransactionMemo.bound(this, Memo.class, Memo::new).references;
     Optional<MissionReferenceDto> known = memo.get(missionId);
     if (known != null) {
       return known.orElse(null);
@@ -67,7 +68,8 @@ public class RefineryOrderMissionCache implements RefineryOrderMissionLookup {
 
   private Set<UUID> missionsInContext() {
     Set<UUID> ids = new LinkedHashSet<>();
-    for (RefineryOrder order : RefineryTransactionMemo.ordersInContext(entityManager)) {
+    for (RefineryOrder order :
+        TransactionMemo.entitiesInContext(entityManager, RefineryOrder.class)) {
       if (order.getMissionId() != null) {
         ids.add(order.getMissionId());
       }

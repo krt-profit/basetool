@@ -274,6 +274,10 @@ an entry of its own. Either op is `unchanged` when the entry already is as asked
 
 ### `allocation-add`, `allocation-change` and `allocation-remove`
 
+To create a mission earmark by `allocation-add` or `book-in`, the acting member must be able to
+read the mission. A hidden mission and an unknown id both return `EARMARK_TARGET_INVALID`.
+Existing mission earmarks can still be changed, removed and restored by undo.
+
 Each names one earmark of the entry `entry` at the `version` you last read: by `jobOrder` or by
 `mission`, never both. `allocation-add` earmarks `quantity` of the entry to a target it is not
 earmarked to yet; `allocation-change` sets the `quantity` of an earmark the entry has;
@@ -357,7 +361,7 @@ listed with its reason. The entries an op created or changed reach you through t
 | `STOCK_EARMARKED` | `book-out`, `sell`, moves, `stolen` | The part of `quantity` that `fromJobOrders` and `fromMissions` do not cover is earmarked, or pledged as a donation; for a partial `stolen` or `move-pool`, the rest of the entry would hold less than its earmarks; a whole `move-pool` of an entry pledged as a donation. |
 | `STOCK_OFFERED` | `stolen`, `move-pool` | The rest of the entry after a partial `stolen` or `move-pool` would hold less than it offers on the Basetool's material exchange. |
 | `OVER_ALLOCATION` | `book-in`, `allocation-add`, `allocation-change` | The earmarks of one kind add up to more than `quantity`, or, for an earmark op, to more than the entry holds. |
-| `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves, earmark ops | An earmark names a job order that does not need the material or item, an unknown mission, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there; `allocation-add` names a target the entry is already earmarked to, `allocation-change` one it is not. |
+| `EARMARK_TARGET_INVALID` | `book-in`, `book-out`, `sell`, moves, earmark ops | An earmark names a job order that does not need the material or item, an unknown mission or a hidden mission for a new earmark, a mission for an item, a target twice, or — when taking from an entry — a target the entry is not earmarked to or more than it holds there; `allocation-add` names a target the entry is already earmarked to, `allocation-change` one it is not. |
 | `ITEM_RETIRED` | `book-in` | `material` resolves to an item the game no longer has, or one the Basetool hid; it cannot be booked in. The entries that hold it can still be taken from, moved and marked. |
 | `UNIT_MISMATCH`, `LOCATION_UNKNOWN`, `STOLEN_MARKING_DISABLED`, `UNMATCHED`, `AMBIGUOUS` | as for [stock](stock.md) | |
 

@@ -12,7 +12,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(eyebrowKey='nav.section.supply', titleText=#{purchasing.deals.title}, count=${dealsPage.totalElements()}, countId='purchasing-deals-count', countFor='purchasing-deals-results', actions=~{::deals-actions})}">
         <th:block th:ref="deals-actions">
             <button type="button" class="btn btn-ghost" data-trigger="purchasing-open-pause" data-testid="purchasing-pause"
-                    th:if="${purchasingState.governing() or !#lists.isEmpty(pausableUnits)}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg> <span th:text="#{purchasing.pause.action}">Ankauf pausieren</span></button>
+                    th:if="${pauseState.mayManageGlobal() or !#lists.isEmpty(pauseState.pausableUnits())}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg> <span th:text="#{purchasing.pause.action}">Ankauf pausieren</span></button>
             <button type="button" class="btn btn--cta" data-trigger="purchasing-open-deal" data-testid="purchasing-new-deal"
                     th:if="${purchasingState.delegate()}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg> <span th:text="#{purchasing.deal.new}">Neues Gesch&auml;ft</span></button>
         </th:block>
@@ -49,11 +49,11 @@
                    th:text="#{purchasing.pause.banner.global(#{'purchasing.pause.reason.' + ${pauseState.globalReason()}})}">Der Ankauf ist pausiert.</p>
                 <p class="m-0" th:each="u : ${pauseState.units()}"
                    th:text="#{purchasing.pause.banner.unit(${u.orgUnitName()}, #{'purchasing.pause.reason.' + ${u.reason()}})}">Der Ankauf f&uuml;r ARGON ist pausiert.</p>
-                <div class="purchasing-actions" th:if="${purchasingState.governing()}">
+                <div class="purchasing-actions">
                     <button type="button" class="btn btn-ghost btn-xs" data-trigger="purchasing-resume" data-testid="purchasing-resume-global"
-                            th:if="${pauseState.globalPaused()}" th:text="#{purchasing.pause.resume}">Fortsetzen</button>
+                            th:if="${pauseState.globalPaused() and pauseState.mayManageGlobal()}" th:text="#{purchasing.pause.resume}">Fortsetzen</button>
                     <button type="button" class="btn btn-ghost btn-xs" data-trigger="purchasing-resume"
-                            th:each="u : ${pauseState.units()}" th:data-unit-id="${u.orgUnitId()}"
+                            th:each="u : ${pauseState.units()}" th:if="${u.mayResume()}" th:data-unit-id="${u.orgUnitId()}"
                             th:text="#{purchasing.pause.resume.unit(${u.orgUnitName()})}">ARGON fortsetzen</button>
                 </div>
             </div>
@@ -165,7 +165,7 @@
     </th:block>
     </th:block>
 
-    <th:block th:if="${purchasingState.governing() or !#lists.isEmpty(pausableUnits)}">
+    <th:block th:if="${pauseState.mayManageGlobal() or !#lists.isEmpty(pauseState.pausableUnits())}">
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='purchasing-pause-modal', titleKey='purchasing.pause.action', titleId='purchasing-pause-title', variant='krt-modal--danger', body=~{::purchasing-pause-modal-body})}">
         <th:block th:ref="purchasing-pause-modal-body">
             <form id="purchasing-pause-form" class="no-track" novalidate>
@@ -173,8 +173,8 @@
                     <div class="form-group">
                         <label for="purchasing-pause-scope" th:text="#{purchasing.pause.scope}">Geltungsbereich</label>
                         <select id="purchasing-pause-scope" data-testid="purchasing-pause-scope">
-                            <option value="" th:if="${purchasingState.governing()}" th:text="#{purchasing.pause.scope.global}">Gesamte Organisation</option>
-                            <option th:each="u : ${pausableUnits}" th:value="${u.orgUnitId()}" th:text="${u.name()}">ARGON</option>
+                            <option value="" th:if="${pauseState.mayManageGlobal()}" th:text="#{purchasing.pause.scope.global}">Gesamte Organisation</option>
+                            <option th:each="u : ${pauseState.pausableUnits()}" th:value="${u.orgUnitId()}" th:text="${u.orgUnitName()}">ARGON</option>
                         </select>
                     </div>
                     <div class="form-group">

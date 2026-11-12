@@ -746,7 +746,9 @@ mission's owner or co-manager an admin keeps those rights under any selection, l
 
 > Payout asymmetry: every Mission-Manager may set `paidOut=true`,
 > but only a caller with officer reach in the operation's owning unit, or an Admin, may reset a
-> confirmed paid-out back to `false`.
+> confirmed paid-out back to `false`. Any current paid-out mark freezes the operation's mission
+> links and payout inputs. Only the existing clear gate can release the freeze, by reversing every
+> current mark (REQ-MISSION-034).
 >
 > **Visibility (`canSeeOperation`) has three paths since #500/#501** (one suffices):
 > **(1)** the normal Staffel scope (operation of one's own org unit);
@@ -756,8 +758,8 @@ mission's owner or co-manager an admin keeps those rights under any selection, l
 > **(3)** **participant visibility** (ADR-0006): whoever took part in one of the linked
 > missions sees the operation and **their own** payout row even across Staffeln.
 > None of the three paths lets a caller link a mission to the operation: that needs
-> `canEditOperation`, and the mission's operation picker lists only such operations
-> (REQ-MISSION-034). A mission names its operation to everyone who may see the mission, even when
+> `canEditOperation`. The mission's operation picker lists editable operations without a current
+> paid-out mark (REQ-MISSION-034). A mission names its operation to everyone who may see the mission, even when
 > they cannot open the operation (REQ-ORG-032).
 >
 > ³ **The third path does not carry the ledger (ADR-0150, REQ-ORG-027).** It is self-issuable —
@@ -849,7 +851,7 @@ rank is the only record of the seat (REQ-ROLE-006).
 |:----------------------------------------------------------------------------------------------------------------------|:---------------------------:|:----------------------------:|:---------:|:-----:|
 | Open the Leitung page (`/organisation/leitung`, frontend `OfficerSurfaceGate.canOpenLeitung()`; view `GET /api/v1/leadership`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
 | Assign / clear Kommandoleiter, Stv., Ensign (`PUT`/`DELETE /api/v1/squadrons/{id}/ranks/{userId}`)                  |              ✅              |              ❌               |     ❌     |   ✅   |
-| Create / rename / delete a Kommandogruppe (≤ 4 per Staffel) (`/api/v1/squadrons/{id}/kommando-groups`, `/api/v1/kommando-groups/{id}`) |              ✅              |              ❌               |     ❌     |   ✅   |
+| Create / rename / delete a Kommandogruppe (≤ 4 per Staffel) (`POST /api/v1/squadrons/{squadronId}/kommando-groups`, `PUT`/`DELETE /api/v1/squadrons/{squadronId}/kommando-groups/{groupId}`) |              ✅              |              ❌               |     ❌     |   ✅   |
 | Assign / clear the **Staffelleiter** of a child Staffel (same endpoints)                                            |              ❌              |              ✅               |     ❌     |   ✅   |
 | Appoint / clear the **SK lead** of a child SK (`PATCH /api/v1/special-commands/{id}/members/{uid}/lead`)           |              ❌              |              ✅               |     ❌     |   ✅   |
 | Add / remove Bereichskoordinator, Bereichsoperator (`POST`/`DELETE /api/v1/org-units/bereiche/{id}/members`)    |              ❌              |              ✅               |     ❌     |   ✅   |
@@ -858,8 +860,8 @@ rank is the only record of the seat (REQ-ROLE-006).
 | Set, change or clear **one's own** rank on any of the endpoints above (`targetsAnotherUser`)                        |              ❌              |              ❌               |     ❌     |   ✅   |
 | See in the Leitung view                                                                                               |       own Staffel only       | own Bereich + its Staffeln and SKs |  every unit | every unit |
 
-Reading the Kommandogruppen of a Staffel (`GET /api/v1/squadrons/{id}/kommando-groups`) is open to
-every member. ¹ Needs officer reach from a leadership seat in the active context, with `KRT Member`
+Kommandogruppen appear in the caller's scoped Leitung view.
+¹ Needs officer reach from a leadership seat in the active context, with `KRT Member`
 (`OfficerSurfaceGate.canOpenLeitung()`, REQ-SEC-047); the page shows the units the caller leads and those below them, and renders
 only what the capability flags allow as editable — the caller's own row never, for a non-admin.
 An SK lead sees only their own SK. ² A *pure* `OL_MEMBER` row — a Bereichsleiter's organisational
@@ -1102,11 +1104,11 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 
 \* Bank Empl./Bank Management reach the request endpoint only as far as they may view the account themselves (view/oversight scope). The two approval acts lie on **different surfaces of different users**; an out-of-band approval bumps the `@Version` of the request — an open bank queue with an old version runs into 409 `OPTIMISTIC_LOCK` on the next confirmation and recovers via reload (intended behavior, REQ-BANK-041).
 
-**Four-eyes (REQ-BANK-062, ADR-0251):** for every booking request the member who raised it can neither grant its owner approval nor confirm it (409 `BANK_FOUR_EYES_REQUIRED`) — a second person decides. This binds bank employees, bank management and every other role; an **Admin** may approve and confirm their own request. The requester may still reject or cancel it, and direct bookings (no request) are unchanged.
+**Four-eyes (REQ-BANK-062, ADR-0251):** for every booking request the member who raised it can neither grant its owner approval nor confirm it (409 `BANK_FOUR_EYES_REQUIRED` when the requester otherwise has that right) — a second person decides. This binds bank employees, bank management and every other role; an **Admin** may approve and confirm their own request. The requester may still reject or cancel it, and direct bookings (no request) are unchanged.
 
 #### 3.11.4 KRT-account 3-stage approval ladder & the "Mitglieder des Bereichs" audience (REQ-BANK-047/-048)
 
-- **KRT-account (`CARTEL`) amount ladder (REQ-BANK-047):** the KRT account replaces the per-audience limits of 3.11.3 with an **amount-tiered** approval on withdrawals/transfers leaving it. Two thresholds `T1 ≤ T2` define who approves: **≤ T1** the **bank employee** (self-approve), **T1..T2** the **Bankleitung** (`ROLE_BANK_MANAGEMENT`), **> T2** the **Organisationsleitung** (corrected from the Bereichsleiter Profit by ADR-0109). The thresholds are set **only by the Bankleitung** (`ROLE_BANK_MANAGEMENT`; Admin via hierarchy) in the **new „KRT-Freigaben" tab** of the bank Verwaltung (`PATCH …/approval-tiers`, audited `CARTEL_APPROVAL_TIERS_SET/CLEARED`); the account-detail pages show the ladder read-only to every viewer. The **Bankleitung** and **OL** approve their band's requests in Meine Einheit → Bank → „Anträge an unsere Konten" (band-routed: each sees only its own band; an **Admin** sees **and approves all three bands**), then a bank employee confirms with the same mandatory checkbox as 3.11.3 — the Bankleitung, reaching `BANK_EMPLOYEE` through the role hierarchy, can also confirm/book directly from the bank-staff queue. A plain bank employee's **direct** KRT withdrawal/transfer above `T1` is **not booked**: it is auto-filed as the band-routed approval request and the endpoint answers `202` (the employee is told to notify the Bankleitung), rather than being refused `409 BANK_CARTEL_APPROVAL_REQUIRED` (management/admin uncapped; ADR-0109).
+- **KRT-account (`CARTEL`) amount ladder (REQ-BANK-047):** the KRT account replaces the per-audience limits of 3.11.3 with an **amount-tiered** approval on withdrawals/transfers leaving it. Two thresholds `T1 ≤ T2` define who approves: **≤ T1** the **bank employee** (self-approve), **T1..T2** the **Bankleitung** (`ROLE_BANK_MANAGEMENT`), **> T2** the **Organisationsleitung** (corrected from the Bereichsleiter Profit by ADR-0109). The thresholds are set **only by the Bankleitung** (`ROLE_BANK_MANAGEMENT`; Admin via hierarchy) in the **new „KRT-Freigaben" tab** of the bank Verwaltung (`PATCH …/approval-tiers`, audited `CARTEL_APPROVAL_TIERS_SET/CLEARED`); the account-detail pages show the ladder read-only to every viewer. The **Bankleitung** and **OL** approve their band's requests in Meine Einheit → Bank → „Anträge an unsere Konten" (each sees only its own band. Unrouted requests stay out of both approval queues. An **Admin** sees all requests and can approve any that require approval), then a bank employee confirms with the same mandatory checkbox as 3.11.3 — the Bankleitung, reaching `BANK_EMPLOYEE` through the role hierarchy, can also confirm/book directly from the bank-staff queue. A plain bank employee's **direct** KRT withdrawal/transfer above `T1` is **not booked**: it is auto-filed as the band-routed approval request and the endpoint answers `202` (the employee is told to notify the Bankleitung), rather than being refused `409 BANK_CARTEL_APPROVAL_REQUIRED` (management/admin uncapped; ADR-0109).
 
 | Function (gate)                                                                         | Member | Bereichsl. Profit | OL | Bank Empl. | Bank Mgmt. | Admin |
 |:----------------------------------------------------------------------------------------|:------:|:-----------------:|:--:|:----------:|:----------:|:-----:|
@@ -1209,7 +1211,7 @@ Logisticians of the raising unit. Partner notes are returned to HBs and the gove
 | Create / edit / block / unblock a partner                            | —      | ✅           | —         | —                           | ✅                    | —          | ✅     |
 | Erase an individual partner                                          | —      | —           | —         | —                           | ✅                    | —          | ✅     |
 | Appoint / revoke an HB, set a personal limit                         | —      | —           | —         | —                           | ✅                    | —          | ✅     |
-| Pause / resume purchasing                                            | —      | —           | —         | ✅ (own unit)                | ✅ (also global)      | —          | ✅     |
+| Pause / resume purchasing                                            | —      | —           | —         | ✅ (lead, own unit)                | ✅ (also global)      | —          | ✅     |
 | Read the report, CSV and forum text                                  | —      | ✅           | —         | ✅ (own unit)                | ✅                    | ✅          | ✅     |
 | Switch the surface on, set the funding account, limits, risk classes | —      | —           | —         | —                           | —                    | —          | ✅     |
 
@@ -1237,7 +1239,10 @@ everything, with a pin the same restrictive view as a Member. Only a pin the cal
 counts; any other is no pin (REQ-ORG-032). Creation without a pick stamps a mission or operation on
 the pin, else on the creator's only stampable unit, and a personal row on the pin only when it is
 one of its owner's stampable units, else on the owner's only one — the stampable units being the
-direct memberships on active units of a `KRT Member` (REQ-ORG-004).
+direct memberships on active units of a `KRT Member` (REQ-ORG-004). These units also govern
+personal hangar and Lager reassignments and named unit targets for connected applications.
+Lager rebooking and refinery storage offer the receiver's stampable units, with the eligible
+active unit or sole option preselected.
 
 - **Strictly staffel-scoped** (no cross-Staffel): `Ship`, `InventoryItem`
   (inventory view), `RefineryOrder` — lists filter on
@@ -1298,6 +1303,8 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
   `adminAllScope` branch. An OL/Bereich principal **never** satisfies `isAdmin()`; all
   `hasRole('ADMIN')` gates (admin area, SK lifecycle, system settings, master data,
   bank admin/audit) stay closed.
+- **Bereichsleiter seat:** Each Bereich has at most one Bereichsleiter. Only an admin or a pure OL
+  member may appoint a Bereichsleiter, change that person's rank or revoke the seat.
 - **Strict separation:** a Bereichsleitung views/edits **only** their own Bereich; **only** the
   OL is cross-Bereich.
 - **SK-Leiter stays SK-only:** their Bereichsleitung membership is purely organizational (a seat in the

@@ -46,12 +46,15 @@ class OperationSummaryReaderTest {
 
   @Mock private OperationRepository operationRepository;
   @Mock private OperationAccessPolicy operationAccessPolicy;
+  @Mock private OperationPayoutStatusRepository payoutStatusRepository;
 
   private OperationSummaryReader reader;
 
   @BeforeEach
   void setUp() {
-    reader = new OperationSummaryReader(operationRepository, operationAccessPolicy);
+    reader =
+        new OperationSummaryReader(
+            operationRepository, operationAccessPolicy, payoutStatusRepository);
   }
 
   @Test

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, MSG_PAYOUT_PAID_UNSET_LOCKED, OPS_FINANCE_DETAIL_ERROR */
+/* global OPS_DETAIL_MSG, MSG_PAYOUT_PAID_ERROR, MSG_PAYOUT_PAID_FORBIDDEN, OPS_FINANCE_DETAIL_ERROR */
 
 import { showFrontendErrorToast } from '/js/kernel/toast.js';
 import { assignFormAction, safeSameOriginUrl } from '/js/kernel/safe-url.js';
@@ -120,6 +120,12 @@ function initOperationDetail() {
         }
         setText('op-kpi-donated', meta.getAttribute('data-kpi-donated'));
         setText('op-kpi-participants', meta.getAttribute('data-kpi-participants'));
+        document
+            .getElementById('operation-add-mission')
+            ?.classList.toggle(
+                'is-hidden',
+                meta.getAttribute('data-payout-inputs-frozen') === 'true',
+            );
     });
 }
 
@@ -484,61 +490,8 @@ function canUnsetPaidOut() {
     return pane != null && pane.getAttribute('data-can-unset-paid-out') === 'true';
 }
 
-/** Recounts the paid-out rows into the payout table's sum row. */
-function refreshPayoutPaidCount() {
-    const results = document.getElementById('op-payout-results');
-    const counter = document.getElementById('op-payout-paid-count');
-    if (!results || !counter) return;
-    const boxes = results.querySelectorAll('.payout-paid-checkbox');
-    if (!boxes.length) return;
-    const paid = results.querySelectorAll('.payout-paid-checkbox:checked').length;
-    counter.textContent = `${paid} / ${boxes.length}`;
-}
-
 /**
- * Applies a paid-out status response to its table row.
- *
- * @param {Element | null} row the participant's row
- * @param {{ paidOut?: boolean, paidOutByName?: string | null, paidOutAt?: string | null }} dto
- *     the refreshed status
- */
-function refreshPayoutPaidStatusCell(row, dto) {
-    if (!row) return;
-    const checkbox = /** @type {HTMLInputElement | null} */ (
-        row.querySelector('.payout-paid-checkbox')
-    );
-    if (!checkbox) return;
-    checkbox.checked = !!dto.paidOut;
-    if (checkbox.checked && !canUnsetPaidOut()) {
-        checkbox.disabled = true;
-        checkbox.title = MSG_PAYOUT_PAID_UNSET_LOCKED;
-    } else {
-        checkbox.disabled = false;
-        checkbox.title = '';
-    }
-    let statusSpan = /** @type {HTMLElement | null} */ (row.querySelector('.payout-paid-status'));
-    if (dto.paidOut && dto.paidOutByName) {
-        if (!statusSpan) {
-            statusSpan = document.createElement('span');
-            statusSpan.className = 'payout-paid-status';
-            if (checkbox.parentElement) {
-                checkbox.parentElement.appendChild(statusSpan);
-            }
-        }
-        statusSpan.textContent = dto.paidOutByName;
-        if (dto.paidOutAt) {
-            const date = new Date(dto.paidOutAt);
-            if (!isNaN(date.getTime())) {
-                statusSpan.title = date.toLocaleString();
-            }
-        }
-    } else if (statusSpan) {
-        statusSpan.remove();
-    }
-}
-
-/**
- * Writes a paid-out toggle and updates the row, the sum row and the overview in place.
+ * Writes a paid-out toggle and refreshes the payout and overview sections in place.
  *
  * @param {HTMLInputElement} checkbox the toggled checkbox
  */
@@ -571,15 +524,9 @@ async function handlePayoutPaidToggle(checkbox) {
                 return true;
             },
         });
-        if (result && result.ok && result.body) {
-            refreshPayoutPaidStatusCell(checkbox.closest('tr[data-participant-id]'), result.body);
-            refreshPayoutPaidCount();
-            if (operationHooks.refreshSection) {
-                operationHooks.refreshSection('overview', { broadcast: false });
-            }
-            if (operationHooks.notifyChanged) {
-                operationHooks.notifyChanged(['payout']);
-            }
+        if (result?.ok) {
+            await operationHooks.refreshSection?.(['payout', 'overview'], { broadcast: false });
+            operationHooks.notifyChanged?.(['payout']);
         }
     } finally {
         if (!(checkbox.checked && !canUnsetPaidOut())) {

@@ -240,6 +240,24 @@ class MissionServiceSectionPatchTest {
   }
 
   @Test
+  void changingPlannedTimesWithUnchangedActualEndDoesNotWriteAttendance() {
+    Instant actualStart = Instant.parse("2030-01-01T10:00:00Z");
+    Instant actualEnd = actualStart.plus(2, ChronoUnit.HOURS);
+    Instant plannedStart = actualStart.minus(1, ChronoUnit.HOURS);
+    existing.setActualStartTime(actualStart);
+    existing.setActualEndTime(actualEnd);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    when(missionRepository.save(any(Mission.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    Mission saved =
+        missionService.updateScheduleSection(
+            missionId, null, plannedStart, null, actualStart, actualEnd, 5L);
+
+    assertEquals(plannedStart, saved.getPlannedStartTime());
+    verify(missionParticipantRepository, never()).clampCheckedInEndTimes(any(), any());
+  }
+
+  @Test
   void updateScheduleSection_shouldThrow409_whenScheduleVersionMismatch() {
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
 

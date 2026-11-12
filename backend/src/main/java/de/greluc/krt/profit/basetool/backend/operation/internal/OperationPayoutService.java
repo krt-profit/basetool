@@ -57,6 +57,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,6 +76,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OperationPayoutService {
 
   private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+  private static final String ORPHANED_MARK_PREFIX = "orphan_";
 
   private final OperationRepository operationRepository;
   private final MissionFinanceEntryRepository financeEntryRepository;
@@ -114,7 +116,12 @@ public class OperationPayoutService {
    * @throws NotFoundException when no match
    */
   @NotNull
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public List<OperationPayoutDto> getOperationPayouts(@NotNull UUID id) {
+    return calculatePayouts(id).rows();
+  }
+
+  private PayoutCalculation calculatePayouts(UUID id) {
     Operation operation =
         Entities.require(
             operationRepository.findWithMissionsAndParticipantsById(id), "Operation not found");
@@ -128,13 +135,14 @@ public class OperationPayoutService {
     BigDecimal totalSum = OperationPayoutCalculator.computeTotalSum(allEntries, allOrders);
     Map<String, BigDecimal> personalExpensesByKey =
         OperationPayoutCalculator.computePersonalExpensesByParticipant(allEntries, allOrders);
-    BigDecimal transferFeeRate = transferFeePolicy.snapshot().rate();
+    List<OperationPayoutStatus> statuses = payoutStatusRepository.findByOperationId(id);
+    CalculationBasis basis = calculationBasis(statuses);
 
     OperationPayoutCalculator.ParticipationBreakdown breakdown =
-        OperationPayoutCalculator.computeParticipationBreakdown(operation);
+        OperationPayoutCalculator.computeParticipationBreakdown(operation, basis.referenceTime());
 
     Map<String, OperationPayoutStatus> statusByKey =
-        payoutStatusRepository.findByOperationId(id).stream()
+        statuses.stream()
             .collect(
                 Collectors.toMap(OperationPayoutStatus::getParticipantKey, Function.identity()));
 
@@ -163,7 +171,7 @@ public class OperationPayoutService {
       BigDecimal donatedAmount = donating ? fullShare : zeroShare;
       BigDecimal grossPayout = personalExpenses.add(shareAmount);
       BigDecimal transferFee =
-          grossPayout.multiply(transferFeeRate).setScale(2, RoundingMode.HALF_UP);
+          grossPayout.multiply(basis.feeRate()).setScale(2, RoundingMode.HALF_UP);
       BigDecimal payoutAmount = grossPayout.subtract(transferFee).setScale(0, RoundingMode.HALF_UP);
 
       OperationPayoutStatus status = statusByKey.get(key);
@@ -194,8 +202,20 @@ public class OperationPayoutService {
         Comparator.comparing(
             OperationPayoutDto::participantName,
             Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
-    return result;
+    List<String> orphanedMarks =
+        statuses.stream()
+            .filter(OperationPayoutStatus::isPaidOut)
+            .filter(status -> !breakdown.participantNames().containsKey(status.getParticipantKey()))
+            .map(status -> ORPHANED_MARK_PREFIX + status.getId())
+            .sorted()
+            .toList();
+    boolean hasPaidMarks = statuses.stream().anyMatch(OperationPayoutStatus::isPaidOut);
+    return new PayoutCalculation(result, orphanedMarks, hasPaidMarks);
   }
+
+  /** The computed rows and paid marks whose recipient no longer has a row. */
+  private record PayoutCalculation(
+      List<OperationPayoutDto> rows, List<String> orphanedMarks, boolean hasPaidMarks) {}
 
   /**
    * Returns the operation payout breakdown together with the donation total, summed from the rows'
@@ -206,14 +226,24 @@ public class OperationPayoutService {
    * @throws NotFoundException when no operation matches the id
    */
   @NotNull
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public OperationPayoutSummaryDto getOperationPayoutSummary(@NotNull UUID id) {
-    List<OperationPayoutDto> payouts = restrictToOwnRowIfEscapeOnly(id, getOperationPayouts(id));
+    PayoutCalculation calculation = calculatePayouts(id);
+    List<OperationPayoutDto> payouts = restrictToOwnRowIfEscapeOnly(id, calculation.rows());
     BigDecimal totalDonations =
         payouts.stream()
             .map(OperationPayoutDto::donatedAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(2, RoundingMode.HALF_UP);
-    return new OperationPayoutSummaryDto(totalDonations, payouts);
+    boolean payoutInputsFrozen =
+        calculation.hasPaidMarks() && operationAccessPolicy.canEditOperation(id);
+    List<String> orphanedMarks = calculation.orphanedMarks();
+    if (!orphanedMarks.isEmpty()
+        && (!payoutInputsFrozen || !operationAccessPolicy.canClearPayout(id))) {
+      orphanedMarks = List.of();
+    }
+    return new OperationPayoutSummaryDto(
+        totalDonations, payouts, payoutInputsFrozen, orphanedMarks);
   }
 
   /**
@@ -286,6 +316,7 @@ public class OperationPayoutService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public OperationPayoutStatusDto setPayoutStatusWithinTransaction(
       @NotNull UUID operationId, @NotNull String participantKey, boolean paidOut) {
+    operationRepository.lockPayoutCalculation(operationId);
     Operation operation =
         Entities.require(
             operationRepository.findWithMissionsAndParticipantsById(operationId),
@@ -295,44 +326,91 @@ public class OperationPayoutService {
         OperationPayoutCalculator.computeParticipationBreakdown(operation)
             .participantNames()
             .keySet();
-    if (!validKeys.contains(participantKey)) {
-      throw new NotFoundException(
-          "Participant '" + participantKey + "' is not part of operation " + operationId);
-    }
-
+    boolean orphanedMark = participantKey.startsWith(ORPHANED_MARK_PREFIX);
     OperationPayoutStatus status =
-        payoutStatusRepository
-            .findByOperationIdAndParticipantKey(operationId, participantKey)
-            .orElseGet(() -> {
-              OperationPayoutStatus s = new OperationPayoutStatus();
-              s.setOperation(operation);
-              s.setParticipantKey(participantKey);
-              return s;
-            });
+        orphanedMark
+            ? requireOrphanedMark(operationId, participantKey, paidOut, validKeys)
+            : requireCurrentPayoutStatus(operation, participantKey, validKeys);
 
     final boolean wasPaidOut = status.isPaidOut();
-    status.setPaidOut(paidOut);
     if (paidOut) {
+      CalculationBasis basis =
+          calculationBasis(payoutStatusRepository.findByOperationId(operationId));
+      status.setSettlementFeeRate(basis.feeRate());
+      status.setSettlementCalculatedAt(basis.referenceTime());
       status.setPaidOutAt(Instant.now());
       User actor = userService.getCurrentUser().orElse(null);
       status.setPaidOutByUser(actor);
     }
 
+    status.setPaidOut(paidOut);
     payoutStatusRepository.save(status);
+    AuditDetails details = AuditDetails.of("paidOut", paidOut);
+    if (orphanedMark) {
+      details.with("orphanedMark", status.getId());
+    }
     auditRecorder.record(
-        AuditEventType.OPERATION_PAYOUT_TOGGLED,
-        operationId,
-        operation.getName(),
-        null,
-        AuditDetails.of("paidOut", paidOut));
+        AuditEventType.OPERATION_PAYOUT_TOGGLED, operationId, operation.getName(), null, details);
 
-    publishPayoutNotice(operation, participantKey, wasPaidOut, paidOut);
+    if (!orphanedMark) {
+      publishPayoutNotice(operation, participantKey, wasPaidOut, paidOut);
+    }
 
     String paidOutByName =
-        status.getPaidOutByUser() != null ? status.getPaidOutByUser().getEffectiveName() : null;
+        !orphanedMark && status.getPaidOutByUser() != null
+            ? status.getPaidOutByUser().getEffectiveName()
+            : null;
     return new OperationPayoutStatusDto(
         participantKey, status.isPaidOut(), status.getPaidOutAt(), paidOutByName);
   }
+
+  private OperationPayoutStatus requireCurrentPayoutStatus(
+      Operation operation, String participantKey, Set<String> validKeys) {
+    if (!validKeys.contains(participantKey)) {
+      throw new NotFoundException("Participant is not part of this operation");
+    }
+    return payoutStatusRepository
+        .findByOperationIdAndParticipantKey(operation.getId(), participantKey)
+        .orElseGet(() -> {
+          OperationPayoutStatus status = new OperationPayoutStatus();
+          status.setOperation(operation);
+          status.setParticipantKey(participantKey);
+          return status;
+        });
+  }
+
+  private OperationPayoutStatus requireOrphanedMark(
+      UUID operationId, String key, boolean paidOut, Set<String> validKeys) {
+    if (paidOut) {
+      throw new NotFoundException("Unmatched paid-out mark not found");
+    }
+    UUID id;
+    try {
+      id = UUID.fromString(key.substring(ORPHANED_MARK_PREFIX.length()));
+    } catch (IllegalArgumentException _) {
+      throw new NotFoundException("Unmatched paid-out mark not found");
+    }
+    return Entities.require(
+        payoutStatusRepository
+            .findByIdAndOperationIdAndPaidOutTrue(id, operationId)
+            .filter(status -> !validKeys.contains(status.getParticipantKey())),
+        "Unmatched paid-out mark not found");
+  }
+
+  private CalculationBasis calculationBasis(List<OperationPayoutStatus> statuses) {
+    for (OperationPayoutStatus status : statuses) {
+      if (status.isPaidOut()
+          && status.getSettlementFeeRate() != null
+          && status.getSettlementCalculatedAt() != null) {
+        return new CalculationBasis(
+            status.getSettlementFeeRate(), status.getSettlementCalculatedAt());
+      }
+    }
+    return new CalculationBasis(transferFeePolicy.snapshot().rate(), Instant.now());
+  }
+
+  /** Fee and attendance inputs retained while an operation has paid-out marks. */
+  private record CalculationBasis(BigDecimal feeRate, Instant referenceTime) {}
 
   /**
    * Tells a participant that their payout was paid out, or takes that notice back, when the mark
@@ -371,14 +449,15 @@ public class OperationPayoutService {
     boolean lastOpenPayout = payouts.stream().allMatch(OperationPayoutDto::paidOut);
     eventPublisher.publishEvent(
         OperationNotices.payoutMarked(
-            operation.getId(),
-            operation.getName(),
-            recipientId,
-            mine.payoutAmount(),
-            mine.donatedAmount(),
-            mine.transferFee(),
-            userService.currentActor(),
-            lastOpenPayout));
+                operation.getId(),
+                operation.getName(),
+                recipientId,
+                mine.payoutAmount(),
+                mine.donatedAmount(),
+                mine.transferFee(),
+                userService.currentActor(),
+                lastOpenPayout)
+            .inOrgUnit(subjectUnit(operation)));
   }
 
   /**
@@ -404,18 +483,22 @@ public class OperationPayoutService {
             operation.getMissions().stream()
                 .filter(m -> m.getActualStartTime() == null || m.getActualEndTime() == null)
                 .count();
-    OrgUnit owner = operation.getOwningOrgUnit();
     eventPublisher.publishEvent(
         OperationNotices.completed(
             operation.getId(),
             operation.getName(),
-            owner == null ? null : new OrgUnitRef(owner.getId(), owner.getKind()),
+            subjectUnit(operation),
             userService.currentActor(),
             total,
             open,
             paid,
             payouts.size(),
             unfinished));
+  }
+
+  private static @Nullable OrgUnitRef subjectUnit(Operation operation) {
+    OrgUnit owner = operation.getOwningOrgUnit();
+    return owner == null ? null : new OrgUnitRef(owner.getId(), owner.getKind());
   }
 
   /**

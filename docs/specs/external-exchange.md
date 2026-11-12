@@ -1236,7 +1236,7 @@ with the external client. A ship's `name` is optional and up to 255 characters, 
 unnamed ship is sent without it, and an upsert may leave it out (owner decision 2026-09-27). An
 `upsert` sets the ship as sent: a `name` or `location` it leaves out is cleared, and only an absent
 `fitted` keeps its value. An `upsert` may name the ship's org unit as `orgUnit`, one of the member's
-direct memberships of any kind or `null` for none (#2602). A create without it puts the ship in the
+stampable units of any kind or `null` for none (#2602, REQ-ORG-004). A create without it puts the ship in the
 member's only stampable unit — a direct membership on an active unit, while the member holds the
 stored role `KRT Member` (REQ-ORG-032) —, or in none when the member has none or several, and the
 member can assign it later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner
@@ -1245,7 +1245,7 @@ decision 2026-09-27, `HangarService.addShipForClient`,
 stored unit, so an older client never clears a unit set in the web; an update that changes it also
 sends the ship's `orgUnitVersion` and goes through the Hangar's unit change, which never moves the
 ship's `version`; naming the stored unit writes nothing, even when the member has since left it. A
-unit outside the member's direct memberships rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a
+unit outside the member's stampable units rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a
 missing or stale `orgUnitVersion` with `ORG_UNIT_VERSION_CONFLICT`; the rest of the batch still
 applies.
 *Corrected 2026-09-27: a member of several units had the whole batch refused with
@@ -1708,8 +1708,8 @@ still govern every retained operation. A ship also goes back to the org unit its
 earlier state names (`orgUnit`, none included): one that still exists moves there through the
 Hangar's unit change behind its current unit counter (REQ-HANGAR-009, ADR-0258, audited
 `HANGAR_SHIP_ORG_UNIT_CHANGED`, its `version` untouched), and a recreated one is created in it. An
-earlier unit the member no longer directly belongs to is not restored — the ship keeps its current
-unit — and the entry still counts as restored. A recreated ship whose unit is not restored, or whose
+earlier unit outside the member's stampable units leaves an existing ship in its current unit and
+the entry still counts as restored (REQ-ORG-004). A recreated ship whose unit is not restored, or whose
 journaled state has no `orgUnit` key, is stamped like a client's create (REQ-XCH-017): the member's
 only stampable unit, or none for a member with none or several; an existing ship whose state has no
 `orgUnit` key keeps its unit. Links the client made are taken back, and a
@@ -2986,8 +2986,8 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
     its own pool is `unchanged`;
   - `allocation-add`, `allocation-change`, `allocation-remove` on an entry, naming one `jobOrder`
     or one `mission` and, to add or change, a `quantity`: the Lager's allocation writes of
-    REQ-INV-027 with their rules — a job order that needs the material or item, an existing
-    mission and none for an item, no second earmark to the same target and one to change
+    REQ-INV-027 with their rules — a job order that needs the material or item, a readable
+    mission for a new earmark and none for an item, no second earmark to the same target and one to change
     (`EARMARK_TARGET_INVALID`), per dimension no more than the entry holds (`OVER_ALLOCATION`).
     Each op advances the entry's version by one, so a later op of the batch names the next one; a
     change to the amount it has, a removal of an earmark it does not have and an amount that rounds to
@@ -3008,7 +3008,9 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   names a material or a game item. Job orders are the open and in-progress ones that need it and
   that the unit, a Spezialkommando or no unit is responsible for, only for a member who passes the
   web's job-order gate (REQ-XCH-018), with id, `number` and status; missions are those of the
-  Lager's mission picker for the unit, with id, name and status, and none for an item. An id that
+  Lager's mission picker for the unit, with id, name and status, and none for an item. The picker
+  uses the selected pool's context. A new earmark write checks mission visibility for the reduced
+  acting member, whose Exchange request carries no web pin (REQ-XCH-009). An id that
   names neither answers empty lists; a unit the member is not a Logistician and direct member of is
   `403 NOT_PERMITTED`. The answer is `org-stock-targets.schema.json`.
 - **Side effects as in the web.** Reservations are protected (`STOCK_EARMARKED`, `OVER_ALLOCATION`),
@@ -3731,7 +3733,8 @@ restore it as follows:
 
 - **`delete`** — the order is recreated under its old id, its goods under their old ids, with its
   `clientKey`, client marker and every field; the mission link only while that mission still
-  exists, the owning unit only while the member is still a direct member of it (else none). Both
+  exists, the owning unit only while it is one of the member's stampable units (REQ-ORG-004).
+  Otherwise the order is recreated without an owning unit. Both
   counters come back one above the deleted order's, so a client's stale echo is refused. Sections
   the client's earlier writes in the span touched go back under the counter check above, also when
   those writes are in the delete's own change set; an order the client also created in the span

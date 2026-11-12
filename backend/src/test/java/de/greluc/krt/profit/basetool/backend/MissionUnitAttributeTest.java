@@ -97,6 +97,7 @@ class MissionUnitAttributeTest {
     ship.setName("Test Ship Attribute");
     ship.setOwner(officerUser);
     ship.setShipType(shipType);
+    ship.setInsurance("LTI");
     shipRepository.save(ship);
 
     mission = new Mission();

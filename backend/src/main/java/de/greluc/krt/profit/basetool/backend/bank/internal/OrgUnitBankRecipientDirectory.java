@@ -22,14 +22,20 @@ package de.greluc.krt.profit.basetool.backend.bank.internal;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.notification.api.AccountRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.notification.api.NotificationRoleAudience;
 import de.greluc.krt.profit.basetool.backend.notification.api.RoleRecipientDirectory;
+import de.greluc.krt.profit.basetool.backend.notification.api.events.OrgUnitRef;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.MembershipRole;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitSeatEligibility;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -55,6 +61,15 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
   private final OrgUnitSeatEligibility seatEligibility;
   private final RoleRecipientDirectory roleRecipientDirectory;
+
+  @Override
+  @Transactional(readOnly = true)
+  public @NotNull Optional<OrgUnitRef> orgUnitOfAccount(@NotNull UUID accountId) {
+    return bankAccountRepository
+        .findById(accountId)
+        .map(BankAccount::getOrgUnit)
+        .map(unit -> new OrgUnitRef(unit.getId(), unit.getKind()));
+  }
 
   /**
    * The grantees of an account who hold Bank Employee or a role above it; the inert grant of anyone
@@ -107,9 +122,8 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
    * The members whose approval a pending, over-limit, not yet approved request waits for, by its
    * {@code required_approver} (REQ-NOTIF-033, REQ-BANK-041/-047): the account's responsible
    * holders, the {@code BANK_MANAGEMENT} role holders or every {@code OL_MEMBER}, a seat holder
-   * only while they hold {@code KRT Member}. A request naming no approver class falls to the
-   * responsible holders, as its approval does. The requester is left out, because they may not
-   * approve their own request (REQ-BANK-062).
+   * only while they hold {@code KRT Member}. The requester is excluded. If a request routed to the
+   * responsible holder has no eligible approver, the notice goes to administrators.
    *
    * @param requestId the booking request
    * @return their user subs; never {@code null}, empty when no approval is outstanding
@@ -117,17 +131,36 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
   @Override
   @NotNull
   @Transactional(readOnly = true)
-  public Set<UUID> requiredApproversOf(@NotNull UUID requestId) {
+  public Map<UUID, NotificationRoleAudience> requiredApproverAudienceOf(@NotNull UUID requestId) {
     BankBookingRequest request = bankBookingRequestRepository.findById(requestId).orElse(null);
     if (request == null || !awaitsApproval(request)) {
-      return Set.of();
+      return Map.of();
     }
     Set<UUID> approvers = new HashSet<>(approversOf(request));
     UUID requester = request.getRequestedBy();
-    if (requester != null) {
+    approvers.remove(requester);
+    if (approvers.isEmpty() && isHolderApproval(request)) {
+      approvers.addAll(roleRecipientDirectory.holdersOfRole(Roles.ADMIN));
       approvers.remove(requester);
+      return withAudience(approvers, NotificationRoleAudience.DIRECT);
     }
-    return approvers;
+    return withAudience(
+        approvers,
+        request.getRequiredApprover() == BankRequestApprover.BANK_MANAGEMENT
+            ? NotificationRoleAudience.DIRECT
+            : NotificationRoleAudience.MEMBER);
+  }
+
+  private static Map<UUID, NotificationRoleAudience> withAudience(
+      Set<UUID> recipients, NotificationRoleAudience audience) {
+    return recipients.stream()
+        .collect(Collectors.toUnmodifiableMap(Function.identity(), _ -> audience));
+  }
+
+  private static boolean isHolderApproval(@NotNull BankBookingRequest request) {
+    BankRequestApprover approver = request.getRequiredApprover();
+    return (approver == null || approver == BankRequestApprover.RESPONSIBLE_HOLDER)
+        && Objects.requireNonNull(request.getAccount()).getType() != BankAccountType.CARTEL;
   }
 
   /**
@@ -150,15 +183,17 @@ public class OrgUnitBankRecipientDirectory implements AccountRecipientDirectory 
    */
   @NotNull
   private Set<UUID> approversOf(@NotNull BankBookingRequest request) {
-    BankRequestApprover approver = request.getRequiredApprover();
+    BankRequestApprover approver =
+        Objects.requireNonNullElse(
+            request.getRequiredApprover(), BankRequestApprover.RESPONSIBLE_HOLDER);
     UUID accountId = Objects.requireNonNull(request.getAccount()).getId();
     return switch (approver) {
-      case RESPONSIBLE_HOLDER -> responsibleHoldersOf(accountId);
+      case RESPONSIBLE_HOLDER ->
+          isHolderApproval(request) ? responsibleHoldersOf(accountId) : Set.of();
       case BANK_MANAGEMENT -> roleRecipientDirectory.holdersOfRole(Roles.BANK_MANAGEMENT);
       case ORGANISATIONSLEITUNG ->
           seatEligibility.krtMembersAmong(
               orgUnitMembershipRepository.findUserIdsByRole(MembershipRole.OL_MEMBER));
-      case null -> responsibleHoldersOf(accountId);
     };
   }
 }

@@ -38,7 +38,6 @@ import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingSetting
 import de.greluc.krt.profit.basetool.frontend.purchasing.model.PurchasingStateDto;
 import de.greluc.krt.profit.basetool.frontend.supply.client.SupplyBackendClient;
 import de.greluc.krt.profit.basetool.frontend.supply.model.NeedDto;
-import de.greluc.krt.profit.basetool.frontend.supply.model.SupplyUnitDto;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Set;
@@ -205,7 +204,6 @@ public class PurchasingPageController {
       PurchasingStateDto state = purchasingState();
       model.addAttribute("openNeeds", state.delegate() ? purchasableNeeds() : List.<NeedDto>of());
       model.addAttribute("partners", state.delegate() ? activePartners() : List.<PartnerDto>of());
-      model.addAttribute("pausableUnits", pausableUnits());
     }
     return results ? "purchasing/deals :: dealsResults" : "purchasing/deals";
   }
@@ -372,7 +370,9 @@ public class PurchasingPageController {
   private @NotNull PauseStateDto pauseStateOrNone() {
     PauseStateDto state =
         SectionFallback.load(log, "purchasing-pause-state", purchasingClient::pauseState, null);
-    return state == null ? new PauseStateDto(false, null, null, List.of()) : state;
+    return state == null
+        ? new PauseStateDto(false, null, null, List.of(), false, List.of())
+        : state;
   }
 
   private @NotNull List<NeedDto> purchasableNeeds() {
@@ -383,14 +383,6 @@ public class PurchasingPageController {
   private @NotNull List<PartnerDto> activePartners() {
     PageResponse<PartnerDto> partners = purchasingClient.partners(null, null, "ACTIVE", 0, 200);
     return partners == null ? List.of() : partners.content();
-  }
-
-  private @NotNull List<SupplyUnitDto> pausableUnits() {
-    List<SupplyUnitDto> units =
-        SectionFallback.load(log, "purchasing-pausable-units", supplyClient::units, List.of());
-    return units == null
-        ? List.of()
-        : units.stream().filter(u -> u.canManage() && u.mayRaiseNeeds()).toList();
   }
 
   private static @Nullable String month(@Nullable String value) {

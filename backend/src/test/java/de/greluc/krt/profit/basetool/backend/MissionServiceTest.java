@@ -112,124 +112,51 @@ class MissionServiceTest {
   }
 
   @Test
-  void getNextMission_refetchesByIdThroughGraph() {
+  void getNextMission_skipsHiddenHeadAndRefetchesFirstVisibleCandidate() {
     UUID id = UUID.randomUUID();
-    Mission head = new Mission();
-    head.setId(id);
-    Mission detail = new Mission();
-    detail.setId(id);
-    when(requestScopeResolver.currentScopePredicate())
-        .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-            any(), eq(List.of("PLANNED", "ACTIVE"))))
-        .thenReturn(Optional.of(head));
-    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
-
-    Optional<Mission> result = missionService.getNextMission();
-
-    assertSame(detail, result.orElseThrow(), "must return the graphed findById re-fetch");
-    verify(missionRepository)
-        .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-            any(), eq(List.of("PLANNED", "ACTIVE")));
-    verify(missionRepository).findById(id);
-  }
-
-  @Test
-  void getNextMission_noUpcomingMission_returnsEmptyWithoutRefetch() {
-    when(requestScopeResolver.currentScopePredicate())
-        .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(missionRepository.findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(
-            any(), eq(List.of("PLANNED", "ACTIVE"))))
-        .thenReturn(Optional.empty());
-
-    Optional<Mission> result = missionService.getNextMission();
-
-    assertEquals(Optional.empty(), result);
-    verify(missionRepository, never()).findById(any());
-  }
-
-  @Test
-  void getNextMission_memberWithoutUnit_readsPublicMissionsOnly() {
-    UUID id = UUID.randomUUID();
+    Mission hidden = new Mission();
+    hidden.setId(UUID.randomUUID());
     Mission head = new Mission();
     head.setId(id);
     Mission detail = new Mission();
     detail.setId(id);
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(missionRepository.findNextPublicMission(any(), eq(List.of("PLANNED", "ACTIVE"))))
-        .thenReturn(Optional.of(head));
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(),
+            eq(List.of("PLANNED", "ACTIVE")),
+            eq(false),
+            eq(true),
+            isNull(),
+            eq(Set.of()),
+            isNull(),
+            any()))
+        .thenReturn(List.of(hidden, head));
+    when(missionVisibility.canSeeMission(hidden)).thenReturn(false);
+    when(missionVisibility.canSeeMission(head)).thenReturn(true);
     when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
 
-    Optional<Mission> result = missionService.getNextMission();
-
-    assertSame(detail, result.orElseThrow());
-    verify(missionRepository, never())
-        .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(any(), any());
-    verify(missionRepository, never()).findNextScopedMission(any(), any(), any(), any(), any());
+    assertSame(detail, missionService.getNextMission().orElseThrow());
+    verify(missionRepository, never()).findById(hidden.getId());
   }
 
   @Test
-  void getNextMission_scopedMember_usesScopedQueryThenRefetches() {
-    UUID orgA = UUID.randomUUID();
-    UUID id = UUID.randomUUID();
-    Mission head = new Mission();
-    head.setId(id);
-    Mission detail = new Mission();
-    detail.setId(id);
-    when(requestScopeResolver.currentScopePredicate())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
-    when(missionRepository.findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any()))
-        .thenReturn(List.of(head));
-    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
-
-    Optional<Mission> result = missionService.getNextMission();
-
-    assertSame(detail, result.orElseThrow(), "scoped lookup must re-fetch the hit by id");
-    verify(missionRepository)
-        .findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any());
-    verify(missionRepository).findById(id);
-    verify(missionRepository, never())
-        .findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(any(), any());
-  }
-
-  @Test
-  void getNextMission_scopedPinned_passesActiveOrgUnitId() {
+  void getNextMission_returnsEmptyWhenNoCandidateIsVisible() {
     UUID pin = UUID.randomUUID();
-    UUID id = UUID.randomUUID();
-    Mission head = new Mission();
-    head.setId(id);
-    Mission detail = new Mission();
-    detail.setId(id);
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, pin, Set.of()));
-    when(missionRepository.findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), eq(pin), eq(Set.of()), any()))
-        .thenReturn(List.of(head));
-    when(missionRepository.findById(id)).thenReturn(Optional.of(detail));
+    when(missionRepository.findUpcomingOwnOrSignedUp(
+            any(),
+            eq(List.of("PLANNED", "ACTIVE")),
+            eq(false),
+            eq(false),
+            eq(pin),
+            eq(Set.of()),
+            isNull(),
+            any()))
+        .thenReturn(List.of(new Mission()));
 
-    Optional<Mission> result = missionService.getNextMission();
-
-    assertSame(detail, result.orElseThrow());
-    verify(missionRepository)
-        .findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), eq(pin), eq(Set.of()), any());
-  }
-
-  @Test
-  void getNextMission_scopedMember_noUpcoming_returnsEmptyWithoutRefetch() {
-    UUID orgA = UUID.randomUUID();
-    when(requestScopeResolver.currentScopePredicate())
-        .thenReturn(new ScopePredicate(false, null, Set.of(orgA)));
-    when(missionRepository.findNextScopedMission(
-            any(), eq(List.of("PLANNED", "ACTIVE")), isNull(), eq(Set.of(orgA)), any()))
-        .thenReturn(List.of());
-
-    Optional<Mission> result = missionService.getNextMission();
-
-    assertEquals(Optional.empty(), result);
+    assertEquals(Optional.empty(), missionService.getNextMission());
     verify(missionRepository, never()).findById(any());
   }
 

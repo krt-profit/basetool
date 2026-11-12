@@ -202,8 +202,7 @@ class NotificationRuleServiceTest {
         "MISSION_PARTICIPANTS",
         "MISSION_LEADERSHIP",
         "EXCHANGE_CLIENT_HOLDERS",
-        "EVENT_RECIPIENTS",
-        "SEAT_HOLDERS"
+        "EVENT_RECIPIENTS"
       })
   void createAcceptsEventDerivedKindAndStoresNoColumns(SelectorKind kind) {
     NotificationRule saved = ruleWithVersion(UUID.randomUUID(), 0L);
@@ -289,6 +288,16 @@ class NotificationRuleServiceTest {
     IllegalArgumentException ex =
         assertThrows(IllegalArgumentException.class, () -> notificationRuleService.create(request));
     assertThat(ex.getMessage()).as(label).contains(expectedMessage);
+    verify(notificationRuleRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void rejectsAnEnabledGlobalRoleForAUnitEvent() {
+    catalogueKnows("KRT_MEMBER");
+
+    assertThatThrownBy(
+            () -> notificationRuleService.create(writeRequest(null, roleSelector("KRT_MEMBER"))))
+        .isInstanceOf(de.greluc.krt.profit.basetool.backend.kernel.BadRequestException.class);
     verify(notificationRuleRepository, never()).saveAndFlush(any());
   }
 

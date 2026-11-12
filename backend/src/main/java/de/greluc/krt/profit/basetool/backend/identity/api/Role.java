@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.identity.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -31,6 +32,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Stream;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -78,4 +80,13 @@ public class Role extends AbstractEntity<Long> {
   @Column(name = "permission")
   @ToString.Exclude
   private Set<String> permissions = new HashSet<>();
+
+  /**
+   * Returns the stored permissions that can be granted as authorities.
+   *
+   * @return the in-vocabulary permissions
+   */
+  public Stream<String> effectivePermissions() {
+    return permissions.stream().filter(Permissions::isKnown);
+  }
 }

@@ -193,10 +193,10 @@ on its own, never a stack aggregate.
 
 ### REQ-INV-004 — Org-unit reconcile re-stamps without merging
 
-When a user gains their first or loses their last org-unit membership, the reconciler
-re-stamps `owning_org_unit` on their non-personal rows (promote `NULL` → the joined unit, or
-demote all → `NULL`). It must **not** merge rows that become identical after the re-stamp;
-they remain separate and are collapsed only for display.
+When a `KRT Member` without active memberships joins an active org unit, the reconciler assigns
+their unowned non-personal Lager rows to the joined unit. Stored memberships on deactivated units
+do not block adoption. The reconciler clears ownership from non-personal rows when the member loses
+their last stored membership. Rows remain separate and are collapsed only for display.
 
 **Acceptance**
 
@@ -343,14 +343,10 @@ its modal also hosts the relocated location/user transfer (the former book-out `
 `/inventory/all` view exposes the Umbuchen action for the location/user transfer only (the
 personal↔shared toggle is owner-scoped and lives on `/my`). Both owning-org-unit pickers — the
 de-personalize picker (keyed on the row owner) and the location/user transfer picker (keyed on the
-destination user) — offer the selected owner's direct memberships across all four org-unit kinds
-(Staffel + SK + Bereich + OL). Each picker is **shown whenever that owner has at least one
-membership** and is **preset to the row's current owning org unit** (or the owner's primary unit
-when the current unit is not one of the owner's memberships, e.g. a cross-user transfer), so a submit
-that does not touch the picker keeps the stock in its current unit rather than silently reassigning
-it. A picker is hidden only for a membershipless owner — the moved/shared row is then ownerless.
-There is no "keep home unit" placeholder: the picker always carries a concrete preselected unit
-(#1328).
+destination user) — offer the selected owner's stampable units of all four kinds (REQ-ORG-004).
+This applies to single and bulk rebooking. Each picker is shown when the owner has an eligible
+unit. It preselects the active context when it is an option, else the sole option. With several
+eligible units and no matching active context, „Bitte wählen" requires an explicit choice.
 
 **Acceptance**
 
@@ -360,11 +356,10 @@ There is no "keep home unit" placeholder: the picker always carries a concrete p
 - [ ] A de-personalize stamps the new shared row on the picked org-unit pool (or the owner's sole
   membership, or `null` when membershipless), consistent with REQ-ORG-004.
 - [ ] The owning-org-unit picker (de-personalize and location/user transfer) lists the selected
-  owner's direct memberships across all four kinds (Staffel + SK + Bereich + OL, via
-  `?allKinds=true`); a Bereich/OL-member owner can book into their Bereich/OL pool.
-- [ ] The picker is visible whenever the owner has ≥1 membership (not only ≥2) and is preset to the
-  row's current owning org unit, so submitting without changing it keeps the current unit; it is
-  hidden only for a membershipless owner.
+  owner's stampable units across all four kinds (`?allKinds=true&ownerPicker=true`).
+- [ ] The picker uses the eligible active context or sole option. With several eligible units
+  and no matching active context, the booking requires a choice. With no eligible units, the
+  picker is hidden.
 - [ ] A personalize carries the source row's `owningOrgUnit` over and refuses a source bound to a
   job order or mission with HTTP 400.
 - [ ] A stale `version` yields HTTP 409; a non-owner without an admin/logistician grant yields 403.
@@ -749,6 +744,10 @@ there is no separate income-attribution input.
   amount to it (per dimension); with two or more targets a blank row is refused with `422`
   `INVENTORY_ALLOCATION_AMOUNT_MISSING` and the form does not submit, an explicit amount always
   wins, and a blank-amount row still trips the personal-entry rejection.
+
+For book-in or allocation add, a mission the writer cannot see is treated as an unknown target
+(REQ-MISSION-008). Changes to, removal of and undo of existing allocations use the caller-independent
+mission lookup.
 
 A connected application does the same for a Logistician of the entry's pool through the org-stock
 ops `allocation-add`, `allocation-change` and `allocation-remove` (REQ-XCH-045), with these rules and
@@ -1426,8 +1425,9 @@ themselves are not yet pinned by a test · **Code:**
 > `ExternalContractTest` went with the app and `ApiVhostAnonymousSurfaceTest` with the API vhost,
 > so both leave the enforcer list.
 
-A member can set the owning org unit of one of their **own personal** rows to one of their direct
-memberships of any of the four kinds, or to **„Keine Einheit"**, after the booking — per row
+A member can set the owning org unit of one of their **own personal** rows to one of their
+stampable units or to **„Keine Einheit"** after the booking. Stampable units are active direct
+memberships of any of the four kinds while the owner holds `KRT Member` (REQ-ORG-004). Changes work — per row
 (`POST /api/v1/inventory/{id}/org-unit`, optimistic `version`) and for a selection from the bulk bar
 (`POST /api/v1/inventory/bulk-org-unit`, rows locked pessimistically in sorted id order, no
 versions, like REQ-INV-036). Stock booked in through the exchange carries no unit (REQ-XCH-016), and
@@ -1454,7 +1454,7 @@ and a `TRANSFER` may not change it alone (REQ-INV-025).
 **Acceptance**
 
 - [x] Own personal rows move to a membership and back to no unit, singly and as a selection; shared
-  or foreign rows and a unit that is not a membership are refused.
+  or foreign rows and targets outside the owner's stampable units are refused.
 - [x] `PIECE` rows merge into the new unit's stack, `SCU` rows only with the opt-in.
 - [x] An unchanged unit records nothing; a change records one event, a selection one summary.
 - [x] The web action and bulk-bar button update the page in place.

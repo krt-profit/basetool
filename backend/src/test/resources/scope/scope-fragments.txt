@@ -1,11 +1,33 @@
+=== MISSION_ANCESTOR_VISIBILITY
+WITH unreadable_mission AS (
+  SELECT m.id AS id FROM Mission m
+  WHERE EXISTS (SELECT 1 FROM Mission child WHERE child.parent.id = m.id)
+    AND NOT
+(
+  :isAdminAllScope = true
+  OR coalesce(m.isInternal, false) = false
+  OR (m.owningOrgUnit IS NOT NULL AND (
+    (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)
+    OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)
+  ))
+  OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)
+ )
+  UNION
+  SELECT child.id AS id FROM Mission child
+  JOIN unreadable_mission ancestor ON child.parent.id = ancestor.id
+)
+=== end
 === MISSION_SCOPE_PREDICATE
 (
   :isAdminAllScope = true
-  OR (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)
-  OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)
-  OR m.isInternal = false
+  OR coalesce(m.isInternal, false) = false
+  OR (m.owningOrgUnit IS NOT NULL AND (
+    (:activeOrgUnitId IS NOT NULL AND m.owningOrgUnit.id = :activeOrgUnitId)
+    OR (:activeOrgUnitId IS NULL AND m.owningOrgUnit.id IN :memberOrgUnitIds)
+  ))
   OR (m.owningOrgUnit IS NULL AND :viewerIsMemberOrAbove = true)
  )
+AND m.id NOT IN (SELECT hidden.id FROM unreadable_mission hidden)
 === end
 === SHIP_SCOPE_TRIPLE
 (

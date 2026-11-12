@@ -62,7 +62,7 @@ public class OwnedRowsMover {
       int dropped = dropRowsTheTargetAlreadyHas(owned, source, target);
       int repointed = repoint(owned, source, target);
       if (repointed > 0 || dropped > 0) {
-        moved.add(new Moved(owned.qualified(), repointed));
+        moved.add(new Moved(owned.qualified(), repointed, dropped));
       }
     }
     return moved;

@@ -100,6 +100,7 @@ class MissionUnitManagementTest {
     ship.setName("Test Ship");
     ship.setOwner(officerUser);
     ship.setShipType(st);
+    ship.setInsurance("LTI");
     shipRepository.save(ship);
 
     mission =
@@ -399,6 +400,7 @@ class MissionUnitManagementTest {
     outsiderShip.setName("Outsider Ship");
     outsiderShip.setOwner(outsider);
     outsiderShip.setShipType(ship.getShipType());
+    outsiderShip.setInsurance("LTI");
     return shipRepository.save(outsiderShip);
   }
 }

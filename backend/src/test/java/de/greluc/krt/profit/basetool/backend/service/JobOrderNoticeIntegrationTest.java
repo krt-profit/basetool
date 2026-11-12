@@ -216,18 +216,18 @@ class JobOrderNoticeIntegrationTest {
   }
 
   @Test
-  void anAutomaticPromiseEndingRetainsItsExistingNoticePolicy() {
+  void anAutomaticPromiseEndingNotifiesAnEligibleWriterAndDropsARolelessRecipient() {
     creationService.createFromEvent(
         JobOrderNotices.promisesEnded(
             orderId,
             12,
             "Ada",
-            Set.of(ASSIGNEE),
+            Set.of(LOGISTICIAN, ASSIGNEE),
             "Quantanium",
             JobOrderNotices.AutomaticEndingReason.ORDER_CHANGED,
             ACTING));
 
-    assertThat(inbox(ASSIGNEE)).containsExactly(NotificationType.JOB_ORDER_CLAIM_WITHDRAWN);
-    assertThat(inbox(LOGISTICIAN)).isEmpty();
+    assertThat(inbox(LOGISTICIAN)).containsExactly(NotificationType.JOB_ORDER_CLAIM_WITHDRAWN);
+    assertThat(inbox(ASSIGNEE)).isEmpty();
   }
 }
