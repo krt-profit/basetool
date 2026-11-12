@@ -140,7 +140,7 @@ export function createMissionTemplateEditor(panel) {
      * Starts an editor in create or edit mode.
      *
      * @param {string} ownerId the active scope for a blank template
-     * @param {MissionTemplate | null} template the stored planning content, or null for blank
+     * @param {MissionTemplate | ApiDto<'CreateMissionTemplateRequest'> | null} template the initial planning content, or null for blank
      */
     function open(ownerId, template) {
         form.reset();
@@ -148,12 +148,13 @@ export function createMissionTemplateEditor(panel) {
         rows('steps').replaceChildren();
         rows('units').replaceChildren();
         owner.value = template?.owningOrgUnitId || ownerId;
-        owner.disabled = template !== null;
+        const editing = Boolean(template && 'id' in template && template.id);
+        owner.disabled = editing;
         name.value = template?.name || '';
-        heading.textContent = template
+        heading.textContent = editing
             ? panel.dataset.editTitle || ''
             : panel.dataset.createTitle || '';
-        deleteButton.hidden = template === null;
+        deleteButton.hidden = !editing;
         template?.objectives?.forEach((row) => addRow('objectives', row));
         template?.steps?.forEach((row) => addRow('steps', row));
         template?.units?.forEach((row) => addRow('units', row));

@@ -46,6 +46,12 @@ public class MissionMentionSource implements PersonMentionSource {
         new Target("MISSION", "mission_participant", "guest_name", "mission_id", LinkKind.MISSION),
         new Target("MISSION", "mission_step", "meta", "mission_id", LinkKind.MISSION),
         new Target("MISSION", "mission_step", "title", "mission_id", LinkKind.MISSION),
+        new Target("MISSION", "mission_template", "name", "id", null),
+        new Target("MISSION", "mission_template_objective", "title", "template_id", null),
+        new Target("MISSION", "mission_template_step", "meta", "template_id", null),
+        new Target("MISSION", "mission_template_step", "title", "template_id", null),
+        new Target("MISSION", "mission_template_unit", "name", "template_id", null),
+        new Target("MISSION", "mission_template_unit", "note", "template_id", null),
         new Target("MISSION", "mission_unit", "name", "mission_id", LinkKind.MISSION),
         new Target("MISSION", "mission_unit", "note", "mission_id", LinkKind.MISSION));
   }
@@ -64,6 +70,7 @@ public class MissionMentionSource implements PersonMentionSource {
         "mission_objective.updated_by",
         "mission_participant.payout_preference",
         "mission_step.created_by",
-        "mission_step.updated_by");
+        "mission_step.updated_by",
+        "mission_template_objective.kind");
   }
 }

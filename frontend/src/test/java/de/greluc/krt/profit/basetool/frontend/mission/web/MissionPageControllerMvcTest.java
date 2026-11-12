@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -65,6 +66,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDt
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateCustomFrequencyRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionOwnerRequest;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -214,6 +216,9 @@ class MissionPageControllerMvcTest {
     UUID missionId = UUID.randomUUID();
 
     MissionDto mission = minimalMission(missionId);
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(
+            new MeLayoutResponse(null, null, List.of(), LayoutResponses.missionManager(), 0L));
 
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
@@ -226,6 +231,8 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission/mission-detail"))
         .andExpect(content().string(containsString("mission-head-sticky")))
+        .andExpect(
+            content().string(containsString("/mission-templates?sourceMissionId=" + missionId)))
         .andExpect(content().string(containsString("facts-bar")))
         .andExpect(content().string(containsString("role=\"tablist\"")))
         .andExpect(content().string(containsString("id=\"pane-ueb\"")))
@@ -248,7 +255,10 @@ class MissionPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
-    mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
+    mockMvc
+        .perform(get("/missions/" + missionId))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("sourceMissionId="))));
 
     verify(backendApiClient)
         .get(

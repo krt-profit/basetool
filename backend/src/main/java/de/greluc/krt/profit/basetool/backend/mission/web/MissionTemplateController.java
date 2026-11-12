@@ -50,7 +50,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "Mission templates")
 @PreAuthorize("isAuthenticated()")
-class MissionTemplateController {
+public class MissionTemplateController {
 
   private final MissionTemplateService templates;
 

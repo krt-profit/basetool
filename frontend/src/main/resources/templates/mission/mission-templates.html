@@ -24,6 +24,7 @@
         </section>
         <section class="list-panel" th:if="${ownerId != null}" id="mission-template-workspace"
                  th:attr="data-list-url=@{/mission-templates/list},data-templates-url=@{/mission-templates},
+                     data-template-draft=${templateDraft},
                      data-load-error=#{missionTemplate.error.load},data-list-error=#{missionTemplate.error.list},
                      data-save-error=#{missionTemplate.error.save},data-delete-error=#{missionTemplate.error.delete},
                      data-duplicate-error=#{missionTemplate.error.duplicate},data-revision-error=#{missionTemplate.error.revision},

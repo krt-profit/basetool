@@ -25,18 +25,26 @@ import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionBackendClient;
 import de.greluc.krt.profit.basetool.frontend.mission.client.MissionTemplateBackendClient;
+import de.greluc.krt.profit.basetool.frontend.mission.model.CreateMissionTemplateRequest;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionObjectiveKind;
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplateOwnerDto;
+import de.greluc.krt.profit.basetool.frontend.mission.model.MissionTemplatePlan;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Renders the org-unit template list and its independent editor. */
 @Controller
@@ -49,16 +57,21 @@ public class MissionTemplatePageController {
   private final MissionTemplateBackendClient templates;
   private final MissionBackendClient missions;
   private final LayoutContextLoader layout;
+  private final JsonMapper jsonMapper;
 
   /**
    * Shows an eligible unit's templates and the controls for managing them.
    *
+   * @param sourceMissionId the optional mission to use as the editor's starting point
    * @param request the request carrying the active org unit
    * @param model the template view model
    * @return the management page
    */
   @GetMapping
-  public String page(HttpServletRequest request, Model model) {
+  public String page(
+      @RequestParam(required = false) @Nullable UUID sourceMissionId,
+      HttpServletRequest request,
+      Model model) {
     List<MissionTemplateOwnerDto> owners = withBackendStatus(templates::owners);
     UUID active = layout.load(request).activeOrgUnitId();
     UUID owner =
@@ -67,6 +80,16 @@ public class MissionTemplatePageController {
             .filter(id -> id.equals(active))
             .findFirst()
             .orElseGet(() -> owners.isEmpty() ? null : owners.getFirst().id());
+    if (sourceMissionId != null) {
+      if (owner == null) {
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+      }
+      MissionDto source = withBackendStatus(() -> missions.mission(sourceMissionId));
+      if (source == null) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+      }
+      model.addAttribute("templateDraft", jsonMapper.writeValueAsString(draft(owner, source)));
+    }
     model.addAttribute("owners", owners);
     model.addAttribute("ownerId", owner);
     model.addAttribute(
@@ -89,5 +112,36 @@ public class MissionTemplatePageController {
   public String list(@RequestParam UUID ownerId, Model model) {
     model.addAttribute("templates", withBackendStatus(() -> templates.list(ownerId)));
     return "mission/mission-templates :: list";
+  }
+
+  /**
+   * Copies the reusable fields from the caller's normal mission detail response.
+   *
+   * @param owner a currently manageable destination
+   * @param source the visible mission detail
+   * @return the independent draft
+   */
+  private static CreateMissionTemplateRequest draft(UUID owner, MissionDto source) {
+    return new CreateMissionTemplateRequest(
+        owner,
+        source.name(),
+        Stream.ofNullable(source.objectives())
+            .flatMap(List::stream)
+            .map(row -> new MissionTemplatePlan.Objective(row.title(), row.kind()))
+            .toList(),
+        Stream.ofNullable(source.steps())
+            .flatMap(List::stream)
+            .map(row -> new MissionTemplatePlan.Step(row.title(), row.meta()))
+            .toList(),
+        Stream.ofNullable(source.assignedUnits())
+            .flatMap(List::stream)
+            .map(row ->
+                new MissionTemplatePlan.Unit(
+                    row.name(),
+                    row.shipType() == null ? null : row.shipType().id(),
+                    row.note(),
+                    Boolean.TRUE.equals(row.highValueUnit()),
+                    row.frequency()))
+            .toList());
   }
 }

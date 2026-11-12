@@ -42,7 +42,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -60,6 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class MissionTemplateService {
 
+  private static final String TEMPLATE_NOT_FOUND = "Mission template not found";
   private static final String UNIQUE_OWNER_NAME = "uk_mission_template_owner_name";
 
   private final MissionTemplateRepository templates;
@@ -150,9 +150,9 @@ public class MissionTemplateService {
    * @return owner options ordered by name
    */
   public List<MissionTemplateOwnerDto> owners() {
-    Predicate<UUID> manageable = manageableUnits();
+    Set<UUID> managerUnits = currentManagerUnits();
     return orgUnits.findAllActiveWithParent().stream()
-        .filter(unit -> manageable.test(unit.getId()))
+        .filter(unit -> canManageIn(unit.getId(), managerUnits))
         .sorted(Comparator.comparing(OrgUnit::getName).thenComparing(OrgUnit::getId))
         .map(unit -> new MissionTemplateOwnerDto(unit.getId(), unit.getName()))
         .toList();
@@ -164,10 +164,10 @@ public class MissionTemplateService {
 
   MissionTemplateDto preview(@Nullable OrgUnit owner, UUID id) {
     if (owner == null || !owner.isActive()) {
-      throw new NotFoundException("Mission template not found");
+      throw new NotFoundException(TEMPLATE_NOT_FOUND);
     }
     return Entities.require(
-            templates.findByIdAndOwningOrgUnitId(id, owner.getId()), "Mission template not found")
+            templates.findByIdAndOwningOrgUnitId(id, owner.getId()), TEMPLATE_NOT_FOUND)
         .detail();
   }
 
@@ -207,18 +207,20 @@ public class MissionTemplateService {
   }
 
   private MissionTemplate requireTemplate(Optional<MissionTemplate> found) {
-    Predicate<UUID> manageable = manageableUnits();
-    return Entities.require(
-        found.filter(template ->
-            template.getOwningOrgUnit().isActive()
-                && manageable.test(template.getOwningOrgUnit().getId())),
-        "Mission template not found");
+    MissionTemplate template = Entities.require(found, TEMPLATE_NOT_FOUND);
+    OrgUnit owner = template.getOwningOrgUnit();
+    if (!owner.isActive() || !canManageIn(owner.getId(), currentManagerUnits())) {
+      throw new NotFoundException(TEMPLATE_NOT_FOUND);
+    }
+    return template;
   }
 
-  private Predicate<UUID> manageableUnits() {
-    Set<UUID> managerUnits =
-        requestScope.currentGrantedOrgUnitIdsInActiveContext(Roles.MISSION_MANAGER);
-    return id -> managerUnits.contains(id) || accessGate.canActAsOfficerIn(id);
+  private Set<UUID> currentManagerUnits() {
+    return requestScope.currentGrantedOrgUnitIdsInActiveContext(Roles.MISSION_MANAGER);
+  }
+
+  private boolean canManageIn(UUID owner, Set<UUID> managerUnits) {
+    return managerUnits.contains(owner) || accessGate.canActAsOfficerIn(owner);
   }
 
   private MissionTemplatePlan normalize(
@@ -254,7 +256,7 @@ public class MissionTemplateService {
   }
 
   private OrgUnit requireOwner(UUID id) {
-    if (!manageableUnits().test(id)) {
+    if (!canManageIn(id, currentManagerUnits())) {
       throw new AccessDeniedException("Mission template ownership scope required");
     }
     return Entities.require(

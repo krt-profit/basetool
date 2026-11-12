@@ -49,6 +49,7 @@ public final class FrontendPageRoutes {
           "/",
           "/missions",
           "/missions/new",
+          "/mission-templates",
           "/operations",
           "/orders",
           "/orders/create",
@@ -141,6 +142,7 @@ public final class FrontendPageRoutes {
    */
   public static final @Unmodifiable List<String> NOT_PAGES =
       List.of(
+          "/mission-templates/list",
           "/profile/deletion-request",
           "/profile/notification-preferences",
           "/inventory/all/stack/entries",

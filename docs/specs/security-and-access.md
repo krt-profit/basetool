@@ -5340,7 +5340,9 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 > The existing paragraphs and verification references below describe the current implementation baseline.
 
 An admin MUST be able to find **every** place a given name appears, case-insensitively, across every
-free-text surface of the application.
+free-text surface of the application. Mission template names, goal and step text, step hints,
+and unit names and notes are searchable as mission planning text. The owning org unit retains
+the template through account erasure, so its text is part of the manual erasure review.
 
 **Why.** A name can sit where no foreign key points: an external mission participant
 (`mission_participant.guest_name`), a party lead with no account, a job-order handover recipient, a

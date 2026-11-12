@@ -60,6 +60,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipant;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionController;
 import de.greluc.krt.profit.basetool.backend.mission.web.MissionFinanceEntryController;
+import de.greluc.krt.profit.basetool.backend.mission.web.MissionTemplateController;
 import de.greluc.krt.profit.basetool.backend.navigation.internal.NavigationDashboardWidget;
 import de.greluc.krt.profit.basetool.backend.operation.internal.Operation;
 import de.greluc.krt.profit.basetool.backend.operation.internal.OperationAccessPolicy;
@@ -403,6 +404,12 @@ class TenancyGuardTest {
                   de.greluc.krt.profit.basetool.backend.mission.web.MissionRosterController.class,
                   "removeParticipantSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
+          Map.entry(
+              new HandlerKey(MissionTemplateController.class, "update"),
+              "MissionTemplateService checks the loaded template's owning unit"),
+          Map.entry(
+              new HandlerKey(MissionTemplateController.class, "delete"),
+              "MissionTemplateService checks the loaded template's owning unit"),
           Map.entry(
               new HandlerKey(MissionController.class, "addManagerSlim"),
               "MissionEditor checks the mission gate on the loaded mission"),
