@@ -6176,6 +6176,11 @@ second pattern already matches it, so the first was removed without a change in 
 
 ### REQ-SEC-080 — Gate exemptions are exact sets of real paths
 
+> [!note] Corrected 2026-11-12 — the acting-member set is not counted
+> The acting-member bullet counted seventeen paths; `ActingMemberFilter.ACTING_PATHS` holds 29 and
+> grows with every exchange mapping, so the bullet names the set by its rule, and
+> `FilterExemptionSetsTest` pins the list.
+
 > [!note] Amended 2026-11-12 (ADR-0269) — the version policy leaves both exemption lists
 > `GET /api/v1/app/version-policy` is removed with the app floor (REQ-API-020, superseded), so the
 > pending-approval and the terms-acceptance lists below no longer name it; each is the set its
@@ -6191,8 +6196,8 @@ literal paths, each naming a real mapping:
   This replaced the patterns `/api/v1/terms` and `/api/v1/terms/**`, under which a future
   `/api/v1/terms/admin` would have escaped the gate; for the three mappings under `/api/v1/terms`
   the behaviour is identical.
-- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the seventeen exchange paths the ingest
-  gateway may act on; every mapping under `/api/v1/exchange` is one of them.
+- **Acting member** (`ActingMemberFilter.ACTING_PATHS`): the exchange paths the ingest gateway may
+  act on; every mapping under `/api/v1/exchange` is one of them.
 
 A new mapping under `/api/v1/terms` fails the test until it is listed as exempt or as gated by
 consent.
