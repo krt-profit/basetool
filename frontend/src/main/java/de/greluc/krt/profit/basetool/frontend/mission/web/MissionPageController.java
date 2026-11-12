@@ -480,6 +480,9 @@ public class MissionPageController {
               mission.meetingPoint(),
               null,
               null,
+              null,
+              null,
+              null,
               true,
               true,
               true));
@@ -596,6 +599,9 @@ public class MissionPageController {
               null,
               null,
               null,
+              null,
+              null,
+              null,
               true,
               true,
               true));
@@ -618,6 +624,10 @@ public class MissionPageController {
               .noneMatch(option -> option.id().toString().equals(form.operationId())));
     }
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
+    model.addAttribute(
+        "createShipTypes",
+        SectionFallback.load(
+            log, "create-ship-types", () -> contentOf(missionClient.shipTypes()), List.of()));
     return "mission/mission-detail";
   }
 

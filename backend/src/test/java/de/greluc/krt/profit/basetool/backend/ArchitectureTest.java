@@ -213,6 +213,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionStepDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionUnitDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionViewerAccess;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateSubMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionPeerRedactor;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionSectionVersions;
@@ -756,7 +757,8 @@ class ArchitectureTest {
   static final Set<Class<?>> SQUADRON_ID_COLUMN_GRANDFATHERED = Set.of(User.class);
 
   /** Mission write requests that must not carry server-managed components. */
-  static final Set<Class<?>> MISSION_WRITE_REQUESTS = Set.of(CreateMissionRequest.class);
+  static final Set<Class<?>> MISSION_WRITE_REQUESTS =
+      Set.of(CreateMissionRequest.class, CreateSubMissionRequest.class);
 
   /** The bank ledger repositories, insert-only (REQ-BANK-004). */
   static final Set<Class<?>> LEDGER_REPOSITORIES =
@@ -1710,7 +1712,7 @@ class ArchitectureTest {
   @Test
   void missionWriteRequestDtosMustNotCarryServerManagedFields() {
     DescribedPredicate<JavaClass> selection = classesIn(MISSION_WRITE_REQUESTS);
-    assertClassFloor("missionWriteRequestDtosMustNotCarryServerManagedFields", selection, 1);
+    assertClassFloor("missionWriteRequestDtosMustNotCarryServerManagedFields", selection, 2);
     missionWriteRequestDtosRule(selection).check(CLASSES);
   }
 

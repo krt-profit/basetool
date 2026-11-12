@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionListDto;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionMapper;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionReferenceDto;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateSubMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.PatchMissionCoreRequest;
@@ -183,13 +184,12 @@ public class MissionController {
    */
   @PostMapping
   @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
-  @Operation(summary = "Create a new mission")
-  @ApiResponses({
-    @ApiResponse(responseCode = "200", description = "Mission created."),
-    @ApiResponse(
-        responseCode = "409",
-        description = "The destination operation's payout inputs are frozen.")
-  })
+  @Operation(
+      summary = "Create a new mission",
+      description =
+          "An unavailable selected template revision returns 409 MISSION_TEMPLATE_STALE."
+              + " A destination operation with frozen payout inputs returns 409 BUSINESS_CONFLICT.")
+  @ApiResponse(responseCode = "200", description = "Mission created.", useReturnTypeSchema = true)
   public MissionDto createMission(@RequestBody @Valid @NotNull CreateMissionRequest request) {
     return projection.cleanupForPeer(missionMapper.toDto(missionService.createMission(request)));
   }
@@ -212,7 +212,8 @@ public class MissionController {
         description = "The destination operation's payout inputs are frozen.")
   })
   public MissionDto createSubMission(
-      @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull CreateMissionRequest request) {
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid @NotNull CreateSubMissionRequest request) {
     return projection.cleanupForPeer(
         missionMapper.toDto(missionService.addSubMission(id, request)));
   }

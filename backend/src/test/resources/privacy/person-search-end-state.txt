@@ -58,6 +58,12 @@ MISSION|mission_participant|comment|MISSION|Vor ZzzMentionZzz nach
 MISSION|mission_participant|guest_name|MISSION|Vor ZzzMentionZzz nach
 MISSION|mission_step|meta|MISSION|Vor ZzzMentionZzz nach
 MISSION|mission_step|title|MISSION|Vor ZzzMentionZzz nach
+MISSION|mission_template_objective|title|null|Vor ZzzMentionZzz nach
+MISSION|mission_template_step|meta|null|Vor ZzzMentionZzz nach
+MISSION|mission_template_step|title|null|Vor ZzzMentionZzz nach
+MISSION|mission_template_unit|name|null|Vor ZzzMentionZzz nach
+MISSION|mission_template_unit|note|null|Vor ZzzMentionZzz nach
+MISSION|mission_template|name|null|Vor ZzzMentionZzz nach
 MISSION|mission_unit|name|MISSION|Vor ZzzMentionZzz nach
 MISSION|mission_unit|note|MISSION|Vor ZzzMentionZzz nach
 MISSION|mission|description|MISSION|Vor ZzzMentionZzz nach

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
@@ -101,9 +102,8 @@ class MissionCreateE2eTest {
         page.getByTestId("mission-start-date")
             .fill(java.time.LocalDate.now().plusDays(7).toString());
         page.getByTestId("mission-start-time").fill("12:00");
-        E2eSupport.clickSubmitClearingFooter(
-            page.locator("button[type='submit'][form='mission-form']"));
-        page.waitForLoadState();
+        assertEquals(201, E2eSupport.submitMissionDraft(page));
+        page.waitForURL(url -> url.contains("?tab=verw"));
 
         E2eSupport.navigate(page, baseUrl + "/missions");
         assertThat(

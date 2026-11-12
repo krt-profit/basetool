@@ -226,7 +226,7 @@ class NavigationRegistryTest {
   @Test
   void aHiddenPageTakesItsTabsAndViewsAlong() {
     assertThat(registry.familyOf(Set.of("missions.list")))
-        .containsExactlyInAnyOrder("missions.list", "operations.list");
+        .containsExactlyInAnyOrder("missions.list", "operations.list", "missions.templates");
     assertThat(registry.familyOf(Set.of("storage.overview")))
         .containsExactlyInAnyOrder(
             "storage.overview", "storage.levels", "storage.my", "storage.all");

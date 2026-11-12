@@ -1723,6 +1723,8 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   „Statistik" and „Bericht", and the pages list what the active context covers (REQ-ORG-032,
   REQ-SUP-003, REQ-PUR-021). The tab bars of „Bedarf & Spenden" and „Ankauf" read the same flags,
   so the navigation, the tab bars and the quick access offer the same tabs.
+  **Mission templates** joins the Missions and Operations tab family under the same registry
+  contract, gated by template-management reach in the active context (REQ-MISSION-035).
   Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
@@ -2325,7 +2327,10 @@ without a drag, and every such list uses the one kernel helper `krtReorder`
    (phones, tablets) the helper cancels a drag start, so a swipe scrolls instead of grabbing a row.
 
 The job-order priority queue (REQ-ORDERS-020) and the frequency types of the mission-data admin
-page use it; positions there count the reorderable rows of the rendered page.
+page use it; positions there count the reorderable rows of the rendered page. Mission create
+and mission template forms also use the helper for their ordered draft rows. Each move updates
+the form locally and announces the new position. The final form submission persists the draft
+order (REQ-MISSION-015, REQ-MISSION-035, REQ-MISSION-037).
 
 **Enforced by:** `:frontend:testReorderJs` (`scripts/krt-reorder.test.mjs`),
 `OrdersQueueReorderWithoutDragE2eTest`, `AdminFrequencyTypeReorderWithoutDragE2eTest` ·

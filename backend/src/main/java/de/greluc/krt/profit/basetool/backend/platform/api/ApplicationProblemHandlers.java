@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.platform.api;
 import de.greluc.krt.profit.basetool.backend.kernel.AppException;
 import de.greluc.krt.profit.basetool.backend.kernel.AppExceptionKind;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
+import de.greluc.krt.profit.basetool.backend.kernel.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.kernel.ErrorDisclosurePolicy;
 import de.greluc.krt.profit.basetool.backend.kernel.ExternalServiceException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
@@ -106,6 +107,11 @@ public abstract class ApplicationProblemHandlers extends RequestProblemHandlers 
       pd.setProperty("correlationId", cid);
     } else {
       ex.extraProperties().forEach(pd::setProperty);
+      if (ex instanceof DuplicateEntityException duplicate && duplicate.field() != null) {
+        String field = duplicate.field();
+        pd.setProperty("errors", Map.of(field, detail));
+        pd.setProperty("fieldErrors", List.of(Map.of("field", field, "message", detail)));
+      }
       Map<String, Object> extra = new LinkedHashMap<>();
       if (ex.logExtra() != null) {
         extra.putAll(ex.logExtra());

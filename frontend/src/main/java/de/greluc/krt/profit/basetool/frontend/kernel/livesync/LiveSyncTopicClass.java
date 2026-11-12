@@ -238,6 +238,16 @@ public enum LiveSyncTopicClass {
    */
   MISSIONS_LIST("missions", false, Set.of("list"), false, "missions_list", null, null),
 
+  /** Unit-scoped mission template list, authorized by reading that unit's templates. */
+  MISSION_TEMPLATES(
+      "mission-templates",
+      true,
+      Set.of("list"),
+      false,
+      "mission_templates",
+      "/api/v1/mission-templates?owningOrgUnitId={id}",
+      null),
+
   /**
    * Global refinery-order queue room for {@code /refinery-orders} with the {@code queue} section,
    * authorized by the socket's authentication alone.

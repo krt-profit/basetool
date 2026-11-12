@@ -65,7 +65,8 @@ class MissionListLiveSyncPublishTest {
             new MissionBackendClient(backendApiClient),
             mock(MessageSource.class),
             mock(MissionPageController.class),
-            liveSyncLocalBus);
+            liveSyncLocalBus,
+            mock(MissionCreation.class));
     redirectAttributes = new RedirectAttributesModelMap();
   }
 

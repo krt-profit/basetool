@@ -10,7 +10,7 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
 guarantee is extended to twelve more areas — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
-Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`),
+Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`, `MissionTemplate`), **Operationen** (`Operation`),
 **Rollen & Mitglieder** (`org_unit_membership`, epic #800), **Materialbörse** (`MaterialExchangeOffer` /
 `MaterialExchangeInterest`), **Hangar** (`Ship`), **Blueprints** (`PersonalBlueprint`,
 `DefaultBlueprint`), **Verbundene Anwendungen** (`ExchangeClient`, `ExchangeSettings`) and **Bedarf & Spenden** (`SupplyNeed`, `SupplyDonation`). Every
@@ -190,8 +190,10 @@ web, naming its client (REQ-AUDIT-005):
   (`PERSONAL_DATA_PURGED_ON_USER_DELETION`, REQ-DATA-008) carrying the four row counts.
 - **Missionen** — mission create (incl. sub-mission; `operation` is its linked operation id or `none`;
   any goals/steps seeded on the create form each record their own `MISSION_OBJECTIVE_ADDED` /
-  `MISSION_STEP_ADDED`, REQ-MISSION-015) / edit (core, schedule, flags; changing the core link records
-  `fromOperation` and `toOperation` as ids or `none`) / delete;
+  `MISSION_STEP_ADDED`, REQ-MISSION-015. Create-time unit plans record `MISSION_UNIT_ADDED`.
+  A rejected template revision produces no mission or child audit event, REQ-MISSION-037) /
+  edit (core, schedule, flags; changing the core link records `fromOperation` and `toOperation`
+  as ids or `none`) / delete;
   participant add / remove / edit / check-in / check-out (the manager's check-in / check-out of
   everyone records one event per stamped row with `bulk=true`, REQ-MISSION-032); unit add / edit / remove; crew add / edit /
   remove; frequency change / remove (typed and custom mission-specific channels alike,
@@ -202,7 +204,9 @@ web, naming its client (REQ-AUDIT-005):
   (mission/external participant names beyond the snapshot label, notes, **step titles and
   time/place hints, goal
   titles, and custom-frequency labels**) is never written to the details payload — only ids, counts,
-  the goal kind enum and the non-personal mission name snapshot.
+  the goal kind enum and the non-personal mission name snapshot. Template create / update / delete
+  record `MISSION_TEMPLATE_CREATED`, `MISSION_TEMPLATE_UPDATED` and `MISSION_TEMPLATE_DELETED`
+  with the template and owning org-unit IDs only (REQ-MISSION-035, REQ-AUDIT-007).
 - **Operationen** — create / edit (incl. status change) / delete (missions are unlinked, not
   deleted); per-participant payout toggle, including reversal of a mark without a current payout
   row with the opaque `orphanedMark` status id and no former participant identity.

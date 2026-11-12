@@ -143,7 +143,7 @@ public class MissionEditor {
     return mission;
   }
 
-  private void audit(@NotNull Mission mission, @NotNull MissionEdit edit) {
+  void audit(@NotNull Mission mission, @NotNull MissionEdit edit) {
     if (edit.type() != null) {
       auditRecorder.record(
           edit.type(), mission.getId(), mission.getName(), edit.targetUserId(), edit.details());

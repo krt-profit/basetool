@@ -58,6 +58,12 @@ target|MISSION|mission_participant|comment|mission_id|MISSION
 target|MISSION|mission_participant|guest_name|mission_id|MISSION
 target|MISSION|mission_step|meta|mission_id|MISSION
 target|MISSION|mission_step|title|mission_id|MISSION
+target|MISSION|mission_template_objective|title|template_id|null
+target|MISSION|mission_template_step|meta|template_id|null
+target|MISSION|mission_template_step|title|template_id|null
+target|MISSION|mission_template_unit|name|template_id|null
+target|MISSION|mission_template_unit|note|template_id|null
+target|MISSION|mission_template|name|id|null
 target|MISSION|mission_unit|name|mission_id|MISSION
 target|MISSION|mission_unit|note|mission_id|MISSION
 target|MISSION|mission|description|id|MISSION
@@ -214,6 +220,7 @@ exempt-column|mission_objective.updated_by
 exempt-column|mission_participant.payout_preference
 exempt-column|mission_step.created_by
 exempt-column|mission_step.updated_by
+exempt-column|mission_template_objective.kind
 exempt-column|navigation_appearance.desktop_mode
 exempt-column|navigation_appearance.shortcuts_enabled
 exempt-column|navigation_appearance.start_page_admin

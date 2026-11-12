@@ -37,6 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -45,7 +46,9 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.FrequencyTypeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.JobTypeDto;
 import de.greluc.krt.profit.basetool.frontend.inventory.model.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.LayoutContextLoader.MeLayoutResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
@@ -63,6 +66,7 @@ import de.greluc.krt.profit.basetool.frontend.mission.model.MissionParticipantDt
 import de.greluc.krt.profit.basetool.frontend.mission.model.MissionUnitDto;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateCustomFrequencyRequest;
 import de.greluc.krt.profit.basetool.frontend.mission.model.UpdateMissionOwnerRequest;
+import de.greluc.krt.profit.basetool.frontend.support.LayoutResponses;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -177,10 +181,44 @@ class MissionPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void createMissionAjaxRelaysTheTypedStaleConflictAndTheNormalDestination() throws Exception {
+    UUID missionId = UUID.randomUUID();
+    UUID templateId = UUID.randomUUID();
+    when(backendApiClient.post(eq("/api/v1/missions"), any(), eq(MissionDto.class)))
+        .thenThrow(
+            new BackendServiceException(
+                "Stale template", null, 409, "MISSION_TEMPLATE_STALE", null, List.of(), null))
+        .thenReturn(minimalMission(missionId));
+    var draft =
+        post("/missions/ajax")
+            .param("name", "Draft mission")
+            .param("status", "PLANNED")
+            .param("unitsJson", "[{\"name\":\"Pathfinder\",\"highValueUnit\":false}]")
+            .with(csrf());
+    mockMvc
+        .perform(draft.param("templateId", templateId.toString()).param("templateVersion", "1"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MISSION_TEMPLATE_STALE"));
+    mockMvc
+        .perform(
+            post("/missions/ajax")
+                .param("name", "Draft mission")
+                .param("status", "PLANNED")
+                .param("unitsJson", "[{\"name\":\"Pathfinder\",\"highValueUnit\":false}]")
+                .with(csrf()))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.targetUrl").value("/missions/" + missionId + "?tab=verw"));
+  }
+
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
   void missionDetail_ShouldRenderWithoutErrors() throws Exception {
     UUID missionId = UUID.randomUUID();
 
     MissionDto mission = minimalMission(missionId);
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(
+            new MeLayoutResponse(null, null, List.of(), LayoutResponses.missionManager(), 0L));
 
     when(backendApiClient.get(eq("/api/v1/missions/{id}"), anyTypeRef(), eq(missionId)))
         .thenReturn(mission);
@@ -193,6 +231,8 @@ class MissionPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("mission/mission-detail"))
         .andExpect(content().string(containsString("mission-head-sticky")))
+        .andExpect(
+            content().string(containsString("/mission-templates?sourceMissionId=" + missionId)))
         .andExpect(content().string(containsString("facts-bar")))
         .andExpect(content().string(containsString("role=\"tablist\"")))
         .andExpect(content().string(containsString("id=\"pane-ueb\"")))
@@ -215,7 +255,10 @@ class MissionPageControllerMvcTest {
         .thenReturn(Collections.emptyList());
     stubEmptyFinance(missionId);
 
-    mockMvc.perform(get("/missions/" + missionId)).andExpect(status().isOk());
+    mockMvc
+        .perform(get("/missions/" + missionId))
+        .andExpect(status().isOk())
+        .andExpect(content().string(not(containsString("sourceMissionId="))));
 
     verify(backendApiClient)
         .get(

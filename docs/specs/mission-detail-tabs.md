@@ -4,6 +4,10 @@
 
 # Mission detail page — tab layout (Variante B)
 
+The detail header offers **Save as template** to planners with template management reach in the
+active context. It opens the common editor with the mission's reusable plan
+([REQ-MISSION-036](mission-templates.md#req-mission-036---start-a-template-from-a-readable-mission)).
+
 ## Context & goal
 
 The mission detail page (`/missions/{id}`) uses the **tab layout (Variante B)** approved in the
@@ -774,6 +778,12 @@ REQ-AUDIT-001. `CreateMissionRequest` stays the create-path security boundary (a
 `objectives` / `steps` are an explicit, `@Valid`-checked addition (non-blank title, valid kind), and
 the id / orderIndex / step done-state remain server-stamped.
 
+**Template and unit planning.** The same form provides an optional template selector and editable
+unit rows for standalone and operation-linked missions. `unitsJson` carries the unit planning
+rows. The applied template ID and version are separate from the editable values. AJAX validation
+and template conflicts keep the open form intact. The scope, conflict behavior and transactional
+write rules are specified by [REQ-MISSION-037](mission-templates.md#req-mission-037---apply-editable-template-rows-when-creating-a-mission).
+
 **Landing in the edit mode after create.** A successful create redirects to the new mission's detail page
 in its edit mode (`redirect:/missions/{newId}?tab=verw`, via the REQ-MISSION-004 `?tab=`
 deeplink), so the planner keeps working (crew, refine goals/steps) instead of being dropped on the
@@ -805,7 +815,7 @@ bump, no re-fetch, id-only / kind-only audit) + `MissionServiceTest` /
 `MissionService.createMission` / `MissionTimelineService.addObjectiveAtCreate` / `addStepAtCreate`;
 frontend `MissionForm` (`objectivesJson` / `stepsJson`), `CreateMissionRequest`,
 `MissionWriteController.createMission`, `mission/mission-detail.html` (create sections + sticky actions),
-`mission-detail.js` (create-form editor module).
+`mission-create.js` and `mission-create-rows.js` (create form and planning rows).
 
 ### REQ-MISSION-020 — Manager-only add-by-id for the app *(removed)*
 

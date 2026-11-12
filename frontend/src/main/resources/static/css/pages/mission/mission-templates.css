@@ -1,0 +1,56 @@
+@layer base, components, page, utilities;
+
+@layer page {
+    .mission-template-editor {
+        margin-block-start: 1rem;
+    }
+
+    .mission-template-editor fieldset {
+        border: 1px solid var(--control-border);
+        border-radius: var(--radius-sm);
+        margin-block: 1rem;
+        min-inline-size: 0;
+    }
+
+    .mission-template-editor ol {
+        margin-block: 0;
+        padding-inline-start: 1.5rem;
+    }
+
+    .mission-template-row {
+        border-block-end: 1px solid var(--control-border);
+        margin-block-end: 1rem;
+        padding-block-end: 0.75rem;
+    }
+
+    .mission-template-fields,
+    .mission-template-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 0.5rem;
+    }
+
+    .mission-template-fields label {
+        display: grid;
+        gap: 0.25rem;
+        flex: 1 1 12rem;
+    }
+
+    .mission-template-fields .mission-template-checkbox {
+        display: flex;
+        align-items: center;
+    }
+
+    .mission-template-actions {
+        margin-block-start: 0.75rem;
+    }
+
+    [data-template-delete][hidden] {
+        display: none;
+    }
+
+    .mission-template-error {
+        color: var(--color-danger-text);
+    }
+}

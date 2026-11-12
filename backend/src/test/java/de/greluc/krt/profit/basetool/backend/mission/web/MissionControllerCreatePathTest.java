@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
 import de.greluc.krt.profit.basetool.backend.mission.internal.CreateMissionRequest;
+import de.greluc.krt.profit.basetool.backend.mission.internal.CreateSubMissionRequest;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionParticipantService;
 import de.greluc.krt.profit.basetool.backend.mission.internal.MissionService;
@@ -47,10 +48,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/**
- * Verifies that the mission write endpoints bind {@link CreateMissionRequest}, so server-managed
- * fields smuggled into the JSON never reach the service.
- */
+/** Verifies that mission create endpoints bind only the fields their requests declare. */
 @SpringBootTest
 class MissionControllerCreatePathTest {
 
@@ -122,10 +120,10 @@ class MissionControllerCreatePathTest {
   }
 
   @Test
-  void createSubMission_dangerousFieldsInJson_areSilentlyDroppedByDtoBinding() throws Exception {
+  void createSubMission_bindsOnlyItsOwnRequestFields() throws Exception {
     UUID parentId = UUID.randomUUID();
     when(missionAccessPolicy.canManageMission(eq(parentId), any())).thenReturn(true);
-    when(missionService.addSubMission(eq(parentId), any(CreateMissionRequest.class)))
+    when(missionService.addSubMission(eq(parentId), any(CreateSubMissionRequest.class)))
         .thenReturn(new Mission());
 
     String body =
@@ -140,6 +138,8 @@ class MissionControllerCreatePathTest {
             + "\"parent\":{\"id\":\""
             + UUID.randomUUID()
             + "\"},"
+            + "\"units\":{},"
+            + "\"templateSelection\":{\"version\":\"invalid\"},"
             + "\"name\":\"Sub\""
             + "}";
 
@@ -152,8 +152,8 @@ class MissionControllerCreatePathTest {
                     jwt().jwt(j -> j.subject(UUID.randomUUID().toString())).authorities(member())))
         .andExpect(status().isOk());
 
-    ArgumentCaptor<CreateMissionRequest> captor =
-        ArgumentCaptor.forClass(CreateMissionRequest.class);
+    ArgumentCaptor<CreateSubMissionRequest> captor =
+        ArgumentCaptor.forClass(CreateSubMissionRequest.class);
     Mockito.verify(missionService).addSubMission(eq(parentId), captor.capture());
     org.junit.jupiter.api.Assertions.assertEquals("Sub", captor.getValue().name());
   }
