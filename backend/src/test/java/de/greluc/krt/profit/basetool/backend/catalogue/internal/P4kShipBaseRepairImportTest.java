@@ -82,28 +82,26 @@ class P4kShipBaseRepairImportTest {
   @Test
   void missingLoadoutAndMalformedBaseLeaveTheRepairPending() {
     P4kImportRuns runs = new P4kImportRuns(imports, jobs);
-    P4kReviewCase pending = pending(runs);
+    pending(runs);
     ObjectNode missingLoadout = catalogue();
     missingLoadout.putArray("loadouts");
     assertThat(runs.previewWithReport(P4kTestCatalogues.bytes(missingLoadout)).changes())
         .noneMatch(P4kShipBaseRepairImportTest::repairedGuid);
 
-    ObjectNode malformed = catalogue();
-    P4kTestCatalogues.record(malformed, "ships", BASE).put("vehicleKind", "unknown");
-    runs.apply(P4kTestCatalogues.bytes(malformed), false);
+    runs.apply(P4kTestCatalogues.bytes(catalogueWithMalformedBase()), false);
 
-    ShipType ship = ships.findByExternalUuid(BASE).orElseThrow();
-    assertThat(ship.getP4kUuid()).isEqualTo(VARIANT);
-    assertThat(ship.getClassName()).isEqualTo(VARIANT_CLASS);
-    assertThat(pending.isShipRepairPending()).isTrue();
-    assertThat(pending.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
-    assertThat(pending.getResolvedAt()).isNull();
+    assertThat(ships.findByExternalUuid(BASE))
+        .hasValueSatisfying(ship -> {
+          assertThat(ship.getP4kUuid()).isEqualTo(VARIANT);
+          assertThat(ship.getClassName()).isEqualTo(VARIANT_CLASS);
+        });
+    assertRepairRemainsOpen();
   }
 
   @Test
   void competingProjectedNameAndUexAliasEachBlockRepair() {
     P4kImportRuns runs = new P4kImportRuns(imports, jobs);
-    P4kReviewCase pending = pending(runs);
+    pending(runs);
     ObjectNode contested = catalogue();
     ObjectNode competitor =
         P4kTestCatalogues.record(contested, "ships", P4kTestCatalogues.SPECIAL_SHIP);
@@ -111,25 +109,47 @@ class P4kShipBaseRepairImportTest {
     assertThat(runs.previewWithReport(P4kTestCatalogues.bytes(contested)).changes())
         .noneMatch(P4kShipBaseRepairImportTest::repairedGuid);
 
-    ShipType aliased = new ShipType();
-    aliased.setName("Competing UEX Ship");
-    aliased.setUexVehicleId(UEX_VEHICLE_ID + 1);
-    ships.saveAndFlush(aliased);
-    entityManager.persist(new ShipTypeUexAlias(UEX_VEHICLE_ID + 1, BASE_CLASS));
-    entityManager.flush();
+    saveCompetingUexAlias();
     assertThat(runs.previewWithReport(P4kTestCatalogues.bytes(catalogue())).changes())
         .noneMatch(P4kShipBaseRepairImportTest::repairedGuid);
-    assertThat(pending.isShipRepairPending()).isTrue();
+    assertRepairRemainsOpen();
+  }
+
+  private void assertRepairRemainsOpen() {
+    assertThat(cases.findByKindAndGuidAndReason(P4kKind.SHIP, BASE, P4kReviewReason.GUID_CONFLICT))
+        .hasValueSatisfying(review -> {
+          assertThat(review.isShipRepairPending()).isTrue();
+          assertThat(review.getStatus()).isEqualTo(P4kReviewStatus.OPEN);
+          assertThat(review.getResolvedAt()).isNull();
+        });
+  }
+
+  private void saveCompetingUexAlias() {
+    int competingUexId = UEX_VEHICLE_ID + 1;
+    ships.saveAndFlush(shipWithUexIdentity("Competing UEX Ship", competingUexId));
+    entityManager.persist(new ShipTypeUexAlias(competingUexId, BASE_CLASS));
+    entityManager.flush();
+  }
+
+  private static ShipType shipWithUexIdentity(String name, int uexId) {
+    ShipType ship = new ShipType();
+    ship.setName(name);
+    ship.setUexVehicleId(uexId);
+    return ship;
+  }
+
+  private static ObjectNode catalogueWithMalformedBase() {
+    ObjectNode root = catalogue();
+    P4kTestCatalogues.record(root, "ships", BASE).put("vehicleKind", "unknown");
+    return root;
   }
 
   private P4kReviewCase pending(P4kImportRuns runs) {
     UUID runId = runs.apply(P4kTestCatalogues.fixtureBytes(), false).runId();
-    ShipType ship = new ShipType();
-    ship.setName("Repair Test Variant");
+    ShipType ship = shipWithUexIdentity("Repair Test Variant", UEX_VEHICLE_ID);
     ship.setClassName(VARIANT_CLASS);
     ship.setP4kUuid(VARIANT);
     ship.setExternalUuid(BASE);
-    ship.setUexVehicleId(UEX_VEHICLE_ID);
     ship.setSourceSystems(GameItemSourceSystem.BOTH);
     ship.setRole("Variant Role");
     ships.saveAndFlush(ship);

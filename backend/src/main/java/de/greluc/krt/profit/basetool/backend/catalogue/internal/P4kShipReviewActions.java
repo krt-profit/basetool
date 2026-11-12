@@ -275,7 +275,6 @@ class P4kShipReviewActions implements P4kReviewActionProvider {
   @Transactional(propagation = Propagation.MANDATORY)
   public void apply(
       @NotNull P4kReviewCaseDto review,
-      @Nullable String recordPath,
       @NotNull P4kReviewCandidate candidate,
       @NotNull UUID adminUserId) {
     if (candidate.action() == P4kReviewAction.CANCEL_SHIP_REPAIR) {

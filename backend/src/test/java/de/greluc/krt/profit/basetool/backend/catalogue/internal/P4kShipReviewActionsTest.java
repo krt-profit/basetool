@@ -78,7 +78,7 @@ class P4kShipReviewActionsTest {
           assertThat(candidate.evidence())
               .containsExactly(P4kReviewEvidence.EXACT_SCWIKI_UUID, P4kReviewEvidence.EXACT_CLASS);
           assertThat(candidate.uexIds()).containsExactly(417);
-          actions.apply(review, null, candidate, UUID.randomUUID());
+          actions.apply(review, candidate, UUID.randomUUID());
         });
     assertThat(ship.getP4kUuid()).isEqualTo(incoming);
     assertThat(ship.getExternalUuid()).isEqualTo(incoming);
@@ -128,7 +128,7 @@ class P4kShipReviewActionsTest {
         .satisfies(candidate -> {
           assertThat(candidate.action()).isEqualTo(P4kReviewAction.ATTACH_P4K);
           assertThat(candidate.evidence()).contains(P4kReviewEvidence.P4K_VARIANT);
-          actions.apply(review, null, candidate, UUID.randomUUID());
+          actions.apply(review, candidate, UUID.randomUUID());
         });
 
     assertThat(ship.getP4kUuid()).isEqualTo(incoming);
@@ -181,7 +181,7 @@ class P4kShipReviewActionsTest {
           assertThat(candidate.action()).isEqualTo(P4kReviewAction.CORRECT_P4K_GUID);
           assertThat(candidate.evidence())
               .contains(P4kReviewEvidence.P4K_VARIANT, P4kReviewEvidence.OTHER_P4K_GUID);
-          actions.apply(review, null, candidate, admin);
+          actions.apply(review, candidate, admin);
         });
     assertThat(ship.getP4kUuid()).isEqualTo(oldGuid);
     assertThat(ship.getClassName()).isEqualTo(oldClass);
@@ -214,7 +214,7 @@ class P4kShipReviewActionsTest {
         .satisfies(candidate -> {
           assertThat(candidate.action()).isEqualTo(P4kReviewAction.CANCEL_SHIP_REPAIR);
           assertThat(candidate.targetId()).isEqualTo(removedShip);
-          actions.apply(review, null, candidate, UUID.randomUUID());
+          actions.apply(review, candidate, UUID.randomUUID());
         });
     verify(ships, never()).findById(removedShip);
     assertThat(pending.isShipRepairPending()).isFalse();

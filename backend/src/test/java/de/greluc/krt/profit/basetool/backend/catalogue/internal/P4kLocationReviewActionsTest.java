@@ -83,7 +83,7 @@ class P4kLocationReviewActionsTest {
                   P4kReviewEvidence.SAME_TYPE,
                   P4kReviewEvidence.SAME_NAME,
                   P4kReviewEvidence.PARENT_LINK);
-          actions.apply(review, null, candidate, UUID.randomUUID());
+          actions.apply(review, candidate, UUID.randomUUID());
         });
     verify(admin)
         .changeLink(
@@ -141,7 +141,7 @@ class P4kLocationReviewActionsTest {
           assertThat(candidate.uexIds()).containsExactly(417);
           assertThat(candidate.evidence())
               .containsExactly(P4kReviewEvidence.SAME_PLACE, P4kReviewEvidence.SHOP_NAME_MATCH);
-          actions.apply(review, null, candidate, UUID.randomUUID());
+          actions.apply(review, candidate, UUID.randomUUID());
         });
     verify(admin).changeLink(shop.getId(), StarmapLinkAction.SET, terminal.getId(), null, false);
   }

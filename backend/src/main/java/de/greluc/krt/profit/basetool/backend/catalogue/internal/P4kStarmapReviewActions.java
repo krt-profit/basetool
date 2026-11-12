@@ -105,7 +105,6 @@ class P4kStarmapReviewActions implements P4kReviewActionProvider {
   @Override
   public void apply(
       @NotNull P4kReviewCaseDto review,
-      @Nullable String recordPath,
       @NotNull P4kReviewCandidate candidate,
       @NotNull UUID adminUserId) {
     StarmapPlaceRow row =

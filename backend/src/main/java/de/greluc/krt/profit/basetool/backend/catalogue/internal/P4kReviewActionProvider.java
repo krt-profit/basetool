@@ -62,13 +62,11 @@ public interface P4kReviewActionProvider {
    * Applies a revalidated proposal within the review transaction.
    *
    * @param review the current case
-   * @param recordPath the source record path, if recorded
    * @param candidate the selected current proposal
    * @param adminUserId the administrator confirming the proposal
    */
   void apply(
       @NotNull P4kReviewCaseDto review,
-      @Nullable String recordPath,
       @NotNull P4kReviewCandidate candidate,
       @NotNull UUID adminUserId);
 }

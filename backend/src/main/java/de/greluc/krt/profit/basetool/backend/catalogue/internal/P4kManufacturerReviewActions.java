@@ -121,7 +121,6 @@ class P4kManufacturerReviewActions implements P4kReviewActionProvider {
   @Transactional(propagation = Propagation.MANDATORY)
   public void apply(
       @NotNull P4kReviewCaseDto review,
-      @Nullable String recordPath,
       @NotNull P4kReviewCandidate candidate,
       @NotNull UUID adminUserId) {
     Manufacturer target = requireVersion(candidate.targetId(), candidate.targetVersion());

@@ -193,7 +193,7 @@ public class P4kReviewWorkspaceService {
         request.subjectVersion(),
         P4kReviewCandidate.class,
         reviewCase.getRowId());
-    provider.apply(entry.review(), entry.recordPath(), candidate, adminUserId);
+    provider.apply(entry.review(), candidate, adminUserId);
 
     AuditEventType eventType =
         switch (candidate.action()) {

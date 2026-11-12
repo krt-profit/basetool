@@ -300,7 +300,7 @@ class P4kManufacturerPrecedenceTest {
             .orElseThrow();
     assertThat(candidate.evidence())
         .contains(P4kReviewEvidence.EXACT_SCWIKI_UUID, P4kReviewEvidence.OTHER_P4K_GUID);
-    manufacturerActions.apply(review, path, candidate, UUID.randomUUID());
+    manufacturerActions.apply(review, candidate, UUID.randomUUID());
 
     ObjectNode root = P4kTestCatalogues.tree();
     named(root, GORGON, brand.getName(), brand.getName());
@@ -397,7 +397,7 @@ class P4kManufacturerPrecedenceTest {
     assertThat(candidate.targetId()).isEqualTo(duplicateId);
     assertThat(candidate.uexIds()).containsExactly(17991);
 
-    manufacturerActions.apply(review, path, candidate, UUID.randomUUID());
+    manufacturerActions.apply(review, candidate, UUID.randomUUID());
     entityManager.flush();
     entityManager.clear();
 

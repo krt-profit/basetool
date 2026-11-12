@@ -124,7 +124,6 @@ class P4kShopReviewActions implements P4kReviewActionProvider {
   @Override
   public void apply(
       @NotNull P4kReviewCaseDto review,
-      @Nullable String recordPath,
       @NotNull P4kReviewCandidate candidate,
       @NotNull UUID adminUserId) {
     UUID id = review.rowId();
