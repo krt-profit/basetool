@@ -726,6 +726,7 @@
 
     .tree-name {
         display: flex;
+        flex-wrap: nowrap;
         align-items: center;
         gap: 0.5rem;
         min-width: 0;
@@ -745,10 +746,19 @@
     }
 
     .tree-chevron {
+        position: relative;
         flex: none;
         width: 14px;
+        height: 14px;
+        padding: 0;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: none;
         color: var(--color-primary);
+        font-family: inherit;
         font-size: 0.7rem;
+        line-height: 1;
+        cursor: pointer;
         transition: transform 0.15s ease;
     }
 
@@ -5451,7 +5461,8 @@
     .close-sidebar-btn:focus-visible,
     .nav-lang-btn:focus-visible,
     .nav-logout-btn:focus-visible,
-    .nav-filter-to-palette:focus-visible {
+    .nav-filter-to-palette:focus-visible,
+    .tree-chevron:focus-visible {
         outline: 2px solid var(--color-primary);
         outline-offset: 2px;
     }
@@ -5617,7 +5628,16 @@
             min-width: var(--touch-target);
         }
 
-        .scu-hint::before {
+        .tree-row:has(> .tree-name > .tree-chevron) {
+            min-height: var(--touch-target);
+        }
+
+        .tree-chevron {
+            min-height: 0;
+        }
+
+        .scu-hint::before,
+        .tree-chevron::before {
             content: '';
             position: absolute;
             top: 50%;

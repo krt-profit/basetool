@@ -135,6 +135,17 @@ so the stylesheet knows which row is the last visible one and drops its bottom r
 panel's frame (REQ-UI-007): a collapsed last group row, the closed last stack header, or the note
 of the last entry.
 
+The chevron of each group row and stack header is the level's disclosure control: a
+`<button type="button" class="tree-chevron">` with `aria-expanded`, an `aria-controls` naming the
+container's id (`lager-group-<material or game item id>` for a group's items,
+`lager-group-<id>-stack-<n>` for the entries of its n-th stack) and an `aria-label` that names the
+group or stack (`inventory.tree.toggle.*`). It takes focus and toggles on Enter and Space; the whole
+row stays clickable. Every expand and collapse — by mouse, keyboard or the restore after a re-swap —
+sets `aria-expanded` with the `hidden` attribute, and the kernel turns the chevron from
+`aria-expanded`. The row itself takes no role, because the „Mein Lager" group row holds the group
+checkbox, which must not sit inside a button. The button shows the orange focus ring and reaches the
+touch floor through its overlay (REQ-UI-009).
+
 **Acceptance**
 
 - [ ] Rows sharing the stock identity appear as one stack row with the correct summed amount,
@@ -150,16 +161,23 @@ of the last entry.
 - [ ] Both trees render every group's items and stack's entries with `hidden` and no inline
   display; whichever row ends the tree, it draws no bottom rule while every visible row above it
   keeps one.
+- [ ] Every group row and stack header of both trees, in both views, carries a chevron button
+  whose `aria-controls` names the container it shows and whose `aria-expanded` is `false` on
+  render; Enter and Space on the focused button expand and collapse the level and flip
+  `aria-expanded`, the first expand of a stack loads its entries, and a restored level comes back
+  with `aria-expanded="true"`.
 
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
 `InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`,
-`InventoryLagerPatternRenderTest`, `LagerTreeLastRowE2eTest`, `InventoryOperationsE2eTest`
+`InventoryLagerPatternRenderTest`, `LagerTreeLastRowE2eTest`, `LagerTreeDisclosureE2eTest`,
+`InventoryOperationsE2eTest`
 · **Code:** `InventoryAggregationService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
 `InventoryStackDto`, `GroupedInventoryDto`, `inventory/inventory-my.html`, `inventory/inventory-admin.html`,
+`inventory/fragments/inventory-item-group.html`,
 `static/js/inventory/inventory-common.js` (tree expand/collapse persistence, shared by `inventory-my.js` and
 `inventory-admin.js` since FE-SIMP-03), `static/css/inventory/inventory-lager.css` (the last visible
-row) · **Issues:** #466
+row), `static/css/kernel/styles.css` (`.tree-chevron`) · **Issues:** #466
 
 ### REQ-INV-044 — Actions operate per entry
 

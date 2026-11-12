@@ -2,10 +2,11 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<div th:fragment="itemGroupRow(group, toggleTrigger, contextText, selectTrigger)"
+<div th:fragment="itemGroupRow(group, toggleTrigger, contextText, selectTrigger, itemsId)"
      class="tree-row tree-row--group" th:data-trigger="${toggleTrigger}" th:data-game-item-id="${group.gameItem.id}">
     <div class="tree-cell tree-name lager-item-name">
-        <span class="tree-chevron toggle-icon">▶</span>
+        <button type="button" class="tree-chevron" aria-expanded="false" th:aria-controls="${itemsId}"
+                th:aria-label="#{inventory.tree.toggle.group(${group.gameItem.displayName(#locale)})}">▶</button>
         <span class="tree-label" th:text="${group.gameItem.displayName(#locale)}">Item</span>
         <span th:if="${group.gameItem.noLongerInGame}" class="chip chip--warning" data-testid="no-longer-in-game" th:text="#{catalogue.noLongerInGame}">Nicht mehr im Spiel</span>
         <span class="lager-item-chips" th:insert="~{kernel/fragments/item-chips :: itemChips(${group.gameItem})}"></span>

@@ -307,7 +307,8 @@ function createLager(cfg) {
 
     /**
      * Shows or hides the row that follows a tree toggle row through its `hidden` attribute and
-     * flips the toggle's arrow.
+     * mirrors the state into `aria-expanded` of the row's disclosure button, which also turns its
+     * chevron.
      *
      * @param {Element} row the toggle row
      * @param {Element} nextRow the row it expands
@@ -315,8 +316,8 @@ function createLager(cfg) {
      */
     function setExpanded(row, nextRow, open) {
         nextRow.toggleAttribute('hidden', !open);
-        const icon = row.querySelector('.toggle-icon');
-        if (icon) icon.textContent = open ? '▼' : '▶';
+        const toggle = row.querySelector('.tree-chevron');
+        if (toggle) toggle.setAttribute('aria-expanded', String(open));
     }
 
     /**

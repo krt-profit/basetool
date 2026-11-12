@@ -24,7 +24,7 @@ Jede Seite der Pfadkataloge wird geladen und vermessen bzw. gescannt.
 
 ### Barrierefreiheit (`AccessibilitySmokeE2eTest`)
 
-1. Parametrisiert über `FrontendPageRoutes#A11Y_SMOKE` — `/`, `/missions`, `/orders`, `/refinery-orders`, `/hangar` — jede Seite laden.
+1. Parametrisiert über `FrontendPageRoutes#A11Y_SMOKE` — `/`, `/missions`, `/orders`, `/refinery-orders`, `/hangar`, `/inventory/my` — jede Seite laden.
 2. axe-core über Playwrights `evaluate` in die Seite spritzen und die Regeln `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` ausführen.
 
 ### Layout je Geräteklasse (`TouchClassLayoutE2eTest`)
