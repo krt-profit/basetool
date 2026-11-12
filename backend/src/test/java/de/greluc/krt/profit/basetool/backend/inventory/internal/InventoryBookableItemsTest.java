@@ -38,9 +38,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Runs the Lager item picker read against PostgreSQL (REQ-INV-029): every listed blueprint output
- * and every listed item of a stocked type is bookable; consumables, clothing, paints, turrets,
- * untyped rows and retired rows are not.
+ * Runs the Lager item picker read against PostgreSQL (REQ-INV-029, REQ-P4K-048): every listed
+ * blueprint output and every listed item of a stocked type is bookable; consumables, clothing,
+ * paints, turrets, untyped rows, retired rows and rows an admin hid as not obtainable are not.
  */
 @SpringBootTest
 @Transactional
@@ -100,6 +100,25 @@ class InventoryBookableItemsTest {
     blueprintRepository.flush();
 
     assertThat(bookable(TAG)).containsExactly(name("Live Railgun"));
+  }
+
+  @Test
+  void anItemAnAdminHidAsUnobtainableIsNotBookable_untilItIsOfferedAgain() {
+    item("Offered Railgun", "WeaponPersonal", "Large");
+    GameItem hidden = item("Unobtainable Railgun", "WeaponPersonal", "Large");
+    hidden.setUnobtainableSince(RETIRED);
+    crafted(item("Unobtainable Magazine", "WeaponAttachment", "Magazine"))
+        .getOutputItem()
+        .setUnobtainableSince(RETIRED);
+    gameItemRepository.flush();
+
+    assertThat(bookable(TAG)).containsExactly(name("Offered Railgun"));
+
+    hidden.setUnobtainableSince(null);
+    gameItemRepository.flush();
+
+    assertThat(bookable(TAG))
+        .containsExactlyInAnyOrder(name("Offered Railgun"), name("Unobtainable Railgun"));
   }
 
   @Test

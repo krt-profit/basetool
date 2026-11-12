@@ -741,6 +741,7 @@ public class NavigationRegistry {
                 of("admin.p4kimport", "/admin/p4k-import", "nav.admin.p4kImport")
                     .with(PALETTE_ONLY),
                 of("admin.starmap", "/admin/starmap", "nav.admin.starmap").with(PALETTE_ONLY),
+                of("admin.items", "/admin/items", "nav.admin.items").with(PALETTE_ONLY),
                 of("admin.shops", "/admin/shops", "nav.admin.shops").with(PALETTE_ONLY),
                 of("admin.syncreports", "/admin/sync-reports", "nav.admin.syncReports")
                     .with(PALETTE_ONLY),
@@ -810,7 +811,8 @@ public class NavigationRegistry {
         NavigationPageTabs.of("admin.locations", "admin.uex"),
         NavigationPageTabs.of("admin.materials", "admin.materialaliases", "admin.qualitytiers"),
         NavigationPageTabs.of("admin.blueprints", "admin.defaultblueprints"),
-        NavigationPageTabs.of("admin.p4kimport", "admin.starmap", "admin.syncreports"),
+        NavigationPageTabs.of(
+            "admin.p4kimport", "admin.starmap", "admin.items", "admin.syncreports"),
         NavigationPageTabs.of(
             "admin.settings.general", "admin.supply", "admin.purchasing", "admin.dangerzone"));
   }

@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintProductRow;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintStatBaseDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemStatRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.LikePatterns;
 import java.util.ArrayList;
@@ -77,10 +78,13 @@ public class BlueprintProductService implements BlueprintProducts {
   private final ProductKeys productKeys;
   private final BlueprintMapper blueprintMapper;
   private final GameItemStatRepository gameItemStatRepository;
+  private final GameItemRepository gameItemRepository;
 
   /**
    * Searches blueprint products by case-insensitive name substring, flagging those {@code
-   * ownerUserId} already owns.
+   * ownerUserId} already owns. A product whose output item an admin hid as not obtainable is left
+   * out (REQ-P4K-048): the search backs the Materialbörse item pickers and the personal and default
+   * blueprint pickers.
    *
    * @param query product-name substring; {@code null} / blank returns all products
    * @param limit requested maximum; clamped to {@code [1, MAX_LIMIT]}
@@ -93,7 +97,13 @@ public class BlueprintProductService implements BlueprintProducts {
     int cap = Math.clamp(limit, 1, MAX_LIMIT);
     String q = query == null ? "" : query.trim();
 
-    List<ProductAccumulator> products = new ArrayList<>(offerableProducts(q).values());
+    Set<UUID> unobtainable = Set.copyOf(gameItemRepository.findUnobtainableIds());
+    List<ProductAccumulator> products = new ArrayList<>();
+    for (ProductAccumulator p : offerableProducts(q).values()) {
+      if (p.outputItemId == null || !unobtainable.contains(p.outputItemId)) {
+        products.add(p);
+      }
+    }
     products.sort(
         Comparator.comparing(
             p -> p.displayName, Comparator.nullsLast(String::compareToIgnoreCase)));

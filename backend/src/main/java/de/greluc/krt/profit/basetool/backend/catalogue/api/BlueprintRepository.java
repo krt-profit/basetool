@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.catalogue.api;
 
 import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_BLUEPRINT;
-import static de.greluc.krt.profit.basetool.backend.catalogue.api.P4kRetirementJpql.LISTED_ITEM;
+import static de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItemJpql.SELECTABLE_ITEM;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -45,7 +45,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
 
   /**
    * The {@code WHERE} clause of the item-order picker over a game item aliased {@code gi}: an
-   * output of a live active blueprint with a resolved RESOURCE ingredient, itself listed, whose
+   * output of a live active blueprint with a resolved RESOURCE ingredient, itself selectable, whose
    * name contains {@code :q}.
    */
   String ORDERABLE_ITEM_FILTER =
@@ -55,7 +55,7 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
           + "AND i.kind ="
           + " de.greluc.krt.profit.basetool.backend.catalogue.api.BlueprintIngredientKind.RESOURCE"
           + " AND i.material IS NOT NULL) AND"
-          + LISTED_ITEM
+          + SELECTABLE_ITEM
           + "AND LOWER(gi.name) LIKE LOWER(CONCAT('%', :q, '%')) ESCAPE '\\'";
 
   /**
@@ -193,8 +193,8 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
 
   /**
    * Pages the distinct game items orderable as item-order lines: outputs of an active blueprint
-   * with at least one resolved RESOURCE ingredient, the items and blueprints the P4K retired left
-   * out (REQ-P4K-013).
+   * with at least one resolved RESOURCE ingredient, the items and blueprints the P4K retired and
+   * the items an admin hid as not obtainable left out (REQ-P4K-013, REQ-P4K-048).
    *
    * @param q case-insensitive item-name substring, or {@code null} for no filter
    * @param pageable page request (whitelisted sort)

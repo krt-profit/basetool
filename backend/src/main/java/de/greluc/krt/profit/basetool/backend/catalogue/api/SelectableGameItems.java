@@ -29,7 +29,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * The one lookup a write uses to put a game item on an entry: it resolves the id like {@link
- * GameItemRepository#findById} and refuses an item the P4K retired (REQ-P4K-013).
+ * GameItemRepository#findById} and refuses an item that is not {@linkplain GameItem#isSelectable()
+ * selectable}, one the P4K retired or an admin hid as not obtainable (REQ-P4K-013, REQ-P4K-048).
  */
 @Component
 @RequiredArgsConstructor
@@ -41,9 +42,10 @@ public class SelectableGameItems {
    * Loads the item a write sets on an entry.
    *
    * @param id the caller-supplied live or retained item id
-   * @return the surviving item, never retired
+   * @return the surviving item, always selectable
    * @throws NotFoundException when the id names no item
-   * @throws RetiredGameItemException when the P4K swept the item or an admin hid it
+   * @throws RetiredGameItemException when the P4K swept the item, or an admin hid it through a
+   *     review case or as not obtainable
    */
   @NotNull
   public GameItem require(@NotNull UUID id) {
@@ -52,16 +54,17 @@ public class SelectableGameItems {
   }
 
   /**
-   * Refuses an item an entry is about to keep or take when the P4K retired it.
+   * Refuses an item an entry is about to keep or take when it is not selectable.
    *
    * @param item the item already loaded
    * @return {@code item}
-   * @throws RetiredGameItemException when the P4K swept the item or an admin hid it
+   * @throws RetiredGameItemException when the P4K swept the item, or an admin hid it through a
+   *     review case or as not obtainable
    */
   @NotNull
   @Contract("_ -> param1")
   public GameItem requireSelectable(@NotNull GameItem item) {
-    if (item.isP4kRetired()) {
+    if (!item.isSelectable()) {
       throw new RetiredGameItemException(item.getId());
     }
     return item;

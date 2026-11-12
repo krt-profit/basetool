@@ -184,7 +184,7 @@ public class StockLevelService {
    * @throws DuplicateEntityException when the unit already has a level for the entry and tier
    * @throws BadRequestException when not exactly one of material and game item is given, a game
    *     item carries a tier, or the amounts are invalid
-   * @throws RetiredGameItemException when the P4K retired the game item
+   * @throws RetiredGameItemException when the game item is retired or unobtainable
    */
   @Transactional
   public @NotNull StockLevelDto create(@NotNull StockLevelCreateRequest request) {
@@ -238,7 +238,7 @@ public class StockLevelService {
    *     stale
    * @throws DuplicateEntityException when the new tier collides with another level
    * @throws BadRequestException when a game-item level is given a tier or the amounts are invalid
-   * @throws RetiredGameItemException when the P4K retired the level's game item
+   * @throws RetiredGameItemException when the level's game item is retired or unobtainable
    */
   @Transactional
   public @NotNull StockLevelDto update(@NotNull UUID id, @NotNull StockLevelUpdateRequest request) {

@@ -29,7 +29,9 @@ import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.http.HttpStatus;
 
 /**
- * Thrown when a write would set or keep a game item the P4K retired on an entry (REQ-P4K-013).
+ * Thrown when a write would set or keep a game item that is not {@linkplain GameItem#isSelectable()
+ * selectable} on an entry: one the P4K retired or an admin hid as not obtainable (REQ-P4K-013,
+ * REQ-P4K-048).
  *
  * <p>Answers {@code 400} with code {@code CATALOGUE_ITEM_RETIRED} and the extension property {@code
  * gameItemId}; nothing is written.
@@ -42,13 +44,13 @@ public final class RetiredGameItemException extends DomainProblem {
   /** The bundle key the localised {@code detail} resolves from. */
   private static final String DETAIL_KEY = "problem.catalogue_item_retired.detail";
 
-  /** The retired item the write named. */
+  /** The unselectable item the write named. */
   @NotNull private final UUID gameItemId;
 
   /**
    * Creates the exception; its {@code detail} is the localised text of {@link #DETAIL_KEY}.
    *
-   * @param gameItemId the retired item the write named
+   * @param gameItemId the unselectable item the write named
    */
   public RetiredGameItemException(@NotNull UUID gameItemId) {
     super(DETAIL_KEY);
@@ -89,7 +91,7 @@ public final class RetiredGameItemException extends DomainProblem {
   }
 
   /**
-   * Adds the retired item's id to the problem body.
+   * Adds the unselectable item's id to the problem body.
    *
    * @return {@code gameItemId}
    */
