@@ -105,8 +105,34 @@ function bulkGroupSelector(groupCb) {
     )}"]`;
 }
 
+/**
+ * The material or game item a group checkbox belongs to, which keys the group's id set.
+ *
+ * @param {Element} groupCb the group's select-all checkbox
+ * @returns {string} the group's id, or '' when the checkbox names none
+ */
+function bulkGroupKey(groupCb) {
+    return (
+        groupCb.getAttribute('data-material-id') || groupCb.getAttribute('data-game-item-id') || ''
+    );
+}
+
 /** @type {Set<string>} */
 const bulkSelectedIds = new Set();
+
+/**
+ * The ids of every entry of a group in the current filtered view, resolved on the server when its
+ * checkbox was ticked, by the group's material or game item id. A re-swap of the table clears it.
+ *
+ * @type {Map<string, Set<string>>}
+ */
+const bulkGroupIds = new Map();
+
+/** @type {Set<string>} */
+const bulkGroupLookupsInFlight = new Set();
+
+/** Counts selection resets, so a group lookup that a reset overtook drops its answer. */
+let bulkSelectionGeneration = 0;
 
 /**
  * The ids of the marked entries.
@@ -159,20 +185,31 @@ function updateBulkCheckoutState() {
     /** @type {NodeListOf<HTMLInputElement>} */ (
         document.querySelectorAll('.group-select-all')
     ).forEach((groupCb) => {
-        const groupBoxes = /** @type {NodeListOf<HTMLInputElement>} */ (
-            document.querySelectorAll(bulkGroupSelector(groupCb))
-        );
-        let allChecked = groupBoxes.length > 0;
-        groupBoxes.forEach((cb) => {
-            if (!cb.checked) allChecked = false;
+        if (bulkGroupLookupsInFlight.has(bulkGroupKey(groupCb))) return;
+        const ids = bulkGroupMemberIds(groupCb);
+        let marked = 0;
+        ids.forEach((id) => {
+            if (bulkSelectedIds.has(id)) marked++;
         });
-        groupCb.checked = allChecked;
-        groupCb.indeterminate =
-            !allChecked &&
-            Array.from(groupBoxes).some((cb) => {
-                return cb.checked;
-            });
+        groupCb.checked = ids.size > 0 && marked === ids.size;
+        groupCb.indeterminate = marked > 0 && marked < ids.size;
     });
+}
+
+/**
+ * The ids of a group's entries known on the page: the set its last server lookup returned and the
+ * entries of its loaded stacks.
+ *
+ * @param {HTMLInputElement} groupCb the group's select-all checkbox
+ * @returns {Set<string>} the ids
+ */
+function bulkGroupMemberIds(groupCb) {
+    const ids = new Set(bulkGroupIds.get(bulkGroupKey(groupCb)));
+    document.querySelectorAll(bulkGroupSelector(groupCb)).forEach((cb) => {
+        const id = cb.getAttribute('data-id');
+        if (id) ids.add(id);
+    });
+    return ids;
 }
 
 /**
@@ -191,24 +228,63 @@ function onEntryCheckboxToggle(cb) {
 }
 
 /**
- * Applies a group checkbox to all entries of its group.
+ * Applies a group checkbox to all entries of its group: the known ones at once and, on the first
+ * tick in this view, every entry of the group the server resolves, without expanding the group
+ * (REQ-INV-034).
  *
  * @param {HTMLInputElement} groupCb the group's select-all checkbox
  */
 function toggleGroupCheckboxes(groupCb) {
-    const groupBoxes = /** @type {NodeListOf<HTMLInputElement>} */ (
-        document.querySelectorAll(bulkGroupSelector(groupCb))
-    );
-    groupBoxes.forEach((cb) => {
-        cb.checked = groupCb.checked;
-        const id = cb.getAttribute('data-id');
-        if (id) {
-            if (groupCb.checked) bulkSelectedIds.add(id);
-            else bulkSelectedIds.delete(id);
-        }
+    bulkGroupMemberIds(groupCb).forEach((id) => {
+        if (groupCb.checked) bulkSelectedIds.add(id);
+        else bulkSelectedIds.delete(id);
     });
+    const key = bulkGroupKey(groupCb);
+    if (groupCb.checked && key && !bulkGroupIds.has(key) && !bulkGroupLookupsInFlight.has(key)) {
+        loadGroupEntryIds(groupCb, key);
+    }
+    applyBulkSelectionToLoaded(document);
     syncSelectAllButtonToSelection();
     updateBulkCheckoutState();
+}
+
+/**
+ * Resolves on the server the ids of every entry of a ticked group in the current filtered view —
+ * collapsed, never-opened and paginated stacks included — and marks them while the box is still
+ * ticked. A failed lookup keeps what is marked and shows the select-all error.
+ *
+ * @param {HTMLInputElement} groupCb the group's select-all checkbox
+ * @param {string} key the group's material or game item id
+ */
+function loadGroupEntryIds(groupCb, key) {
+    const generation = bulkSelectionGeneration;
+    const selection = currentLagerSelection();
+    if (selection.itemsView) selection.gameItems = [key];
+    else selection.materials = [key];
+    bulkGroupLookupsInFlight.add(key);
+    fetchEntryIds(selection)
+        .then((ids) => {
+            if (generation !== bulkSelectionGeneration) return;
+            /** @type {Set<string>} */
+            const groupIds = new Set();
+            (Array.isArray(ids) ? ids : []).forEach((id) => {
+                if (id) groupIds.add(String(id));
+            });
+            bulkGroupIds.set(key, groupIds);
+            if (groupCb.checked) groupIds.forEach((id) => bulkSelectedIds.add(id));
+        })
+        .catch((e) => {
+            if (generation !== bulkSelectionGeneration) return;
+            console.error('Failed to resolve the entries of a Lager group', e);
+            showFrontendErrorToast(bulkI18n.selectAllFailed);
+        })
+        .finally(() => {
+            if (generation !== bulkSelectionGeneration) return;
+            bulkGroupLookupsInFlight.delete(key);
+            applyBulkSelectionToLoaded(document);
+            syncSelectAllButtonToSelection();
+            updateBulkCheckoutState();
+        });
 }
 
 let bulkSelectAllInFlight = false;
@@ -232,18 +308,31 @@ function syncSelectAllButtonToSelection() {
     if (bulkSelectedIds.size === 0) setSelectAllButtonState(false);
 }
 
+/**
+ * Empties the selection, forgets every group's resolved id set and drops the answers of lookups
+ * still in flight.
+ */
 function clearBulkSelection() {
+    bulkSelectionGeneration++;
+    bulkGroupIds.clear();
+    bulkGroupLookupsInFlight.clear();
     bulkSelectedIds.clear();
     applyBulkSelectionToLoaded(document);
     setSelectAllButtonState(false);
     updateBulkCheckoutState();
 }
 
-function fetchAllMatchingEntryIds() {
+/**
+ * The Lager selection the page's filter controls hold, as the grouped table and the entry-id
+ * lookups send it.
+ *
+ * @returns {KrtLagerSelection} the selection
+ */
+function currentLagerSelection() {
     const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
         document.getElementById('minQuality')
     );
-    const selection = {
+    return {
         itemsView: myLager.lagerIsItemsView(),
         materials: myLager.collectChecked('matCheck'),
         gameItems: myLager.collectChecked('gameItemCheck'),
@@ -255,11 +344,28 @@ function fetchAllMatchingEntryIds() {
         nonPersonal: personalScopeIs('shared'),
         stolen: myStolenFilterValue(),
     };
+}
 
+/**
+ * Resolves on the server the ids of the caller's entries a selection matches
+ * (`GET /inventory/my/entry-ids`, REQ-INV-034).
+ *
+ * @param {KrtLagerSelection} selection the selection
+ * @returns {Promise<unknown>} the id list
+ */
+function fetchEntryIds(selection) {
     const url = new URL(`${window.location.origin}/inventory/my/entry-ids`);
     myLager.appendLagerFilterParams(url.searchParams, selection);
-
     return krtFetch.getJson(url.toString());
+}
+
+/**
+ * Resolves the ids of every entry of the current filtered view.
+ *
+ * @returns {Promise<unknown>} the id list
+ */
+function fetchAllMatchingEntryIds() {
+    return fetchEntryIds(currentLagerSelection());
 }
 
 async function toggleSelectAllInView() {
@@ -846,21 +952,7 @@ function filterMyInventory() {
     persistMyInventoryFilters();
     krtFilterPanel.refresh('myFilterPanel');
     krtFilterChips.refresh();
-    const minQualitySelect = /** @type {HTMLSelectElement | null} */ (
-        document.getElementById('minQuality')
-    );
-    const selection = {
-        itemsView: myLager.lagerIsItemsView(),
-        materials: myLager.collectChecked('matCheck'),
-        gameItems: myLager.collectChecked('gameItemCheck'),
-        locations: myLager.collectChecked('locCheck'),
-        minQuality: minQualitySelect ? minQualitySelect.value : '',
-        jobOrders: myLager.collectChecked('jobOrderCheck'),
-        missions: myLager.collectChecked('missionCheck'),
-        personal: personalScopeIs('personal'),
-        nonPersonal: personalScopeIs('shared'),
-        stolen: myStolenFilterValue(),
-    };
+    const selection = currentLagerSelection();
 
     const container = document.getElementById('myInventoryTableContainer');
     if (!container) return;

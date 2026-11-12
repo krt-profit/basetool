@@ -178,8 +178,9 @@ touch floor through its overlay (REQ-UI-009).
   render; Enter and Space on the focused button expand and collapse the level and flip
   `aria-expanded`, the first expand of a stack loads its entries, and a restored level comes back
   with `aria-expanded="true"`.
-- [ ] Ticking or unticking the „Mein Lager" group checkbox, by mouse or Space, marks or unmarks the
-  group's loaded entries and neither expands nor collapses the group.
+- [ ] Ticking or unticking the „Mein Lager" group checkbox, by mouse or Space, marks or unmarks
+  every entry of the group in the filtered view (REQ-INV-034) and neither expands nor collapses
+  the group.
 
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
 `InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`,
@@ -916,6 +917,16 @@ no-silent-cap principle).
   unticked, and keeping stale ids across a re-render could aim the bulk check-out at an entry a peer
   already removed (the backend bulk-checkout 404s on any unknown id). Select-all itself does not
   re-swap the table, so a live selection survives drill-down expansion.
+- **A group checkbox marks the whole group, open or not.** Ticking it marks the group's entries
+  already on the page at once and, on the first tick since the last re-swap, resolves the ids of
+  every entry of the group in the current filtered view through the same `GET
+  /inventory/my/entry-ids`, its material or game-item filter narrowed to that one group — collapsed
+  and never-opened stacks and entries past a stack's first page included. The group stays as it is:
+  nothing is expanded and no stack is loaded for it; a stack opened later comes up ticked. The
+  checkbox shows ticked while every known entry of the group is marked and indeterminate while some
+  are; unticking unmarks them all. The resolved set lives until the next re-swap, which drops it
+  with the selection and discards a lookup still in flight; a failed lookup keeps what is marked
+  and shows the select-all error.
 - **No new mutation.** Select-all is a read that feeds the existing bulk check-out
   (`POST /inventory/bulk-checkout`, REQ-INV-044); it adds no new write path and no new audit event
   (the bulk check-out's `INVENTORY_BULK_CHECKED_OUT` audit is unchanged).
@@ -943,6 +954,10 @@ pair) moved into a sticky selection bar that appears only while something is mar
   the bulk check-out); expanding a stack after select-all shows its rows already ticked.
 - [ ] The selection checkbox of every material and game-item entry carries an accessible name, and
   an axe scan of the open tree reports no critical or serious violation.
+- [ ] Ticking the group checkbox of a collapsed, never-opened group marks every entry of that group
+  in the filtered view and no entry of another group, keeps the box ticked and the group collapsed,
+  and shows the count in the selection bar; opening the group and its stack afterwards shows the
+  entries ticked, and unticking unmarks them.
 
 **Enforced by:** `InventoryItemControllerTest`, `InventoryPageControllerTest`,
 `InventoryPageControllerMvcTest`, `InventoryAggregationServiceTest`, `LagerTreeDisclosureE2eTest` ·

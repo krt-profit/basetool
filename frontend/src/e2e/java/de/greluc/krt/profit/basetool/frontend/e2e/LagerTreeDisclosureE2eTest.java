@@ -92,17 +92,23 @@ class LagerTreeDisclosureE2eTest {
   private static String materialId;
   private static String itemId;
 
-  /** Launches the browser and seeds one shared stock row of an own material at an own place. */
+  /**
+   * Launches the browser and seeds, at an own place, one shared stock row of an own material and
+   * one of a second material, so a group's selection can be told apart from the whole view's.
+   */
   @BeforeAll
   static void setUp() {
-    assumeTrue(STACK.managesStack(), "the flow seeds its own stock row");
+    assumeTrue(STACK.managesStack(), "the flow seeds its own stock rows");
     playwright = Playwright.create();
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     BackendSeeder seeder = new BackendSeeder();
     seeder.ensureIridiumMembership(USERNAME, PASSWORD);
     materialId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Lager Disclosure Mat");
+    String otherMaterialId =
+        seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Lager Disclosure Other Mat");
     String locationId = seeder.createLocation(USERNAME, PASSWORD, "E2E Lager Disclosure Hub");
     itemId = seeder.createInventoryItem(USERNAME, PASSWORD, materialId, locationId, 700, 25.0);
+    seeder.createInventoryItem(USERNAME, PASSWORD, otherMaterialId, locationId, 700, 5.0);
     storageState =
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
   }
@@ -183,13 +189,13 @@ class LagerTreeDisclosureE2eTest {
   }
 
   /**
-   * A mouse click on the group checkbox of the collapsed group leaves it collapsed; with the group
-   * and its stack open, Space on the checkbox marks and unmarks the loaded entry and leaves both
-   * levels open. The checkbox reflects the loaded entries, so on a group with none loaded it does
-   * not stay ticked.
+   * A mouse click on the group checkbox of the collapsed, never-opened group marks every entry of
+   * that group and of no other group, stays ticked and leaves the group collapsed with no stack
+   * loaded; opening the group and its stack shows the entry ticked, and Space on the checkbox then
+   * unmarks and marks it again while both levels stay open.
    */
   @Test
-  void theGroupCheckboxMarksWithoutTogglingTheGroup() {
+  void theGroupCheckboxMarksTheWholeGroupWithoutOpeningIt() {
     try (BrowserContext context = newContext(1280, 800)) {
       Page page = context.newPage();
       try {
@@ -198,23 +204,31 @@ class LagerTreeDisclosureE2eTest {
         Locator groupCheckbox = page.locator(groupRow() + " input.group-select-all");
         Locator entryCheckbox =
             page.locator("input.inventory-item-checkbox[data-id='" + itemId + "']");
+        Locator selectionBar = page.locator("#bulkCheckoutBar");
+        Locator selectionCount = page.locator("#bulkCheckoutCount");
         assertThat(groupToggle).isVisible(afterLoad());
 
         groupCheckbox.click();
+        assertThat(groupCheckbox).isChecked();
+        assertThat(selectionCount).hasText("1");
         assertThat(groupToggle).hasAttribute("aria-expanded", "false");
         assertThat(page.locator("#lager-group-" + materialId)).isHidden();
+        assertThat(page.locator(stackRow())).hasAttribute("data-stack-loaded", "false");
 
         groupToggle.click();
         stackToggle(page).click();
         assertThat(entryCheckbox).isVisible(afterLoad());
+        assertThat(entryCheckbox).isChecked();
 
         groupCheckbox.focus();
         page.keyboard().press("Space");
-        assertThat(groupCheckbox).isChecked();
-        assertThat(entryCheckbox).isChecked();
-        page.keyboard().press("Space");
         assertThat(groupCheckbox).not().isChecked();
         assertThat(entryCheckbox).not().isChecked();
+        assertThat(selectionBar).isHidden();
+        page.keyboard().press("Space");
+        assertThat(groupCheckbox).isChecked();
+        assertThat(entryCheckbox).isChecked();
+        assertThat(selectionCount).hasText("1");
         assertThat(groupToggle).hasAttribute("aria-expanded", "true");
         assertThat(stackToggle(page)).hasAttribute("aria-expanded", "true");
       } catch (RuntimeException | AssertionError failure) {
