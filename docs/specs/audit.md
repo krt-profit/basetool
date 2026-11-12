@@ -270,15 +270,18 @@ web, naming its client (REQ-AUDIT-005):
   an item offer (both non-personal game-asset values); the anbieter is the target reference. The
   details payload carries only bounded facts — the offer `kind`, plus for a material offer the item id
   / quality / **offered amount** (and the item's current stock on release) / re-release flag and for an
-  item offer the blueprint `product` key / `qty`, and always the remark **length** — **never** the
-  remark body, the anbieter/interessent handle, or the item's location. **Requests (Gesuche)** on the
+  item offer the blueprint `product` key or the catalogue row `gameItem` (ADR-0372) / `qty`, and
+  always the remark **length** — **never** the remark body, the anbieter/interessent handle, or the
+  item's location. **Requests (Gesuche)** on the
   same board (REQ-MARKET-015…020) add five sibling event types under the same domain: request post
   (`MARKET_REQUEST_CREATED`), request edit (`MARKET_REQUEST_UPDATED`), request deactivate
   (`MARKET_REQUEST_DEACTIVATED`), fulfilment signal (`MARKET_REQUEST_INTEREST_SIGNALLED`) and its
   withdrawal (`MARKET_REQUEST_INTEREST_WITHDRAWN`), listed in the same Materialbörse viewer tab. Their
-  details carry only bounded facts — the request `kind`, the material id or blueprint `product` key,
-  the `minQuality`, the desired `amt` / `qty`, and the description **length** — never the description
-  body, the requester/supplier handle, or any location.
+  details carry only bounded facts — the request `kind`, the material id, blueprint `product` key or
+  catalogue row `gameItem`, the `minQuality`, the desired `amt` / `qty`, and the description
+  **length** — never the description body, the requester/supplier handle, or any location. A
+  catalogue reconciliation that moves an item offer or request to the surviving catalogue row writes
+  `MARKET_CATALOGUE_REASSIGNED` (see "Catalogue duplicate reconciliation" below).
 - **Hangar** (`Ship`, `AuditDomain.HANGAR`, every channel — web, app and the exchange) — ship
   create (`HANGAR_SHIP_CREATED`), edit (`HANGAR_SHIP_UPDATED`, only when a field changed; the
   details name the changed fields, never their values), org-unit change
@@ -961,7 +964,8 @@ REQ-AUDIT-001 also covers automatic reference reassignment during the archived r
 REQ-DATA-034. Each changed row is audited in its owning transaction and existing domain:
 `INVENTORY_ITEM_CATALOGUE_REASSIGNED`, `MIN_STOCK_LEVEL_CATALOGUE_REASSIGNED`,
 `JOB_ORDER_ITEM_CATALOGUE_REASSIGNED`, `BLUEPRINT_CATALOGUE_REASSIGNED`,
-`SUPPLY_CATALOGUE_REASSIGNED` and `PURCHASING_CATALOGUE_REASSIGNED`.
+`SUPPLY_CATALOGUE_REASSIGNED`, `PURCHASING_CATALOGUE_REASSIGNED` and
+`MARKET_CATALOGUE_REASSIGNED` (an item offer or request named by its catalogue row, ADR-0372).
 Details contain canonical/retired ids and fixed tokens; duplicate stock-floor reconciliation
 also records numeric before/after minimum and target settings. No note or member free text is
 copied into details. Unchanged rows and rolled-back attempts emit no mutation event. These

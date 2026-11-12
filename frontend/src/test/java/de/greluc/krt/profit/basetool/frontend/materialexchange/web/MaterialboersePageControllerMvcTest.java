@@ -34,15 +34,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.blueprint.model.BlueprintProductDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.InventoryGameItemReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.MaterialReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.OrgUnitReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeCountsDto;
+import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeItemReleaseRequest;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferDto;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeOfferUpdateRequest;
 import de.greluc.krt.profit.basetool.frontend.materialexchange.model.MaterialExchangeReleasableItemDto;
@@ -435,6 +439,66 @@ class MaterialboersePageControllerMvcTest {
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
                     "$[0].stolen")
                 .value(true));
+  }
+
+  /**
+   * The item pickers' relay merges the blueprint products and the stocked items without a blueprint
+   * into one name order, each entry carrying its own identity (ADR-0372).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemOptionsProxy_mergesProductsAndItemsWithoutBlueprint() throws Exception {
+    UUID railgun = UUID.fromString("0b7c3e1a-2d4f-4a5b-9c6d-7e8f9a0b1c2d");
+    when(backendApiClient.get(
+            eq("/api/v1/blueprints/products/search?limit=25&q={q}"), anyTypeRef(), eq("rail")))
+        .thenReturn(
+            List.of(new BlueprintProductDto("rail pack", "Rail Pack", 1, "RSI", null, false)));
+    when(backendApiClient.get(
+            eq("/api/v1/game-items?withoutBlueprint=true&size=25&sort=name,asc&q={q}"),
+            anyTypeRef(),
+            eq("rail")))
+        .thenReturn(
+            new PageResponse<>(
+                List.of(
+                    new InventoryGameItemReferenceDto(
+                        railgun, "Advocacy Railgun", "Behring", "WEAPON")),
+                0,
+                25,
+                1,
+                1,
+                List.of()));
+
+    mockMvc
+        .perform(get("/materialboerse/item-options").param("q", "rail"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].name").value("Advocacy Railgun"))
+        .andExpect(jsonPath("$[0].gameItemId").value(railgun.toString()))
+        .andExpect(jsonPath("$[0].productKey").doesNotExist())
+        .andExpect(jsonPath("$[1].name").value("Rail Pack"))
+        .andExpect(jsonPath("$[1].productKey").value("rail pack"))
+        .andExpect(jsonPath("$[1].gameItemId").doesNotExist());
+  }
+
+  /** The item-offer proxy relays an item named by its catalogue row unchanged (ADR-0372). */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void itemOfferProxy_relaysTheCatalogueRow() throws Exception {
+    UUID railgun = UUID.fromString("0b7c3e1a-2d4f-4a5b-9c6d-7e8f9a0b1c2d");
+
+    mockMvc
+        .perform(
+            post("/materialboerse/item-offers/ajax")
+                .with(csrf())
+                .contentType("application/json")
+                .content(
+                    "{\"gameItemId\":\"" + railgun + "\",\"quantity\":1,\"remark\":\"tausch\"}"))
+        .andExpect(status().isOk());
+
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/material-exchange/item-offers"),
+            eq(new MaterialExchangeItemReleaseRequest(null, railgun, 1, "tausch")),
+            eq(MaterialExchangeOfferDto.class));
   }
 
   /** The deactivate proxy returns 200 on a successful backend call. */

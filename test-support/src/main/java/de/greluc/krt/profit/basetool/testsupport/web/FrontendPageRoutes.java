@@ -165,7 +165,7 @@ public final class FrontendPageRoutes {
           "/inventory/merge-candidates",
           "/inventory/my/entry-ids",
           "/inventory/order-needs",
-          "/materialboerse/offerable-products",
+          "/materialboerse/item-options",
           "/materialboerse/releasable-items",
           "/materialboerse/request-materials",
           "/materials/overview/data",

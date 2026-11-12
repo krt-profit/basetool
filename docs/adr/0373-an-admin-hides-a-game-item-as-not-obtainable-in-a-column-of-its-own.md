@@ -4,7 +4,8 @@
 - **Date:** 2026-11-12
 - **Deciders:** @greluc
 - **Related:** amends the picker and write rules of ADR-0336 (REQ-P4K-013) · ADR-0370 (the Lager
-  books every item of a stocked type) · ADR-0345 (the starmap visibility override, the same kind of
+  books every item of a stocked type) · ADR-0372 (the Materialbörse names an item without a
+  blueprint by its catalogue row) · ADR-0345 (the starmap visibility override, the same kind of
   admin decision on a P4K row) · spec `docs/specs/p4k-catalogue.md` (REQ-P4K-048, REQ-P4K-013,
   REQ-P4K-046), `docs/specs/observability.md` (REQ-OBS-022)
 
@@ -34,7 +35,8 @@ the Lager list (REQ-INV-067) and the exchange's refusal to book the item in (REQ
    `SelectableGameItemJpql.SELECTABLE_ITEM` replace the listed state wherever a new reference is
    chosen:
    - the item pickers filter on it: the Lager picker (`GameItemRepository.findStockable`), the
-     item-order picker (`BlueprintRepository.findOrderableItems`) and every picker built on them;
+     Materialbörse's stocked items without a blueprint (`findStockedWithoutBlueprint`, ADR-0372)
+     and the item-order picker (`BlueprintRepository.findOrderableItems`);
    - the blueprint-product search drops a product whose output item is unobtainable. It backs the
      Materialbörse item pickers and the personal and default blueprint pickers; a blueprint of an
      item nobody can obtain cannot be obtained either;

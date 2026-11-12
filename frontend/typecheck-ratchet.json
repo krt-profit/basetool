@@ -205,6 +205,7 @@
       "leadership/leitung.js"
     ],
     "materialexchange": [
+      "materialexchange/exchange-item-options.js",
       "materialexchange/materialboerse-release.js",
       "materialexchange/materialboerse.js",
       "materialexchange/materialgesuch-modal.js"

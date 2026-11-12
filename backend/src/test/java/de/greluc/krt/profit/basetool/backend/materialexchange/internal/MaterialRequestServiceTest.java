@@ -36,13 +36,16 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditService;
 import de.greluc.krt.profit.basetool.backend.blueprint.api.ResolvedProduct;
 import de.greluc.krt.profit.basetool.backend.blueprint.internal.BlueprintProductService;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItem;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemReferenceDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.QuantityType;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.SelectableGameItems;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.kernel.OrgUnitKind;
@@ -98,6 +101,8 @@ class MaterialRequestServiceTest {
   @Mock private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Mock private OrgUnitRepository orgUnitRepository;
   @Mock private BlueprintProductService blueprintProductService;
+  @Mock private SelectableGameItems selectableGameItems;
+  @Mock private StockItemCatalogue stockItemCatalogue;
   @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private ExchangeItemReferences exchangeItemReferences;
   @Mock private ApplicationEventPublisher eventPublisher;
@@ -126,7 +131,8 @@ class MaterialRequestServiceTest {
             authHelperService,
             auditService,
             boardService,
-            blueprintProductService,
+            new ExchangeItemSubjects(
+                blueprintProductService, selectableGameItems, stockItemCatalogue),
             requestScopeResolver,
             eventPublisher,
             selfProvider);
@@ -160,14 +166,41 @@ class MaterialRequestServiceTest {
     when(requestRepository.findBoard(
             any(), anyBoolean(), any(), anyInt(), any(), any(), any(Pageable.class)))
         .thenReturn(new PageImpl<>(List.of(request, helmet)));
-    when(exchangeItemReferences.byProductKey(List.of("venture_helmet")))
-        .thenReturn(Map.of("venture_helmet", reference));
+    when(exchangeItemReferences.ofPage(List.of("venture_helmet"), List.of()))
+        .thenReturn(
+            new ExchangeItemReferences.PageItems(Map.of("venture_helmet", reference), Map.of()));
 
     List<MaterialRequestDto> board =
         boardService.board(null, null, null, null, null, 0, 50).content();
 
     assertThat(board).extracting(MaterialRequestDto::gameItem).containsExactly(null, reference);
-    verify(exchangeItemReferences, never()).ofProductKey(any());
+    verify(exchangeItemReferences, never()).ofEntry(any(), any());
+  }
+
+  /**
+   * A board page resolves the game item of a request named by its catalogue row in the same batch
+   * as the product-keyed ones (ADR-0372).
+   */
+  @Test
+  void board_catalogueRowRequestCarriesItsGameItem() {
+    MaterialExchangeRequest railgun = itemRequest(UUID.randomUUID(), owner);
+    UUID gameItemId = UUID.randomUUID();
+    railgun.setItemProductKey(null);
+    railgun.setItemGameItemId(gameItemId);
+    railgun.setItemName("Scourge Railgun");
+    GameItemReferenceDto reference =
+        new GameItemReferenceDto(gameItemId, "Scourge Railgun", "VEHICLE_ITEM");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
+    when(requestRepository.findBoard(
+            any(), anyBoolean(), any(), anyInt(), any(), any(), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(railgun)));
+    when(exchangeItemReferences.ofPage(List.of(), List.of(gameItemId)))
+        .thenReturn(new ExchangeItemReferences.PageItems(Map.of(), Map.of(gameItemId, reference)));
+
+    List<MaterialRequestDto> board =
+        boardService.board(null, null, null, null, null, 0, 50).content();
+
+    assertThat(board).extracting(MaterialRequestDto::gameItem).containsExactly(reference);
   }
 
   /** An item request's detail carries the game item its product names (REQ-MARKET-023). */
@@ -178,7 +211,7 @@ class MaterialRequestServiceTest {
         new GameItemReferenceDto(UUID.randomUUID(), "Venture Helmet", "ARMOR");
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(requestRepository.findWithDetailById(requestId)).thenReturn(Optional.of(helmet));
-    when(exchangeItemReferences.ofProductKey("venture_helmet")).thenReturn(reference);
+    when(exchangeItemReferences.ofEntry("venture_helmet", null)).thenReturn(reference);
 
     assertThat(boardService.detail(requestId).gameItem()).isEqualTo(reference);
   }
@@ -190,7 +223,7 @@ class MaterialRequestServiceTest {
     when(requestRepository.findWithDetailById(requestId)).thenReturn(Optional.of(request));
 
     assertThat(boardService.detail(requestId).gameItem()).isNull();
-    verify(exchangeItemReferences, never()).ofProductKey(any());
+    verify(exchangeItemReferences, never()).ofEntry(any(), any());
   }
 
   /** A non-owner viewer sees only the supplier count — never the names (REQ-MARKET-019). */
@@ -299,7 +332,7 @@ class MaterialRequestServiceTest {
 
     MaterialRequestDto dto =
         service.createItemRequest(
-            new MaterialItemRequestCreateRequest("venture helmet", 700, 5, "gegen aUEC"));
+            new MaterialItemRequestCreateRequest("venture helmet", null, 700, 5, "gegen aUEC"));
 
     assertThat(dto.kind()).isEqualTo(MaterialExchangeRequestKind.ITEM);
     assertThat(dto.itemName()).isEqualTo("Venture Helmet");
@@ -333,8 +366,68 @@ class MaterialRequestServiceTest {
     when(blueprintProductService.resolveByProductKey("nope")).thenReturn(Optional.empty());
 
     assertThatThrownBy(() ->
-            service.createItemRequest(new MaterialItemRequestCreateRequest("nope", null, 1, "")))
+            service.createItemRequest(
+                new MaterialItemRequestCreateRequest("nope", null, null, 1, "")))
         .isInstanceOf(NotFoundException.class);
+    verify(requestRepository, never()).saveAndFlush(any());
+  }
+
+  /**
+   * Posting a request for a stocked item no blueprint produces persists it under its catalogue row
+   * and audits that row, never the display name (ADR-0372).
+   */
+  @Test
+  void createItemRequest_gameItemWithoutBlueprint_persistsUnderTheCatalogueRow() {
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Scourge Railgun");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(selectableGameItems.require(gameItem.getId())).thenReturn(gameItem);
+    when(blueprintProductService.resolveByGameItem(gameItem.getId())).thenReturn(Optional.empty());
+    when(stockItemCatalogue.isStockedByType(gameItem)).thenReturn(true);
+    when(requestScopeResolver.currentOrgUnit()).thenReturn(Optional.empty());
+
+    MaterialRequestDto dto =
+        service.createItemRequest(
+            new MaterialItemRequestCreateRequest(null, gameItem.getId(), null, 1, "gegen aUEC"));
+
+    ArgumentCaptor<MaterialExchangeRequest> saved = ArgumentCaptor.captor();
+    verify(requestRepository).saveAndFlush(saved.capture());
+    assertThat(saved.getValue().getItemProductKey()).isNull();
+    assertThat(saved.getValue().getItemGameItemId()).isEqualTo(gameItem.getId());
+    assertThat(dto.itemName()).isEqualTo("Scourge Railgun");
+    ArgumentCaptor<CharSequence> details = ArgumentCaptor.captor();
+    verify(auditService)
+        .record(
+            eq(AuditEventType.MARKET_REQUEST_CREATED),
+            any(),
+            eq("Scourge Railgun"),
+            eq(ownerId),
+            details.capture());
+    assertThat(details.getValue().toString())
+        .contains("gameItem=" + gameItem.getId())
+        .doesNotContain("product=")
+        .doesNotContain("Scourge Railgun");
+  }
+
+  /** A request for a catalogue row the Lager does not book is rejected and nothing is saved. */
+  @Test
+  void createItemRequest_gameItemTheLagerDoesNotBook_badRequest() {
+    GameItem gameItem = new GameItem();
+    gameItem.setId(UUID.randomUUID());
+    gameItem.setName("Pembroke Pants");
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
+    when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+    when(selectableGameItems.require(gameItem.getId())).thenReturn(gameItem);
+    when(blueprintProductService.resolveByGameItem(gameItem.getId())).thenReturn(Optional.empty());
+    when(stockItemCatalogue.isStockedByType(gameItem)).thenReturn(false);
+
+    UUID gameItemId = gameItem.getId();
+    assertThatThrownBy(() ->
+            service.createItemRequest(
+                new MaterialItemRequestCreateRequest(null, gameItemId, null, 1, "")))
+        .isInstanceOf(BadRequestException.class);
     verify(requestRepository, never()).saveAndFlush(any());
   }
 

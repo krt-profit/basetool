@@ -163,8 +163,9 @@ public class MaterialExchangeBoardService {
     Map<UUID, List<OrgUnitReferenceDto>> badges =
         ownerOrgUnitBadges(ownerIdsOf(offers.getContent()));
     Map<UUID, StockRow> rows = rowsOf(offers.getContent());
-    Map<String, GameItemReferenceDto> gameItems =
-        exchangeItemReferences.byProductKey(itemProductKeysOf(offers.getContent()));
+    ExchangeItemReferences.PageItems gameItems =
+        exchangeItemReferences.ofPage(
+            itemProductKeysOf(offers.getContent()), itemGameItemIdsOf(offers.getContent()));
 
     Page<MaterialExchangeOfferDto> dtos =
         offers.map(offer ->
@@ -324,7 +325,7 @@ public class MaterialExchangeBoardService {
             : ownerOrgUnitBadges(Set.of(ownerId)).getOrDefault(ownerId, List.of());
     GameItemReferenceDto gameItem =
         offer.getKind() == MaterialExchangeOfferKind.ITEM
-            ? exchangeItemReferences.ofProductKey(offer.getItemProductKey())
+            ? exchangeItemReferences.ofEntry(offer.getItemProductKey(), offer.getItemGameItemId())
             : null;
     return toDto(offer, rowOf(offer), gameItem, viewerId, badges, count, viewerInterested, names);
   }
@@ -411,7 +412,7 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * The product keys of a page's item offers, the input of the batched game-item resolution.
+   * The product keys of a page's item offers, one input of the batched game-item resolution.
    *
    * @param offers the board page's offers
    * @return the item offers' product keys; material offers contribute nothing
@@ -425,18 +426,32 @@ public class MaterialExchangeBoardService {
   }
 
   /**
+   * The catalogue rows of a page's item offers, the other input of the batched game-item
+   * resolution.
+   *
+   * @param offers the board page's offers
+   * @return the item offers' catalogue rows; material offers contribute nothing
+   */
+  private static List<UUID> itemGameItemIdsOf(@NotNull Collection<MaterialExchangeOffer> offers) {
+    return offers.stream()
+        .filter(offer -> offer.getKind() == MaterialExchangeOfferKind.ITEM)
+        .map(MaterialExchangeOffer::getItemGameItemId)
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  /**
    * Looks up the game item of one offer in a page's resolved references.
    *
    * @param offer the offer
-   * @param gameItems product key to reference for the page
+   * @param gameItems the page's references
    * @return the reference of an item offer, or {@code null}
    */
   @Nullable
   private static GameItemReferenceDto gameItemOf(
-      @NotNull MaterialExchangeOffer offer, @NotNull Map<String, GameItemReferenceDto> gameItems) {
-    String key = offer.getItemProductKey();
-    return offer.getKind() == MaterialExchangeOfferKind.ITEM && key != null
-        ? gameItems.get(key)
+      @NotNull MaterialExchangeOffer offer, @NotNull ExchangeItemReferences.PageItems gameItems) {
+    return offer.getKind() == MaterialExchangeOfferKind.ITEM
+        ? gameItems.of(offer.getItemProductKey(), offer.getItemGameItemId())
         : null;
   }
 

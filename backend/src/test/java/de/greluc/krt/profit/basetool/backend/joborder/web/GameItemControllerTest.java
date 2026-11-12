@@ -20,10 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.joborder.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.app.api.SecurityConfig;
@@ -32,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryGameItemRefe
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockItemCatalogue;
 import de.greluc.krt.profit.basetool.backend.joborder.api.ItemDerivationDto;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderItemService;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.PageResponse;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import java.lang.reflect.Method;
@@ -61,8 +64,8 @@ import org.springframework.security.util.SimpleMethodInvocation;
 
 /**
  * Unit tests for {@link GameItemController}, the one game-item catalogue behind the order and Lager
- * pickers: the {@code orderable} switch picks the query, the sort whitelist and the gate of the
- * folded read keep both former audiences exactly.
+ * pickers: the {@code orderable} and {@code withoutBlueprint} switches pick the query, the sort
+ * whitelist and the gate of the folded read keep both former audiences exactly.
  */
 @ExtendWith(MockitoExtension.class)
 class GameItemControllerTest {
@@ -100,7 +103,8 @@ class GameItemControllerTest {
     return MANAGER
         .authorize(
             () -> authentication,
-            new SimpleMethodInvocation(target, getGameItems(), null, orderable, 0, 20, "name"))
+            new SimpleMethodInvocation(
+                target, getGameItems(), null, orderable, false, 0, 20, "name"))
         .isGranted();
   }
 
@@ -113,7 +117,7 @@ class GameItemControllerTest {
         .thenReturn(new PageImpl<>(List.of(ref), PageRequest.of(0, 20), 1));
 
     PageResponse<InventoryGameItemReferenceDto> result =
-        controller.getGameItems("drive", false, 0, 20, "name,asc;id,asc");
+        controller.getGameItems("drive", false, false, 0, 20, "name,asc;id,asc");
 
     assertThat(result.content()).containsExactly(ref);
     assertThat(result.totalElements()).isEqualTo(1L);
@@ -133,10 +137,35 @@ class GameItemControllerTest {
         .thenReturn(new PageImpl<>(List.of(ref), PageRequest.of(0, 20), 1));
 
     PageResponse<InventoryGameItemReferenceDto> result =
-        controller.getGameItems("cirrus", true, 0, 20, "name,asc");
+        controller.getGameItems("cirrus", true, false, 0, 20, "name,asc");
 
     assertThat(result.content()).containsExactly(ref);
     verify(stockItemCatalogue, never()).findBookableItems(any(), any());
+  }
+
+  @Test
+  @DisplayName("withoutBlueprint=true reads the stocked items no blueprint produces only")
+  void withoutBlueprintReadsTheStockedItemsWithoutBlueprint() {
+    InventoryGameItemReferenceDto ref =
+        new InventoryGameItemReferenceDto(
+            UUID.randomUUID(), "Scourge Railgun", "Behring", "WEAPON");
+    when(stockItemCatalogue.findBookableItemsWithoutBlueprint(eq("scourge"), any(Pageable.class)))
+        .thenReturn(new PageImpl<>(List.of(ref), PageRequest.of(0, 20), 1));
+
+    PageResponse<InventoryGameItemReferenceDto> result =
+        controller.getGameItems("scourge", false, true, 0, 20, "name,asc");
+
+    assertThat(result.content()).containsExactly(ref);
+    verify(stockItemCatalogue, never()).findBookableItems(any(), any());
+    verify(stockItemCatalogue, never()).findOrderableItems(any(), any());
+  }
+
+  @Test
+  @DisplayName("orderable and withoutBlueprint together are a bad request")
+  void orderableAndWithoutBlueprintExcludeEachOther() {
+    assertThatThrownBy(() -> controller.getGameItems("x", true, true, 0, 20, "name,asc"))
+        .isInstanceOf(BadRequestException.class);
+    verifyNoInteractions(stockItemCatalogue);
   }
 
   @Test

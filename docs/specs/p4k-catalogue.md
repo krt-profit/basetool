@@ -412,8 +412,9 @@ prices and terminals.
   `ITEM_RETIRED`; a fall, and a move the batch's falls cover, still apply.
 
 A row is retired when `p4k_deleted_at` (the sweep) or `p4k_hidden_at` (a hide, REQ-P4K-016) is
-set. The pickers that filter it: the Lager and item-order item pickers
-(`GameItemRepository.findStockable`, `BlueprintRepository.findOrderableItems`), the blueprint pickers,
+set. The pickers that filter it: the Lager, Materialbörse and item-order item pickers
+(`GameItemRepository.findStockable`, `findStockedWithoutBlueprint`,
+`BlueprintRepository.findOrderableItems`), the blueprint pickers,
 the ship-type, manufacturer and material pickers and searches. A game item an admin hid as not
 obtainable leaves the same item pickers and is refused on the same writes, without being retired
 (REQ-P4K-048). A blueprint recipe leaves the product
@@ -432,7 +433,9 @@ item, or edits an entry that keeps one, answers `400` with code `CATALOGUE_ITEM_
 property `gameItemId`, and writes nothing; the user picks another item. This covers a Lager item
 stock booked in (REQ-INV-029), a minimum stock level set or changed (REQ-INV-067), a need raised or
 edited (REQ-SUP-003), a donation pledged or recorded (REQ-SUP-007, REQ-SUP-011), an item-order line
-added or edited (REQ-ORDERS-032) and a trade deal created or edited for a need (REQ-PUR-007). Reads,
+added or edited (REQ-ORDERS-032), a trade deal created or edited for a need (REQ-PUR-007) and a
+Materialbörse item offer or request named by its catalogue row (REQ-MARKET-012, REQ-MARKET-014,
+REQ-MARKET-015). Reads,
 lists, deletes, withdrawals and the state changes of an existing entry (pause, resume, receive,
 decline) stay open. Every such write resolves the item through `SelectableGameItems` in
 `catalogue.api`, which refuses an item that is not `GameItem#isSelectable()`; an item-order line
@@ -462,8 +465,8 @@ are all retired answers as unknown there.
 **Enforced by:** `P4kStampedRowVisibilityTest`, `JobOrderItemDetailRenderTest`,
 `SelectableGameItemsTest`, `SelectableBlueprintsTest`, `StockLevelIntegrationTest`, `SupplyNeedServiceTest`,
 `SupplyDonationServiceTest`, `JobOrderItemServiceTest`, `InventoryItemServiceTest`,
-`PurchasingDealServiceTest`, `GlobalExceptionHandlerTest` (frontend), `krt-fetch-read.test.mjs`,
-`ExchangeStockWriteControllerTest`, `ExchangeOrgStockWriteControllerTest`,
+`PurchasingDealServiceTest`, `MaterialExchangeServiceTest`, `GlobalExceptionHandlerTest` (frontend),
+`krt-fetch-read.test.mjs`, `ExchangeStockWriteControllerTest`, `ExchangeOrgStockWriteControllerTest`,
 `ExchangeGoldenAnswerTest` (ingest)
 · **ADR:** [ADR-0336](../adr/0336-a-complete-p4k-kind-sweeps-vanished-rows-behind-a-mass-guard-and-every-run-keeps-a-change-report.md) · **Issues:** #2888
 
@@ -698,8 +701,9 @@ and no duplicate merge writes it, and it is no P4K retirement (REQ-P4K-013).
 A hidden item:
 
 - leaves every item picker: the Lager picker (`findStockable`), the item-order picker
-  (`findOrderableItems`), the Materialbörse item pickers and the blueprint-product search, which
-  also backs the personal and default blueprint pickers;
+  (`findOrderableItems`) and the Materialbörse item pickers — the stocked items without a blueprint
+  (`findStockedWithoutBlueprint`) and the blueprint-product search, which also backs the personal
+  and default blueprint pickers;
 - is refused on every write that names it by id like a retired item (REQ-P4K-013): `400` with code
   `CATALOGUE_ITEM_RETIRED`, an edit that keeps it included;
 - keeps its existing references, which show no notice; reads, lists, deletes, withdrawals and the
@@ -725,8 +729,9 @@ product by key are not refused: they carry observed game data or follow the blue
 lists, searched by name, or only the hidden items, the retired among them. A change names the wanted
 state (`PUT /api/v1/catalog/admin/game-items/{id}/obtainability` with `obtainable`), so a repeated
 change records nothing, and it takes the `SyncCoordinator` lock without waiting, as a review
-resolution does (REQ-P4K-016). The Lager and item-order pickers and the item-order write facts
-concatenate `SelectableGameItemJpql.SELECTABLE_ITEM`, the query form of `GameItem#isSelectable()`;
+resolution does (REQ-P4K-016). The Lager, Materialbörse and item-order pickers and the item-order
+write facts concatenate `SelectableGameItemJpql.SELECTABLE_ITEM`, the query form of
+`GameItem#isSelectable()`;
 the blueprint-product search drops a product whose output item `findUnobtainableIds` names; the
 reads of existing entries keep `P4kRetirementJpql.LISTED_ITEM`. Each change announces the
 `catalogue-admin` room's `items` section (`CatalogueAdminLiveSync`, REQ-FE-015), the frontend proxy
