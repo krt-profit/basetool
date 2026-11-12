@@ -26,9 +26,6 @@
     .mb-board .empty-state {
         border: 0;
     }
-    .mb-board .mb-md {
-        border: 0;
-    }
     .mb-sort {
         max-width: none;
         min-height: 40px;
@@ -62,19 +59,24 @@
     .mb-md {
         grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr);
         gap: 0;
-        background: var(--color-bg-dark-gray);
-        border: var(--border-hairline);
     }
     .mb-mlist {
+        /* Fills its grid row, so its bottom corner is the box's; min-height outranks max-height,
+           which caps only the row height the list asks for. */
+        min-height: 100%;
         max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 16rem));
         overflow-y: auto;
+        background: transparent;
         border: none;
         border-right: var(--border-hairline);
+        border-radius: var(--flush-corner-top) 0 0 var(--flush-corner-bottom);
     }
     .mb-detailpane {
         min-height: 300px;
         padding: var(--space-4) var(--space-6);
+        background: transparent;
         border: none;
+        border-radius: 0;
     }
     .mb-dp-back {
         display: none;
@@ -86,6 +88,8 @@
         .mb-mlist {
             max-height: none;
             border-right: none;
+            border-radius: var(--flush-corner-top) var(--flush-corner-top)
+                var(--flush-corner-bottom) var(--flush-corner-bottom);
         }
         .mb-md .mb-detailpane {
             display: none;
@@ -118,9 +122,10 @@
         box-sizing: border-box;
         text-align: left;
         background: none;
-        border: none;
-        border-bottom: var(--border-hairline);
+        border-top: 0;
+        border-right: 0;
         border-left: 3px solid transparent;
+        border-radius: 0;
         font-family: var(--font-body);
     }
     .mb-mrow.mb-mine {

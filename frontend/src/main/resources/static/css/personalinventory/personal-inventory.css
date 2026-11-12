@@ -588,25 +588,34 @@
     }
 
     .krt-bp-md {
+        /* Closes its list panel from inside #krt-bp-list, where the kernel's last-child hand-on
+           does not reach. */
+        --flush-corner-bottom: calc(var(--radius-box) - 1px);
         gap: 0;
     }
 
     .krt-bp-md .master-list {
+        /* Fills its grid row, so its bottom corner is the box's; min-height outranks max-height,
+           which caps only the row height the list asks for. */
+        min-height: 100%;
+        max-height: 70vh;
+        overflow-y: auto;
         background: transparent;
         border: 0;
         border-right: var(--border-hairline);
+        border-radius: var(--flush-corner-top) 0 0 var(--flush-corner-bottom);
     }
 
     .krt-bp-md .detail-pane {
         background: transparent;
         border: 0;
+        border-radius: 0;
         padding: var(--space-6);
         min-width: 0;
     }
 
-    .krt-bp-master-rows {
-        max-height: 70vh;
-        overflow-y: auto;
+    .krt-bp-master-rows > .master-row:nth-last-child(1 of :not([hidden])) {
+        border-bottom: 0;
     }
 
     .master-row {
@@ -884,6 +893,8 @@
 
         .krt-bp-md .master-list {
             border-right: 0;
+            border-radius: var(--flush-corner-top) var(--flush-corner-top)
+                var(--flush-corner-bottom) var(--flush-corner-bottom);
         }
 
         .krt-bp-md.is-detail .master-list {

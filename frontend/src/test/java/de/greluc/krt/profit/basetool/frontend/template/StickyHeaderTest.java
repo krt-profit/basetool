@@ -21,15 +21,12 @@ package de.greluc.krt.profit.basetool.frontend.template;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.template.CssRules.Rule;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
@@ -39,9 +36,6 @@ import org.junit.jupiter.api.Test;
  * which would bind the header's stickiness to a box that never scrolls.
  */
 class StickyHeaderTest {
-
-  /** An innermost rule: its selector list and its declarations. */
-  private static final Pattern RULE = Pattern.compile("([^{};]+)\\{([^{}]*)}");
 
   /** An overflow declaration that makes its element a scroll container; {@code clip} does not. */
   private static final Pattern SCROLL_CONTAINER =
@@ -68,15 +62,8 @@ class StickyHeaderTest {
    */
   @Test
   void theHeaderIsStickyAtTheTop() throws IOException, URISyntaxException {
-    Path styles = CssSources.mainResources().resolve("static/css/kernel/styles.css");
-    String css = CssSources.stripComments(Files.readString(styles, StandardCharsets.UTF_8));
-    List<String> headerRules = new ArrayList<>();
-    Matcher rule = RULE.matcher(css);
-    while (rule.find()) {
-      if (PAGE_HEADER.equals(rule.group(1).strip().replaceAll("\\s+", " "))) {
-        headerRules.add(rule.group(2));
-      }
-    }
+    List<String> headerRules =
+        CssRules.declarations(CssRules.read("static/css/kernel/styles.css"), PAGE_HEADER);
     assertThat(headerRules)
         .as("REQ-UI-026: a `body > header` rule makes the header sticky at the top edge")
         .anyMatch(body -> STICKY.matcher(body).find() && TOP_ZERO.matcher(body).find());
@@ -98,15 +85,10 @@ class StickyHeaderTest {
     List<Path> sheets = CssSources.files(CssSources.mainResources().resolve("static/css"), ".css");
     List<String> offenders = new ArrayList<>();
     for (Path sheet : sheets) {
-      String css = CssSources.stripComments(Files.readString(sheet, StandardCharsets.UTF_8));
-      Matcher rule = RULE.matcher(css);
-      while (rule.find()) {
-        boolean namesRootOrBody =
-            Arrays.stream(rule.group(1).split(","))
-                .map(String::strip)
-                .anyMatch(selector -> "html".equals(selector) || "body".equals(selector));
-        if (namesRootOrBody && SCROLL_CONTAINER.matcher(rule.group(2)).find()) {
-          offenders.add(sheet.getFileName() + ": " + rule.group(1).strip());
+      for (Rule rule : CssRules.read(sheet)) {
+        if ((rule.names("html") || rule.names("body"))
+            && SCROLL_CONTAINER.matcher(rule.body()).find()) {
+          offenders.add(sheet.getFileName() + ": " + rule.selector());
         }
       }
     }
