@@ -120,6 +120,16 @@ class NavigationMemberRenderMvcTest {
     assertThat(section(html)).doesNotContain("data-testid=\"nav-sc-links\"");
   }
 
+  @Test
+  void thePhoneDrawerIncludesBothForumLinks() throws Exception {
+    assertThat(section(render("/impressum")))
+        .containsSubsequence(
+            "class=\"nav-legal\"",
+            "data-entry-key=\"legal.changelog\"",
+            "data-entry-key=\"legal.discussion\"",
+            "class=\"nav-legal-version\"");
+  }
+
   /**
    * The Leitung tab sits beside the unit bank and shows only with the officer-reach flag; without
    * it the unit bank has no tab bar.

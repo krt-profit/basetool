@@ -844,7 +844,17 @@ public class NavigationRegistry {
         of("legal.privacy", "/privacy", "nav.privacy"),
         of("legal.terms", "/terms", "nav.terms"),
         of("legal.licenses", "/licenses", "nav.licenses"),
-        of("legal.handbook", HANDBOOK_URL, "footer.handbook").with(EXTERNAL, NOT_INDEXED));
+        of("legal.handbook", HANDBOOK_URL, "footer.handbook").with(EXTERNAL, NOT_INDEXED),
+        of(
+                "legal.changelog",
+                "https://das-kartell.org/forum/thread/9468-profit-basetool-changelog/",
+                "footer.changelog")
+            .with(EXTERNAL, NOT_INDEXED),
+        of(
+                "legal.discussion",
+                "https://das-kartell.org/forum/thread/9469-profit-basetool-diskussion-und-sammelthread/",
+                "footer.discussion")
+            .with(EXTERNAL, NOT_INDEXED));
   }
 
   @NotNull
