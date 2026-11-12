@@ -289,8 +289,16 @@ triangles), thin technical markers framing content
   scroll wrapper (`.table-responsive`, `.overflow-x-auto`) that clips what it holds anyway, such
   as the Lager's tree table. A frameless flush card inside a `.list-panel` hands on only the panel
   corners it sits in as the first or last visible child, so a table head under a toolbar stays
-  square. A table in a flush card has no fill of its own; a `.master-list` rounds its first and
-  last visible row.
+  square. A table in a flush card has no fill of its own; a `.master-list` box rounds its first
+  and last visible row.
+- **Panes are not boxes.** A `.master-list` and a `.detail-pane` that share one framed box as
+  frameless panes (the Materialbörse, the blueprint collection) take no radius and no fill; the
+  box paints, and the divider between them stays straight. The list pane is the scroll list: it
+  fills its grid row, so its bottom corner is the box's, takes the inner radius through
+  `--flush-corner-top` / `--flush-corner-bottom` in the box corners it fills (the left ones beside
+  the detail pane, all four when it stands alone at ≤ 1024 px) and clips its rows, which take none.
+  A flush card that closes its list panel from inside a wrapper element sets
+  `--flush-corner-bottom` itself.
 - **HUD corner brackets** stay on `.hud-box`, the modal and the toast and follow the rounded
   corner.
 - **Box title.** `.card-head`, a leading `.card-title` and `.section-title` are a title bar:
@@ -307,7 +315,9 @@ triangles), thin technical markers framing content
 
 **Enforced by:** `FlushCardCornerTest` (a flush card hands its inner radius to both edges, a
 frameless one in a list panel only to the panel corners it sits in, and every corner inside a flush
-card reads `--flush-corner-top` / `--flush-corner-bottom`); the rest by design review.
+card reads `--flush-corner-top` / `--flush-corner-bottom`) · `MasterDetailPaneCornerTest` (the
+panes of the Materialbörse and the blueprint collection take no radius and no fill, and the list
+pane fills its row and reads the corner properties); the rest by design review.
 
 ### REQ-UI-008 — No native browser dialogs
 

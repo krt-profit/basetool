@@ -19,12 +19,12 @@
 
 package de.greluc.krt.profit.basetool.frontend.template;
 
+import static de.greluc.krt.profit.basetool.frontend.template.CssRules.declares;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.frontend.template.CssRules.Rule;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -41,9 +41,6 @@ import org.junit.jupiter.api.Test;
  */
 class FlushCardCornerTest {
 
-  /** An innermost rule: its selector list and its declarations. */
-  private static final Pattern RULE = Pattern.compile("([^{};]+)\\{([^{}]*)}");
-
   /** A corner-radius longhand and its value. */
   private static final Pattern CORNER_RADIUS =
       Pattern.compile("(?<![-\\w])border-(top|bottom)-(?:left|right)-radius\\s*:\\s*([^;]+);");
@@ -54,9 +51,6 @@ class FlushCardCornerTest {
   /** The kernel stylesheet's innermost rules, read once. */
   private static List<Rule> rules;
 
-  /** One innermost rule of the stylesheet. */
-  private record Rule(@NotNull String selector, @NotNull String body) {}
-
   /**
    * Reads and splits the kernel stylesheet.
    *
@@ -65,16 +59,7 @@ class FlushCardCornerTest {
    */
   @BeforeAll
   static void readStylesheet() throws IOException, URISyntaxException {
-    String css =
-        CssSources.stripComments(
-            Files.readString(
-                CssSources.mainResources().resolve("static/css/kernel/styles.css"),
-                StandardCharsets.UTF_8));
-    rules = new ArrayList<>();
-    Matcher rule = RULE.matcher(css);
-    while (rule.find()) {
-      rules.add(new Rule(rule.group(1).strip().replaceAll("\\s+", " "), rule.group(2)));
-    }
+    rules = CssRules.read("static/css/kernel/styles.css");
     assertThat(rules).as("the kernel stylesheet still has its rules").hasSizeGreaterThan(500);
   }
 
@@ -137,31 +122,12 @@ class FlushCardCornerTest {
   }
 
   /**
-   * Lists the declaration blocks of the rules whose selector list names a selector exactly.
+   * Lists the declaration blocks of the kernel rules whose selector list names a selector exactly.
    *
    * @param selector the selector, with single spaces
    * @return the declaration blocks
    */
   private static @NotNull List<String> declarations(@NotNull String selector) {
-    return rules.stream()
-        .filter(rule -> List.of(rule.selector().split("\\s*,\\s*")).contains(selector))
-        .map(Rule::body)
-        .toList();
-  }
-
-  /**
-   * Tells whether a declaration block sets a property to a value.
-   *
-   * @param body the declaration block
-   * @param property the property name
-   * @param value the expected value
-   * @return whether the block declares exactly that value
-   */
-  private static boolean declares(
-      @NotNull String body, @NotNull String property, @NotNull String value) {
-    Matcher declaration =
-        Pattern.compile("(?<![-\\w])" + Pattern.quote(property) + "\\s*:\\s*([^;]+);")
-            .matcher(body);
-    return declaration.find() && value.equals(declaration.group(1).strip());
+    return CssRules.declarations(rules, selector);
   }
 }
