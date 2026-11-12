@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-03.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** ORDERS/UI · **Related ADRs:** [ADR-0099](../adr/0099-job-order-item-production-booking.md),
 > [ADR-0101](../adr/0101-inventory-game-item-rows.md) (production book-in)
 
@@ -169,6 +169,14 @@ that rounded only the sum let a figure with a fourth decimal pass in the dialog 
 `422` from the backend's unrounded comparison. Below the cards the modal carries the book-in
 section (location — required, the booking button stays disabled without it —, owner defaulting to
 the acting user, owning org unit, personal flag, "allocate to order") that fills the `bookIn` block.
+The owning org unit picker („Buchen in OrgUnit") lists the owner's direct memberships
+(`GET /users/{id}/memberships?allKinds=true`, reloaded when the owner changes; only the newest
+reload renders, and the booking button stays disabled while it loads) and preselects the active
+org unit (`activeSquadronId`, REQ-ORG-024, REQ-ORG-032) when the owner is a direct member of it,
+else the owner's only membership. Otherwise it leads with the empty „-- Bitte wählen --" choice of
+the owner pickers (REQ-ORG-023), is required, and the booking button stays disabled until a unit is
+chosen; the first unit of the list is never booked silently. An owner without a membership gets no
+picker.
 The relay `JobOrderWriteController.bookProductionAjax`
 (`POST /orders/{id}/items/{itemId}/production`, consumes JSON) forwards the payload to the backend,
 re-fetches the order, and returns it so `orders-detail.js` re-renders the affected sections in place
@@ -214,6 +222,10 @@ registry), and the receiver's apply map.
 - [ ] A booking with a `bookIn` block creates (or merges into) the matching game-item stack,
   earmarked to the order unless deselected, audited as `INVENTORY_RECEIVED_FROM_PRODUCTION` in
   the same transaction (REQ-INV-032); a payload without `bookIn` is rejected with 400.
+- [ ] Among the owner's direct memberships the modal's owning org unit picker preselects the active
+  org unit, else the only membership, and posts it as `bookIn.owningOrgUnitId`; with neither among
+  several memberships it shows the required empty choice and the booking stays disabled until a
+  unit is chosen. An answer for an earlier owner never fills the picker.
 - [ ] The endpoint is reachable only by a LOGISTICIAN/ADMIN with `canEditJobOrder`; the
   success response re-renders the `items` (booking surface + inline stock) and `kpi` sections, among
   others, in place and propagates them to a peer without a reload.
@@ -224,13 +236,17 @@ mission auto-clamp, 409/422 mapping, audit, skipped/not-booked-out material),
 a choose-2-of-3 recipe snapshots two options and no optional cost),
 `JobOrderControllerTest` (`bookProduction` auth +
 mapping), `JobOrderItemHandoverServiceTest` (delivery capped at manufactured-but-undelivered),
-`V219MigrationTest` (backfill + CHECK constraints) · **Code:**
-`JobOrderItemProductionService.bookProduction`, `JobOrderController.bookProduction`,
+`V219MigrationTest` (backfill + CHECK constraints), `orders-detail-production.test.mjs`
+(`:frontend:testOrdersDetailProductionJs`: the org-unit preselection, the required choice, the
+dropped late answer and the booking gate), `JobOrderItemDetailRenderTest` (the active org unit on
+the picker), `JobOrderProductionE2eTest` (the owner's only unit preselected in the browser) ·
+**Code:** `JobOrderItemProductionService.bookProduction`, `JobOrderController.bookProduction`,
 `JobOrderItemHandoverService.createItemHandover`, `JobOrderItemProductionCreateDto` /
 `JobOrderItemProductionConsumptionDto`, `ProductionAllocationException`, `AuditEventType`
 (`JOB_ORDER_PRODUCTION_BOOKED` / `INVENTORY_CONSUMED_BY_PRODUCTION` /
 `INVENTORY_RECEIVED_FROM_PRODUCTION`),
-`JobOrderWriteController.bookProductionAjax`, migration `V219` · **Issues:** #1182 · **ADR:**
+`JobOrderWriteController.bookProductionAjax`, `orders-detail-production.js`
+(`_prodRefreshOrgUnitPicker`), migration `V219` · **Issues:** #1182 · **ADR:**
 ADR-0099
 
 ### REQ-ORDERS-026 — Order-detail tab layout and KPI band
@@ -503,10 +519,13 @@ Herstellung surfaces fall back to a dash as well).
 
 **Mission slices.** The two pickers also carry the mission slices of each row (REQ-INV-027). For
 every caller, a slice whose mission the caller may not read (the mission detail rule,
-`MissionVisibility`, REQ-MISSION-008) is anonymised by `JobOrderMissionAllocationRedactor`: the
-slice and its amount stay so the row's sums remain traceable, the mission's name and planned start
-are dropped (the frontend renders its „unknown mission" label). Access to the order — including the
-assignee grant of REQ-ORDERS-047 — never widens access to a mission referenced by its stock.
+`MissionVisibility`, REQ-MISSION-008) is anonymised through what the mission module's earmark
+targets show the reader (`EarmarkTargets.Missions#shownMissions`, implemented by
+`MissionEarmarkTargets`, REQ-INV-027), which the Lager's mapper reads for every mission chip of
+every inventory read: the slice and its amount stay so the row's sums remain traceable, the
+mission's name and planned start are dropped (the frontend renders its „unknown mission" label).
+Access to the order — including the assignee grant of REQ-ORDERS-047 — never widens access to a
+mission referenced by its stock.
 
 **Acceptance**
 
@@ -520,11 +539,11 @@ assignee grant of REQ-ORDERS-047 — never widens access to a mission referenced
 
 **Enforced by:** `JobOrderItemStockControllerTest` + `MaterialCollectionControllerTest` +
 `JobOrderMaterialControllerTest` (owner and location passed through, the pickers only mission-safe),
-`JobOrderMissionAllocationRedactorTest` + `JobOrderLinkedStockMissionAllocationIntegrationTest` (the
+`MissionEarmarkTargetsTest` + `JobOrderLinkedStockMissionAllocationIntegrationTest` (the
 assignee of another unit gets the internal mission's slice anonymised over HTTP),
 `JobOrderItemDetailRenderTest` (`—` fallback) · **Code:** `JobOrderItemStockController` /
 `MaterialCollectionController` / `JobOrderMaterialController` (the two pickers),
-`JobOrderMissionAllocationRedactor`, `joborder/orders-detail.html` +
+`MissionEarmarkTargets`, `joborder/orders-detail.html` +
 `joborder/material-collection.html` (`—` fallbacks) · **Issues:** — · **ADR:**
 [ADR-0350](../adr/0350-every-order-viewer-sees-the-linked-stock-owner-and-location.md)
 

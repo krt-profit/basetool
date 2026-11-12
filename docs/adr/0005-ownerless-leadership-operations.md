@@ -1,6 +1,6 @@
 # ADR-0005 — Ownerless leadership ("Bereichsleitung") operations
 
-- **Status:** Accepted
+- **Status:** Accepted — **narrowed by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): the mission's operation picker lists only the operations the caller may edit, so linking a mission to an ownerless operation needs a Mission Manager grant in an Organisationsleitung or Bereich unit (REQ-MISSION-034); an operation is ownerless only when its creator has neither a stampable unit nor a pin, and an admin edits one only without a pin (REQ-ORG-009, REQ-ORG-032)
 - **Date:** 2026-06-09
 - **Deciders:** Repository owner (@greluc)
 - **Related:** [ADR-0004](0004-ownerless-leadership-missions.md) · spec [`org-unit-tenancy.md`](../specs/org-unit-tenancy.md) `REQ-ORG-003/004/009` · [`security-and-access.md`](../specs/security-and-access.md) · issue #500

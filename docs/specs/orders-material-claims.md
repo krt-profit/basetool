@@ -49,7 +49,9 @@ The claim domain's other invariants are unchanged and remain enforced in `Materi
 claims are allowed **only on non-terminal SK orders**; a squadron holds **at most one claim per
 bucket** (a repeat post updates its row rather than duplicating, backed by the unique index); only a
 **profit-eligible squadron** may claim; and the claim permission matrix (own-squadron
-logistician/officer, or a logistician/lead of the responsible SK, or an admin) gates every mutation.
+logistician/officer, or a logistician/lead of the responsible SK) gates every mutation, in the active
+context like every role power (REQ-ORG-032): an admin passes both branches for the units their
+context covers, every unit unpinned and the pinned unit pinned.
 Claims are reconciled inside the transaction that changes the order, deleting through the repository
 so the order's `@Version` is never bumped: an order edit that removes a bucket withdraws the claims on
 it (`withdrawOrphanedClaimsWithinTransaction`), and an SK → squadron reassignment, which makes the

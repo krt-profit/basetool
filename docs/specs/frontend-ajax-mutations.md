@@ -73,16 +73,20 @@ on hand-wired `sendChanged`/`createReceiver` is migrated with the next change th
 A create / update / delete / toggle / reorder interaction must update only the changed DOM nodes and
 must not navigate the document (no `window.location.reload()`, no redirect-follow) on success. The
 **only** sanctioned reloads are (1) the optimistic-lock conflict path, where the user explicitly
-accepts a reload via `showKrtConfirm`, and (2) the bfcache history-restore refresh of REQ-FE-008 —
+accepts a reload via `showKrtConfirm`, (2) the bfcache history-restore refresh of REQ-FE-008 —
 which is not a success-path reload but a freshness guarantee for a document the browser replays from
-its back/forward cache.
+its back/forward cache — and (3) the context reload of REQ-ORG-032: a tab of the same browser that
+still shows another active org unit than the one just chosen reloads, after asking through a KRT
+dialog when it holds unsaved input. It is not a success-path reload of the acting tab either; the
+acting tab switches by its own navigation.
 
 **Acceptance**
 
 - [ ] After the action, the URL and document are unchanged and the affected node(s) reflect the new
   state (badges, totals and status cells re-derived in the success handler, not by a reload).
 - [ ] No `location.reload()` runs on the success path; the only success-path-adjacent reloads are a
-  user-accepted optimistic-lock confirm and the bfcache history-restore refresh (REQ-FE-008).
+  user-accepted optimistic-lock confirm, the bfcache history-restore refresh (REQ-FE-008) and the
+  context reload of another tab (REQ-ORG-032).
 - [ ] Derived UI that lives **outside** the swapped fragment is refreshed too — an emptied list
   restores its "no entries" placeholder, and a count or server-derived value shown in a separate
   modal/header reflects the new state (when a fragment swap cannot cover it, the handler patches it
@@ -900,9 +904,11 @@ status pill / facts) is added by this requirement so core/schedule/status edits 
 Three server-side guards bound the abuse surface the socket adds. Joining the mission room is
 **authorized against mission access** — the topic authorizer issues the same authenticated
 `GET /api/v1/missions/{id}` the page does (per REQ-FE-015 this happens at `subscribe` time on the
-shared socket), so an authenticated user cannot
-join the presence room of a mission they may not see (an explicit backend 403/404 refuses; a transient
-backend error fails open so a blip never kills presence). Inbound `changed` frames are **rate-limited
+shared socket and again while the socket holds the room), so an authenticated user cannot
+join, or stay in, the presence room of a mission they may not see (an explicit backend 403/404
+refuses the subscribe or evicts the socket; a transient backend error fails the subscribe closed,
+which the client retries, but keeps a joined room until its next check, so a blip never kills
+presence). Inbound `changed` frames are **rate-limited
 per session** (a token bucket sized far above any human edit cadence), so a crafted client cannot
 drive sustained re-fetch amplification even within a mission it can see. The **presence control
 frames** (`focus` / `heartbeat` / `blur`) carry the same bounds (#1245, ported onto the generalized
@@ -1477,10 +1483,10 @@ every fragment re-fetch re-authorizes per viewer, so their verdict is `ALLOW` by
 (`LiveSyncTopicClass#needsCheck`). The probes carry the bearer captured at the handshake, and the
 handshake obtains it through the single-flight authorized-client manager (REQ-SEC-012), which
 **refreshes a lapsed access token** first and records its expiry (an already-expired token is not
-captured). A `subscribe` on a socket whose captured token has lapsed (5 s skew) closes the socket
-with code `4401` before any probe; the client reconnects, the new handshake refreshes token and
-authorities, and the topics are re-subscribed — so a long-lived tab keeps live updates, and a
-revoked role or session cannot ride a stale handshake indefinitely.
+captured). A `subscribe` to a topic the socket has not subscribed to yet, on a socket whose captured
+token has lapsed (5 s skew), closes the socket with code `4401` before any probe; the client
+reconnects, the new handshake refreshes token, pin and authorities, and the topics are
+re-subscribed.
 *Publishing* a `changed` frame requires only an authenticated socket, a known topic, the topic
 class's section whitelist and the per-session token bucket — **no subscription**: a requester
 creating an order must be able to signal the staff queue it may not read, and an org-unit owner
@@ -1500,6 +1506,34 @@ window (which clamps the fragment-refetch herd independent of the relay rate), n
 Server-side and cross-replica deliveries bypass the per-topic bucket (trusted / already accepted). A
 refused socket is closed with an app close code the client backs off on; every bound degrades to a
 bounded re-fetch rate, never data loss.
+
+**A joined room is authorized again while the socket holds it**, because a silent tab sends no
+further `subscribe` while a membership, a role, a resource's visibility or the session changes
+underneath it. Every 10 s the relay sweeps its sockets (`LiveSyncWebSocketHandler#tickReauthorize`),
+and only rooms whose class needs a check take part:
+
+- Once its captured token has lapsed (5 s skew), a socket holding such a room is closed with `4401`
+  without a probe, and the reconnect's handshake captures the session's current token, pin and
+  authorities. A socket holding only authentication-only rooms, or none, stays open: those rooms
+  admit any signed-in member and carry no presence.
+- Otherwise its checked rooms are re-checked at most every two minutes per socket
+  (`LiveSyncSubscriptions.REAUTHORIZE_INTERVAL`), with the same authorizer, captured values and
+  executor as a subscribe, never per frame. An explicit deny evicts the socket from that room: it
+  leaves the room, its presence there is dropped, its topic slot is freed, so a new `subscribe` is
+  probed again rather than acknowledged, and it gets the terminal `denied` frame with reason
+  `authz`. A probe `401` closes the socket with `4401`; an indeterminate verdict or a saturated
+  executor keeps the room until the next check, which the token-lapse close bounds.
+- A presence frame counts only for a room the socket holds: one sent while its `subscribe` is still
+  being authorized, or after an eviction, neither shows nor keeps a dot.
+
+So once a probe answers differently, for example after a resource's visibility changed, the room
+stops feeding a tab within about two minutes; a change the backend itself reads through its
+authorities cache, such as an org-unit membership, can take that cache's window on top
+(REQ-SEC-056). What the handshake captured is renewed within the captured token's lifetime (five
+minutes in the realm). The renewal costs a tab that holds a checked room one reconnect, one probe
+per room and one resync per token lifetime; `basetool_livesync_reauthorize_total` counts the
+outcomes (REQ-OBS-011). A switch of the active org unit reaches another tab through its context
+reload (REQ-ORG-032), whose new handshake captures the new pin.
 
 **Close codes are a contract, and the two in use mean opposite things.** `4029` (socket cap, mirrors
 HTTP `429`) is *transient*: the client jumps straight to the 30 s backoff and keeps probing until
@@ -1586,17 +1620,30 @@ because an ordinary navigation also ends a socket after seconds and no threshold
   editor.
 - [ ] A backend write that failed publishes nothing — peers do not re-fetch for a change that
   never happened.
-- [ ] A tab left open on a silent surface keeps **one** socket for as long as it is open: no
-  reconnect, no re-subscribe and no background resync while nothing changes.
+- [ ] A tab left open on a silent surface keeps **one** socket while nothing changes: no reconnect,
+  no re-subscribe and no background resync. A tab holding a room whose class needs a check renews
+  that socket once per captured-token lifetime with a `4401` reconnect; one holding only
+  authentication-only rooms, or none, keeps it for as long as it is open.
 - [ ] Raising the keepalive interval past half the edge's `proxy_read_timeout`, or lowering that
   timeout below twice the interval, fails `:frontend:test`.
 - [ ] A mission tab that reconnects after its access token lapsed is subscribed again, not refused:
   the handshake refreshes the token before the subscribe probe uses it.
+- [ ] A joined room whose re-check is denied is left: the socket gets the terminal `denied` frame
+  and none of the room's frames any more, its presence dots there are dropped, a later presence
+  frame for the room is ignored and a new `subscribe` is probed again.
+- [ ] A socket holding a checked room is closed with `4401` by the sweep once its captured token
+  lapses, without a subscribe and without a probe; a room whose re-check allows, or reaches no
+  verdict, stays joined, and no room is re-checked more than once per interval.
+- [ ] A presence frame sent while its `subscribe` is still being authorized shows no dot.
 
 **Enforced by:** `LiveSyncWebSocketHandlerTest` (topic parsing, cross-room isolation, per-topic
 whitelists, publish-without-subscription, per-session rate limit, topic cap, close cleanup, plus the
 F2/#1243 abuse bounds: per-user socket cap accept/refuse/decrement/per-user, per-topic publish
-throttle across publishers, idle-bucket reaping, the keepalive sweep and the socket-lifetime timer) ·
+throttle across publishers, idle-bucket reaping, the keepalive sweep and the socket-lifetime timer,
+plus the re-authorization of joined rooms: eviction with the terminal `denied`, the sweep's `4401`
+on a lapsed or rejected token, a kept room on an allow, an indeterminate verdict or a saturated
+executor, one check per interval, presence only for a held room, and no re-check outcome logged at
+`WARN`) ·
 `LiveSyncTopicTest` + `LiveSyncSectionMapParityTest` (topic-class parsing/exhaustiveness + seam-map
 parity) · `LiveSyncKeepaliveEdgeTimeoutParityTest` (the keepalive interval against the edge's
 `proxy_read_timeout`) · `LiveSyncSubscriptionAuthorizerTest` (per-topic allow/deny/fail-open incl.

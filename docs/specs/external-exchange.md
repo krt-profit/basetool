@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — requirements accepted by the owner, built except where a status line
 > says otherwise (epic [#2078](https://github.com/krt-profit/basetool/issues/2078)). Last reviewed:
-> 2026-10-15.
+> 2026-11-12.
 > **Owner area:** XCH · **Related ADRs:** [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md),
 > [ADR-0218](../adr/0218-exchange-sync-semantics.md),
@@ -707,12 +707,22 @@ book onto. Both decide from the database by the rule of REQ-SEC-039 for exchange
 from a stored role and never with the admin all-scope or pin, and name no member who withholds
 their name.
 
+The fourth exception is the bank family (REQ-BXCH-001…005): it reads the accounts the member may
+view, their bookings with the counterparty names and the requests the member raised or approves,
+and raises and corrects the member's own requests. It decides through the bank's access policy from
+the database (ADR-0352), without an active-org-unit pin, since the exchange carries no active
+context (REQ-ORG-032).
+
 **How it is built** (WP 3.1). `ActingMemberFilter` keeps an explicit list of exchange routes
 next to the two ingest routes. On an exchange route the member gets
 `ActingMemberAuthorities.exchangeAuthoritiesFor`: `ROLE_EXCHANGE_MEMBER` plus one
-`XCH_CAPABILITY:<scope>` per relayed known scope, and nothing else; a member the approval or role
-gate refuses keeps exactly that gate's marker, so the gates refuse as they do for the web. The
-demand feed reads the member's memberships itself (`ExchangeDemandService`, REQ-XCH-018).
+`XCH_CAPABILITY:<scope>` per relayed known scope, and for a member who holds `KRT Member` the
+marker `XCH_KRT_MEMBER`, and nothing else; a member the approval or role gate refuses keeps exactly
+that gate's marker, so the gates refuse as they do for the web. The marker is no role and matches no
+`hasRole(...)` gate: it only tells the scope kernel that the member's memberships confer their
+reach (REQ-SEC-015, REQ-ORG-032), so a member without `KRT Member` reaches no unit on the exchange
+either (`RequestScopeResolver`, `DatabaseActingMemberAuthoritiesTest`). The demand feed reads the
+member's memberships itself (`ExchangeDemandService`, REQ-XCH-018).
 *Corrected 2026-09-27: this requirement said the acting member would also hold the memberships the
 demand feed needs, arriving with it; the feed was built without any membership authority.*
 
@@ -1221,14 +1231,17 @@ unnamed ship is sent without it, and an upsert may leave it out (owner decision 
 `upsert` sets the ship as sent: a `name` or `location` it leaves out is cleared, and only an absent
 `fitted` keeps its value. An `upsert` may name the ship's org unit as `orgUnit`, one of the member's
 direct memberships of any kind or `null` for none (#2602). A create without it puts the ship in the
-member's only direct org unit, or in none when the member has none or several, and the member can
-assign it later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner decision
-2026-09-27, `HangarService.addShipForClient`). An update without `orgUnit` keeps the stored unit, so
-an older client never clears a unit set in the web; an update that changes it also sends the ship's
-`orgUnitVersion` and goes through the Hangar's unit change, which never moves the ship's `version`;
-naming the stored unit writes nothing, even when the member has since left it. A unit outside the
-member's direct memberships rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a missing or stale
-`orgUnitVersion` with `ORG_UNIT_VERSION_CONFLICT`; the rest of the batch still applies.
+member's only stampable unit — a direct membership on an active unit, while the member holds the
+stored role `KRT Member` (REQ-ORG-032) —, or in none when the member has none or several, and the
+member can assign it later in the web with „Einheit ändern" (REQ-HANGAR-009, ADR-0258; owner
+decision 2026-09-27, `HangarService.addShipForClient`,
+`OrgUnitStampingService#resolveOrgUnitForClientCreate`). An update without `orgUnit` keeps the
+stored unit, so an older client never clears a unit set in the web; an update that changes it also
+sends the ship's `orgUnitVersion` and goes through the Hangar's unit change, which never moves the
+ship's `version`; naming the stored unit writes nothing, even when the member has since left it. A
+unit outside the member's direct memberships rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a
+missing or stale `orgUnitVersion` with `ORG_UNIT_VERSION_CONFLICT`; the rest of the batch still
+applies.
 *Corrected 2026-09-27: a member of several units had the whole batch refused with
 `OWNER_ORG_UNIT_REQUIRED`.*
 
@@ -1249,6 +1262,9 @@ member's direct memberships rejects that op with `ORG_UNIT_NOT_ALLOWED`, and a m
   `HANGAR_SHIP_ORG_UNIT_CHANGED` with the client; a foreign unit and a stale counter reject only
   their own op. *`ExchangeShipWriteControllerTest`, `ExchangeShipChangeSetJsonTest`,
   `ExchangeSchemasTest`.*
+- [x] A create without `orgUnit` counts only the member's active units and only while the member
+  holds `KRT Member`: a deactivated second unit leaves the other one stamped, and a member without
+  the role gets the ship without a unit. *`OrgUnitStampingStampableUnitsTest`.*
 
 The ship feed keys a ship by its id and sends its `version`, the ship type's id as `shipType.bt`,
 insurance as `LTI` or a number of months, and the location when it has one. A ship stored without
@@ -1671,7 +1687,7 @@ Hangar's unit change behind its current unit counter (REQ-HANGAR-009, ADR-0258, 
 earlier unit the member no longer directly belongs to is not restored — the ship keeps its current
 unit — and the entry still counts as restored. A recreated ship whose unit is not restored, or whose
 journaled state has no `orgUnit` key, is stamped like a client's create (REQ-XCH-017): the member's
-only direct org unit, or none for a member of several; an existing ship whose state has no
+only stampable unit, or none for a member with none or several; an existing ship whose state has no
 `orgUnit` key keeps its unit. Links the client made are taken back, and a
 link one of them replaced is put back only while the ship is still the member's. The restored
 entries' journal rows are marked undone, the undo is audited as `EXCHANGE_CHANGES_UNDONE` (restored

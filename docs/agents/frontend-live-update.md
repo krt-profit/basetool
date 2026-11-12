@@ -5,8 +5,9 @@ Read this before adding, changing or removing any frontend mutation, read or liv
 **Live update is a binding requirement: every part of the frontend must support live update to
 the current standard.** Every create / update / delete / toggle / reorder / filter / paginate
 interaction updates the DOM **in place** through the shared `krtFetch` / `krtCsrf` / fragment-swap
-foundation — **no full-page reload on success** (the only two sanctioned reloads are the
-optimistic-lock conflict confirm and the bfcache history-restore of `REQ-FE-008`) — derived UI
+foundation — **no full-page reload on success** (the only three sanctioned reloads are the
+optimistic-lock conflict confirm, the bfcache history-restore of `REQ-FE-008` and another tab's
+context reload of `REQ-ORG-032`, all listed in `REQ-FE-001`) — derived UI
 outside the swapped fragment is refreshed too, and on any surface where several users can see the
 same state a peer's change propagates to the others without a manual reload. The current standard,
 its full `krtFetch`/fragment-swap contract and the live multi-user sync live in

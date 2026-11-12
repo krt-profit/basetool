@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** ORDERS · **Related ADRs:** ADR-0091
 
 # Requesting-owner (Auftraggeber) job-order access
@@ -47,6 +47,11 @@ A member of a job order's **requesting org unit** (Auftraggeber) MAY (both reque
   org unit, the status or the priority — those inputs are ignored server-side. Once any delivery is
   recorded the order is frozen for the requester (HTTP 400).
 
+The requesting units follow the active org unit (REQ-ORG-032): with a unit selected, "Meine
+Aufträge", the detail and the requester edits cover the orders that unit placed, and only when the
+caller is a direct member of it; under „Alle meine Org-Einheiten" the orders of every unit they are
+a direct member of.
+
 The requester escape is **additive**: it never widens the general order queue (which stays
 responsible-scoped) and never grants the requester the blueprint-coverage view. A caller who is *also*
 a full viewer (responsible-side member / admin) keeps the complete, unredacted view and the
@@ -74,11 +79,11 @@ four inventory reads (Item-Bestand panel, material collection, the two pickers).
 
 **Enforced by:** `ScopeKernelTest` (RequesterEscapeGateTests), `JobOrderServiceTest`
 (updateJobOrderAsRequester\_\*) · **Code:** `JobOrderAccessPolicy.canSeeJobOrderAsRequester` /
-`canEditJobOrderAsRequester` (via the private `isOrderRequesterRow` →
-`RequestScopeResolver.currentUserIsMemberOfOrgUnit`), `RequestScopeResolver`
-`currentDirectMembershipOrgUnitIds` / `canViewOwnJobOrders`,
-`JobOrderService.updateJobOrderAsRequester` / `updateItemJobOrderAsRequester`,
-`JobOrderQueryService.getRequestedJobOrders`, `JobOrderController` (`GET /requested`, `PUT /{id}/requested`,
+`canEditJobOrderAsRequester` (via the private `isOrderRequesterRow`) and
+`JobOrderQueryService.getRequestedJobOrders`, both through
+`RequestScopeResolver#currentDirectMembershipOrgUnitIdsInActiveContext`, `RequestScopeResolver`
+`canViewOwnJobOrders`, `JobOrderService.updateJobOrderAsRequester` /
+`updateItemJobOrderAsRequester`, `JobOrderController` (`GET /requested`, `PUT /{id}/requested`,
 `PUT /{id}/items/requested`, `cleanupJobOrderForRequester`) · **Issues:** #1186
 
 ## Out of scope

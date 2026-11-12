@@ -1,6 +1,10 @@
 # ADR-0027 — Bereich and Organisationsleitung as direct owners of org-unit-scoped aggregates
 
 - **Status:** Accepted — implemented in Phase 4 (#697). See *Implementation note*.
+  **Amended by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)**
+  (2026-11-11): the direct memberships that validate a pick and drive the auto-stamp are the active
+  ones of a `KRT Member`, the units a caller may edit lie inside the active context, and a mission
+  or operation created without a pick is stamped on the honoured pin (REQ-ORG-004, REQ-ORG-032).
 - **Date:** 2026-06-19
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-ORG-016 · REQ-ORG-004 (amended) · REQ-ORG-009 · REQ-ORG-011 (#701) · ADR-0025 · ADR-0026 · issue #692 · #697

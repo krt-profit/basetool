@@ -156,6 +156,12 @@ mission DTO without the redaction pass. It used to select gates *without* `isAut
 is why it never saw `joinMission` returning the full Einsatz, roster included, to the member who had
 just joined.
 
+**A Lager earmark names only a mission the reader may see.** An earmark on a mission the reader may
+not see (`canSeeMission`) carries only the mission id and the amount and reads „Unbekannter
+Einsatz", for every caller, an admin pinned to another unit included. The earmark writes and undos
+look the earmark up without the reader's rights, so none of them fails on it (REQ-INV-027,
+REQ-ORG-032).
+
 > **`ROLE_NO_ROLE` is the successor of the `GUEST` role.** `GUEST` was an *authenticated* Keycloak
 > user with no authorities at all, and the URL matrix's anonymous families then let it through — so
 > "no role" quietly meant "the anonymous read surface". `V239` deleted the role; the marker that
@@ -264,10 +270,11 @@ every `BANK_EMPLOYEE` check (REQ-BANK-007).
 | **Bank Management** | *(none — "see everything" visibility comes from the role itself, ADR-0011)*                                                                                      |
 
 Of the seeded permissions only three are read anywhere: `HANGAR_READ` / `HANGAR_WRITE` (hangar URL
-rule and the hangar list / delete-all gates) and `MISSION_MANAGE` (`MissionAccessPolicy` treats it
-like `ROLE_MISSION_MANAGER`, still scope-checked). `MISSION_READ`, `MISSION_WRITE`, `USER_MANAGE`
-and `ROLE_MANAGE` are seeded but checked by no endpoint — every member- and role-management
-endpoint has been `hasRole('ADMIN')` since the Phase-4 lockdown.
+rule, the unit-overview and own-ship bulk-edit gates, and the `HANGAR_WRITE` delete-all gate) and
+`MISSION_MANAGE` (`MissionAccessPolicy` treats it like `ROLE_MISSION_MANAGER`, still scope-checked).
+`MISSION_READ`, `MISSION_WRITE`, `USER_MANAGE` and `ROLE_MANAGE` are seeded but checked by no
+endpoint — every member- and role-management endpoint has been `hasRole('ADMIN')` since the
+Phase-4 lockdown.
 
 ### Monitoring UI (Grafana) — client role `grafana-admin` only
 
@@ -302,7 +309,9 @@ promotes these into two authority surfaces:
 flag or rank — in a **Bereich** covers the Bereich and the Staffeln and Spezialkommandos below it, a
 grant in the **Organisationsleitung** covers every unit, a grant in a Staffel or Spezialkommando
 covers that unit alone. Every per-unit Logistician and Mission-Manager gate and list reads this
-cascaded set; with a unit pinned, the pin must lie in it. Admins are unrestricted.
+cascaded set; with a unit pinned, only the pinned unit counts, and only when it lies in the set. An
+admin passes within their own scope: every unit unpinned, the pinned unit pinned, and a target
+without an owning unit only unpinned (REQ-ORG-032).
 
 > The **old** `app_user.is_logistician` / `app_user.is_mission_manager` columns
 > were removed with **V104** — the single source of truth is exclusively
@@ -316,9 +325,11 @@ exists only on **Spezialkommando** rows; it replaced the `is_lead` flag dropped 
 automatically makes the user **both `LOGISTICIAN` and
 `MISSION_MANAGER`** within *that one SK* (flat + contextual) — the lead stands
 above both roles of their SK, analogous to an Officer being Logistician +
-Mission-Manager of their own Staffel. Additionally, a lead may **manage the
+Mission-Manager of their own Staffel. Additionally, a lead who holds `KRT Member` may **manage the
 members of their SK** (add/remove/toggle the `is_logistician`/`is_mission_manager`
-flags) via `@specialCommandSecurityService.canManageMembers`. **Appointing or clearing the lead**
+flags) via `@specialCommandSecurityService.canManageMembers` — but never their own row nor another
+lead's row (`canManageMember`), and only while the SK lies in the active context (REQ-ORG-032).
+**Appointing or clearing the lead**
 is for an Admin or the **Bereichsleiter of the SK's parent Bereich**
 (`@orgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004) — never the lead themselves.
 No carry-over to other SKs.
@@ -386,17 +397,17 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Function (gate)                                                                    | Member | Log. | MM | Officer | Admin |
 |:-----------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Be logged in (`isAuthenticated()`)                                                 |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Own profile / `GET /me`, active OrgUnit context (`/me/active-org-unit`)            |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Own profile / `GET /me`, active OrgUnit context (`/me/active-org-unit`) and its stored choice (`/org-units/me/active-choice`, own row only, REQ-ORG-031) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Own settings: description, payout preference, blueprint sharing, RSI handle (REQ-SEC-072), announcement read-marker, pickable org units, capabilities, the one-call layout read (`/users/me/**`, `/me/**` incl. `/me/layout`, `isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Own notifications + SSE stream + mute preferences (`/notifications/**`, `/api/v1/notifications/preferences`, `/profile/notification-preferences`), live-sync stream (`/live-sync/**`), registration status (`/users/me/registration-status`) (`isAuthenticated()`) | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Terms of Use status + consent (`/terms/status`, `POST /terms/acceptance`; consent refused for `ROLE_INGEST_GATEWAY`) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; peer-redacted for every non-admin (roles, permissions, flags, join date, Discord link and read watermark are admin-only; `description` is visible to all); the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read user directory (`/users`, `/search`, `/search/references`, `/lookup`, `/{id}`, `/{id}/memberships`) — `hasAnyRole(ADMIN, OFFICER, KRT_MEMBER)`; organisation-wide, whatever the caller's units or pin (REQ-ORG-017); peer-redacted for every non-admin (roles, permissions, flags, join date, Discord link and read watermark are admin-only; `description` is visible to all); the `/references` picker searches return the peer field set only (REQ-API-012); `/lookup`, `/search-bank`, `/search-bank/references` and `/{id}/memberships` additionally admit bank staff |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ### 3.2 Hangar & Personal Data
 
 | Function (gate)                                                                                    | Member | Log. | MM | Officer | Admin |
 |:---------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
-| Read hangar (`HANGAR_READ`)                                                                        |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read own hangar and its readiness (`GET /hangar/my-ships`, `/my-ships/readiness`, `isAuthenticated()` + Owner) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Maintain own ships / import (CCU, HangarXPLOR, Fleetyards, StarJump, Hangar Extension JSON / CSV); see own pledge data (`isAuthenticated()` + Owner; pledge data otherwise ADMIN only, REQ-HANGAR-015) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Delete all own ships (`DELETE /hangar/ships`, `HANGAR_WRITE`)                                      |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Change an own ship's org unit to an own direct unit or none (`PUT /hangar/ships/{id}/org-unit`, Owner, REQ-HANGAR-009) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
@@ -411,7 +422,7 @@ gets past the four public paths of §1. The tables carried an `Anonymous` column
 | Manage personal inventory/blueprints of **others** (`/admin/...`, `hasRole('ADMIN')`)              |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Read blueprint availability of the org unit (`/blueprint-overview`, `canAccessBlueprintOverview`)  |   ❌    |  ❌¹  | ❌  |    ✅    |   ✅   |
 
-¹ `canAccessBlueprintOverview` admits Admin and any membership holding a leadership rank (anything but `MEMBER`; the `OFFICER` realm role alone no longer counts) — never the plain Logistician / Mission-Manager flag. The rows it aggregates follow `currentOversightScope()`: an officer all of their own Staffeln, an SK lead their SK, a Staffel rank its own Staffel, a Bereichsleitung its Bereich and every Staffel/SK in it, an OL member every org unit (the Phase-6 cascade, REQ-ORG-015); Admins without a pin all org units, with a pin only the pinned one. Its search matches the product name and, since 2026-10-03, the display names of the in-scope owners it counts — never a person outside that scope (REQ-INV-013).
+¹ `canAccessBlueprintOverview` admits Admin and any membership holding a leadership rank (anything but `MEMBER`; the `OFFICER` realm role alone no longer counts) — never the plain Logistician / Mission-Manager flag. The rows it aggregates follow `currentOversightScope()`, the units of the caller's leadership seats (a plain membership of another Staffel adds none): an SK lead their SK, a Staffel rank its own Staffel, a Bereichsleitung its Bereich and every Staffel/SK in it, an OL member every org unit (the Phase-6 cascade, REQ-ORG-015); Admins without a pin all org units, with a pin only the pinned one. Its search matches the product name and, since 2026-10-03, the display names of the in-scope owners it counts — never a person outside that scope (REQ-INV-013).
 
 Every hangar mutation in this table — by the owner, by an admin on another member's hangar, the import and the fitted reset — is audited under `AuditDomain.HANGAR`; detaching a deleted ship from a mission unit also writes `MISSION_UNIT_UPDATED`. Every change to a member's own or another member's blueprints, the sharing opt-in, the default set and its provisioning is audited under `AuditDomain.BLUEPRINT` (see [`docs/specs/audit.md`](docs/specs/audit.md)).
 
@@ -568,10 +579,10 @@ Staffel stay invisible (REQ-ROLE-002, finding SEC-01).
 | **Join** (sign yourself up, with the sign-up sheet's answers, ADR-0170) (`POST /{id}/join`, read gate⁸)                      |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Check in/out / change payout preference / edit / leave a participant row (participant gate⁸)                                |   ✅¹   |  ✅   | ✅  |    ✅    |   ✅   |
 | Record and maintain an **external** participant (`canSeeMission` to record, `canManageMission` to change someone else's row) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Manage** mission (edit, sub-missions, participants/units/crew/steps/objectives/frequencies, party lead, check everyone in/out — REQ-MISSION-032) (`canManageMission`) |   ✅²⁶  |  ✅²⁶ | ✅³ |   ✅³    |   ✅   |
-| Add/remove **co-managers** (manage gate⁸)                                                                                    |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅   |
-| Change the **owner** (`canChangeOwner`)                                                                                      |   ✅⁷   |  ✅⁷  | ✅⁷ |   ✅³    |   ✅   |
-| Reassign **owning org unit** ("Zugeordnete Einheit"; `canChangeOwner` + assignable-target scope⁵, REQ-ORG-018)               |   ✅⁷   |  ✅⁷  | ✅⁷ |   ✅³    |   ✅   |
+| **Manage** mission (edit, sub-missions, participants/units/crew/steps/objectives/frequencies, party lead, check everyone in/out — REQ-MISSION-032) (`canManageMission`) |   ✅²⁶  |  ✅²⁶ | ✅³ |   ✅³    |   ✅⁹  |
+| Add/remove **co-managers** (manage gate⁸)                                                                                    |   ✅²   |  ✅²  | ✅³ |   ✅³    |   ✅⁹  |
+| Change the **owner** (`canChangeOwner`)                                                                                      |   ✅⁷   |  ✅⁷  | ✅⁷ |   ✅³    |   ✅⁹  |
+| Reassign **owning org unit** ("Zugeordnete Einheit"; `canChangeOwner` + assignable-target scope⁵, REQ-ORG-018)               |   ✅⁷   |  ✅⁷  | ✅⁷ |   ✅³    |   ✅⁹  |
 | **Delete** mission (`hasRole('ADMIN')`)                                                                                      |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
 **The `Anonymous` column is gone, not empty.** Every row of it was a `❌` except two, and those two
@@ -580,10 +591,13 @@ caller below `Member` on this surface: an account holding no role is refused wit
 `403 NO_ROLE` before a handler runs (REQ-SEC-053).
 
 ¹ On their **own** linked participant row. ² Only as **owner/co-manager** of the mission.
-³ A Mission-Manager grant counts only for the unit that owns the mission (`holdsMissionManagerGrantFor`); an
+³ A Mission-Manager grant counts only for the unit that owns the mission, inside the active context
+(`holdsMissionManagerGrantFor`, REQ-ORG-032); an
 ownerless mission needs a grant in an Organisationsleitung or Bereich unit. An
 Officer's owner change needs officer reach in the mission's owning unit (`canChangeOwner`,
-REQ-SEC-065). ⁴ A member **below Logistician** reads the peer view: the roster stays, its PII
+REQ-SEC-065); the owner change of a mission without a unit is left to its owner and to an admin
+without a selected unit.
+⁴ A member **below Logistician** reads the peer view: the roster stays, its PII
 does not (§1.3). Which missions are in scope is `canSeeMission` — own Staffel, or any non-internal
 mission organisation-wide. The finance ledger stays member-or-above on its own endpoints.
 ⁵ The owning-org-unit reassignment shares the
@@ -600,6 +614,9 @@ the read gate is `canSeeMission`, the participant gate the own linked row or the
 manage gate `canManageMission`. The endpoint itself only requires authentication, and member-or-above
 for the read and participant gates. The same edit module decides the timeline, unit and crew edits
 of the manage row above.
+⁹ An admin passes within the active context (REQ-ORG-032): without a selected unit for every
+mission, with one only for the missions of that unit and for no mission without a unit. As the
+mission's owner or co-manager an admin keeps those rights under any selection, like everyone else.
 
 > **The external participant replaced the guest sign-up (ADR-0159, decision D4).** A named person
 > without an account is still recorded on an Einsatz — the row shape is unchanged, `user_id IS NULL`
@@ -614,14 +631,17 @@ of the manage row above.
 > and the authenticated silent link.
 >
 > **Mission without org unit (Bereichsleitung).** „Mission anlegen" (create mission) is
-> `isMemberOrAbove()` — that includes a logged-in member **without** Staffel/SK membership (e.g. the
-> Bereichsleitung superordinate to the SKs and Staffeln). Their mission is created **ownerless**
-> (`owning_org_unit_id = NULL`, V144) instead of being rejected with `400`, and stays attributable
-> via `mission.owner_id`. Visibility: **non-internal → visible to every member**, whichever unit
-> they belong to; **internal → only for member-or-above** (`isMemberOrAbove()`).
-> Editing follows the usual mission-management gate (owner, co-manager, Mission-Manager/Officer,
-> admins), without Staffel-scope narrowing. Details: REQ-ORG-009 in
-> [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md).
+> `isMemberOrAbove()` — that includes a logged-in member **without** any org-unit membership.
+> Without a pick, a mission lands on the selected unit, else on the creator's only stampable unit
+> (a direct membership on an active unit, held with `KRT Member` — a Bereich or the OL counts, so
+> a Bereichsleiter's mission belongs to the Bereich); a creator with neither creates it
+> **ownerless** (`owning_org_unit_id = NULL`, V144) instead of being rejected with `400`, and it
+> stays attributable via `mission.owner_id` (REQ-ORG-004, REQ-ORG-032). Visibility:
+> **non-internal → visible to every member**, whichever unit they belong to; an ownerless mission
+> cannot be internal (REQ-MISSION-008). Editing: the owner, co-managers, a Mission-Manager grant in
+> an Organisationsleitung or Bereich unit, and an admin without a selected unit — neither a
+> squadron Mission-Manager nor officer reach in a unit manages it (REQ-SEC-005, REQ-SEC-065).
+> Details: REQ-ORG-009 in [`docs/specs/org-unit-tenancy.md`](docs/specs/org-unit-tenancy.md).
 
 ### 3.6 Operations (mission bracket, finances & payouts)
 
@@ -631,6 +651,7 @@ of the manage row above.
 | Read payout breakdown (`canSeeOperation`; escape-only caller sees **only their own row**) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Read finances / finance-summary (`canSeeOperationLedger` — **scope only**, ADR-0150)      |   ✅³   |  ✅³  | ✅³ |   ✅³    |   ✅   |
 | Create/edit operation (Mission Manager grant in the owning unit: `canEditOperation`) |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
+| **Link a mission** to the operation — create, sub-mission, changed core link (`canEditOperation` of the operation, REQ-MISSION-034) |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
 | **Mark payout as paid-out** (`canEditOperation`)                                          |   ❌    |  ❌   | ✅  |    ✅    |   ✅   |
 | **Revoke** paid-out (additionally `canClearPayout`: officer reach in the operation's unit)                        |   ❌    |  ❌   | ❌  |    ✅    |   ✅   |
 | **Delete** operation (`hasRole('ADMIN')` + `canEditOperation`)                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
@@ -646,6 +667,10 @@ of the manage row above.
 > no organisation-wide escape (they carry no `is_internal` flag), it stays invisible below member;
 > **(3)** **participant visibility** (ADR-0006): whoever took part in one of the linked
 > missions sees the operation and **their own** payout row even across Staffeln.
+> None of the three paths lets a caller link a mission to the operation: that needs
+> `canEditOperation`, and the mission's operation picker lists only such operations
+> (REQ-MISSION-034). A mission names its operation to everyone who may see the mission, even when
+> they cannot open the operation (REQ-ORG-032).
 >
 > ³ **The third path does not carry the ledger (ADR-0150, REQ-ORG-027).** It is self-issuable —
 > `POST /api/v1/missions/{id}/join` is open for every non-internal mission of every org unit — so
@@ -661,48 +686,60 @@ of the manage row above.
 > reach of a Bereich or Organisationsleitung seat) creates, edits and marks payouts for A's operations
 > only; creating stamps the pinned or picked unit and needs the grant there. An ownerless
 > (Bereichsleitung) operation or mission is managed only with a Mission Manager grant in an
-> Organisationsleitung or Bereich unit — a squadron Mission Manager does not — and deleted by admins.
+> Organisationsleitung or Bereich unit — a squadron Mission Manager does not — or by an admin
+> without a selected unit, and deleted by such an admin. With a unit selected, an admin edits only
+> that unit's operations (REQ-ORG-032).
 
 ### 3.7 Mission finances & profit
 
 | Function (gate)                                                               | Member | Log. | MM | Officer | Admin |
 |:------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Read a mission's finance entries, sum and summary (`isMemberOrAbove` + `canSeeMission`) |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| **Create** finance entry (`isMemberOrAbove` + `canCreateFinanceEntry`)        |   ✅¹   |  ✅¹  | ✅³ |   ✅³    |   ✅   |
-| Edit/delete finance entry (service-level `canEditFinanceEntry`: the entry's own participant **or** officer reach in the mission's owning unit **or** Admin) |   ✅¹   |  ✅¹  | ✅¹ |   ✅²   |   ✅   |
+| **Create** finance entry (`isMemberOrAbove` + `canCreateFinanceEntry`)        |   ✅¹   |  ✅¹  | ✅³ |   ✅³    |   ✅⁴  |
+| Edit/delete finance entry (service-level `canEditFinanceEntry`: the entry's own participant **or** officer reach in the mission's owning unit **or** Admin) |   ✅¹   |  ✅¹  | ✅¹ |   ✅²   |   ✅⁴  |
 | Read profit calculation (`hasAnyRole('KRT_MEMBER','ADMIN')`)                  |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 
 ¹ Only one's own entry and only while still a participant of the mission.
 ² Only for a mission whose owning unit the caller reaches as officer (leadership seat, REQ-SEC-015,
-security audit H1); outside it the caller is back to ¹. A mission without an owning unit is Admin-only.
+security audit H1); outside it the caller is back to ¹. A mission without an owning unit is left to
+an admin without a selected unit.
 ³ For any participant of the mission, but only within their own owning-OrgUnit scope
 (`canManageMission`); the mission owner and its co-managers pass the same way. **Creating** is a
 write and therefore no longer rides the read-level `canSeeMission`, whose cross-squadron public
 escape let any member book into a foreign squadron's ledger and attribute the row to one of its
 participants (REQ-SEC-042).
+⁴ Within the active context (REQ-ORG-032): without a selected unit for every mission, with one only
+for the missions of that unit and for no mission without a unit; on their own entry an admin is
+back to ¹.
 
 ### 3.9 Organisation (Staffeln & Spezialkommandos)
 
 | Function (gate)                                                                                                                                                     | Member | Log. | MM | Officer | Admin |
 |:--------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------:|:----:|:--:|:-------:|:-----:|
 | Read Staffel list / active OrgUnit list (`/org-units/active`)                                                                                                       |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
-| Read SK list (`isAuthenticated()`; inactive ones admin only; the detail view `GET /special-commands/{id}` admin **or SK-Lead of this SK**, `canManageMembers`)     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
+| Read SK list (`isAuthenticated()`; inactive ones admin only; the detail view `GET /special-commands/{id}` admin **or SK-Lead of this SK**, `canManageMembers`, only in the active context)     |   ✅    |  ✅   | ✅  |    ✅    |   ✅   |
 | Switch the active OrgUnit context (sidebar switcher)                                                                                                                |   ✅²   |  ✅²  | ✅² |   ✅²    |   ✅   |
 | Staffel lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                           |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | Set Staffel membership flags (`PATCH /squadrons/{id}/members/{uid}`, `hasRole('ADMIN')`)                                                                            |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 | SK lifecycle (create/rename/delete/activate, `profit-eligible`) (`hasRole('ADMIN')`)                                                                                |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
-| **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`) |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
-| Appoint / clear the SK **lead** (`PATCH /special-commands/{id}/members/{uid}/lead`, `hasRole('ADMIN') or canAppointSkLead`)                                         |   ❌    |  ❌   | ❌  |   ❌⁴    |   ✅   |
+| **Read SK member list** & **manage members** (add/remove/flags) (`@specialCommandSecurityService.canManageMembers` — applies also to the plain `GET /{id}/members`; flags and removal `canManageMember`, never a non-admin's own row nor a lead's row; every endpoint only in the active context) |   ❌    |  ❌   | ❌  |   ❌³    |   ✅   |
+| Appoint / clear the SK **lead** (`PATCH /special-commands/{id}/members/{uid}/lead`, `(hasRole('ADMIN') or canAppointSkLead) and isInActiveContext`)                                         |   ❌    |  ❌   | ❌  |   ❌⁴    |   ✅   |
 | Org structure: create Bereiche + the OL, set parent edges, list all org units (`/api/v1/org-units/**` reads + structure writes, `/admin/org-structure`, `hasRole('ADMIN')`) |   ❌    |  ❌   | ❌  |    ❌    |   ✅   |
 
-² Non-admins switch between their memberships; admins additionally „Alle Staffeln" (all Staffeln). ³ SK member management
+² Non-admins switch between the units they reach (their memberships plus a Bereich or OL seat's
+cascade) and „Alle meine Org-Einheiten"; admins between every active unit and „Alle Org-Einheiten"
+(every unit of every kind; the title shows it as „Alle Staffeln"). The choice is stored per member
+and restored at the next login (REQ-ORG-031); a pin on any other unit counts as no pin
+(REQ-ORG-032). ³ SK member management
 is **admin or SK-Lead of this SK** — not tied
 to the global Officer role. The web surface for it is the SK's **„Mitglieder"** tab on the
 **„Leitung"** page (`/organisation/leitung?unit={id}`, since 2026-10-03), and the SK member page
-`/organisation/special-commands/{id}` that the admin list opens (frontend gate `ADMIN_OR_OFFICER`
-on both, the backend's per-SK verdict decides), not the admin area; `/admin/special-commands/{id}`
+`/organisation/special-commands/{id}` that the admin list opens (frontend gate
+`OfficerSurfaceGate.canOpenLeitung()` on „Leitung", `hasOfficerReach()` on the member page; the
+backend's per-SK verdict decides), not the admin area; `/admin/special-commands/{id}`
 only redirects there. An SK lead cannot change the lead seat on either — the lead toggle is offered
-only to whoever may appoint the lead (on the member page: admins only).
+only to whoever may appoint the lead (on the member page: admins only) — and neither changes nor
+removes their own row or another lead's row, which render read-only.
 ⁴ Besides the admin, the **Bereichsleiter of the SK's parent Bereich** sets the lead, on the
 „Leitung" page (`OrgRoleManagementSecurityService.canAppointSkLead`, REQ-ROLE-004) — never the SK
 lead itself. *(Corrected 2026-09-22: this row said `hasRole('ADMIN')` only.)*
@@ -711,15 +748,18 @@ lead itself. *(Corrected 2026-09-22: this row said `hasRole('ADMIN')` only.)*
 
 Ranks are appointed by rank, not by role: to grant rank R you must hold a strictly higher one, so
 nobody promotes themselves. The verdict is `@orgRoleManagementSecurityService` and reads only the
-caller's own membership ranks — never the admin pin, contextual authorities or the org-unit scope services
+caller's own membership ranks, and only while the caller holds `KRT Member` (REQ-SEC-015) — never
+the pin, contextual authorities or the org-unit scope services
 (ArchUnit `delegatedRoleAuthoriserMustNotConsultOwnerScope`); Admin short-circuits at each
-`@PreAuthorize` (`hasRole('ADMIN') or …`). The parent Bereich is always read from the target unit's
+`@PreAuthorize` (`hasRole('ADMIN') or …`), and every endpoint ANDs
+`@requestScopeResolver.isInActiveContext(<target unit>)` around both branches, so a pin on another
+unit refuses the write, an admin's included (REQ-ORG-032). The parent Bereich is always read from the target unit's
 persisted `parent` edge. Every appointment is audited in „Rollen & Mitglieder" (REQ-AUDIT-001); the
 rank is the only record of the seat (REQ-ROLE-006).
 
 | Function (endpoint)                                                                                                   | Staffelleiter (own Staffel) | Bereichsleiter (own Bereich) | OL member | Admin |
 |:----------------------------------------------------------------------------------------------------------------------|:---------------------------:|:----------------------------:|:---------:|:-----:|
-| Open the Leitung page (`/organisation/leitung`, frontend `ADMIN_OR_OFFICER`; view `GET /api/v1/leadership`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
+| Open the Leitung page (`/organisation/leitung`, frontend `OfficerSurfaceGate.canOpenLeitung()`; view `GET /api/v1/leadership`)       |             ✅¹              |              ✅¹              |    ✅¹     |   ✅   |
 | Assign / clear Kommandoleiter, Stv., Ensign (`PUT`/`DELETE /api/v1/squadrons/{id}/ranks/{userId}`)                  |              ✅              |              ❌               |     ❌     |   ✅   |
 | Create / rename / delete a Kommandogruppe (≤ 4 per Staffel) (`/api/v1/squadrons/{id}/kommando-groups`, `/api/v1/kommando-groups/{id}`) |              ✅              |              ❌               |     ❌     |   ✅   |
 | Assign / clear the **Staffelleiter** of a child Staffel (same endpoints)                                            |              ❌              |              ✅               |     ❌     |   ✅   |
@@ -731,8 +771,8 @@ rank is the only record of the seat (REQ-ROLE-006).
 | See in the Leitung view                                                                                               |       own Staffel only       | own Bereich + its Staffeln and SKs |  every unit | every unit |
 
 Reading the Kommandogruppen of a Staffel (`GET /api/v1/squadrons/{id}/kommando-groups`) is open to
-every member. ¹ Needs the `OFFICER` realm role in the frontend, which every leader holds
-operationally (§2); the page shows the units the caller leads and those below them, and renders
+every member. ¹ Needs officer reach from a leadership seat in the active context, with `KRT Member`
+(`OfficerSurfaceGate.canOpenLeitung()`, REQ-SEC-047); the page shows the units the caller leads and those below them, and renders
 only what the capability flags allow as editable — the caller's own row never, for a non-admin.
 An SK lead sees only their own SK. ² A *pure* `OL_MEMBER` row — a Bereichsleiter's organisational
 OL seat (REQ-ROLE-005) does not count.
@@ -888,7 +928,7 @@ at confirmation; overdraft/holder checks then apply as for a direct booking
 are notified via in-app notification (REQ-BANK-026, `ACCOUNT_GRANT` selector); **the account's
 responsible holder is also notified — on creation AND on confirmation/rejection** — via the
 `ACCOUNT_RESPONSIBLE` selector (REQ-BANK-026/-034), with the deciding/creating actor excluded so a
-holder who raised or decided the request is not notified about their own action. An account with an
+holder who raised or decided the request is not notified about their own action. A responsible holder without KRT Member and a grantee without the Bank Employee role are not notified (REQ-NOTIF-024, REQ-NOTIF-007). An account with an
 open request cannot be closed
 (409 `BANK_ACCOUNT_HAS_PENDING_REQUESTS`). The audit log stays admin-only. The page shows
 exclusively **active** accounts (REQ-BANK-028).
@@ -930,14 +970,17 @@ decides per account what is visible.
 
 | Function (gate)                                                                                                |  Member (if granted)  | Responsible | Bank Empl. (access) | Admin |
 |:---------------------------------------------------------------------------------------------------------------|:---------------------:|:-----------:|:-------------------:|:-----:|
-| View balance + read-only detail + account statement (`/api/v1/bank/org-units/accounts/{id}`, holders redacted) | ✅ (as far as visible) |      ✅      |    ✅ (bank page)    |   ✅   |
-| Configure visibility (`/api/v1/bank/org-units/accounts/{id}/visibility/**`)                                    |           ❌           |      ✅      |         ❌ †         |   ✅   |
-| Set/remove balance target (`PUT …/balance-target`, org-unit or `/api/v1/bank/accounts/{id}/balance-target`)         |           ❌           |      ✅      |     ✅ (access)      |   ✅   |
+| View balance + read-only detail + account statement (`/api/v1/bank/org-units/accounts/{id}`, holders redacted) | ✅ (as far as visible) |      ✅      |    ✅ (bank page)    |   ✅‡  |
+| Configure visibility (`/api/v1/bank/org-units/accounts/{id}/visibility/**`)                                    |           ❌           |      ✅      |         ❌ †         |   ✅‡  |
+| Set/remove balance target (`PUT …/balance-target`, org-unit or `/api/v1/bank/accounts/{id}/balance-target`)         |           ❌           |      ✅      |     ✅ (access)      |   ✅‡  |
 
 † Configuring **Sonderkonto** visibility is restricted to **OL members or Bank Management**
 (REQ-BANK-035/-037, `canConfigureVisibility`) — **not** a plain Bank Empl. (the column
 has no dedicated Bank Mgmt. column); `ORG_UNIT`/`AREA` is configured by the responsible holder,
 `CARTEL`/`CARTEL_BANK` are fixed (REQ-BANK-037).
+‡ On the org-unit bank an admin views a Staffel, SK or Bereich account and reads and changes its
+settings (balance target, view grants, approval limits) within the active context (REQ-ORG-032):
+without a selected unit every such account, with one only that unit's own account.
 
 #### 3.11.3 Requesting for all view-eligible users, transfer requests, approval limits & unrestricted deposits (REQ-BANK-039..042)
 
@@ -953,9 +996,11 @@ Building on 3.11.1/3.11.2, still solely via the seam `OrgUnitBankAccessService` 
 |:---------------------------------------------------------------------------------------------------------------------------------------------|:-------------------:|:-----------:|:----------:|:----------:|:-----:|
 | Submit a **deposit** request on **any active account** (`createBookingRequest`, REQ-BANK-042 — any authenticated user, no limit)             |       ✅ (any)       |      ✅      |     ✅      |     ✅      |   ✅   |
 | Submit a **withdrawal / transfer** request on a **visible** requestable account (`OrgUnitBankRequestService#createBookingRequest`, `OrgUnitBankAccessService#canView`) |          ✅          |      ✅      |    (✅)*    |    (✅)*    |   ✅   |
-| Set/remove approval limits per level (`canConfigureApprovalLimits`)                                                                          |          ❌          |      ✅      |     ❌      |     ✅      |   ✅   |
+| Set/remove approval limits per level (`canConfigureApprovalLimits`)                                                                          |          ❌          |      ✅      |     ❌      |     ✅      |   ✅‡  |
 | **Approve/revoke** an over-limit request („Anträge an unsere Konten" tab, account in one's own responsibility)                                |          ❌          |      ✅      |     ❌      |     ❌      |   ✅   |
 | **Confirm** an over-limit request (mandatory checkbox, otherwise 409 `BANK_OWNER_APPROVAL_REQUIRED`; without an in-app approval the staff note must name the approver, otherwise 400 `BANK_APPROVER_NOTE_REQUIRED`) |          ❌          |      ❌      | ✅ per flag |     ✅      |   ✅   |
+
+‡ As in §3.11.2: with a unit selected, an admin sets limits only on that unit's own account; Bank Management's right to the limits does not depend on the selection (REQ-ORG-032).
 
 \* Bank Empl./Bank Management reach the request endpoint only as far as they may view the account themselves (view/oversight scope). The two approval acts lie on **different surfaces of different users**; an out-of-band approval bumps the `@Version` of the request — an open bank queue with an old version runs into 409 `OPTIMISTIC_LOCK` on the next confirmation and recovers via reload (intended behavior, REQ-BANK-041).
 
@@ -1012,10 +1057,11 @@ The supply surface (`/supply/...`, group „Beschaffung") is off until an admin 
 on `/admin/supply`; while it is off every endpoint except the state read and the admin endpoints
 answers `404`. Every controller is class-gated on `hasRole('KRT_MEMBER')`; the admin controller on
 `hasRole('ADMIN')`. Within that gate the unit-scoped writes are role-scoped in `SupplyAccessPolicy`
-(`canManageUnit`: the lead or a Logistician of the unit, or an admin), not tenant-scoped — a need is
-visible to every member. The purchase fields of a need (maximum unit price, purchased amount, UEX
+(`canManageUnit`: the lead or a Logistician of the unit, or an admin, inside the active context,
+REQ-ORG-032), not tenant-scoped — a need is visible to every member. The purchase fields of a need
+(maximum unit price, purchased amount, UEX
 reference price) are returned only to the raising unit's managers, the governing leadership and a
-trade delegate.
+trade delegate; the linked job order and its id (REQ-SUP-023) only to the raising unit's managers.
 
 | Action                                                                      | Member | Log. / Lead of the unit | Governing leadership | Admin |
 |:----------------------------------------------------------------------------|:-------|:------------------------|:---------------------|:------|
@@ -1033,6 +1079,15 @@ trade delegate.
 ² An admin may withdraw any unreceived pledge. „Governing leadership" is the Bereichsleiter of the
 governing Bereich (`supply.governing_area_id`), the Organisationsleitung and an admin. Every supply
 mutation is audited under `AuditDomain.SUPPLY`.
+The unit columns follow the selected unit (REQ-ORG-032): with a unit selected, a lead or
+Logistician and an admin manage only that unit — its needs, incoming donations, the need form's
+job-order options and every manage flag —, without one a lead or Logistician all of their units and
+an admin every unit. The admin page `/admin/supply` stays an administration tool that lists and
+changes the setting of every unit; only the manage flag of its unit list and of its update answer
+follows the selection (REQ-SUP-002). The tabs „Eingehende Spenden" and „Statistik" do not follow
+it: they count the units a lead or Logistician manages in any context, every unit for an admin
+(ADR-0329), so a manager who selects a unit they do not manage keeps both tabs, whose pages then
+list only what the selection covers (REQ-SUP-003).
 
 ### 3.14 Ankauf (purchasing, REQ-PUR-\*)
 
@@ -1065,6 +1120,11 @@ Logisticians of the raising unit. Partner notes are returned to HBs and the gove
 Organisationsleitung and an admin. Every purchasing mutation is audited under `AuditDomain.PURCHASING`;
 the money itself moves only through bank requests, which obey the four-eyes rule (REQ-BANK-062): the HB is the
 requester and can neither grant nor confirm a tranche.
+The raising unit's column follows the selected unit (REQ-ORG-032, REQ-PUR-021): with a unit
+selected, its lead and Logisticians read its deals and decide its deliveries, and its lead pauses
+it, only there. Whether they read the report does not: `canReadReport` counts the managers of
+every unit, so the „Bericht" tab stays offered under any selection, and the report lists the deals
+of the selection (ADR-0329, REQ-PUR-023).
 
 ---
 
@@ -1075,7 +1135,11 @@ Read and write paths are filtered through
 and [`AccessGateService`](backend/src/main/java/de/greluc/krt/profit/basetool/backend/scope/api/AccessGateService.java), with create-time stamping in
 `OrgUnitStampingService`, covering every org-unit kind. Baseline rule: non-admins view the union
 of their memberships (widened by the leadership cascade of §4.1); admins without an active pin view
-everything, with a pin the same restrictive view as a Member.
+everything, with a pin the same restrictive view as a Member. Only a pin the caller may select
+counts; any other is no pin (REQ-ORG-032). Creation without a pick stamps a mission or operation on
+the pin, else on the creator's only stampable unit, and a personal row on the pin only when it is
+one of its owner's stampable units, else on the owner's only one — the stampable units being the
+direct memberships on active units of a `KRT Member` (REQ-ORG-004).
 
 - **Strictly staffel-scoped** (no cross-Staffel): `Ship`, `InventoryItem`
   (inventory view), `RefineryOrder` — lists filter on
@@ -1083,7 +1147,7 @@ everything, with a pin the same restrictive view as a Member.
   `canSee*`/`canEdit*`. Personal rows with no org unit at all
   (`owning_org_unit_id = NULL`, V132 — e.g. the ship of a user without
   Staffel/SK) are **owner-only**: visible/editable only to the owner
-  themselves and to admins (`canAccessOwnerlessPersonalRow`). **Owner escape
+  themselves and to admins without an active pin (`canAccessOwnerlessPersonalRow`). **Owner escape
   (REQ-ORG-011):** the per-user owner (`ship.owner` / `inventory_item.user` /
   `refinery_order.owner`) may **always** view/edit their row, regardless of
   the `owning_org_unit_id` stamp — `isCurrentUserOwner` takes effect before the
@@ -1091,8 +1155,8 @@ everything, with a pin the same restrictive view as a Member.
   scoped; the shared list views remain unchanged.
 - **Cross-Staffel with public escape**: `Mission` — visible to other OrgUnits
   exactly when `is_internal = false`; editable only by the owning
-  OrgUnit + admins. Ownerless Bereichsleitung missions (V144) follow
-  REQ-ORG-009 (see the box in §3.5).
+  OrgUnit + admins within the active context (§3.5 ⁹). Ownerless Bereichsleitung missions (V144)
+  follow REQ-ORG-009 (see the box in §3.5).
 - **Staffel-scoped with two escapes**: `Operation` — no public escape, but
   (a) **ownerless Bereichsleitung operations** (V145) are visible to all
   members-or-above and (b) **participants** of the linked
@@ -1108,8 +1172,9 @@ everything, with a pin the same restrictive view as a Member.
   run through the role gate (Logistician+), not through the Staffel scope.
 - **Oversight overview** (no aggregate of its own): the blueprint availability
   (`/blueprint-overview`) aggregates the per-user `personal_blueprint` rows across
-  the members of the org units the caller **oversees** — officers all of their
-  Staffeln, SK-Leads their SK(s), a Staffel rank its Staffel, a Bereichsleitung its Bereich and
+  the members of the org units the caller **oversees** — the units of their leadership seats,
+  not every Staffel they belong to: SK-Leads their SK(s), a Staffel rank its Staffel, a
+  Bereichsleitung its Bereich and
   everything below it, an OL member every unit, admins all of them or the pinned one
   (`RequestScopeResolver.currentOversightScope()`, narrower than the
   membership union of the normal lists). Owners are delivered only as a
@@ -1177,7 +1242,7 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
    flags, feed into the membership delta `PATCH /api/v1/org-units/members/{id}/memberships`
    and are reconciled in a single transaction (REQ-ORG-017). The old toggle endpoints
    `UserController#patchLogistician` / `#patchMissionManager` and the member-list switches
-   were removed. For an SK, the SK-Lead still sets the flags via `canManageMembers`.
+   were removed. For an SK, the SK-Lead still sets the flags of the other members' rows that hold no lead seat via `canManageMember`.
    The old `app_user` flag columns have not existed since V104.
 5. **Phase-4 lockdown:** The entire admin area (master data,
    member management, announcements, UEX, system settings,
@@ -1216,7 +1281,7 @@ layout read grants them: the incoming donations to the lead or a Logistician of 
 accepts donations (and to `ADMIN`), the statistics to the governing leadership and any unit
 manager, the partners to a trade delegate and the governing leadership, the delegates to the
 governing leadership, the report to a delegate, the governing leadership, bank staff and any unit
-manager (REQ-UI-026). Its entity search, `GET /quick-access/search` (`isAuthenticated()`, REQ-UI-033), reads the backend read behind each page it opens — missions and operations as their lists show them, materials from the visible catalogue, blueprints from the availability overview, ship types from the unit hangar overview and job orders by number through the order list's scope and the assignee grant (`GET /api/v1/orders/by-number`, `isAuthenticated()`, REQ-ORDERS-048) — so a hit never reveals more than that page. Its actions follow the same buttons: „Ins globale Lager
+manager (REQ-UI-026), whatever unit is selected (REQ-ORG-032). Its entity search, `GET /quick-access/search` (`isAuthenticated()`, REQ-UI-033), reads the backend read behind each page it opens — missions and operations as their lists show them, materials from the visible catalogue, blueprints from the availability overview, ship types from the unit hangar overview and job orders by number through the order list's scope and the assignee grant (`GET /api/v1/orders/by-number`, `isAuthenticated()`, REQ-ORDERS-048) — so a hit never reveals more than that page. Its actions follow the same buttons: „Ins globale Lager
 einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMIN`. Page controllers live under `frontend/.../<domain>/web/`.
 
 | Screen (route)                                                                                                                       | Frontend gate                                                           | Navigation                                                                     |
@@ -1230,7 +1295,7 @@ einbuchen“ only for `LOGISTICIAN`, „Administration öffnen“ only for `ADMI
 | Materialien, Material-Übersicht, Profitberechnung (`/materials/**`, `/materials/profit-calculation`)                                | `isAuthenticated()`; profit calculation `KRT_MEMBER`/`ADMIN`             | always                                                                         |
 | Mein Inventar, Meine Blueprints (`/personal-inventory/**`)                                                                           | `isAuthenticated()`                                                     | always, in the personal menu („Persönlich“) of the drawer’s user row           |
 | Star-Citizen-Links (`/sc-links`, REQ-UI-025)                                                                                         | `isAuthenticated()`; read-only                                          | always, as a link in the footer                                              |
-| Leitung (`/organisation/leitung`)                                                                                                    | `ADMIN_OR_OFFICER` (page and every write proxy)                         | tab „Leitung" of Meine Einheit, if `canOpenLeitung`                                                                  |
+| Leitung (`/organisation/leitung`)                                                                                                    | `@officerSurfaceGate.canOpenLeitung()` (page and every write proxy)     | tab „Leitung" of Meine Einheit, if `canOpenLeitung`                                                                  |
 | Meine Einheit → Bank (`/org-unit-bank/**`) | member-or-above | link „Meine Einheit" in the Staffel group for `ADMIN`/`OFFICER`/`LOGISTICIAN`/`MISSION_MANAGER`/`KRT_MEMBER` |
 | Bank-Dashboard, Bankverwaltung, Anträge (`/bank`, `/bank/manage`, `/bank/requests`, `/bank/accounts/{id}`, `/bank/holders/{id}`)    | `BANK_EMPLOYEE`                                                         | `BANK_EMPLOYEE`                                                                |
 | Berechtigungen (`/bank/grants`)                                                                                                      | `BANK_MANAGEMENT`                                                       | `BANK_MANAGEMENT`                                                              |
@@ -1262,7 +1327,22 @@ backend serves every member) but no control that writes.
   own; a bank manager who also holds a leadership seat has reach there like anyone else.
 - **Every leadership seat requires `KRT Member`:** an appointment without it is refused; a seat
   whose holder loses it stays in place and confers no reach. Membership rights rest on
-  `KRT Member`.
+  `KRT Member`: without it no membership confers anything — no reach, no switcher entry, no
+  explicit Logistiker or Einsatzleiter flag, no bank membership audience (REQ-SEC-015,
+  REQ-ORG-032).
+- **A deactivated unit confers nothing** (REQ-ORG-032, ADR-0373 D10): its memberships stay stored
+  for a reactivation, but give no reach, no officer, Logistician, Mission Manager or seat right, no
+  leadership cascade, no SK roster management and no notices until the unit is active again.
+- **Role powers follow the active org unit** (REQ-ORG-032): with a unit selected, every column
+  above acts in that unit only — officer, Logistician and Mission Manager rights, the Leitung writes,
+  the org-unit bank's holder rights and approvals, material claims — admins included; „Alle meine
+  Org-Einheiten" covers all of the caller's units. Personal views, the member directory, the
+  bank-staff side, connected applications and the supply and purchasing tabs (§3.13, §3.14) do not
+  follow it. An officer, Logistician or Mission Manager gate on a target without an owning unit
+  passes only an admin without a selected unit.
+- **One check of `KRT Member`:** `AuthHelperService#holdsKrtMember()` decides whether a caller's
+  memberships confer anything — the role, or the exchange marker of an acting member who holds it
+  (REQ-SEC-015, REQ-XCH-009).
 - Officer reach sets no member-rank range: any account may hold any rank 1–20 (REQ-ROLE-007,
   ADR-0348). The bank's global
   `OFFICER` view-grant and approval-limit buckets for special accounts are removed (REQ-BANK-037).
@@ -1277,7 +1357,7 @@ Setting, changing and removing a unit's levels for materials and game items, the
 | --- | --- |
 | Set, change and remove a unit's minimum stock levels; „Bedarf anlegen“ / „Auftrag anlegen“ from a low row | the unit's Logisticians, its leadership included (`hasRoleInOrgUnit(unit, LOGISTICIAN)`) |
 | See the „Mindestbestände“ tab, the „niedrig“ badge and the „Bestand niedrig“ widget | everyone who can see the unit's pool |
-| Receive the low-stock notification (REQ-NOTIF-030) | the unit's direct Logisticians and direct leadership seats |
+| Receive the low-stock notification (REQ-NOTIF-030) | the unit's direct Logisticians and direct leadership seats who hold KRT Member |
 
 ### 7.3 Navigation preferences (ADR-0298, REQ-UI-032, REQ-UI-034)
 

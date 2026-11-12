@@ -1,6 +1,6 @@
 # ADR-0022 — Bank booking-request notifications via `ACCOUNT_GRANT` + `EVENT_RECIPIENT` selector kinds
 
-- **Status:** Accepted
+- **Status:** Accepted — **amended by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)** (2026-11-11): `ACCOUNT_GRANT` resolves only the grantees who hold `Bank Employee` or a role above it (REQ-NOTIF-007)
 - **Date:** 2026-06-17
 - **Deciders:** @greluc, Claude
 - **Related:** spec REQ-BANK-026 · REQ-NOTIF-011 · REQ-NOTIF-007 · ADR-0015 · issue #666
@@ -28,6 +28,11 @@ the existing `contextOrgUnits()` used by `ORG_RELATIVE_ROLE`. `RecipientResoluti
 a `resolveAccountGrantHolders(accountId)` backed by `BankAccountGrantRepository.findByAccountId`.
 A seeded default rule (V160) maps `BANK_BOOKING_REQUEST_CREATED` to a notification with a
 `ROLE` selector (`BANK_MANAGEMENT`) and an `ACCOUNT_GRANT` selector, excluding the requester.
+
+> **Amended by [ADR-0373](0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md)
+> (2026-11-11, REQ-NOTIF-007):** `ACCOUNT_GRANT` resolves only the grantees who hold `Bank Employee`
+> or a role above it, in one query (`BankAccountGrantRepository#findGranteeIdsHoldingAnyRole`); the
+> inert grant of anyone else resolves to nobody.
 
 For the decision direction we add a second selector kind, **`EVENT_RECIPIENT`**, that resolves to
 the single user the event is directed at. The event contract gains a `default UUID

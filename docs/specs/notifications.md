@@ -1,6 +1,6 @@
 # Notifications & alerting
 
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-11.
 > **Owner area:** NOTIF · **Related ADRs:** [ADR-0014](../adr/0014-notification-system-architecture.md),
 > [ADR-0015](../adr/0015-notification-data-driven-rule-engine.md),
 > [ADR-0016](../adr/0016-notification-transport-polling-sse.md),
@@ -76,7 +76,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `OPERATION_PAYOUT_MARKED` | `OPERATION_PAYOUT_PAID_OUT` | V273 | `EVENT_RECIPIENT` (the participant); the last open payout supersedes `OPERATION_COMPLETED` | REQ-MISSION-028 |
 | `OPERATION_PAYOUT_UNMARKED` | none (no rule) | — | supersedes that participant's `OPERATION_PAYOUT_PAID_OUT` | REQ-MISSION-028 |
 | `OPERATION_COMPLETED` | `OPERATION_COMPLETED` | V273 | `ORG_RELATIVE_ROLE` `MISSION_MANAGER` and `OFFICER` on `RESPONSIBLE` | REQ-MISSION-029 |
-| `OPERATION_COMPLETED_UNOWNED` | `OPERATION_COMPLETED` | V273 | `ROLE` `OFFICER` (an operation without an owning unit) | REQ-MISSION-029 |
+| `OPERATION_COMPLETED_UNOWNED` | `OPERATION_COMPLETED` | V273 + V320 | `SEAT_HOLDERS` (an operation without an owning unit: every leadership seat holder of any unit who holds `KRT Member`) | REQ-MISSION-029 |
 | `JOB_ORDER_REASSIGNED` | `JOB_ORDER_REASSIGNED` | V274 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `RESPONSIBLE` (the new unit); supersedes `JOB_ORDER_CREATED`, `…_UPDATED_BY_REQUESTER` and itself | REQ-ORDERS-041 |
 | `JOB_ORDER_FINISHED` | `JOB_ORDER_FINISHED` | V274 | `ORG_RELATIVE_ROLE` OFFICER / LEAD / LOGISTICIAN on `REQUESTING`; the status word is the coded parameter `statusCode` | REQ-ORDERS-042 |
 | `JOB_ORDER_ASSIGNEE_ADDED` | `JOB_ORDER_ASSIGNED` | V274 | `EVENT_RECIPIENT` (the assignee); clears a removal | REQ-ORDERS-043 |
@@ -128,7 +128,7 @@ is the notification-engine view of it; the linked requirement is canonical.
 | `PURCHASING_NEED_CLOSED` | none (no rule) | — | supersedes the need's release notices when it is fulfilled or withdrawn | REQ-PUR-024 |
 | `PURCHASING_DELIVERY_RECORDED` | `PURCHASING_DELIVERY_RECORDED` | V289 | `ORG_RELATIVE_ROLE` `UNIT_LEADERSHIP` and `LOGISTICIAN` on `RESPONSIBLE` (the raising unit); not mutable | REQ-PUR-024 |
 | `PURCHASING_DELIVERY_DECIDED` | `PURCHASING_DELIVERY_DECIDED` | V289 | `EVENT_RECIPIENT` (the deal's HB); coded `outcomeCode`; supersedes the delivery notice; not mutable | REQ-PUR-024 |
-| `PURCHASING_SETTLEMENT_OVERDUE` | `PURCHASING_SETTLEMENT_OVERDUE` | V289 | `EVENT_RECIPIENTS` (the HB and the Bereichsleiter and Bereichskoordinatoren of every governing Bereich), `ROLE` `BANK_MANAGEMENT`; raised once per deal by the `purchasing_settlement_overdue` timed producer; not mutable | REQ-PUR-018 |
+| `PURCHASING_SETTLEMENT_OVERDUE` | `PURCHASING_SETTLEMENT_OVERDUE` | V289 | `EVENT_RECIPIENTS` (the HB and the Bereichsleiter and Bereichskoordinatoren of every governing Bereich who hold `KRT Member`), `ROLE` `BANK_MANAGEMENT`; raised once per deal by the `purchasing_settlement_overdue` timed producer; not mutable | REQ-PUR-018 |
 | `PURCHASING_PAUSED` | `PURCHASING_PAUSED` | V289 | `EVENT_RECIPIENTS` (the active HBs) and, for a unit pause, the unit's leadership; coded `scopeCode`, `reasonCode`; not mutable | REQ-PUR-019 |
 | `PURCHASING_RESUMED` | `PURCHASING_RESUMED` | V289 | as the pause; supersedes `PURCHASING_PAUSED`; not mutable | REQ-PUR-019 |
 | `PURCHASING_DELEGATE_APPOINTED` | `PURCHASING_DELEGATE_APPOINTED` | V289 | `EVENT_RECIPIENT` (the appointed member); not mutable | REQ-PUR-003 |
@@ -254,8 +254,10 @@ Recipients are decided by admin-managed `notification_rule` rows, each owning a 
 `notification_rule_selector` rows. Selector kinds: `SPECIFIC_USER` (a `sub`), `ROLE` (a global
 `role.code`), `ORG_RELATIVE_ROLE` (a role — `OFFICER` / `LEAD` / `LOGISTICIAN` /
 `MISSION_MANAGER` — evaluated against an org unit the event carries, by `context_role`
-`RESPONSIBLE` / `REQUESTING`), `ACCOUNT_GRANT` (the bank employees holding a
-`bank_account_grant` on the **bank account** the event carries — see `NotificationEvent.contextAccountId()`),
+`RESPONSIBLE` / `REQUESTING`), `ACCOUNT_GRANT` (the grantees of a `bank_account_grant` on the
+**bank account** the event carries — see `NotificationEvent.contextAccountId()` — who hold `Bank
+Employee` or a role above it; the inert grant of a member who lost the role resolves to nobody,
+REQ-BANK-009),
 `EVENT_RECIPIENT` (the single user the event is **directed at** — see
 `NotificationEvent.contextRecipientUserId()`, e.g. the officer/lead notified when their booking request is
 decided) and `ACCOUNT_RESPONSIBLE` (the derived responsible holder(s) of the bank account the event
@@ -270,6 +272,9 @@ column either: `MISSION_PARTICIPANTS`, `MISSION_LEADERSHIP`, `EXCHANGE_CLIENT_HO
 `REQUIRED_APPROVER` (the members a booking request's approval waits for, read from the request the
 event carries, `NotificationEvent.contextBankRequestId()`) and `REQUEST_RESPONSIBLE` (the responsible
 holders of the event's account except the KRT account's) read no column either (REQ-NOTIF-033).
+Every kind that reads org-unit memberships — `ORG_RELATIVE_ROLE`, `SEAT_HOLDERS`,
+`ACCOUNT_RESPONSIBLE`, `REQUEST_RESPONSIBLE` and the seat-derived approvers of `REQUIRED_APPROVER` —
+resolves only members who hold `KRT Member` (REQ-NOTIF-024).
 A rule's `exclude_actor` flag drops the triggering user. The selector `kind` is an open enum so a
 future `GROUP` selector slots in without reworking the engine. Rules are created, edited, enabled /
 disabled and deleted at runtime via an admin-only API — **every** rule, including the seeded ones:
@@ -284,6 +289,8 @@ saved from the editor — not even to disable it.)
 - [x] Admin CRUD at `/api/v1/notifications/admin/rules` is gated on `hasRole('ADMIN')`.
 - [x] The engine unions a rule's selectors, applies `exclude_actor`, and de-duplicates
   recipients.
+- [x] `ACCOUNT_GRANT` resolves a grantee only while they hold `Bank Employee` or a role above it; a
+  former bank employee's grant row notifies nobody.
 - [x] Every selector kind is admin-manageable; a seeded rule round-trips through the editor
   unchanged.
 
@@ -305,7 +312,8 @@ bundles.
 - [x] Every seeded rule id has a `defaultDescription` key in every bundle.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `NotificationRuleEngineIntegrationTest`, `NotificationRuleServiceTest`,
-`AdminNotificationRulePageControllerMvcTest`, `DefaultNotificationRuleDescriptionCoverageTest` ·
+`AdminNotificationRulePageControllerMvcTest`, `DefaultNotificationRuleDescriptionCoverageTest`,
+`RecipientDirectoriesTest`, `ApprovalNeededNoticeIntegrationTest` ·
 **Code:** `notification/api/NotificationRule`, `notification/api/NotificationRuleSelector`,
 `notification/internal/RuleEvaluationService`, `notification/api/NotificationRuleService`,
 `notification/web/NotificationRuleController`, `db/migration/V156__create_notification_rule.sql`,
@@ -319,7 +327,8 @@ org unit**: officers (the seat holders directly in that unit, `OrgRelativeRole.O
 (`org_unit_membership.role = SK_LEAD`), logisticians (`org_unit_membership.is_logistician`), plus the
 global admins (`ROLE` `ADMIN`). The creating actor is excluded. The seeded rule is
 admin-editable and -deletable. Officer-ness is the membership rank, read live from
-`org_unit_membership`; a newly appointed seat holder is a recipient at once.
+`org_unit_membership`; a newly appointed seat holder is a recipient at once. Officers, leads and
+logisticians are recipients only while they hold `KRT Member` (REQ-NOTIF-024).
 
 The notice leaves the inbox when the order closes: completing it (status change or the last
 handover), rejecting it or deleting it publishes `JOB_ORDER_CLOSED`, which supersedes the order's
@@ -646,7 +655,9 @@ admin-editable at runtime.
 **Acceptance**
 
 - [x] Creating a booking request (after commit) notifies bank management + the account's grant
-  holders, excluding the requester (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`).
+  holders who hold `Bank Employee` or a role above it, excluding the requester
+  (`RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`, `RecipientDirectoriesTest`,
+  `ApprovalNeededNoticeIntegrationTest`).
 - [x] Confirming/rejecting a request (after commit) notifies the requesting officer/lead via the
   `EVENT_RECIPIENT` selector, excluding the deciding employee (`RuleEvaluationServiceTest`,
   `BankBookingRequestServiceTest`).
@@ -656,7 +667,8 @@ admin-editable at runtime.
 - [x] The notifications render via `notifications.type.BANK_BOOKING_REQUEST_*` (i18n keys in all
   three bundles, named placeholders `{accountNo}`/`{amount}`/`{requester}`/`{reason}`).
 
-**Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest` · **Code:**
+**Enforced by:** `RuleEvaluationServiceTest`, `BankBookingRequestServiceTest`,
+`RecipientDirectoriesTest`, `ApprovalNeededNoticeIntegrationTest` · **Code:**
 `bank/api/events/BankBookingRequest{Created,Confirmed,Rejected}Event`,
 `notification/internal/RecipientResolutionService#resolveAccountGrantHolders`,
 `notification/internal/RuleEvaluationService#resolveEventRecipient`,
@@ -968,20 +980,33 @@ the rule editor like the others:
 | `MISSION_LEADERSHIP` | the mission's owner and its co-managers | `contextMissionId()` |
 | `EXCHANGE_CLIENT_HOLDERS` | every member with a non-revoked installation of the client; of any client when the event is exchange-wide | `contextExchangeClientId()` or `contextAllExchangeClients()` |
 | `EVENT_RECIPIENTS` | the set of affected users the event lists (bulk actions) | `contextRecipientUserIds()` |
-| `SEAT_HOLDERS` | every member who holds a leadership seat in any org unit | nothing |
+| `SEAT_HOLDERS` | every member who holds a leadership seat in any org unit and `KRT Member` | nothing |
 | `REQUIRED_APPROVER` | the members a pending, flagged, not yet approved booking request waits for, never its requester (REQ-NOTIF-033) | `contextBankRequestId()` |
 | `REQUEST_RESPONSIBLE` | the responsible holders of the account, none on the KRT account (REQ-NOTIF-033) | `contextAccountId()` |
 
 `OrgRelativeRole.UNIT_LEADERSHIP` resolves to the members whose rank confers oversight of the context
 org unit (`MembershipRole#confersOwnLevelOversight()`: Staffelleiter, Bereichsleiter, …). The seats
 are read **directly in that unit**: the seat holders of a Bereich or the Organisationsleitung are not
-included for a Staffel, and a Bereich's rule does not reach its Staffeln. No `KRT Member` filter
-applies; a seat holder without that role is a recipient like any other.
+included for a Staffel, and a Bereich's rule does not reach its Staffeln.
 
-`OFFICER` is no stored role any more. `OrgRelativeRole.OFFICER` is an alias of `UNIT_LEADERSHIP`,
-and a `ROLE` selector with the code `OFFICER` resolves like `SEAT_HOLDERS`, so rules that name it
-keep addressing the seat holders (ADR-0300). `SEAT_HOLDERS` is the persistable, editable target
-such rules are migrated to.
+**Only with `KRT Member`.** Without the stored role `KRT Member` no membership confers anything
+(REQ-SEC-015, ADR-0373 D7), so none yields a recipient. Every selector that reads org-unit
+memberships — `UNIT_LEADERSHIP`, `OFFICER`, `LEAD`, `LOGISTICIAN`, `MISSION_MANAGER`,
+`SEAT_HOLDERS`, the bank's `ACCOUNT_RESPONSIBLE` and `REQUEST_RESPONSIBLE`, and the responsible
+holders and OL members of `REQUIRED_APPROVER` — keeps only the members who hold it, and so does the
+governing leadership the overdue-settlement producer lists (REQ-PUR-018). A seat holder, an SK lead
+or a member flagged Logistiker or Einsatzleiter who lost the role is no recipient until it is back;
+an admin is judged alike. `ROLE` reads a stored global role, as does the Bankleitung band of
+`REQUIRED_APPROVER`, `SPECIFIC_USER` names a member and `ACCOUNT_GRANT` follows the bank roles
+(REQ-NOTIF-007); none of them reads a membership. Each directory filters a resolved set with one
+batch role lookup (`OrgUnitSeatEligibility#krtMembersAmong`, REQ-DATA-003). The filter decides who
+gets a new notice; one delivered before the role was withdrawn stays until it is deleted or
+superseded.
+
+`OFFICER` is no stored role any more (V318). `OrgRelativeRole.OFFICER` is an alias of
+`UNIT_LEADERSHIP`. V320 turned every `ROLE` selector with the code `OFFICER` into a `SEAT_HOLDERS`
+selector, the persistable, editable target for the seat holders, and the rule editor refuses the
+code `OFFICER`, because the role catalogue no longer knows it (ADR-0300).
 
 An event that carries nothing a kind needs resolves to nobody for that kind. The plain
 `excludeActor` rule and the de-duplication apply to the new kinds exactly as to the old ones, and
@@ -992,21 +1017,32 @@ data only through its SPIs `MissionRecipientDirectory` and `ExchangeRecipientDir
 
 - [x] Each new kind resolves through the event's context and drops the actor when the rule says so.
 - [x] A mission or exchange event without its context resolves to nobody.
-- [x] `UNIT_LEADERSHIP` reaches every seat holder of the unit and no plain member.
+- [x] `UNIT_LEADERSHIP` reaches every seat holder of the unit who holds `KRT Member` and no plain
+  member.
 - [x] `OrgRelativeRole.OFFICER` resolves to the seat holders directly in the context unit; the
   seat holders of a higher unit (Bereich, Organisationsleitung) are not reached.
-- [x] A `ROLE` selector `OFFICER` and a `SEAT_HOLDERS` selector resolve to every seat holder
-  without reading the role mirror; `SEAT_HOLDERS` is stored with every selector column `null`.
+- [x] A `SEAT_HOLDERS` selector resolves to every seat holder who holds `KRT Member` and is stored
+  with every selector column `null`; the seeded `ROLE` `OFFICER` selector became one (V320), and
+  the rule editor refuses every role code the catalogue does not know, `OFFICER` included.
+- [x] A seat holder, an SK lead or a member flagged Logistiker or Einsatzleiter without `KRT
+  Member` is resolved by no membership selector and by none of the bank's responsible-holder and
+  approver selectors; with the role they are.
 - [x] The rule editor offers every new kind and the new role, under a localized label, and stores a
   group kind with every selector column `null`.
 
 **Enforced by:** `RuleEvaluationServiceTest`, `RecipientDirectoriesTest`,
-`NotificationRecipientQueriesIntegrationTest`, `NotificationRuleServiceTest`,
-`AdminNotificationRuleOptionListsTest` · **Code:** `notification/api/SelectorKind`, `notification/api/OrgRelativeRole`,
+`NotificationRecipientQueriesIntegrationTest`, `JobOrderNoticeIntegrationTest`,
+`StockLevelNoticeIntegrationTest`, `SettlementOverdueNoticeIntegrationTest`,
+`SeededNotificationRulesIntegrationTest`,
+`NotificationRuleServiceTest`, `AdminNotificationRuleOptionListsTest` · **Code:**
+`notification/api/SelectorKind`, `notification/api/OrgRelativeRole`,
 `notification/api/events/NotificationEvent`, `notification/api/MissionRecipientDirectory`,
 `notification/api/ExchangeRecipientDirectory`, `notification/internal/RuleEvaluationService`,
-`notification/internal/RecipientResolutionService` · **Decision:**
-[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md) ·
+`notification/internal/RecipientResolutionService`,
+`orgunit/internal/OrgUnitMembershipRecipientDirectory`, `orgunit/api/OrgUnitSeatEligibility`,
+`bank/internal/OrgUnitBankRecipientDirectory` · **Decision:**
+[ADR-0245](../adr/0245-group-recipients-time-based-notices-and-muting-extend-the-notification-engine.md),
+[ADR-0373](../adr/0373-the-active-org-unit-context-has-one-pin-rule-and-a-stored-choice.md) ·
 **Issues:** #2414
 
 ### REQ-NOTIF-025 — Supersede for named recipients
@@ -1192,8 +1228,9 @@ notification type `INVENTORY_STOCK_LEVEL_LOW`.
   the marker is written by a conditional update that leaves the level's `@Version` alone, so a
   Logistician's edit never 409s against it. Reaching the target clears the marker.
 - **Recipients.** The unit's direct Logisticians and the holders of a leadership seat directly in
-  the unit, with no cascade from a Bereich or the Organisationsleitung, resolved by a seeded rule
-  through the rule engine (REQ-NOTIF-007). The notice links to the unit's „Mindestbestände" tab.
+  the unit who hold `KRT Member` (REQ-NOTIF-024), with no cascade from a Bereich or the
+  Organisationsleitung, resolved by a seeded rule through the rule engine (REQ-NOTIF-007). The
+  notice links to the unit's „Mindestbestände" tab.
 - **Switchable.** The type is mutable (REQ-NOTIF-027) and appears in the profile's
   „Benachrichtigungen" card under the Lager area.
 - **Silent lifecycle.** Deleting a level or its material, and deactivating its tier, send no
@@ -1215,6 +1252,8 @@ notification type `INVENTORY_STOCK_LEVEL_LOW`.
   the target and falling low again sends a second notice. *`StockLevelNoticeProducerTest`,
   `StockLevelNoticeIntegrationTest`.*
 - [x] A member who muted the type gets nothing. *`StockLevelNoticeIntegrationTest`.*
+- [x] A Logistician or seat holder without `KRT Member` gets nothing.
+  *`StockLevelNoticeIntegrationTest`.*
 - [x] Deleting the level or its material, deactivating the unit or the catalogue entry, and
   deactivating the tier send nothing; a level of an inactive unit or entry notifies once it returns.
   *`StockLevelNoticeIntegrationTest`.*
@@ -1355,7 +1394,11 @@ responsible holders) and never resolves the requester (REQ-BANK-062).
   correction by the requester (REQ-BANK-056) re-decides it, including a change of approver class. A
   change of responsible holder moves it like the other open notices (REQ-NOTIF-023).
 - **The same set as the queue.** The requests carrying this notice for a member are the requests
-  waiting for their approval.
+  waiting for their approval. A responsible holder or OL member without `KRT Member` may approve
+  nothing (REQ-BANK-034), so their seat yields neither this notice nor the generic one
+  (REQ-NOTIF-024); a bank role still reaches them through its own selectors. On an account whose
+  only holder lacks the role a request tells no responsible holder; a new holder is told of the
+  open requests when the seat passes (REQ-NOTIF-023).
 
 Notifications are not audited, so this adds no audit event. Rendered with `type`, `amount`,
 `accountNo` and `requester`; linked to `/org-unit-bank?focus={id}#tab=fremde` (REQ-NOTIF-032).
@@ -1367,6 +1410,8 @@ Notifications are not audited, so this adds no audit event. Rendered with `type`
 - [x] A KRT request at or below `T2` raises no notice for an OL member.
 - [x] Approval, rejection, cancellation and confirmation clear the notice; a revocation raises it again.
 - [x] A correction below the limit replaces the approval notice with the generic one.
+- [x] A responsible holder or OL member without `KRT Member` is no required approver and is not
+  told of the account's requests as its holder.
 
 **Enforced by:** `ApprovalNeededNoticeIntegrationTest`, `RecipientDirectoriesTest`,
 `SeededNotificationRulesIntegrationTest`, `NotificationRuleEngineIntegrationTest` · **Code:**

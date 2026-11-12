@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-02.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
 > **Owner area:** ROLE · **Related ADRs:** ADR-0042 (qualifies ADR-0026, ADR-0027, ADR-0029),
 > ADR-0300, ADR-0331
 
@@ -127,10 +127,10 @@ the officer standing they stood next to is no longer a Keycloak role.
   confers no reach until the role is back (REQ-ORG-029).
 - **Gates read the target's owning unit.** An officer check asks for reach in the owning unit of the
   mission, job order, ship or other target; lists are filtered to the caller's
-  officer units. The active context only narrows what navigation and lists show, with the union
-  when nothing is pinned. Hangar owner details, the Leitung page, job-order
-  writes, mission finance and owner change, the operation's unpaid reset and the purchasing
-  `leadsUnit` check move to this per-unit reach.
+  officer units. The active context narrows both to the pinned unit, a Bereich or OL pin to that
+  unit alone, with the union when nothing is pinned (REQ-ORG-032). Hangar owner details, the
+  Leitung page, job-order writes, mission finance and owner change, the operation's unpaid reset
+  and the purchasing `leadsUnit` check move to this per-unit reach.
 - **The Keycloak `OFFICER` role is retired** (REQ-SEC-004). The paragraph above on the operational
   `OFFICER` grant no longer applies: no one holds `OFFICER`, and nothing reads it.
 - **No new audit event.** Reach follows the seat changes, which `ROLE_GRANTED` / `ROLE_CHANGED` /
@@ -191,16 +191,32 @@ Invariant: a leader can **never** assign the rank they themselves hold at that l
 R you must hold a strictly-higher rank, which you cannot grant to yourself) — the no-self-escalation
 property the ADMIN-only `is_lead` toggle used to provide, now held at every tier (the SK lead itself is
 appointed by the Bereichsleiter of the SK's parent Bereich, `canAppointSkLead`). The delegated verdict is
-computed from the caller's own membership ranks only (never from the admin-pin header, contextual
-authorities, or `isAdmin()` inside the verdict); admin short-circuits only at the `@PreAuthorize`
-layer.
+computed from the caller's own membership ranks only, and only while the caller holds `KRT Member`,
+without which a seat confers nothing (REQ-SEC-015) — never from the pin, contextual authorities, or
+`isAdmin()` inside the verdict; admin short-circuits only at the `@PreAuthorize` layer. Every
+Leitung verdict — the appointments and Kommandogruppen of `OrgRoleManagementSecurityService`, the
+SK roster of `SpecialCommandSecurityService` and the units `LeitungViewService` lists — asks the
+one `KRT Member` check, `AuthHelperService#holdsKrtMember()` (REQ-SEC-015, REQ-ORG-032).
+
+**The active context narrows every endpoint.** Each gate of the ladder — the squadron ranks, the
+Kommandogruppen, the Bereich roles, the SK lead, and the SK read and roster of REQ-ORG-005 —
+additionally requires its target unit (the path's Staffel, Bereich or SK) to lie in the active
+context (`RequestScopeResolver.isInActiveContext`, ANDed around both the admin and the delegated
+branch). The pin narrows the verdict and never widens it: a pin on another unit refuses the write,
+an admin's included, and a Bereich or OL pin is that unit alone, so appointing in a child Staffel or
+SK needs that unit pinned or „Alle meine Org-Einheiten" (REQ-ORG-032).
 
 **No write on one's own seat.** Every delegated rank write — assign / clear a squadron rank, add /
 remove a Bereich role, toggle an SK lead — additionally requires that the target is not the caller
 (`OrgRoleManagementSecurityService.targetsAnotherUser`, ANDed into each endpoint's delegated
 branch). Only an admin sets, changes or clears their own rank; a Bereichsleiter cannot make
 themselves Staffelleiter, a Staffelleiter cannot demote themselves to Kommandoleiter. (Since
-2026-09-27.)
+2026-09-27.) The SK roster follows the same rule: a non-admin changes the Logistiker /
+Einsatzleiter flags of, or removes, neither their own row nor the row of a member who holds
+`SK_LEAD` (`SpecialCommandSecurityService.canManageMember`). A lead's seat is touched only by an
+admin or, through the lead toggle, by the parent Bereichsleiter, so an SK lead can neither unseat a
+co-lead nor remove themselves; once the parent Bereichsleiter has cleared the seat, the row is a
+plain member's that another lead or an admin may remove.
 
 **What the view shows.** `GET /api/v1/leadership` lists the units the caller **leads and those
 below them**, independent of what they may change: a squadron rank or `SK_LEAD` shows its own unit,
@@ -214,13 +230,13 @@ back to „Mitglied". (Since 2026-09-27; before that a unit was listed only when
 held, an OL member saw no Staffel or SK, and the rank dropdown showed „Mitglied" for any rank the
 caller could not assign.)
 
-The frontend Leitung page (`/organisation/leitung`) and its write proxies are role-gated to
-`ADMIN` / `OFFICER` only (`Roles.ADMIN_OR_OFFICER`). Every functional leader carries the operative
-`OFFICER` grant (see the "Operational OFFICER grant" section of
-[`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md)), so the coarse page gate never denies
-a delegated leader; `LOGISTICIAN` / `MISSION_MANAGER` are deliberately **not** accepted, so a
-capability-only holder with no appointment reach (empty view) cannot open the surface. The per-unit
-appointment authority remains the delegated verdict above, re-checked on every backend write.
+The frontend Leitung page (`/organisation/leitung`) and every one of its write proxies gate on
+`OfficerSurfaceGate.canOpenLeitung()`: an admin, or a caller with officer reach from a leadership
+seat in the active context — `KRT Member` is required and a pin narrows the reach (REQ-SEC-047).
+`LOGISTICIAN` / `MISSION_MANAGER` alone do not open it, so a capability-only holder with no
+appointment reach cannot open the surface, and a leader pinned to a unit where they hold no officer
+reach loses the page until they switch. The per-unit appointment authority remains the delegated
+verdict above, re-checked together with the active context on every backend write.
 
 **The page is a master-detail.** On the left a unit tree grouped „Organisationsleitung · Bereiche ·
 Staffeln · Spezialkommandos", each unit with its Bereich colour square and member count, and a
@@ -236,15 +252,18 @@ or deleting a group sits in the row's „⋯" menu behind a confirmation.
 
 In the page's **Spezialkommandos** section the two flags mean different people: `canAppointLead`
 is the Bereichsleiter rung above, `canManageRoster` is
-`SpecialCommandSecurityService.canManageMembers` — admin, or the SK's own `SK_LEAD`, REQ-ORG-005.
-The SK's roster renders **in place** in the selected unit (the `organisation/unit-detail ::
-skRoster` fragment the SK member page `/organisation/special-commands/{id}` uses as well): name,
-the Logistiker / Einsatzleiter flags as toggles and the lead as a read-only flag. With
-`canManageRoster` the caller adds members, toggles the flags and removes members there; the lead
-toggle is offered in the row menu only with `canAppointLead`. So an SK lead manages their own SK
-here without being able to touch its lead seat. (Since 2026-09-22 an SK lead sees their SK; until
-2026-10-03 `canManageRoster` rendered a „Mitglieder verwalten" link to the SK member page instead
-of the roster.)
+`SpecialCommandSecurityService.canManageMembers` — admin, or the SK's own `SK_LEAD` with `KRT
+Member`, REQ-ORG-005. The SK's roster renders **in place** in the selected unit (the
+`organisation/unit-detail :: skRoster` fragment the SK member page
+`/organisation/special-commands/{id}` uses as well, behind `OfficerSurfaceGate.hasOfficerReach()`):
+name, the Logistiker / Einsatzleiter flags as toggles and the lead as a read-only flag. With
+`canManageRoster` the caller adds members, toggles the flags and removes members there — a
+non-admin neither on their own row nor on a lead's row, which render read-only: the set flags as
+chips, no toggle and no „Entfernen". The lead toggle is offered in the row menu only with
+`canAppointLead`. So an SK lead manages their own SK here without being able to touch any lead
+seat, their own included. (Since 2026-09-22 an SK lead sees their SK; until 2026-10-03
+`canManageRoster` rendered a „Mitglieder verwalten" link to the SK member page instead of the
+roster.)
 
 Amended 2026-10-03 (website overhaul phase 3): the Leitung page became the master-detail above,
 rank and group selects save on change, and the SK roster moved onto the page; the „Mitglieder
@@ -258,8 +277,14 @@ and `SpecialCommandMembersPageControllerMvcTest`.
 - [x] A delegated write targeting the caller's own seat is denied; an admin may write their own.
 - [x] The Leitung view shows a Staffelleiter only their Staffel, a Bereichsleiter their Bereich with
   its Staffeln and SKs, an OL member every unit; the caller's own seat renders read-only.
+- [x] A verdict passes only while the caller holds `KRT Member`: a retained seat without it
+  appoints nobody and manages no Kommandogruppe and no SK roster.
+- [x] Every delegated write, the SK read and the SK roster act only in the active context: a pin on
+  another unit refuses them, an admin's included, and a pin on the target unit admits them.
+- [x] A non-admin SK lead neither changes the flags of nor removes their own row or a lead's row,
+  and the roster renders both read-only; an admin writes every row.
 
-**Enforced by:** `OrgRoleManagementSecurityServiceTest`, `DelegatedAppointmentControllerSecurityTest`, `LeitungViewServiceTest`, `LeitungPageControllerMvcTest`, `ArchitectureTest` (`delegatedRoleAuthoriserMustNotConsultOwnerScope`) · **Code:** `OrgRoleManagementSecurityService`, `LeitungViewService`, `SquadronRoleController`, `KommandoGroupController`, `OrgHierarchyController` (Bereich gates), `SpecialCommandMembershipController` (SK-lead gate) · **Decision:** ADR-0042 · **Issues:** #800
+**Enforced by:** `OrgRoleManagementSecurityServiceTest`, `SpecialCommandSecurityServiceTest`, `DelegatedAppointmentControllerSecurityTest`, `SpecialCommandRosterGateIntegrationTest`, `LeitungViewServiceTest`, `LeitungPageControllerMvcTest`, `SpecialCommandMembersPageControllerMvcTest`, `AuthHelperServiceTest`, `ArchitectureTest` (`delegatedRoleAuthoriserMustNotConsultOwnerScope`) · **Code:** `OrgRoleManagementSecurityService`, `SpecialCommandSecurityService`, `LeitungViewService`, `AuthHelperService#holdsKrtMember`, `SquadronRoleController`, `KommandoGroupController`, `OrgHierarchyController` (Bereich gates), `SpecialCommandMembershipController` (SK-lead and roster gates), `SpecialCommandController` (SK read), `organisation/unit-detail :: skRoster` · **Decision:** ADR-0042 · **Issues:** #800
 
 ### REQ-ROLE-005 — Bereichsleiter auto-OL membership is organisational only
 
@@ -316,10 +341,10 @@ comes only from leadership seats (REQ-ROLE-002).
 
 **Officer surfaces read only the caller's reach.** The Leitung page lists and edits only the units
 where the caller holds officer reach: a seat in Staffel A with plain membership of Staffel B shows
-A's members and never B's. A pin narrows this to the pinned unit when it is within reach, widened by the units the
-caller's seat on it reaches through the cascade (a Bereich or OL pin covers the units below it), and
-to nothing when it is not within reach (the page is then hidden); unpinned, the units of reach are
-the union. Admins are not restricted beyond their pin.
+A's members and never B's. A pin narrows this to exactly the pinned unit when it is within reach —
+a Bereich or OL pin is that unit alone, the units below it need „Alle meine Org-Einheiten" — and to
+nothing when it is not within reach (the page is then hidden); unpinned, the units of reach are the
+union (REQ-ORG-032). An admin sees every unit unpinned and only the pinned unit pinned.
 
 A rank that differs from the stored one records `MEMBER_RANK_CHANGED` in the Rollen & Mitglieder
 audit area, with only the old and new rank in its details (REQ-AUDIT-001); an unchanged or refused

@@ -64,6 +64,8 @@ requires it and duplicating it into further files spreads personal data for no g
   `navigation_dashboard_layout`,
   `navigation_dashboard_widget` (the member's own dashboard: widget types, columns and option
   choices, no free text),
+  `member_active_org_unit` (the member's last chosen active org unit, or none for all of their
+  units; exported, erased with the account, REQ-ORG-031),
   `material_exchange_*`, `material_claim`,
   `announcement`.
 - **Transient only:** while a member has a mission open, the frontend shares their handle and the

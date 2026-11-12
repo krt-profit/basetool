@@ -9,7 +9,7 @@
 
 ## Akteur
 
-`test-admin` (ADMIN, IRIDIUM-Mitglied) — bearbeitet über die Rollenhierarchie jeden Einsatz. Die Live-Sync-Tests öffnen denselben Einsatz in **zwei Browser-Kontexten** desselben Nutzers: zwei getrennte WebSocket-Sitzungen sind genau das, was der Relay auffächert; ein echter zweiter Nutzer träfe denselben Handler-Zweig.
+`test-admin` (ADMIN, IRIDIUM-Mitglied) — bearbeitet ohne gewählte Einheit jeden Einsatz (mit gewählter Einheit nur deren Einsätze, REQ-ORG-032). Die Live-Sync-Tests öffnen denselben Einsatz in **zwei Browser-Kontexten** desselben Nutzers: zwei getrennte WebSocket-Sitzungen sind genau das, was der Relay auffächert; ein echter zweiter Nutzer träfe denselben Handler-Zweig.
 
 ## Vorbedingungen
 

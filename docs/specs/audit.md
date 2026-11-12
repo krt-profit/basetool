@@ -442,7 +442,8 @@ in `AdminAuditLogPageController.EVENT_TYPES_BY_DOMAIN` and the `admin.audit.even
 (`admin.bank.audit.event.<TYPE>` for the bank trail's `BankAuditEventType`) in all three message
 bundles are the two mirror points, and `AdminAuditLogPageControllerTest` pins them
 by reading the `AuditEventDto.eventType` enum out of the committed `openapi.json` and asserting that
-**every** produced type is offered by one of the tabs *and* carries a label.
+**every** produced type is offered by one of the tabs *and* carries a label, and that every type a
+non-bank tab offers is still produced, so a removed type leaves the filter in the same change.
 
 **Enforced by:** `AuditServiceTest`, `AuditQueryIntegrationTest`, `AuditAdminControllerSecurityTest`,
 `RoleServiceTest`, `AdminAuditLogPageControllerTest`,
@@ -472,10 +473,13 @@ The new Lager types join the viewer's per-area event-type list and the DE/EN lab
 counted by `basetool_audit_events_total{domain}` (REQ-OBS-011).
 
 **Deliberately not audited:** navigation preferences (favourites, hidden entries, order, tab-bar
-slots, display mode) and the home dashboard (widgets, options, start page), including their resets.
-They are an account's own presentation choices, owner-only and read by nobody else (ADR-0298); a
-trail of them would record personal habits without serving any oversight. They are counted, not
-audited (`basetool_navigation_preference_writes_total`, REQ-OBS-011).
+slots, display mode) and the home dashboard (widgets, options, start page), including their resets,
+and a member's stored choice of the active org unit (REQ-ORG-031, ADR-0373). They are an account's
+own presentation choices, owner-only and read by nobody else (ADR-0298); a trail of them would
+record personal habits, such as who looked at which unit when, without serving any oversight. The
+active org unit only narrows what its member sees and may do, and every act in it is audited in its
+own area. They are counted, not audited (`basetool_navigation_preference_writes_total`,
+`basetool_active_org_unit_choice_writes_total`, REQ-OBS-011).
 
 **Enforced by:** `StockLevelIntegrationTest`, `OfficerCutMigrationTest`,
 `SonderkontoBucketRetirementMigrationTest`, `AdminAuditLogPageControllerTest`
