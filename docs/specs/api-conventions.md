@@ -484,6 +484,13 @@ contract tests then compared against a stale contract. Two parts close it:
 
 ### REQ-API-018 — Every operation names its domain; every schema name one type
 
+> [!note] Amended 2026-11-12 (ADR-0274) — the domain list follows `ApiDomains`
+> The list below named `livesync`, gone with the live-sync bridge, and lacked `navigation`,
+> `purchasing` and `supply`; it now names the 22 domains `ApiDomains` holds. The reviewed entries
+> are the ten `ApiDomainsMatchTheDomainMapTest` keeps, `purchasing` and `supply` get the
+> operation-count floor every domain has, and the operation and controller counts that change with
+> every endpoint leave the text; git keeps the text.
+
 > [!note] Amended 2026-10-17 (ADR-0269, #2673) — the contract tier is gone
 > The requirement also gave every operation a contract tier (`x-contract-tier`, from
 > `contract-tiers.txt`, held by `ExternalContractTest`). The tiers sorted the surface by what a
@@ -498,22 +505,23 @@ own.
 - **One tag per domain.** `OpenApiDomainConfig.domainTagCustomizer` (an `OperationCustomizer`)
   replaces every operation's tags with exactly one, its controller's domain, and mirrors it as
   `x-domain`; the document's `tags` list holds those domains and nothing else, and springdoc's
-  class-name tags are off (`springdoc.auto-tag-classes: false`). The domains are the 20 of the REST
-  API cut's *Today's surface* that still exist (`admin-system`, `audit`, `bank`, `blueprint`, `catalogue`,
-  `dashboard`, `exchange`, `hangar`, `identity`, `inventory`, `joborder`, `leadership`, `livesync`,
-  `materialexchange`, `mission`, `notification`, `operation`, `orgunit`,
-  `personalinventory`, `refinery`). The controller-to-domain table is explicit in main
+  class-name tags are off (`springdoc.auto-tag-classes: false`). The domains are 22 (`admin-system`,
+  `audit`, `bank`, `blueprint`, `catalogue`, `dashboard`, `exchange`, `hangar`, `identity`,
+  `inventory`, `joborder`, `leadership`, `materialexchange`, `mission`, `navigation`,
+  `notification`, `operation`, `orgunit`, `personalinventory`, `purchasing`, `refinery`,
+  `supply`). The controller-to-domain table is explicit in main
   code, `platform/internal/ApiDomains`: the backend domain map of plan guard G-09
   (`backend/src/test/resources/architecture/domain-map.txt`, REQ-MOD-001) lives in test scope, where
-  the running application cannot read it, and these 21 domains are not the map's 28 modules.
+  the running application cannot read it, and these 22 domains are not the map's 28 modules.
   `ApiDomainsMatchTheDomainMapTest` therefore holds the table to the map: a controller's tag is its
-  module, or the API domain one of four reviewed entries names — the `privacy` module's endpoints
-  are tagged `identity`, the `admin` module's `admin-system`, and `LeitungController`
-  and `BlueprintController` keep the domain the REST cut gives them —, and
+  module, or the API domain a reviewed entry names — two module renames (the `privacy` module's
+  endpoints are tagged `identity`, the `admin` module's `admin-system`) and eight controllers the
+  REST cut serves under another domain than their module (`BlueprintController` under `blueprint`,
+  seven under `identity`) —, and
   an entry no controller needs fails. One published document stays — the frontend generates its
   test types from it; per-domain views are filtered from it. The exchange
   relay surface alone is fenced into its own internal document (REQ-XCH-039), so the `exchange`
-  domain's 31 relay operations are counted there and its 21 member and admin operations here.
+  domain's 31 relay operations are counted there and its member and admin operations here.
 - **Unique schema names.** Every name under `components.schemas` belongs to exactly one exposed Java
   type or an explicit `@Schema(name = …)`. `ExposedTypes` walks every main-source controller's
   handlers — return types, `@RequestBody` / `@RequestPart` parameters, generic arguments, record
@@ -532,13 +540,14 @@ own.
 
 **Acceptance**
 
-- [x] Every operation carries exactly one tag, equal to `x-domain`, from the 21 domains; the tag list
+- [x] Every operation carries exactly one tag, equal to `x-domain`, from the 22 domains; the tag list
   is the domains — asserted by the generator before it writes and on the committed document
   (`OpenApiDocumentAssertionsTest`).
-- [x] Each domain's operation count has a floor at today's count (575 operations: 559 in
-  `openapi.json`, the 31 relay operations in the relay document, REQ-XCH-039).
+- [x] Each domain's operation count has a floor, the count when the floor was last raised
+  (`OpenApiDocumentAssertions.DOMAIN_FLOOR`); the relay document holds exactly its 31 operations
+  (REQ-XCH-039).
 - [x] No two exposed types share a schema name; the scan reaches at least 441 names, and the domain
-  table names exactly the 99 controllers (`OpenApiSchemaNamesTest`).
+  table names exactly the controllers the scan finds (`OpenApiSchemaNamesTest`).
 - [x] Each guard proven able to fail: a planted document with every fault, planted fixture
   controllers with two `Op` records, and the real ship op without its explicit name.
 
