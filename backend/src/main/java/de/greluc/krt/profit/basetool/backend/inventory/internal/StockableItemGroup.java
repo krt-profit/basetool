@@ -74,6 +74,9 @@ enum StockableItemGroup {
   /** Self-storage containers such as the Stor*All boxes. */
   STORAGE_CONTAINERS(Set.of("InventoryContainer"), Set.of()),
 
+  /** Comp-boards, server blades, passcode disks, keycards, access cards and data drives. */
+  ACCESS_CHIPS(Set.of("RemovableChip"), Set.of()),
+
   /**
    * Loot and collectibles such as artifacts, medals, ingots and creature parts; mineable gems are
    * materials and food is used up.

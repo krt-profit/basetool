@@ -67,6 +67,7 @@ class InventoryBookableItemsTest {
     item("Remote Turret", "Turret", "GunTurret");
     item("Artifact", "Misc", "UNDEFINED");
     item("Medal", "Misc", null);
+    item("Comp-Board", "RemovableChip", "SystemAccess");
     item("Gem", "Misc", "Mineable");
     item("MedPen", "FPS_Consumable", "Medical");
     item("Shirt", "Char_Clothing_Torso_0", "UNDEFINED");
@@ -84,6 +85,7 @@ class InventoryBookableItemsTest {
             name("Shield"),
             name("Artifact"),
             name("Medal"),
+            name("Comp-Board"),
             name("Untyped Crafted"));
   }
 
