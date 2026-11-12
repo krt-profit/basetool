@@ -31,6 +31,9 @@ of linked stock across an order's buckets that every reader uses.
 > promises preserves their history instead of deleting it. This adds neither a currency model to
 > ITEM/MATERIAL nor a new quality catalogue.
 
+> [!note] Amended 2026-11-12 (ADR-0269) — `ExternalContractTest` is gone
+> The test went with the app and leaves the enforcer list.
+
 Quality tiers MUST live in the table `quality_tier` (`code`, `min_quality`, `label_de`,
 `label_en`, `sort_order`, `active`), not in code. Material lines (`job_order_material`),
 item-order material requirements (`job_order_item_material`) and material claims
@@ -73,8 +76,8 @@ item-order material requirements (`job_order_item_material`) and material claims
   no template or script compares against `GOOD` / `NONE`.
 
 **Enforced by:** `QualityTierServiceTest`, `V261QualityTierMigrationTest`,
-`MaterialClaimServiceTest`, `JobOrderServiceTest`, `JobOrderItemServiceTest`,
-`ExternalContractTest` · **Code:** `QualityTier`, `QualityTierService`, `QualityTierController`,
+`MaterialClaimServiceTest`, `JobOrderServiceTest`, `JobOrderItemServiceTest` · **Code:**
+`QualityTier`, `QualityTierService`, `QualityTierController`,
 `AdminQualityTierController`, V261–V264, `joborder/fragments/quality-tier.html`, `QualityTierCatalog`
 
 ### REQ-ORDERS-037 — Linked stock counts toward exactly one quality bucket

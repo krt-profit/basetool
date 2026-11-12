@@ -73,8 +73,8 @@ class JwkSetUriNamespaceTest {
   }
 
   /**
-   * The dev profile keeps the split-horizon escape hatch the Android emulator stack needs (its
-   * tokens carry an issuer the backend cannot resolve), on the blank-tolerant namespace.
+   * The dev profile keeps the split-horizon escape hatch (keys fetched from another host than the
+   * token's issuer, REQ-SEC-024) on the blank-tolerant namespace.
    *
    * @throws IOException if the configuration file cannot be read.
    */

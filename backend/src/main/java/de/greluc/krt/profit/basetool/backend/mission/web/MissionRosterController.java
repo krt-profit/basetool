@@ -82,8 +82,8 @@ public class MissionRosterController {
   /**
    * Enrols the caller as a participant of the mission.
    *
-   * <p>The optional body carries the desired Funktion and payout preference; a bodyless request
-   * behaves as before (REQ-API-009).
+   * <p>The optional body carries the desired Funktion and payout preference; without it the caller
+   * asks for no Funktion and gets the profile-default payout chain (ADR-0170, REQ-MISSION-002).
    *
    * @param jwt caller's JWT
    * @param id mission id

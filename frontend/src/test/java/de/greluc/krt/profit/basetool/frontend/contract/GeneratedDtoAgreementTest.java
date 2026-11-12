@@ -40,8 +40,9 @@ import org.springframework.core.type.filter.AssignableTypeFilter;
  * Compares the property names of the hand-written {@link DtoMirror} types with the types generated
  * from {@code openapi.json} (ADR-0161).
  *
- * <p>Only names are compared; types and nullability are covered by {@code ExternalContractTest}
- * (REQ-API-009). Existing drift is listed in {@link #KNOWN_DRIFT}.
+ * <p>Only names are compared; {@code FrontendDtoContractTest} adds the enum types, and nothing
+ * compares the other types or the nullability with the document. Existing drift is listed in {@link
+ * #KNOWN_DRIFT}.
  */
 class GeneratedDtoAgreementTest {
 

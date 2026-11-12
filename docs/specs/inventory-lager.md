@@ -377,6 +377,10 @@ There is no "keep home unit" placeholder: the picker always carries a concrete p
 
 ### REQ-INV-025 — Book-out validates the CheckoutType; a target-less TRANSFER is rejected
 
+> [!note] Amended 2026-11-12 (ADR-0269) — `ExternalContractTest` is gone
+> The exchange paragraph also said `ExternalContractTest` does not pin `CheckoutType`; the test went
+> with the app, and the clause with it.
+
 Book-out (`POST /api/v1/inventory/{id}/book-out`) resolves the `CheckoutType` before mutating the
 row. An **absent** `type` is inferred — `TRANSFER` when the request carries a target user or
 location, otherwise `DISCARD`. An **explicit** `type = TRANSFER` is *not* re-inferred, so a
@@ -396,8 +400,7 @@ audit event, consistent with the audit contract that only committed state mutati
 
 An exchange book-out (REQ-XCH-016) is this book-out with `CheckoutType.DISCARD`
 (`InventoryCheckoutService#bookOutForClient`), row by row; the Materialbörse offers it lowers or
-removes are audited with the reason `stock`. `CheckoutType` is not part of the exchange contract,
-and `ExternalContractTest` does not pin it.
+removes are audited with the reason `stock`. `CheckoutType` is not part of the exchange contract.
 
 **Acceptance**
 
@@ -1400,6 +1403,10 @@ themselves are not yet pinned by a test · **Code:**
 
 ### REQ-INV-052 — A member can change the org unit of their own personal row afterwards
 
+> [!note] Amended 2026-11-12 (ADR-0268, ADR-0269) — two enforcers are gone
+> `ExternalContractTest` went with the app and `ApiVhostAnonymousSurfaceTest` with the API vhost,
+> so both leave the enforcer list.
+
 A member can set the owning org unit of one of their **own personal** rows to one of their direct
 memberships of any of the four kinds, or to **„Keine Einheit"**, after the booking — per row
 (`POST /api/v1/inventory/{id}/org-unit`, optimistic `version`) and for a selection from the bulk bar
@@ -1435,12 +1442,16 @@ and a `TRANSFER` may not change it alone (REQ-INV-025).
 
 **Enforced by:** `InventoryOrgUnitChangeServiceTest`, `InventoryItemControllerTest`,
 `InventoryOrgUnitChangeAjaxControllerTest`, `InventoryPageControllerMvcTest`,
-`InventoryOperationsE2eTest.changingAPersonalRowsOrgUnitWorksBothWaysInPlace`,
-`ExternalContractTest`, `ApiVhostAnonymousSurfaceTest` · **Code:** `InventoryOrgUnitChangeService`,
+`InventoryOperationsE2eTest.changingAPersonalRowsOrgUnitWorksBothWaysInPlace` · **Code:**
+`InventoryOrgUnitChangeService`,
 `InventoryItemController`, `InventoryOrgUnitChangeProxyController`, `inventory-my.js` · **Issues:** #2107
 (epic #2078).
 
 ### REQ-INV-053 — Stock can be marked „gestohlen", and the marker is part of its identity
+
+> [!note] Amended 2026-11-12 (ADR-0268, ADR-0269) — two enforcers are gone
+> `ExternalContractTest` went with the app and `ApiVhostAnonymousSurfaceTest` with the API vhost,
+> so both leave the enforcer list.
 
 Stolen cargo cannot be sold at ordinary terminals, so it is a property of a stack, not a note. Every
 Lager row — shared or personal, material or game item — carries a **„gestohlen" marker**
@@ -1501,8 +1512,7 @@ Lager row — shared or personal, material or game item — carries a **„gesto
 **Enforced by:** `InventoryStolenMarkServiceTest`, `InventoryStolenStockDataTest`,
 `InventoryStackKeyCoverageTest`, `InventoryItemServiceTest`, `InventoryItemServicePersonalRebookTest`,
 `MaterialExchangeRepositoryDataTest`, `JobOrderInventoryOwnerRedactorTest`, `MeControllerTest`,
-`InventoryItemControllerTest`, `ExternalContractTest`, `ApiVhostAnonymousSurfaceTest`,
-`InventoryStolenMarkAjaxControllerTest`, `InventoryStolenMarkerRenderTest`,
+`InventoryItemControllerTest`, `InventoryStolenMarkAjaxControllerTest`, `InventoryStolenMarkerRenderTest`,
 `MaterialboersePageControllerMvcTest`, `CapabilityFlagsAdviceTest`,
 `InventoryOperationsE2eTest.markingPartOfARowAsStolenSplitsItIntoItsOwnStackInPlace` · **Code:**
 `InventoryStolenMarkService`, `InventoryItemRepository`, `InventoryAggregationService`,

@@ -48,9 +48,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /**
  * Holds wave 4 of the REST API cut (the org-unit bank prefix) to the running application: the
- * controller serves exactly the new paths of the map, no handler answers the old prefix any more,
- * the new paths demand authentication, and the old ones answer {@code 404} (frozen operations) or
- * {@code 404} (the five that were never frozen).
+ * controller serves exactly the new paths of the map, no handler answers the old prefix, the new
+ * paths demand authentication, and every old path answers {@code 404}.
  */
 @SpringBootTest
 class OrgUnitBankPathCutTest {

@@ -358,10 +358,10 @@ class ProblemCodeRegistryTest {
     assertThat(problem.path("properties").propertyNames())
         .contains("code", "correlationId", "fieldErrors", "errors", "type", "title", "status");
     assertThat(problem.path("required").isMissingNode() || !hasCodeRequired(problem))
-        .as("code must stay optional: a required code would be frozen by the contract guards")
+        .as("code stays optional (REQ-API-019)")
         .isTrue();
     assertThat(problem.path("properties").path("code").has("enum"))
-        .as("code is a documented list, never an enum (theContractRequiredEnumsAreFrozen)")
+        .as("code is a documented list, never an enum (REQ-API-019)")
         .isFalse();
   }
 
