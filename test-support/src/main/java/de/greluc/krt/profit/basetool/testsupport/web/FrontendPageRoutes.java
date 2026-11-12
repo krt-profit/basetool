@@ -170,6 +170,7 @@ public final class FrontendPageRoutes {
           "/materialboerse/request-materials",
           "/materials/overview/data",
           "/members/api/search",
+          "/missions/template-choices",
           "/notifications/page-items",
           "/notifications/recent",
           "/notifications/unread-count",
