@@ -67,8 +67,8 @@ is a list, and the list is the requirement:
 | **Frontend** | `/` (the landing page — name, one paragraph, the two login entries, the legal links, the Fan Kit band; **no data, no session**), `/impressum`, `/privacy`, `/terms`, `/licenses`, `/error(/**)`, the asset trees, `/favicon.ico`, `/robots.txt`, `/sm/**`, `/**/*.map`, `/manifest.webmanifest`, `/actuator/health(/**)`, and Spring Security's own login/logout endpoints |
 | **Backend**  | `GET /api/v1/terms/document`, `/internal/**` (machine-to-machine behind a shared-secret header), `/actuator/health(/**)`, `/error`                                                                                                                                                                                                                          |
 
-Everything else requires authentication **and** a method gate. Both backend reads are `GET`-scoped,
-so a `HEAD` on either answers `401`.
+Everything else requires authentication **and** a method gate. The backend's terms read is
+`GET`-scoped, so a `HEAD` on it answers `401`.
 
 **And there is nothing below member.** An approved account whose assembled authority set is empty —
 no stored application role and no Logistician / Mission-Manager / leadership flag on any
@@ -376,7 +376,7 @@ Columns: **Member** = KRT Member ·
 
 Every table here starts at **Member**, because that is where the tool starts: an account below one
 is refused with `403 NO_ROLE` before a handler runs (REQ-SEC-053), and nobody without an account
-gets past the four public paths of §1. The tables carried an `Anonymous` column until 2026-09-06.
+gets past the public surface of §1. The tables carried an `Anonymous` column until 2026-09-06.
 
 > Logistician/Mission-Manager are **add-on flags** on a Member: they inherit
 > all Member rights and add their flag-specific capability, **scoped to
@@ -1285,8 +1285,8 @@ analogously to `ADMIN > OFFICER > LOGISTICIAN/MISSION_MANAGER`:
    authorisation annotation and every read and write endpoint declares one
    (`everyRestControllerShouldDeclareAtLeastOneAuthorisationAnnotation`,
    `readEndpointsMustDeclareAnAuthorisationAnnotation`,
-   `writeEndpointsMustDeclareAnAuthorisationAnnotation`); `permitAll()` appears only on the four
-   public endpoints (`permitAllIsDeclaredOnlyOnTheFourPublicEndpoints`); Staffel-scoped services
+   `writeEndpointsMustDeclareAnAuthorisationAnnotation`); `permitAll()` appears only on the three
+   public endpoints (`permitAllIsDeclaredOnlyOnThePublicEndpoints`); Staffel-scoped services
    must inject a scope-kernel service / `AuthHelperService` and their writes gate on it; peer-readable
    mission endpoints must redact PII; the bank never consults org-unit scope outside the one seam;
    controllers never return JPA entities. A new violation breaks the build (`./gradlew test`).
