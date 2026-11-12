@@ -640,7 +640,7 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Deletes every non-personal inventory item in the caller's scope (the admin "globales Lager
+   * Deletes every non-personal inventory item in the caller's scope (the admin "Einheitslager
    * leeren" action). Personal rows are kept.
    *
    * <p>The rows are locked first, so no Materialbörse offer can be released on or withdrawn from

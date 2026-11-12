@@ -53,7 +53,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * The Lager pages that pool several units carry the „Alle meine Org-Einheiten" notice while the
- * member's context spans their units (REQ-ORG-024): the Lager overview and the global Lager show
+ * member's context spans their units (REQ-ORG-024): the Lager overview and the „Einheitslager" show
  * it, a selected unit removes it, and „Mein Lager" never shows it because it does not follow the
  * selection.
  */

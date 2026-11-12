@@ -40,12 +40,12 @@ that is the output of a listed active blueprint, **and** every listed game item 
 | Ship components and weapons | every `ShipComponentType` except `Turret`, plus `GroundVehicleMissileLauncher` | — |
 | Mining and salvage modules | `MiningModifier`, `Gadget`, `SalvageModifier` | — |
 | Storage containers | `InventoryContainer` | — |
+| Access chips: comp-boards, server blades, passcode disks, keycards, data drives | `RemovableChip` | — |
 | Loot and collectibles | `Misc` | `Mineable` (materials), `Consumable` (food) |
 
 Everything else — clothing, paints, decoration, turrets, consumables (medical pens, hacking tools,
-food, drink, keycards, scrip), cargo, a ship's fixed parts and items without a known type — is
-bookable only as the output of a blueprint, so everything a job order produces stays bookable by
-hand. The item-order picker (`orderable=true`) is unchanged: outputs of an active blueprint with a
+food, drink, scrip), cargo, a ship's fixed parts and items without a known type — is bookable only
+as the output of a blueprint, so everything a job order produces stays bookable by hand. The item-order picker (`orderable=true`) is unchanged: outputs of an active blueprint with a
 resolved RESOURCE ingredient. The create path does not re-check the picker's rule, but it refuses
 an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 
@@ -62,9 +62,10 @@ an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 - [ ] Item rows merge on write (PIECE rule); the merge FOR-UPDATE group query matches
   NULL material/quality + the gameItem key (no silent no-op).
 - [x] The picker offers a Scourge Railgun (`WeaponPersonal/Large`, no blueprint), a scope, a
-  helmet, a shield, an artifact and a crafted magazine; it offers no grenade, uncrafted magazine,
-  mineable gem, medical pen, shirt, paint, turret, untyped row without a blueprint, retired or
-  hidden item, and no output of a retired recipe whose type is not stocked.
+  helmet, a shield, an artifact, a comp-board (`RemovableChip/SystemAccess`) and a crafted
+  magazine; it offers no grenade, uncrafted magazine, mineable gem, medical pen, shirt, paint,
+  turret, untyped row without a blueprint, retired or hidden item, and no output of a retired
+  recipe whose type is not stocked.
 - [x] Every `ShipComponentType` but the turret is a stocked type.
 
 **Enforced by:** `InventoryItemServiceTest` / `InventoryStockMergeTest` item cases,
@@ -192,7 +193,7 @@ member's ledger, another Staffel's and a private pool included.
 
 ### REQ-INV-061 — Component type, size and grade beside an item's name
 
-In **Mein Lager**, the **Globales Lager** and the aggregated Lager items table (`/inventory`,
+In **Mein Lager**, the **Einheitslager** and the aggregated Lager items table (`/inventory`,
 `view=items`), a ship component shows its component type and its size and grade next to its name,
 e.g. `FR-66 [SCHILD] [S1 · A]`.
 
@@ -210,7 +211,7 @@ e.g. `FR-66 [SCHILD] [S1 · A]`.
 - `InventoryGameItemReferenceDto` carries `componentType`, `size` and `grade`, set only for a
   component. They are columns of the `game_item` row the read already loads, so the read path adds
   no query per row.
-- The Mein Lager and Globales Lager item group rows render from one shared fragment
+- The Mein Lager and Einheitslager item group rows render from one shared fragment
   (`inventory/fragments/inventory-item-group :: itemGroupRow`), and all three surfaces render the
   chips from `kernel/fragments/item-chips :: itemChips`, which the job orders reuse (REQ-ORDERS-045).
 - Up to tablet width (≤ 1024 px), where the tree takes its content width, the chips move to a
@@ -220,7 +221,7 @@ e.g. `FR-66 [SCHILD] [S1 · A]`.
 **Acceptance**
 
 - [x] A shield with size 1 and grade A shows a "Schild" chip and an `S1 · A` chip in Mein Lager,
-  the Globales Lager and the aggregated items table.
+  the Einheitslager and the aggregated items table.
 - [x] A paint or flair item shows neither chip and keeps its category chip.
 - [x] A component without size and grade shows no data chip.
 - [x] Every `ShipComponentType` has a label in all three bundles.
@@ -248,7 +249,7 @@ after its size/grade chip, e.g. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`.
 
 **Acceptance**
 
-- [x] A military shield shows a "Militär" chip after `S1 · A` in Mein Lager, the Globales Lager and
+- [x] A military shield shows a "Militär" chip after `S1 · A` in Mein Lager, the Einheitslager and
   the aggregated items table.
 - [x] A component whose class has no label, and every paint or flair item, shows no class chip.
 - [x] Every `ShipComponentClass` has a label in all three bundles.
@@ -261,7 +262,7 @@ after its size/grade chip, e.g. `FR-66 [SCHILD] [S1 · A] [MILITÄR]`.
 
 ### REQ-INV-063 — The Lager items view filters by category, component type, size, grade and class
 
-In the items view of Mein Lager and the Globales Lager, the filter popover (REQ-INV-037) offers five
+In the items view of Mein Lager and the Einheitslager, the filter popover (REQ-INV-037) offers five
 more multi-selects beside item, location, Auftrag and „Gestohlen": **Kategorie** (`GameItemKind`),
 **Komponententyp** (`ShipComponentType`), **Größe**, **Grad** and **Klasse**
 (`ShipComponentClass`, REQ-INV-062). A member can ask for "only S2 quantum drives, grade A or B" or

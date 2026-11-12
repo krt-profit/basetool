@@ -1115,7 +1115,7 @@ The mechanics follow the established idiom (REQ-ORDERS-027, REQ-UI-016):
 Covered surfaces (beyond the pre-existing REQ-ORDERS-027 orders queue, REQ-UI-016 price matrix,
 bank request-queue/dashboard/org-layout modules and the grouping toggles): Materialbörse (view +
 scope, and per view min quality, min amount, sort and „Ohne gestohlene"; key
-`materialboerse_filters`), Mein Lager + Globales Lager (all multi-selects, min quality,
+`materialboerse_filters`), Mein Lager + Einheitslager (all multi-selects, min quality,
 „Gestohlen", the „Alle · Persönlich · Gemeinsam" segment stored as the two personal flags, per
 view), Raffinerie (the segment „Läuft · Abholbereit · Abgeschlossen · Alle" + only-mine, key
 `refinery_orders_filter`; a stored status list of the former checkboxes maps onto a segment),
@@ -1699,7 +1699,7 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
 - **The quick access** (`Strg`/`⌘` + `K` from anywhere, inputs included; the header trigger; the
   phone's search button) is a dialog of the one dialog shape (REQ-UI-013, `#nav-palette`). Its pages
   are the menu's links, the legal links, and sub-pages the menu reaches only as tabs: „Mein Lager",
-  „Globales Lager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and
+  „Einheitslager", „Hangar der Org-Einheit", for administrators the two sync-report tabs, and
   „Eingehende Spenden" and „Spenden-Statistik" (REQ-SUP) and „Ankauf-Partner",
   „Handelsbeauftragte" and „Ankauf-Bericht" (REQ-PUR) for exactly the members who may open them.
   Those five tabs are registry entries (`supply.incoming`, `supply.stats`, `purchasing.partners`,
@@ -1725,7 +1725,7 @@ built pixel-exact from the design hand-off „Navigation neu" (Turn 2: 2a deskto
   Empty, it offers up to four recently visited pages (`localStorage`
   `krt.recent`, recorded on every page it offers by its exact path, otherwise by the current menu
   link, and when a page is opened from it) and the actions: „Neuen Auftrag anlegen", „Neue Mission
-  anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins globale Lager
+  anlegen", „Neuen Raffinerieauftrag anlegen", „In mein Lager einbuchen", „Ins Einheitslager
   einbuchen" (logisticians only), „Org-Einheit wechseln" (only with a switcher), „Administration
   öffnen" (administrators only; opens the drawer in administration mode), „Handbuch öffnen" (the
   wiki, in a new tab), the switch to the other language, and „Abmelden". With text it lists up to
@@ -1835,7 +1835,7 @@ its former sibling pages become tabs of it.
   see 9 links, bank staff 10.
 - The tab names are i18n labels; „Lager · Mindestbestände" is „Storage · Minimum levels" in English
   (REQ-INV-068).
-- **The storage page has exactly these two tabs.** „Mein Lager" and „Globales Lager" are neither
+- **The storage page has exactly these two tabs.** „Mein Lager" and „Einheitslager" are neither
   tabs nor pages of their own: they become a switch inside the „Lager" tab (a `.krt-segmented`
   control, REQ-UI-028), each option shown under the same role condition as today's page. Their
   quick-access entries open the „Lager" tab with that option selected and keep their own stable
@@ -2122,8 +2122,8 @@ server-side paging, progress bars and a row action „Einlagern" on ready rows; 
 one numbered form (Raffinerie · Zeit · Materialien · Finanzen · Besitzer) with a side card holding
 the status steps „Läuft → Abholbereit → Eingelagert", the profit with its calculation and the
 primary action „Ausbeute einlagern", and saving as an outline button in the sticky bar
-(REQ-REFINERY-019). Mein Lager and Globales Lager: page head with „Einbuchen" (and, for an admin on
-the shared Lager, „Globales Lager leeren" in the overflow menu), the filters in the transient
+(REQ-REFINERY-019). Mein Lager and Einheitslager: page head with „Einbuchen" (and, for an admin on
+the shared Lager, „Einheitslager leeren" in the overflow menu), the filters in the transient
 popover with chips, the segment „Alle · Persönlich · Gemeinsam" on Mein Lager, and the bulk actions
 in a sticky selection bar that appears only while something is marked; the tree stays. The material
 and item drill-downs are data tables with a count chip in the head. Handel: the price matrix as a
@@ -2348,7 +2348,7 @@ A user may adapt the default of REQ-UI-026 on top of it; nothing here changes th
 
 **Entry keys.** Every page and every tab of a tabbed page — the personal pages included — has a
 stable entry key (e.g. `missions.list`, `orders.demand`) from the frontend entry registry and in
-its key format (REQ-UI-026, „One entry registry"), never a URL path. So do the two storage views „Mein Lager" and „Globales Lager": entries that open
+its key format (REQ-UI-026, „One entry registry"), never a URL path. So do the two storage views „Mein Lager" and „Einheitslager": entries that open
 the „Lager" tab with that switch selected (REQ-UI-026), keyed and handled like a tab. The backend
 checks the key's format only. A renamed page keeps its key or gets an explicit key remap; an
 unknown key from a new release (entry or group) is placed after its default predecessor, with no
