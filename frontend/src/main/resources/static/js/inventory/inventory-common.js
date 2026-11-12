@@ -306,16 +306,27 @@ function createLager(cfg) {
     }
 
     /**
-     * Shows or hides the row that follows a tree toggle row and flips its arrow.
+     * Shows or hides the row that follows a tree toggle row through its `hidden` attribute and
+     * flips the toggle's arrow.
      *
      * @param {Element} row the toggle row
      * @param {Element} nextRow the row it expands
      * @param {boolean} open whether to show it
      */
     function setExpanded(row, nextRow, open) {
-        /** @type {HTMLElement} */ (nextRow).style.display = open ? 'block' : 'none';
+        nextRow.toggleAttribute('hidden', !open);
         const icon = row.querySelector('.toggle-icon');
         if (icon) icon.textContent = open ? '▼' : '▶';
+    }
+
+    /**
+     * Whether the row that follows a tree toggle row is shown.
+     *
+     * @param {Element} nextRow the row the toggle expands
+     * @returns {boolean} `true` when it carries no `hidden` attribute
+     */
+    function isExpanded(nextRow) {
+        return !nextRow.hasAttribute('hidden');
     }
 
     /** Re-applies the persisted group expansion to the freshly rendered tree. */
@@ -372,7 +383,7 @@ function createLager(cfg) {
         if (!nextRow || !nextRow.classList.contains('tree-group-items')) return;
         const key = groupStorageKey();
         const expandedRows = readExpanded(key);
-        if (window.getComputedStyle(nextRow).display === 'none') {
+        if (!isExpanded(nextRow)) {
             setExpanded(row, nextRow, true);
             if (groupKey && !expandedRows.includes(groupKey)) {
                 expandedRows.push(groupKey);
@@ -401,7 +412,7 @@ function createLager(cfg) {
         const key = stackStorageKey();
         const expandedStacks = readExpanded(key);
         const id = stackKey(row);
-        if (window.getComputedStyle(nextRow).display === 'none') {
+        if (!isExpanded(nextRow)) {
             setExpanded(row, nextRow, true);
             if (id && !expandedStacks.includes(id)) {
                 expandedStacks.push(id);

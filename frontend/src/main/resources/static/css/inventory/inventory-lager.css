@@ -72,9 +72,29 @@
         border: 0;
     }
 
-    .tree-group-items,
-    .tree-stack-entries {
-        display: none;
+    /* The list panel's frame is the tree's bottom edge: the last visible row draws no hairline. */
+    .list-panel
+        > .lager-tree-card:nth-last-child(1 of :not([hidden]))
+        .tree-table
+        > .tree-group:last-child
+        > .tree-row--group:has(+ .tree-group-items[hidden]),
+    .list-panel
+        > .lager-tree-card:nth-last-child(1 of :not([hidden]))
+        .tree-table
+        > .tree-group:last-child
+        > .tree-group-items:not([hidden])
+        > :last-child
+        > .stack-header:has(+ .tree-stack-entries[hidden]),
+    .list-panel
+        > .lager-tree-card:nth-last-child(1 of :not([hidden]))
+        .tree-table
+        > .tree-group:last-child
+        > .tree-group-items:not([hidden])
+        > :last-child
+        > .tree-stack-entries:not([hidden])
+        > .stack-entries-content
+        > .tree-note:last-child {
+        border-bottom: 0;
     }
 
     .tree-row--group,

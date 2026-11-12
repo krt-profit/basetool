@@ -268,7 +268,7 @@
                         <div class="tree-cell"></div>
                     </div>
 
-                    <div class="tree-group-items">
+                    <div class="tree-group-items" hidden>
                         <div th:each="stack : ${group.stacks}">
                             <div class="tree-row tree-row--mid stack-header" data-trigger="inv-admin-toggle-stack"
                                  data-stack-loaded="false"
@@ -300,7 +300,7 @@
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries">
+                            <div class="tree-stack-entries" hidden>
                                 <div class="stack-entries-content">
                                 </div>
                             </div>
@@ -327,7 +327,7 @@
                         contextText=#{inventory.tree.groupContext(${group.userCount()}, ${#lists.size(group.stacks)})},
                         selectTrigger=null)}"></div>
 
-                    <div class="tree-group-items">
+                    <div class="tree-group-items" hidden>
                         <div th:each="stack : ${group.stacks}">
                             <div class="tree-row tree-row--mid stack-header" data-trigger="inv-admin-toggle-stack"
                                  data-stack-loaded="false"
@@ -354,7 +354,7 @@
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries">
+                            <div class="tree-stack-entries" hidden>
                                 <div class="stack-entries-content">
                                 </div>
                             </div>

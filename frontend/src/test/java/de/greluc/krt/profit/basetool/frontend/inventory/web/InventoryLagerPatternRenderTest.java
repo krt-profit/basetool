@@ -371,6 +371,37 @@ class InventoryLagerPatternRenderTest {
   }
 
   /**
+   * Both Lager trees, in both views, render every group's items and every stack's entries collapsed
+   * through the {@code hidden} attribute and never through an inline display (REQ-INV-002).
+   */
+  @Test
+  @WithMockUser(roles = "LOGISTICIAN")
+  void lagerTreesRenderEveryContainerCollapsedThroughHidden() throws Exception {
+    List<String> trees =
+        List.of(
+            main(
+                render(
+                    "/inventory?storage=my", "/inventory/my-inventory/grouped", materialGroups())),
+            main(
+                render(
+                    "/inventory?storage=my&view=items",
+                    "/inventory/my-inventory/grouped",
+                    itemGroups())),
+            main(render("/inventory?storage=all", "/inventory/all/grouped", materialGroups())),
+            main(
+                render(
+                    "/inventory?storage=all&view=items", "/inventory/all/grouped", itemGroups())));
+
+    for (String tree : trees) {
+      assertThat(tree)
+          .containsPattern("class=\"tree-group-items\"\\s+hidden")
+          .containsPattern("class=\"tree-stack-entries\"\\s+hidden")
+          .doesNotContainPattern("class=\"tree-(group-items|stack-entries)\"(?!\\s+hidden)")
+          .doesNotContain("style=\"display");
+    }
+  }
+
+  /**
    * Three item groups: a size-1 grade-A military shield, a paint carrying a meaningless grade, and
    * a cooler without size and grade whose class has no label.
    *

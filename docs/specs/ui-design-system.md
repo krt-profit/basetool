@@ -317,7 +317,8 @@ triangles), thin technical markers framing content
 frameless one in a list panel only to the panel corners it sits in, and every corner inside a flush
 card reads `--flush-corner-top` / `--flush-corner-bottom`) · `MasterDetailPaneCornerTest` (the
 panes of the Materialbörse and the blueprint collection take no radius and no fill, and the list
-pane fills its row and reads the corner properties); the rest by design review.
+pane fills its row and reads the corner properties) · `LagerTreeLastRowE2eTest` (the Lager tree's
+last visible row draws no bottom rule in any collapse state); the rest by design review.
 
 ### REQ-UI-008 — No native browser dialogs
 

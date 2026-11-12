@@ -129,6 +129,12 @@ does not re-fire `DOMContentLoaded`, so the expansion is restored explicitly aft
 restored stack re-fetches its (now up-to-date) entries. A modal mutation therefore never collapses
 the tree the user was working in.
 
+A collapsed level is its container's `hidden` attribute: `.tree-group-items` and
+`.tree-stack-entries` render with `hidden`, and expanding removes it. The state lives in the markup,
+so the stylesheet knows which row is the last visible one and drops its bottom rule on the list
+panel's frame (REQ-UI-007): a collapsed last group row, the closed last stack header, or the note
+of the last entry.
+
 **Acceptance**
 
 - [ ] Rows sharing the stock identity appear as one stack row with the correct summed amount,
@@ -141,14 +147,19 @@ the tree the user was working in.
 - [ ] After an in-place grouped-table re-swap (filter change or modal write), the material groups
   and location stacks the user had expanded stay expanded and a restored stack re-loads its
   entries; a modal mutation never collapses the tree.
+- [ ] Both trees render every group's items and stack's entries with `hidden` and no inline
+  display; whichever row ends the tree, it draws no bottom rule while every visible row above it
+  keeps one.
 
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
-`InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`, `InventoryOperationsE2eTest`
+`InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`,
+`InventoryLagerPatternRenderTest`, `LagerTreeLastRowE2eTest`, `InventoryOperationsE2eTest`
 · **Code:** `InventoryAggregationService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
 `InventoryStackDto`, `GroupedInventoryDto`, `inventory/inventory-my.html`, `inventory/inventory-admin.html`,
 `static/js/inventory/inventory-common.js` (tree expand/collapse persistence, shared by `inventory-my.js` and
-`inventory-admin.js` since FE-SIMP-03) · **Issues:** #466
+`inventory-admin.js` since FE-SIMP-03), `static/css/inventory/inventory-lager.css` (the last visible
+row) · **Issues:** #466
 
 ### REQ-INV-044 — Actions operate per entry
 
