@@ -5400,6 +5400,18 @@
           }
         }
       },
+      "ExchangePatchChangeRefDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        }
+      },
       "ExchangeQuantityDto" : {
         "type" : "object",
         "properties" : {
@@ -5619,6 +5631,9 @@
       "ExchangeRefineryOrderDto" : {
         "type" : "object",
         "properties" : {
+          "canceledByPatch" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeRefDto"
+          },
           "clientKey" : {
             "type" : "string"
           },
@@ -5722,6 +5737,9 @@
           },
           "installationId" : {
             "type" : "string"
+          },
+          "patchChange" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeRefDto"
           }
         }
       },

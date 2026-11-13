@@ -64,6 +64,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -338,7 +339,8 @@ class InventoryCheckoutServiceBulkRebookTest {
             source.getQuality(),
             false,
             false,
-            null))
+            null,
+            Instant.EPOCH))
         .thenReturn(List.of(target));
 
     checkoutService.bulkRebook(

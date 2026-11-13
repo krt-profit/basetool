@@ -3,6 +3,18 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-13
+
+- **New: the `patch` change source.** When an admin records a Star Citizen patch change, the
+  changes its trigger makes reach the feeds from the new channel `patch`. A tombstone's `removedBy`
+  then carries `patchChange: {id, label}`; the `id` names every entry one patch change caused
+  ([sync guide](sync-guide.md#tombstones-and-never-re-adding)). New in
+  `tombstone.schema.json`: the channel value `patch` and the optional `removedBy.patchChange`.
+- **New: `canceledByPatch` on refinery orders.** A running order the patch change ended arrives
+  with the status `CANCELED` and `canceledByPatch: {id, label}`
+  ([orders a patch ended](resources/refinery-orders.md#orders-a-patch-ended)). New in
+  `refinery-order.schema.json`: the optional `canceledByPatch`.
+
 ## 2026-11-09
 
 - **New: refinery orders.** A client reads and writes the member's own refinery work orders and

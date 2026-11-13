@@ -53,6 +53,7 @@ public final class ApiDomains {
           Map.entry("AdminP4kImportController", "catalogue"),
           Map.entry("AdminP4kImportReportController", "catalogue"),
           Map.entry("AdminP4kReviewWorkspaceController", "catalogue"),
+          Map.entry("AdminPatchChangeController", "patchchange"),
           Map.entry("AdminStarmapController", "catalogue"),
           Map.entry("AdminShopController", "catalogue"),
           Map.entry("AdminPersonSearchController", "identity"),

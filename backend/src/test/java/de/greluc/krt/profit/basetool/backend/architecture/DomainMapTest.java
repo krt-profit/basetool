@@ -40,7 +40,7 @@ class DomainMapTest {
 
   private static final int MAPPER_FLOOR = 44;
 
-  private static final int MODULE_COUNT = 28;
+  private static final int MODULE_COUNT = 29;
 
   @Test
   void everyBackendClassIsAssignedToExactlyOneModule() {

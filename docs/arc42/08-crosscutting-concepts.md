@@ -645,3 +645,15 @@ rules; [data persistence](../specs/data-persistence.md), [audit](../specs/audit.
 [observability](../specs/observability.md) own their respective contracts. Retained credited-subset
 history is not evidence of a complete original provision or its actual quality. The shared
 read gate and Inventory write gate stay independent; no money/Bank workflow is implied.
+
+## 8.16 The live time of a patch change
+
+A patch change's effects touch only what was created or started before its live time; anything
+later is a post-patch fact and stays
+([ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)). The creation time
+of a stock row is that criterion, so no write may blur it: from the latest live time on, the
+write-time merge skips every older row (REQ-PATCH-004), and the Lager learns the cutoff through the
+SPI `inventory.api.StockMergeCutoff` the `patchchange` module implements. The trigger itself is one
+transaction that takes the history's advisory lock first and lets each effect lock its own rows in
+id order ([ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md)).
+The contract lives in [`patch-change.md`](../specs/patch-change.md).

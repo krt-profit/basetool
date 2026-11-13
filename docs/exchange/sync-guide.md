@@ -70,9 +70,13 @@ elsewhere — drop it locally.
 
 ## Tombstones and never re-adding
 
-A tombstone's `removedBy` names who removed the entry: `{channel, clientId?, installationId?}`, with
-`channel` one of `web`, `app`, `client` and `system`, and for `client` the client's id and its
-installation's `installationId`; a channel you do not know counts as a removal elsewhere
+A tombstone's `removedBy` names who removed the entry:
+`{channel, clientId?, installationId?, patchChange?}`, with `channel` one of `web`, `app`, `client`,
+`system` and `patch`, for `client` the client's id and its installation's `installationId`, and for
+`patch` the `patchChange` `{id, label}` whose trigger removed the entry: a Star Citizen patch change
+an admin recorded for everyone. It touches only what was created or started before the patch went
+live, and its `id` names every entry it changed, so you can take it over in one step. A channel you
+do not know counts as a removal elsewhere
 ([reading tolerantly](versioning.md#reading-tolerantly)). When `installationId` is your own, it is
 your own removal. Any other tombstone means the member removed the entry elsewhere: remove it locally
 and **do not add it back**. The server refuses such an add per op with `REMOVED_ELSEWHERE` while the

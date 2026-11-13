@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -114,7 +115,8 @@ class InventoryMergeProbeTest {
         null,
         new InventoryProperties(enabled),
         new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-            orderWrites));
+            orderWrites),
+        () -> Instant.EPOCH);
   }
 
   @Test
@@ -126,7 +128,7 @@ class InventoryMergeProbeTest {
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
         .thenReturn(unit);
     when(inventoryItemRepository.countMergeCandidates(
-            CALLER, MATERIAL, LOCATION, 500, false, false, unitId))
+            CALLER, MATERIAL, LOCATION, 500, false, false, unitId, Instant.EPOCH))
         .thenReturn(2L);
 
     assertTrue(
@@ -139,7 +141,7 @@ class InventoryMergeProbeTest {
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
         .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
-            CALLER, MATERIAL, LOCATION, 500, true, false, null))
+            CALLER, MATERIAL, LOCATION, 500, true, false, null, Instant.EPOCH))
         .thenReturn(0L);
 
     assertFalse(
@@ -155,7 +157,8 @@ class InventoryMergeProbeTest {
     assertFalse(
         service.hasMergeCandidates(null, CALLER, MATERIAL, LOCATION, 500, false, false, null));
     verify(inventoryItemRepository, never())
-        .countMergeCandidates(any(), any(), any(), anyInt(), anyBoolean(), anyBoolean(), any());
+        .countMergeCandidates(
+            any(), any(), any(), anyInt(), anyBoolean(), anyBoolean(), any(), any());
   }
 
   @Test
@@ -192,7 +195,7 @@ class InventoryMergeProbeTest {
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(target, null))
         .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
-            other, MATERIAL, LOCATION, 500, false, false, null))
+            other, MATERIAL, LOCATION, 500, false, false, null, Instant.EPOCH))
         .thenReturn(1L);
 
     assertTrue(
@@ -223,7 +226,7 @@ class InventoryMergeProbeTest {
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
         .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
-            CALLER, MATERIAL, LOCATION, 500, false, true, null))
+            CALLER, MATERIAL, LOCATION, 500, false, true, null, Instant.EPOCH))
         .thenReturn(1L);
 
     assertTrue(

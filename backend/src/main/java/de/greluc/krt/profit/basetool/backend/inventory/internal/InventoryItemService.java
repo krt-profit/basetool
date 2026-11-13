@@ -42,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockMergeCutoff;
 import de.greluc.krt.profit.basetool.backend.kernel.AppException;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
@@ -105,6 +106,9 @@ public class InventoryItemService {
   private final InventoryCheckoutService inventoryCheckoutService;
   private final InventoryProperties inventoryProperties;
   private final InventoryProvisionRecorder provisionRecorder;
+
+  /** From when on rows take part in the write-time merge (REQ-PATCH-004). */
+  private final StockMergeCutoff mergeCutoff;
 
   /**
    * Aggregated per-material inventory view — used by the squadron-wide inventory page.
@@ -508,7 +512,7 @@ public class InventoryItemService {
   /**
    * Probes whether an Einbuchen with the given material stock identity would find a row to merge
    * with (REQ-INV-026), resolving owner and owning org unit exactly as {@link #createInventoryItem}
-   * does.
+   * does; a row created before the merge cutoff never counts (REQ-PATCH-004).
    *
    * <p>Runs without a surrounding transaction so a refused org-unit resolution answers {@code
    * false} instead of marking a shared transaction rollback-only.
@@ -563,7 +567,8 @@ public class InventoryItemService {
             quality,
             personal,
             stolen,
-            owningOrgUnit != null ? owningOrgUnit.getId() : null)
+            owningOrgUnit != null ? owningOrgUnit.getId() : null,
+            mergeCutoff.cutoff())
         > 0;
   }
 

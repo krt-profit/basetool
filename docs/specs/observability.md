@@ -2100,6 +2100,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - The `CATALOGUE` audit domain (ADR-0346) is excluded from `AuditDomainSilenceAnomaly` as well;
   its admin mutations are rare, and a sync outage is reported by the sync monitoring instead
   (`audit_domain_silence_alerts_13_silent_catalogue_is_exempt_test.yml`).
+- The `PATCH_CHANGE` audit domain ([REQ-PATCH-009](patch-change.md#req-patch-009--the-audit-area-patchwechsel))
+  is excluded from `AuditDomainSilenceAnomaly` too: patch changes come a few times a year
+  (`audit_domain_silence_alerts_14_silent_patch_change_is_exempt_test.yml`). The existing
+  `basetool_audit_events_total{domain}` counts the domain without a new metric.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most

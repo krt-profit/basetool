@@ -1206,6 +1206,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `supply` | 3 | `supply_donation`, `supply_need`, `supply_unit_setting` |
 | `purchasing` | 11 | `purchasing_deal`, `purchasing_deal_delivery`, `purchasing_deal_settlement`, `purchasing_deal_tranche`, `purchasing_delegate`, `purchasing_partner`, `purchasing_risk_class`, `purchasing_setting`, `purchasing_setting_allowed_tier`, `purchasing_setting_governing_area`, `purchasing_unit_pause` |
 | `exchange` | 12 | `exchange_bulk_undo_run`, `exchange_bulk_undo_skip`, `exchange_change`, `exchange_client`, `exchange_client_capability`, `exchange_client_revocation`, `exchange_feed_horizon`, `exchange_installation`, `exchange_journal`, `exchange_refinery_order_link`, `exchange_settings`, `exchange_ship_link` |
+| `patchchange` | 3 | `patch_change`, `patch_change_effect_count`, `patch_change_wipe_group` |
 
 The listed crossings:
 
@@ -1240,7 +1241,7 @@ The listed crossings:
 ### REQ-DATA-021 — every column that references a member has a disposition in each GDPR registry
 
 A column **references a member** when it carries a foreign key to `app_user`, or when it is a `uuid`
-named `user_id`, `owner_id`, `*_user_id`, `*_by`, `*_by_id` or `*_sub` (57 columns today, three of
+named `user_id`, `owner_id`, `*_user_id`, `*_by`, `*_by_id` or `*_sub` (58 columns today, seven of
 them without a foreign key). Each such column has a disposition in all three registries, or is
 listed with its reason:
 
@@ -1252,9 +1253,11 @@ listed with its reason:
   after every import run; `p4k_import_run.created_by`, the applying admin's id on a run, which
   is never pruned, REQ-P4K-005; `p4k_review_case.resolved_by`, the admin who resolved a review
   case, never pruned, REQ-P4K-016, and `p4k_review_case.ship_repair_by`, the administrator who
-  queued a pending identity repair, moved to `resolved_by` when the import applies it, REQ-P4K-049).
+  queued a pending identity repair, moved to `resolved_by` when the import applies it, REQ-P4K-049;
+  and `patch_change.triggered_by`, the admin who triggered a patch change, never pruned,
+  REQ-PATCH-001).
 - **Export** (REQ-SEC-058, the `PersonalDataExportSection` participants of the modules): a
-  section selects the member's rows by it, or it is listed as not exported. Today 44 columns are exported and 15 are not, each of which names the
+  section selects the member's rows by it, or it is listed as not exported. Today 44 columns are exported and 16 are not, each of which names the
   member as the actor on somebody else's or the organisation's record, or mirrors an exported
   column. The eight columns that held data about the member without a section
   (`bank_account_approval_limit.grantee_user_id`, `bank_account_grant.user_id`,
@@ -1265,7 +1268,7 @@ listed with its reason:
   column that holds data about the member.
 - **Merge** (REQ-SEC-046, `UserAccountMergeService`): it follows the member or stays with the act,
   as the union of the modules' `UserReassignmentParticipant` declarations; only
-  `p4k_import_job.created_by`, `p4k_import_run.created_by` and `p4k_review_case.resolved_by` are listed as not merged. `UserAccountMergeCoverageTest` holds the
+  `p4k_import_job.created_by`, `p4k_import_run.created_by`, `p4k_review_case.resolved_by` and `patch_change.triggered_by` are listed as not merged. `UserAccountMergeCoverageTest` holds the
   foreign-key columns as before; this requirement adds the ones without a key.
 
 **Acceptance**

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
 > **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0101, ADR-0104,
 > ADR-0120, ADR-0124, ADR-0302
 
@@ -497,6 +497,13 @@ offer. The offered quantity is therefore never increased by a merge. The locking
 offer-backed rows it sees, and the merge asks again once the group is locked, since a release locks
 its row (ADR-0362) and an offer released while the merge waited is not seen by the locking read.
 
+**No mixing across a patch change** ([REQ-PATCH-004](patch-change.md#req-patch-004--no-mixing-a-row-from-before-the-live-time-never-merges),
+[ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)). A row created
+before the latest patch change's live time takes no part in the merge: it is never a survivor that
+absorbs another row and never folded into one, and the Einbuchen probe does not count it. The write
+lands its own row instead, so a pre-patch row holds only pre-patch stock and a patch change's
+effects can select it by its creation time. Before the first patch change every row takes part.
+
 **Concurrency.** The merge group is loaded `FOR UPDATE` (pessimistic write lock) so two racing
 same-stack writers serialise instead of double-counting or losing stock — this re-introduces, **only
 on the merge path**, the lost-update lock the append-only model (ADR-0003) had removed. The merge is
@@ -528,10 +535,13 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
   offer-backed rows untouched.
 - [ ] Each fold records one `INVENTORY_ITEM_MERGED` audit event; the unified viewer's Lager filter
   lists it.
+- [x] A row created before the latest patch change's live time is neither survivor nor folded, and
+  the probe does not count it (REQ-PATCH-004).
 
 **Enforced by:** `InventoryStockMergeTest`, `InventoryItemServiceTest`,
 `InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest`,
-`InventoryMergeProbeTest`, `InventoryMergeGroupDataTest`, `InventoryPageControllerMvcTest` ·
+`InventoryMergeProbeTest`, `InventoryMergeGroupDataTest`, `InventoryMergeCutoffTest`,
+`InventoryPageControllerMvcTest` ·
 **Code:** `InventoryCheckoutService#mergeStockIfRequested`,
 `InventoryItemRepository#findMergeGroupForUpdate`, `InventoryItemService#hasMergeCandidates`,
 `InventoryItemRepository#countMergeCandidates`,

@@ -113,7 +113,13 @@ public enum LiveSyncTopicClass {
    * Global admin dashboard room: the backend pokes the section of the widget whose state changed;
    * only administrators may listen (REQ-UI-034).
    */
-  ADMIN_DASHBOARD("admin-dashboard", false, "admin_dashboard");
+  ADMIN_DASHBOARD("admin-dashboard", false, "admin_dashboard"),
+
+  /**
+   * Global admin room of the patch-change page: the backend pokes {@code history} after a trigger
+   * or a label correction; only administrators may listen (REQ-PATCH-008).
+   */
+  PATCH_CHANGE("patch-change", false, "patch_change");
 
   private static final Set<String> INVENTORY_ALL_SECTIONS = Set.of("stock", "stock-levels");
   private static final Set<String> SHIPS_SECTIONS = Set.of("ships");
@@ -193,6 +199,7 @@ public enum LiveSyncTopicClass {
       case BANK_STAFF -> Set.of("requestQueue");
       case ORGUNIT_BANK -> Set.of("orgUnitBank");
       case ADMIN_DASHBOARD -> ADMIN_DASHBOARD_SECTIONS;
+      case PATCH_CHANGE -> Set.of("history");
     };
   }
 

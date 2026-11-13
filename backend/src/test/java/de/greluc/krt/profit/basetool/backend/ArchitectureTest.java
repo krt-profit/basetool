@@ -440,6 +440,7 @@ class ArchitectureTest {
           AuthoritiesCacheProperties.class,
           ChangeSource.class,
           ChangeSourceProperties.class,
+          de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeWrites.class,
           ClientAttribution.class,
           ClientDirectory.class,
           ConnectedAppsProperties.class,
@@ -1366,7 +1367,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 134);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 135);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);

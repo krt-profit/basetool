@@ -179,6 +179,7 @@ public class AuditReportService {
       case SUPPLY -> AuditEventType.SUPPLY_AUDIT_EXPORTED;
       case PURCHASING -> AuditEventType.PURCHASING_AUDIT_EXPORTED;
       case CATALOGUE -> AuditEventType.CATALOGUE_AUDIT_EXPORTED;
+      case PATCH_CHANGE -> AuditEventType.PATCH_CHANGE_AUDIT_EXPORTED;
     };
   }
 

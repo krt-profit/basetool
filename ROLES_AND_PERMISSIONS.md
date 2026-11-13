@@ -564,6 +564,7 @@ linked specifications.
 | Correct recorded material provision quantity, attribution or original quality (current contribution authority; current Inventory rights and row versions for physical changes) | ❌ | ✅³ | ❌ | ✅³ | ✅ |
 | **Delete** job order (`hasRole('ADMIN')`)                                                                                                                                                                                                                                                                                                                                |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
 | Wipe the whole Lager (`DELETE /api/v1/inventory/all`, `hasRole('ADMIN')`)                                                                                                                                                                                                                                                                                                |   ❌    |  ❌   |  ❌  |    ❌    |   ✅   |
+| Record a **patch change** for every org unit, preview it, read its history and correct its label (`/api/v1/patch-changes/admin/**`, `hasRole('ADMIN')`, also when pinned to one unit; REQ-PATCH-001); its effects reach every member's data, the running refinery orders started before the live time included | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ¹ Only via the own object / the owner-scope check — not in general. The **owner** of a
 personal aggregate (inventory entry `inventory_item.user`, ship `ship.owner`, refinery order

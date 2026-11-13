@@ -50,6 +50,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.support.InventoryCheckoutFixtures;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -146,7 +147,8 @@ class InventoryItemServiceVersionFlushTest {
             realCheckoutService,
             new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false),
             new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-                orderWrites));
+                orderWrites),
+            () -> Instant.EPOCH);
   }
 
   private User userWithId(UUID id) {

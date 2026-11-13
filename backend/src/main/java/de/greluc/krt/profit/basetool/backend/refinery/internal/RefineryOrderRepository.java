@@ -186,6 +186,35 @@ public interface RefineryOrderRepository extends JpaRepository<RefineryOrder, UU
   List<UUID> findExistingIds(@Param("ids") Collection<UUID> ids);
 
   /**
+   * Counts the orders in the given statuses that started before an instant, an order without a
+   * start counting from its creation (REQ-PATCH-006).
+   *
+   * @param statuses the statuses to count
+   * @param liveAt the instant, exclusive
+   * @return the number of such orders of every member
+   */
+  @Query(
+      "SELECT COUNT(r) FROM RefineryOrder r WHERE r.status IN :statuses"
+          + " AND COALESCE(r.startedAt, r.createdAt) < :liveAt")
+  long countStartedBefore(
+      @Param("statuses") Collection<RefineryOrderStatus> statuses, @Param("liveAt") Instant liveAt);
+
+  /**
+   * Row-locks the orders in the given statuses that started before an instant, in ascending id
+   * order, an order without a start counting from its creation (REQ-PATCH-006).
+   *
+   * @param statuses the statuses to lock
+   * @param liveAt the instant, exclusive
+   * @return the orders of every member, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      "SELECT r FROM RefineryOrder r WHERE r.status IN :statuses"
+          + " AND COALESCE(r.startedAt, r.createdAt) < :liveAt ORDER BY r.id")
+  List<RefineryOrder> lockStartedBeforeOrderById(
+      @Param("statuses") Collection<RefineryOrderStatus> statuses, @Param("liveAt") Instant liveAt);
+
+  /**
    * Finds the creation timestamp of the oldest refinery order in the given status, for the "oldest
    * open refinery order age" gauge (REQ-OBS-011).
    *

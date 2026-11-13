@@ -139,6 +139,9 @@ p4k_import_change catalogue
 p4k_import_run catalogue
 p4k_import_run_kind catalogue
 p4k_review_case catalogue
+patch_change patchchange
+patch_change_effect_count patchchange
+patch_change_wipe_group patchchange
 personal_blueprint blueprint
 personal_inventory_item personalinventory
 planet catalogue

@@ -24,9 +24,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository.Ex
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeLocationDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeTombstoneDto;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeLabels;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryExchangeReader;
 import java.util.ArrayList;
@@ -62,6 +64,7 @@ public class ExchangeRefineryOrderFeedService {
   private final LocationRepository locationRepository;
   private final KnownExchangeClients knownClients;
   private final ExchangeRefineryOrderLinkRepository linkRepository;
+  private final PatchChangeLabels patchChangeLabels;
 
   /**
    * Returns one page of the member's refinery orders.
@@ -150,7 +153,8 @@ public class ExchangeRefineryOrderFeedService {
 
   /**
    * Reads what the page names by id: its orders' locations' starmap GUIDs, their creating clients'
-   * display names and the caller's own keys of every delivered key, one query each.
+   * display names, the labels of the patch changes that cancelled them and the caller's own keys of
+   * every delivered key, one query each.
    *
    * @param caller the caller, whose client alone sees its keys
    * @param keys every order the page delivers, a removed one included
@@ -169,8 +173,25 @@ public class ExchangeRefineryOrderFeedService {
     return new References(
         guids(orders),
         clientNames(orders),
+        patchLabels(orders),
         keysByOrder(links.stream().filter(link -> link.getRetiredAt() == null).toList()),
         keysByOrder(links));
+  }
+
+  /**
+   * Reads the labels of the patch changes that cancelled the given orders in one query.
+   *
+   * @param orders the orders
+   * @return the label by patch change id
+   */
+  private @NotNull Map<UUID, String> patchLabels(
+      @NotNull Collection<RefineryExchangeOrder> orders) {
+    Set<UUID> patchChanges =
+        orders.stream()
+            .map(RefineryExchangeOrder::canceledByPatchChange)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return patchChanges.isEmpty() ? Map.of() : patchChangeLabels.labels(patchChanges);
   }
 
   /**
@@ -244,6 +265,7 @@ public class ExchangeRefineryOrderFeedService {
                 ExchangeStockFeedService.cut(refs.clientNames().getOrDefault(creator, creator))),
         new ExchangeRefineryOrderDto.Versions(order.gameDataVersion(), order.financesVersion()),
         order.status().name(),
+        ExchangePatchChangeRefDto.of(order.canceledByPatchChange(), refs.patchLabels()),
         new ExchangeLocationDto(
             ExchangeStockFeedService.cut(place.name()),
             ExchangeCatalogService.uex(place.uexCityId(), place.uexSpaceStationId()),
@@ -292,6 +314,7 @@ public class ExchangeRefineryOrderFeedService {
    *
    * @param guids the starmap GUID by location id
    * @param clientNames the display name by client id
+   * @param patchLabels the label by id of a patch change that cancelled an order
    * @param clientKeys the caller's own key by id of an order it still names
    * @param removedKeys the caller's own key by id of every order, for a tombstone; a key a later
    *     create took over still names the removed order
@@ -299,6 +322,7 @@ public class ExchangeRefineryOrderFeedService {
   private record References(
       @NotNull Map<UUID, UUID> guids,
       @NotNull Map<String, String> clientNames,
+      @NotNull Map<UUID, String> patchLabels,
       @NotNull Map<String, String> clientKeys,
       @NotNull Map<String, String> removedKeys) {}
 }

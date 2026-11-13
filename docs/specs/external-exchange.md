@@ -891,8 +891,10 @@ served by the gateway with WP 3.2 (#2082); ship-type order of ADR-0341 built (#3
 feed is sequenced at the database level, so writes that bypass the services — default-grant
 provisioning, „delete all", admin purge, user deletion, org re-stamping, owner reassignment and a
 change of the default blueprint set — appear in it. Removals leave tombstones with `removedBy`
-(`web`, `app`, `client` with client id and installation id, `system`) and `removedAt`, kept 90 days
-and purged nightly. A cursor older than the tombstones answers `410 CURSOR_EXPIRED`.
+(`web`, `app`, `client` with client id and installation id, `system`, and `patch` with the patch
+change `{id, label}`, [REQ-PATCH-007](patch-change.md#req-patch-007--the-exchange-feeds-name-the-patch-change-behind-a-change))
+and `removedAt`, kept 90 days and purged nightly. A cursor older than the tombstones answers
+`410 CURSOR_EXPIRED`.
 
 The sequence is `exchange_change` (ADR-0224): an `AFTER` row trigger on every synced table records
 `(member, resource, key)` with its writing transaction's id and a sequence number, and the feed reads
@@ -900,7 +902,9 @@ each changed key's current state, or a tombstone when it is gone. A feed positio
 seq)`, and a reader passes only transactions below the oldest one still running, so an entry committed
 late can never land behind a position a client has already passed. Who wrote it comes from the transaction variable
 `basetool.change_source`, which the backend's transaction manager sets at the start of every writing
-transaction (`web`, `app`, `client|<id>|<installation key>`, otherwise `system`). A nightly job
+transaction (`web`, `app`, `client|<id>|<installation key>`, `patch|<patch change id>` for a patch
+change's trigger, otherwise `system`); a `patch` entry keeps the patch change in
+`exchange_change.source_patch_change` (`V421`), and the feed reads its current label. A nightly job
 (`exchange_change_retention`, 03:30 UTC) purges entries older than 90 days and records the highest
 purged position as the horizon, below which a cursor has expired.
 
@@ -3372,7 +3376,9 @@ REQ-XCH-013.
   org unit as an id, the client marker (the creating client's name, or none for an order the web
   created) and the two section counters `gameData` and `finances` (REQ-REFINERY-029).
   `clientKey` is carried only to the client that created the order; every other client sees the
-  marker without it.
+  marker without it. An order a patch change cancelled carries `canceledByPatch` `{id, label}`
+  ([REQ-PATCH-006](patch-change.md#req-patch-006--the-refinery-effect-ends-the-running-orders-started-before-the-live-time),
+  REQ-PATCH-007).
 - **Tombstones**: on a hard delete (REQ-XCH-055) and when the order moves to another owner (user
   deletion, `REFINERY_ORDERS_REASSIGNED`), with the usual `removedBy` and `removedAt`, and the
   `clientKey` for the creating client. A cancel is a status change, not a tombstone. A change of the

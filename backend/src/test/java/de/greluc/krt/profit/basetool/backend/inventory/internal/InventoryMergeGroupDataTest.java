@@ -110,7 +110,14 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, false, null);
+            user.getId(),
+            material.getId(),
+            location.getId(),
+            QUALITY,
+            false,
+            false,
+            null,
+            Instant.EPOCH);
 
     assertThat(group)
         .extracting(InventoryItem::getId)
@@ -125,7 +132,14 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> nullGroup =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, false, null);
+            user.getId(),
+            material.getId(),
+            location.getId(),
+            QUALITY,
+            false,
+            false,
+            null,
+            Instant.EPOCH);
     assertThat(nullGroup).extracting(InventoryItem::getId).containsExactly(nullOrgRow.getId());
 
     List<InventoryItem> orgGroup =
@@ -136,7 +150,8 @@ class InventoryMergeGroupDataTest {
             QUALITY,
             false,
             false,
-            orgUnit.getId());
+            orgUnit.getId(),
+            Instant.EPOCH);
     assertThat(orgGroup).extracting(InventoryItem::getId).containsExactly(orgStampedRow.getId());
   }
 
@@ -149,7 +164,14 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, false, null);
+            user.getId(),
+            material.getId(),
+            location.getId(),
+            QUALITY,
+            false,
+            false,
+            null,
+            Instant.EPOCH);
 
     assertThat(group).extracting(InventoryItem::getId).containsExactly(match.getId());
   }
@@ -172,7 +194,14 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, false, null);
+            user.getId(),
+            material.getId(),
+            location.getId(),
+            QUALITY,
+            false,
+            false,
+            null,
+            Instant.EPOCH);
 
     assertThat(group).extracting(InventoryItem::getId).containsExactly(plain.getId());
   }
@@ -189,7 +218,15 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), null, drive.getId(), location.getId(), null, false, false, null);
+            user.getId(),
+            null,
+            drive.getId(),
+            location.getId(),
+            null,
+            false,
+            false,
+            null,
+            Instant.EPOCH);
 
     assertThat(group)
         .extracting(InventoryItem::getId)
@@ -204,7 +241,14 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), QUALITY, false, false, null);
+            user.getId(),
+            material.getId(),
+            location.getId(),
+            QUALITY,
+            false,
+            false,
+            null,
+            Instant.EPOCH);
 
     assertThat(group).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
   }
@@ -218,9 +262,53 @@ class InventoryMergeGroupDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), null, drive.getId(), location.getId(), null, false, false, null);
+            user.getId(),
+            null,
+            drive.getId(),
+            location.getId(),
+            null,
+            false,
+            false,
+            null,
+            Instant.EPOCH);
 
     assertThat(group).extracting(InventoryItem::getId).containsExactly(shared.getId());
+  }
+
+  @Test
+  void rowsCreatedBeforeTheMergeCutoffNeitherJoinTheGroupNorCount() {
+    Instant cutoff = Instant.parse("2026-11-14T20:00:00Z");
+    InventoryItem prePatch = persistRow(5.0, QUALITY, false, null);
+    InventoryItem postPatch = persistRow(3.0, QUALITY, false, null);
+    entityManager.flush();
+    entityManager
+        .createNativeQuery("UPDATE inventory_item SET created_at = :at WHERE id = :id")
+        .setParameter("at", cutoff.minusSeconds(60))
+        .setParameter("id", prePatch.getId())
+        .executeUpdate();
+    entityManager
+        .createNativeQuery("UPDATE inventory_item SET created_at = :at WHERE id = :id")
+        .setParameter("at", cutoff.plusSeconds(60))
+        .setParameter("id", postPatch.getId())
+        .executeUpdate();
+    entityManager.clear();
+
+    List<InventoryItem> group =
+        inventoryItemRepository.findMergeGroupForUpdate(
+            user.getId(), material.getId(), location.getId(), QUALITY, false, false, null, cutoff);
+
+    assertThat(group).extracting(InventoryItem::getId).containsExactly(postPatch.getId());
+    assertThat(
+            inventoryItemRepository.countMergeCandidates(
+                user.getId(),
+                material.getId(),
+                location.getId(),
+                QUALITY,
+                false,
+                false,
+                null,
+                cutoff))
+        .isEqualTo(1L);
   }
 
   @Test
@@ -251,15 +339,30 @@ class InventoryMergeGroupDataTest {
                 QUALITY,
                 false,
                 false,
-                orgUnit.getId()))
+                orgUnit.getId(),
+                Instant.EPOCH))
         .isEqualTo(2L);
     assertThat(
             inventoryItemRepository.countMergeCandidates(
-                user.getId(), material.getId(), location.getId(), QUALITY, false, false, null))
+                user.getId(),
+                material.getId(),
+                location.getId(),
+                QUALITY,
+                false,
+                false,
+                null,
+                Instant.EPOCH))
         .isEqualTo(1L);
     assertThat(
             inventoryItemRepository.countMergeCandidates(
-                user.getId(), material.getId(), location.getId(), QUALITY + 1, false, false, null))
+                user.getId(),
+                material.getId(),
+                location.getId(),
+                QUALITY + 1,
+                false,
+                false,
+                null,
+                Instant.EPOCH))
         .isZero();
   }
 

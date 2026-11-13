@@ -191,7 +191,8 @@ class InventoryItemServiceTest {
             realCheckoutService,
             new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(false),
             new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-                orderWrites));
+                orderWrites),
+            () -> Instant.EPOCH);
   }
 
   @Test
@@ -760,7 +761,8 @@ class InventoryItemServiceTest {
             realCheckoutService,
             new de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties(true),
             new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-                orderWrites));
+                orderWrites),
+            () -> Instant.EPOCH);
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID locationId = UUID.randomUUID();

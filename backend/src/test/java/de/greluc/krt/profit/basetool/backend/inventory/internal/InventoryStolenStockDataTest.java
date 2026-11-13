@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -255,7 +256,14 @@ class InventoryStolenStockDataTest {
 
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
-            user.getId(), material.getId(), location.getId(), 600, false, false, iridium.getId());
+            user.getId(),
+            material.getId(),
+            location.getId(),
+            600,
+            false,
+            false,
+            iridium.getId(),
+            Instant.EPOCH);
 
     assertThat(group).extracting(InventoryItem::getId).containsExactly(legit.getId());
   }
