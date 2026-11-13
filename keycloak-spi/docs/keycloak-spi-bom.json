@@ -1,10 +1,10 @@
 {
   "bomFormat" : "CycloneDX",
   "specVersion" : "1.6",
-  "serialNumber" : "urn:uuid:7ef526a8-7073-4895-8726-04edc871862e",
+  "serialNumber" : "urn:uuid:b5474da7-3238-401a-9b0a-b157a7b9255f",
   "version" : 1,
   "metadata" : {
-    "timestamp" : "2026-11-13T08:02:39Z",
+    "timestamp" : "2026-11-13T12:30:06Z",
     "tools" : {
       "components" : [
         {
@@ -17,16 +17,16 @@
     },
     "component" : {
       "type" : "library",
-      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@1.24.0?project_path=%3Akeycloak-spi",
+      "bom-ref" : "pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@1.24.1?project_path=%3Akeycloak-spi",
       "group" : "de.greluc.krt.profit.basetool",
       "name" : "keycloak-spi",
-      "version" : "1.24.0",
-      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@1.24.0?project_path=%3Akeycloak-spi",
+      "version" : "1.24.1",
+      "purl" : "pkg:maven/de.greluc.krt.profit.basetool/keycloak-spi@1.24.1?project_path=%3Akeycloak-spi",
       "modified" : false,
       "externalReferences" : [
         {
           "type" : "build-system",
-          "url" : "https://github.com/krt-profit/basetool/actions/runs/43389756775"
+          "url" : "https://github.com/krt-profit/basetool/actions/runs/43425342801"
         },
         {
           "type" : "vcs",
