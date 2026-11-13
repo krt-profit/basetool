@@ -5,7 +5,7 @@
     <form class="orders-create__form" th:action="@{/orders/auec}" method="post"
           th:data-error="#{orders.money.create.error}">
         <fieldset class="form-section">
-            <legend class="form-section__head" th:text="#{orders.create.section.order}"></legend>
+            <legend class="form-section__head" th:text="|1 · #{orders.create.section.order}|"></legend>
             <div class="form-grid">
                 <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('auec-responsible-org-unit', 'responsibleOrgUnitId', ${responsibleOptions}, ${auecOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
                 <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('auec-requesting-org-unit', 'requestingOrgUnitId', ${requestingOptions}, ${auecOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
@@ -21,14 +21,21 @@
                 </div>
             </div>
         </fieldset>
-        <div class="form-section form-group">
-            <label for="auec-comment">
-                <span th:text="#{orders.create.comment}"></span>
-                <span class="opt" th:text="#{form.optional}"></span>
-            </label>
-            <textarea id="auec-comment" name="comment" rows="4" maxlength="1000" th:text="${auecOrderForm.comment}"></textarea>
-        </div>
+        <fieldset class="form-section" th:with="comment=${auecOrderForm.comment},commentLimit=1000">
+            <legend class="form-section__head">
+                <label for="auec-comment"><span aria-hidden="true">2 · </span><span th:text="#{orders.create.comment}"></span></label>
+                <span class="opt" th:text="|· #{form.optional}|"></span>
+            </legend>
+            <div class="form-group">
+                <textarea id="auec-comment" name="comment" rows="4" th:maxlength="${commentLimit}" th:placeholder="#{orders.create.comment.placeholder}"
+                          aria-describedby="auec-comment-count" data-counter="auec-comment-count" th:text="${comment}"></textarea>
+                <p class="form-hint orders-create__counter" id="auec-comment-count"
+                   th:text="|${comment == null ? 0 : comment.length()} / ${commentLimit}|"></p>
+            </div>
+        </fieldset>
         <div class="form-actions--sticky">
+            <span class="form-actions__summary" id="orders-auec-summary" data-testid="order-auec-summary"
+                  th:attr="data-amount=#{orders.money.amount.display},data-for=#{orders.create.summary.for}"></span>
             <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.create.cancel}"></a>
             <button type="submit" class="btn btn--cta" data-testid="order-auec-submit">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>

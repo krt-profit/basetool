@@ -24,8 +24,10 @@ runbook. Individual features, plans and decisions are **not** re-documented here
 - **Members only** — the landing page and the legal pages are the whole public surface (ADR-0159). Everything else needs a login, and every account holds at least member rights. A person without an account can still take part in an Einsatz: the mission leadership records them as an external participant.
 - **Job orders & cross-order material demand** — a prioritised queue of material and item orders with one complete permitted workspace and remembered filters. Current unit writers can transfer Profit responsibility, coordinate Staffel participation, and cancel or reopen work on the central order page. Requesters can safely adjust remaining need after partial delivery. The *Materialbedarf* overview shows remaining material need, earmarked stock and outstanding Staffel promises separately. Explicitly attributed provision credits a promise once; its contribution history remains distinct from current stock coverage. An authorised editor (Bearbeiter) can read their concrete order and maintain their own note outside their unit, without general Profit access (ADR-0301).
   [aUEC orders](docs/specs/orders-auec.md) track reported holdings, unit commitments, exact fees
-  and net handovers. Each new money action starts with [Kartellbank selected](docs/specs/orders-auec-bank.md)
-  and offers an explicit Bank-free choice. With a collection and designated requester account,
+  and net handovers. Their creation form shows the target and requesting unit as you fill it out
+  and counts characters in the optional comment. Each new money action starts with
+  [Kartellbank selected](docs/specs/orders-auec-bank.md) and offers an explicit Bank-free choice.
+  With a collection and designated requester account,
   the same forms record deposit and account-to-account delivery without a personal order holder.
   The active org unit limits ordinary visibility of unit accounts and linked debits. Bank staff
   confirm deposits in their existing queue. Waiting and failed attempts are visible

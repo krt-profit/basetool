@@ -181,6 +181,7 @@ class OrdersCreateFormPatternRenderTest {
     assertThat(forms.get(2))
         .contains("action=\"/orders/auec\"")
         .contains("data-testid=\"order-auec-target\"")
+        .containsPattern("id=\"auec-comment\"[^>]*placeholder=\"Optionaler Kommentar zum Auftrag\"")
         .contains("data-testid=\"order-auec-submit\"")
         .doesNotContain("data-testid=\"order-material-select\"", "id=\"item-lines\"");
   }
@@ -197,7 +198,12 @@ class OrdersCreateFormPatternRenderTest {
         .containsPattern("name=\"orderModeToggle\" value=\"auec\"[^>]*checked=\"checked\"")
         .contains("id=\"mode-auec\">")
         .contains("id=\"mode-material\" hidden=\"hidden\"");
-    assertThat(forms(html).get(2)).contains("action=\"/orders/auec\"", "method=\"post\"");
+    assertThat(forms(html).get(2))
+        .contains("action=\"/orders/auec\"", "method=\"post\"")
+        .contains(">1 · Auftrag<", ">2 · </span><span>Kommentar</span>", "· optional")
+        .contains("maxlength=\"1000\"", "aria-describedby=\"auec-comment-count\"")
+        .contains("data-counter=\"auec-comment-count\"", "data-testid=\"order-auec-summary\"")
+        .containsPattern("id=\"auec-comment-count\"[^>]*>0 / 1000<");
   }
 
   /** The item editor hides the kind segment and the material form and saves changes. */

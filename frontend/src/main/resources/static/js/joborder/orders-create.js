@@ -28,6 +28,8 @@ import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtEnhanceComboboxes, krtSearchableSelect } from '/js/kernel/krt-searchable-select.js';
 import { toGameItemOption } from '/js/kernel/krt-catalog-search.js';
 import { localisedName } from '/js/kernel/krt-localised-name.js';
+import { formatParts, separatorsFor } from '/js/kernel/krt-number-format.js';
+import { krtNumberInput } from '/js/kernel/krt-number-input.js';
 
 /** @typedef {ApiDto<'MaterialDto'> & {id: string}} OrderMaterial */
 /** @typedef {ApiDto<'BlueprintReferenceDto'> & {id: string}} OrderBlueprint */
@@ -210,18 +212,29 @@ function selectedUnitName(selectId) {
 }
 
 /**
- * Writes a live summary line: the count phrase, an optional emphasised quantity, and the
- * requesting unit; the phrases come from the element's `data-one`, `data-other` and `data-for`.
+ * Formats the number of filled lines with the summary's singular or plural phrase.
  *
- * @param {HTMLElement} el the `.form-actions__summary` element
+ * @param {HTMLElement} el the summary element
  * @param {number} count the number of filled lines
- * @param {string} strong the emphasised quantity, or an empty string
+ * @returns {string} the localized count phrase
+ */
+function summaryCount(el, count) {
+    const pattern = (count === 1 ? el.dataset.one : el.dataset.other) || '{0}';
+    return pattern.replace('{0}', formatSummaryNumber(count));
+}
+
+/**
+ * Writes the count, emphasised amount and requesting unit when present.
+ *
+ * @param {HTMLElement} el the summary element
+ * @param {string} count the localized count phrase, or an empty string
+ * @param {string} strong the emphasised amount, or an empty string
  * @param {string} unitName the requesting unit's name, or an empty string
  */
 function renderSummary(el, count, strong, unitName) {
-    const pattern = (count === 1 ? el.dataset.one : el.dataset.other) || '{0}';
+    /** @type {Node[]} */
     const parts = [];
-    parts.push(document.createTextNode(pattern.replace('{0}', formatSummaryNumber(count))));
+    if (count) parts.push(document.createTextNode(count));
     if (strong) {
         const s = document.createElement('strong');
         s.textContent = strong;
@@ -254,7 +267,12 @@ function updateMaterialSummary() {
         if (!isNaN(value)) scu += value;
     });
     const scuText = scu > 0 ? `${formatSummaryNumber(scu)} ${el.dataset.unit || ''}` : '';
-    renderSummary(el, count, scuText.trim(), selectedUnitName('requestingOrgUnitId'));
+    renderSummary(
+        el,
+        summaryCount(el, count),
+        scuText.trim(),
+        selectedUnitName('requestingOrgUnitId'),
+    );
 }
 
 /** Recomputes the item form's summary: lines with a chosen item and the requester. */
@@ -267,7 +285,35 @@ function updateItemSummary() {
         const sel = row.querySelector('[data-role="item-select"]');
         if (sel && /** @type {HTMLInputElement} */ (sel).value) count++;
     });
-    renderSummary(el, count, '', selectedUnitName('item-requestingOrgUnitId'));
+    renderSummary(el, summaryCount(el, count), '', selectedUnitName('item-requestingOrgUnitId'));
+}
+
+/** Keeps the aUEC summary in sync with the exact target and selected requesting unit. */
+function initAuecSummary() {
+    const summary = document.getElementById('orders-auec-summary');
+    const target = document.getElementById('auec-target');
+    const requester = document.getElementById('auec-requesting-org-unit');
+    if (!summary || !(target instanceof HTMLInputElement) || !requester) return;
+
+    const amountPattern = summary.dataset.amount || '{0}';
+    const separators = separatorsFor(document.documentElement.lang);
+    krtNumberInput.enhance(target);
+
+    /** @type {() => void} */
+    const update = () => {
+        const value = target.value;
+        const amount = value
+            ? amountPattern.replace(
+                  '{0}',
+                  formatParts({ neg: false, int: value, frac: null }, separators),
+              )
+            : '';
+        renderSummary(summary, '', amount, selectedUnitName(requester.id));
+    };
+    target.addEventListener('input', update);
+    target.addEventListener('compositionend', update);
+    requester.addEventListener('change', update);
+    update();
 }
 
 /**
@@ -977,3 +1023,4 @@ function initCreationUnitPairs() {
     }
 }
 initCreationUnitPairs();
+initAuecSummary();
