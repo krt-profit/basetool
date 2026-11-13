@@ -2,13 +2,14 @@
 > **Owner area:** PATCH
 > **Status:** The record, the options, the trigger with the refinery effect, the admin page with
 > its history, the audit area, the `patch` change source and the no-mixing rule are implemented
-> (REQ-PATCH-001…009), and so is the wipe by group and exception with its dependents, preview and
-> audit (REQ-PATCH-010…018). The home-location phase with the relocation, the form default, the
-> currency wipe and the exchange resource follow in their own slices of epic #3328 and add their
-> requirements here.
+> (REQ-PATCH-001…009), the wipe by group and exception with its dependents, preview and audit
+> (REQ-PATCH-010…018) and the currency wipe (REQ-PATCH-040…046). The home-location phase with
+> the relocation, the form default and the exchange resource follow in their own slices of epic
+> #3328 and add their requirements here.
 > **Related ADRs:** [ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md),
 > [ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md),
-> [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md)
+> [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md),
+> [ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)
 
 # Patch change
 
@@ -22,7 +23,7 @@ live in the game, decides what each effect touches: only what existed before it.
 The decisions behind this spec are on the wayfinder map #3246: the ground rules #3247 (with its
 live-time amendment), the dependents #3249, the ship origin #3250, the wipe selection #3251 (with
 its live-time amendment), the refinery effect #3254, the exchange side #3255, the admin page #3256,
-audit and monitoring #3257 and the spec and ADR cut #3327.
+audit and monitoring #3257, the currency wipe #3258 and the spec and ADR cut #3327.
 
 **Terms** (arc42 §12): a *patch change* is the admin's record of a game patch and its options; the
 *patch kind* is Rebuild or Full wipe; the *live time* is when the patch went live, the cutoff of
@@ -75,9 +76,9 @@ materials, refined materials, materials that cannot be refined, other items and 
 (#3251, REQ-PATCH-010); exceptions keep or wipe single entries beside them (REQ-PATCH-011). The
 record stores every option as triggered (`patch_change_wipe_group`, `patch_change_wipe_exception`
 and the option columns of `patch_change`). The trigger runs the effect of an option only once its
-effect exists: today the refinery effect (REQ-PATCH-006) and the wipe (REQ-PATCH-012,
-REQ-PATCH-015); the currency wipe and the home-location phase are stored and take effect with their
-slices.
+effect exists: today the refinery effect (REQ-PATCH-006), the wipe (REQ-PATCH-012,
+REQ-PATCH-015) and the currency wipe (REQ-PATCH-040); the home-location phase is stored and takes
+effect with its slice.
 
 **Acceptance**
 
@@ -237,9 +238,9 @@ The audit domain `PATCH_CHANGE` keeps the patch-change trail (REQ-AUDIT-001):
 
 Each affected area records **one** summary event per trigger in its own trail, with counts and the
 patch change id: the refinery `REFINERY_ORDERS_CANCELED_BY_PATCH` with the number of orders
-cancelled, and the wipe's areas as REQ-PATCH-017 lists them. Single orders are not audited one by
-one. No free text and no personal data go into
-any details. The area has its own filter and DE/EN labels in the admin viewer.
+cancelled, the wipe's areas as REQ-PATCH-017 lists them and the currency wipe's two events
+(REQ-PATCH-046). Single orders are not audited one by one. No free text and no personal data go
+into any details. The area has its own filter and DE/EN labels in the admin viewer.
 
 The existing `basetool_audit_events_total{domain}` counts the area by itself; `AuditDomainSilenceAnomaly`
 exempts `PATCH_CHANGE`, because patch changes are rare (REQ-OBS-011).
@@ -441,3 +442,150 @@ rolled-back trigger.
 · **Code:**
 `InventoryPatchWipeService`, `MaterialExchangePatchWipeService`, `SupplyPatchWipeService`,
 `HangarPatchWipeService`, `JobOrderStockWriteEligibility`
+### REQ-PATCH-040 — The currency wipe follows the game in the Bank and the aUEC orders
+
+The option **currency wipe** is off by default and offered for both kinds (REQ-PATCH-002). When it
+is on, the trigger runs it inside the all-or-nothing step (REQ-PATCH-005), with the live time as
+its criterion (ADR-0381): first in the aUEC orders (REQ-PATCH-043…045), then in the Kartellbank
+(REQ-PATCH-041, -042). The orders run first because they take their order guards before any Bank
+request, as a linked Bank decision does, and their cancelled attempts release their bindings
+before the shortages are measured. Every order takes part whatever its status and its
+responsibility: the wipe is an explicit exception to the invalid-responsibility gate of
+[REQ-ORDERS-055](orders-core.md#req-orders-055--invalid-responsibility-permits-reading-and-valid-transfer-only),
+because a patch change is a game fact. Nobody is notified.
+
+**Acceptance**
+
+- [x] With the option off nothing in the Bank or the orders changes and no count is reported.
+- [x] The orders run before the Bank; a refusal of either rolls the whole patch change back.
+
+**Enforced by:** `CurrencyWipeEffectTest`, `PatchChangeCurrencyWipeIntegrationTest` · **Code:**
+`CurrencyWipeEffect`, `joborder.api.JobOrderCurrencyWipe`, `bank.api.BankCurrencyWipe`,
+`JobOrderEditor#lockMoneyOrdersForPatchChange`
+
+### REQ-PATCH-041 — The Bank reset offsets the balances as of the live time
+
+One `WIPE_RESET` transaction offsets exactly the balances **as of the live time** on both
+ledgers (ADR-0384): a negative account leg per account and a negative holder leg per holder whose
+balance from the postings before the live time is not zero. Every booking after the live time
+stays. When the offset would overdraw an account (REQ-BANK-006), because more was booked out of
+it than into it since the live time, the patch change is refused with
+`error.patch_change.currency_wipe_overdraft`, in the preview as well; the admin corrects those
+bookings or chooses a later live time. The standalone reset button of
+[REQ-BANK-013](bank.md#req-bank-013--admin-wipe-reset) keeps its behaviour, and both share one
+booking. The staff grid, the org-unit Bank view and every account detail the reset booked on
+refresh in place.
+
+**Acceptance**
+
+- [x] After the reset the accounts and holders hold exactly what was booked after the live time.
+- [x] A reset that would overdraw an account refuses, and nothing changes.
+
+**Enforced by:** `BankCurrencyWipeIntegrationTest`, `CurrencyWipeEffectTest`,
+`BankLedgerServiceTest` · **Code:** `BankCurrencyWipeService`, `BankWipeResetBooking`,
+`BankPostingRepository#accountBalancesBefore`, `BankHolderPostingRepository#holderAmountsBefore`
+
+### REQ-PATCH-042 — Pending Bank requests from before the live time are cancelled
+
+Every pending Bank booking request submitted before the live time that no order payment attempt
+owns ends as `CANCELLED`, with the patch change as its reason
+(`bank_booking_request.cancelled_by_patch_change`). The cancellation clears the staff's open
+request notices like any other, and a purpose-bound request tells its owner (REQ-BANK-063). A
+request submitted after the live time stays pending; a request of an order attempt follows
+REQ-PATCH-043. The web and the exchange show only the status.
+
+**Acceptance**
+
+- [x] Only requests submitted before the live time are cancelled, each with the patch change as
+  its reason.
+
+**Enforced by:** `BankCurrencyWipeIntegrationTest` · **Code:** `BankCurrencyWipeRequests`,
+`BankBookingRequest#cancelByPatchChange`, `V428`
+
+### REQ-PATCH-043 — Waiting order Bank attempts from before the live time are cancelled
+
+Every order Bank attempt waiting since before the live time ends as `CANCELLED`, with the patch
+change as its reason (`job_order_linked_money_attempt.cancelled_by_patch_change`), and its
+pending Bank request with it (`BankLinkedPayments#cancelForCurrencyWipe`). The order decides by
+the attempt's submission time and cancels the request itself, so the Bank is not called back.
+Under [REQ-ORDERS-075](orders-auec-bank.md#req-orders-075---failure-cancellation-and-reversal-preserve-actual-money-facts)
+this creates no booking and releases the attempt's binding; an attempt with a reported actual
+payment keeps its money unavailable until a correction or a replacement. The attempt history
+shows the patch label.
+
+**Acceptance**
+
+- [x] An attempt waiting since before the live time and its Bank request are cancelled with the
+  patch change as their reason; a later attempt stays waiting.
+
+**Enforced by:** `JobOrderLinkedBankIntegrationTest` · **Code:** `JobOrderCurrencyWipeService`,
+`JobOrderLinkedMoneyAttempt#cancelForCurrencyWipe`, `AuecBankComposition`, `V427`
+
+### REQ-PATCH-044 — Holdings that existed at the live time become real shortages
+
+Per holder and per Bank account position of every aUEC order, the part of the booked holding that
+existed at the live time and is still held becomes a **real shortage**
+([REQ-ORDERS-061](orders-auec.md#req-orders-061--settlement-reuses-movements-and-explicit-purpose-changes),
+-062): the lesser of the balance from the facts recorded before the live time, at their current
+effective amounts, and the current balance less what stays bound once the attempts of
+REQ-PATCH-043 are cancelled. Money added later and money a later attempt still binds stay.
+
+Each shortage is its own `SHORTAGE` operation with its own operation id, recorded by no actor and
+naming the patch change (`job_order_money_operation.patch_change_id`). Past provision and
+commitment credit stay true. Target, net handover and status do not change; residual money from
+before the live time on a completed or cancelled order goes to zero. The order's
+participant-readable history shows the shortage with the patch change's current label
+(REQ-ORDERS-064, through `joborder.api.JobOrderPatchLabels`).
+
+**Acceptance**
+
+- [x] A holding of the live time is booked as a shortage, a later provision stays, a holding moved
+  away after the live time is booked only for what its holder still holds, and the status stays.
+- [x] The history shows the shortage with the patch label and without an actor.
+
+**Enforced by:** `PatchChangeCurrencyWipeIntegrationTest`, `OrdersDetailPatternRenderTest` ·
+**Code:** `JobOrderCurrencyWipePlanner`, `JobOrderCurrencyWipeService`,
+`JobOrderMoneyLedger.Ledger#before`, `JobOrderMoneyOperation#currencyWipeShortage`,
+`JobOrderMoneyQueries`, `PatchChangeLabelDirectory`, `V427`
+
+### REQ-PATCH-045 — Open unit commitments from before the live time end
+
+Every open unit commitment opened before the live time ends with the reason `CURRENCY_WIPE`
+([REQ-ORDERS-059](orders-auec.md#req-orders-059--unit-commitments-are-planning-with-one-time-provision-attribution)).
+Credited parts stay as history; a unit that still contributes commits anew. A commitment opened
+after the live time stays.
+
+**Acceptance**
+
+- [x] A commitment from before the live time ends with the reason `CURRENCY_WIPE` and its
+  outstanding amount at zero.
+
+**Enforced by:** `PatchChangeCurrencyWipeIntegrationTest` · **Code:**
+`JobOrderMoneyCommitments#endForCurrencyWipe`, `MoneyCommitmentChangeDto.Reason`
+
+### REQ-PATCH-046 — Preview, audit and live update of the currency wipe
+
+The preview and the record count six kinds: the Bank reset total (`BANK_RESET_TOTAL`, aUEC), the
+Bank requests cancelled, the aUEC holdings booked as shortage and their total
+(`AUEC_SHORTAGE_TOTAL`, aUEC), the order Bank attempts cancelled and the commitments ended. The
+preview counts exactly what the trigger then does.
+
+The trigger records one summary event in each affected trail: the job orders'
+`JOB_ORDER_MONEY_CURRENCY_WIPED` (subject the patch change with its label; details `orders`,
+`holdings`, `shortageTotal`, `attemptsCancelled`, `commitmentsEnded`, `patchChange`) and the
+Bank's own `WIPE_RESET_EXECUTED` (details `patchChange`, `liveAt`, `accounts`, `stashes`,
+`totalZeroed`, `cancelledRequests`). Single shortages, attempts, requests and commitments are not
+audited one by one. Open order pages refresh their money and participation sections and the order
+queue; the Bank's staff queue and grid, the org-unit Bank view and the touched account details
+refresh in place.
+
+**Acceptance**
+
+- [x] Preview and record carry the same six counts.
+- [x] A trigger records one `JOB_ORDER_MONEY_CURRENCY_WIPED` and one `WIPE_RESET_EXECUTED` naming
+  the patch change.
+
+**Enforced by:** `PatchChangeCurrencyWipeIntegrationTest`, `BankCurrencyWipeIntegrationTest`,
+`AdminAuditLogPageControllerTest`, `LiveSyncTopicRegistryParityTest` · **Code:** `PatchCount`,
+`CurrencyWipeEffect`, `JobOrderCurrencyWipeService`, `BankCurrencyWipeService`,
+`JobOrderMoneyEffects#currencyWiped`, `LiveSyncTopicClass.BANK_ACCOUNT`

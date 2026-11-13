@@ -226,8 +226,15 @@ class AdminAuditLogPageControllerTest {
     assertNotNull(refineryTypes);
     assertTrue(refineryTypes.contains("REFINERY_ORDERS_CANCELED_BY_PATCH"));
 
+    Model jobOrders = new ConcurrentModel();
+    controller.auditLog("JOB_ORDER", null, null, null, null, null, 0, null, jobOrders);
+    List<String> jobOrderTypes = (List<String>) jobOrders.getAttribute("eventTypes");
+    assertNotNull(jobOrderTypes);
+    assertTrue(jobOrderTypes.contains("JOB_ORDER_MONEY_CURRENCY_WIPED"));
+
     Properties labels = loadDefaultBundle();
     assertTrue(labels.containsKey("admin.audit.domain.PATCH_CHANGE"));
+    assertTrue(labels.containsKey("admin.audit.event.JOB_ORDER_MONEY_CURRENCY_WIPED"));
   }
 
   @Test

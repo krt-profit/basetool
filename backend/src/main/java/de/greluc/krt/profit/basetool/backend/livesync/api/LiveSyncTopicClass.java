@@ -99,9 +99,16 @@ public enum LiveSyncTopicClass {
 
   /**
    * Global bank-staff room; the backend pokes {@code requestQueue} when a booking request was
-   * raised, corrected or cancelled through the exchange (REQ-XCH-030, REQ-BANK-068).
+   * raised, corrected or cancelled through the exchange (REQ-XCH-030, REQ-BANK-068), and {@code
+   * grid} and {@code requestQueue} after a currency wipe (REQ-PATCH-046).
    */
   BANK_STAFF("bank", false, "bank_staff"),
+
+  /**
+   * One bank account's detail room, keyed by the account's id; a currency wipe pokes {@code
+   * account}, {@code bookings} and {@code chart} of every account it booked on (REQ-PATCH-046).
+   */
+  BANK_ACCOUNT("bank", true, "bank_account"),
 
   /**
    * Global org-unit bank room, which the request page joins too; the backend pokes {@code
@@ -196,7 +203,8 @@ public enum LiveSyncTopicClass {
       case MATERIALBOARD -> MATERIALBOARD_SECTIONS;
       case REFINERY -> Set.of("queue");
       case REFINERY_ORDER -> Set.of("order", "store", "deleted");
-      case BANK_STAFF -> Set.of("requestQueue");
+      case BANK_STAFF -> Set.of("grid", "requestQueue");
+      case BANK_ACCOUNT -> Set.of("account", "bookings", "chart");
       case ORGUNIT_BANK -> Set.of("orgUnitBank");
       case ADMIN_DASHBOARD -> ADMIN_DASHBOARD_SECTIONS;
       case PATCH_CHANGE -> Set.of("history");

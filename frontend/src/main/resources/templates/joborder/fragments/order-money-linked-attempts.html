@@ -28,6 +28,8 @@
                 <div th:if="${attempt.actualPayment}" th:text="#{orders.money.bank.actualPayment}"></div>
                 <div th:if="${attempt.actualFee != null and attempt.actualFee != '0' and attempt.feeFunding != null}"
                      th:text="${#messages.msg('orders.money.bank.fee.' + attempt.feeFunding, @moneyFormat.exactWhole(attempt.actualFee, #locale))}"></div>
+                <div th:if="${attempt.patchLabel != null}" data-testid="order-money-linked-attempt-patch"
+                     th:text="#{orders.money.bank.cancelledByPatch(${attempt.patchLabel})}"></div>
                 <div th:if="${attempt.activeLinkedRevision == false}" th:text="#{orders.money.bank.superseded}"></div>
             </div>
             <div>

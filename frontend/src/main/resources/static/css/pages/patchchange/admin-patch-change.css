@@ -43,7 +43,6 @@
         padding: 0;
     }
     .pc-switch-cell {
-        width: 1%;
         white-space: nowrap;
     }
     .pc-num {
@@ -104,6 +103,12 @@
     }
     .pc-confirm .btn {
         white-space: normal;
+    }
+
+    @media (width > 768px) {
+        .pc-switch-cell {
+            width: 1%;
+        }
     }
 
     @media (width <= 1024px) {

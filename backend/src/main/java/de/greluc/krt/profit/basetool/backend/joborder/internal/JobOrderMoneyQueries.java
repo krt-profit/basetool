@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrder;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderPatchLabels;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderRepository;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderStatus;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderType;
@@ -39,6 +40,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
@@ -69,6 +71,7 @@ public class JobOrderMoneyQueries {
   private final JobOrderMoneyHolderHistory holderHistory;
   private final JobOrderMoneyPairedCorrectionChoices pairedCorrectionChoices;
   private final ObjectProvider<JobOrderBankPort> bankPort;
+  private final JobOrderPatchLabels patchChangeLabels;
 
   /**
    * Reconstructs current reported amounts from effective monetary facts.
@@ -86,6 +89,7 @@ public class JobOrderMoneyQueries {
             .sorted(Comparator.comparing(JobOrderMoneyHolder::getId))
             .toList();
     Map<UUID, String> names = peopleNames(identities, booked.facts(), linked);
+    Map<UUID, String> causes = patchLabels(booked.facts(), linked);
     List<JobOrderMoneyRecipientView> designations = recipients.views(orderId);
     Map<UUID, JobOrderMoneyRecipientView> recipientsById =
         designations.stream().collect(Collectors.toMap(JobOrderMoneyRecipientView::id, r -> r));
@@ -136,7 +140,8 @@ public class JobOrderMoneyQueries {
                             responsible,
                             requester,
                             correctablePaired.contains(fact.getOperationId()))
-                        : null))
+                        : null,
+                    patchLabel(causes, fact.getPatchChangeId())))
             .toList();
     boolean self = validResponsibility && actor != null && order.getStatus().isActive();
     boolean unitWriter = responsible || requester;
@@ -191,7 +196,7 @@ public class JobOrderMoneyQueries {
             .map(JobOrderMoneyRecipientView::id)
             .toList(),
         linked.stream()
-            .map(attempt -> projectLinkedOutcome(attempt, booked, names, recipientsById))
+            .map(attempt -> projectLinkedOutcome(attempt, booked, names, recipientsById, causes))
             .toList(),
         accountHoldingViews(booked),
         unitWriter ? accountReturns(booked) : List.of(),
@@ -398,6 +403,29 @@ public class JobOrderMoneyQueries {
     return holderChoices.namesOf(ids);
   }
 
+  /**
+   * Reads the current labels of the patch changes behind the given shortages and attempts.
+   *
+   * @param facts the money facts, of which a currency-wipe shortage names its patch change
+   * @param attempts the linked attempts, of which a cancelled one may name its patch change
+   * @return the label by patch change id
+   */
+  private Map<UUID, String> patchLabels(
+      Collection<JobOrderMoneyOperation> facts, Collection<JobOrderLinkedMoneyAttempt> attempts) {
+    Set<UUID> ids =
+        Stream.concat(
+                facts.stream().map(JobOrderMoneyOperation::getPatchChangeId),
+                attempts.stream().map(JobOrderLinkedMoneyAttempt::getCancelledByPatchChange))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return ids.isEmpty() ? Map.of() : patchChangeLabels.labels(ids);
+  }
+
+  private static @Nullable String patchLabel(
+      Map<UUID, String> labels, @Nullable UUID patchChangeId) {
+    return patchChangeId == null ? null : labels.get(patchChangeId);
+  }
+
   private static @Nullable String label(JobOrderMoneyHolder holder, Map<UUID, String> names) {
     return holder.getUserId() == null ? holder.getAccountlessName() : names.get(holder.getUserId());
   }
@@ -453,14 +481,16 @@ public class JobOrderMoneyQueries {
     var designations =
         recipients.views(attempt.getOrderId()).stream()
             .collect(Collectors.toMap(JobOrderMoneyRecipientView::id, Function.identity()));
-    return projectLinkedOutcome(attempt, booked, names, designations);
+    return projectLinkedOutcome(
+        attempt, booked, names, designations, patchLabels(List.of(), List.of(attempt)));
   }
 
   private static JobOrderMoneyOutcome projectLinkedOutcome(
       JobOrderLinkedMoneyAttempt attempt,
       JobOrderMoneyLedger.Ledger booked,
       Map<UUID, String> names,
-      Map<UUID, JobOrderMoneyRecipientView> designations) {
+      Map<UUID, JobOrderMoneyRecipientView> designations,
+      Map<UUID, String> causes) {
     String holderName = holderLabel(attempt.getHolderId(), booked, names);
     String counterpartyName =
         attempt.getCounterpartyUserId() == null
@@ -502,7 +532,8 @@ public class JobOrderMoneyQueries {
         counterpartyName,
         attempt.isActive(),
         clarified,
-        attempt.getAccountHoldingId());
+        attempt.getAccountHoldingId(),
+        patchLabel(causes, attempt.getCancelledByPatchChange()));
   }
 
   JobOrderMoneyOutcome projectOutcome(JobOrderMoneyOperation operation) {
@@ -533,7 +564,8 @@ public class JobOrderMoneyQueries {
                 .map(JobOrderMoneyCorrectionEntry::view)
                 .toList()
             : List.of(),
-        null);
+        null,
+        patchLabel(patchLabels(List.of(operation), List.of()), operation.getPatchChangeId()));
   }
 
   private @Nullable String currentHolderName(@Nullable JobOrderMoneyHolder holder) {

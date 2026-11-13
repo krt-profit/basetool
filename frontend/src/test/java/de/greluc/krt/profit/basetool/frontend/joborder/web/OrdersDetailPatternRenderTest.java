@@ -319,6 +319,68 @@ class OrdersDetailPatternRenderTest {
         .doesNotContain(bankAccount.toString(), "data-testid=\"order-money-history-entry\"");
   }
 
+  @Test
+  void moneyFragmentNamesThePatchChangeBehindAShortageAndACancelledAttempt() throws Exception {
+    UUID order = UUID.randomUUID();
+    UUID holder = UUID.randomUUID();
+    UUID accountHolding = UUID.randomUUID();
+    stubOrder(order(order, "AUEC", "IN_PROGRESS", List.of(), List.of(), List.of(), true));
+    JobOrderMoneyView money =
+        JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .build()
+            .readValue(
+                """
+                {
+                  "target":"500000","targetVersion":0,"provided":"800000","holdings":"0",
+                  "netHandedOver":"0","remaining":"500000","fees":"0","overpaid":"0",
+                  "responsibilityValid":true,"targetChanges":[],"recipients":[],
+                  "holderIdentityHistory":[],"returnableRecipientIds":[],"holders":[],
+                  "history":[{"operationId":"%s","holderId":"%s","amount":"600000",
+                     "bankHandling":false,"recordedAt":"2026-11-11T11:00:00Z","holderName":"Alex",
+                     "kind":"SHORTAGE","fee":"0","provision":"0","corrections":[],
+                     "state":"POSTED","patchLabel":"4.4"},
+                    {"operationId":"%s","accountHoldingId":"%s","amount":"200000",
+                     "bankHandling":false,"recordedAt":"2026-11-11T11:00:00Z",
+                     "kind":"SHORTAGE","fee":"0","provision":"0","corrections":[],
+                     "state":"POSTED","patchLabel":"4.4"}],
+                  "linkedAttempts":[{"operationId":"%s","holderId":"%s","amount":"100000",
+                     "bankHandling":true,"recordedAt":"2026-11-10T11:00:00Z","holderName":"Alex",
+                     "actorName":"Sam","kind":"PROVISION","fee":"0","provision":"100000",
+                     "corrections":[],"state":"CANCELLED","linkedRevision":1,
+                     "actualPayment":false,"patchLabel":"4.4"}]
+                }
+                """
+                    .formatted(
+                        UUID.randomUUID(),
+                        holder,
+                        UUID.randomUUID(),
+                        accountHolding,
+                        UUID.randomUUID(),
+                        holder),
+                JobOrderMoneyView.class);
+    when(backendApiClient.get(
+            eq("/api/v1/orders/{id}/money"), eq(JobOrderMoneyView.class), eq(order)))
+        .thenReturn(money);
+
+    String html =
+        mockMvc
+            .perform(
+                get("/orders/{id}", order)
+                    .param("fragment", "money")
+                    .header("Accept-Language", "de")
+                    .with(authentication(token("ROLE_KRT_MEMBER"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(html)
+        .contains("600.000 aUEC als Fehlbetrag erfasst", "Geldhalter: Alex · Patchwechsel 4.4")
+        .contains("200.000 aUEC als Fehlbetrag erfasst", ">Patchwechsel 4.4<")
+        .contains("Bankantrag storniert", "Durch Patchwechsel 4.4 storniert")
+        .doesNotContain("Name nicht verfügbar");
+  }
+
   /** A cancelled order retains its recorded handover without an active fulfillment action. */
   @Test
   void cancelledOrderKeepsHandoverHistoryWithoutRecordingControls() throws Exception {

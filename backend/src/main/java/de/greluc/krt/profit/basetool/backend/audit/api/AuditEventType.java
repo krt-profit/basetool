@@ -185,6 +185,12 @@ public enum AuditEventType {
   JOB_ORDER_MONEY_TARGET_CHANGED(AuditDomain.JOB_ORDER),
   /** A unit's outstanding aUEC commitment changed. */
   JOB_ORDER_MONEY_COMMITMENT_CHANGED(AuditDomain.JOB_ORDER),
+  /**
+   * A patch change's currency wipe booked the aUEC shortages, cancelled the waiting Bank attempts
+   * and ended the commitments: one summary event per trigger with the counts, whose subject is the
+   * patch change (REQ-PATCH-046).
+   */
+  JOB_ORDER_MONEY_CURRENCY_WIPED(AuditDomain.JOB_ORDER),
   /** An item job order was created. */
   JOB_ORDER_ITEM_CREATED(AuditDomain.JOB_ORDER),
   /** A material job order was edited (materials/handle/requesting unit). */

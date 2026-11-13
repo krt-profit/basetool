@@ -37,5 +37,17 @@ public enum PatchCount {
   /** Materialbörse offers that end because the wipe removes their stock (REQ-PATCH-013). */
   MARKET_OFFERS_ENDED,
   /** Donation pledges withdrawn because the wipe removes their stock (REQ-PATCH-013). */
-  DONATIONS_WITHDRAWN
+  DONATIONS_WITHDRAWN,
+  /** The sum of the Kartellbank's account balances as of the live time, in whole aUEC. */
+  BANK_RESET_TOTAL,
+  /** Pending Kartellbank requests submitted before the live time that end as cancelled. */
+  BANK_REQUESTS_CANCELED,
+  /** Holdings of aUEC orders that existed at the live time and are booked as a real shortage. */
+  AUEC_SHORTAGES,
+  /** The sum of those shortages, in whole aUEC. */
+  AUEC_SHORTAGE_TOTAL,
+  /** Bank attempts of aUEC orders waiting since before the live time that end as cancelled. */
+  AUEC_BANK_ATTEMPTS_CANCELED,
+  /** Unit commitments of aUEC orders opened before the live time that end. */
+  AUEC_COMMITMENTS_ENDED
 }

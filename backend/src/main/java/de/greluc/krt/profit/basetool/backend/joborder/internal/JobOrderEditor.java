@@ -161,6 +161,31 @@ public class JobOrderEditor {
     return result.result();
   }
 
+  /**
+   * Locks money orders for a patch change's currency wipe, which runs for every order whatever the
+   * caller's access and the order's responsibility (REQ-PATCH-040, the exception to
+   * REQ-ORDERS-055). The wipe audits once for all orders, so this checks and records nothing.
+   *
+   * @param ids the orders the wipe touches
+   * @return the locked, refreshed orders in id order; a deleted order is absent
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  List<JobOrder> lockMoneyOrdersForPatchChange(List<UUID> ids) {
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    profitHierarchy.lockForOrderWrite();
+    List<JobOrder> locked = new ArrayList<>();
+    for (UUID id : jobOrderRepository.lockForOrderEarmarks(ids)) {
+      JobOrder order =
+          Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
+      entityManager.refresh(order);
+      JobOrderMoneyQueries.requireMoneyKind(order);
+      locked.add(order);
+    }
+    return locked;
+  }
+
   private JobOrder requireMoneyOrder(UUID id) {
     JobOrder order =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);

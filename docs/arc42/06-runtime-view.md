@@ -357,13 +357,19 @@ See [the aUEC order contract](../specs/orders-auec.md) for settlement and correc
    [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md)),
    classifies them again on their locked facts, ends the offers and withdraws the pledges on them and
    deletes them by id. The ship wipe locks the unlocked in-game ships created before the live time
-   and deletes them through the hangar's ordinary deletion path. An effect that refuses rolls the
-   whole patch change back.
+   and deletes them through the hangar's ordinary deletion path. With the currency wipe on, the
+   job orders lock every aUEC order with money from before the live time in id order under the
+   hierarchy guard, cancel the waiting Bank attempts with their Bank requests, book the holdings
+   of the live time as real shortages and end the earlier commitments; then the Bank cancels the
+   remaining earlier requests, locks every account and books one reset of the balances as of the
+   live time ([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)).
+   An effect that refuses, a reset that would overdraw an account among them, rolls the whole
+   patch change back.
 4. The record keeps the effects' counts; `PATCH_CHANGE_TRIGGERED` and each area's summary event
-   commit with it. After the commit the refinery pages and every open patch-change page refresh in
-   place, and the exchange feeds show the changes with the `patch` source and the patch change's
-   `{id, label}`.
+   commit with it. After the commit the refinery, order and Bank pages and every open
+   patch-change page refresh in place, and the exchange feeds show the changes with the `patch`
+   source and the patch change's `{id, label}`.
 5. From then on the write-time stock merge skips every row created before the live time
    ([ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)).
 
-The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-001…018).
+The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-001…018, -040…046).

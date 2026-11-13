@@ -61,6 +61,7 @@ worth reading even if you know the domain.
 | **Wipe-Gruppe / Wipe group** | A fixed set of catalogue types a patch change can wipe: consumables, FPS equipment, ship components and vehicle weapons, raw, refined and no-refine materials, other items (whatever no group claims) and in-game ships (REQ-PATCH-010). |
 | **Ausnahme / Wipe exception** | A single game item, or a material in every quality, whose stock a patch change keeps although its group is wiped, or wipes although its group is not (REQ-PATCH-011). |
 | **Home-Location-Abfrage / Home-location phase** | The period in which members are asked at their next login for their new home location after a patch change, until each has chosen, the admin ends it or a newer patch change supersedes it (decision #3252). |
+| **Währungs-Wipe / Currency wipe** | The option of a patch change that follows a wipe of the game's money: the Kartellbank is reset to its balances as of the live time, earlier Bank requests and order Bank attempts are cancelled, the aUEC holdings of the live time become real shortages and earlier commitments end (REQ-PATCH-040, ADR-0384). |
 
 ## 12.3 Architecture and operations
 

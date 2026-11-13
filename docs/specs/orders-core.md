@@ -256,6 +256,12 @@ authorized explicit transfer into the actual Profit hierarchy: retain the missin
 and record the new transfer completely. Concrete linked personal history remains readable
 where authorized; historical names alone do not create access.
 
+**Patch change (amendment, [REQ-PATCH-040](patch-change.md#req-patch-040--the-currency-wipe-follows-the-game-in-the-bank-and-the-auec-orders)).**
+A patch change's currency wipe is an explicit exception to this gate, because a patch change
+is a game fact: it cancels the waiting Bank attempts, books the real shortages and ends the
+commitments on an order with invalid responsibility as well. The order's responsibility and
+clarification stay as they are.
+
 **Acceptance**
 
 - [ ] Invalid responsibility blocks every user mutation and coupled financial effect except a valid responsibility transfer; mandatory automatic eligibility maintenance still ends ineligible support and promises.
