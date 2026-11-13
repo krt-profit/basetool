@@ -136,7 +136,7 @@ class HangarModuleContractTest {
   private UUID create() throws Exception {
     String body =
         """
-        {"name":"Erstflug","shipTypeId":"%s","insurance":"LTI","fitted":false,"owningOrgUnitId":"%s"}
+        {"name":"Erstflug","shipTypeId":"%s","insurance":"LTI","fitted":false,"origin":"PLEDGE","owningOrgUnitId":"%s"}
         """
             .formatted(type.getId(), home.getId());
     String response =

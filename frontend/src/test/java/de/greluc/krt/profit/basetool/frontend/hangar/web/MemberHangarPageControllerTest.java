@@ -43,6 +43,8 @@ import de.greluc.krt.profit.basetool.frontend.catalogue.model.ManufacturerDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.ShipTypeDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
@@ -109,7 +111,8 @@ class MemberHangarPageControllerTest {
             new BigDecimal("0"),
             false);
     ShipDto ship =
-        new ShipDto(SHIP, "Iron Mule", type, "LTI", null, true, null, null, 3L, 0L, null, null);
+        new ShipDto(
+            SHIP, "Iron Mule", type, "LTI", null, true, null, null, 3L, 0L, null, null, null);
     when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
         .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
     when(backendApiClient.get(eq("/api/v1/users/{id}"), eq(UserDto.class), eq(MEMBER)))
@@ -190,7 +193,7 @@ class MemberHangarPageControllerTest {
             + type
             + "\",\"insurance\":\"LTI\",\"fitted\":true,\"version\":7,\"owningOrgUnitId\":\""
             + unit
-            + "\"}";
+            + "\",\"origin\":\"IN_GAME\"}";
 
     mockMvc
         .perform(
@@ -207,6 +210,7 @@ class MemberHangarPageControllerTest {
             argThat((ShipRequestDto r) ->
                 type.equals(r.shipTypeId())
                     && unit.equals(r.owningOrgUnitId())
+                    && "IN_GAME".equals(r.origin())
                     && r.version() == null),
             eq(ShipDto.class),
             eq(MEMBER));
@@ -318,6 +322,7 @@ class MemberHangarPageControllerTest {
             new SquadronReferenceDto(unit, "Sondereinheit", "SE"),
             3L,
             4L,
+            null,
             null,
             null);
     when(backendApiClient.get(eq(SHIPS_READ), anyTypeRef(), eq(MEMBER)))
@@ -462,6 +467,69 @@ class MemberHangarPageControllerTest {
 
     verify(backendApiClient, never())
         .post(anyString(), any(), eq(ShipBulkOrgUnitResultDto.class), any());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void addWithoutAChosenOriginIsRefusedBeforeTheBackend() throws Exception {
+    mockMvc
+        .perform(
+            post(BASE + "/add")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"shipTypeId\":\""
+                        + UUID.randomUUID()
+                        + "\",\"insurance\":\"LTI\",\"origin\":\"UNKNOWN\"}"))
+        .andExpect(status().is(422))
+        .andExpect(jsonPath("$.code").value("VALIDATION"));
+
+    verify(backendApiClient, never()).post(anyString(), any(), eq(ShipDto.class), any());
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void bulkOriginChangeGoesToTheMembersShipsAndAnswersTheCounts() throws Exception {
+    when(backendApiClient.post(
+            eq("/api/v1/hangar/admin/users/{userId}/ships/bulk-origin"),
+            any(),
+            eq(ShipBulkOriginResultDto.class),
+            eq(MEMBER)))
+        .thenReturn(new ShipBulkOriginResultDto(1, 0));
+
+    mockMvc
+        .perform(
+            post(BASE + "/bulk-origin")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shipIds\":[\"" + SHIP + "\"],\"origin\":\"PLEDGE\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.changed").value(1));
+
+    verify(backendApiClient)
+        .post(
+            eq("/api/v1/hangar/admin/users/{userId}/ships/bulk-origin"),
+            eq(new ShipBulkOriginRequestDto(List.of(SHIP), "PLEDGE")),
+            eq(ShipBulkOriginResultDto.class),
+            eq(MEMBER));
+  }
+
+  @Test
+  @WithMockUser
+  void nonAdminIsRefusedTheBulkOriginChange() throws Exception {
+    mockMvc
+        .perform(
+            post(BASE + "/bulk-origin")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"shipIds\":[\"" + SHIP + "\"],\"origin\":\"PLEDGE\"}"))
+        .andExpect(status().isForbidden());
+
+    verify(backendApiClient, never())
+        .post(anyString(), any(), eq(ShipBulkOriginResultDto.class), any());
   }
 
   @Test

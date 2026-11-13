@@ -473,6 +473,12 @@ public enum NotificationEventType {
   HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN,
 
   /**
+   * An admin changed the origin of several of a member's ships in one action (REQ-HANGAR-018). The
+   * default rule notifies that member.
+   */
+  HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN,
+
+  /**
    * An admin added, changed, deleted or imported blueprints of a member (REQ-HANGAR-008). The
    * default rule notifies that member.
    */

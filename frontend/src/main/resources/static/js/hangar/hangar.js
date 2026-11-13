@@ -33,6 +33,7 @@ import {
     presetUnitSelect,
     reportBulkUnitOutcome,
 } from '/js/hangar/ship-unit-change.js';
+import { bindOriginField, bulkChangeOrigin } from '/js/hangar/ship-origin.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('ship-modal');
@@ -74,17 +75,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Shows the hint with the number of ships of unknown origin, or hides it when there are none
+     * (REQ-HANGAR-017).
+     *
+     * @param {number | null} unknown the count, null when it could not be read
+     */
+    function syncOriginHint(unknown) {
+        const hint = document.getElementById('hangar-origin-hint');
+        if (!hint) return;
+        if (unknown === null || unknown === 0) {
+            hint.hidden = true;
+            return;
+        }
+        hint.textContent = formatMessage(hangarI18n.originHintTemplate, [unknown]);
+        hint.hidden = false;
+    }
+
+    /**
      * Copies the swapped list's totals into everything outside the list that shows them: the tab
-     * count, the readiness counter, the home-location ship count and the enabled state of the two
-     * hangar-wide menu entries.
+     * count, the readiness counter, the origin hint, the home-location ship count and the enabled
+     * state of the two hangar-wide menu entries.
      */
     function syncHangarStats() {
         const stats = document.getElementById('hangar-stats');
         if (!stats) return;
         const totalRaw = stats.getAttribute('data-total');
         const fittedRaw = stats.getAttribute('data-fitted');
+        const unknownRaw = stats.getAttribute('data-unknown-origin');
         const total = totalRaw === null || totalRaw === '' ? null : Number(totalRaw);
         const fitted = fittedRaw === null || fittedRaw === '' ? null : Number(fittedRaw);
+        syncOriginHint(unknownRaw === null || unknownRaw === '' ? null : Number(unknownRaw));
 
         const tabCount = document.getElementById('hangar-tab-count-mine');
         if (tabCount && total !== null) {
@@ -225,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const modalDeleteBtn = /** @type {HTMLElement} */ (document.getElementById('modal-delete-btn'));
     const ownerPickerSlot = document.getElementById('ship-owner-picker-slot');
+    const originField = bindOriginField(form);
 
     /**
      * Shows the "Zuordnen zu" picker in the create dialog only; the unit of an existing ship is
@@ -262,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
         shipField('ship-location').value = '';
         shipField('ship-fitted').checked = false;
         shipField('ship-version').value = '';
+        originField.reset();
         modalDeleteBtn.hidden = true;
         showOwnerPicker(true);
         openModal();
@@ -281,6 +303,10 @@ document.addEventListener('DOMContentLoaded', () => {
         shipField('ship-location').value = btn.getAttribute('data-loc') || '';
         shipField('ship-fitted').checked = btn.getAttribute('data-fitted') === 'true';
         shipField('ship-version').value = btn.getAttribute('data-version') ?? '';
+        originField.show(
+            btn.getAttribute('data-origin') || '',
+            btn.getAttribute('data-origin-locked') === 'true',
+        );
         const action = /** @type {string} */ (btn.getAttribute('data-action'));
         modalDeleteBtn.setAttribute('data-action', action.replace('/update', '/delete'));
         modalDeleteBtn.hidden = false;
@@ -367,6 +393,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     krtEvents.on('click', 'hangar-open-bulk-unit', openBulkUnitModal);
+
+    krtEvents.on('click', 'hangar-bulk-origin', (btn) => {
+        const shipIds = shipChecks()
+            .filter((c) => selectedShips.has(c.value))
+            .map((c) => c.value);
+        if (shipIds.length === 0) return;
+        bulkChangeOrigin({
+            url: '/hangar/bulk-origin',
+            shipIds,
+            origin: btn.getAttribute('data-origin') || '',
+            texts: {
+                none: hangarI18n.bulkOriginNone,
+                success: hangarI18n.bulkOriginSuccess,
+                partial: hangarI18n.bulkOriginSuccessPartial,
+                error: hangarI18n.bulkOriginError,
+            },
+            conflict: hangarConflict,
+            button: /** @type {HTMLButtonElement} */ (btn),
+            onDone() {
+                selectedShips.clear();
+                renderSelection();
+                afterHangarWrite();
+            },
+        });
+    });
 
     /**
      * Moves the selected ships to the chosen unit in one request, then swaps the list in place,
@@ -803,6 +854,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fitted: shipField('ship-fitted').checked,
             version: isUpdate && versionRaw ? Number(versionRaw) : null,
             owningOrgUnitId: isUpdate ? null : ownerSel && ownerSel.value ? ownerSel.value : null,
+            origin: originField.read(),
         };
         const submitBtn = /** @type {HTMLButtonElement | null} */ (
             form.querySelector('button[type="submit"]')
@@ -881,7 +933,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filterForm.addEventListener('change', (e) => {
             const target = /** @type {HTMLInputElement | null} */ (e.target);
-            if (!target || target.name !== 'fitted') {
+            if (!target || (target.name !== 'fitted' && target.name !== 'origin')) {
                 return;
             }
             clearTimeout(hangarFilterTimer ?? undefined);
@@ -916,6 +968,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     filterForm.querySelectorAll('input[name="fitted"]')
                 ).forEach((radio) => {
                     radio.checked = radio.value === '';
+                });
+                /** @type {NodeListOf<HTMLInputElement>} */ (
+                    filterForm.querySelectorAll('input[name="origin"]')
+                ).forEach((box) => {
+                    box.checked = false;
                 });
             }
             clearTimeout(hangarFilterTimer ?? undefined);

@@ -43,6 +43,8 @@ import org.jetbrains.annotations.Nullable;
  *     imported
  * @param pledge the imported pledge data, or {@code null} when none was imported or the caller is
  *     neither the owner nor an admin (REQ-HANGAR-015)
+ * @param origin the ship's origin, or {@code null} when the caller is neither the owner nor an
+ *     admin (REQ-HANGAR-017)
  */
 public record ShipDto(
     UUID id,
@@ -56,4 +58,5 @@ public record ShipDto(
     Long version,
     long owningOrgUnitVersion,
     @Nullable ShipProductionStatus productionStatus,
-    @Nullable ShipPledgeDto pledge) {}
+    @Nullable ShipPledgeDto pledge,
+    @Nullable ShipOriginDto origin) {}

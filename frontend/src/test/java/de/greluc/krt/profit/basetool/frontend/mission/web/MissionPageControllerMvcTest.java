@@ -2083,6 +2083,7 @@ class MissionPageControllerMvcTest {
             1L,
             0L,
             null,
+            null,
             null);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto outsiderShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
@@ -2096,6 +2097,7 @@ class MissionPageControllerMvcTest {
             null,
             1L,
             0L,
+            null,
             null,
             null);
 
@@ -2250,6 +2252,7 @@ class MissionPageControllerMvcTest {
             1L,
             0L,
             null,
+            null,
             null);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto assignedShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
@@ -2264,6 +2267,7 @@ class MissionPageControllerMvcTest {
             1L,
             0L,
             null,
+            null,
             null);
     de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto strayShip =
         new de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto(
@@ -2277,6 +2281,7 @@ class MissionPageControllerMvcTest {
             null,
             1L,
             0L,
+            null,
             null,
             null);
 

@@ -97,7 +97,8 @@ class ShipRepositoryPersonalHangarTest {
     saveShip("s-G", gladius, "LTI", false, area18);
 
     Page<Ship> page =
-        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(0, 50));
+        shipRepository.findByOwnerIdFiltered(
+            owner.getId(), null, null, null, PageRequest.of(0, 50));
 
     assertThat(page.getContent().stream().map(Ship::getName))
         .containsExactly("s-A", "s-A2", "s-C", "s-B", "s-D", "s-E", "s-F", "s-G", "s-H");
@@ -111,7 +112,8 @@ class ShipRepositoryPersonalHangarTest {
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), "cutlass-773", null, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(
+                    owner.getId(), "cutlass-773", null, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
@@ -119,14 +121,16 @@ class ShipRepositoryPersonalHangarTest {
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), "AEGIS-773", null, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(
+                    owner.getId(), "AEGIS-773", null, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
         .containsExactly("s-A", "s-G");
 
     assertThat(
-            shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(0, 50)))
+            shipRepository.findByOwnerIdFiltered(
+                owner.getId(), null, null, null, PageRequest.of(0, 50)))
         .hasSize(3);
   }
 
@@ -139,13 +143,13 @@ class ShipRepositoryPersonalHangarTest {
     saveShip("s-H", cutlass, "LTI", false, area18);
 
     Page<Ship> fitted =
-        shipRepository.findByOwnerIdFiltered(owner.getId(), null, true, PageRequest.of(0, 1));
+        shipRepository.findByOwnerIdFiltered(owner.getId(), null, true, null, PageRequest.of(0, 1));
     assertThat(fitted.getTotalElements()).isEqualTo(2L);
     assertThat(fitted.getContent().stream().map(Ship::getName)).containsExactly("s-A");
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), null, false, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(owner.getId(), null, false, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
@@ -153,11 +157,48 @@ class ShipRepositoryPersonalHangarTest {
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), "aegis-773", false, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(
+                    owner.getId(), "aegis-773", false, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
         .containsExactly("s-C");
+  }
+
+  /**
+   * The origin filter reads the effective origin: a ship an import locked counts as pledged, never
+   * as the origin it stores (REQ-HANGAR-017).
+   */
+  @Test
+  void findByOwnerIdFiltered_originFilterReadsTheEffectiveOrigin() {
+    saveShip("s-unknown", avenger, "LTI", false, area18);
+    Ship inGame = saveShip("s-in-game", avenger, "LTI", false, area18);
+    inGame.setOrigin(ShipOrigin.IN_GAME);
+    Ship pledged = saveShip("s-pledged", avenger, "LTI", false, area18);
+    pledged.setOrigin(ShipOrigin.PLEDGE);
+    Ship locked = saveShip("s-locked", avenger, "LTI", false, area18);
+    locked.setOriginLocked(true);
+    saveShipFor(otherOwner, "s-foreign", avenger, "LTI", false, area18);
+    shipRepository.flush();
+
+    assertThat(originNames(ShipOrigin.UNKNOWN)).containsExactly("s-unknown");
+    assertThat(originNames(ShipOrigin.IN_GAME)).containsExactly("s-in-game");
+    assertThat(originNames(ShipOrigin.PLEDGE)).containsExactlyInAnyOrder("s-locked", "s-pledged");
+    assertThat(
+            shipRepository
+                .findByOwnerIdFiltered(
+                    owner.getId(), null, null, ShipOrigin.UNKNOWN, PageRequest.of(0, 1))
+                .getTotalElements())
+        .isEqualTo(1L);
+  }
+
+  private List<String> originNames(ShipOrigin origin) {
+    return shipRepository
+        .findByOwnerIdFiltered(owner.getId(), null, null, origin, PageRequest.of(0, 50))
+        .getContent()
+        .stream()
+        .map(Ship::getName)
+        .toList();
   }
 
   /** The readiness counts only the owner's ships, and a hangar without ships reads zero. */
@@ -186,13 +227,13 @@ class ShipRepositoryPersonalHangarTest {
     saveShip("s-F", avenger, "0", false, area18);
 
     Page<Ship> first =
-        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(0, 2));
+        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, null, PageRequest.of(0, 2));
     assertThat(first.getTotalElements()).isEqualTo(5L);
     assertThat(first.getTotalPages()).isEqualTo(3);
     assertThat(first.getContent().stream().map(Ship::getName)).containsExactly("s-A", "s-A2");
 
     Page<Ship> second =
-        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(1, 2));
+        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, null, PageRequest.of(1, 2));
     assertThat(second.getContent().stream().map(Ship::getName)).containsExactly("s-C", "s-D");
   }
 
@@ -203,14 +244,14 @@ class ShipRepositoryPersonalHangarTest {
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(owner.getId(), null, null, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
         .containsExactly("mine");
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(otherOwner.getId(), null, null, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(otherOwner.getId(), null, null, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
@@ -239,7 +280,7 @@ class ShipRepositoryPersonalHangarTest {
 
   private List<String> ownShips(String escapedFragment) {
     return shipRepository
-        .findByOwnerIdFiltered(owner.getId(), escapedFragment, null, PageRequest.of(0, 50))
+        .findByOwnerIdFiltered(owner.getId(), escapedFragment, null, null, PageRequest.of(0, 50))
         .getContent()
         .stream()
         .map(Ship::getName)

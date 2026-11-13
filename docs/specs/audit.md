@@ -288,7 +288,10 @@ web, naming its client (REQ-AUDIT-005):
   `MARKET_CATALOGUE_REASSIGNED` (see "Catalogue duplicate reconciliation" below).
 - **Hangar** (`Ship`, `AuditDomain.HANGAR`, every channel — web, app and the exchange) — ship
   create (`HANGAR_SHIP_CREATED`), edit (`HANGAR_SHIP_UPDATED`, only when a field changed; the
-  details name the changed fields, never their values), org-unit change
+  details name the changed fields, never their values — an origin change names `origin`,
+  REQ-HANGAR-017), origin change of a selection (`HANGAR_SHIPS_BULK_ORIGIN_CHANGED`,
+  REQ-HANGAR-018, one summary only when a ship changed; the `changed` / `skipped` counts, never the
+  origin), org-unit change
   (`HANGAR_SHIP_ORG_UNIT_CHANGED`, REQ-HANGAR-009, only when the unit changed; `from` / `to` as
   `kind:id` or `none`, never a name), org-unit change of a selection
   (`HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED`, REQ-HANGAR-010, one summary only when a ship moved; the

@@ -74,7 +74,19 @@ class HangarPageControllerMvcTest {
             false);
     ShipDto ship =
         new ShipDto(
-            UUID.randomUUID(), "Stalker", type, "LTI", null, true, null, null, 0L, 0L, null, null);
+            UUID.randomUUID(),
+            "Stalker",
+            type,
+            "LTI",
+            null,
+            true,
+            null,
+            null,
+            0L,
+            0L,
+            null,
+            null,
+            null);
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
 
@@ -181,6 +193,7 @@ class HangarPageControllerMvcTest {
             0L,
             0L,
             null,
+            null,
             null);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
@@ -219,6 +232,7 @@ class HangarPageControllerMvcTest {
             null,
             0L,
             0L,
+            null,
             null,
             null);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 1000, 1, 1, List.of());
@@ -259,6 +273,7 @@ class HangarPageControllerMvcTest {
             null,
             0L,
             0L,
+            null,
             null,
             null);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());

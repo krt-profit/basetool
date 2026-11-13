@@ -22,16 +22,20 @@ package de.greluc.krt.profit.basetool.backend.hangar.web;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipMapper;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.FleetviewImportResponseDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarAccessPolicy;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarImportService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarShipOriginService;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SetHomeLocationResponseDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOrgUnitResultDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOriginRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipBulkOriginResultDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.ShipOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
@@ -97,6 +101,7 @@ public class HangarController {
           + "')";
 
   private final HangarService hangarService;
+  private final HangarShipOriginService shipOriginService;
   private final HangarImportService hangarImportService;
   private final UserService userService;
   private final ShipMapper shipMapper;
@@ -111,6 +116,8 @@ public class HangarController {
    * @param size page size
    * @param search optional case-insensitive ship-type/manufacturer name filter; blank means none
    * @param fitted optional fitted filter; absent means fitted and unfitted ships
+   * @param origin optional filter on the effective origin (REQ-HANGAR-017); absent means every
+   *     origin
    * @return one ordered, optionally filtered page of the caller's ships
    */
   @GetMapping("/my-ships")
@@ -120,11 +127,12 @@ public class HangarController {
       @RequestParam(required = false) Integer page,
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String search,
-      @RequestParam(required = false) Boolean fitted) {
+      @RequestParam(required = false) Boolean fitted,
+      @RequestParam(required = false) ShipOrigin origin) {
     Pageable pageable = PaginationUtil.createUnsortedPageRequest(page, size);
     Page<Ship> p =
         hangarService.getMyShipsFiltered(
-            userService.getUserIdFromJwt(jwt), search, fitted, pageable);
+            userService.getUserIdFromJwt(jwt), search, fitted, origin, pageable);
     return PageResponse.of(p.map(shipMapper::toOwnerDto));
   }
 
@@ -288,6 +296,37 @@ public class HangarController {
   }
 
   /**
+   * Marks a selection of the calling user's ships as pledged or bought in-game, in one transaction
+   * (REQ-HANGAR-018).
+   *
+   * @param jwt caller's JWT; its {@code sub} claim must own every selected ship
+   * @param request the selected ships and the origin
+   * @return how many ships changed and how many were skipped
+   */
+  @Operation(
+      summary = "Change the origin of several ships",
+      description =
+          "Marks a selection of the caller's ships as PLEDGE or IN_GAME. Ships that already have"
+              + " the origin, and ships an import locked to PLEDGE, are skipped; an unknown or a"
+              + " foreign ship refuses the whole selection.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Changed and skipped counts"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Empty or oversized selection, or an origin other than PLEDGE or IN_GAME"),
+    @ApiResponse(responseCode = "403", description = "A selected ship belongs to someone else"),
+    @ApiResponse(responseCode = "404", description = "A selected ship does not exist")
+  })
+  @PostMapping("/ships/bulk-origin")
+  @PreAuthorize(HANGAR_ACCESS)
+  public ShipBulkOriginResultDto bulkChangeMyShipsOrigin(
+      @AuthenticationPrincipal Jwt jwt,
+      @RequestBody @Valid @NotNull ShipBulkOriginRequestDto request) {
+    return shipOriginService.bulkChangeOrigin(
+        userService.getUserIdFromJwt(jwt), request.shipIds(), request.origin());
+  }
+
+  /**
    * Deletes one of the calling user's ships. Mission-unit references are detached before delete.
    */
   @DeleteMapping("/ships/{id}")
@@ -423,6 +462,36 @@ public class HangarController {
       @RequestBody @Valid @NotNull ShipBulkOrgUnitRequestDto request) {
     return hangarService.bulkChangeShipOrgUnitByAdmin(
         userId, request.shipIds(), request.orgUnitId());
+  }
+
+  /**
+   * Admin-only: marks a selection of a target user's ships as pledged or bought in-game in one
+   * transaction, and tells the user once (REQ-HANGAR-018).
+   *
+   * @param userId the ships' owner
+   * @param request the selected ships and the origin
+   * @return how many ships changed and how many were skipped
+   */
+  @Operation(
+      summary = "Change the origin of several ships of a member",
+      description =
+          "Marks a selection of a member's ships as PLEDGE or IN_GAME. Ships that already have the"
+              + " origin, and ships an import locked to PLEDGE, are skipped; an unknown ship or one"
+              + " of another member refuses the whole selection. The member is notified once.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Changed and skipped counts"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Empty or oversized selection, or an origin other than PLEDGE or IN_GAME"),
+    @ApiResponse(responseCode = "403", description = "Not an admin, or ship of another member"),
+    @ApiResponse(responseCode = "404", description = "A selected ship does not exist")
+  })
+  @PostMapping("/admin/users/{userId}/ships/bulk-origin")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  public ShipBulkOriginResultDto bulkChangeUserShipsOrigin(
+      @PathVariable @NotNull UUID userId,
+      @RequestBody @Valid @NotNull ShipBulkOriginRequestDto request) {
+    return shipOriginService.bulkChangeOriginByAdmin(userId, request.shipIds(), request.origin());
   }
 
   /** Admin-only: deletes a target user's ship. */

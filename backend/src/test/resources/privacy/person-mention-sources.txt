@@ -294,6 +294,7 @@ exempt-column|role.description
 exempt-column|role.name
 exempt-column|role_permissions.permission
 exempt-column|ship.insurance
+exempt-column|ship.origin
 exempt-column|ship.pledge_cost_currency
 exempt-column|ship.pledge_id
 exempt-column|ship.production_status

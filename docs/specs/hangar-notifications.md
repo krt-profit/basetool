@@ -53,7 +53,9 @@ rule notifies the owner and excludes the actor, so an officer resetting their ow
 the admin member hangar of REQ-HANGAR-011 / -012) publish `HANGAR_CHANGED_BY_ADMIN`;
 `#bulkChangeShipOrgUnitByAdmin` publishes one notice per action — `HANGAR_CHANGED_BY_ADMIN` when one
 ship moved, `HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN` with the `count` when several did, nothing when
-none did; `PersonalBlueprintService#addForUser`,
+none did; `HangarShipOriginService#bulkChangeOriginByAdmin` (REQ-HANGAR-018) likewise publishes
+`HANGAR_CHANGED_BY_ADMIN` (`UPDATED`) for one changed ship and `HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN`
+with the `count` for several, never naming the origin; `PersonalBlueprintService#addForUser`,
 `#addBatchForUser`, `#updateForUser`, `#deleteForUser` and the admin import apply
 (`#announceImportByAdmin`) publish `BLUEPRINT_CHANGED_BY_ADMIN`; the global purge
 `#deleteAllForAllUsers` counts the removable blueprints per owner first and publishes

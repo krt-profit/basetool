@@ -36,6 +36,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResol
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -95,6 +96,9 @@ public class ExchangeShipWriteService
 
   /** The refusal of a unit counter the ship no longer has. */
   static final String ORG_UNIT_VERSION_CONFLICT = "ORG_UNIT_VERSION_CONFLICT";
+
+  /** The refusal of another origin than {@code PLEDGE} for a ship an import locked. */
+  static final String ORIGIN_LOCKED = "ORIGIN_LOCKED";
 
   private final ExchangeResolveService resolveService;
   private final ExchangeLocationResolver locationResolver;
@@ -332,7 +336,8 @@ public class ExchangeShipWriteService
                   locationId,
                   Boolean.TRUE.equals(op.fitted()),
                   null,
-                  null),
+                  null,
+                  requestedOrigin(op)),
               unit));
     }
     UUID shipId = parse(op.shipId());
@@ -368,6 +373,10 @@ public class ExchangeShipWriteService
     if (move != null && !Objects.equals(op.orgUnitVersion(), move.expectedVersion())) {
       return ExchangeChangeSetAdapter.skip(REJECTED, ORG_UNIT_VERSION_CONFLICT);
     }
+    ShipOrigin origin = requestedOrigin(op);
+    if (origin != null && origin != ship.effectiveOrigin() && ship.isOriginLocked()) {
+      return ExchangeChangeSetAdapter.skip(REJECTED, ORIGIN_LOCKED);
+    }
     ShipRequestDto dto =
         new ShipRequestDto(
             op.name(),
@@ -376,7 +385,8 @@ public class ExchangeShipWriteService
             locationId,
             op.fitted() == null ? ship.isFitted() : op.fitted(),
             ship.getVersion(),
-            null);
+            null,
+            origin == null ? ship.effectiveOrigin() : origin);
     boolean changes = !State.of(ship).synced().equals(State.of(dto));
     if (!changes && move == null && linked != null) {
       return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
@@ -445,7 +455,8 @@ public class ExchangeShipWriteService
                 locationId,
                 Boolean.TRUE.equals(op.fitted()),
                 null,
-                null),
+                null,
+                requestedOrigin(op)),
             unit));
   }
 
@@ -733,6 +744,16 @@ public class ExchangeShipWriteService
       throw new BadRequestException("Missing " + name);
     }
     return value;
+  }
+
+  /**
+   * Reads the origin an upsert names.
+   *
+   * @param op the upsert
+   * @return the origin, or {@code null} when the op leaves it out
+   */
+  private static @Nullable ShipOrigin requestedOrigin(@NotNull ExchangeShipChangeSet.Op op) {
+    return op.origin() == null ? null : ShipOrigin.valueOf(op.origin());
   }
 
   /**

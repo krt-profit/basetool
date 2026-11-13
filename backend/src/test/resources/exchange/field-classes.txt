@@ -283,6 +283,7 @@ change-set.schema.json#/$defs/shipOp/oneOf/1/properties/op IDENTIFIER
 change-set.schema.json#/$defs/shipOp/oneOf/1/properties/opId IDENTIFIER
 change-set.schema.json#/$defs/shipOp/oneOf/1/properties/orgUnit IDENTIFIER
 change-set.schema.json#/$defs/shipOp/oneOf/1/properties/orgUnitVersion IDENTIFIER
+change-set.schema.json#/$defs/shipOp/oneOf/1/properties/origin FACT_VALUE
 change-set.schema.json#/$defs/shipOp/oneOf/1/properties/override FACT_VALUE
 change-set.schema.json#/$defs/shipOp/oneOf/1/properties/shipId IDENTIFIER
 change-set.schema.json#/$defs/shipOp/oneOf/1/properties/version IDENTIFIER
@@ -493,6 +494,7 @@ ship.schema.json#/properties/insurance/properties/kind FACT_VALUE
 ship.schema.json#/properties/insurance/properties/months FACT_VALUE
 ship.schema.json#/properties/name MEMBER_FREE_TEXT
 ship.schema.json#/properties/orgUnitVersion IDENTIFIER
+ship.schema.json#/properties/origin FACT_VALUE
 ship.schema.json#/properties/shipId IDENTIFIER
 ship.schema.json#/properties/version IDENTIFIER
 stock-lot.schema.json#/properties/extensions CLIENT_DATA

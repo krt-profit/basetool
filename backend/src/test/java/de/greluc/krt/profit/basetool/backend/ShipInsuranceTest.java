@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -93,7 +94,8 @@ class ShipInsuranceTest {
   }
 
   private ShipRequestDto createShipWithInsurance(String insurance) {
-    return new ShipRequestDto("Test Ship", shipType.getId(), insurance, null, false, null, null);
+    return new ShipRequestDto(
+        "Test Ship", shipType.getId(), insurance, null, false, null, null, ShipOrigin.PLEDGE);
   }
 
   @Test

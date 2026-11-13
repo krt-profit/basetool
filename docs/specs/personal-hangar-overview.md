@@ -1,5 +1,5 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
-> **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md), [ADR-0295](../adr/0295-a-hangar-import-matches-ships-by-pledge-and-keeps-pledge-data-private.md)
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
+> **Owner area:** HANGAR/UI · **Related ADRs:** [ADR-0258](../adr/0258-a-ships-org-unit-has-its-own-optimistic-counter.md), [ADR-0295](../adr/0295-a-hangar-import-matches-ships-by-pledge-and-keeps-pledge-data-private.md), [ADR-0379](../adr/0379-the-coarse-ship-origin-is-exchanged.md)
 
 # Personal hangar overview — pagination & server-side sort/filter
 
@@ -48,6 +48,8 @@ already in the DOM:
 - The optional `search` term filters case-insensitively on ship-type *or* manufacturer name (parity
   with the former client-side filter and the squadron overview, REQ-HANGAR-001); types without a
   manufacturer still match on their own name (LEFT-JOIN semantics). Blank input means "no filter".
+- The optional `origin` (`PLEDGE` / `IN_GAME` / `UNKNOWN`) narrows the page and its count to the
+  ships of that effective origin (REQ-HANGAR-017); absent means every origin.
 - The optional `fitted` flag (`true` / `false`) narrows the page and its count to fitted or unfitted
   ships; absent means both. The page offers it as the segment „Alle · Bereit · Nicht bereit" and shows
   „n von m einsatzbereit" for the current search, read with one extra single-entry page request — the
@@ -121,6 +123,9 @@ departing member's ships (REQ-DATA-008).
 - [x] Create, edit (only with a changed field), delete, empty, import (only when ships were
   created or updated, REQ-HANGAR-015), fitted reset (only when a flag was cleared) and home
   location each record one event.
+- [x] An origin change is recorded as an edit with the field name `origin`, never its value; a
+  bulk origin change records one `HANGAR_SHIPS_BULK_ORIGIN_CHANGED` summary with counts only
+  (REQ-HANGAR-017, -018). *`HangarServiceTest`, `HangarShipOriginIntegrationTest`.*
 - [x] A deleted ship's mission units are detached and each detachment is recorded.
 - [x] The Hangar tab in the admin audit viewer lists, filters, exports and purges the area.
 - [x] A connected application's create, update and delete record the same events.
@@ -367,14 +372,18 @@ format is detected from the payload, like the other formats (REQ-HANGAR-014 keep
   created ship takes its own entry's insurance.
 - **Matching instead of duplicating.** Per ship type each upload entry is matched to one ship
   already in the hangar — first a ship with the same pledge id, then a ship without a pledge id
-  (preferring one with the same insurance); only entries left over create ships. A matched ship
+  (preferring one with the same insurance); only entries left over create ships. A ship whose
+  origin is `IN_GAME` is never matched (REQ-HANGAR-017): a member who owns a pledged and an
+  in-game ship of one type never sees the in-game one turned into a pledge. A matched ship
   takes the entry's status and pledge data and keeps everything else (name, insurance, location,
   fitted, unit). So JSON then CSV, or the same file twice, never duplicates ships; ships missing
   from the upload are never deleted. The other formats follow the same matching and carry no
   status or pledge data. The importer's ships are locked in ascending id order for the run.
-- **Locking.** Status and pledge columns are written only by the import and lie outside the ship's
-  `version` (ADR-0295): an import never 409s a concurrent edit, and an edit never overwrites
-  imported data.
+- **Origin.** Every format reads only pledged ships, so every ship an import creates or matches is
+  locked to the origin `PLEDGE` (REQ-HANGAR-017); a newly locked matched ship counts as updated.
+- **Locking.** Status, pledge and origin-lock columns are written only by the import and lie
+  outside the ship's `version` (ADR-0295): an import never 409s a concurrent edit, and an edit
+  never overwrites imported data.
 - **Privacy.** Pledge data are the owner's purchase data. They leave the backend only on the
   owner's own hangar endpoints (`/my-ships`, the owner's add / edit / unit change) and on the
   admin member hangar; the mission views and every other `ShipDto` carry `pledge = null`. The
@@ -392,6 +401,10 @@ format is detected from the payload, like the other formats (REQ-HANGAR-014 keep
   re-import that changes nothing records no event.
 - [x] Pledge data appear on „Meine Schiffe" and the admin member hangar, never in a mission.
 - [x] An import does not change a ship's `version`.
+- [x] An import creates ships locked to `PLEDGE`, locks the ships it matches without moving their
+  `version`, and never matches an `IN_GAME` ship. *`HangarImportServiceTest`
+  (`importShips_createdShipsArePledgedAndLocked`, `…_matchedShipOfUnknownOrigin_…`,
+  `…_neverMatchesAShipBoughtInGame`), `HangarShipOriginIntegrationTest`.*
 
 **Enforced by:** `HangarImportServiceTest` (`importShips_hangarExtension*`),
 `HangarExtensionCsvParserTest`, `HangarImportIntegrationTest#importHangarExtension_jsonThenCsv_fillsTheSameShipsWithoutDuplicates`,
@@ -422,6 +435,121 @@ they own and how many of those are fitted („einsatzbereit"). It is the read of
 (`testMyReadiness_*`), `DashboardSummaryWidgetsMvcTest` · **Code:** `HangarController#getMyReadiness`,
 `HangarService#getMyReadiness`, `ShipRepository#readinessOf`, `ShipReadinessDto` · **Related:**
 REQ-HANGAR-002, REQ-UI-034
+
+### REQ-HANGAR-017 — Every ship is pledged, bought in-game or of unknown origin
+
+Every ship MUST carry an origin: `PLEDGE` (bought on the RSI website), `IN_GAME` (bought with
+in-game currency) or `UNKNOWN`. A patch wipe (epic #3328) removes only `IN_GAME` ships and treats
+`UNKNOWN` like `PLEDGE`. Decisions #3250 and #3255; [ADR-0379](../adr/0379-the-coarse-ship-origin-is-exchanged.md).
+
+- **Version.** The origin is part of the ship's `version`: an origin change is an ordinary edit, and
+  a concurrent edit with the old `version` gets the 409 conflict dialog.
+- **Lock.** A ship from any file import (REQ-HANGAR-015), or with a pledge id, is locked to
+  `PLEDGE`: it reads `PLEDGE` everywhere, whatever origin it stores, and nobody can change it. The
+  lock is a column of its own, written only by the import and outside the `version` (ADR-0295), so
+  an import never 409s an edit. An edit naming another origin than `PLEDGE` for a locked ship is a
+  `400`.
+- **Starting values.** `V418` starts every ship with a pledge id or a production status as locked
+  `PLEDGE` — only the Hangar Extension import sets those — and every other ship as `UNKNOWN`; a later
+  re-import locks the imported ones.
+- **Create.** The add dialog of „Meine Schiffe" and of the admin member hangar requires a choice
+  between „Gepledged" and „Ingame gekauft", with none preset; the frontend proxies refuse an add
+  without one (`422 VALIDATION`) and the backend's web and admin create refuse it with `400`. A
+  connected application's create without one stores `UNKNOWN` (REQ-XCH-057).
+- **Edit.** The edit dialog shows the origin; a locked ship shows „Gepledged" fixed with a hint, an
+  `UNKNOWN` one no choice. An edit without an origin keeps the stored one. The change is audited as
+  `HANGAR_SHIP_UPDATED` with the field name `origin` and never the value, which counts as purchase
+  data (REQ-HANGAR-004).
+- **Visibility.** The origin is private like the pledge data: `ShipMapper#toOwnerDto` carries it
+  as `origin {value, locked}` on the owner's hangar endpoints and the admin member hangar; the unit
+  overview, `/ships`, the mission views and the mission peer redaction never do. Each row of
+  „Meine Schiffe" and the admin member hangar shows it as a chip under the ship name: „Gepledged"
+  (primary), „Ingame gekauft" (warning), „Herkunft unbekannt" (muted).
+- **Hint and filter.** „Meine Schiffe" shows a hint with the number of the caller's ships of
+  unknown origin (one single-entry read of `/my-ships?origin=UNKNOWN`, whole fleet) while it is
+  above zero, and the switch „Herkunft unbekannt" in the toolbar, which filters the list in place
+  through `/my-ships?origin=UNKNOWN` (REQ-HANGAR-002) and survives paging. There is no gate and no
+  login prompt. The hint follows every in-place swap.
+
+**Acceptance**
+
+- [x] A web or admin create without `PLEDGE` or `IN_GAME` is refused; a client's create without an
+  origin stores `UNKNOWN`. *`HangarServiceTest`, `HangarShipOriginIntegrationTest`,
+  `HangarWriteAjaxControllerTest`, `MemberHangarPageControllerTest`.*
+- [x] An origin edit moves the `version`, so a stale edit 409s; an edit without an origin keeps
+  it; a locked ship refuses another origin. *`HangarShipOriginIntegrationTest`, `HangarServiceTest`.*
+- [x] The owner DTO carries the effective origin and the lock; every other DTO carries none.
+  *`ShipMapperTest`, `MissionPeerRedactorTest`.*
+- [x] `V418` starts imported ships as locked `PLEDGE` and the rest as `UNKNOWN`.
+  *`V418ShipOriginMigrationTest`.*
+- [x] The origin filter reads the effective origin; the page shows the chip, the hint with the
+  count, the filter switch and the dialog choice. *`ShipRepositoryPersonalHangarTest`,
+  `HangarPagePatternRenderTest`.*
+
+**Enforced by:** `HangarServiceTest`, `HangarShipOriginIntegrationTest`, `V418ShipOriginMigrationTest`, `ShipMapperTest`,
+`MissionPeerRedactorTest`, `ShipRepositoryPersonalHangarTest`, `HangarControllerTest`,
+`HangarWriteAjaxControllerTest`, `MemberHangarPageControllerTest`, `HangarPagePatternRenderTest`,
+`HangarBackendClientTest` · **Code:** `ShipOrigin`, `Ship#effectiveOrigin`, `ShipOriginRules`,
+`HangarService#addShip`, `#updateShip`, `ShipRepository#findByOwnerIdFiltered`,
+`ShipMapper#toOwnerDto`, `V418__add_ship_origin.sql`, `HangarPageController#viewHangar`,
+`hangar/hangar.html`, `hangar/member-hangar.html`, `hangar/fragments/ship-origin-field.html`,
+`hangar/fragments/ship-meta.html`, `hangar/ship-origin.js` · **Issues:** #3329 (epic #3328),
+decisions #3250 and #3255
+
+### REQ-HANGAR-018 — Owners and admins mark several ships as pledged or bought in-game at once
+
+The owner MUST be able to mark a selection of „Meine Schiffe" as pledged or bought in-game in one
+action, and an admin a selection of a member's ships on the admin member hangar (REQ-HANGAR-011),
+with the selection bar of REQ-HANGAR-010 / -012.
+
+- **Selection bar.** Beside „Einheit ändern" the bar offers „Als gepledged markieren" and „Als
+  ingame gekauft markieren" (design system: outline buttons in the sticky bar). Each acts at once,
+  without a dialog, since marking again undoes it.
+- **Endpoints.** `POST /api/v1/hangar/ships/bulk-origin` (owner, `HANGAR_ACCESS` like the bulk unit
+  change) and `POST /api/v1/hangar/admin/users/{userId}/ships/bulk-origin` (`hasRole('ADMIN')`) with
+  `shipIds` (1 – 1000) and `origin` (`PLEDGE` or `IN_GAME`) answer the `changed` and `skipped`
+  counts. The frontend proxies `/hangar/bulk-origin` and `/admin/members/{userId}/hangar/bulk-origin`
+  refuse an empty selection or another origin with `422 VALIDATION`.
+- **Locks.** The ships are locked pessimistically in ascending id order, as in REQ-HANGAR-010, and
+  checked before the first write: an unknown ship refuses the whole selection with `404`, a ship of
+  another member with `403`; `UNKNOWN` as the target is a `400`. Ships that already have the origin
+  and ships an import locked to `PLEDGE` are skipped and counted. Every changed ship's `version`
+  goes up, so an edit dialog opened before the action 409s.
+- **Audit.** One `HANGAR_SHIPS_BULK_ORIGIN_CHANGED` summary (REQ-HANGAR-004) with `changed` and
+  `skipped`, never the origin, no names, no per-ship events; nothing when nothing changed.
+- **Notice.** On the admin path the member hears one notice per action, after the commit:
+  `HANGAR_CHANGED_BY_ADMIN` with `changeCode` `UPDATED` and the ship type when one ship changed, a
+  summary `HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN` with the count when several did (seeded rule
+  `V419`, `EVENT_RECIPIENT`, actor excluded; [`hangar-notifications.md`](hangar-notifications.md)
+  REQ-HANGAR-008); the notice never names the origin. An admin marking their own ships hears
+  nothing.
+- **Live update.** The list swaps in place, the selection clears, a toast names the counts, and the
+  owner's other open hangar pages and the admin member hangar refresh through `hangar:{owner}`
+  (REQ-FE-001/010). The unit overviews do not show the origin and are not told.
+
+**Acceptance**
+
+- [x] A selection changes in one request; the already marked and the locked ships are skipped and
+  counted; one summary event records the counts without the origin.
+  *`HangarShipOriginIntegrationTest`.*
+- [x] A foreign or unknown ship, or `UNKNOWN` as the target, refuses the whole selection.
+  *`HangarShipOriginIntegrationTest`.*
+- [x] A bulk change makes a stale edit 409. *`HangarShipOriginIntegrationTest`.*
+- [x] Only an admin reaches the admin path; the member hears one notice per action, without the
+  origin. *`HangarShipOriginIntegrationTest`, `HangarShipOriginServiceTest`,
+  `SeededNotificationRulesIntegrationTest`.*
+- [x] The proxies forward a valid selection and refuse an invalid one before the backend.
+  *`HangarWriteAjaxControllerTest`, `MemberHangarPageControllerTest`, `HangarBackendClientTest`.*
+
+**Enforced by:** `HangarShipOriginIntegrationTest`, `HangarShipOriginServiceTest`,
+`HangarControllerTest`, `SeededNotificationRulesIntegrationTest`, `HangarWriteAjaxControllerTest`,
+`MemberHangarPageControllerTest`, `HangarBackendClientTest`, `HangarPagePatternRenderTest` ·
+**Code:** `HangarController#bulkChangeMyShipsOrigin`, `#bulkChangeUserShipsOrigin`,
+`HangarShipOriginService`, `HangarAdminNotifier`, `HangarNotices#shipsOriginChanged`,
+`V419__seed_admin_ship_origin_notification_rule.sql`, `HangarShipOriginProxyController`,
+`MemberHangarShipProxyController#bulkChangeShipOrigin`, `hangar/hangar.js`,
+`hangar/member-hangar.js`, `hangar/ship-origin.js` · **Issues:** #3329 (epic #3328), decision
+#3250
 
 ## Out of scope
 

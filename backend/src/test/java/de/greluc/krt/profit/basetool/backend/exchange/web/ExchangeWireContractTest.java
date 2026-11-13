@@ -430,7 +430,7 @@ class ExchangeWireContractTest {
             assertMatches(
                 "page.schema.json#/$defs/shipPage",
                 "{\"items\":[{\"shipId\":\"s\",\"shipType\":{\"bt\":\"b\",\"name\":\"n\"},"
-                    + "\"insurance\":{\"kind\":\"LTI\"},\"fitted\":false}],"
+                    + "\"insurance\":{\"kind\":\"LTI\"},\"origin\":\"UNKNOWN\",\"fitted\":false}],"
                     + "\"removed\":[],\"hasMore\":false}",
                 "a ship without its version"))
         .isInstanceOf(AssertionError.class);

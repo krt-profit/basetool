@@ -134,7 +134,8 @@ public class MissionPeerRedactor {
    * (REQ-SEC-040).
    *
    * @param dto the ship DTO nested in an assigned unit; never {@code null}
-   * @return a copy whose owner is redacted for a peer and which carries no pledge data
+   * @return a copy whose owner is redacted for a peer and which carries no pledge data and no
+   *     origin
    */
   @NotNull
   public ShipDto cleanupShipForPeer(@NotNull ShipDto dto) {
@@ -150,6 +151,7 @@ public class MissionPeerRedactor {
         dto.version(),
         dto.owningOrgUnitVersion(),
         dto.productionStatus(),
+        null,
         null);
   }
 

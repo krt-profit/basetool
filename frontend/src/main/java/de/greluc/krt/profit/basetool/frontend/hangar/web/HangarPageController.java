@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipForm;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrigin;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorLogging;
@@ -132,6 +133,7 @@ public class HangarPageController {
    * @param size page size, validated against {@link #HANGAR_PAGE_SIZES}
    * @param search optional ship-type/manufacturer filter, applied by the backend
    * @param fitted optional fitted filter, {@code true} or {@code false}; anything else means both
+   * @param origin optional origin filter (REQ-HANGAR-017); an unknown value means every origin
    * @param fragment {@code "results"} renders only the ship-table fragment (REQ-FE-005)
    * @param model model populated with the ship form, ship page, counters, reference catalogs and
    *     pagination state
@@ -144,6 +146,7 @@ public class HangarPageController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String search,
       @RequestParam(required = false) String fitted,
+      @RequestParam(required = false) String origin,
       @RequestParam(required = false) String fragment,
       Model model) {
     if (!model.containsAttribute("shipForm")) {
@@ -156,6 +159,7 @@ public class HangarPageController {
     int effectivePage = page == null || page < 0 ? 0 : page;
     String effectiveSearch = search == null || search.isBlank() ? null : search.trim();
     Boolean fittedFilter = parseFitted(fitted);
+    ShipOrigin originFilter = ShipOrigin.parse(origin);
 
     AtomicBoolean shipsFailed = new AtomicBoolean(false);
 
@@ -163,7 +167,8 @@ public class HangarPageController {
         parallelPageLoader
             .<PageResponse<ShipDto>>loadAsync(() -> {
               PageResponse<ShipDto> p =
-                  hangarClient.myShips(effectivePage, effectiveSize, fittedFilter, effectiveSearch);
+                  hangarClient.myShips(
+                      effectivePage, effectiveSize, fittedFilter, originFilter, effectiveSearch);
               return p != null
                   ? p
                   : new PageResponse<>(List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
@@ -179,11 +184,22 @@ public class HangarPageController {
     Boolean counterpartFitted = fittedFilter == null ? Boolean.TRUE : null;
     CompletableFuture<Long> counterpartFuture =
         parallelPageLoader
-            .<Long>loadAsync(
-                () -> totalOf(hangarClient.myShips(0, 1, counterpartFitted, effectiveSearch)))
+            .<Long>loadAsync(() ->
+                totalOf(
+                    hangarClient.myShips(0, 1, counterpartFitted, originFilter, effectiveSearch)))
             .exceptionally(e -> {
               SectionFallback.rethrowIfReauthenticationRequired(e);
               log.warn("Failed to count my ships for the readiness counter", e);
+              return null;
+            });
+
+    CompletableFuture<Long> unknownOriginFuture =
+        parallelPageLoader
+            .<Long>loadAsync(
+                () -> totalOf(hangarClient.myShips(0, 1, null, ShipOrigin.UNKNOWN, null)))
+            .exceptionally(e -> {
+              SectionFallback.rethrowIfReauthenticationRequired(e);
+              log.warn("Failed to count my ships of unknown origin", e);
               return null;
             });
 
@@ -228,6 +244,7 @@ public class HangarPageController {
     CompletableFuture.allOf(
             shipsFuture,
             counterpartFuture,
+            unknownOriginFuture,
             unitTypeCountFuture,
             shipTypesFuture,
             locationsFuture,
@@ -265,7 +282,10 @@ public class HangarPageController {
     model.addAttribute("pageSize", effectiveSize);
     model.addAttribute("search", effectiveSearch);
     model.addAttribute("fitted", fittedFilter == null ? "" : fittedFilter.toString());
-    model.addAttribute("paginationBaseUrl", listBaseUrl("/hangar", effectiveSearch, fittedFilter));
+    model.addAttribute("origin", originFilter == null ? "" : originFilter.name());
+    model.addAttribute("unknownOriginCount", unknownOriginFuture.join());
+    model.addAttribute(
+        "paginationBaseUrl", listBaseUrl("/hangar", effectiveSearch, fittedFilter, originFilter));
     model.addAttribute("shipTypes", shipTypes);
     model.addAttribute("locations", locations);
     model.addAttribute("manufacturers", manufacturers);
@@ -343,17 +363,21 @@ public class HangarPageController {
   }
 
   /**
-   * Builds a tab's pagination base URL keeping the active search and fitted filter, so paging and
-   * the size picker never drop them.
+   * Builds a tab's pagination base URL keeping the active search, fitted and origin filters, so
+   * paging and the size picker never drop them.
    *
    * @param path the tab's own path
    * @param search the active search term, or {@code null}
    * @param fitted the active fitted filter, or {@code null}
+   * @param origin the active origin filter, or {@code null}
    * @return the base URL without paging params
    */
   private static @NotNull String listBaseUrl(
-      @NotNull String path, @Nullable String search, @Nullable Boolean fitted) {
-    if (search == null && fitted == null) {
+      @NotNull String path,
+      @Nullable String search,
+      @Nullable Boolean fitted,
+      @Nullable ShipOrigin origin) {
+    if (search == null && fitted == null && origin == null) {
       return path;
     }
     UriComponentsBuilder uri = UriComponentsBuilder.fromPath(path);
@@ -362,6 +386,9 @@ public class HangarPageController {
     }
     if (fitted != null) {
       uri.queryParam("fitted", fitted);
+    }
+    if (origin != null) {
+      uri.queryParam("origin", origin.name());
     }
     return uri.toUriString();
   }
@@ -452,7 +479,7 @@ public class HangarPageController {
         fragmentOnly
             ? CompletableFuture.completedFuture(null)
             : parallelPageLoader
-                .<Long>loadAsync(() -> totalOf(hangarClient.myShips(0, 1, null, null)))
+                .<Long>loadAsync(() -> totalOf(hangarClient.myShips(0, 1, null, null, null)))
                 .exceptionally(e -> {
                   SectionFallback.rethrowIfReauthenticationRequired(e);
                   log.warn("Failed to count my ships for the hangar tab", e);
@@ -478,7 +505,8 @@ public class HangarPageController {
     model.addAttribute("search", effectiveSearch);
     model.addAttribute("pageSizes", HANGAR_PAGE_SIZES);
     model.addAttribute("pageSize", effectiveSize);
-    model.addAttribute("paginationBaseUrl", listBaseUrl("/hangar/squadron", effectiveSearch, null));
+    model.addAttribute(
+        "paginationBaseUrl", listBaseUrl("/hangar/squadron", effectiveSearch, null, null));
     model.addAttribute("mineTabCount", mineCountFuture.join());
     model.addAttribute("unitTabCount", res != null ? Long.valueOf(res.totalElements()) : null);
     if (fragmentOnly) {
@@ -516,10 +544,14 @@ public class HangarPageController {
       BindingResult bindingResult,
       Model model,
       RedirectAttributes redirectAttributes) {
+    String origin = ShipOrigin.choiceOf(form.getOrigin());
+    if (origin == null) {
+      bindingResult.rejectValue("origin", "ship.validation.origin.required");
+    }
     if (bindingResult.hasErrors()) {
       model.addAttribute("showShipModal", true);
       model.addAttribute("modalAction", "/hangar/add");
-      return viewHangar(null, null, null, null, null, model);
+      return viewHangar(null, null, null, null, null, null, model);
     }
 
     try {
@@ -531,7 +563,8 @@ public class HangarPageController {
               form.getLocationId(),
               form.isFitted(),
               null,
-              form.getOwningOrgUnitId());
+              form.getOwningOrgUnitId(),
+              origin);
       hangarClient.createShip(request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_add");
     } catch (BackendServiceException e) {
@@ -571,7 +604,7 @@ public class HangarPageController {
       model.addAttribute("errorToast", "error.validation.failed");
       model.addAttribute("showShipModal", true);
       model.addAttribute("modalAction", "/hangar/" + id + "/update");
-      return viewHangar(null, null, null, null, null, model);
+      return viewHangar(null, null, null, null, null, null, model);
     }
 
     try {
@@ -583,7 +616,8 @@ public class HangarPageController {
               form.getLocationId(),
               form.isFitted(),
               form.getVersion(),
-              null);
+              null,
+              ShipOrigin.choiceOf(form.getOrigin()));
       hangarClient.updateShip(id, request);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_update");
     } catch (BackendServiceException e) {
@@ -655,7 +689,11 @@ public class HangarPageController {
   @PostMapping(value = "/add", headers = "X-Requested-With=XMLHttpRequest")
   @ResponseBody
   public ResponseEntity<Object> addShipAjax(@RequestBody ShipRequestDto request) {
-    if (request == null || request.shipTypeId() == null || isBlank(request.insurance())) {
+    String origin = request == null ? null : ShipOrigin.choiceOf(request.origin());
+    if (request == null
+        || request.shipTypeId() == null
+        || isBlank(request.insurance())
+        || origin == null) {
       return validationProblem();
     }
     return relay(
@@ -670,7 +708,8 @@ public class HangarPageController {
                   request.locationId(),
                   request.fitted(),
                   null,
-                  request.owningOrgUnitId()));
+                  request.owningOrgUnitId(),
+                  origin));
           return ResponseEntity.noContent().build();
         });
   }
@@ -704,7 +743,8 @@ public class HangarPageController {
                   request.locationId(),
                   request.fitted(),
                   request.version(),
-                  null));
+                  null,
+                  ShipOrigin.choiceOf(request.origin())));
           return ResponseEntity.noContent().build();
         });
   }

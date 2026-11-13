@@ -165,6 +165,30 @@ public final class HangarNotices {
   }
 
   /**
+   * An admin changed the origin of several ships of a member in one action; the notice never names
+   * the origin, which is purchase data (REQ-HANGAR-018).
+   *
+   * @param memberId the ships' owner, the single recipient
+   * @param count how many of their ships changed
+   * @param actor the admin
+   * @return the event
+   */
+  @NotNull
+  public static NoticeEvent shipsOriginChanged(
+      @NotNull UUID memberId, long count, @NotNull ActorRef actor) {
+    Map<String, String> params = new LinkedHashMap<>();
+    params.put("actor", actor.name());
+    params.put("count", Long.toString(count));
+    return builder(
+            NotificationEventType.HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN,
+            HANGAR_ENTITY_TYPE,
+            memberId,
+            actor)
+        .renderParams(params)
+        .build();
+  }
+
+  /**
    * An admin added, changed, deleted or imported blueprints of a member.
    *
    * @param memberId the blueprints' owner, the single recipient

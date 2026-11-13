@@ -54,7 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>A snapshot pages through the member's ships by id and ends with the feed position it was taken
  * at; the feed answers each ship changed after the cursor once, with its current state or a
- * tombstone. Purchase data is never read.
+ * tombstone. Purchase data is never read; the coarse origin is sent as the ship reads it
+ * (REQ-XCH-057).
  */
 @Service
 @RequiredArgsConstructor
@@ -227,7 +228,8 @@ public class ExchangeShipFeedService {
                 ship.locationId() == null ? null : guids.get(ship.locationId())),
         ship.fitted(),
         orgUnit(ship.orgUnit()),
-        ship.orgUnitVersion());
+        ship.orgUnitVersion(),
+        ship.effectiveOrigin().name());
   }
 
   /**
