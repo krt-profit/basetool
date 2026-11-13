@@ -338,6 +338,8 @@
 /impressum GET -> ImpressumController#showImpressum gate=none layout=yes
 /internal/client-error POST -> ClientErrorReportController#report gate=class:isAuthenticated() layout=no
 /inventory GET -> InventoryPageController#viewAggregatedInventory gate=class:isAuthenticated() layout=yes
+/inventory GET params=[fragment=view,storage=all] -> InventoryListPageController#switchAllInventoryView gate=class:isAuthenticated() layout=yes
+/inventory GET params=[fragment=view,storage=my] -> InventoryListPageController#switchMyInventoryView gate=class:isAuthenticated() layout=yes
 /inventory GET params=[storage=all] -> InventoryListPageController#viewAllInventory gate=class:isAuthenticated() layout=yes
 /inventory GET params=[storage=my] -> InventoryListPageController#viewMyInventory gate=class:isAuthenticated() layout=yes
 /inventory/all DELETE -> InventoryDeleteAllProxyController#deleteAllGlobalInventory gate=method:hasRole('ADMIN') layout=no
