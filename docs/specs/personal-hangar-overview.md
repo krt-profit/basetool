@@ -480,13 +480,13 @@ in-game currency) or `UNKNOWN`. A patch wipe (epic #3328) removes only `IN_GAME`
   it; a locked ship refuses another origin. *`HangarShipOriginIntegrationTest`, `HangarServiceTest`.*
 - [x] The owner DTO carries the effective origin and the lock; every other DTO carries none.
   *`ShipMapperTest`, `MissionPeerRedactorTest`.*
-- [ ] `V418` starts imported ships as locked `PLEDGE` and the rest as `UNKNOWN`. *The test
-  database is empty when Flyway runs, so no test covers the backfill yet.*
+- [x] `V418` starts imported ships as locked `PLEDGE` and the rest as `UNKNOWN`.
+  *`V418ShipOriginMigrationTest`.*
 - [x] The origin filter reads the effective origin; the page shows the chip, the hint with the
   count, the filter switch and the dialog choice. *`ShipRepositoryPersonalHangarTest`,
   `HangarPagePatternRenderTest`.*
 
-**Enforced by:** `HangarServiceTest`, `HangarShipOriginIntegrationTest`, `ShipMapperTest`,
+**Enforced by:** `HangarServiceTest`, `HangarShipOriginIntegrationTest`, `V418ShipOriginMigrationTest`, `ShipMapperTest`,
 `MissionPeerRedactorTest`, `ShipRepositoryPersonalHangarTest`, `HangarControllerTest`,
 `HangarWriteAjaxControllerTest`, `MemberHangarPageControllerTest`, `HangarPagePatternRenderTest`,
 `HangarBackendClientTest` · **Code:** `ShipOrigin`, `Ship#effectiveOrigin`, `ShipOriginRules`,
