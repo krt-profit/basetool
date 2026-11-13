@@ -37,6 +37,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param triggeredAt when the admin triggered it
  * @param triggeredBy the triggering admin's display name, or {@code null} when the account is gone
  * @param options the options it was triggered with
+ * @param wipeExceptions its wipe exceptions with their entries' names, ordered by name
  * @param counts what its effects touched, one entry per kind
  */
 public record PatchChangeDto(
@@ -48,4 +49,5 @@ public record PatchChangeDto(
     @NotNull Instant triggeredAt,
     @Nullable String triggeredBy,
     @NotNull PatchChangeOptions options,
+    @NotNull @Unmodifiable List<WipeExceptionDto> wipeExceptions,
     @NotNull @Unmodifiable List<PatchCountDto> counts) {}

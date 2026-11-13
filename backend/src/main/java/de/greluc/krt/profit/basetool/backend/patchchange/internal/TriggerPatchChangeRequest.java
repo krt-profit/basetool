@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -38,5 +39,5 @@ public record TriggerPatchChangeRequest(
     @NotBlank @Size(max = 32) String label,
     @NotNull PatchKind kind,
     @Nullable Instant liveAt,
-    @NotNull PatchChangeOptions options,
+    @NotNull @Valid PatchChangeOptions options,
     @NotBlank @Size(max = 32) String confirmation) {}

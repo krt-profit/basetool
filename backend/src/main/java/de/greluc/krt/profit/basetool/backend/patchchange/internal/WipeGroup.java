@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 /**
- * The fixed wipe groups a patch change can select (REQ-PATCH-002). They are stored as options; the
- * wipe effect that reads them is not part of the trigger yet.
+ * The fixed wipe groups a patch change can select (REQ-PATCH-002, REQ-PATCH-010): every group but
+ * the in-game ships selects stock rows by the catalogue types {@link WipeGroupTypes} assigns it.
  */
 public enum WipeGroup {
   /** Food, drinks, medpens and other FPS consumables, magazines and ammunition. */
@@ -39,5 +39,14 @@ public enum WipeGroup {
   /** Every item no other group claims. */
   OTHER_ITEMS,
   /** Ships whose origin is in-game. */
-  IN_GAME_SHIPS
+  IN_GAME_SHIPS;
+
+  /**
+   * Tells whether the group selects stock rows rather than ships.
+   *
+   * @return {@code false} only for {@link #IN_GAME_SHIPS}
+   */
+  public boolean selectsStock() {
+    return this != IN_GAME_SHIPS;
+  }
 }

@@ -30,7 +30,6 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
-import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
@@ -50,7 +49,6 @@ import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
-import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -92,9 +90,8 @@ public class HangarService {
   private final UserRepository userRepository;
   private final ShipTypeRepository shipTypeRepository;
   private final LocationRepository locationRepository;
-  private final ShipDeletionObserver shipDeletionObserver;
+  private final HangarShipRemoval shipRemoval;
   private final ShipTypeMapper shipTypeMapper;
-  private final EntityManager entityManager;
   private final RequestScopeResolver requestScopeResolver;
   private final AccessGateService accessGateService;
   private final OrgUnitStampingService orgUnitStampingService;
@@ -639,17 +636,13 @@ public class HangarService {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
     ShipOwnership.requireOwner(ship, userId);
 
-    int detached = shipDeletionObserver.beforeShipDelete(shipId);
-
-    entityManager.flush();
-    shipRepository.delete(ship);
+    int detached = shipRemoval.remove(List.of(ship));
     auditRecorder.record(
         AuditEventType.HANGAR_SHIP_DELETED,
         shipId,
         ship.getShipType().getName(),
         userId,
         AuditDetails.of("detachedUnits", detached));
-    unitLiveSync.shipsChanged(Arrays.asList(ship.getOwningOrgUnit()));
     return detached;
   }
 
@@ -667,19 +660,13 @@ public class HangarService {
       return;
     }
     log.info("deleteAllShipsForUser: unlinking {} ships for user {}", ships.size(), userId);
-    int detached = 0;
-    for (Ship ship : ships) {
-      detached += shipDeletionObserver.beforeShipDelete(ship.getId());
-    }
-    entityManager.flush();
-    shipRepository.deleteAll(ships);
+    int detached = shipRemoval.remove(ships);
     auditRecorder.record(
         AuditEventType.HANGAR_EMPTIED,
         null,
         null,
         userId,
         AuditDetails.of("ships", ships.size()).with("detachedUnits", detached));
-    unitLiveSync.shipsChanged(ships.stream().map(Ship::getOwningOrgUnit).toList());
     log.info("deleteAllShipsForUser: deleted {} ships for user {}", ships.size(), userId);
   }
 
