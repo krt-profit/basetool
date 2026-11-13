@@ -29,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The label of a patch change: a version of two or three numbers such as {@code 4.4} or {@code
  * 4.4.1} (REQ-PATCH-001). Labels compare number by number, a missing third number counting as zero.
+ * Every instance has a valid shape, also one built from a stored label.
  *
  * @param value the label as written
  */
@@ -45,6 +46,20 @@ public record PatchLabel(@NotNull String value) {
   /** The separator between a label's numbers. */
   private static final Pattern DOT = Pattern.compile("\\.");
 
+  /** The radix the label's numbers are written in. */
+  private static final int DECIMAL = 10;
+
+  /**
+   * Validates the label's shape.
+   *
+   * @throws BadRequestException {@code error.patch_change.label_invalid} for any other shape
+   */
+  public PatchLabel {
+    if (!SHAPE.matcher(value).matches()) {
+      throw new BadRequestException("error.patch_change.label_invalid");
+    }
+  }
+
   /**
    * Validates and wraps a label.
    *
@@ -54,7 +69,7 @@ public record PatchLabel(@NotNull String value) {
    */
   @Contract("null -> fail")
   public static @NotNull PatchLabel parse(@Nullable String value) {
-    if (value == null || !SHAPE.matcher(value).matches()) {
+    if (value == null) {
       throw new BadRequestException("error.patch_change.label_invalid");
     }
     return new PatchLabel(value);
@@ -79,8 +94,22 @@ public record PatchLabel(@NotNull String value) {
     long[] numbers = new long[PARTS];
     int part = 0;
     for (String number : DOT.splitAsStream(value).toList()) {
-      numbers[part++] = Long.parseLong(number);
+      numbers[part++] = digits(number);
     }
     return numbers;
+  }
+
+  /**
+   * Reads one of the label's numbers.
+   *
+   * @param number one to nine decimal digits, as {@link #SHAPE} guarantees
+   * @return its value
+   */
+  private static long digits(@NotNull String number) {
+    long value = 0;
+    for (int i = 0; i < number.length(); i++) {
+      value = value * DECIMAL + Character.digit(number.charAt(i), DECIMAL);
+    }
+    return value;
   }
 }
