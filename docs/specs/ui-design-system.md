@@ -1958,8 +1958,11 @@ Page merges this needs:
   personal-blueprints pages, now keyed by the member (`/admin/personal-inventory?userSub=…`,
   `/admin/personal-blueprints?userSub=…`); the member picker is gone and the pages without a member
   lead to the member list.
-- „Gefahrenzone" (`/admin/settings/danger-zone`) holds the destructive one-off actions: the bank
-  wipe reset and deleting every user's blueprints. `/admin/bank` redirects to it.
+- „Gefahrenzone" (`/admin/settings/danger-zone`) holds the destructive one-off actions: the patch
+  change, the bank wipe reset and deleting every user's blueprints. `/admin/bank` redirects to it.
+  The patch change's card leads to its own page `/admin/settings/patch-change` (REQ-PATCH-008),
+  which keeps the Gefahrenzone tab marked: a page below another tab's path marks the tab its page
+  head names.
 - „Informationen" (the home-page announcement) is edited inline in its dashboard widget; it has no
   admin link, and `/admin/announcement` redirects to the dashboard (page `GET` only).
 

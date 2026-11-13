@@ -84,7 +84,8 @@ class AdminAuditLogPageControllerTest {
           "CONNECTED_APPS",
           "SUPPLY",
           "PURCHASING",
-          "CATALOGUE");
+          "CATALOGUE",
+          "PATCH_CHANGE");
 
   private BackendApiClient backendApiClient;
   private AdminAuditLogPageController controller;
@@ -193,6 +194,40 @@ class AdminAuditLogPageControllerTest {
     assertTrue(
         labels.containsKey("admin.audit.event.MEMBER_RANK_CHANGED"),
         "Missing i18n label admin.audit.event.MEMBER_RANK_CHANGED");
+  }
+
+  /**
+   * The patch-change area is its own tab right after the catalogue, offering its four event types;
+   * the refinery's summary event of a patch change stays in the refinery tab (REQ-PATCH-009).
+   */
+  @Test
+  void patchChangeTab_followsTheCatalogueAndOffersItsEventTypes() throws Exception {
+    stubEveryTrailRead(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
+    Model model = new ConcurrentModel();
+
+    controller.auditLog("PATCH_CHANGE", null, null, null, null, null, 0, null, model);
+
+    assertEquals("PATCH_CHANGE", model.getAttribute("activeDomain"));
+    assertEquals("/api/proxy/audit/PATCH_CHANGE/export", model.getAttribute("exportEndpoint"));
+    List<String> domains = (List<String>) model.getAttribute("domains");
+    assertNotNull(domains);
+    assertEquals(domains.indexOf("CATALOGUE") + 1, domains.indexOf("PATCH_CHANGE"));
+    assertEquals(
+        List.of(
+            "PATCH_CHANGE_TRIGGERED",
+            "PATCH_CHANGE_LABEL_CORRECTED",
+            "PATCH_CHANGE_AUDIT_EXPORTED",
+            "PATCH_CHANGE_AUDIT_PURGED"),
+        model.getAttribute("eventTypes"));
+
+    Model refinery = new ConcurrentModel();
+    controller.auditLog("REFINERY", null, null, null, null, null, 0, null, refinery);
+    List<String> refineryTypes = (List<String>) refinery.getAttribute("eventTypes");
+    assertNotNull(refineryTypes);
+    assertTrue(refineryTypes.contains("REFINERY_ORDERS_CANCELED_BY_PATCH"));
+
+    Properties labels = loadDefaultBundle();
+    assertTrue(labels.containsKey("admin.audit.domain.PATCH_CHANGE"));
   }
 
   @Test

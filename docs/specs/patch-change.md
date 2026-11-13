@@ -209,9 +209,12 @@ refreshes its history and its form's previous values.
 - [x] A correction with a stale version answers 409.
 - [x] The page renders the form, the preview, the confirmation and the history.
 
-**Enforced by:** `PatchChangeTriggerIntegrationTest`, the frontend page tests · **Code:**
+**Enforced by:** `PatchChangeTriggerIntegrationTest`, `AdminPatchChangePageControllerMvcTest`,
+`AdminPatchChangeRelayControllerMvcTest`, `PatchChangeBackendClientTest`,
+`LiveSyncSectionMapParityTest`, `LiveSyncTopicTest`, `NavigationMenuTest` · **Code:**
 `PatchChangeHistory`, `PatchChangeLabelCorrection`, `PatchChangeLiveSync`, the frontend's
-`patchchange` domain
+`patchchange` domain (`AdminPatchChangePageController`, `AdminPatchChangeRelayController`,
+`PatchChangeBackendClient`, `static/js/patchchange/`), `LiveSyncTopicClass.PATCH_CHANGE`
 
 ### REQ-PATCH-009 — The audit area „Patchwechsel“
 
@@ -236,6 +239,7 @@ exempts `PATCH_CHANGE`, because patch changes are rare (REQ-OBS-011).
 - [x] A trigger records `PATCH_CHANGE_TRIGGERED` and the refinery's summary event; a correction
   records `PATCH_CHANGE_LABEL_CORRECTED`.
 
-**Enforced by:** `PatchChangeTriggerIntegrationTest`, `AuditReportServiceTest`, the alert's
-promtool test · **Code:** `AuditDomain.PATCH_CHANGE`, `PatchChangeTrigger`,
+**Enforced by:** `PatchChangeTriggerIntegrationTest`, `AuditReportServiceTest`,
+`AdminAuditLogPageControllerTest`, the alert's promtool test · **Code:**
+`AuditDomain.PATCH_CHANGE`, `AuditDomains`, `AdminAuditLogPageController`, `PatchChangeTrigger`,
 `PatchChangeLabelCorrection`, `RefineryPatchCancellationService`

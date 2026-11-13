@@ -2388,7 +2388,7 @@ the role tab's `member`,
 `hangar_own` and `blueprints_own`, the unit template room `mission_templates` (REQ-MISSION-035),
 and the unit hangar rooms `hangar_unit` and `hangar_units`,
 ADR-0260, the admin dashboard room `admin_dashboard`, ADR-0328, the member catalogue room
-`catalogue`, the admin starmap, shops and P4K import room `catalogue_admin`, and the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`), and
+`catalogue`, the admin starmap, shops and P4K import room `catalogue_admin`, the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`, and the admin patch-change room `patch_change` of REQ-PATCH-008), and
 the meter names stay put — a rename would break the `07` panels and this alert set.
 
 The backend and frontend share the `catalogue` section allow-list. Committed source changes publish

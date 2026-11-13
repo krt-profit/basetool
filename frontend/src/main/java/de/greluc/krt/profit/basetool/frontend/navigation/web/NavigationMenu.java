@@ -130,9 +130,11 @@ public record NavigationMenu(
   }
 
   /**
-   * The tab bar of the page an entry belongs to, with the current tab marked.
+   * The tab bar of the page an entry belongs to, with the current tab marked: the tab whose path is
+   * the request's, else the entry's own tab, so a sub-page below another tab's path keeps the tab
+   * its page head names, else the tab whose path is the longest prefix of the request's.
    *
-   * @param entryKey the key of any entry of the page's tab bar
+   * @param entryKey the key of the entry whose tab the page belongs to
    * @param requestUri the current request URI, with or without a query
    * @return the permitted tabs in order, or empty when the entry has no tab bar or fewer than two
    *     tabs are permitted
@@ -146,9 +148,13 @@ public record NavigationMenu(
     String path = requestUri.split("\\?", 2)[0];
     NavigationEntry current =
         bar.tabs().stream()
-            .filter(tab -> path.equals(tab.href()) || path.startsWith(tab.href() + "/"))
-            .max(Comparator.comparingInt(tab -> tab.href().length()))
+            .filter(tab -> path.equals(tab.href()))
+            .findFirst()
             .or(() -> bar.tabs().stream().filter(tab -> tab.key().equals(entryKey)).findFirst())
+            .or(() ->
+                bar.tabs().stream()
+                    .filter(tab -> path.startsWith(tab.href() + "/"))
+                    .max(Comparator.comparingInt(tab -> tab.href().length())))
             .orElse(null);
     return bar.tabs().stream().map(tab -> new PageTab(tab, tab == current)).toList();
   }
