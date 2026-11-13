@@ -106,13 +106,15 @@ it, and no such row is folded into another. The write-time merge of
 [REQ-INV-026](inventory-lager.md#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in)
 skips such rows as survivor and as candidate, and the merge probe of the Einbuchen form does not
 count them; the write then lands its own row. A pre-patch row therefore holds only pre-patch stock,
-which the wipe and the relocation select by its creation time (ADR-0381). Before the first patch
-change every row takes part as before.
+which the wipe and the relocation select by its creation time (ADR-0381). A candidate row without a
+creation time counts as created before the live time. Before the first patch change every row
+takes part as before, dated or not.
 
 **Acceptance**
 
 - [x] A merge whose just-written row was created before the cutoff leaves every row as it is.
-- [x] The merge group and the merge probe leave out rows created before the cutoff.
+- [x] The merge group and the merge probe leave out rows created before the cutoff or without a
+  creation time; without a patch change they leave out none.
 
 **Enforced by:** `InventoryMergeCutoffTest`, `InventoryMergeGroupDataTest` · **Code:**
 `inventory.api.StockMergeCutoff`, `PatchChangeMergeCutoff`, `InventoryMergeService`,

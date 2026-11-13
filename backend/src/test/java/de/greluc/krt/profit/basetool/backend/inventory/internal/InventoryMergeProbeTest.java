@@ -33,13 +33,10 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
-import de.greluc.krt.profit.basetool.backend.inventory.api.OrderLinkedStockWriteObserver;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OwnerOrgUnitRequiredException;
-import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,12 +47,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Covers {@link InventoryItemService#hasMergeCandidates}, the Einbuchen merge probe (REQ-INV-026).
+ * Covers {@link InventoryMergeProbe#hasMergeCandidates}, the Einbuchen merge probe (REQ-INV-026).
  */
-@ExtendWith({
-  MockitoExtension.class,
-  de.greluc.krt.profit.basetool.backend.support.InventoryWritePlanExtension.class
-})
+@ExtendWith(MockitoExtension.class)
 class InventoryMergeProbeTest {
 
   private static final UUID CALLER = UUID.randomUUID();
@@ -64,11 +58,10 @@ class InventoryMergeProbeTest {
 
   @Mock private InventoryItemRepository inventoryItemRepository;
   @Mock private UserRepository userRepository;
-  @Mock private RequestScopeResolver requestScopeResolver;
   @Mock private OrgUnitStampingService orgUnitStampingService;
   @Mock private InventoryAccessPolicy inventoryAccessPolicy;
 
-  private InventoryItemService service;
+  private InventoryMergeProbe service;
   private User caller;
 
   @BeforeEach
@@ -78,45 +71,14 @@ class InventoryMergeProbeTest {
     caller.setId(CALLER);
   }
 
-  private InventoryItemService serviceWithStolenMarking(boolean enabled) {
-    InventoryOrderWrites orderWrites =
-        new InventoryOrderWrites(
-            inventoryItemRepository, org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class));
-    return new InventoryItemService(
-        orderWrites,
+  private InventoryMergeProbe serviceWithStolenMarking(boolean enabled) {
+    return new InventoryMergeProbe(
         inventoryItemRepository,
         userRepository,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        requestScopeResolver,
         orgUnitStampingService,
         inventoryAccessPolicy,
-        new InventoryStockCommands(
-            new InventoryOrderWrites(
-                org.mockito.Mockito.mock(
-                    de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemRepository
-                        .class),
-                org.mockito.Mockito.mock(OrderLinkedStockWriteObserver.class)),
-            null,
-            null,
-            null,
-            null,
-            null,
-            inventoryAccessPolicy,
-            null,
-            null),
-        null,
-        null,
-        null,
-        null,
         new InventoryProperties(enabled),
-        new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-            orderWrites),
-        () -> Instant.EPOCH);
+        Optional::empty);
   }
 
   @Test
@@ -128,7 +90,7 @@ class InventoryMergeProbeTest {
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
         .thenReturn(unit);
     when(inventoryItemRepository.countMergeCandidates(
-            CALLER, MATERIAL, LOCATION, 500, false, false, unitId, Instant.EPOCH))
+            CALLER, MATERIAL, LOCATION, 500, false, false, unitId, null))
         .thenReturn(2L);
 
     assertTrue(
@@ -141,7 +103,7 @@ class InventoryMergeProbeTest {
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
         .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
-            CALLER, MATERIAL, LOCATION, 500, true, false, null, Instant.EPOCH))
+            CALLER, MATERIAL, LOCATION, 500, true, false, null, null))
         .thenReturn(0L);
 
     assertFalse(
@@ -195,7 +157,7 @@ class InventoryMergeProbeTest {
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(target, null))
         .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
-            other, MATERIAL, LOCATION, 500, false, false, null, Instant.EPOCH))
+            other, MATERIAL, LOCATION, 500, false, false, null, null))
         .thenReturn(1L);
 
     assertTrue(
@@ -221,12 +183,12 @@ class InventoryMergeProbeTest {
 
   @Test
   void probesStolenStockWhileMarkingIsOn() {
-    InventoryItemService marking = serviceWithStolenMarking(true);
+    InventoryMergeProbe marking = serviceWithStolenMarking(true);
     when(userRepository.findById(CALLER)).thenReturn(Optional.of(caller));
     when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(caller, null))
         .thenReturn(null);
     when(inventoryItemRepository.countMergeCandidates(
-            CALLER, MATERIAL, LOCATION, 500, false, true, null, Instant.EPOCH))
+            CALLER, MATERIAL, LOCATION, 500, false, true, null, null))
         .thenReturn(1L);
 
     assertTrue(

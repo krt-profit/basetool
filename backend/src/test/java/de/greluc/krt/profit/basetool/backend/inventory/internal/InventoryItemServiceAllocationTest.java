@@ -50,7 +50,6 @@ import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderEarmarkTa
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mission.api.Mission;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -121,8 +120,7 @@ class InventoryItemServiceAllocationTest {
             inventoryCheckoutService,
             null,
             new de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryProvisionRecorder(
-                orderWrites),
-            () -> Instant.EPOCH);
+                orderWrites));
     lenient().when(jobOrderAccessPolicy.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
   }
 

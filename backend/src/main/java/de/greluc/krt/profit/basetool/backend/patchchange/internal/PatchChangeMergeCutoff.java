@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockMergeCutoff;
 import java.time.Instant;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
@@ -38,7 +39,7 @@ class PatchChangeMergeCutoff implements StockMergeCutoff {
 
   @Override
   @Transactional(readOnly = true)
-  public @NotNull Instant cutoff() {
-    return repository.findLatestLiveAt().orElse(Instant.EPOCH);
+  public @NotNull Optional<Instant> cutoff() {
+    return repository.findLatestLiveAt();
   }
 }

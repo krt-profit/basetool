@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,7 +62,8 @@ class InventoryMergeCutoffTest {
   @BeforeEach
   void setUp() {
     service =
-        new InventoryMergeService(orderWrites, repository, offers, auditRecorder, () -> CUTOFF);
+        new InventoryMergeService(
+            orderWrites, repository, offers, auditRecorder, () -> Optional.of(CUTOFF));
   }
 
   @Test

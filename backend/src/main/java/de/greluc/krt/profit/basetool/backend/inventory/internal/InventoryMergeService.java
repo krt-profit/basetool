@@ -82,8 +82,8 @@ public class InventoryMergeService {
     if (stockOfferLookup.isOffered(row.getId())) {
       return row;
     }
-    final Instant cutoff = mergeCutoff.cutoff();
-    if (row.getCreatedAt() != null && row.getCreatedAt().isBefore(cutoff)) {
+    final Instant cutoff = mergeCutoff.cutoff().orElse(null);
+    if (cutoff != null && row.getCreatedAt() != null && row.getCreatedAt().isBefore(cutoff)) {
       return row;
     }
 

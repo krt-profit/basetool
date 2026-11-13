@@ -502,7 +502,8 @@ its row (ADR-0362) and an offer released while the merge waited is not seen by t
 before the latest patch change's live time takes no part in the merge: it is never a survivor that
 absorbs another row and never folded into one, and the Einbuchen probe does not count it. The write
 lands its own row instead, so a pre-patch row holds only pre-patch stock and a patch change's
-effects can select it by its creation time. Before the first patch change every row takes part.
+effects can select it by its creation time; a candidate row without a creation time counts as
+older. Before the first patch change every row takes part.
 
 **Concurrency.** The merge group is loaded `FOR UPDATE` (pessimistic write lock) so two racing
 same-stack writers serialise instead of double-counting or losing stock — this re-introduces, **only
@@ -543,7 +544,7 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
 `InventoryMergeProbeTest`, `InventoryMergeGroupDataTest`, `InventoryMergeCutoffTest`,
 `InventoryPageControllerMvcTest` ·
 **Code:** `InventoryCheckoutService#mergeStockIfRequested`,
-`InventoryItemRepository#findMergeGroupForUpdate`, `InventoryItemService#hasMergeCandidates`,
+`InventoryItemRepository#findMergeGroupForUpdate`, `InventoryMergeProbe#hasMergeCandidates`,
 `InventoryItemRepository#countMergeCandidates`,
 `MaterialExchangeOfferRepository#existsByInventoryItemId` / `#findOfferedInventoryItemIds`,
 `InventoryItemService`,

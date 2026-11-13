@@ -20,21 +20,22 @@
 package de.greluc.krt.profit.basetool.backend.inventory.api;
 
 import java.time.Instant;
+import java.util.Optional;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * Tells the Lager's write-time merge from when on stock rows may take part in it (REQ-INV-026,
- * REQ-PATCH-004): a row created before the cutoff neither absorbs nor is folded into another, so it
- * keeps holding only what it held when it was created. Implemented by the patch-change module; each
- * read joins the caller's transaction.
+ * REQ-PATCH-004): a row created before the cutoff, or without a creation time, neither absorbs nor
+ * is folded into another, so it keeps holding only what it held when it was created. Implemented by
+ * the patch-change module; each read joins the caller's transaction.
  */
 public interface StockMergeCutoff {
 
   /**
    * Returns the instant before which a row never merges.
    *
-   * @return the latest patch change's live time, or {@link Instant#EPOCH} before the first
+   * @return the latest patch change's live time, or empty before the first, when every row merges
    */
   @NotNull
-  Instant cutoff();
+  Optional<Instant> cutoff();
 }

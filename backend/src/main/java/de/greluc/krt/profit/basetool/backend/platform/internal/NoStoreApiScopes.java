@@ -77,6 +77,7 @@ public final class NoStoreApiScopes {
           "/api/v1/orders/**",
           "/api/v1/org-units/me/**",
           "/api/v1/org-units/members/**",
+          "/api/v1/patch-changes/**",
           "/api/v1/personal-blueprints/**",
           "/api/v1/personal-inventory/**",
           "/api/v1/purchasing/**",

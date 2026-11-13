@@ -164,7 +164,7 @@ class InventoryStockMergeTest {
 
     when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
-            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null, Instant.EPOCH))
+            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null, null))
         .thenReturn(List.of(survivor, victim1, victim2));
     when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
 
@@ -210,7 +210,7 @@ class InventoryStockMergeTest {
 
     when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
-            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null, Instant.EPOCH))
+            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null, null))
         .thenReturn(List.of(survivor, victim));
     when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
 
@@ -254,7 +254,7 @@ class InventoryStockMergeTest {
 
     when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
-            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null, Instant.EPOCH))
+            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null, null))
         .thenReturn(List.of(survivor, plain, offered));
     when(stockOfferLookup.offeredRows(List.of(plain.getId(), offered.getId())))
         .thenReturn(Set.of(offered.getId()));
@@ -273,7 +273,7 @@ class InventoryStockMergeTest {
 
     when(stockOfferLookup.isOffered(rowId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
-            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null, Instant.EPOCH))
+            USER_ID, MATERIAL_ID, LOCATION_ID, 100, false, false, null, null))
         .thenReturn(List.of(row));
 
     InventoryItem result = service.mergeStockIfRequested(row, false);
@@ -319,7 +319,7 @@ class InventoryStockMergeTest {
     InventoryItem victim = itemRow(UUID.randomUUID(), gameItem, 2.0);
     when(stockOfferLookup.isOffered(survivorId)).thenReturn(false);
     when(inventoryItemRepository.findMergeGroupForUpdate(
-            USER_ID, null, gameItem.getId(), LOCATION_ID, null, false, false, null, Instant.EPOCH))
+            USER_ID, null, gameItem.getId(), LOCATION_ID, null, false, false, null, null))
         .thenReturn(List.of(survivor, victim));
     when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
 
@@ -339,7 +339,7 @@ class InventoryStockMergeTest {
             eq(false),
             eq(false),
             eq((UUID) null),
-            eq(Instant.EPOCH));
+            eq((Instant) null));
     assertNull(materialKey.getValue(), "an item stack keys with materialId = null");
     assertNull(qualityKey.getValue(), "an item stack keys with quality = null");
     verify(inventoryItemRepository).deleteAll(List.of(victim));

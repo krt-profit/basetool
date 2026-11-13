@@ -33,7 +33,9 @@ longer say whether its stock predates the patch.
 4. **No mixing.** From the latest live time on, the write-time merge skips every row created before
    it, as survivor and as candidate, and the merge probe does not count it. The write lands its own
    row instead, so a pre-patch row holds only pre-patch stock and its creation time stays the
-   criterion. The Lager asks the patch-change module through `inventory.api.StockMergeCutoff`.
+   criterion. A candidate row without a creation time counts as older; before the first patch change
+   the rule does not apply. The Lager asks the patch-change module through
+   `inventory.api.StockMergeCutoff`.
 
 ## Consequences
 

@@ -57,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemPer
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemStolenMarkDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeCandidatesDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryMergeProbe;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryStolenMarkService;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.ItemAttributeFilter;
@@ -98,6 +99,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class InventoryItemControllerTest {
 
   @Mock private InventoryItemService inventoryItemService;
+  @Mock private InventoryMergeProbe inventoryMergeProbe;
   @Mock private InventoryAggregationService inventoryAggregationService;
   @Mock private UserService userService;
   @Mock private InventoryAccessPolicy inventoryAccessPolicy;
@@ -1637,7 +1639,7 @@ class InventoryItemControllerTest {
     UUID unitId = UUID.randomUUID();
     Jwt token = jwt(caller.toString());
     when(userService.getUserIdFromJwt(token)).thenReturn(caller);
-    when(inventoryItemService.hasMergeCandidates(
+    when(inventoryMergeProbe.hasMergeCandidates(
             null, caller, materialId, locationId, 640, false, false, unitId))
         .thenReturn(true);
 
