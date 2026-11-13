@@ -272,7 +272,8 @@ personal-note draft and its independent version, then saves and applies the defe
 The same workspace supports aUEC creation, reported amounts, money movements, target and
 information edits, and submitted-operation recovery.
 
-All kinds share the overview and a type filter. Its scopes are Meine (requesting units),
+All kinds share the overview and a type filter. The overview displays the localized Orders heading.
+Its scopes are Meine (requesting units),
 Ich bearbeite (personal Bearbeiter), Zu bearbeiten (responsible or supporting own units under
 current context/reach), and Alle (all permitted orders, including personal holder/recipient access).
 Remember the selection; default to Alle. Every filter narrows the permitted read set.
