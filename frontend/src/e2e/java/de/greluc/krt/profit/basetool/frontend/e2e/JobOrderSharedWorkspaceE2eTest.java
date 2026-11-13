@@ -250,8 +250,11 @@ class JobOrderSharedWorkspaceE2eTest {
 
         expectLifecycleWrite(editor, () -> editor.getByTestId("order-reopen").click());
         assertThat(editor.locator("#order-head-meta")).hasAttribute("data-status", "OPEN");
-        assertThat(fulfillment.locator("#tab-handovers")).isVisible();
-        fulfillment.locator("#tab-handovers").click();
+        assertThat(fulfillment.locator("#order-head-meta")).hasAttribute("data-status", "OPEN");
+        var handoversTab = fulfillment.locator("#tab-handovers");
+        assertThat(handoversTab).isVisible();
+        handoversTab.press("Enter");
+        assertThat(handoversTab).hasAttribute("aria-selected", "true");
         assertThat(fulfillment.getByTestId("order-handover-open")).isVisible();
         assertThat(queue.locator(row(id) + " .status-open")).isVisible();
         assertThat(detail.locator("#assignee-note-text")).hasValue(NOTE);

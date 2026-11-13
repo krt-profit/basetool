@@ -10,9 +10,9 @@ a Logistician of a unit also gets that unit's orders one by one; see [order deta
 The open and in-progress job orders that a unit **the member is a member of** is responsible for.
 Units the member only oversees or administers do not count.
 
-Only a member who may see their organisation's job orders in the Basetool gets the demand: a
-member of at least one unit that takes part in the profit sharing, or of a leadership seat above
-one. Everyone else, a member of no unit included, gets `200` with two empty lists and `"reason": "NOT_PERMITTED"`:
+The Basetool's job-order gate grants access to members of the active Profit area or one of its
+active squadrons or special commands. A leadership seat can also grant access through those units.
+Other members get `200` with two empty lists and `"reason": "NOT_PERMITTED"`:
 
 ```json
 {
@@ -23,9 +23,9 @@ one. Everyone else, a member of no unit included, gets `200` with two empty list
 }
 ```
 
-The check runs on every request, so a member whose unit leaves the profit sharing stops seeing its
-demand at once, even while its orders stay open. An administrator's role does not open it: the
-exchange acts with the member's own reach only. A permitted member whose units have nothing open
+The check runs on every request, so a member who loses their last qualifying unit loses access
+to the feed even while orders stay open. The exchange evaluates the member's own reach. A
+permitted member whose units have nothing open
 gets two empty lists **without** a `reason`. Show the member why the view is empty when `reason` is
 present, drop any cached demand, and treat a `reason` value you do not know as withheld.
 

@@ -206,11 +206,13 @@ no open promises.
 - [ ] Manual early MATERIAL/ITEM completion remains; aUEC cannot complete below its threshold.
 - [ ] Cancellation releases MATERIAL/ITEM earmarks and open promises without deleting history.
 - [ ] Need edits do not silently reopen manual completion or cancellation.
+- [ ] A peer sees the material handover action return in place after explicit reopening.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest` covers MATERIAL and ITEM lifecycle
 rights, cancellation and the preservation of historical promises and booked work. The ITEM
 early-completion case reads back the unmet need and original handover after a responsible-unit
 writer closes the order. `JobOrderStatusE2eTest` covers early MATERIAL completion.
+`JobOrderSharedWorkspaceE2eTest` covers the peer handover action after reopening without a reload.
 `JobOrderStatusQueueRaceIntegrationTest` covers terminal queue changes. The Bank-free completion,
 return and settlement cases are part of the
 [money lifecycle contract](orders-auec.md#req-orders-063--auec-lifecycle-follows-effective-net-handover).

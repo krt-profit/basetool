@@ -404,9 +404,9 @@ exchange off. The gateway sees a change within about 5 seconds.
   `sandbox-member-2` holds one lot of Sandbox Metal.
 - **Ships.** Two for `sandbox-member`, one for `sandbox-member-2`.
 - **Open orders.** A material order and an item order for IRIDIUM and a material order for Sandbox
-  Squadron, with minimum qualities, so `GET /exchange/v1/me/org-demand` answers. Sandbox Squadron
-  takes part in the profit sharing and IRIDIUM does not, so `sandbox-member` gets the demand of
-  both squadrons and `sandbox-member-2` gets the withheld answer with `"reason": "NOT_PERMITTED"`
+  Squadron, with minimum qualities. Sandbox Squadron is under the active Profit area, and IRIDIUM
+  is outside that hierarchy. `GET /exchange/v1/me/org-demand` shows `sandbox-member` the demand
+  of both squadrons and gives `sandbox-member-2` the withheld answer with `"reason": "NOT_PERMITTED"`
   ([whose demand](resources/org-demand.md#whose-demand)).
 - **The exchange switch is on.** The seed sets it in the database. The backend copies it to the
   gateway's registry mirror within 10 s and the gateway re-reads the mirror at most every 5 s, so
