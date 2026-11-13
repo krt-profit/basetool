@@ -181,6 +181,7 @@ class OrdersCreateFormPatternRenderTest {
     assertThat(forms.get(2))
         .contains("action=\"/orders/auec\"")
         .contains("data-testid=\"order-auec-target\"")
+        .containsPattern("id=\"auec-comment\"[^>]*placeholder=\"Optionaler Kommentar zum Auftrag\"")
         .contains("data-testid=\"order-auec-submit\"")
         .doesNotContain("data-testid=\"order-material-select\"", "id=\"item-lines\"");
   }

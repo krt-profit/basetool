@@ -26,7 +26,8 @@
                 <span th:text="#{orders.create.comment}"></span>
                 <span class="opt" th:text="#{form.optional}"></span>
             </label>
-            <textarea id="auec-comment" name="comment" rows="4" maxlength="1000" th:text="${auecMode ? jobOrderForm.comment : null}"></textarea>
+            <textarea id="auec-comment" name="comment" rows="4" maxlength="1000"
+                      th:placeholder="#{orders.create.comment.placeholder}" th:text="${auecMode ? jobOrderForm.comment : null}"></textarea>
         </div>
         <div class="form-actions--sticky">
             <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.create.cancel}"></a>

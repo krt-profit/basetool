@@ -461,7 +461,8 @@ audit commit in one transaction.
 ### REQ-ORDERS-067 — Few contextual actions provide truthful live feedback
 
 The common overview and central detail remain the workspace. Creation requires requester unit,
-responsible Profit unit, contact and target; comment is optional. Holders, recipients, commitments
+responsible Profit unit, contact and target. The optional comment field uses the same localized
+placeholder as the material and item order forms. Holders, recipients, commitments
 and Bank details can follow later. Show only kind-relevant inputs. After create, open the order
 detail and retain the list/filter return context.
 Use the shared create transport in REQ-FE-006. AJAX submits the form and follows the server's
