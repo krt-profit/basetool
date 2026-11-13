@@ -575,7 +575,8 @@ strict OrgUnit scope.
 recovery when the current unit is no longer eligible.
 ³ General Profit access follows actual membership in the unique active `Department.PROFIT`
 area or its active Staffel/SK children, independent of retired flags. Creating MATERIAL, ITEM or aUEC
-requires a current contextual writer of the requesting **or** responsible unit. Responsible writers
+requires a current contextual writer of the requesting **or** responsible unit. The aUEC form
+preselects the eligible Profit area as the responsible unit. Responsible writers
 process and immediately transfer responsibility to any eligible target in the verified original
 boundary, without target acceptance or movement of stock. Concrete current-unit recovery authority
 survives loss of the general Profit capability. Invalid responsibility blocks every other order

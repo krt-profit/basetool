@@ -14,7 +14,7 @@
 
     <p class="form-hint" th:text="#{admin.shops.intro}">Die Shops stammen aus dem P4K-Import.</p>
 
-    <section class="shops-section" th:aria-label="#{admin.shops.title}" data-testid="shops">
+    <section class="list-panel shops-section" th:aria-label="#{admin.shops.title}" data-testid="shops">
         <form id="shops-filter" class="no-track" role="search">
             <div class="toolbar">
                 <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('shops-query', 'query', null, 'admin.shops.filter.search')}"></th:block>

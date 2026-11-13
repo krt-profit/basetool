@@ -111,13 +111,13 @@ function initMaterialboerse() {
     }
 
     /**
-     * The board view the active tab shows.
+     * The selected board view.
      *
      * @returns {string} `requests` for the Gesuche, `offers` for the Angebote
      */
     function activeMode() {
-        const tab = document.querySelector('.tab.active[data-mb-mode]');
-        return tab && tab.getAttribute('data-mb-mode') === 'requests' ? 'requests' : 'offers';
+        const segment = document.querySelector('[data-mb-mode][aria-pressed="true"]');
+        return segment?.getAttribute('data-mb-mode') === 'requests' ? 'requests' : 'offers';
     }
 
     /**
@@ -463,15 +463,14 @@ function initMaterialboerse() {
     }
 
     /**
-     * Marks a view's tab active and shows that view's create menu.
+     * Selects a board view and shows its create menu.
      *
      * @param {string} mode `offers` or `requests`
      */
     function setActiveMode(mode) {
-        document.querySelectorAll('.tab[data-mb-mode]').forEach((btn) => {
+        document.querySelectorAll('[data-mb-mode]').forEach((btn) => {
             const on = btn.getAttribute('data-mb-mode') === mode;
-            btn.classList.toggle('active', on);
-            btn.setAttribute('aria-selected', on ? 'true' : 'false');
+            btn.setAttribute('aria-pressed', String(on));
         });
         krtOverflowMenu.closeAll();
         document.querySelectorAll('[data-mb-cta-group]').forEach((group) => {
@@ -493,7 +492,7 @@ function initMaterialboerse() {
         }
     }
 
-    /** Copies the counts the last swapped list carries into the tabs and the scope segment. */
+    /** Updates the view and scope counts from the swapped list. */
     function updateCounts() {
         const counts = /** @type {HTMLElement | null} */ (
             document.querySelector('[data-mb-counts]')
@@ -502,8 +501,8 @@ function initMaterialboerse() {
             return;
         }
         const data = counts.dataset;
-        setText('[data-mb-mode="offers"] .tab-count', data.offersAll);
-        setText('[data-mb-mode="requests"] .tab-count', data.requestsAll);
+        setText('[data-mb-mode="offers"] .krt-segmented__count', data.offersAll);
+        setText('[data-mb-mode="requests"] .krt-segmented__count', data.requestsAll);
         const requests = activeMode() === 'requests';
         setText(
             '[data-testid="segment-scope-all"] .krt-segmented__count',

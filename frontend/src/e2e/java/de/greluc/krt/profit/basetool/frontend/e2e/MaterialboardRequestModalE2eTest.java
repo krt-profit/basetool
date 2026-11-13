@@ -93,7 +93,11 @@ class MaterialboardRequestModalE2eTest {
         assertThat(page.locator("#mg-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
-        page.locator("[data-testid='mb-tab-requests']").click();
+        page.getByTestId("mb-tab-requests").press("Enter");
+
+        assertThat(page.getByTestId("mb-tab-requests")).hasAttribute("aria-pressed", "true");
+        assertThat(page.getByTestId("mb-tab-offers")).hasAttribute("aria-pressed", "false");
+        assertThat(page.locator("#mg-listwrap")).isVisible();
 
         assertThat(page.locator("[data-testid='mb-create-request']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));

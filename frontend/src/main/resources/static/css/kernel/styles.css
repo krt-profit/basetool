@@ -5855,7 +5855,7 @@
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--color-primary);
-        margin: 0 0 var(--space-3) 0;
+        margin: 0 0 var(--space-4);
         font-size: 1.05rem;
     }
 
@@ -6281,6 +6281,7 @@
 
     .tab-nav {
         display: flex;
+        margin-block-end: var(--space-4);
         border-bottom: var(--border-hairline);
         background-color: var(--surface-bar);
         padding: 0 12px;
@@ -6580,7 +6581,7 @@
         outline: none;
     }
     .krt-modal-body {
-        padding: 14px 16px;
+        padding: var(--space-4);
         min-height: 0;
         overflow-y: auto;
     }
@@ -7538,6 +7539,7 @@
         [aria-current='page'],
         [aria-pressed='true'],
         [aria-checked='true'],
+        [aria-selected='true'],
         .is-active
     ),
     .krt-segmented__item:has(input:checked) {
@@ -7558,6 +7560,7 @@
             [aria-current='page'],
             [aria-pressed='true'],
             [aria-checked='true'],
+            [aria-selected='true'],
             .is-active,
             :has(input:checked)
         )
@@ -7614,6 +7617,7 @@
                 [aria-current='page'],
                 [aria-pressed='true'],
                 [aria-checked='true'],
+                [aria-selected='true'],
                 .is-active,
                 :has(input:checked)
             ) {
@@ -7696,7 +7700,7 @@
     .list-panel > .card--flush:nth-last-child(1 of :not([hidden])) {
         --flush-corner-bottom: calc(var(--radius-box) - 1px);
     }
-    .list-panel .pagination {
+    .list-panel .pagination:where(:not(.list-foot .pagination)) {
         margin: 0;
         padding: var(--space-3) var(--space-4);
         border-top: var(--border-hairline);
@@ -8211,6 +8215,7 @@
     .filter-count[hidden],
     .krt-segmented[hidden],
     .alert[hidden],
+    .pagination[hidden],
     .krt-switch[hidden],
     .card[hidden] {
         display: none;

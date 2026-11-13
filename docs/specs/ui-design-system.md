@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -20,6 +20,8 @@
 > REQ-UI-034, REQ-UI-035 shipped) ·
 > [0371](../adr/0371-the-basetool-follows-the-websites-design-3-0.md) (Design 3.0: REQ-UI-002,
 > REQ-UI-003, REQ-UI-006, REQ-UI-007) ·
+> [0378](../adr/0378-navigation-and-list-surfaces-have-distinct-edges.md) (navigation, list and dialog
+> composition, REQ-UI-007, REQ-UI-013, REQ-UI-028) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -279,6 +281,10 @@ triangles), thin technical markers framing content
   `--radius-sm` 4 px (chips, labels, badges, counters, status labels). Checkboxes and the switch
   knob take 2 px. Pills stay for squadron badges, the bell and counters, circles for radio buttons
   and status dots, and table cells, accent bars and gauges stay square (`--radius-none`).
+- **Navigation and content have distinct edges.** Full-width page and detail tab strips have
+  square edges. The first content below the strip starts at least `--space-4` (16 px) away,
+  including when an optional notice is absent. Existing content insets count toward the spacing.
+  Contiguous bars that belong to the same navigation or sticky header may share a straight edge.
 - **A rounded container never sets `overflow: hidden`**, so popovers and autocomplete lists can
   leave it.
 - **A child never paints over its box's rounded frame.** The child that fills a frame corner
@@ -446,6 +452,12 @@ alone, or the inline `display:flex` outranks `is-hidden` and the modal stays on 
 `delete-operation-modal` Cancel button). As a defensive backstop **both** shared handlers clear any
 inline `display` on the modal — `open-modal-display` before showing it, `close-modal-display` before
 hiding it — so the class always wins regardless of how the other side toggled visibility.
+
+The standard `.krt-modal-body` uses `--space-4` inset from the title divider and the frame.
+A dedicated composition such as the quick-access palette owns the spacing of its search and
+results surfaces. A list in a dialog follows the same toolbar and table composition as a page list
+(REQ-UI-028). The dialog title, content and actions keep straight interior joins where they share
+the frame.
 
 **Acceptance (FE-SIMP-04 / 04b, 2026-09-23)**
 
@@ -2144,7 +2156,7 @@ of `inline-migration.css` follow as their own PRs, each moving its pages onto th
 **On pattern A (phase 1):** Einsätze, Operationen, Benachrichtigungen, Mitglieder,
 Auftragsverwaltung, Materialbedarf, Lager-Übersicht, Item- und Materialsammelübersicht,
 Material-Liste, and the admin lists Audit-Logs, Blueprints, Standard-Blueprints, Löschanträge,
-Discord-Registrierungen (tabs „Offen · Abgelehnt"), Verbundene Anwendungen, Orte, Material-Aliase,
+Discord-Registrierungen (segments „Offen · Abgelehnt"), Verbundene Anwendungen, Orte, Material-Aliase,
 Materialien, Benachrichtigungsregeln, Organisationsstruktur, Qualitätsstufen, P4K-Import,
 Personensuche, Persönliche Blueprints/Inventare, Spezialkommandos, Sync-Berichte,
 Nutzungsbedingungen (segment „Noch offen · Zugestimmt · Alle"), Einsatzdaten and UEX-Daten. A list
@@ -2176,8 +2188,8 @@ Blueprints: „Blueprints hinzufügen" opens a dialog, the VerseKit link and „
 the „⋯" menu, one search, the segment „Alle · Craftbar" and the refinery switch; each row shows a
 status dot and „3×", the detail a key figure and the ingredients with need, stock and quality; the
 availability overview shows the first owners as chips with „+ n weitere" (REQ-INV-008/012/013/048).
-Materialbörse: tabs „Angebote · Gesuche" with the scope segment „Alle · Meine" (the former four
-tabs, `?view=&scope=`, old `mode`/`tab` honoured), one create menu per tab („Angebot erstellen ▾" /
+Materialbörse: view segment „Angebote · Gesuche" and scope segment „Alle · Meine" in the
+toolbar (`?view=&scope=`, old `mode`/`tab` honoured), one create menu per view („Angebot erstellen ▾" /
 „Gesuch erstellen ▾"), the filter popover with chips and a compact sort menu, three detail figures.
 Raffinerie: the list with the run-state segment „Läuft · Abholbereit · Abgeschlossen · Alle" and its
 counters, a server-side search over owner, location, method and materials across all pages,
@@ -2274,14 +2286,21 @@ Segment toggles, the filter button, the title count and row icon buttons stood a
    checkbox/radio, `.pagination .page-btn` and `.chip-select` have the `--control-bg` fill and a 1px
    `--control-border`. A card that is itself a link (the material tiles of `/materials`) carries the
    `--control-border` too and turns orange on hover. The hairline stays for decorative dividers only.
-3. **Toggles.** Every period, status or view toggle is `.krt-segmented` with `.krt-segmented__item`
-   (and `.krt-segmented__count`): the `segmented` fragment's radios, or links with `aria-current`.
+3. **Toggles.** A local selector with two to four exclusive periods, statuses or views uses
+   `.krt-segmented` with `.krt-segmented__item` and optional `.krt-segmented__count`.
+   The shared `segmented` fragment renders radios. Links use `aria-current`, view buttons use
+   `aria-pressed`, and segments that control distinct tab panels use `aria-selected`. Page and
+   detail navigation use the full-width tab strip (REQ-UI-007).
    Selected = tint, orange border and a 3px underline, never a filled orange block.
    Each segment is as wide as its label plus the segment padding; the toggle keeps no gap between
    segments and does not grow in a flex row, also when it is a `<nav>` in the page head.
    On/off options are `label.krt-switch` with `role="switch"`.
-4. **List pages.** The head's count is `.count-badge`; toolbar, filter chips, table and pagination sit
-   on one `section.list-panel`. An active filter puts `.is-filtered` on the „Filter" button and shows
+4. **Lists.** The page head uses `.count-badge` for its count. A toolbar, filter chips, table
+   and pagination share one `section.list-panel` with the Design 3.0 box radius. The toolbar
+   is inset by the shared spacing tokens and carries the local view selector when there is one.
+   A hairline separates the toolbar from the results. The table head sits square at that join
+   and the edges that fill the outer frame follow REQ-UI-007.
+   An active filter marks the filter button with `.is-filtered` and shows
    the square `.filter-count`.
 5. **Muted text** is `--color-gray-2-text`; quality and other data values are `--data-fg`, orange is
    for identity and actions.

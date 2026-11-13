@@ -157,6 +157,13 @@ class BankHolderDetailFragmentMvcTest {
             .andExpect(content().string(containsString("data-testid=\"bank-holder-balance-bar\"")))
             .andExpect(content().string(containsString("class=\"stack-bar")))
             .andExpect(content().string(containsString("data-table data-table--stack")))
+            .andExpect(
+                content()
+                    .string(
+                        containsString(
+                            "class=\"list-panel\""
+                                + " aria-labelledby=\"bank-holder-history-heading\"")))
+            .andExpect(content().string(containsString("id=\"bank-holder-history-heading\"")))
             .andExpect(content().string(not(containsString("hud-box"))))
             .andExpect(content().string(not(containsString("class=\"greeting"))))
             .andReturn()

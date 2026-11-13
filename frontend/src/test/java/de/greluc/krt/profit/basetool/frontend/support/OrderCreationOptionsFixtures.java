@@ -46,6 +46,7 @@ public final class OrderCreationOptionsFixtures {
             new JobOrderCreateUnitOptionDto(
                 requestingUnitId, "Requesting unit", "QU", "SQUADRON", true)),
         responsibleId,
-        requestingUnitId);
+        requestingUnitId,
+        responsibleId);
   }
 }

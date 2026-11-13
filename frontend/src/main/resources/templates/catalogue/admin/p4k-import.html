@@ -34,25 +34,25 @@
         </div>
     </section>
 
-    <section class="p4k-jobs" aria-labelledby="krt-p4k-jobs-title">
-        <h2 id="krt-p4k-jobs-title" class="p4k-section-title" th:text="#{admin.p4kImport.jobs.title}">Importe</h2>
+    <section class="list-panel p4k-panel" aria-labelledby="krt-p4k-jobs-title">
+        <div class="toolbar">
+            <h2 id="krt-p4k-jobs-title" class="card-title" th:text="#{admin.p4kImport.jobs.title}">Importe</h2>
+        </div>
         <div class="card card--flush">
-            <div data-p4k-jobs-table>
-                <div class="table-responsive">
-                    <table class="data-table data-table--stack">
-                        <thead>
-                        <tr>
+            <div class="table-responsive" data-p4k-jobs-table>
+                <table class="data-table data-table--stack">
+                    <thead>
+                    <tr>
                             <th th:text="#{admin.p4kImport.jobs.col.file}">Datei</th>
                             <th th:text="#{admin.p4kImport.jobs.col.kind}">Typ</th>
                             <th class="cell-status" th:text="#{admin.p4kImport.jobs.col.status}">Status</th>
                             <th th:text="#{admin.p4kImport.jobs.col.summary}">Zusammenfassung</th>
                             <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</span></th>
-                        </tr>
-                        </thead>
-                        <tbody id="krt-p4k-jobs">
-                        </tbody>
-                    </table>
-                </div>
+                    </tr>
+                    </thead>
+                    <tbody id="krt-p4k-jobs">
+                    </tbody>
+                </table>
             </div>
             <div id="krt-p4k-jobs-empty" class="empty-state" data-testid="empty-state" hidden>
                 <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.p4kImport.jobs.empty.title', 'admin.p4kImport.jobs.empty', null)}"></th:block>
@@ -173,47 +173,53 @@
         </p>
     </section>
 
-    <section id="krt-p4k-report" class="card p4k-panel" hidden aria-labelledby="krt-p4k-report-title">
-        <div class="card-head">
-            <h2 id="krt-p4k-report-title" class="card-title"><span th:text="#{admin.p4kImport.report.title}">Änderungsbericht</span> · <span id="krt-p4k-report-subject"></span></h2>
-            <button type="button" id="krt-p4k-report-close" class="btn btn-ghost"
-                    th:text="#{admin.p4kImport.apply.panel.cancel}">Schließen</button>
-        </div>
-        <form class="search-form" onsubmit="return false">
-            <div>
-                <label for="krt-p4k-report-kind" th:text="#{admin.p4kImport.col.type}">Typ</label>
-                <select id="krt-p4k-report-kind">
-                    <option value="" th:text="#{admin.p4kImport.report.filter.all}">Alle</option>
-                </select>
+    <section id="krt-p4k-report" class="list-panel p4k-panel" hidden aria-labelledby="krt-p4k-report-title">
+        <div class="toolbar p4k-list-toolbar">
+            <div class="p4k-review-heading">
+                <h2 id="krt-p4k-report-title" class="card-title"><span th:text="#{admin.p4kImport.report.title}">Änderungsbericht</span> · <span id="krt-p4k-report-subject"></span></h2>
+                <button type="button" id="krt-p4k-report-close" class="btn btn-ghost"
+                        th:text="#{admin.p4kImport.apply.panel.cancel}">Schließen</button>
             </div>
-            <div>
-                <label for="krt-p4k-report-type" th:text="#{admin.p4kImport.report.col.change}">Änderung</label>
-                <select id="krt-p4k-report-type">
-                    <option value="" th:text="#{admin.p4kImport.report.filter.all}">Alle</option>
-                </select>
+            <div class="p4k-review-filters">
+                <div class="form-group">
+                    <label for="krt-p4k-report-kind" th:text="#{admin.p4kImport.col.type}">Typ</label>
+                    <select id="krt-p4k-report-kind">
+                        <option value="" th:text="#{admin.p4kImport.report.filter.all}">Alle</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="krt-p4k-report-type" th:text="#{admin.p4kImport.report.col.change}">Änderung</label>
+                    <select id="krt-p4k-report-type">
+                        <option value="" th:text="#{admin.p4kImport.report.filter.all}">Alle</option>
+                    </select>
+                </div>
             </div>
-        </form>
-        <div class="table-responsive">
-            <table class="data-table data-table--stack">
-                <thead>
-                <tr>
-                    <th th:text="#{admin.p4kImport.col.type}">Typ</th>
-                    <th th:text="#{admin.p4kImport.report.col.change}">Änderung</th>
-                    <th th:text="#{admin.p4kImport.report.col.record}">Datensatz</th>
-                    <th th:text="#{admin.p4kImport.report.col.field}">Feld</th>
-                    <th th:text="#{admin.p4kImport.report.col.value}">Wert</th>
-                </tr>
-                </thead>
-                <tbody id="krt-p4k-report-rows">
-                </tbody>
-            </table>
         </div>
-        <p id="krt-p4k-report-empty" class="text-muted" hidden th:text="#{admin.p4kImport.report.empty}">Keine Einträge.</p>
-        <nav id="krt-p4k-report-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+        <div class="card card--flush">
+            <div class="table-responsive">
+                <table class="data-table data-table--stack">
+                    <thead>
+                    <tr>
+                        <th th:text="#{admin.p4kImport.col.type}">Typ</th>
+                        <th th:text="#{admin.p4kImport.report.col.change}">Änderung</th>
+                        <th th:text="#{admin.p4kImport.report.col.record}">Datensatz</th>
+                        <th th:text="#{admin.p4kImport.report.col.field}">Feld</th>
+                        <th th:text="#{admin.p4kImport.report.col.value}">Wert</th>
+                    </tr>
+                    </thead>
+                    <tbody id="krt-p4k-report-rows">
+                    </tbody>
+                </table>
+            </div>
+            <p id="krt-p4k-report-empty" class="text-muted p4k-list-empty" hidden th:text="#{admin.p4kImport.report.empty}">Keine Einträge.</p>
+            <nav id="krt-p4k-report-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+        </div>
     </section>
 
-    <section class="p4k-jobs" aria-labelledby="krt-p4k-runs-title">
-        <h2 id="krt-p4k-runs-title" class="p4k-section-title" th:text="#{admin.p4kImport.runs.title}">Angewendete Läufe</h2>
+    <section class="list-panel p4k-panel" aria-labelledby="krt-p4k-runs-title">
+        <div class="toolbar">
+            <h2 id="krt-p4k-runs-title" class="card-title" th:text="#{admin.p4kImport.runs.title}">Angewendete Läufe</h2>
+        </div>
         <div class="card card--flush">
             <div class="table-responsive">
                 <table class="data-table data-table--stack">
@@ -229,49 +235,56 @@
                     </tbody>
                 </table>
             </div>
-            <p id="krt-p4k-runs-empty" class="text-muted" hidden th:text="#{admin.p4kImport.runs.empty}">Noch kein Lauf angewendet.</p>
+            <p id="krt-p4k-runs-empty" class="text-muted p4k-list-empty" hidden th:text="#{admin.p4kImport.runs.empty}">Noch kein Lauf angewendet.</p>
             <nav id="krt-p4k-runs-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
         </div>
     </section>
 
-    <section class="p4k-jobs" aria-labelledby="krt-p4k-cases-title">
-        <h2 id="krt-p4k-cases-title" class="p4k-section-title" th:text="#{admin.p4kImport.review.title}">Review list</h2>
-        <p class="form-hint" th:text="#{admin.p4kImport.workspace.hint}">Filter by type or reason. Open a case to compare P4K, UEX and SC Wiki.</p>
-        <div class="p4k-review-filters">
-            <div class="form-group">
-                <label for="krt-p4k-review-kind" th:text="#{admin.p4kImport.workspace.kind}">Type</label>
-                <select id="krt-p4k-review-kind" class="form-input">
-                    <option value="" th:text="#{admin.p4kImport.workspace.allKinds}">All types</option>
-                </select>
+    <section class="p4k-panel" aria-labelledby="krt-p4k-cases-title">
+        <div class="list-panel">
+            <div class="toolbar p4k-list-toolbar">
+                <h2 id="krt-p4k-cases-title" class="card-title" th:text="#{admin.p4kImport.review.title}">Review list</h2>
+                <p class="form-hint" th:text="#{admin.p4kImport.workspace.hint}">Filter by type or reason. Open a case to compare P4K, UEX and SC Wiki.</p>
+                <div class="p4k-review-filters">
+                    <div class="form-group">
+                        <label for="krt-p4k-review-kind" th:text="#{admin.p4kImport.workspace.kind}">Type</label>
+                        <select id="krt-p4k-review-kind" class="form-input">
+                            <option value="" th:text="#{admin.p4kImport.workspace.allKinds}">All types</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="krt-p4k-review-reason" th:text="#{admin.p4kImport.workspace.reason}">Reason</label>
+                        <select id="krt-p4k-review-reason" class="form-input">
+                            <option value="" th:text="#{admin.p4kImport.workspace.allReasons}">All reasons</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="krt-p4k-review-readiness" th:text="#{admin.p4kImport.workspace.readiness}">Readiness</label>
+                        <select id="krt-p4k-review-readiness" class="form-input">
+                            <option value="" th:text="#{admin.p4kImport.workspace.allReadiness}">All statuses</option>
+                        </select>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="krt-p4k-review-reason" th:text="#{admin.p4kImport.workspace.reason}">Reason</label>
-                <select id="krt-p4k-review-reason" class="form-input">
-                    <option value="" th:text="#{admin.p4kImport.workspace.allReasons}">All reasons</option>
-                </select>
+            <div class="card card--flush">
+                <th:block th:replace="~{::reviewTable('krt-p4k-cases')}"></th:block>
+                <p id="krt-p4k-cases-empty" class="text-muted p4k-list-empty" hidden th:text="#{admin.p4kImport.review.empty}">No open cases.</p>
+                <nav id="krt-p4k-cases-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
             </div>
-            <div class="form-group">
-                <label for="krt-p4k-review-readiness" th:text="#{admin.p4kImport.workspace.readiness}">Readiness</label>
-                <select id="krt-p4k-review-readiness" class="form-input">
-                    <option value="" th:text="#{admin.p4kImport.workspace.allReadiness}">All statuses</option>
-                </select>
-            </div>
-
         </div>
-        <div class="card card--flush">
-            <th:block th:replace="~{::reviewTable('krt-p4k-cases')}"></th:block>
-            <p id="krt-p4k-cases-empty" class="text-muted" hidden th:text="#{admin.p4kImport.review.empty}">No open cases.</p>
-            <nav id="krt-p4k-cases-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
-        </div>
-        <section id="krt-p4k-review-group" class="card p4k-review-pane" aria-labelledby="krt-p4k-review-group-title" tabindex="-1" hidden>
-            <div class="p4k-review-heading">
-                <h3 id="krt-p4k-review-group-title" th:text="#{admin.p4kImport.workspace.members}">Cases in group</h3>
-                <button type="button" class="btn btn-ghost btn-xs" id="krt-p4k-review-close-group"
-                        th:text="#{admin.p4kImport.workspace.close}">Close</button>
+        <section id="krt-p4k-review-group" class="list-panel" aria-labelledby="krt-p4k-review-group-title" tabindex="-1" hidden>
+            <div class="toolbar p4k-list-toolbar">
+                <div class="p4k-review-heading">
+                    <h3 id="krt-p4k-review-group-title" class="card-title" th:text="#{admin.p4kImport.workspace.members}">Cases in group</h3>
+                    <button type="button" class="btn btn-ghost btn-xs" id="krt-p4k-review-close-group"
+                            th:text="#{admin.p4kImport.workspace.close}">Close</button>
+                </div>
+                <div id="krt-p4k-review-batch" hidden></div>
             </div>
-            <div id="krt-p4k-review-batch" hidden></div>
-            <th:block th:replace="~{::reviewTable('krt-p4k-review-members')}"></th:block>
-            <nav id="krt-p4k-review-members-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+            <div class="card card--flush">
+                <th:block th:replace="~{::reviewTable('krt-p4k-review-members')}"></th:block>
+                <nav id="krt-p4k-review-members-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+            </div>
         </section>
         <section id="krt-p4k-review-detail" class="card p4k-review-pane" aria-labelledby="krt-p4k-review-detail-title" tabindex="-1" hidden>
             <div class="p4k-review-heading">

@@ -1,9 +1,6 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .reg-tabs {
-        margin-bottom: var(--space-4);
-    }
     .reg-actions {
         justify-content: flex-end;
     }
@@ -12,7 +9,9 @@
         font-size: 0.85rem;
     }
     .reg-hint {
-        margin: 0 0 var(--space-3);
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-bottom: var(--border-hairline);
     }
     .reg-empty > .empty-state {
         border: 0;

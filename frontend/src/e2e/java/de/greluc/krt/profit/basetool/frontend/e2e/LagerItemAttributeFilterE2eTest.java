@@ -32,6 +32,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -102,6 +103,31 @@ class LagerItemAttributeFilterE2eTest {
     }
   }
 
+  @Test
+  void overviewChangesCatalogInsideTheListPanel() {
+    String baseUrl = STACK.baseUrl();
+    Path storageState = E2eSupport.authenticatedStorageState(browser, baseUrl, USERNAME, PASSWORD);
+    try (BrowserContext context =
+        browser.newContext(
+            new Browser.NewContextOptions()
+                .setIgnoreHTTPSErrors(true)
+                .setStorageStatePath(storageState))) {
+      Page page = context.newPage();
+      E2eSupport.navigate(page, baseUrl + "/inventory");
+      Locator list = page.locator("#inventory-results.list-panel");
+      Locator items = list.getByTestId("lager-view-items");
+      assertThat(list.getByTestId("lager-view-material")).hasAttribute("aria-current", "page");
+      page.evaluate("() => { window.__e2eNoReloadMarker = 'kept'; }");
+      items.press("Enter");
+      assertThat(items).hasAttribute("aria-current", "page");
+      assertThat(items).isFocused();
+      assertThat(list.locator(".card--flush")).containsText("E2E Attribute Drive S2");
+      assertThat(page.getByTestId("inventory-global-link"))
+          .hasAttribute("href", java.util.regex.Pattern.compile("view=items"));
+      Assertions.assertEquals("kept", page.evaluate("() => window.__e2eNoReloadMarker"));
+    }
+  }
+
   /**
    * Ticks "Quantenantrieb" and S2 and asserts the items view keeps only the S2 drive, counts both
    * filters on the toggle, never reloads, and lists every item again after "Alle zurücksetzen".
@@ -124,8 +150,11 @@ class LagerItemAttributeFilterE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        E2eSupport.navigate(page, baseUrl + path);
+        E2eSupport.navigate(page, baseUrl + path.replace("&view=items", ""));
         page.waitForLoadState();
+        page.evaluate("() => { window.__e2eNoReloadMarker = 'kept'; }");
+        page.getByTestId("lager-view-items").click();
+        assertThat(page.getByTestId("lager-view-items")).hasAttribute("aria-current", "page");
 
         assertThat(group(page, driveS2Id))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
@@ -136,8 +165,6 @@ class LagerItemAttributeFilterE2eTest {
           page.locator("[data-testid='lager-filter-toggle']").click();
         }
         assertThat(page.locator("#" + panelId)).isVisible();
-        page.evaluate("() => { window.__e2eNoReloadMarker = 'kept'; }");
-
         page.locator("#componentTypeHeader").click();
         page.locator("#componentTypeOptions input.componentTypeCheck[value='QUANTUM_DRIVE']")
             .check();
@@ -160,8 +187,12 @@ class LagerItemAttributeFilterE2eTest {
         assertThat(page.locator("[data-testid='filter-chip-componentTypeFilter']")).isVisible();
         assertThat(page.locator("[data-testid='filter-chip-sizeFilter']")).isVisible();
 
-        E2eSupport.navigate(page, baseUrl + path);
-        page.waitForLoadState();
+        page.locator("#" + panelId).press("Escape");
+        page.getByTestId("lager-view-material").click();
+        assertThat(page.getByTestId("lager-view-material")).hasAttribute("aria-current", "page");
+        page.getByTestId("lager-view-items").click();
+        assertThat(page.getByTestId("lager-view-items")).hasAttribute("aria-current", "page");
+        Assertions.assertEquals("kept", page.evaluate("() => window.__e2eNoReloadMarker"));
         assertThat(group(page, driveS1Id))
             .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(group(page, driveS2Id))

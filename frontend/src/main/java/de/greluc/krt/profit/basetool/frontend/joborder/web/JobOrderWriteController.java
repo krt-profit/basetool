@@ -462,7 +462,7 @@ public class JobOrderWriteController {
       sharedForm.setRequestingOrgUnitId(form.requestingOrgUnitId());
       sharedForm.setHandle(form.handle());
       sharedForm.setComment(form.comment());
-      redirectAttributes.addFlashAttribute("jobOrderForm", sharedForm);
+      redirectAttributes.addFlashAttribute("auecOrderForm", sharedForm);
       redirectAttributes.addFlashAttribute("auecTarget", form.target());
     }
     return "redirect:/orders/create";

@@ -879,8 +879,9 @@ org-unit-blind.
 > their counts living inside the `orgUnitBank` swap fragment, so a request create/cancel updates the
 > list and the request tab-count in place (REQ-FE-005); the active tab is carried in a `#tab=` deeplink
 > that is re-applied after each swap; `/org-unit-bank#tab=antraege` opens „Meine Anträge" and is
-> the target of the dashboard widget „Meine Bankanträge". A booking request is raised from a **single page-level CTA**
-> whose modal carries an **account selector** filled only with the caller's requestable accounts
+> the target of the dashboard widget „Meine Bankanträge". When the requester has requests and no other available
+> section, the list opens directly under a counted section heading. A booking request is raised
+> from a **single page-level CTA** whose modal carries an **account selector** filled only with the caller's requestable accounts
 > (`canRequest`); the CTA + modal are shown only when at least one such account is visible, replacing
 > the former per-card request button + "view only" label. Accounts render with a linked name, 30-day
 > trend, balance, target progress and a single "Details" action — no per-account status chip and no
@@ -1548,8 +1549,8 @@ bank owes them, so their own money exceeds the entered balance.
 „Verwaltung" linking back to the holder tab, the holder's name as title, chips for active/inactive and
 auto/manual), two KPI tiles („Hält gesamt", „Buchungen") and the calculator as a compact card whose
 result is a `.stack-bar` — „Bank-reserviert" against „Privat (eigenes Geld)", the reserved share
-capped at the entered balance — with both amounts in the legend; the history follows as „Halter-
-Buchungen". Behaviour and gate unchanged.
+capped at the entered balance — with both amounts in the legend. The "Halter-Buchungen" heading,
+table and pagination share one list panel.
 
 **Enforced by:** `BankSecurityServiceTest` (canSeeHolder: management-any / employee-own-only), `BankHolderServiceTest` (account & counter-holder annotation, 404), `BankControllerSecurityTest` (holder-history gate), frontend `BankPageControllerTest` / `BankHolderDetailFragmentMvcTest`, `BankManagePageControllerTest` (selfUserId = OIDC sub, not preferred_username), `BankHolderSelfLinkRenderMvcTest` (employee links own holder only) · **Code:** `bank/internal/BankHolderService#getHolder/#getHolderBookings`, `bank/internal/BankSecurityService#canSeeHolder`, `bank/web/BankHolderController`, `bank/internal/BankHolderPostingRepository#findHolderBookings`, `bank/internal/BankHolderBookingRow`, `bank/internal/BankHolderBookingDto`, frontend `bank/web/BankPageController`, `bank/web/BankManagePageController` (holder self-link selfUserId), `templates/bank/bank-holder-detail.html`, `templates/bank/bank-manage.html`, `static/js/bank/bank.js` (balance-split calculator figures), `static/js/bank/bank-holder-detail.js` (its bar) · **ADR:** [ADR-0039](../adr/0039-bank-holder-ledger-decoupled-from-accounts.md) · **Issues:** #556
 

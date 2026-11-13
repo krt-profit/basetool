@@ -194,7 +194,7 @@ class MaterialboersePatternRenderTest {
         .thenReturn(request);
   }
 
-  /** The Angebote view renders the page head, tabs, toolbar, master row and KPI detail. */
+  /** The Angebote view renders the page head, view controls, master row and KPI detail. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void rendersTheOffersView() throws Exception {
@@ -207,7 +207,9 @@ class MaterialboersePatternRenderTest {
         .containsPattern("class=\"page-eyebrow\"[^>]*>Handel<")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box");
-    String head = html.substring(html.indexOf("class=\"page-actions\""), html.indexOf("mb-tabs"));
+    String head =
+        html.substring(
+            html.indexOf("class=\"page-actions\""), html.indexOf("<section class=\"list-panel\">"));
     assertThat(head)
         .doesNotContain("btn--cta")
         .contains("data-testid=\"mb-create-offer\"")
@@ -216,10 +218,11 @@ class MaterialboersePatternRenderTest {
         .containsPattern("data-mb-cta-group=\"offers\"\\s*>")
         .containsPattern("data-mb-cta-group=\"requests\"\\s+hidden=\"hidden\"");
     assertThat(html)
-        .containsPattern("class=\"tab active\"[^>]*data-mb-mode=\"offers\"")
+        .containsPattern(
+            "class=\"krt-segmented__item\"[^>]*data-mb-mode=\"offers\"[^>]*aria-pressed=\"true\"")
         .contains("data-testid=\"mb-tab-requests\"")
-        .containsPattern("<span class=\"tab-count\">38</span>")
-        .containsPattern("<span class=\"tab-count\">12</span>")
+        .containsPattern("<span class=\"krt-segmented__count\">38</span>")
+        .containsPattern("<span class=\"krt-segmented__count\">12</span>")
         .contains("data-testid=\"segment-scope-all\"")
         .contains("data-testid=\"segment-scope-mine\"")
         .containsPattern("name=\"scope\" value=\"all\" checked=\"checked\"")
@@ -276,7 +279,8 @@ class MaterialboersePatternRenderTest {
     String html = render("view=requests&scope=mine");
 
     assertThat(html)
-        .containsPattern("class=\"tab active\"[^>]*data-mb-mode=\"requests\"")
+        .containsPattern(
+            "class=\"krt-segmented__item\"[^>]*data-mb-mode=\"requests\"[^>]*aria-pressed=\"true\"")
         .containsPattern("name=\"scope\" value=\"mine\" checked=\"checked\"")
         .containsPattern("<span class=\"krt-segmented__count\">2</span>")
         .containsPattern("data-mb-cta-group=\"offers\"\\s+hidden=\"hidden\"")
@@ -301,12 +305,13 @@ class MaterialboersePatternRenderTest {
     String html = render("mode=requests&tab=mein");
 
     assertThat(html)
-        .containsPattern("class=\"tab active\"[^>]*data-mb-mode=\"requests\"")
+        .containsPattern(
+            "class=\"krt-segmented__item\"[^>]*data-mb-mode=\"requests\"[^>]*aria-pressed=\"true\"")
         .containsPattern("name=\"scope\" value=\"mine\" checked=\"checked\"");
     verify(backendApiClient).get(contains("/material-exchange/requests?tab=mein"), anyTypeRef());
   }
 
-  /** The board fragment of the Gesuche carries the request list and the counts for the tabs. */
+  /** The Gesuche fragment carries the request list and the view counts. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void boardFragmentOfTheRequestsCarriesTheCounts() throws Exception {

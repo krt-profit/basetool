@@ -1,10 +1,6 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .ou-panel {
-        margin-top: var(--space-4);
-    }
-
     .ou-konten-toolbar {
         margin-bottom: 0;
     }

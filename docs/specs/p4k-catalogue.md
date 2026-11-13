@@ -508,7 +508,8 @@ by name with both values `null`. An item's rename shows as its `name` and its `n
 its report, filterable by kind and change type, paginated and updated in place via `krtFetch`
 (REQ-FE-001…010). The sync-reports page gets a P4K tab. A PREVIEW computes the same report and shows
 it on the job without writing `p4k_import_run` or `p4k_import_change`; the preview expires with the
-job after 7 days.
+job after 7 days. The report and run history use the shared list panel for headings, filters,
+results and pagination (REQ-UI-028).
 
 **Acceptance**
 
@@ -1756,6 +1757,8 @@ group when their source records share a family and the cases carry no competing 
 Reciprocal identity conflicts share a card, with both cases retained. The admin can inspect the
 record class, source path and current P4K, UEX and SC Wiki identity evidence in place. The queue
 orders groups by the next available action and supports filtering by readiness, kind and reason.
+The review list and its group member list each use one list panel for controls and results
+(REQ-UI-028).
 
 An available proposal names the target, its identity evidence and its current version. The admin
 confirms a single proposal or explicitly selects versioned members of a compatible group. Name

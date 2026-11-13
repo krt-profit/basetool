@@ -68,8 +68,10 @@
         </section>
     </div>
 
-    <section class="bank-holder-history" data-testid="bank-holder-bookings-panel">
-        <h2 class="bank-holder-history__title" th:text="#{bank.holder.detail.history}">Halter-Buchungen</h2>
+    <section class="list-panel" aria-labelledby="bank-holder-history-heading" data-testid="bank-holder-bookings-panel">
+        <div class="toolbar">
+            <h2 class="card-title" id="bank-holder-history-heading" th:text="#{bank.holder.detail.history}">Halter-Buchungen</h2>
+        </div>
         <div id="bank-holder-bookings-results" class="card card--flush">
         <th:block th:fragment="holderBookings">
         <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">

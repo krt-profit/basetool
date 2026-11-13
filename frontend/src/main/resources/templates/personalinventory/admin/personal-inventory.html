@@ -17,7 +17,7 @@
 
     <div id="pi-results" class="stack gap-3">
     <th:block th:fragment="results">
-    <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}"
+    <section class="list-panel" th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}"
               th:with="piBase=${'/admin/personal-inventory?userSub=' + selectedUserSub
                        + (#strings.isEmpty(filterQuery) ? '' : '&amp;q=' + #uris.escapeQueryParam(filterQuery))}">
         <form th:action="@{/admin/personal-inventory}" method="get" class="krt-pi-filter no-track">
@@ -83,7 +83,7 @@
             </th:block>
             <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${page}, baseUrl=${piBase})}"></th:block>
         </div>
-    </th:block>
+    </section>
     </th:block>
     </div>
 </main>

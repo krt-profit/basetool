@@ -545,7 +545,7 @@ class JobOrderPageReaderTest {
   @Test
   void creationAuthorityDoesNotFallBackToTheActiveUnitCatalog() {
     when(client.createOptions())
-        .thenReturn(new JobOrderCreateOptionsDto(false, List.of(), List.of(), null, null));
+        .thenReturn(new JobOrderCreateOptionsDto(false, List.of(), List.of(), null, null, null));
 
     assertThatThrownBy(reader::readOrderCreate)
         .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);

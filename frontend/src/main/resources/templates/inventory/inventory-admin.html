@@ -31,8 +31,10 @@
     </th:block>
     </th:block>
 
-    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
     <div th:replace="~{kernel/fragments/components :: allMyOrgUnitsNotice}"></div>
+    <div id="inventory-workspace">
+    <th:block th:fragment="inventoryView">
+    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
 
     <div th:if="${org?.springframework?.validation?.BindingResult?.inventoryForm != null}" class="alert alert-danger" role="alert">
         <ul class="lager-error-list">
@@ -40,19 +42,11 @@
         </ul>
     </div>
 
-    <div class="tab-nav lager-tabs" role="tablist" th:aria-label="#{inventory.items.view.aria}">
-        <a th:href="@{/inventory(storage='all')}" class="tab" role="tab"
-           th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
-           data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
-        <a th:href="@{/inventory(storage='all', view='items')}" class="tab" role="tab"
-           th:classappend="${view == 'items'} ? ' active' : ''" th:aria-selected="${view == 'items'}"
-           data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
-    </div>
-
     <section class="list-panel">
     <form th:if="${view != 'items'}" th:action="@{/inventory}" method="get" id="globalFilterForm" class="global-inventory-filter no-track">
         <input type="hidden" name="storage" value="all">
         <div class="toolbar lager-toolbar">
+            <nav th:replace="~{inventory/fragments/inventory-view-switch :: viewSwitch(storage='all')}"></nav>
             <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='globalFilterPanel', panelName='inventory-all',
                 testid='lager-filter-toggle', body=~{::lager-all-filter-body})}">
                 <th:block th:ref="lager-all-filter-body">
@@ -157,6 +151,7 @@
         <input type="hidden" name="storage" value="all">
         <input type="hidden" name="view" value="items">
         <div class="toolbar lager-toolbar">
+            <nav th:replace="~{inventory/fragments/inventory-view-switch :: viewSwitch(storage='all')}"></nav>
             <th:block th:replace="~{kernel/fragments/components :: filterPopover(panelId='globalFilterPanel', panelName='inventory-all',
                 testid='lager-filter-toggle', body=~{::lager-all-items-filter-body})}">
                 <th:block th:ref="lager-all-items-filter-body">
@@ -375,6 +370,8 @@
         </div>
     </div>
     </section>
+    </th:block>
+    </div>
 </main>
 
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='bookOutModal', titleKey='inventory.bookout.title', variant='krt-modal--wide', open=${showBookOutModal != null}, closeTrigger='inv-admin-close-bookout', body=~{::bookOutModal-body})}">

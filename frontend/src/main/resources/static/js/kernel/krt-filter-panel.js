@@ -100,15 +100,19 @@ function setCollapsed(panel, collapsed) {
     if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
 }
 
+/** @type {WeakSet<HTMLElement>} */
+const initializedPanels = new WeakSet();
+
 /**
- * Wires one panel as a transient popover: collapses it, renders the count, and installs the
- * toggle, outside-click and Escape listeners. No open/closed state is stored (REQ-FE-021).
+ * Wires a transient panel and its toggle (REQ-FE-021).
  *
  * @param {HTMLElement} panel the panel element
  */
 function init(panel) {
+    if (initializedPanels.has(panel)) return;
     const toggle = toggleFor(panel);
     if (!toggle) return;
+    initializedPanels.add(panel);
     updateBadge(panel);
     setCollapsed(panel, true);
     toggle.addEventListener('click', () => {
@@ -124,21 +128,6 @@ function init(panel) {
         );
         if (first) first.focus();
     });
-    document.addEventListener('click', (event) => {
-        if (panel.hidden || !(event.target instanceof Node)) return;
-        if (panel.contains(event.target) || toggle.contains(event.target)) return;
-        if (!event.target.isConnected) return;
-        setCollapsed(panel, true);
-    });
-    document.addEventListener('keydown', (event) => {
-        if (event.key !== 'Escape' || panel.hidden) return;
-        if (!(event.target instanceof Node)) return;
-        if (!panel.contains(event.target) && !toggle.contains(event.target)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setCollapsed(panel, true);
-        toggle.focus();
-    });
     panel.addEventListener('input', () => {
         updateBadge(panel);
     });
@@ -147,13 +136,43 @@ function init(panel) {
     });
 }
 
-/** Wires every panel in the document. */
-function initAll() {
-    const panels = document.querySelectorAll('[data-filter-panel]');
-    for (let i = 0; i < panels.length; i++) {
-        init(/** @type {HTMLElement} */ (panels[i]));
-    }
+/**
+ * Wires the filter panels in the supplied subtree.
+ *
+ * @param {ParentNode} root the document or a swapped fragment container
+ */
+function initAll(root) {
+    /** @type {NodeListOf<HTMLElement>} */
+    const panels = root.querySelectorAll('[data-filter-panel]');
+    panels.forEach(init);
 }
+
+document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Node) || !target.isConnected) return;
+    /** @type {NodeListOf<HTMLElement>} */
+    const panels = document.querySelectorAll('[data-filter-panel]:not([hidden])');
+    panels.forEach((panel) => {
+        const toggle = toggleFor(panel);
+        if (!panel.contains(target) && !toggle?.contains(target)) setCollapsed(panel, true);
+    });
+});
+
+document.addEventListener('keydown', (event) => {
+    const target = event.target;
+    if (event.key !== 'Escape' || !(target instanceof Node)) return;
+    /** @type {NodeListOf<HTMLElement>} */
+    const panels = document.querySelectorAll('[data-filter-panel]:not([hidden])');
+    for (const panel of panels) {
+        const toggle = toggleFor(panel);
+        if (!toggle || (!panel.contains(target) && !toggle.contains(target))) continue;
+        event.preventDefault();
+        event.stopPropagation();
+        setCollapsed(panel, true);
+        toggle.focus();
+        break;
+    }
+});
 
 /** @type {KrtFilterPanelApi} */
 export const krtFilterPanel = {
@@ -188,7 +207,11 @@ export const krtFilterPanel = {
 };
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAll);
+    document.addEventListener('DOMContentLoaded', () => initAll(document));
 } else {
-    initAll();
+    initAll(document);
 }
+
+document.addEventListener('krt:swapped', (event) => {
+    if (event.detail.container) initAll(event.detail.container);
+});

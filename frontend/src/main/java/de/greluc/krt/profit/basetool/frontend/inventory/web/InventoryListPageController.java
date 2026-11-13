@@ -159,6 +159,32 @@ public class InventoryListPageController {
   }
 
   /**
+   * Renders the personal view's filters and tree for an in-place catalog switch.
+   *
+   * @param query the requested view and filters
+   * @param model the workspace model
+   * @return the personal inventory workspace fragment
+   */
+  @GetMapping(params = {LagerStorage.MY_CONDITION, "fragment=view"})
+  public @NotNull String switchMyInventoryView(
+      @ModelAttribute LagerQuery query, @NotNull Model model) {
+    return viewMyInventory(query, false, model) + " :: inventoryView";
+  }
+
+  /**
+   * Renders the shared view's filters and tree for an in-place catalog switch.
+   *
+   * @param query the requested view and filters
+   * @param model the workspace model
+   * @return the shared inventory workspace fragment
+   */
+  @GetMapping(params = {LagerStorage.ALL_CONDITION, "fragment=view"})
+  public @NotNull String switchAllInventoryView(
+      @ModelAttribute LagerQuery query, @NotNull Model model) {
+    return viewAllInventory(query, false, model) + " :: inventoryView";
+  }
+
+  /**
    * Returns the ids of every own inventory entry matching the current personal-list filter and
    * view, backing "Alle markieren" (REQ-INV-034).
    *

@@ -31,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -56,7 +57,9 @@ class LagerTreeLastRowE2eTest {
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link rel="stylesheet" href="/css/kernel/styles.css">
       <link rel="stylesheet" href="/css/inventory/inventory-lager.css">
-      </head><body><main class="lager-page"><section class="list-panel">
+      </head><body><main class="lager-page">
+      <nav class="tab-nav"><a class="tab active" href="/">Lager</a></nav>
+      <section class="list-panel">
       <div class="toolbar lager-toolbar"><span>Filter</span></div>
       <div class="card card--flush lager-tree-card"><div class="overflow-x-auto">
       <div class="table-responsive"><div class="tree-table lager-material-tree">
@@ -161,6 +164,35 @@ class LagerTreeLastRowE2eTest {
         }
       });
       E2eSupport.capture(page, "lager-tree-last-row-" + state.name().toLowerCase(Locale.ROOT));
+    }
+  }
+
+  @Test
+  void listToolbarAndTableShareTheOuterFrame() {
+    try (BrowserContext context =
+        browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 800))) {
+      context.route(ORIGIN + "/**", route -> StaticFixtureServer.serve(route, FIXTURE));
+      Page page = context.newPage();
+      page.navigate(ORIGIN + "/");
+      Object geometry =
+          page.evaluate(
+              """
+              () => {
+                const tabs = document.querySelector('.tab-nav');
+                const panel = document.querySelector('.list-panel');
+                const toolbar = panel.querySelector('.toolbar');
+                const card = panel.querySelector('.card--flush');
+                const table = card.querySelector('.overflow-x-auto');
+                return [
+                  panel.getBoundingClientRect().top - tabs.getBoundingClientRect().bottom,
+                  parseFloat(getComputedStyle(panel).borderTopLeftRadius),
+                  parseFloat(getComputedStyle(toolbar).borderBottomWidth),
+                  parseFloat(getComputedStyle(table).borderTopLeftRadius),
+                  parseFloat(getComputedStyle(card).borderLeftWidth)
+                ];
+              }
+              """);
+      org.assertj.core.api.Assertions.assertThat(geometry).isEqualTo(List.of(16, 10, 1, 0, 0));
     }
   }
 

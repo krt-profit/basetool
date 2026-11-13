@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.assertions.LocatorAssertions;
@@ -118,11 +119,7 @@ class OperationWritesInPlaceE2eTest {
     }
   }
 
-  /**
-   * Edits an operation's name on the detail page and saves twice in a row: the first save persists
-   * without a reload, and the second save succeeds without a 409 — proving the twin wrote the fresh
-   * optimistic-lock version back into the form.
-   */
+  /** Checks the description editor's preview switch and two consecutive in-place saves. */
   @Test
   void updateOperationInPlaceAndDoubleSaveDoesNotConflict() {
     String baseUrl = STACK.baseUrl();
@@ -141,6 +138,7 @@ class OperationWritesInPlaceE2eTest {
         page.waitForLoadState();
 
         page.locator("[data-testid='operation-edit']").click();
+        verifyDescriptionViewSwitch(page);
         page.locator("#op-name").fill(firstName);
         page.evaluate("window.__krtNoReload = true;");
         page.waitForResponse(
@@ -170,6 +168,36 @@ class OperationWritesInPlaceE2eTest {
         throw failure;
       }
     }
+  }
+
+  /**
+   * Checks that the preview renders the current source and that switching back retains it.
+   *
+   * @param page the operation detail page with the edit dialog open
+   */
+  private static void verifyDescriptionViewSwitch(Page page) {
+    Locator editor = page.locator("#op-md-editor");
+    Locator edit = editor.locator("[data-md-view='edit']");
+    Locator preview = editor.locator("[data-md-view='preview']");
+    Locator input = editor.locator("#op-desc");
+    Locator rendered = editor.locator("#op-md-preview");
+    String description = "**Lagerbestand**";
+
+    assertThat(edit).hasAttribute("aria-pressed", "true");
+    input.fill(description);
+    preview.click();
+
+    assertThat(preview).hasAttribute("aria-pressed", "true");
+    assertThat(edit).hasAttribute("aria-pressed", "false");
+    assertThat(input).isHidden();
+    assertThat(rendered.locator("strong")).hasText("Lagerbestand");
+
+    edit.click();
+
+    assertThat(edit).hasAttribute("aria-pressed", "true");
+    assertThat(preview).hasAttribute("aria-pressed", "false");
+    assertThat(rendered).isHidden();
+    assertThat(input).hasValue(description);
   }
 
   /**

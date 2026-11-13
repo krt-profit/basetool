@@ -380,9 +380,9 @@
                         <div class="form-group span-all" id="op-md-editor">
                             <div class="op-md-head">
                                 <label for="op-desc" th:text="#{operation.description}">Beschreibung</label>
-                                <span class="tab-nav op-md-views" role="tablist" th:aria-label="#{operation.description}">
-                                    <button type="button" class="tab active" role="tab" aria-selected="true" data-md-view="edit" th:text="#{operation.md.edit}">Bearbeiten</button>
-                                    <button type="button" class="tab" role="tab" aria-selected="false" data-md-view="preview" th:text="#{operation.md.preview}">Vorschau</button>
+                                <span class="krt-segmented" role="group" th:aria-label="#{operation.description}">
+                                    <button type="button" class="krt-segmented__item" aria-pressed="true" aria-controls="op-desc op-md-toolbar" data-md-view="edit" th:text="#{operation.md.edit}">Bearbeiten</button>
+                                    <button type="button" class="krt-segmented__item" aria-pressed="false" aria-controls="op-md-preview" data-md-view="preview" th:text="#{operation.md.preview}">Vorschau</button>
                                 </span>
                             </div>
                             <div class="md-toolbar" id="op-md-toolbar">

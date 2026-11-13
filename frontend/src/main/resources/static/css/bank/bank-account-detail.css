@@ -24,10 +24,6 @@
         font-size: 1rem;
     }
 
-    .bank-detail-tabs {
-        margin-bottom: var(--space-4);
-    }
-
     .bank-detail-panel .card + .card,
     .oud-settings-grid .card + .card {
         margin-top: 0;

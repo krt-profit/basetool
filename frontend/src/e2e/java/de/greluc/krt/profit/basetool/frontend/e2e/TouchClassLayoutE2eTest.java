@@ -821,6 +821,9 @@ class TouchClassLayoutE2eTest {
     for (Object offender : list(probe.get("lineEndDots"))) {
       findings.add(where + ": stacked-row separator dot at the end of a line — " + offender);
     }
+    for (Object offender : list(probe.get("tightTabJoins"))) {
+      findings.add(where + ": insufficient gap after a tab strip - " + offender);
+    }
     for (Object offender : list(probe.get("uncuedTabStrips"))) {
       findings.add(where + ": scrolling tab strip without its edge fade — " + offender);
     }
@@ -1207,6 +1210,7 @@ class TouchClassLayoutE2eTest {
           }
         }
 
+        const layoutGap = parseFloat(getComputedStyle(document.documentElement).fontSize);
         const modalIssues = [];
         const MODAL_SHAPES = %s;
         for (const ov of document.querySelectorAll('%s')) {
@@ -1236,7 +1240,12 @@ class TouchClassLayoutE2eTest {
             }
             const body = shape.body ? ov.querySelector(shape.body) : null;
             if (body) {
-              const oy = getComputedStyle(body).overflowY;
+              const bodyStyle = getComputedStyle(body);
+              const oy = bodyStyle.overflowY;
+              if (modal.querySelector('.krt-modal-head')
+                  && parseFloat(bodyStyle.paddingBlockStart) < layoutGap - slack) {
+                modalIssues.push(name + ' has less than one spacing unit below the title');
+              }
               if (body.scrollHeight > body.clientHeight + slack
                   && oy !== 'auto' && oy !== 'scroll') {
                 modalIssues.push(name + ' body is taller than its box but does not scroll');
@@ -1369,6 +1378,21 @@ class TouchClassLayoutE2eTest {
           }
         }
 
+        const tightTabJoins = [];
+        for (const strip of document.querySelectorAll('.tab-nav')) {
+          if (!shown(strip)) continue;
+          const attached = strip.closest('.mission-head-dock, .unit-tabs') !== null;
+          const anchor = strip.closest('.mission-head-sticky') || strip;
+          let next = anchor.nextElementSibling;
+          while (next && !shown(next)) next = next.nextElementSibling;
+          if (!next) continue;
+          const inset = attached ? parseFloat(getComputedStyle(next).paddingBlockStart) || 0 : 0;
+          const below = next.getBoundingClientRect().top - strip.getBoundingClientRect().bottom;
+          if (below + inset < layoutGap - slack && tightTabJoins.length < maxListed) {
+            tightTabJoins.push(label(strip) + ' touches ' + label(next));
+          }
+        }
+
         const uncuedTabStrips = [];
         for (const strip of document.querySelectorAll('.tab-nav')) {
           const max = strip.scrollWidth - strip.clientWidth;
@@ -1412,7 +1436,7 @@ class TouchClassLayoutE2eTest {
                  cutOff, unscrollableTables, badControls, smallTextEntries, modalIssues, overlaps,
                  cardOverflows, cardOverflowCount, primaryAction, primaryIssue,
                  ctaCrowds, ctaCrowdCount, nestedHudBoxes, nestedHudCount: nested.length,
-                 retiredGrayTexts, retiredGrayCount, lineEndDots, uncuedTabStrips,
+                 retiredGrayTexts, retiredGrayCount, lineEndDots, uncuedTabStrips, tightTabJoins,
                  modalCount: document.querySelectorAll('%s').length };
       }
       """

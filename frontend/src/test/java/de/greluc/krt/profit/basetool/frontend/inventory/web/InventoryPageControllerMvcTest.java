@@ -966,6 +966,34 @@ class InventoryPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
+  void inventoryCatalogSwitchRendersOnlyTheWorkspace() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.get(anyString(), anyTypeRef(), any(Object[].class)))
+        .thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    for (String storage : List.of("my", "all")) {
+      mockMvc
+          .perform(
+              get("/inventory")
+                  .param("storage", storage)
+                  .param("view", "items")
+                  .param("fragment", "view"))
+          .andExpect(status().isOk())
+          .andExpect(
+              content()
+                  .string(containsString("data-testid=\"lager-view-items\" aria-current=\"page\"")))
+          .andExpect(content().string(containsString("data-lager-view-switch")))
+          .andExpect(content().string(containsString("data-testid=\"lager-filter-toggle\"")))
+          .andExpect(content().string(containsString("class=\"tree-table lager-items-tree")))
+          .andExpect(content().string(not(containsString("class=\"page-head\""))))
+          .andExpect(content().string(not(containsString("id=\"bookOutModal\""))));
+    }
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
   void viewAllInventory_ShouldRenderScuDecimalAmountFieldsAndHelper() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))

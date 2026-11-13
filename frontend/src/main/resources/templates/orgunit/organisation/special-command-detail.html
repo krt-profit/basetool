@@ -27,17 +27,19 @@
               th:text="${specialCommand.description()}">Beschreibung</span>
     </p>
 
-    <div class="card card--flush unit-detail" id="members-box" th:data-sc-id="${specialCommand != null ? specialCommand.id() : ''}">
-        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${specialCommand != null ? specialCommand.name() : ''}">
-            <button type="button" class="tab active" role="tab" aria-selected="true" id="sk-tab-members" aria-controls="members-results"
-                    ><span th:text="#{admin.specialcommands.members.title}">Mitglieder</span> <span class="tab-count" id="sk-members-count" th:text="${members != null ? #lists.size(members) : 0}">0</span></button>
+    <section class="list-panel unit-detail" id="members-box" aria-labelledby="sk-members-heading" th:data-sc-id="${specialCommand != null ? specialCommand.id() : ''}">
+        <div class="toolbar">
+            <h2 class="card-title" id="sk-members-heading">
+                <span th:text="#{admin.specialcommands.members.title}">Mitglieder</span>
+                <span class="count-badge" id="sk-members-count" th:text="${members != null ? #lists.size(members) : 0}">0</span>
+            </h2>
         </div>
-        <div id="members-results" class="unit-tabpanel" role="tabpanel" aria-labelledby="sk-tab-members">
+        <div id="members-results" class="card card--flush">
         <th:block th:fragment="membersResults">
             <th:block th:replace="~{orgunit/organisation/unit-detail :: skRoster(skId=${specialCommand.id()}, members=${members}, showFlags=true, canLead=${canToggleLead}, canRemove=true, leadMode='admin', selfUserId=${selfUserId}, admin=${canToggleLead}, refreshUrl=${'/organisation/special-commands/' + specialCommand.id()}, refreshContainer='#members-results', refreshFragment='members')}"></th:block>
         </th:block>
         </div>
-    </div>
+    </section>
 </main>
 
 <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='add-member-modal', titleKey='admin.specialcommands.members.add', closeTrigger='', closeClass='close-add-member-modal', body=~{::add-member-modal-body})}">

@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
 > **Owner area:** ORG · **Related:** [`security-and-access.md`](security-and-access.md) · issues #214, #340–#344, #500
 
 # Multi-org-unit tenancy & scope (CRITICAL)
@@ -363,14 +363,18 @@ which renders in both the browser `<title>` tag and the sidebar brand logo text.
 
 The title, the switcher's selected entry and the owner pickers' preselection read the **effective**
 context the backend reports (REQ-ORG-008, REQ-ORG-032), never the raw session value, so they always
-name the context the data on the page was scoped by. In „Alle meine Org-Einheiten" the pooled lists
-that mix several units carry a notice: the Lager overview, the „Einheitslager" and the Hangar's unit
-overview that they hold the data of all of the member's units (`orgUnit.context.allMine.notice`,
-one shared fragment `components :: allMyOrgUnitsNotice`; „Mein Lager" does not follow the selection
-and carries none), the blueprint overview that it holds the
-blueprints of the members of every unit the viewer oversees
-(`blueprintOverview.overseen_orgunits_notice`). The lists of missions and operations show the
-owning unit of every row; with a unit selected the notices are gone.
+name the context the data on the page was scoped by. The Lager overview uses context-specific
+copy. For `ALL_MY_ORG_UNITS`, the notice describes the pooled stock of the org units whose
+inventory the viewer can access through membership, cascading leadership reach or a contextual
+Logistician grant. These units can be squadrons, special commands, areas or the organisation's
+leadership unit. For an admin in `ALL_ORG_UNITS`, the notice describes stock across all org units.
+
+In „Alle meine Org-Einheiten", the „Einheitslager" and the Hangar's unit overview use the shared
+`components :: allMyOrgUnitsNotice` fragment to describe their pooled data. „Mein Lager"
+does not follow the selection and carries no scope notice. The blueprint overview describes the
+blueprints of members in every unit the viewer oversees (`blueprintOverview.overseen_orgunits_notice`).
+The lists of missions and operations show the owning unit of every row. The pooled notices
+disappear when a unit is selected.
 
 There is **no separate context chip**. An always-on top-right context chip used to render the same
 information (and was the only surface that distinguished/showed an SK pin); it was removed as

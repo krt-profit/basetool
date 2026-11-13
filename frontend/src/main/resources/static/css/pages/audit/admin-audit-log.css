@@ -1,10 +1,6 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .audit-tabs {
-        margin-bottom: var(--space-4);
-    }
-
     .audit-event-filter {
         flex: 0 1 280px;
         min-width: 0;

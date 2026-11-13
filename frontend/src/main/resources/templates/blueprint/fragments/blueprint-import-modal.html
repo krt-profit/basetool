@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="importModal">
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='krt-bp-import-modal',
+        titleKey='personalInventory.blueprints.import.title', variant='krt-bp-import-frame',
+        body=~{blueprint/fragments/blueprint-import-modal :: importModalBody})}"></th:block>
+</th:block>
+<th:block th:fragment="importModalBody">
+    <div class="krt-modal-body">
+        <section class="list-panel krt-bp-import-list" th:aria-label="#{personalInventory.blueprints.import.title}">
+            <div class="toolbar">
+                <p class="krt-bp-import-summary m-0" id="krt-bp-import-summary"></p>
+                <button type="button" class="btn btn-ghost" data-trigger="bp-import-selectall"
+                        th:text="#{personalInventory.blueprints.import.selectAll}">Alle ausw&auml;hlen</button>
+                <button type="button" class="btn btn-ghost" data-trigger="bp-import-selectnone"
+                        th:text="#{personalInventory.blueprints.import.selectNone}">Auswahl aufheben</button>
+            </div>
+            <div id="krt-bp-import-body" class="krt-bp-import-body"></div>
+        </section>
+    </div>
+    <div class="krt-modal-foot">
+        <button type="button" class="btn btn-ghost" data-trigger="bp-import-close"
+                th:text="#{personalInventory.action.cancel}">Abbrechen</button>
+        <button type="button" id="krt-bp-import-apply" class="btn btn--cta" data-trigger="bp-import-apply"
+                th:text="#{personalInventory.blueprints.import.apply}">Anwenden</button>
+    </div>
+</th:block>
+</body>
+</html>

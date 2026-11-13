@@ -357,6 +357,8 @@ Two binding rules shape every UI change:
   child that fills a box corner takes the box's inner radius instead of being clipped. Where
   the website would fail WCAG, the app departs from it: controls keep their 3:1 border and
   department tags stay filled (REQ-UI-003, REQ-UI-007, ADR-0371).
+- [ADR-0378](../adr/0378-navigation-and-list-surfaces-have-distinct-edges.md) governs how tab
+  strips, list panels and dialogs meet their content (REQ-UI-007, REQ-UI-013, REQ-UI-028).
 
 Authority: [`ui-design-system.md`](../specs/ui-design-system.md),
 [`frontend-ajax-mutations.md`](../specs/frontend-ajax-mutations.md) (`REQ-FE-*`),

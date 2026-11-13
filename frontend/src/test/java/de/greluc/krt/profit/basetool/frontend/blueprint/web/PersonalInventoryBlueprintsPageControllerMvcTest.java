@@ -320,6 +320,9 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     assertTrue(html.contains("id=\"krt-bp-search-input\""), html);
     assertTrue(html.contains("id=\"krt-bp-staging-list\""), html);
     assertTrue(html.contains("id=\"krt-bp-add-selected\""), html);
+    assertTrue(html.contains("id=\"krt-bp-import-modal\""), html);
+    assertTrue(html.contains("class=\"list-panel krt-bp-import-list\""), html);
+    assertTrue(html.contains("id=\"krt-bp-import-body\""), html);
     assertFalse(main.contains("hud-box"), "no HUD box");
     assertFalse(main.contains("class=\"greeting"), "no greeting");
     assertFalse(main.contains("krtm-"), "no migrated inline classes");

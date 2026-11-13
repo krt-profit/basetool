@@ -4,9 +4,6 @@
     main [hidden] {
         display: none;
     }
-    .member-edit-tabs {
-        margin-bottom: var(--space-4);
-    }
     .member-edit-panel {
         display: flex;
         flex-direction: column;

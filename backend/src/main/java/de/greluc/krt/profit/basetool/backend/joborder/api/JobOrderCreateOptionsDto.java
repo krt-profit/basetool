@@ -32,10 +32,12 @@ import org.jetbrains.annotations.Nullable;
  * @param requestingOptions active requesting units with at least one authorized responsible side
  * @param suggestedResponsibleOrgUnitId the responsible side of one currently valid proposed pair
  * @param suggestedRequestingOrgUnitId the requesting side of that pair
+ * @param suggestedAuecResponsibleOrgUnitId the responsible side for aUEC with the same requester
  */
 public record JobOrderCreateOptionsDto(
     boolean canCreate,
     @NotNull List<JobOrderCreateUnitOptionDto> responsibleOptions,
     @NotNull List<JobOrderCreateUnitOptionDto> requestingOptions,
     @Nullable UUID suggestedResponsibleOrgUnitId,
-    @Nullable UUID suggestedRequestingOrgUnitId) {}
+    @Nullable UUID suggestedRequestingOrgUnitId,
+    @Nullable UUID suggestedAuecResponsibleOrgUnitId) {}

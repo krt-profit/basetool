@@ -7,12 +7,12 @@
         <fieldset class="form-section">
             <legend class="form-section__head" th:text="#{orders.create.section.order}"></legend>
             <div class="form-grid">
-                <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('auec-responsible-org-unit', 'responsibleOrgUnitId', ${responsibleOptions}, ${jobOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
-                <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('auec-requesting-org-unit', 'requestingOrgUnitId', ${requestingOptions}, ${jobOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
+                <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('auec-responsible-org-unit', 'responsibleOrgUnitId', ${responsibleOptions}, ${auecOrderForm.responsibleOrgUnitId}, 'orders.create.responsible', true)}"></div>
+                <div th:replace="~{joborder/fragments/orgunit-select :: orgUnitSelect('auec-requesting-org-unit', 'requestingOrgUnitId', ${requestingOptions}, ${auecOrderForm.requestingOrgUnitId}, 'orders.create.requesting', true)}"></div>
                 <div class="form-group">
                     <label for="auec-handle" th:text="#{orders.create.handle}"></label>
                     <input type="text" id="auec-handle" name="handle" data-testid="order-auec-handle"
-                           th:value="${auecMode ? jobOrderForm.handle : null}" autocomplete="off" maxlength="200" required>
+                           th:value="${auecOrderForm.handle}" autocomplete="off" maxlength="200" required>
                 </div>
                 <div class="form-group">
                     <label for="auec-target" th:text="#{orders.money.target.withUnit}"></label>
@@ -26,7 +26,7 @@
                 <span th:text="#{orders.create.comment}"></span>
                 <span class="opt" th:text="#{form.optional}"></span>
             </label>
-            <textarea id="auec-comment" name="comment" rows="4" maxlength="1000" th:text="${auecMode ? jobOrderForm.comment : null}"></textarea>
+            <textarea id="auec-comment" name="comment" rows="4" maxlength="1000" th:text="${auecOrderForm.comment}"></textarea>
         </div>
         <div class="form-actions--sticky">
             <a th:href="@{/orders}" class="btn btn-ghost" th:text="#{orders.create.cancel}"></a>

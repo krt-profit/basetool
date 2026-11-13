@@ -309,6 +309,7 @@ class JobOrderPageControllerReaderTest {
                                 true))
                         .toList(),
                     null,
+                    null,
                     null)));
     Model model = new ExtendedModelMap();
 
@@ -331,7 +332,7 @@ class JobOrderPageControllerReaderTest {
                 List.of(),
                 true,
                 List.of(),
-                new JobOrderCreateOptionsDto(true, List.of(), List.of(), null, null)));
+                new JobOrderCreateOptionsDto(true, List.of(), List.of(), null, null, null)));
     Model model = new ExtendedModelMap();
 
     creationController.viewCreateForm(

@@ -290,8 +290,10 @@ class AdminDiscordRegistrationsNicknameRenderTest {
         .containsPattern("data-testid=\"page-head-count\"[^>]*>1<")
         .doesNotContain("class=\"greeting")
         .doesNotContain("hud-box")
-        .contains("data-testid=\"reg-tab-open\"")
-        .contains("data-testid=\"reg-tab-rejected\"")
+        .containsPattern(
+            "class=\"krt-segmented__item\"[^>]*id=\"reg-tab-open\" aria-selected=\"true\"")
+        .containsPattern(
+            "class=\"krt-segmented__item\"[^>]*id=\"reg-tab-rejected\" aria-selected=\"false\"")
         .containsPattern("id=\"reg-panel-rejected\"[^>]*hidden")
         .contains("class=\"data-table data-table--stack\"")
         .contains("class=\"btn btn-success btn-xs\" data-action=\"approve\"")

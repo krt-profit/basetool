@@ -7,10 +7,6 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .lager-tabs {
-        margin-bottom: var(--space-3);
-    }
-
     .lager-toolbar .lager-select-all {
         margin-left: auto;
     }

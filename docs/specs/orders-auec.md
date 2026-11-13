@@ -462,7 +462,9 @@ audit commit in one transaction.
 
 The common overview and central detail remain the workspace. Creation requires requester unit,
 responsible Profit unit, contact and target; comment is optional. Holders, recipients, commitments
-and Bank details can follow later. Show only kind-relevant inputs. After create, open the order
+and Bank details can follow later. Preselect the canonical Profit area as the responsible unit
+using the backend projection in REQ-ORDERS-053. The creator may choose another eligible unit.
+An invalid submission preserves that choice. Show only kind-relevant inputs. After create, open the order
 detail and retain the list/filter return context.
 Use the shared create transport in REQ-FE-006. AJAX submits the form and follows the server's
 detail target. A native form submission redirects to the same detail.
@@ -509,6 +511,9 @@ every participant.
 **Acceptance**
 
 - [ ] Create without holder, Bank or collection account reaches detail with the required minimal fields.
+- [ ] A fresh aUEC form preselects the canonical active Profit area when available. A submitted
+  eligible alternative remains selected after validation errors. Material and item suggestions
+  continue to use the generic pair.
 - [ ] Provision/movement/correction handles normal and settlement cases without a new process per exception.
 - [ ] Preview shows exact cost and optional funding before one save; every new monetary operation defaults to Bank handling.
 - [ ] Bank-free handling is explicitly selected per operation, remains fully usable without Bank prerequisites, and does not become a remembered default.

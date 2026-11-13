@@ -14,21 +14,25 @@
 
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{${error}}">Fehler beim Laden.</div>
 
-    <div class="tab-nav reg-tabs" role="tablist" th:aria-label="#{admin.discordRegistrations.title}" data-testid="reg-tabs">
-        <button type="button" class="tab active" role="tab" id="reg-tab-open" aria-selected="true"
-                aria-controls="reg-panel-open" data-reg-tab="open" data-testid="reg-tab-open">
-            <span th:text="#{admin.discordRegistrations.tab.open}">Offen</span><span class="tab-count" data-reg-count="open"
-                  th:text="${#lists.size(registrations)}">0</span>
-        </button>
-        <button type="button" class="tab" role="tab" id="reg-tab-rejected" aria-selected="false" tabindex="-1"
-                aria-controls="reg-panel-rejected" data-reg-tab="rejected" data-testid="reg-tab-rejected">
-            <span th:text="#{admin.discordRegistrations.tab.rejected}">Abgelehnt</span><span class="tab-count" data-reg-count="rejected"
-                  th:text="${#lists.size(rejected)}">0</span>
-        </button>
-    </div>
+    <section class="list-panel">
+        <div class="toolbar">
+            <div class="krt-segmented" role="tablist" th:aria-label="#{admin.discordRegistrations.title}" data-testid="reg-tabs">
+                <button type="button" class="krt-segmented__item" role="tab" id="reg-tab-open" aria-selected="true"
+                        aria-controls="reg-panel-open" data-reg-tab="open" data-testid="reg-tab-open">
+                    <span th:text="#{admin.discordRegistrations.tab.open}">Offen</span>
+                    <span class="krt-segmented__count" data-reg-count="open"
+                          th:text="${#lists.size(registrations)}">0</span>
+                </button>
+                <button type="button" class="krt-segmented__item" role="tab" id="reg-tab-rejected" aria-selected="false" tabindex="-1"
+                        aria-controls="reg-panel-rejected" data-reg-tab="rejected" data-testid="reg-tab-rejected">
+                    <span th:text="#{admin.discordRegistrations.tab.rejected}">Abgelehnt</span>
+                    <span class="krt-segmented__count" data-reg-count="rejected"
+                          th:text="${#lists.size(rejected)}">0</span>
+                </button>
+            </div>
+        </div>
 
-    <section id="reg-panel-open" role="tabpanel" aria-labelledby="reg-tab-open">
-        <div class="card card--flush">
+        <section id="reg-panel-open" class="card card--flush" role="tabpanel" aria-labelledby="reg-tab-open">
             <div class="table-responsive">
                 <table id="registrationsTable" class="data-table data-table--stack" th:hidden="${#lists.isEmpty(registrations)}">
                     <thead>
@@ -75,12 +79,10 @@
                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.discordRegistrations.empty',
                     textKey='admin.discordRegistrations.empty.text')}"></th:block>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <section id="reg-panel-rejected" role="tabpanel" aria-labelledby="reg-tab-rejected" hidden>
-        <p class="reg-when reg-hint" th:text="#{admin.discordRegistrations.rejected.hint}">Eine irrtümlich abgelehnte Registrierung kann wieder in die Warteschlange zurückgeholt werden.</p>
-        <div class="card card--flush">
+        <section id="reg-panel-rejected" class="card card--flush" role="tabpanel" aria-labelledby="reg-tab-rejected" hidden>
+            <p class="reg-when reg-hint" th:text="#{admin.discordRegistrations.rejected.hint}">Eine irrtümlich abgelehnte Registrierung kann wieder in die Warteschlange zurückgeholt werden.</p>
             <div class="table-responsive">
                 <table id="rejectedTable" class="data-table data-table--stack" th:hidden="${#lists.isEmpty(rejected)}">
                     <thead>
@@ -125,7 +127,7 @@
                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.discordRegistrations.rejected.empty',
                     textKey='admin.discordRegistrations.rejected.empty.text')}"></th:block>
             </div>
-        </div>
+        </section>
     </section>
 
     <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='reject-modal', titleKey='admin.discordRegistrations.reject.modal.title', variant='krt-modal--wide krt-modal--danger', body=~{::reject-modal-body})}">

@@ -93705,6 +93705,10 @@
               "$ref" : "#/components/schemas/JobOrderCreateUnitOptionDto"
             }
           },
+          "suggestedAuecResponsibleOrgUnitId" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
           "suggestedRequestingOrgUnitId" : {
             "type" : "string",
             "format" : "uuid"

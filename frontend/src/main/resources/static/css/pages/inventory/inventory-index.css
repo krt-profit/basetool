@@ -1,8 +1,0 @@
-@layer base, components, page, utilities;
-
-@layer page {
-    .inventory-tabs {
-        border: var(--border-hairline);
-        border-bottom: 0;
-    }
-}

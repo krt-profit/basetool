@@ -16,34 +16,36 @@
 
     <section class="admin-items-section" aria-labelledby="admin-items-title" data-testid="admin-items">
         <h2 id="admin-items-title" class="admin-items-section-title" th:text="#{admin.items.list.title}">Katalog</h2>
-        <form id="admin-items-filter" class="no-track" role="search">
-            <div class="toolbar">
-                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('admin-items-query', 'query', null, 'admin.items.filter.search')}"></th:block>
-                <label class="krt-switch" for="admin-items-unobtainable">
-                    <input type="checkbox" role="switch" id="admin-items-unobtainable" name="unobtainableOnly" data-testid="admin-items-unobtainable" data-filter-chip-ignore>
-                    <span th:text="#{admin.items.filter.unobtainableOnly}">Nur nicht erhältliche</span>
-                </label>
+        <div class="list-panel">
+            <form id="admin-items-filter" class="no-track" role="search">
+                <div class="toolbar">
+                    <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('admin-items-query', 'query', null, 'admin.items.filter.search')}"></th:block>
+                    <label class="krt-switch" for="admin-items-unobtainable">
+                        <input type="checkbox" role="switch" id="admin-items-unobtainable" name="unobtainableOnly" data-testid="admin-items-unobtainable" data-filter-chip-ignore>
+                        <span th:text="#{admin.items.filter.unobtainableOnly}">Nur nicht erhältliche</span>
+                    </label>
+                </div>
+            </form>
+            <div class="card card--flush">
+                <div class="table-responsive">
+                    <table class="data-table data-table--stack">
+                        <thead>
+                        <tr>
+                            <th th:text="#{admin.items.col.name}">Name</th>
+                            <th th:text="#{admin.items.col.type}">Typ</th>
+                            <th class="cell-status" th:text="#{admin.items.col.status}">Status</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.items.col.actions}">Aktionen</span></th>
+                        </tr>
+                        </thead>
+                        <tbody id="admin-items-rows">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="admin-items-empty" class="empty-state" data-testid="empty-state" hidden>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.items.empty.title', 'admin.items.empty', null)}"></th:block>
+                </div>
+                <nav id="admin-items-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
             </div>
-        </form>
-        <div class="card card--flush">
-            <div class="table-responsive">
-                <table class="data-table data-table--stack">
-                    <thead>
-                    <tr>
-                        <th th:text="#{admin.items.col.name}">Name</th>
-                        <th th:text="#{admin.items.col.type}">Typ</th>
-                        <th class="cell-status" th:text="#{admin.items.col.status}">Status</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.items.col.actions}">Aktionen</span></th>
-                    </tr>
-                    </thead>
-                    <tbody id="admin-items-rows">
-                    </tbody>
-                </table>
-            </div>
-            <div id="admin-items-empty" class="empty-state" data-testid="empty-state" hidden>
-                <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.items.empty.title', 'admin.items.empty', null)}"></th:block>
-            </div>
-            <nav id="admin-items-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
         </div>
     </section>
 </main>
