@@ -237,10 +237,10 @@
         align-items: center;
         justify-content: space-between;
         padding: var(--space-3) var(--space-4);
-        background: var(--surface-inset);
+        background: var(--surface-card);
         border: var(--border-hairline);
         border-left: 3px solid var(--color-gray-3);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius-tile);
         transition: border-color 0.15s;
     }
 

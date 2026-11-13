@@ -452,7 +452,7 @@ class ItemInventoryOperationsE2eTest {
     page.waitForLoadState();
     Locator groupRow = page.locator("div.tree-row--group[data-game-item-id='" + gameItemId + "']");
     assertThat(groupRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-    if (isCollapsed(
+    if (E2eSupport.isLagerTreeCollapsed(
         page,
         "div.tree-row--group[data-game-item-id='" + gameItemId + "'] + div.tree-group-items")) {
       groupRow.click();
@@ -465,7 +465,7 @@ class ItemInventoryOperationsE2eTest {
             + "']";
     Locator stackHeader = page.locator(stackSelector);
     assertThat(stackHeader).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-    if (isCollapsed(page, stackSelector + " + div.tree-stack-entries")) {
+    if (E2eSupport.isLagerTreeCollapsed(page, stackSelector + " + div.tree-stack-entries")) {
       stackHeader.click();
     }
     assertThat(page.locator("div.tree-row--leaf[data-item-id='" + rowId + "']"))
@@ -487,23 +487,6 @@ class ItemInventoryOperationsE2eTest {
         .click(new Locator.ClickOptions().setTimeout(20_000));
     assertThat(page.locator("div.tree-row--leaf[data-item-id='" + syncItemRowId + "']"))
         .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-  }
-
-  /**
-   * Reports whether the Lager tree container matched by {@code selector} is collapsed, judged by
-   * its computed {@code display}, not Playwright visibility.
-   *
-   * @param page the authenticated page
-   * @param selector the CSS selector of the group-items / stack-entries container
-   * @return {@code true} when the container is absent or {@code display: none}
-   */
-  private static boolean isCollapsed(Page page, String selector) {
-    Object display =
-        page.evaluate(
-            "sel => { const el = document.querySelector(sel);"
-                + " return el ? getComputedStyle(el).display : 'none'; }",
-            selector);
-    return "none".equals(display);
   }
 
   /**

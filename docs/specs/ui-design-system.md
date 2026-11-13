@@ -18,6 +18,8 @@
 > [0280](../adr/0280-touch-ergonomics-follow-the-pointer-and-the-tablet-is-supported-in-both-orientations.md) (REQ-UI-009, REQ-UI-020) ·
 > ADR-0297, ADR-0298, ADR-0299 and ADR-0323 (REQ-UI-026 amendment, REQ-UI-032, REQ-UI-033,
 > REQ-UI-034, REQ-UI-035 shipped) ·
+> [0371](../adr/0371-the-basetool-follows-the-websites-design-3-0.md) (Design 3.0: REQ-UI-002,
+> REQ-UI-003, REQ-UI-006, REQ-UI-007) ·
 > **Next free id:** `REQ-UI-036` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)),
@@ -123,9 +125,9 @@ This action-hierarchy is **surface-agnostic** — it governs generated documents
 exports: handover protocol, bank statement, three-month report) exactly as it governs
 screens. In those PDFs orange is reserved for the title, the section headers, a single
 accent line under each table header, the balance-chart line, the thin page top-accent bar
-and the logo; page surfaces and the data-cell grid stay neutral (canvas `#0F0F0F`, panel
-`#282C30`, bar `#1A1D21` fills, `#36373B` hairlines), so the orange never overwhelms the
-document.
+and the logo; page surfaces and the data-cell grid stay neutral (canvas `#0D0F12`, box
+`#1A1E24`, bar `#14171C` fills, `#2A3038` hairlines — the app palette of REQ-UI-003), so the orange
+never overwhelms the document.
 
 **Acceptance**
 
@@ -137,37 +139,43 @@ document.
 
 ### REQ-UI-003 — Dark-only surfaces
 
-The surfaces are the gray ladder of das-kartell.org, measured in the browser
-([ADR-0294](../adr/0294-the-app-wears-the-measured-website-palette.md), which supersedes the colour
-values of ADR-0292; its radius and component rules stand). Palette values are read from the live
-site with `getComputedStyle` or the DevTools eyedropper, never from screenshots (HDR capture
-lightens every value):
+The surfaces are the blue-gray ladder of das-kartell.org's Design 3.0
+([ADR-0371](../adr/0371-the-basetool-follows-the-websites-design-3-0.md), which supersedes the
+colour values of ADR-0294). Palette values come from the website style's own colour set (WoltLab
+ACP) or are read from the live site with `getComputedStyle` or the DevTools eyedropper, never from
+screenshots (HDR capture lightens every value):
 
-| Token | Value | Role |
-| :-- | :-- | :-- |
-| `--surface-canvas` | `#0F0F0F` | page background, page head |
-| `--surface-bar` | `#1A1D21` | header, footer, sidebar, tab bars, table heads |
-| `--surface-panel` | `#282C30` | cards, list panels, modals, toasts, dropdowns |
-| `--surface-inset` | `#0F0F0F` | a box set into a panel |
-| `--control-bg` | `#373E43` | every control fill and the table row hover |
-| `--table-stripe-bg` | `--color-control` at 50 % (`#30353A` on the panel) | every second visible table row |
+| Level | Token | Value | Role |
+| :-- | :-- | :-- | :-- |
+| 0 | `--surface-canvas` | `#0D0F12` | page background, page head |
+| bar | `--surface-bar` | `#14171C` | header, footer, drawer, sidebar, tab bars, table heads |
+| 1 | `--surface-panel` | `#1A1E24` | box: cards, list panels, modals, toasts, dropdowns |
+| 2 | `--surface-card` | `#20252C` | tile inside a box: `.card--inset`, KPI tiles, a page's own tiles |
+| 3 | `--surface-inset` | `#14171C` | sunken level: something set into a tile, a table inside a padded card, a detail row |
+| — | `--control-bg` | `#2F3640` | every control fill |
 
-A tile never takes the fill of the surface it sits on: a `.card`, `.kpi-total` or `.kpi-card`
-placed inside a panel (`.list-panel`, another card, a `.detail-pane`, a modal) is `.card--inset` /
-`.kpi-total--inset` / `.kpi-card--inset` and takes the bar fill `#1A1D21`, so the tile stands
-apart from its container; a page's own tile class inside a panel takes the same fill. A framed
+**A level never takes the fill of its parent.** A `.card`, `.kpi-total` or `.kpi-card` placed
+inside a box (`.list-panel`, another card, a `.detail-pane`, a modal) is `.card--inset` /
+`.kpi-total--inset` / `.kpi-card--inset` and takes the **lighter** tile fill `--surface-card`
+`#20252C`, hovering to `--surface-card-hover` `#272D35`; a page's own tile class inside a box takes
+the same fill and `--radius-tile`. The third level sinks instead of lifting again: a framed
 `.data-table` inside a padded card or tab panel lays its rows on `--surface-inset`, so the rows, the
-bar-filled head and the panel stay three distinct levels. Rows alternate by visible row: a row that
-is `hidden` or carries `.detail-row` (an expandable detail under its row) does not count, so the
-stripes still alternate. The stripe is the translucent `--table-stripe-bg`, so it sits halfway
-between the row surface and the row hover on the panel and on an inset table alike. A lighter tile is not an option — `#36373B` and `#373E43` are reserved for
-hairlines, `.btn-secondary` and controls.
+bar-filled head and the box stay distinct. **Every level also carries the `#2A3038` frame**
+(`--color-gray-3`), because the steps are only 1.06–1.17 : 1. More than three levels inside one box
+are a case for a modal or a page of their own.
+
+Rows alternate by visible row: a row that is `hidden` or carries `.detail-row` (an expandable
+detail under its row) does not count, so the stripes still alternate. **Zebra and row hover follow
+the surface the table sits on:** on a box `--table-stripe-bg` `#1E2329` and `--table-row-hover`
+`#272D35`, on a tile (`.card--inset`) `--table-stripe-tile` `#242930` and `--table-row-hover-tile`
+`#2C323A`. The control fill `#2F3640` and the frame `#2A3038` are reserved for controls,
+`.btn-secondary` and frames.
 
 `--color-bg-black` `#000000` is **no page background**: it is the text on orange and the base
 of shadows and scrims. The page background is **flat** — no ambient pattern or texture; a
 subtle radial **top bloom** of the primary fading to transparent is permitted on the login /
 entry surfaces. `color-scheme: dark`; there is **no light theme**. The PWA `theme-color` is
-the bar (`#1A1D21`), the manifest `background_color` the canvas (`#0F0F0F`).
+the bar (`#14171C`), the manifest `background_color` the canvas (`#0D0F12`).
 
 > **Contrast note.** Muted **text** uses the accessible `--color-gray-2-text` tint per
 > REQ-UI-006, not the canonical `--color-gray-2`, which is a control border colour.
@@ -224,15 +232,15 @@ Status hues reuse Bereichsfarben values by appearance: danger `#A3000A`, success
 surfaces and fail WCAG AA as small text. When a semantic
 colour is the **text itself** (inline validation messages, status labels, price up/down),
 use the lightened tints — `--color-danger-text` `#FF7A70`, `--color-info-text` `#8FB2F5`,
-`--color-success-text` `#4CCB5C` (all ≥ 4.5:1 on the panel `#282C30`). Keep the canonical hues for fills,
+`--color-success-text` `#4CCB5C` (all ≥ 6.0:1 on a box `#1A1E24` and a tile `#20252C`). Keep the canonical hues for fills,
 borders and the brand Bereichsfarben tags. An invalid field additionally takes a red
 hairline (`.input-error`) beside its `.field-error` message.
 
 The same rule applies to the **muted grayscale**: Grau 2 (`--color-gray-2` `#8F9399`)
-is the control border (4.5:1 on the panel) and fails WCAG AA as small text. When muted grey
-**is the text itself** — `.text-muted`, secondary
+is the control border (5.4:1 on a box) and fails WCAG AA as small text on a control fill. When
+muted grey **is the text itself** — `.text-muted`, secondary
 labels, hints, placeholders, the quiet-danger button label — use `--color-gray-2-text`
-`#A2A5A9` (≥ 5.6:1 on the panel and the bar, 7.7:1 on the canvas). Keep the canonical
+`#9AA1AB` (≥ 5.9:1 on a box, a tile and the bar, 7.4:1 on the canvas). Keep the canonical
 `--color-gray-2` for control borders, scrollbar thumbs and disabled fills. A glyph that
 sits in text — even an `aria-hidden` one — takes the tint too (DS-1, REQ-UI-027).
 
@@ -253,22 +261,68 @@ icon; DS-1 (REQ-UI-027) gave them the tint as well, so there is no exception lef
 
 **Enforced by:** `AccessibleTextTintTest` (no stylesheet sets `color` to the danger, info, success or Grau 2
 hue, and no script writes one into `style.color`; its selector exemption list for decorative
-glyphs is empty) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on five pages; its report now names every
+glyphs is empty) · `AccessibilitySmokeE2eTest` (axe WCAG A/AA on six pages; its report now names every
 failing node with its colours and ratio)
 
-### REQ-UI-007 — Visual style: sci-fi HUD with a 4 px radius
+### REQ-UI-007 — Visual style: sci-fi HUD with radii by role
 
 Sci-fi / space-organisation / technical-HUD aesthetic: geometric shapes (rings,
-triangles), thin technical markers framing content. **Controls and surfaces take a 4 px
-radius** (`--radius-sm`): buttons, inputs, selects, segmented controls, cards, panels, list
-panels, modals, alerts, chips, badges, toasts and dropdowns; checkboxes and the switch knob
-take 2 px. Pills stay for squadron badges and counters, circles for radio buttons and status
-dots, and table cells, accent bars and gauges stay square (`--radius-none`). A rounded
-container never sets `overflow: hidden`, so popovers and autocomplete lists can leave it. Every
-control has a fill (`--control-bg`) and a visible border (`--control-border`, ≥ 3:1 to its
-background). Department tags are **filled** in the unchanged department colour
-(`.dept-tag--<slug>`), because several department hues are unreadable as text or as a thin
-border on the gray surfaces. The orange bloom glow is the only "shadow" idiom.
+triangles), thin technical markers framing content
+([ADR-0371](../adr/0371-the-basetool-follows-the-websites-design-3-0.md), Design 3.0).
+
+- **Radius by role.** Boxes take `--radius-box` 10 px (cards, list panels, modals, the confirm
+  dialog, toasts, the notification dropdown, detail panes, master lists, tree tables, empty states,
+  KPI cards); tiles take `--radius-tile` 8 px (`.card--inset`, KPI tiles, alerts, person rows, drop
+  zones, annotations, the facts bar, code blocks, flyouts, popover panels and dropdown lists);
+  controls take `--radius-control` 6 px (buttons, inputs, selects, textareas, segmented controls,
+  pagination, the menu filter, the quick-access trigger, the rail buttons); inner elements keep
+  `--radius-sm` 4 px (chips, labels, badges, counters, status labels). Checkboxes and the switch
+  knob take 2 px. Pills stay for squadron badges, the bell and counters, circles for radio buttons
+  and status dots, and table cells, accent bars and gauges stay square (`--radius-none`).
+- **A rounded container never sets `overflow: hidden`**, so popovers and autocomplete lists can
+  leave it.
+- **A child never paints over its box's rounded frame.** The child that fills a frame corner
+  takes the inner radius `calc(var(--radius-box) - 1px)`, and the last visible row drops its own
+  bottom rule; visible means `:not([hidden])`. A `.card--flush` hands that radius to its content
+  through `--flush-corner-top` / `--flush-corner-bottom`: to the head and the last visible row of a
+  table it holds directly (stacked: the sort bar or the first row, and the last row), and to a
+  scroll wrapper (`.table-responsive`, `.overflow-x-auto`) that clips what it holds anyway, such
+  as the Lager's tree table. A frameless flush card inside a `.list-panel` hands on only the panel
+  corners it sits in as the first or last visible child, so a table head under a toolbar stays
+  square. A table in a flush card has no fill of its own; a `.master-list` box rounds its first
+  and last visible row.
+- **Panes are not boxes.** A `.master-list` and a `.detail-pane` that share one framed box as
+  frameless panes take no radius and no fill; the box paints, and the divider between them stays
+  straight. The list pane is the scroll list: it fills its grid row, so its bottom corner is the
+  box's, takes the inner radius through `--flush-corner-top` / `--flush-corner-bottom` in the box
+  corners it fills (the left ones beside the detail pane, all four when it stands alone at
+  ≤ 1024 px) and clips its rows, which take none; its last visible row drops its rule. The kernel's
+  `.master-detail--panes` modifier is this composition, inside the flush card that hands on the
+  corners; the Materialbörse and the blueprint collection build on it, and their page stylesheets
+  set only column widths, scroll caps and paddings. A flush card that closes its list panel from
+  inside a wrapper element sets `--flush-corner-bottom` itself.
+- **HUD corner brackets** stay on `.hud-box`, the modal and the toast and follow the rounded
+  corner.
+- **Box title.** `.card-head`, a leading `.card-title` and `.section-title` are a title bar:
+  0.8125 rem bold upper-case in `--color-title`, a `#2A3038` rule below and a 36 × 2 px orange mark
+  at its left end. Page titles stay orange.
+- **Controls** have a fill (`--control-bg`) and a visible border (`--control-border`, ≥ 3:1 to
+  their background) — unlike the website's frameless 3.0 controls, which reach only 1.4:1.
+- **Labels.** Department tags stay **filled** in the unchanged department colour
+  (`.dept-tag--<slug>`), because several department hues are unreadable as text or as a thin
+  border on the dark surfaces. Status labels (`.status-pill`, `.status-badge`) are **tinted**: the
+  status text tint as text, a 38 % frame and a 14 % fill of it (≥ 5.2:1 on a box, ≥ 4.8:1 on a
+  tile). Alerts are 8 px tiles with a 1 px tinted frame and no left bar.
+- The orange bloom glow is the only "shadow" idiom.
+
+**Enforced by:** `FlushCardCornerTest` (a flush card hands its inner radius to both edges, a
+frameless one in a list panel only to the panel corners it sits in, and every corner inside a flush
+card reads `--flush-corner-top` / `--flush-corner-bottom`) · `MasterDetailPaneCornerTest` (the
+kernel's `.master-detail--panes` gives its panes no radius and no fill, the list pane fills its
+row and reads the corner properties, its rows take no radius; the Materialbörse and the blueprint
+collection use the modifier and keep no pane radius, fill or divider in their page stylesheets) ·
+`LagerTreeLastRowE2eTest` (the Lager tree's last visible row draws no bottom rule in any collapse
+state); the rest by design review.
 
 ### REQ-UI-008 — No native browser dialogs
 
@@ -902,6 +956,10 @@ design-system walk of every page on all six device classes):
   picker, `select`, `textarea`) renders its text below 16px.
 - [ ] A checkbox or radio keeps its small square or disc on every class; its label, not the box,
   reaches the 44px floor.
+- [ ] A tree table's chevron is a disclosure button with the 2px orange focus ring. On the touch
+  classes its 14px glyph keeps its box and a centred `--touch-target` square `::before` carries the
+  hit area, in a row that is itself at least `--touch-target` tall, so the overlay never reaches
+  into the neighbouring row.
 - [ ] No floating element (toast, live-sync pill) overlaps the phone tab bar.
 - [ ] **A hidden overlay takes no room.** A hidden tooltip bubble still counts toward the page's
   scrollable width, and on a phone it widens the layout viewport: the hidden `.scu-hint__bubble`
@@ -919,9 +977,10 @@ page and class and a per-page `patterns:` line in the report) ·
 `PageRouteCatalogueTest` (the route list is no longer hand-maintained on trust: it asks the
 dispatcher for every mapping it knows and fails when a variable-free `GET` route is in neither
 `PAGES` nor `NOT_PAGES`, so a page added next month is swept on the day it is added — and it runs
-in `check`, not in the stack-bound `e2e` suite) + code/design
+in `check`, not in the stack-bound `e2e` suite) · `LagerTreeDisclosureE2eTest` (the tree
+chevron's overlay and row height on the tablet and phone class, and its focus ring) + code/design
 review for the rest · **Code:** `static/css/kernel/styles.css` (`.btn`, `.btn.btn-xs`, `.btn.btn-icon`,
-`--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
+`.tree-chevron`, `--touch-target-dense`, the `width <= 1024px` touch block and the `width <= 768px` block),
 `static/css/bank/bank.css` (`.matrix-flag`, `.bank-row-toggle`), `static/css/personalinventory/personal-inventory.css`
 (`.master-row`), `static/js/kernel/sidebar.js`
 (`--krt-footer-height`).
@@ -1324,7 +1383,7 @@ Binding surface:
 |------------------------------|------------------------------------------------------------------------------------------------------------------|
 | `/manifest.webmanifest`      | Rendered by `WebAppManifestController`, media type `application/manifest+json`, **no `produces` on the mapping** |
 | `<link rel="manifest">`      | In `kernel/fragments/head.html`, **with `?locale=` and no `crossorigin`** — the fetch must stay anonymous               |
-| `theme-color`                | `#1a1d21` — the header bar fill, not the canvas page background                                                  |
+| `theme-color`                | `#14171c` — the header bar fill, not the canvas page background                                                  |
 | `mobile-web-app-capable`     | Standard spelling, plus the `apple-` prefixed legacy one; **both** ship                                          |
 | `apple-mobile-web-app-title` | From `pwa.short_name` — short, and the **same in both locales**, because the product name is a proper noun       |
 | `apple-touch-icon`           | Shipped by REQ-UI-019 (180 px); the manifest lists the 192 px and 512 px tiles at their **content-hashed** URLs  |
@@ -2205,7 +2264,9 @@ Segment toggles, the filter button, the title count and row icon buttons stood a
 `#282828` hairline on black: 1.42:1, where WCAG 1.4.11 asks 3:1. The 2026-10 design system
 (krt-profit/design-system#7) fixes it for the whole app.
 
-1. **Tokens.** `:root` mirrors `--surface-canvas/-panel/-inset/-raised` and `--control-bg`,
+1. **Tokens.** `:root` mirrors `--surface-canvas/-panel/-card/-card-hover/-inset/-raised`, the
+   table tokens `--table-stripe-bg/-stripe-tile` and `--table-row-hover/-row-hover-tile`, the radii
+   `--radius-box/-tile/-control/-sm` and `--control-bg`,
    `--control-bg-hover`, `--control-border` (Grau 2), `--control-fg`, `--control-selected-bg/-border/-fg`;
    `--action-neutral` is Grau 2. The app mirrors `tokens.css` rather than loading it (cascade layers,
    REQ-UI-001's single copy of a colour value).

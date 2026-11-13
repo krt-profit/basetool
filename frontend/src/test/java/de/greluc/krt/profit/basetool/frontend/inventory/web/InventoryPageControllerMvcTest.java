@@ -2406,6 +2406,54 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
+   * The selection checkbox of a material leaf and of a game-item leaf in the "Mein Lager" stack
+   * entries carries an accessible name (REQ-INV-034).
+   */
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
+  void viewMyStackEntries_namesTheSelectionCheckboxOfBothLeafKinds() throws Exception {
+    String namedCheckbox =
+        "(?s).*<input type=\"checkbox\" class=\"item-checkbox inventory-item-checkbox\"[^>]*"
+            + "title=\"Eintrag auswählen\"\\s+aria-label=\"Eintrag auswählen\".*";
+    performMyStackEntriesWithMission(
+            new MissionAllocationDto(UUID.randomUUID(), "Op Nachtfalke", null, 4.0), "de")
+        .andExpect(status().isOk())
+        .andExpect(content().string(matchesRegex(namedCheckbox)));
+
+    UUID gameItemId = UUID.randomUUID();
+    UUID locationId = UUID.randomUUID();
+    stubMyStackEntries(
+        new InventoryItemDto(
+            UUID.randomUUID(),
+            new UserReferenceDto(UUID.randomUUID(), "tester", "Tester", "Tester", null),
+            null,
+            sampleGameItem(gameItemId),
+            new LocationReferenceDto(locationId, "ARC-L1"),
+            null,
+            2.0,
+            false,
+            false,
+            List.of(),
+            2.0,
+            List.of(),
+            null,
+            null,
+            null,
+            1L,
+            null,
+            Instant.parse("2026-03-01T00:00:00Z")));
+    mockMvc
+        .perform(
+            get("/inventory/my/game-item-stack/entries")
+                .cookie(new Cookie("KRT_LOCALE", "de"))
+                .param("gameItemId", gameItemId.toString())
+                .param("locationId", locationId.toString())
+                .param("personal", "false"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(matchesRegex(namedCheckbox)));
+  }
+
+  /**
    * Item-leaf "Für Börse freigeben" toggle checked state (REQ-MARKET-002/014): when the batch
    * released-item-ids lookup reports the row as released, the item leaf's toggle renders checked
    * with the "Auf Börse" chip ({@code chip--primary}) — the item sibling of the material leaf

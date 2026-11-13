@@ -26,20 +26,21 @@
 :root {
     --color-primary: #E77E23;
     --color-bg-black: #000000;
-    --color-canvas: #0F0F0F;
-    --color-bg-dark-gray: #282C30;
+    --color-canvas: #0D0F12;
+    --color-bg-dark-gray: #1A1E24;
 
     --color-accent-light: #EEB64B;
     --color-accent-dark: #C45C00;
 
-    --color-gray-1: #D1D2D3;
+    --color-gray-1: #D7DADE;
     --color-gray-2: #8F9399;
-    --color-gray-3: #36373B;
-    --color-gray-4: #282C30;
-    --color-surface-input: #1A1D21;
-    --color-control: #373E43;
-    --color-gray-2-text: #A2A5A9;
-    --radius-sm: 4px;
+    --color-gray-3: #2A3038;
+    --color-gray-4: #1A1E24;
+    --color-surface-input: #14171C;
+    --color-control: #2F3640;
+    --color-gray-2-text: #9AA1AB;
+    --radius-control: 6px;
+    --radius-box: 10px;
 
     --color-danger: #A3000A;
     --color-danger-text: #FF7A70;
@@ -117,6 +118,7 @@ body {
     background-color: var(--color-bg-dark-gray);
     border: 1px solid var(--color-gray-3);
     border-top: 3px solid var(--color-primary);
+    border-radius: var(--radius-box);
     padding: 40px;
     width: 100%;
     max-width: 450px;
@@ -135,10 +137,12 @@ body {
 .login-container::before {
     top: -2px; left: -2px;
     border-right: none; border-bottom: none;
+    border-top-left-radius: var(--radius-box);
 }
 .login-container::after {
     bottom: -2px; right: -2px;
     border-left: none; border-top: none;
+    border-bottom-right-radius: var(--radius-box);
 }
 
 .login-logo {
@@ -185,7 +189,7 @@ input.pf-v5-c-form-control {
     box-sizing: border-box;
     appearance: none !important;
     -webkit-appearance: none !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-control) !important;
 }
 
 .pf-c-form-control::before, .pf-c-form-control::after,
@@ -255,7 +259,7 @@ button.pf-v5-c-button.pf-m-primary {
     font-weight: 700 !important;
     appearance: none !important;
     -webkit-appearance: none !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-control) !important;
     box-shadow: var(--glow-primary) !important;
 }
 
@@ -326,7 +330,7 @@ button[name="cancel-aia"] {
     margin-top: 10px;
     appearance: none !important;
     -webkit-appearance: none !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-control) !important;
     background-image: none !important;
 }
 
@@ -901,7 +905,7 @@ select[aria-invalid="true"],
     font-weight: 700;
     text-decoration: none;
     box-sizing: border-box;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-control);
     min-height: 44px;
 }
 .btn:hover {
@@ -986,7 +990,7 @@ input[type="checkbox"]:focus-visible,
     background-color: var(--color-surface-input);
     color: var(--color-gray-1);
     border: 1px solid var(--color-gray-2);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-control);
     font-family: var(--font-headline);
     font-weight: 700;
     letter-spacing: 1px;

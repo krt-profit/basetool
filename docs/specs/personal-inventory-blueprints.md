@@ -33,7 +33,8 @@ Below the tabs one toolbar carries the page's **only** search („In meinen Blue
 instant client-side row filter over the owned set), the segment **„Alle n · Craftbar n"** and, on
 the right, the `.krt-switch` **„Raffinerie einrechnen"** with its explanation as `title` and `.scu-hint`
 (REQ-INV-048). Submitting the search re-applies the client filter; a `?q=` in the address still
-narrows the server render. The collection renders as `.master-detail`: left a `.master-list`, one
+narrows the server render. The collection renders as `.master-detail`, as frameless panes inside
+the list panel (`.master-detail--panes`, REQ-UI-007): left a `.master-list`, one
 `.master-row` per blueprint (a craft-status dot, product name, ✎ marker when a note exists, the
 craftable count „3×"); right a permanent `.detail-pane`. When the search and the segment hide every
 row, an `.empty-state` „Keine Treffer" stands in the list. The active row syncs with a `?bp={id}`

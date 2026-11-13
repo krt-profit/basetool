@@ -43,8 +43,12 @@ class ItemClassChipContrastTest {
   /** WCAG AA minimum for normal text. */
   private static final double MIN_CONTRAST = 4.5;
 
-  /** The surfaces a Lager row sits on: the panel (Grau 4) and the row hover (control fill). */
-  private static final String[] SURFACES = {"#282c30", "#373e43"};
+  /**
+   * The tokens of the surfaces a chip's row sits on: the box (Grau 4), the row hover on a box and
+   * the row hover on a tile, the lightest of them.
+   */
+  private static final List<String> SURFACE_TOKENS =
+      List.of("--color-gray-4", "--surface-card-hover", "--table-row-hover-tile");
 
   /** The backend enum whose constants each need a chip variant. */
   private static final String SHIP_COMPONENT_CLASS =
@@ -74,10 +78,10 @@ class ItemClassChipContrastTest {
                 + itemClass
                 + ") 15%, transparent)");
 
-    for (String surface : SURFACES) {
-      double[] fill = mix(rgb(hue), rgb(surface), 0.15);
+    for (String surfaceToken : SURFACE_TOKENS) {
+      double[] fill = mix(rgb(hue), rgb(token(css, surfaceToken)), 0.15);
       assertThat(contrast(rgb(text), fill))
-          .as("%s label on its fill over %s", itemClass, surface)
+          .as("%s label on its fill over %s", itemClass, surfaceToken)
           .isGreaterThanOrEqualTo(MIN_CONTRAST);
     }
   }

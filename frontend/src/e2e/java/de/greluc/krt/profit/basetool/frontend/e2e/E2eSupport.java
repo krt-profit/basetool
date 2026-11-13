@@ -691,6 +691,23 @@ final class E2eSupport {
         .waitFor(new Locator.WaitForOptions().setTimeout(FILTER_PANEL_TIMEOUT_MS));
   }
 
+  /**
+   * Reports whether a Lager tree container is collapsed, judged by its {@code hidden} attribute,
+   * not Playwright visibility.
+   *
+   * @param page the page showing a Lager tree
+   * @param selector the CSS selector of a {@code .tree-group-items} or {@code .tree-stack-entries}
+   *     container
+   * @return {@code true} when the container is absent or carries {@code hidden}, {@code false} when
+   *     it is shown
+   */
+  static boolean isLagerTreeCollapsed(Page page, String selector) {
+    return Boolean.TRUE.equals(
+        page.evaluate(
+            "sel => { const el = document.querySelector(sel); return !el || el.hidden; }",
+            selector));
+  }
+
   /** Names page diagnostic outcomes and their artifact and log representations. */
   private enum SnapshotOutcome {
     SUCCESS("success", "[E2E][CAPTURE]"),

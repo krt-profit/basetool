@@ -474,11 +474,11 @@
     }
 
     .matrix-table tbody tr.row-even td:first-child {
-        background-color: color-mix(in srgb, var(--color-control) 50%, var(--color-bg-dark-gray));
+        background-color: var(--table-stripe-bg);
     }
 
     .matrix-table tbody tr.row-material:hover {
-        background-color: var(--control-bg);
+        background-color: var(--table-row-hover);
     }
 
     .matrix-table tbody tr.row-spacer td {

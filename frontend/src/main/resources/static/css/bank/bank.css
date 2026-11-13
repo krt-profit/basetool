@@ -7,13 +7,6 @@
         gap: 10px;
     }
 
-    .kpi-total {
-        background: var(--color-bg-dark-gray);
-        border: var(--border-hairline);
-        border-left: 4px solid var(--color-primary);
-        padding: 10px 14px;
-    }
-
     .kpi-label {
         font-size: 0.62rem;
         text-transform: uppercase;
@@ -127,7 +120,7 @@
     }
 
     .kpi-card--inset {
-        background: var(--color-surface-input);
+        background: var(--surface-card);
     }
 
     .kpi-sparkline {
@@ -509,7 +502,7 @@
     }
 
     .bank-booking-row.is-expandable:hover {
-        background: var(--control-bg);
+        background: var(--table-row-hover);
     }
 
     .bank-row-toggle {
@@ -776,8 +769,9 @@
         flex-direction: column;
         gap: 10px;
         padding: 14px 16px;
-        background: var(--color-surface-input);
+        background: var(--surface-card);
         border: var(--border-hairline);
+        border-radius: var(--radius-tile);
         transition: border-color 0.15s;
     }
 
@@ -904,18 +898,16 @@
         padding: 8px 10px;
         font-size: 0.72rem;
         color: var(--color-warning);
-        border: 1px solid var(--color-warning);
-        border-left-width: 4px;
-        border-radius: var(--radius-sm);
+        border: 1px solid color-mix(in srgb, var(--color-warning) 45%, transparent);
+        border-radius: var(--radius-tile);
         background: color-mix(in srgb, var(--color-warning) 8%, transparent);
     }
 
     .bank-owner-approval-warning {
         margin-bottom: 12px;
         padding: 10px 12px;
-        border: 1px solid var(--color-warning);
-        border-left-width: 4px;
-        border-radius: var(--radius-sm);
+        border: 1px solid color-mix(in srgb, var(--color-warning) 45%, transparent);
+        border-radius: var(--radius-tile);
         background: color-mix(in srgb, var(--color-warning) 8%, transparent);
     }
 

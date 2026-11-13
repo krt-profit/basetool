@@ -6,8 +6,9 @@ file under [`docs/agents/`](../docs/agents/README.md); **read that file before t
 ## UI & design system
 
 The UI is a **binding requirement**: follow the DAS KARTELL design system. The rules — brand
-colours, Lato-only typography, the department colours, the HUD style with a 4 px radius, no native
-browser dialogs, the four device classes — are in
+colours, Lato-only typography, the department colours, the HUD style with radii by role (boxes
+10 px, tiles 8 px, controls 6 px, inner elements 4 px), no native browser dialogs, the four device
+classes — are in
 [`docs/specs/ui-design-system.md`](../docs/specs/ui-design-system.md); the visual source of truth
 is the design skill's
 [`README.md`](../.claude/skills/das-kartell-design/README.md).

@@ -27,11 +27,8 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.microsoft.playwright.Route;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -44,8 +41,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 class FilterResetTouchTargetE2eTest {
 
   private static final String ORIGIN = "https://filter-layout.test";
-  private static final Path RESOURCES = resources();
-  private static final Path ASSETS = RESOURCES.resolve("static").toAbsolutePath().normalize();
   private static Playwright playwright;
   private static Browser browser;
 
@@ -76,7 +71,7 @@ class FilterResetTouchTargetE2eTest {
         browser.newContext(
             new Browser.NewContextOptions().setViewportSize(width, height).setHasTouch(touch))) {
       String html = fixture();
-      context.route(ORIGIN + "/**", route -> serve(route, html));
+      context.route(ORIGIN + "/**", route -> StaticFixtureServer.serve(route, html));
       Page page = context.newPage();
       page.navigate(ORIGIN + "/");
       page.evaluate("() => document.fonts.ready.then(() => true)");
@@ -110,7 +105,8 @@ class FilterResetTouchTargetE2eTest {
 
   private static String fixture() throws IOException {
     String components =
-        Files.readString(RESOURCES.resolve("templates/kernel/fragments/components.html"));
+        Files.readString(
+            StaticFixtureServer.RESOURCES.resolve("templates/kernel/fragments/components.html"));
     String marker = "<div th:fragment=\"filterChips(formId)\"";
     int start = components.indexOf(marker);
     assertThat(start).as("production filter chip fragment").isNotNegative();
@@ -133,28 +129,5 @@ class FilterResetTouchTargetE2eTest {
         <button type="button" class="overflow-menu__item">Action</button>
         </form></body></html>
         """;
-  }
-
-  private static void serve(Route route, String html) {
-    String path = URI.create(route.request().url()).getPath();
-    if ("/".equals(path)) {
-      route.fulfill(new Route.FulfillOptions().setContentType("text/html").setBody(html));
-      return;
-    }
-    Path file = ASSETS.resolve(path.substring(1)).normalize();
-    if (!file.startsWith(ASSETS) || !Files.isRegularFile(file)) {
-      route.fulfill(new Route.FulfillOptions().setStatus(404));
-      return;
-    }
-    String type =
-        path.endsWith(".css")
-            ? "text/css"
-            : path.endsWith(".js") ? "application/javascript" : "font/woff2";
-    route.fulfill(new Route.FulfillOptions().setContentType(type).setPath(file));
-  }
-
-  private static Path resources() {
-    Path module = Path.of("src/main/resources");
-    return Files.isDirectory(module) ? module : Path.of("frontend").resolve(module);
   }
 }

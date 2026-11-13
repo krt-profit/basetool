@@ -242,10 +242,11 @@
                     <div class="tree-cell lager-cell-end" th:text="#{inventory.tree.action}">Aktion</div>
                 </div>
 
-                <div class="tree-group" th:each="group : ${groupedItems}">
+                <div class="tree-group" th:each="group : ${groupedItems}" th:with="itemsId=|lager-group-${group.material.id}|">
                     <div class="tree-row tree-row--group" data-trigger="inv-my-toggle-group" th:data-material-id="${group.material.id}">
                         <div class="tree-cell tree-name">
-                            <span class="tree-chevron toggle-icon">▶</span>
+                            <button type="button" class="tree-chevron" aria-expanded="false" th:aria-controls="${itemsId}"
+                                    th:aria-label="#{inventory.tree.toggle.group(${group.material.displayName(#locale)})}">▶</button>
                             <span class="tree-label" th:text="${group.material.displayName(#locale)}">Material</span>
                         </div>
                         <div class="tree-cell lager-cell-muted" th:text="${#lists.size(group.stacks) == 1} ? #{inventory.tree.stackCount.one} : #{inventory.tree.stackCount.many(${#lists.size(group.stacks)})}">5 Stacks</div>
@@ -265,8 +266,8 @@
                         </div>
                     </div>
 
-                    <div class="tree-group-items">
-                        <div th:each="stack : ${group.stacks}">
+                    <div th:id="${itemsId}" class="tree-group-items" hidden>
+                        <div th:each="stack : ${group.stacks}" th:with="entriesId=|${itemsId}-stack-${stackStat.index}|">
                             <div class="tree-row tree-row--mid stack-header" data-trigger="inv-my-toggle-stack"
                                  data-stack-loaded="false"
                                  th:data-material-id="${group.material.id}"
@@ -276,7 +277,8 @@
                                  th:data-stolen="${stack.stolen}"
                                  th:data-owning-org-unit-id="${stack.owningSquadron != null ? stack.owningSquadron.id : null}">
                                 <div class="tree-cell tree-name">
-                                    <span class="tree-chevron toggle-icon stack-toggle-icon">▶</span>
+                                    <button type="button" class="tree-chevron" aria-expanded="false" th:aria-controls="${entriesId}"
+                                            th:aria-label="#{inventory.tree.toggle.stack(${stack.location.name})}">▶</button>
                                     <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
                                     <span th:if="${stack.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                                           th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
@@ -296,7 +298,7 @@
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries">
+                            <div th:id="${entriesId}" class="tree-stack-entries" hidden>
                                 <div class="stack-entries-content">
                                 </div>
                             </div>
@@ -318,13 +320,13 @@
                     <div class="tree-cell lager-cell-end" th:text="#{inventory.tree.action}">Aktion</div>
                 </div>
 
-                <div class="tree-group" th:each="group : ${groupedItems}">
+                <div class="tree-group" th:each="group : ${groupedItems}" th:with="itemsId=|lager-group-${group.gameItem.id}|">
                     <div th:replace="~{inventory/fragments/inventory-item-group :: itemGroupRow(group=${group}, toggleTrigger='inv-my-toggle-group',
                         contextText=${#lists.size(group.stacks) == 1} ? #{inventory.tree.stackCount.one} : #{inventory.tree.stackCount.many(${#lists.size(group.stacks)})},
-                        selectTrigger='inv-my-toggle-group-cb')}"></div>
+                        selectTrigger='inv-my-toggle-group-cb', itemsId=${itemsId})}"></div>
 
-                    <div class="tree-group-items">
-                        <div th:each="stack : ${group.stacks}">
+                    <div th:id="${itemsId}" class="tree-group-items" hidden>
+                        <div th:each="stack : ${group.stacks}" th:with="entriesId=|${itemsId}-stack-${stackStat.index}|">
                             <div class="tree-row tree-row--mid stack-header" data-trigger="inv-my-toggle-stack"
                                  data-stack-loaded="false"
                                  th:data-game-item-id="${group.gameItem.id}"
@@ -333,7 +335,8 @@
                                  th:data-stolen="${stack.stolen}"
                                  th:data-owning-org-unit-id="${stack.owningSquadron != null ? stack.owningSquadron.id : null}">
                                 <div class="tree-cell tree-name">
-                                    <span class="tree-chevron toggle-icon stack-toggle-icon">▶</span>
+                                    <button type="button" class="tree-chevron" aria-expanded="false" th:aria-controls="${entriesId}"
+                                            th:aria-label="#{inventory.tree.toggle.stack(${stack.location.name})}">▶</button>
                                     <span class="tree-label" th:text="${stack.location.name}" th:title="${stack.location.name}">Ort</span>
                                     <span th:if="${stack.stolen}" class="chip chip--danger" data-testid="stolen-chip"
                                           th:title="#{inventory.stolen.chip.title}" th:text="#{inventory.stolen.chip}">Gestohlen</span>
@@ -349,7 +352,7 @@
                                     <span class="stack-entry-count" th:text="${stack.entryCount == 1} ? #{inventory.tree.entryCount.one} : #{inventory.tree.entryCount.many(${stack.entryCount})}">1 Eintrag</span>
                                 </div>
                             </div>
-                            <div class="tree-stack-entries">
+                            <div th:id="${entriesId}" class="tree-stack-entries" hidden>
                                 <div class="stack-entries-content">
                                 </div>
                             </div>

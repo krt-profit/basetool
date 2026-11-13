@@ -26,20 +26,21 @@
 :root {
     --color-primary: #E77E23;
     --color-bg-black: #000000;
-    --color-canvas: #0F0F0F;
-    --color-bg-dark-gray: #282C30;
+    --color-canvas: #0D0F12;
+    --color-bg-dark-gray: #1A1E24;
 
     --color-accent-light: #EEB64B;
     --color-accent-dark: #C45C00;
 
-    --color-gray-1: #D1D2D3;
+    --color-gray-1: #D7DADE;
     --color-gray-2: #8F9399;
-    --color-gray-3: #36373B;
-    --color-gray-4: #282C30;
-    --color-surface-input: #1A1D21;
-    --color-control: #373E43;
-    --color-gray-2-text: #A2A5A9;
-    --radius-sm: 4px;
+    --color-gray-3: #2A3038;
+    --color-gray-4: #1A1E24;
+    --color-surface-input: #14171C;
+    --color-control: #2F3640;
+    --color-gray-2-text: #9AA1AB;
+    --radius-control: 6px;
+    --radius-box: 10px;
 
     --color-danger: #A3000A;
     --color-danger-text: #FF7A70;
@@ -172,6 +173,7 @@ a:hover, .pf-v5-c-button--m-link:hover {
     background-color: var(--color-bg-dark-gray) !important;
     border: 1px solid var(--color-gray-3) !important;
     border-top: 3px solid var(--color-primary) !important;
+    border-radius: var(--radius-box) !important;
     padding: 30px !important;
     position: relative !important;
     box-shadow: 0 0 20px rgba(231, 126, 35, 0.1) !important;
@@ -190,10 +192,12 @@ a:hover, .pf-v5-c-button--m-link:hover {
 .pf-v5-c-form::before, .pf-v6-c-form::before {
     top: -2px !important; left: -2px !important;
     border-right: none !important; border-bottom: none !important;
+    border-top-left-radius: var(--radius-box) !important;
 }
 .pf-v5-c-form::after, .pf-v6-c-form::after {
     bottom: -2px !important; right: -2px !important;
     border-left: none !important; border-top: none !important;
+    border-bottom-right-radius: var(--radius-box) !important;
 }
 
 .pf-v5-c-form__label, .pf-v6-c-form__label {
@@ -213,7 +217,7 @@ input[type="text"], input[type="email"], input[type="password"], textarea, selec
     color: var(--color-gray-1) !important;
     font-family: var(--font-body) !important;
     padding: 12px 15px !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-control) !important;
 }
 
 .pf-v5-c-form-control:focus, .pf-v6-c-form-control:focus,
@@ -228,7 +232,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     font-family: var(--font-headline) !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-control) !important;
     border: none !important;
     letter-spacing: 1px !important;
     padding: 12px 25px !important;
@@ -246,7 +250,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     font-family: var(--font-headline) !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-control) !important;
     letter-spacing: 1px !important;
 }
 
@@ -257,7 +261,7 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 .pf-v5-c-card, .pf-v6-c-card {
     background-color: var(--color-bg-dark-gray) !important;
     border: 1px solid var(--color-gray-3) !important;
-    border-radius: var(--radius-sm) !important;
+    border-radius: var(--radius-box) !important;
 }
 
 .pf-v5-c-page__header, .pf-v6-c-page__header {

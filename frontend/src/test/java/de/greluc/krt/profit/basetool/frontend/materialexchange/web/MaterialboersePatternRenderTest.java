@@ -261,7 +261,7 @@ class MaterialboersePatternRenderTest {
         .contains("Keine Angebote")
         .contains("data-mb-reset")
         .doesNotContain("data-testid=\"mb-offer-row\"")
-        .doesNotContain("class=\"master-detail mb-md");
+        .doesNotContain("class=\"master-detail master-detail--panes mb-md");
   }
 
   /**

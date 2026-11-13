@@ -650,7 +650,7 @@ account ordering for `BankManagePageController` / `BankGrantsPageController` /
 The entire bank UI (and both PDFs) follows the DAS KARTELL design system
 (`docs/specs/ui-design-system.md`; visual source of truth:
 `.claude/skills/das-kartell-design/README.md`): Lato-only typography, brand colors,
-HUD styling with a 4 px radius, the four responsive device classes, and **no native browser
+HUD styling with the radii of REQ-UI-007, the four responsive device classes, and **no native browser
 dialogs** (KRT modals / `showKrtConfirm` only). The design system additionally ships a
 dedicated bank component layer in `krt-components.css` (`.kpi-*`, `.holder-*`, `.stack-*`,
 `.matrix-flag`, `.krt-modal`, `.confirm-input` — documented in the submodule `README.md`

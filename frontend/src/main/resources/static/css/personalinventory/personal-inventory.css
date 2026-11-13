@@ -588,25 +588,18 @@
     }
 
     .krt-bp-md {
-        gap: 0;
+        /* Closes its list panel from inside #krt-bp-list, where the kernel's last-child hand-on
+           does not reach. */
+        --flush-corner-bottom: calc(var(--radius-box) - 1px);
     }
 
     .krt-bp-md .master-list {
-        background: transparent;
-        border: 0;
-        border-right: var(--border-hairline);
+        max-height: 70vh;
     }
 
     .krt-bp-md .detail-pane {
-        background: transparent;
-        border: 0;
         padding: var(--space-6);
         min-width: 0;
-    }
-
-    .krt-bp-master-rows {
-        max-height: 70vh;
-        overflow-y: auto;
     }
 
     .master-row {
@@ -880,10 +873,6 @@
     @media (width <= 1024px) {
         .krt-bp-md .detail-pane {
             display: none;
-        }
-
-        .krt-bp-md .master-list {
-            border-right: 0;
         }
 
         .krt-bp-md.is-detail .master-list {

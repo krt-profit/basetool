@@ -10,12 +10,12 @@
     :root {
       --color-primary: #E77E23;
       --color-accent-dark: #C45C00;
-      --color-bg: #0F0F0F;
-      --color-bg-2: #282C30;
-      --color-text: #D1D2D3;
-      --color-text-muted: #A2A5A9;
+      --color-bg: #0D0F12;
+      --color-bg-2: #1A1E24;
+      --color-text: #D7DADE;
+      --color-text-muted: #9AA1AB;
       --color-border: rgba(231, 126, 35, 0.45);
-      --color-divider: rgba(209, 210, 211, 0.15);
+      --color-divider: rgba(215, 218, 222, 0.15);
     }
     * { box-sizing: border-box; }
     html, body {
@@ -43,7 +43,7 @@
       background: var(--color-bg-2);
       border: 2px solid var(--color-border);
       box-shadow: 0 0 24px rgba(231, 126, 35, 0.18);
-      border-radius: 4px;
+      border-radius: 10px;
     }
     main.panel::before,
     main.panel::after {
@@ -58,12 +58,14 @@
       left: -2px;
       border-right: none;
       border-bottom: none;
+      border-top-left-radius: 10px;
     }
     main.panel::after {
       bottom: -2px;
       right: -2px;
       border-left: none;
       border-top: none;
+      border-bottom-right-radius: 10px;
     }
     .status-row {
       text-align: center;

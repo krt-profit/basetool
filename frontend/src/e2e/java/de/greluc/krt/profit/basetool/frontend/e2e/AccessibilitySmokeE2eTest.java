@@ -62,10 +62,10 @@ class AccessibilitySmokeE2eTest {
   @RegisterExtension static final E2eStackExtension STACK = new E2eStackExtension();
 
   /** WCAG 2.0 + 2.1, levels A and AA — the conformance target for the app. */
-  private static final List<String> WCAG_TAGS = List.of("wcag2a", "wcag2aa", "wcag21a", "wcag21aa");
+  static final List<String> WCAG_TAGS = List.of("wcag2a", "wcag2aa", "wcag21a", "wcag21aa");
 
   /** The axe impact levels that fail the gate: the two most severe of axe's four. */
-  private static final Set<String> GATED_IMPACTS = Set.of("critical", "serious");
+  static final Set<String> GATED_IMPACTS = Set.of("critical", "serious");
 
   private static final String USERNAME = System.getProperty("e2e.username", "test-admin");
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
@@ -251,7 +251,7 @@ class AccessibilitySmokeE2eTest {
    * @param rule the axe violation
    * @return a multi-line description
    */
-  private static String describe(Rule rule) {
+  static String describe(Rule rule) {
     StringBuilder out =
         new StringBuilder(
             String.format(

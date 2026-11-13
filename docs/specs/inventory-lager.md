@@ -129,6 +129,24 @@ does not re-fire `DOMContentLoaded`, so the expansion is restored explicitly aft
 restored stack re-fetches its (now up-to-date) entries. A modal mutation therefore never collapses
 the tree the user was working in.
 
+A collapsed level is its container's `hidden` attribute: `.tree-group-items` and
+`.tree-stack-entries` render with `hidden`, and expanding removes it. The state lives in the markup,
+so the stylesheet knows which row is the last visible one and drops its bottom rule on the list
+panel's frame (REQ-UI-007): a collapsed last group row, the closed last stack header, or the note
+of the last entry.
+
+The chevron of each group row and stack header is the level's disclosure control: a
+`<button type="button" class="tree-chevron">` with `aria-expanded`, an `aria-controls` naming the
+container's id (`lager-group-<material or game item id>` for a group's items,
+`lager-group-<id>-stack-<n>` for the entries of its n-th stack) and an `aria-label` that names the
+group or stack (`inventory.tree.toggle.*`). It takes focus and toggles on Enter and Space; the rest
+of the row stays clickable, except that a click on another control inside it — the „Mein Lager"
+group checkbox — only does that control's job and leaves the level as it is. Every expand and collapse — by mouse, keyboard or the restore after a re-swap —
+sets `aria-expanded` with the `hidden` attribute, and the kernel turns the chevron from
+`aria-expanded`. The row itself takes no role, because the „Mein Lager" group row holds the group
+checkbox, which must not sit inside a button. The button shows the orange focus ring and reaches the
+touch floor through its overlay (REQ-UI-009).
+
 > **Amendment (unit naming):** the shared option is named after what it shows. Its switch
 > option, page title, page head and quick-access entry read **„Einheitslager"**
 > (`inventory.overview.global`, EN „Unit inventory"), because „Globales Lager" read as "everything
@@ -152,15 +170,29 @@ the tree the user was working in.
 - [ ] After an in-place grouped-table re-swap (filter change or modal write), the material groups
   and location stacks the user had expanded stay expanded and a restored stack re-loads its
   entries; a modal mutation never collapses the tree.
+- [ ] Both trees render every group's items and stack's entries with `hidden` and no inline
+  display; whichever row ends the tree, it draws no bottom rule while every visible row above it
+  keeps one.
+- [ ] Every group row and stack header of both trees, in both views, carries a chevron button
+  whose `aria-controls` names the container it shows and whose `aria-expanded` is `false` on
+  render; Enter and Space on the focused button expand and collapse the level and flip
+  `aria-expanded`, the first expand of a stack loads its entries, and a restored level comes back
+  with `aria-expanded="true"`.
+- [ ] Ticking or unticking the „Mein Lager" group checkbox, by mouse or Space, marks or unmarks
+  every entry of the group in the filtered view (REQ-INV-034) and neither expands nor collapses
+  the group.
 
 **Enforced by:** `InventoryItemServiceAggregateTest`, `InventoryItemStackQueryTest`,
-`InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`, `InventoryOperationsE2eTest`,
-`InventoryLagerPatternRenderTest`, `PageChromeSnapshotTest`
+`InventoryItemStackQueryDataTest`, `InventoryPageControllerMvcTest`,
+`InventoryLagerPatternRenderTest`, `LagerTreeLastRowE2eTest`, `LagerTreeDisclosureE2eTest`,
+`InventoryOperationsE2eTest`, `PageChromeSnapshotTest`
 · **Code:** `InventoryAggregationService#buildGroupedFromStacks`,
 `InventoryItemRepository#findUserStacks` / `#findGlobalStacks`, `InventoryStackAggregate`,
 `InventoryStackDto`, `GroupedInventoryDto`, `inventory/inventory-my.html`, `inventory/inventory-admin.html`,
+`inventory/fragments/inventory-item-group.html`,
 `static/js/inventory/inventory-common.js` (tree expand/collapse persistence, shared by `inventory-my.js` and
-`inventory-admin.js` since FE-SIMP-03) · **Issues:** #466
+`inventory-admin.js` since FE-SIMP-03), `static/css/inventory/inventory-lager.css` (the last visible
+row), `static/css/kernel/styles.css` (`.tree-chevron`) · **Issues:** #466
 
 ### REQ-INV-044 — Actions operate per entry
 
@@ -906,9 +938,23 @@ no-silent-cap principle).
   unticked, and keeping stale ids across a re-render could aim the bulk check-out at an entry a peer
   already removed (the backend bulk-checkout 404s on any unknown id). Select-all itself does not
   re-swap the table, so a live selection survives drill-down expansion.
+- **A group checkbox marks the whole group, open or not.** Ticking it marks the group's entries
+  already on the page at once and, on the first tick since the last re-swap, resolves the ids of
+  every entry of the group in the current filtered view through the same `GET
+  /inventory/my/entry-ids`, its material or game-item filter narrowed to that one group — collapsed
+  and never-opened stacks and entries past a stack's first page included. The group stays as it is:
+  nothing is expanded and no stack is loaded for it; a stack opened later comes up ticked. The
+  checkbox shows ticked while every known entry of the group is marked and indeterminate while some
+  are; unticking unmarks them all. The resolved set lives until the next re-swap, which drops it
+  with the selection and discards a lookup still in flight; a failed lookup keeps what is marked
+  and shows the select-all error.
 - **No new mutation.** Select-all is a read that feeds the existing bulk check-out
   (`POST /inventory/bulk-checkout`, REQ-INV-044); it adds no new write path and no new audit event
   (the bulk check-out's `INVENTORY_BULK_CHECKED_OUT` audit is unchanged).
+- **Every selection checkbox has a name.** A group's checkbox reads „Alle auswählen"
+  (`inventory.bulk.checkout.select.all`), an entry's „Eintrag auswählen"
+  (`inventory.bulk.checkout.select.entry`), each as `aria-label` and `title`, so a screen reader
+  announces what it ticks (WCAG 4.1.2).
 
 *Amended 2026-10-03 (website overhaul phase 3): „Alle markieren" moved into the toolbar, and the
 bulk buttons („Markierte ausbuchen", „Markierte umbuchen", „Markierte: Einheit ändern", the stolen
@@ -927,13 +973,20 @@ pair) moved into a sticky selection bar that appears only while something is mar
   filters with 400 like `…/my-inventory/grouped`.
 - [ ] Changing a filter, a modal write, or a peer refresh clears the selection (no stale id reaches
   the bulk check-out); expanding a stack after select-all shows its rows already ticked.
+- [ ] The selection checkbox of every material and game-item entry carries an accessible name, and
+  an axe scan of the open tree reports no critical or serious violation.
+- [ ] Ticking the group checkbox of a collapsed, never-opened group marks every entry of that group
+  in the filtered view and no entry of another group, keeps the box ticked and the group collapsed,
+  and shows the count in the selection bar; opening the group and its stack afterwards shows the
+  entries ticked, and unticking unmarks them.
 
 **Enforced by:** `InventoryItemControllerTest`, `InventoryPageControllerTest`,
-`InventoryPageControllerMvcTest`, `InventoryAggregationServiceTest` · **Code:**
-`InventoryItemController#getMyEntryIds`, `InventoryAggregationService#getMyEntryIds` /
+`InventoryPageControllerMvcTest`, `InventoryAggregationServiceTest`, `LagerTreeDisclosureE2eTest` ·
+**Code:** `InventoryItemController#getMyEntryIds`, `InventoryAggregationService#getMyEntryIds` /
 `#getMyItemEntryIds`, `InventoryItemService#getMyEntryIds`,
 `InventoryItemRepository#findUserEntryIds` / `#findUserItemEntryIds`,
-`InventoryPageController#myEntryIds`, `templates/inventory/inventory-my.html`, `static/js/inventory/inventory-my.js` ·
+`InventoryPageController#myEntryIds`, `templates/inventory/inventory-my.html`,
+`templates/inventory/fragments/inventory-stack-entries.html`, `static/js/inventory/inventory-my.js` ·
 **Issues:** — · **ADR:** ADR-0104
 
 ### REQ-INV-035 — Refinery output can be stored straight into the personal pool

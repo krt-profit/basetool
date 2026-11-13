@@ -111,7 +111,7 @@
             padding: 0 var(--space-3);
             background-color: var(--control-bg);
             border: 1px solid var(--control-border);
-            border-radius: var(--radius-sm);
+            border-radius: var(--radius-control);
             font-size: var(--fs-xs);
         }
         .profile-nav a[aria-current='true'] {
