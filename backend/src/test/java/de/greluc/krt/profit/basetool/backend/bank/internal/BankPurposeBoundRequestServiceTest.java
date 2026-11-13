@@ -124,7 +124,7 @@ class BankPurposeBoundRequestServiceTest {
             userRepository,
             orgUnitMembershipQueryService,
             eventPublisher,
-            purposeObservers,
+            new BankPurposeObservers(purposeObservers),
             new BankRequestClientNames(clientDirectory),
             mock(BankLinkedDecisions.class),
             mock(BankLinkedBookings.class),

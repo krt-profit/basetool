@@ -59,6 +59,7 @@ worth reading even if you know the domain.
 | **Patch-Art / Patch kind** | What a patch kept: **Rebuild** (a long-term persistence rebuild: stored items, materials, aUEC and ships survive) or **Full Wipe** (only pledged ships and blueprints survive). The kind presets a patch change's options (REQ-PATCH-002). |
 | **Live-Zeit / Live time** | When the patch went live in the game: the cutoff of every effect of its patch change, which touches only what was created or started before it, and fixed once triggered (REQ-PATCH-003, ADR-0381). |
 | **Home-Location-Abfrage / Home-location phase** | The period in which members are asked at their next login for their new home location after a patch change, until each has chosen, the admin ends it or a newer patch change supersedes it (decision #3252). |
+| **Währungs-Wipe / Currency wipe** | The option of a patch change that follows a wipe of the game's money: the Kartellbank is reset to its balances as of the live time, earlier Bank requests and order Bank attempts are cancelled, the aUEC holdings of the live time become real shortages and earlier commitments end (REQ-PATCH-040, ADR-0384). |
 
 ## 12.3 Architecture and operations
 

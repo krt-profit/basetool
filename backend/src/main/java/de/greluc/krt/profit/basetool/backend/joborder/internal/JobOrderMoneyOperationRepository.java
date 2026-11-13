@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -39,6 +40,28 @@ interface JobOrderMoneyOperationRepository extends JpaRepository<JobOrderMoneyOp
       UUID orderId, Set<UUID> operationIds);
 
   List<JobOrderMoneyOperation> findAllByOrderIdOrderByRecordedAtAscIdAsc(UUID orderId);
+
+  /**
+   * Finds the orders a currency wipe may touch (REQ-PATCH-043…045): those with a money fact
+   * recorded, a Bank attempt waiting or a unit commitment open since before the live time.
+   *
+   * @param liveAt the live time of the patch
+   * @return the order ids in ascending order
+   */
+  @Query(
+      value =
+          """
+          SELECT order_id FROM job_order_money_operation WHERE recorded_at < :liveAt
+          UNION
+          SELECT order_id FROM job_order_linked_money_attempt
+            WHERE active AND state = 'WAITING' AND submitted_at < :liveAt
+          UNION
+          SELECT order_id FROM job_order_money_commitment
+            WHERE ended_at IS NULL AND opened_at < :liveAt
+          ORDER BY 1
+          """,
+      nativeQuery = true)
+  List<UUID> ordersWithMoneyBefore(Instant liveAt);
 
   @Query(
       value =

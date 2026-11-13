@@ -78,6 +78,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   private final TransferFeePolicy feePolicy;
   private final EntityManager entityManager;
   private final BankLinkedRequestLiveSync liveSync;
+  private final BankCurrencyWipeRequests wipeRequests;
 
   @Override
   @NotNull
@@ -329,6 +330,12 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   @Override
   public void cancelUnexecuted(@NotNull UUID requestId, @NotNull BankLinkedAttempt attempt) {
     requests.cancelLinked(requestId, attempt, Action.CANCEL_UNEXECUTED);
+  }
+
+  @Override
+  public void cancelForCurrencyWipe(
+      @NotNull UUID requestId, @NotNull BankLinkedAttempt attempt, @NotNull UUID patchChangeId) {
+    wipeRequests.cancelLinked(requestId, attempt, patchChangeId);
   }
 
   /**

@@ -46,6 +46,7 @@ public record MoneyCommitmentChangeDto(
     PARTICIPATION_ENDED,
     RESPONSIBILITY_ENDED,
     UNIT_INELIGIBLE,
-    ORDER_ENDED
+    ORDER_ENDED,
+    CURRENCY_WIPE
   }
 }

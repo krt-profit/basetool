@@ -55,6 +55,8 @@ import org.jetbrains.annotations.Nullable;
  * @param activeLinkedRevision whether this revision is the current linked attempt
  * @param clarificationResolved whether a targeted correction resolved clarification
  * @param accountHoldingId the credited or debited order-local Bank account holding
+ * @param patchLabel the current label of the patch change whose currency wipe booked the shortage
+ *     or cancelled the attempt, or {@code null}
  */
 @DtoMirror
 public record JobOrderMoneyOutcome(
@@ -83,4 +85,5 @@ public record JobOrderMoneyOutcome(
     @Nullable String counterpartyName,
     @Nullable Boolean activeLinkedRevision,
     @Nullable Boolean clarificationResolved,
-    @Nullable UUID accountHoldingId) {}
+    @Nullable UUID accountHoldingId,
+    @Nullable String patchLabel) {}

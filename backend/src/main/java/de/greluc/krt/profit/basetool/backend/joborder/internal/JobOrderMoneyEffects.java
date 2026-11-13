@@ -103,6 +103,21 @@ class JobOrderMoneyEffects {
     publishMoney(order, lifecycleChanged, false);
   }
 
+  /**
+   * Refreshes the order's open pages after a currency wipe changed it, without any notice
+   * (REQ-PATCH-046).
+   *
+   * @param order the changed order
+   * @param commitmentsEnded whether commitments of the order ended
+   */
+  void currencyWiped(JobOrder order, boolean commitmentsEnded) {
+    live.publishAfterCommit(
+        LiveSyncTopic.of(LiveSyncTopicClass.ORDER, order.getId()),
+        commitmentsEnded ? List.of("money", "participations") : List.of("money"));
+    live.publishAfterCommit(
+        LiveSyncTopic.global(LiveSyncTopicClass.ORDERS_QUEUE), List.of("queue"));
+  }
+
   void linkedAttemptChanged(JobOrder order, boolean participantAdded) {
     publishMoney(order, false, participantAdded);
   }

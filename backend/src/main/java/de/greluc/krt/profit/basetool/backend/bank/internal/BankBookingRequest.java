@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
@@ -36,12 +37,15 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -362,6 +366,45 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   @Nullable
   @Column(name = "idempotency_key", length = 128, updatable = false)
   private String idempotencyKey;
+
+  /**
+   * The patch change whose currency wipe cancelled the request as its reason (REQ-PATCH-042);
+   * {@code null} for every other request.
+   */
+  @Nullable
+  @Setter(AccessLevel.NONE)
+  @Column(name = "cancelled_by_patch_change")
+  private UUID cancelledByPatchChange;
+
+  /**
+   * Rejects a decision on a request that is no longer pending (already
+   * confirmed/rejected/cancelled), which blocks double decisions (REQ-BANK-023).
+   *
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when not pending
+   */
+  void requirePending() {
+    if (status != BankBookingRequestStatus.PENDING) {
+      throw new BankConflictException(
+          BankConflictException.CODE_BANK_REQUEST_NOT_PENDING,
+          "The booking request is no longer pending",
+          Map.of("status", status.name()));
+    }
+  }
+
+  /**
+   * Cancels the pending request for a patch change's currency wipe, which keeps the patch change as
+   * the reason (REQ-PATCH-042, REQ-PATCH-043).
+   *
+   * @param patchChangeId the patch change
+   * @param at the cancellation time
+   * @throws BankConflictException with {@code BANK_REQUEST_NOT_PENDING} when not pending
+   */
+  void cancelByPatchChange(@NotNull UUID patchChangeId, @NotNull Instant at) {
+    requirePending();
+    status = BankBookingRequestStatus.CANCELLED;
+    decidedAt = at;
+    cancelledByPatchChange = patchChangeId;
+  }
 
   /**
    * Stamps a resolved counterparty snapshot onto the request, clearing all four counterparty
