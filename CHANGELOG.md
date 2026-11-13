@@ -2,6 +2,329 @@
 
 ## [Unreleased]
 
+## [v1.24.0](https://github.com/krt-profit/basetool/releases/tag/v1.24.0) - 2026-11-13
+
+### Added
+
+- Material and item orders support Staffel participation, direct responsibility transfer, and cancellation and reopening on the order page.
+
+- Requesters can adjust remaining material and item need after a partial handover while retaining booked work and history.
+
+- Add aUEC orders to the shared workspace with exact reported holdings and recoverable Bank-free provision.
+
+- **aUEC commitments.** Responsible Profit units and supporting Staffeln can record planned contributions on the order. Explicitly attributed fresh provision reduces the open commitment once, with a retained history of revisions and endings.
+
+- **aUEC settlement.** Record returns, shortages, releases and payments from the order. Reassign the same holder's funds between orders and correct linked amounts or identities with the original history retained.
+
+- **Kartellbank.** Die Buchungsanträge zeigen bei verknüpften Zahlungen den tatsächlichen Einzahler oder Empfänger getrennt vom Antragsteller. Halterumbuchungen und die Autorisierung vorhandener Mittel laufen über dieselbe Antragsliste.
+
+- Selected aUEC order payments use the existing Bank request and approval flow. The order tracks waiting payments and available funds, and a confirmed Bank decision applies the linked order effect once.
+
+- **Katalog.** Ein Gegenstand, der im Spiel noch nicht erhältlich ist, lässt sich jetzt ausblenden:
+  Er verschwindet aus den Auswahllisten von Lager, Aufträgen, Bedarf & Spenden und Materialbörse
+  und kann nicht neu gebucht, angeboten oder bestellt werden. Bestehende Einträge behalten ihn.
+  Admins blenden ihn auf der neuen Seite „Gegenstände“ neben der Sternenkarte aus und wieder ein.
+
+- **Aktive Org-Einheit bleibt gespeichert.** Die zuletzt gewählte Einheit gilt auch nach dem nächsten
+  Login. Wechselst du sie in einem Tab, laden deine anderen offenen Tabs mit der neuen Einheit neu.
+
+- **Raffinerie: Einheit je Auftrag.** Die Auftragsliste zeigt in jeder Zeile, zu welcher Einheit ein
+  Auftrag gehört – auch unter „Meine Aufträge", die unabhängig von der gewählten Einheit alle deine
+  Aufträge listet.
+
+- **Bank: Konto je eigenem Antrag.** „Meine Anträge" in der Org-Einheiten-Bank zeigt zu jedem Antrag
+  das Konto und dessen Einheit, denn die Liste umfasst alle deine Anträge, egal welche Einheit
+  gewählt ist.
+
+- **Missionsvorlagen.** Offiziere und Einsatzleiter können Ziele, Ablaufschritte und Einheiten als
+  Vorlagen für ihre Organisationseinheiten anlegen, bearbeiten und löschen.
+
+- Mission planners can save the reusable plan of a readable mission as a template in an org unit
+  they manage.
+
+- Beim Anlegen eines Einsatzes können Ziele, Ablauf und Einheiten aus einer Vorlage der verantwortlichen Org-Einheit übernommen und vor dem Speichern bearbeitet werden.
+
+- **Fußleiste.** Changelog und Forumdiskussion sind direkt verlinkt. Auf dem Smartphone findest du beide Links unten im Menü.
+
+- **P4K-Prüfung.** Zusammengehörige Fälle lassen sich gemeinsam bearbeiten. Das Review zeigt die Herkunft der Kandidaten und bietet passende Verknüpfungen und Zusammenführungen direkt an. Offene Vorschauen bleiben bei unveränderten Daten auch nach einem Live-Update sichtbar.
+
+### Changed
+
+- **Job orders.** Material, item and aUEC orders share the same overview, filters and detail workspace. Current unit responsibilities and relationships determine which orders you can see and work on.
+
+- **Überweisungsgebühren.** Bankbuchungen verwenden eine einheitliche Gebührenbasis für Gebühr und Abbuchung. Gespeicherte Gebührenraten bleiben auch nach einer zentralen Änderung unverändert berechenbar.
+
+- Job orders use the active Profit hierarchy for responsibility and current unit writers for creation. Invalid responsibilities retain reading and immediate transfer recovery while other processing and linked-stock changes wait; ended material promises keep their history.
+
+- Material promises show the still-uncovered contribution and credit explicitly attributed provision once. Readable history distinguishes capacity reductions, corrections and later stock use or loss; concurrent edits preserve independently changed contributions. Connected stock corrections require the same Inventory write permissions as ordinary stock changes.
+
+- The provision picker offers currently suitable open promises under the member's current writer permissions; final booking checks permissions and versions again.
+
+- Original-quality corrections follow the page language's number formatting while preserving the declared quality.
+
+- MATERIAL/ITEM orders show the same permitted facts in lists, number search, detail and linked views, with remembered scope/type filters and recorded unit relationships. Processing, enrollment and independently private data retain their own permissions.
+
+- Order creation uses current unit permissions and opens the returned order's central detail page.
+
+- Order collections retain full permitted stock facts and enable changes only with the relevant Inventory rights.
+
+- The E2E harness accepts a task-local path for its generated synthetic realm, keeping isolated test artifacts outside a checkout.
+
+- Inventory and mission handlers use focused internal modules with unchanged routes, permissions and independent edit versions. Role and squadron caches now hold immutable read models.
+
+- **Build.** Gradle auf 9.9.1 aktualisiert.
+
+- aUEC order actions select Kartellbank by default and offer a Bank-free choice per operation. Use the collection and designated requester accounts for deposit, delivery and return, and recover or repair submitted Bank attempts from the order.
+
+- **Lager.** Beim Einbuchen lassen sich auch Items ohne Blueprint wählen: FPS-Waffen,
+  Waffenaufsätze, Rüstung, Jetpacks, Schiffskomponenten und -waffen, Mining- und Salvage-Module,
+  Lagerbehälter sowie Loot und Sammelobjekte. Kleinkram wie Magazine, Munition, Pens, Essen und
+  Trinken bleibt außen vor, solange ihn kein Blueprint herstellt; Aufträge bleiben bei Items mit
+  Blueprint.
+
+- **Neues Aussehen (Design 3.0).** Das Basetool trägt jetzt die Farben und abgerundeten Ecken des
+  neuen Designs von das-kartell.org: blaugraue Flächen, hellere Kacheln in Boxen und Boxtitel mit
+  orangem Akzent. Gestapelte Boxen und Kacheln heben sich klarer voneinander ab; Anmeldeseite,
+  PDF-Exporte und Wartungsseite folgen ebenso.
+
+- **Materialbörse.** Items ohne Blueprint lassen sich jetzt anbieten und suchen: alles, was das
+  Lager bucht, etwa Waffen, Rüstung, Schiffskomponenten und Loot. Ein solcher Lagerposten lässt
+  sich über „Für Börse freigeben" auf die Börse stellen, statt abgelehnt zu werden.
+
+- **Deaktivierte Einheiten.** Mitgliedschaften, Leitungssitze und Häkchen in einer deaktivierten
+  Einheit geben keine Sicht, keine Rechte und keine Benachrichtigungen mehr, bis sie wieder aktiviert
+  wird. Ihre Daten zählen nicht mehr zu „Alle meine Org-Einheiten"; eigene Einträge bleiben für ihre
+  Eigentümer sichtbar.
+
+- **Mitgliedersuche organisationsweit.** Auswahlfelder und Mitgliederliste finden jetzt alle
+  Mitglieder der Organisation, unabhängig von deiner Staffel und der gewählten Einheit; andere
+  Mitglieder siehst du weiterhin nur mit Namen, Rang, Staffeln und Beschreibung.
+
+- **Rechte nur mit KRT Member.** Ohne die Rolle „KRT Member" geben Mitgliedschaften keinerlei Rechte
+  mehr – auch keine Logistiker- oder Einsatzleiter-Häkchen. Ausgeschiedene Mitglieder sehen und
+  ändern keine Daten ihrer früheren Einheiten mehr, und die Einheitenauswahl bleibt für sie leer.
+
+- **Org-Einheiten-Bank folgt der Auswahl.** Kontoverantwortliche sehen Einstellungen, Freigaben und
+  „Anträge an unsere Konten" eines Staffel-, SK- oder Bereichskontos nur, solange dessen Einheit
+  oder „Alle meine Org-Einheiten" gewählt ist. KRT-Konto, Kartellbank und Sonderkonten bleiben
+  unabhängig davon.
+
+- **Material-Claims folgen der Auswahl.** Auch Admins ändern bei gewählter Einheit nur noch die
+  Claims dieser Einheit oder die Claims auf Aufträgen des gewählten Spezialkommandos.
+
+- **Rechte folgen der Auswahl.** Mit einer gewählten Einheit wirken Logistiker-, Einsatzleiter- und
+  Leitungsrechte nur in dieser Einheit, auch für Admins. Für Aufträge, Einsätze oder Operationen
+  einer anderen Einheit wählst du diese oder „Alle meine Org-Einheiten".
+
+- **Admins: Einsätze der gewählten Einheit.** Mit gewählter Einheit verwalten Admins nur noch deren
+  Einsätze samt Besitzerwechsel und Finanzeinträgen, Einsätze ohne Einheit nur ohne Auswahl.
+  Besitzer und Mitverwalter behalten ihre Rechte unabhängig von der Auswahl.
+
+- **Admins: Kontoeinstellungen der gewählten Einheit.** Zielkontostand, Sichtbarkeit und
+  Freigabe-Limits eines Staffel-, SK- oder Bereichskontos ändern Admins bei gewählter Einheit nur
+  noch für deren Konto. Die Bankleitung setzt Freigabe-Limits weiter unabhängig von der Auswahl.
+
+- **Admins: Bedarf & Spenden der gewählten Einheit.** Mit gewählter Einheit verwalten Admins
+  Bedarfe und eingehende Spenden nur noch dieser Einheit, ohne Auswahl weiter die aller Einheiten;
+  die Einheiten-Einstellungen der Administration zeigen und ändern weiter alle Einheiten. Die Reiter
+  „Eingehende Spenden" und „Statistik" sowie „Bericht" im Ankauf bleiben allen, die sie öffnen
+  dürfen, unabhängig von der Auswahl erhalten; nur Verwaltung und Listen folgen ihr.
+
+- **Lager und Materialbörse.** Comp-Boards wie DCHS-01 bis DCHS-07, Server Blades, Passcode Disks,
+  Keycards, Zugangskarten und Datenlaufwerke lassen sich als Item einbuchen, anbieten und suchen,
+  auch ohne Blueprint.
+
+- **Lager: „Globales Lager" heißt jetzt „Einheitslager".** Die Ansicht zeigt nur den gemeinsamen
+  Bestand der eigenen Einheiten, nicht alles, was nicht persönlich ist; der neue Name sagt das.
+  Adresse, Favoriten und Startseite bleiben unverändert.
+
+### Fixed
+
+- **Sternenkarte.** Die Objekt- und Verknüpfungslisten kennzeichnen ihren Ladezustand für Bildschirmleser auch bei schnellen Filterwechseln korrekt.
+
+- Bestehende Materialeintragungen bleiben für berechtigte eigene Staffelwriter bearbeitbar, auch wenn eine andere Einheit den Auftrag verantwortet. Claim-Aktionen und Sortiergriffe folgen den konkreten Auftragsrechten.
+
+- Explicit deletion of a valid material or item order also handles archived material promises and retains the deletion audit. Invalid responsibility still blocks every deletion effect.
+
+- Personal data exports include the recorded end time of the member's material promises, including archived promises.
+
+- Die Zusammenführungs-Vorschau beim Einbuchen im Lager antwortet wieder zuverlässig, ohne eine Schreibtransaktion vorauszusetzen.
+
+- Operational cleanup and restore checks preserve failure outcomes and their previous success timestamp. Drift checks also cover installed operational units and companion files.
+
+- Structured logging masks credentials before JSON serialization, and Keycloak integration responses have explicit byte limits.
+
+- The OTP setup QR image has a localized description for assistive technology.
+
+- Reference-data caches use separate size-based admission budgets; large catalogue responses remain complete.
+
+- Role administration rejects stale permission and description edits independently; announcement reads no longer create rows and concurrent first writes retain a single current banner.
+
+- Exchange change sets remove every undeclared field even after the warning limit, and concurrent DPoP proof claims respect the global capacity.
+
+- Nested transactions keep their live updates and cached reads separate; leadership and refinery overview counters use batched reads.
+
+- Bank PDF exports retain complete histories while rendering posting batches and streaming the finished download from private temporary storage.
+
+- Blueprint batch failures preserve the staged selection and return the backend error. Superseded searches cannot replace newer results; a completed save reports display-refresh failures without repeating the write.
+
+- Session-loss fallbacks reach login consistently. Bank and audit downloads and P4K uploads use bounded streaming, with backend limits covering response completion.
+
+- Purchasing CSV preserves delimiters, quotes and line breaks; import catalogue text columns as text in spreadsheet tools.
+
+- Filter and overflow actions keep their full touch targets when optional component styles load independently.
+
+- **Exchange Undo.** Entries changed during a lock wait are skipped, preserving later stock changes.
+
+- ITEM orders and previews keep their material requirements consistent. Recipe changes during a save cause a conflict, and unrepresentable quantities are refused instead of being stored or shown incorrectly.
+
+- Correcting a retained SCU portion's quality preserves every allocation and keeps each split row within its physical stock, including minimal 0.001 slices.
+
+- **Inventory.** Reading older stock without stored quantity composition preserves the row's version, preventing a read from invalidating a pending stock edit.
+
+- Order pages refresh Staffel enrollment options when a peer changes the order status.
+
+- Order closure clears obsolete Inbox prompts even when the status changes again before delivery.
+
+- Update the aUEC order's status for other viewers while their money dialog is open, preserving its draft.
+
+- **Bedarf & Spenden.** Die Item-Auswahl beim Bedarf, beim Anmelden und beim Erfassen einer Spende
+  sucht jetzt serverseitig und findet jedes buchbare Item; bisher endete die Liste nach 500
+  Einträgen. Ein neu geöffnetes „Spende erfassen“ übernimmt außerdem nicht mehr unbemerkt den
+  Spender der vorigen Erfassung.
+
+- **Runde Ecken.** Tabellen, der Lager-Baum und Auswahllisten zeichnen nicht mehr eckig über den
+  abgerundeten Rahmen ihrer Box; Tabellenköpfe unter einer Werkzeugleiste bleiben gerade.
+
+- **Runde Ecken in Materialbörse und Blueprint-Sammlung.** Liste und Detailbereich zeichnen keine
+  eigenen Rundungen mehr in die gemeinsame Box: Die Trennlinie verläuft gerade bis zum Rand, die
+  Box behält ihre runden Ecken, und die Liste reicht immer bis zum unteren Rand.
+
+- **Lager-Baum.** Die letzte sichtbare Zeile – eine zugeklappte Gruppe, ein geschlossener Stack
+  oder eine Notiz – zieht keine eigene Linie mehr auf den unteren Rahmen; die Unterkante ist wieder
+  so schmal wie die übrigen Kanten.
+
+- **Aktive Org-Einheit.** Ohne gewählte Einheit zeigen Auswahlfeld, Titel und Dashboard jetzt
+  „Alle meine Org-Einheiten" statt der Heimat-Staffel, passend zu den angezeigten Daten. Die Auswahl
+  springt nicht mehr zurück, und eine gewählte Einheit zeigt überall nur noch deren Daten.
+
+- **Anlegen ohne gewählte Einheit.** Lager, Hangar, Missionen, Operationen und Raffinerie wählen bei
+  „Alle meine Org-Einheiten" keine Einheit mehr still vor; du entscheidest, wem der neue Eintrag
+  gehört.
+
+- **Hangar-Schnittstelle.** Die ungenutzte Schiffsliste `GET /api/v1/hangar/ships` ist entfernt. Sie
+  lieferte Besitzer, Standort und Einsatzbereitschaft jedes Schiffs der eigenen Org-Einheiten ohne
+  das Offiziersrecht, das die Org-Einheitsübersicht dafür verlangt.
+
+- **Lager-Vormerkungen auf fremde Einsätze.** Ist Bestand für einen Einsatz vorgemerkt, den du nicht
+  sehen darfst, zeigt das Lager nur noch „Unbekannter Einsatz" statt Name und Startzeit — in allen
+  Lageransichten, in „Mein Lager", bei Aufträgen und in der Schnittstelle für verbundene Anwendungen.
+
+- **Leitung nur in der gewählten Einheit.** Ränge, Bereichsrollen, SK-Leitung, Kommandogruppen und
+  SK-Mitglieder änderst du nur noch in der Einheit, die unter „Aktive Org-Einheit" gewählt ist,
+  oder ohne gewählte Einheit – auch als Admin. Ein gewählter Bereich oder die Organisationsleitung
+  umfasst nur diese Einheit selbst, und die Mitgliederseite eines SK öffnet sich nur, wenn dieses SK
+  oder keine einzelne Einheit gewählt ist.
+
+- **Leitungsrechte nur mit KRT Member.** Ohne die Rolle „KRT Member" gibt ein Leitungssitz keine
+  Ernennungs-, Kommandogruppen- oder SK-Mitgliederrechte mehr.
+
+- **SK-Leiter und Leitungssitze.** Als SK-Leiter änderst oder entfernst du weder deine eigene Zeile
+  noch die eines anderen SK-Leiters; ihre Logistiker- und Einsatzleiter-Häkchen siehst du dort nur
+  noch. Den Leitungssitz setzen weiterhin der Bereichsleiter oder ein Admin.
+
+- **Live-Aktualisierung nach entzogenem Zugriff.** Ein offener Tab zeigt nicht mehr an, wer eine
+  Seite gerade bearbeitet oder wann sie sich ändert, sobald du sie nicht mehr sehen darfst – etwa
+  nach dem Austritt aus einer Einheit oder wenn eine Mission intern wird. Die Live-Verbindung prüft
+  deinen Zugriff dafür regelmäßig neu.
+
+- **Einsatz einer Operation zuordnen.** Einen Einsatz kannst du nur noch einer Operation zuordnen,
+  die du auch bearbeiten darfst, also als Missionsmanager ihrer Org-Einheit. Die Auswahl bietet nur
+  diese Operationen an; eine bestehende Zuordnung bleibt beim Speichern erhalten.
+
+- **Benachrichtigungen nur mit KRT Member.** Hinweise an die Leitung, die Leads, Logistiker und
+  Einsatzleiter einer Einheit, an alle Sitzinhaber, an Kontoverantwortliche und an die OL als
+  Freigebende erreichen nur noch Mitglieder mit der Rolle „KRT Member". Ausgeschiedene Mitglieder
+  erhalten keine neuen Hinweise ihrer früheren Einheiten mehr.
+
+- **Bank: ruhende Kontoberechtigungen.** Neue, korrigierte und freigegebene Buchungsanträge eines
+  Kontos melden sich nur noch bei Berechtigten, die die Rolle „Bank Employee" haben. Eine
+  Berechtigung ohne diese Rolle benachrichtigt niemanden mehr.
+
+- **Neue persönliche Einträge.** Ein neues Schiff, ein Lagereintrag oder ein Raffinerieauftrag landet
+  ohne eigene Auswahl nur dann in der gewählten Einheit, wenn du dort direkt Mitglied bist – nie in
+  einer Einheit, die du nur über die Leitung erreichst.
+
+- **Schiff für ein Mitglied anlegen (Admin).** Die Einheit kommt nur aus den Mitgliedschaften des
+  Mitglieds; die eigene gewählte Einheit des Admins entscheidet nie mit.
+
+- **Herstellung erfassen: „Buchen in OrgUnit".** Vorausgewählt ist die gewählte Org-Einheit, wenn der
+  Eigentümer dort Mitglied ist, sonst seine einzige Einheit. Passt nichts davon, zeigt das Feld
+  „-- Bitte wählen --", und gebucht wird erst nach einer Auswahl, nicht mehr still in die erste
+  Einheit der Liste.
+
+- **Raffinerie-Liste: „Einlagern".** Der Link erscheint nur noch bei eigenen Aufträgen und für
+  Logistiker der Einheit des Auftrags, nicht mehr bei Aufträgen anderer Mitglieder.
+
+- **Bedarf & Spenden: verknüpfter Auftrag.** Die Verknüpfung eines Bedarfs mit einem Auftrag geht
+  nur noch an die Logistiker und die Leitung der Einheit, die den Bedarf angelegt hat; der
+  Spendendialog im Lager schickt sie anderen Mitgliedern nicht mehr mit.
+
+- **Lager-Baum.** Gruppen und Stacks lassen sich auch per Tastatur auf- und zuklappen: Der Pfeil
+  ist eine Schaltfläche mit Fokusrahmen, die Screenreadern sagt, ob die Ebene offen ist. Auf
+  Touch-Geräten ist ihre Trefferfläche so groß wie die der übrigen Schaltflächen.
+
+- **Datenschutzerklärung.** Die Buchstaben im Inhaltsverzeichnis (a., b., …) sind jetzt orange wie die Kapitelnummern.
+
+- **Mein Lager.** Der Auswahlhaken eines Eintrags trägt jetzt einen Namen („Eintrag auswählen"),
+  den Screenreader vorlesen und der beim Darüberfahren erscheint.
+
+- **Mein Lager.** Der Haken einer Gruppe markiert nur noch ihre geladenen Einträge und klappt die
+  Gruppe nicht mehr mit auf oder zu.
+
+- **Mein Lager.** Der Haken einer Gruppe markiert alle ihre Einträge der gefilterten Ansicht, auch
+  in noch nicht geöffneten Stapeln; die Gruppe bleibt dabei zugeklappt.
+
+- Bankleitung und Organisationsleitung sehen in „Anträge an unsere Konten“ jeweils die KRT-Anträge ihrer Freigabestufe. Wartet ein Antrag ohne freigabeberechtigten Kontoverantwortlichen, erhält die Administration einen Hinweis.
+
+- Ein Bereich hat höchstens einen Bereichsleiter. Änderungen an diesem Rang setzen die Berechtigung der Organisationsleitung oder der Administration voraus.
+
+- Einheitenlose Lagereinträge werden bei der ersten aktiven Mitgliedschaft übernommen, auch wenn das Mitglied bereits einer deaktivierten Einheit angehört.
+
+- **Operation payouts.** Confirming a payout protects the mission links, attendance and finances that determine all shares until the paid-out marks are reversed.
+
+- **Missions.** Search, pickers and upcoming missions respect parent visibility. Participant notifications follow the member's current access, including after a transfer or a visibility change.
+
+- Beim Umbuchen im Lager und beim Einlagern von Raffinerieausbeute ist die aktive Org-Einheit vorausgewählt, sofern sie als Ziel infrage kommt. Bei mehreren Zielen ohne passende aktive Einheit ist eine Auswahl erforderlich.
+
+- Für persönliche Einträge stehen nur aktive Einheiten zur Auswahl, denen das Mitglied mit der Rolle `KRT Member` direkt angehört.
+
+- Beim Entfernen einer Mitgliedschaft mit Leitungssitz wird auch der Sitzentzug im Audit protokolliert und die zugehörige Meldung geprüft.
+
+- Die Ankauf-Seite zeigt Pause und Fortsetzung nur für den erlaubten Geltungsbereich. Einheitsleitungen können den Ankauf ihrer Einheit wieder fortsetzen.
+
+- Bestandsmeldungen für einen Bedarf nennen die aktuell zuständige Einheit, wenn der verknüpfte Auftrag übertragen wurde.
+
+- Die Exchange-Sandbox zeigt den Auftragsbedarf für das vorgesehene Testkonto wieder an.
+
+- Einsätze, Operationen und persönliche Einträge können nur aktiven Org-Einheiten neu zugeordnet werden. Bestehende Einträge bleiben bearbeitbar und können in eine aktive Einheit verschoben werden.
+
+- **aUEC-Aufträge.** Bei gewählter Org-Einheit berücksichtigt die Kartellbank diese Auswahl für die Kontosicht und Anträge auf Abbuchung oder Nutzung vorhandener Bankmittel.
+
+### Security
+
+- Preserve the acting member's permitted order scope for external exchange stock allocations and book-in earmarks.
+
+- Beim Zusammenführen von Konten werden unvereinbare Mitgliedschaften vor dem Schreiben der Discord-Verknüpfung abgelehnt. Das Auditprotokoll zählt entfernte Duplikate.
+
+- Neue Lagerreservierungen können nur Einsätze auswählen, die für das schreibende Mitglied sichtbar sind. Bestehende Reservierungen lassen sich weiterhin bearbeiten und entfernen.
+
+- Benachrichtigungen zu Einheiten bleiben im vorgesehenen Empfängerkreis. Rollenabhängige Hinweise werden beim Entzug ihrer letzten Berechtigung aus dem Posteingang entfernt.
+
+- Glocke, Posteingang und Dashboard zeigen bei Benachrichtigungen mit Einheitsbezug die zuständige Einheit.
+
+- Rollenberechtigungen werden gegen die zulässigen Werte geprüft. Unbekannte gespeicherte Werte verleihen keine Berechtigungen.
+
 ## [v1.23.4](https://github.com/krt-profit/basetool/releases/tag/v1.23.4) - 2026-11-10
 
 ### Added
