@@ -329,6 +329,35 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       """;
 
   /**
+   * The personal-hangar search on ship-type or manufacturer name (REQ-HANGAR-002); a type without a
+   * manufacturer still matches on its own name.
+   */
+  String MY_SHIPS_SEARCH =
+      """
+      AND (cast(:search as string) IS NULL
+      OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+      OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+      )
+      """;
+
+  /** The personal-hangar order of REQ-HANGAR-002, with the row id as the stable tiebreaker. */
+  String MY_SHIPS_ORDER =
+      """
+      ORDER BY
+      LOWER(COALESCE(m.name, '')) ASC,
+      LOWER(COALESCE(st.name, '')) ASC,
+      CASE WHEN s.insurance = 'LTI' THEN 1
+      WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3
+      ELSE 2 END ASC,
+      CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0
+      ELSE cast(s.insurance as integer) END DESC,
+      LOWER(COALESCE(l.name, '')) ASC,
+      CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,
+      LOWER(COALESCE(s.name, '')) ASC,
+      s.id ASC
+      """;
+
+  /**
    * One page of the calling user's own ships, ordered server-side by the hangar's multi-key
    * comparator and optionally filtered by a case-insensitive search term (REQ-HANGAR-002).
    *
@@ -356,23 +385,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           AND (:fitted IS NULL OR s.fitted = :fitted)
           """
               + EFFECTIVE_ORIGIN_FILTER
-              + """
-              AND (cast(:search as string) IS NULL
-              OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-              ) ORDER BY
-              LOWER(COALESCE(m.name, '')) ASC,
-              LOWER(COALESCE(st.name, '')) ASC,
-              CASE WHEN s.insurance = 'LTI' THEN 1
-              WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3
-              ELSE 2 END ASC,
-              CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0
-              ELSE cast(s.insurance as integer) END DESC,
-              LOWER(COALESCE(l.name, '')) ASC,
-              CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,
-              LOWER(COALESCE(s.name, '')) ASC,
-              s.id ASC
-              """,
+              + MY_SHIPS_SEARCH
+              + MY_SHIPS_ORDER,
       countQuery =
           """
           SELECT COUNT(s) FROM Ship s
@@ -382,12 +396,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           AND (:fitted IS NULL OR s.fitted = :fitted)
           """
               + EFFECTIVE_ORIGIN_FILTER
-              + """
-              AND (cast(:search as string) IS NULL
-              OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-              )
-              """)
+              + MY_SHIPS_SEARCH)
   Page<Ship> findByOwnerIdFiltered(
       @Param("ownerId") UUID ownerId,
       @Param("search") @Nullable String search,
