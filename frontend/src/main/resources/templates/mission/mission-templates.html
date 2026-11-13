@@ -20,7 +20,7 @@
             </th:block>
         </th:block>
         <section class="list-panel" th:if="${ownerId == null}">
-            <p th:text="#{missionTemplate.noOwners}">Keine Org-Einheit</p>
+            <p class="empty-state mission-template-empty" th:text="#{missionTemplate.noOwners}">Keine Org-Einheit</p>
         </section>
         <section class="list-panel" th:if="${ownerId != null}" id="mission-template-workspace"
                  th:attr="data-list-url=@{/mission-templates/list},data-templates-url=@{/mission-templates},
@@ -43,14 +43,14 @@
                     <thead>
                         <tr>
                             <th scope="col" th:text="#{general.name}">Name</th>
-                            <th scope="col" class="actions-col"><span class="sr-only" th:text="#{general.actions}">Aktionen</span></th>
+                            <th scope="col" class="actions-col"><span class="visually-hidden" th:text="#{general.actions}">Aktionen</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr th:each="entry : ${templates}">
                             <td th:text="${entry.name}">Vorlage</td>
                             <td class="actions-col">
-                                <button type="button" class="btn btn-ghost btn-icon" data-template-edit
+                                <button type="button" class="btn btn-ghost btn-xs btn-icon" data-template-edit
                                         th:attr="data-template-id=${entry.id}" th:aria-label="#{missionTemplate.edit}"
                                         th:title="#{missionTemplate.edit}">
                                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg>
@@ -59,7 +59,7 @@
                         </tr>
                     </tbody>
                 </table>
-                <p th:if="${#lists.isEmpty(templates)}" th:text="#{missionTemplate.empty}">Keine Missionsvorlagen</p>
+                <p class="empty-state mission-template-empty" th:if="${#lists.isEmpty(templates)}" th:text="#{missionTemplate.empty}">Keine Missionsvorlagen</p>
                 <nav th:replace="~{kernel/fragments/pagination :: pagination(pageResponse=${templatePage},
                         baseUrl=@{/mission-templates/list(ownerId=${ownerId})})}"></nav>
                 </div>

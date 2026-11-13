@@ -66,6 +66,14 @@ export function createMissionTemplateEditor(panel) {
         ]),
     );
 
+    /** Updates the visible section totals after a draft change. */
+    function updateCounts() {
+        for (const section of sections) {
+            const count = form.querySelector(`[data-template-count="${section}"]`);
+            if (count) count.textContent = String(rows[section].list.childElementCount);
+        }
+    }
+
     /**
      * @param {Element} row the row to read
      * @param {string} field the named field
@@ -112,6 +120,7 @@ export function createMissionTemplateEditor(panel) {
         rows.objectives.fill(template?.objectives || []);
         rows.steps.fill(template?.steps || []);
         rows.units.fill(template?.units || []);
+        updateCounts();
         showError('');
         panel.hidden = false;
         name.focus();
@@ -169,6 +178,7 @@ export function createMissionTemplateEditor(panel) {
             if (!section) return;
             rows[section].remove(row);
         }
+        updateCounts();
         form.dispatchEvent(new Event('input', { bubbles: true }));
     });
     name.addEventListener('input', () => showError(''));

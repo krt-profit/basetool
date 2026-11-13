@@ -35,6 +35,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.AriaRole;
+import com.microsoft.playwright.options.BoundingBox;
 import com.microsoft.playwright.options.SelectOption;
 import java.time.Duration;
 import java.time.Instant;
@@ -108,9 +109,13 @@ class MissionTemplateEditorE2eTest {
               .click();
           Locator objectives = writer.locator("[data-template-rows='objectives']");
           Locator titles = objectives.locator("input[name='title']");
+          Locator objectiveCount = writer.locator("[data-template-count='objectives']");
+          assertThat(objectiveCount).hasText("0");
           writer.locator("[data-template-add='objectives']").click();
           titles.first().fill("Rally at the jump point");
+          assertThat(objectiveCount).hasText("1");
           writer.locator("[data-template-add='objectives']").click();
+          assertThat(objectiveCount).hasText("2");
           Locator scout = objectives.locator("[data-planning-row]").last();
           Locator scoutTitle = scout.locator("input[name='title']");
           scoutTitle.fill("Scout ahead");
@@ -123,6 +128,7 @@ class MissionTemplateEditorE2eTest {
               .hasAttribute("aria-disabled", "true");
           assertThat(writer.locator("#mission-template-form").getByTestId("reorder-live"))
               .containsText("Scout ahead");
+          assertResponsiveLayout(writer, objectives.locator("[data-planning-row]").first());
           writer.getByTestId("mission-template-save").click();
           assertThat(writer.locator("#mission-template-editor")).isHidden();
           writer
@@ -372,6 +378,61 @@ class MissionTemplateEditorE2eTest {
         }
       }
     }
+  }
+
+  /**
+   * Checks section placement and the desktop objective row with the current draft still open.
+   *
+   * @param page the template editor page
+   * @param objective a populated objective row
+   */
+  private static void assertResponsiveLayout(Page page, Locator objective) {
+    var original = page.viewportSize();
+    assertNotNull(original);
+    Locator objectives = page.locator("[aria-labelledby='mission-template-objectives-title']");
+    Locator steps = page.locator("[aria-labelledby='mission-template-steps-title']");
+    Locator units = page.locator("[aria-labelledby='mission-template-units-title']");
+    try {
+      page.setViewportSize(1440, 900);
+      BoundingBox goalsBox = boxOf(objectives);
+      BoundingBox stepsBox = boxOf(steps);
+      BoundingBox unitsBox = boxOf(units);
+      assertTrue(goalsBox.x + goalsBox.width <= stepsBox.x, "Goals sit left of the steps");
+      assertEquals(goalsBox.y, stepsBox.y, 1, "Goals and steps start on the same line");
+      assertEquals(stepsBox.x, unitsBox.x, 1, "Steps and units share the right column");
+      assertTrue(stepsBox.y + stepsBox.height <= unitsBox.y, "Units sit below the steps");
+
+      BoundingBox title = boxOf(objective.locator("input[name='title']"));
+      BoundingBox kind = boxOf(objective.locator("select[name='kind']"));
+      BoundingBox remove = boxOf(objective.locator("[data-template-row-action='remove']"));
+      assertTrue(title.x + title.width <= kind.x, "Classification sits next to the objective text");
+      assertTrue(kind.x + kind.width <= remove.x, "Row actions sit after the classification");
+      assertEquals(title.y, kind.y, 1, "Objective text and classification share a row");
+      assertEquals(title.y, remove.y, 1, "Row actions align with the objective text");
+
+      page.setViewportSize(390, 844);
+      goalsBox = boxOf(objectives);
+      stepsBox = boxOf(steps);
+      unitsBox = boxOf(units);
+      assertEquals(goalsBox.x, stepsBox.x, 1, "Goals and steps share the phone column");
+      assertEquals(goalsBox.x, unitsBox.x, 1, "Goals and units share the phone column");
+      assertTrue(goalsBox.y + goalsBox.height <= stepsBox.y, "Steps sit below goals on phones");
+      assertTrue(stepsBox.y + stepsBox.height <= unitsBox.y, "Units sit below steps on phones");
+    } finally {
+      page.setViewportSize(original.width, original.height);
+    }
+  }
+
+  /**
+   * Returns the visible element's bounding box.
+   *
+   * @param locator the measured element
+   * @return the visible bounding box
+   */
+  private static BoundingBox boxOf(Locator locator) {
+    BoundingBox box = locator.boundingBox();
+    assertNotNull(box, () -> locator + " must have a visible bounding box");
+    return box;
   }
 
   private static String seedSourcePlan(

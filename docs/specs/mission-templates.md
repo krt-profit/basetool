@@ -24,6 +24,10 @@ frequency is rounded to two decimal places and must lie between 100.00 and 999.9
 Procedure completion, assigned hangar ships, responsible members and crew assignments remain on
 missions.
 
+On wide screens, the editor shows goals in the left column and procedure and unit planning in the
+right column. On narrow screens, the sections stack in the order goals, procedure, then unit
+planning. Goal and procedure fields share a compact row with their actions wherever space permits.
+
 Template names are trimmed and compared case-sensitively within the owning unit. The database
 enforces uniqueness when writes race. Duplicate names produce an inline error on the name field.
 The editor saves the whole template under one revision. Changes to any planning row advance it.
@@ -51,6 +55,8 @@ refused with 403 on list and create.
 
 - [ ] An officer or Mission Manager creates a blank template, saves ordered planning data and
   deletes it. Multiple templates in a unit work, and two units may use the same name.
+- [ ] The editor presents the three planning sections in two columns on wide screens and in one
+  column on narrow screens. Goal classifications and row actions stay with the goal they belong to.
 - [ ] Concurrent same-owner writes of the same name yield one successful write and a name
   conflict. Invalid mission fields, including out-of-range frequencies, are rejected.
 - [ ] List, detail and mutation endpoints enforce the target scope, including direct requests
