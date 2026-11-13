@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [v1.24.1](https://github.com/krt-profit/basetool/releases/tag/v1.24.1) - 2026-11-13
+
+### Changed
+
+- **aUEC-Aufträge.** Das Formular hat nummerierte Abschnitte und zählt die Zeichen im optionalen Kommentar.
+  Unten stehen der eingegebene Zielbetrag und der gewählte Auftraggeber.
+
+- **Darstellung.** Reiterleisten haben mehr Abstand zum Inhalt. Ansichtsumschalter wie „Material /
+  Items“ sitzen in der Werkzeugleiste im gemeinsamen Listenrahmen. Dialoginhalte haben einen
+  einheitlichen Abstand zum Titel.
+
+- **Lagerübersicht.** Der Hinweis erklärt, welche Bestände in die Übersicht einfließen.
+
+- **aUEC-Aufträge.** Beim Anlegen ist der Profit-Bereich als bearbeitende Einheit vorausgewählt,
+  wenn er zur Auswahl steht.
+
+- **Missionsvorlagen.** Ziele lassen sich in kompakten Zeilen bearbeiten. Auf breiten Bildschirmen
+  stehen Ablauf und Einheitenplanung daneben, auf schmalen darunter.
+
+### Fixed
+
+- **Aufträge.** Die Auftragsliste zeigt wieder ihre Überschrift. Im leeren Kommentarfeld beim Anlegen eines aUEC-Auftrags steht ein Hinweis.
+
+- **Aufträge.** Die Aktionsleiste folgt den abgerundeten Ecken des Auftragsformulars.
+
 ## [v1.24.0](https://github.com/krt-profit/basetool/releases/tag/v1.24.0) - 2026-11-13
 
 ### Added
