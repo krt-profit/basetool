@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-11.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
 > **Owner area:** INV / ORDERS · **Related ADRs:** ADR-0101 (builds on ADR-0098/0099), ADR-0370
 > (the bookable items); design context in
 > [`docs/archive/DESIGN_ITEM_INVENTORY.md`](../archive/DESIGN_ITEM_INVENTORY.md).
@@ -78,7 +78,8 @@ an item the P4K retired (`CATALOGUE_ITEM_RETIRED`, REQ-P4K-013).
 ### REQ-INV-030 — Separate Material / Items views on the Lager surfaces
 
 `/inventory`, `/inventory?storage=my` and `/inventory?storage=all` offer a Material ↔ Items view switch
-(`view=items` riding the page's query state); the item view mirrors the material tree
+(`view=items` riding the page's query state). The two views use the segmented selector in the list
+toolbar (REQ-UI-028). The item view mirrors the material tree
 (GameItem → stack → lazy entries, REQ-INV-002/005 semantics) without quality or mission
 columns and with view-scoped expansion persistence. Drilldowns are per-catalog pages
 (`/inventory/material/{id}`, `/inventory/game-item/{id}`) without a switch, both paginated
@@ -92,6 +93,7 @@ ignored (`minQuality`/`missionIds`/`materialIds` under `ITEM`, `gameItemIds` und
 
 **Acceptance**
 
+- [ ] The Material / Items switch updates the catalog and its toolbar in place on all three Lager surfaces.
 - [ ] Both views render independently with persisted expansion state; fragment swaps
   preserve the active view (REQ-FE-005/008 patterns).
 - [ ] `catalog=ITEM` grouped/stack/aggregated/flat reads return only item rows, sorted

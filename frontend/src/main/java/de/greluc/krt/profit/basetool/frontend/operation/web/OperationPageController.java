@@ -498,9 +498,7 @@ public class OperationPageController {
   }
 
   /**
-   * Renders a Markdown preview for the description editor's "Vorschau" tab through the same
-   * sanitising {@link MarkdownRenderer} the detail page uses, so the result is safe to inject via
-   * {@code innerHTML}.
+   * Renders the description editor's Markdown preview through the detail page's sanitiser.
    *
    * @param request JSON body carrying the raw Markdown under the {@code markdown} key
    * @return the sanitized rendered HTML (text/html)

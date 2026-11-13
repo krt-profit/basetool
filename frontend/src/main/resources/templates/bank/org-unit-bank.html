@@ -24,9 +24,10 @@
 
     <div id="org-unit-bank-results" th:fragment="orgUnitBank"
          th:with="showKonten=${!#lists.isEmpty(balances)},
-                  showTabs=${!#lists.isEmpty(balances) or !#lists.isEmpty(ownRequests) or hasResponsibleAccounts}">
+                  showTabs=${showKonten or hasResponsibleAccounts},
+                  showContent=${showTabs or !#lists.isEmpty(ownRequests)}">
 
-        <th:block th:unless="${showTabs}">
+        <th:block th:unless="${showContent}">
             <section class="list-panel">
                 <div class="card card--flush" data-testid="org-unit-bank-empty">
                     <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='bank.orgUnit.emptyTitle',
@@ -35,8 +36,8 @@
             </section>
         </th:block>
 
-        <div th:if="${showTabs}">
-            <div class="tab-nav" role="tablist" th:aria-label="#{bank.orgUnit.title}">
+        <div th:if="${showContent}">
+            <div class="tab-nav" role="tablist" th:if="${showTabs}" th:aria-label="#{bank.orgUnit.title}">
                 <button type="button" class="tab active" role="tab" aria-selected="true"
                         th:if="${showKonten}"
                         id="ou-tab-konten" aria-controls="ou-panel-konten" data-tab="konten"
@@ -154,9 +155,16 @@
                 </section>
             </div>
 
-            <div class="ou-panel" id="ou-panel-antraege" data-tabpanel="antraege" role="tabpanel"
-                 aria-labelledby="ou-tab-antraege" th:attr="hidden=${showKonten} ? 'hidden' : null">
-                <section class="list-panel">
+            <div class="ou-panel" id="ou-panel-antraege"
+                 th:attr="hidden=${showKonten} ? 'hidden' : null,role=${showTabs} ? 'tabpanel' : null,
+                          aria-labelledby=${showTabs} ? 'ou-tab-antraege' : null,data-tabpanel=${showTabs} ? 'antraege' : null">
+                <section class="list-panel" th:attr="aria-labelledby=${showTabs} ? null : 'ou-requests-heading'">
+                    <div class="toolbar" th:unless="${showTabs}">
+                        <h2 class="card-title" id="ou-requests-heading">
+                            <span th:text="#{bank.orgUnit.tab.requests}">Meine Antr&auml;ge</span>
+                            <span class="count-badge" th:text="${#lists.size(ownRequests)}">0</span>
+                        </h2>
+                    </div>
                     <div class="card card--flush">
                         <th:block th:if="${#lists.isEmpty(ownRequests)}">
                             <div data-testid="org-unit-bank-requests-empty">

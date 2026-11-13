@@ -21,9 +21,6 @@
     .sync-attempt-counts {
         min-width: 12rem;
     }
-    .sync-tabs {
-        margin-bottom: var(--space-3);
-    }
     .event-type {
         white-space: nowrap;
     }

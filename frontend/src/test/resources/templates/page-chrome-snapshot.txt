@@ -285,7 +285,7 @@ inventory/inventory-game-item.html body <body data-nav-mode="drawer">
 inventory/inventory-game-item.html parts chrome:414d9d76af1903a4 x-content toast:a1359ecc4bd4b21d x-tail
 inventory/inventory-index.html html <html lang="de">
 inventory/inventory-index.html head-fixed d04638c124e5c652
-inventory/inventory-index.html head-own <title>Lagerverwaltung - Profit Basetool</title><link rel="stylesheet" href="/css/inventory/inventory-lager.css"><link rel="stylesheet" href="/css/pages/inventory/inventory-index.css">
+inventory/inventory-index.html head-own <title>Lagerverwaltung - Profit Basetool</title><link rel="stylesheet" href="/css/inventory/inventory-lager.css">
 inventory/inventory-index.html body <body data-nav-mode="drawer">
 inventory/inventory-index.html parts chrome:414d9d76af1903a4 x-content toast:a1359ecc4bd4b21d x-tail
 inventory/inventory-input.html html <html lang="de">

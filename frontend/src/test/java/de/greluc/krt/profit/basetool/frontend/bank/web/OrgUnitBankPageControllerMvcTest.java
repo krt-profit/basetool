@@ -967,6 +967,9 @@ class OrgUnitBankPageControllerMvcTest {
     mockMvc
         .perform(get("/org-unit-bank"))
         .andExpect(status().isOk())
+        .andExpect(content().string(Matchers.containsString("id=\"ou-requests-heading\"")))
+        .andExpect(
+            content().string(Matchers.not(Matchers.containsString("id=\"ou-tab-antraege\""))))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-expand")))
         .andExpect(content().string(Matchers.containsString("org-unit-bank-request-detail")))
         .andExpect(content().string(Matchers.containsString("Missionsfreigabe")))

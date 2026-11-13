@@ -248,8 +248,10 @@ function initOperationDetail3() {
     const input = /** @type {HTMLTextAreaElement | null} */ (document.getElementById('op-desc'));
     const preview = document.getElementById('op-md-preview');
     const toolbar = document.getElementById('op-md-toolbar');
-    const viewTabs = Array.prototype.slice.call(editor.querySelectorAll('[data-md-view]'));
-    if (!input || !preview || !toolbar || !viewTabs.length) return;
+    const viewButtons = /** @type {NodeListOf<HTMLButtonElement>} */ (
+        editor.querySelectorAll('button[data-md-view]')
+    );
+    if (!input || !preview || !toolbar || !viewButtons.length) return;
 
     /**
      * Switches the description editor between the Markdown source and its rendered preview.
@@ -262,10 +264,9 @@ function initOperationDetail3() {
         input.hidden = !edit;
         toolbar.hidden = !edit;
         preview.hidden = edit;
-        viewTabs.forEach((t) => {
-            const on = t.getAttribute('data-md-view') === (edit ? 'edit' : 'preview');
-            t.classList.toggle('active', on);
-            t.setAttribute('aria-selected', on ? 'true' : 'false');
+        viewButtons.forEach((button) => {
+            const selected = button.getAttribute('data-md-view') === (edit ? 'edit' : 'preview');
+            button.setAttribute('aria-pressed', String(selected));
         });
         if (!edit) {
             renderPreview();
@@ -340,8 +341,8 @@ function initOperationDetail3() {
         input.focus();
     }
 
-    viewTabs.forEach((t) =>
-        t.addEventListener('click', () => showView(t.getAttribute('data-md-view'))),
+    viewButtons.forEach((button) =>
+        button.addEventListener('click', () => showView(button.getAttribute('data-md-view'))),
     );
     toolbar.addEventListener('click', (e) => {
         const target = /** @type {Element} */ (e.target);

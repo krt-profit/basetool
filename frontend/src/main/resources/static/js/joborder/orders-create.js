@@ -989,7 +989,11 @@ function initCreationUnitPairs() {
             !(submit instanceof HTMLButtonElement)
         )
             continue;
-        if (!writable.has(responsible.value) && !writable.has(requesting.value)) {
+        if (
+            form !== auecCreateForm &&
+            !writable.has(responsible.value) &&
+            !writable.has(requesting.value)
+        ) {
             responsible.value =
                 Array.from(responsible.options).find((option) => writable.has(option.value))
                     ?.value || '';

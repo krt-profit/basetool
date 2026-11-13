@@ -17,11 +17,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { krtFetch } from '/js/kernel/krt-fetch.js';
+import { bindLagerViewSwitch } from '/js/inventory/inventory-view-switch.js';
 import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    krtFetch.bindSwap({ container: '#inventory-results', history: true });
+    const afterViewSwitch = bindLagerViewSwitch({
+        container: '#inventory-results',
+        fragmentValue: 'results',
+    });
     krtPageSections.create({
         topicClass: 'INVENTORY_ALL',
         sections: {
@@ -31,6 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return window.location.pathname + window.location.search;
         },
         topic: 'inventory',
-        receiver: document.getElementById('inventory-results') ? { coalesceMs: 1500 } : undefined,
+        receiver: document.getElementById('inventory-results')
+            ? {
+                  coalesceMs: 1500,
+                  refresh(keys, run) {
+                      void afterViewSwitch(async () => {
+                          const startedAt = window.location.href;
+                          const result = await run(keys);
+                          if (result.includes(false)) {
+                              await afterViewSwitch(async () => {
+                                  if (window.location.href !== startedAt) await run(keys);
+                              });
+                          }
+                      });
+                  },
+              }
+            : undefined,
     });
 });

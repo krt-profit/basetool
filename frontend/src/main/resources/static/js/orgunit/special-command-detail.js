@@ -260,7 +260,7 @@ function reswapMembers() {
     });
 }
 
-/** Writes the rendered row count into the member page's tab counter. */
+/** Updates the roster heading count after a fragment swap. */
 function updateCount() {
     const count = document.getElementById('sk-members-count');
     const results = document.getElementById('members-results');

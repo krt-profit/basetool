@@ -39,6 +39,7 @@ import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtInventory } from '/js/inventory/inventory-common.js';
 import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
 import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
+import { bindLagerViewSwitch } from '/js/inventory/inventory-view-switch.js';
 import { initPoolChange } from '/js/inventory/inventory-pool-change.js';
 
 const adminLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
@@ -330,6 +331,7 @@ function filterInventory() {
             return response.text();
         })
         .then((html) => {
+            if (!container.isConnected) return;
             krtFetch.replaceWithTrustedHtml(container, html);
             adminLager.restoreExpandedTree();
         })
@@ -354,7 +356,7 @@ const inventoryAll = krtPageSections.create({
                   return !!document.querySelector('[data-assoc-pop]:not([hidden])');
               },
               refresh() {
-                  filterInventory();
+                  void afterViewSwitch(filterInventory);
               },
           }
         : undefined,
@@ -375,7 +377,7 @@ krtPageSections.create({
                   return !!document.querySelector('[data-assoc-pop]:not([hidden])');
               },
               refresh() {
-                  filterInventory();
+                  void afterViewSwitch(filterInventory);
               },
           }
         : undefined,
@@ -425,7 +427,8 @@ function resetInventoryFilter() {
     filterInventory();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+/** Restores the current view's saved filters and synchronizes the filter controls. */
+function initializeViewFilters() {
     const filtersRestored = restoreAdminInventoryFilters();
     if (
         /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -475,6 +478,15 @@ document.addEventListener('DOMContentLoaded', () => {
     krtFilterPanel.refresh('globalFilterPanel');
     krtFilterChips.refresh();
     if (filtersRestored) filterInventory();
+}
+document.addEventListener('DOMContentLoaded', initializeViewFilters);
+const afterViewSwitch = bindLagerViewSwitch({
+    container: '#inventory-workspace',
+    fragmentValue: 'view',
+    onViewChanged() {
+        initializeViewFilters();
+        adminLager.restoreExpandedTree();
+    },
 });
 
 document.addEventListener('DOMContentLoaded', () => {

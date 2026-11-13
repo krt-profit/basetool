@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateOptionsDto;
+import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderCreateUnitOptionDto;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderForm;
 import de.greluc.krt.profit.basetool.frontend.joborder.model.JobOrderItemForm;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -43,6 +44,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithAnonymousUser;
@@ -90,7 +93,7 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
   @WithMockUser
   void aReaderWithoutAnAuthorizedPairCannotOpenTheCreationForm() throws Exception {
     when(backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class))
-        .thenReturn(new JobOrderCreateOptionsDto(false, List.of(), List.of(), null, null));
+        .thenReturn(new JobOrderCreateOptionsDto(false, List.of(), List.of(), null, null, null));
 
     mockMvc.perform(get("/orders/create")).andExpect(status().isForbidden());
   }
@@ -107,6 +110,66 @@ class JobOrderPageControllerCreateFormAuthMvcTest {
         .andExpect(view().name("joborder/orders-create"));
 
     verify(backendApiClient).getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @WithMockUser
+  void auecPreselectsProfitOrTheGenericSuggestionWhenUnavailable(boolean hasAuecSuggestion)
+      throws Exception {
+    UUID root = UUID.randomUUID();
+    UUID defaultUnit = UUID.randomUUID();
+    when(backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class))
+        .thenReturn(creationOptions(defaultUnit, root, hasAuecSuggestion ? root : null));
+
+    Map<String, Object> forms =
+        mockMvc
+            .perform(get("/orders/create").param("mode", "auec"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getModelAndView()
+            .getModel();
+
+    assertThat(((JobOrderForm) forms.get("auecOrderForm")).getResponsibleOrgUnitId())
+        .isEqualTo(hasAuecSuggestion ? root : defaultUnit);
+    assertThat(((JobOrderForm) forms.get("jobOrderForm")).getResponsibleOrgUnitId())
+        .isEqualTo(defaultUnit);
+    assertThat(((JobOrderItemForm) forms.get("jobOrderItemForm")).getResponsibleOrgUnitId())
+        .isEqualTo(defaultUnit);
+  }
+
+  @Test
+  @WithMockUser
+  void auecPreservesSubmittedResponsibilityAfterValidationFailure() throws Exception {
+    UUID root = UUID.randomUUID();
+    UUID defaultUnit = UUID.randomUUID();
+    JobOrderForm submitted = new JobOrderForm();
+    submitted.setResponsibleOrgUnitId(defaultUnit);
+    submitted.setRequestingOrgUnitId(defaultUnit);
+    when(backendApiClient.get("/api/v1/orders/create-options", JobOrderCreateOptionsDto.class))
+        .thenReturn(creationOptions(defaultUnit, root, root));
+
+    Map<String, Object> forms =
+        mockMvc
+            .perform(
+                get("/orders/create")
+                    .flashAttr("auecOrderForm", submitted)
+                    .flashAttr("startInAuecMode", true))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getModelAndView()
+            .getModel();
+
+    assertThat(((JobOrderForm) forms.get("auecOrderForm")).getResponsibleOrgUnitId())
+        .isEqualTo(defaultUnit);
+  }
+
+  private static JobOrderCreateOptionsDto creationOptions(
+      UUID defaultUnit, UUID root, UUID auecSuggestion) {
+    var squadron = new JobOrderCreateUnitOptionDto(defaultUnit, "Squadron", "SQ", "SQUADRON", true);
+    var area = new JobOrderCreateUnitOptionDto(root, "Operations area", "OA", "BEREICH", false);
+    return new JobOrderCreateOptionsDto(
+        true, List.of(squadron, area), List.of(squadron), defaultUnit, defaultUnit, auecSuggestion);
   }
 
   @Test

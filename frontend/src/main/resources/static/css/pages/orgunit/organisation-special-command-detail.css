@@ -14,15 +14,6 @@
         color: var(--color-gray-1);
     }
 
-    .unit-detail {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .unit-detail > .unit-tabs {
-        padding: 0 var(--space-3);
-    }
-
     .unit-detail .unit-roster {
         border: 0;
     }

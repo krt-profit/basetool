@@ -100,13 +100,11 @@
                                     data-leitung-open="add-ol" th:data-unit-id="${u.id()}" th:data-unit-name="${u.name()}"
                                     ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg><span th:text="#{leitung.bereich.add}">Mitglied hinzufügen</span></button>
                         </div>
-                        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${u.name()}">
-                            <button type="button" class="tab active" role="tab" aria-selected="true" data-lt-tab="members"
-                                    th:id="'lt-tab-' + ${u.id()} + '-members'" th:aria-controls="'lt-panel-' + ${u.id()} + '-members'"
-                                    ><span th:text="#{leitung.members.title}">Mitglieder</span> <span class="tab-count" th:text="${#lists.size(u.members())}">0</span></button>
-                        </div>
-                        <div class="unit-tabpanel" role="tabpanel" data-lt-panel="members"
-                             th:id="'lt-panel-' + ${u.id()} + '-members'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-members'">
+                        <div class="stack">
+                            <h3 class="card-title">
+                                <span th:text="#{leitung.members.title}">Mitglieder</span>
+                                <span class="count-badge" th:text="${#lists.size(u.members())}">0</span>
+                            </h3>
                             <th:block th:if="${#lists.isEmpty(u.members())}">
                                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='leitung.empty.rosterTitle', textKey='leitung.empty.members')}"></th:block>
                             </th:block>
@@ -167,13 +165,11 @@
                                     th:data-can-lead="${u.canAppointLead()}" th:data-can-roster="${u.canManageRoster()}"
                                     ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg><span th:text="#{leitung.bereich.add}">Mitglied hinzufügen</span></button>
                         </div>
-                        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${u.name()}">
-                            <button type="button" class="tab active" role="tab" aria-selected="true" data-lt-tab="members"
-                                    th:id="'lt-tab-' + ${u.id()} + '-members'" th:aria-controls="'lt-panel-' + ${u.id()} + '-members'"
-                                    ><span th:text="#{leitung.members.title}">Mitglieder</span> <span class="tab-count" th:text="${#lists.size(u.members())}">0</span></button>
-                        </div>
-                        <div class="unit-tabpanel" role="tabpanel" data-lt-panel="members"
-                             th:id="'lt-panel-' + ${u.id()} + '-members'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-members'">
+                        <div class="stack">
+                            <h3 class="card-title">
+                                <span th:text="#{leitung.members.title}">Mitglieder</span>
+                                <span class="count-badge" th:text="${#lists.size(u.members())}">0</span>
+                            </h3>
                             <th:block th:if="${#lists.isEmpty(u.members())}">
                                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='leitung.empty.rosterTitle', textKey='leitung.empty.members')}"></th:block>
                             </th:block>
@@ -347,13 +343,11 @@
                                     data-leitung-open="add-sk" th:data-unit-id="${u.id()}" th:data-unit-name="${u.name()}"
                                     ><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-user-plus"/></svg><span th:text="#{leitung.bereich.add}">Mitglied hinzufügen</span></button>
                         </div>
-                        <div class="tab-nav unit-tabs" role="tablist" th:aria-label="${u.name()}">
-                            <button type="button" class="tab active" role="tab" aria-selected="true" data-lt-tab="members"
-                                    th:id="'lt-tab-' + ${u.id()} + '-members'" th:aria-controls="'lt-panel-' + ${u.id()} + '-members'"
-                                    ><span th:text="#{leitung.members.title}">Mitglieder</span> <span class="tab-count" th:text="${#lists.size(u.members())}">0</span></button>
-                        </div>
-                        <div class="unit-tabpanel" role="tabpanel" data-lt-panel="members"
-                             th:id="'lt-panel-' + ${u.id()} + '-members'" th:aria-labelledby="'lt-tab-' + ${u.id()} + '-members'">
+                        <div class="stack">
+                            <h3 class="card-title">
+                                <span th:text="#{leitung.members.title}">Mitglieder</span>
+                                <span class="count-badge" th:text="${#lists.size(u.members())}">0</span>
+                            </h3>
                             <th:block th:replace="~{orgunit/organisation/unit-detail :: skRoster(skId=${u.id()}, members=${skRosters.get(u.id())}, showFlags=${flagsKnown}, canLead=${u.canAppointLead()}, canRemove=${u.canManageRoster()}, leadMode='leitung', selfUserId=${selfUserId}, admin=${leitung.admin()}, refreshUrl=${'/organisation/leitung?unit=' + u.id()}, refreshContainer='#leitung-sections', refreshFragment='leitungSections')}"></th:block>
                         </div>
                     </section>

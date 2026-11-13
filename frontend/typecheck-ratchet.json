@@ -108,6 +108,7 @@
       "inventory/inventory-my.js",
       "inventory/inventory-note-modal.js",
       "inventory/inventory-pool-change.js",
+      "inventory/inventory-view-switch.js",
       "inventory/stock-levels.js"
     ],
     "joborder": [

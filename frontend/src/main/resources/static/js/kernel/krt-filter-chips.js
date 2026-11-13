@@ -265,8 +265,7 @@ function render(bar) {
 }
 
 /**
- * Wires one bar: renders it, re-renders on every change in its container, and clears all
- * filters from the reset button.
+ * Wires a bar's reset button and renders its current chips.
  *
  * @param {HTMLElement} bar the `[data-filter-chips]` element
  */
@@ -276,14 +275,6 @@ function init(bar) {
         return;
     }
     bar.setAttribute('data-filter-chips-ready', '');
-    document.addEventListener('input', (event) => {
-        const source = sourceOf(bar);
-        if (source && event.target instanceof Node && source.contains(event.target)) schedule(bar);
-    });
-    document.addEventListener('change', (event) => {
-        const source = sourceOf(bar);
-        if (source && event.target instanceof Node && source.contains(event.target)) schedule(bar);
-    });
     const reset = bar.querySelector('[data-filter-chips-reset]');
     if (reset) {
         reset.addEventListener('click', () => {
@@ -298,6 +289,24 @@ function init(bar) {
     }
     render(bar);
 }
+
+/**
+ * Schedules chip bars whose source contains the changed filter.
+ *
+ * @param {Event} event a filter input or change event
+ */
+function scheduleAffectedBars(event) {
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    /** @type {NodeListOf<HTMLElement>} */
+    const bars = document.querySelectorAll('[data-filter-chips-ready]');
+    bars.forEach((bar) => {
+        if (sourceOf(bar)?.contains(target)) schedule(bar);
+    });
+}
+
+document.addEventListener('input', scheduleAffectedBars);
+document.addEventListener('change', scheduleAffectedBars);
 
 /**
  * Wires every chip bar below a root.
@@ -328,3 +337,7 @@ if (document.readyState === 'loading') {
 } else {
     initAll(document);
 }
+
+document.addEventListener('krt:swapped', (event) => {
+    if (event.detail.container) initAll(event.detail.container);
+});

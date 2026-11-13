@@ -16,85 +16,89 @@
 
     <section class="starmap-section" aria-labelledby="starmap-objects-title" data-testid="starmap-objects">
         <h2 id="starmap-objects-title" class="starmap-section-title" th:text="#{admin.starmap.objects.title}">Objekte</h2>
-        <form id="starmap-objects-filter" class="no-track" role="search">
-            <div class="toolbar">
-                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('starmap-objects-query', 'query', null, 'admin.starmap.filter.search')}"></th:block>
-                <div class="starmap-filter">
-                    <label for="starmap-objects-system" class="visually-hidden" th:text="#{admin.starmap.filter.system}">Sternensystem</label>
-                    <input type="text" id="starmap-objects-system" name="starSystem" autocomplete="off" data-filter-chip-ignore
-                           th:attr="placeholder=#{admin.starmap.filter.system}">
+        <div class="list-panel">
+            <form id="starmap-objects-filter" class="no-track" role="search">
+                <div class="toolbar">
+                    <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('starmap-objects-query', 'query', null, 'admin.starmap.filter.search')}"></th:block>
+                    <div class="starmap-filter">
+                        <label for="starmap-objects-system" class="visually-hidden" th:text="#{admin.starmap.filter.system}">Sternensystem</label>
+                        <input type="text" id="starmap-objects-system" name="starSystem" autocomplete="off" data-filter-chip-ignore
+                               th:attr="placeholder=#{admin.starmap.filter.system}">
+                    </div>
+                    <div class="starmap-filter">
+                        <label for="starmap-objects-type" class="visually-hidden" th:text="#{admin.starmap.filter.type}">Typ</label>
+                        <input type="text" id="starmap-objects-type" name="type" autocomplete="off" data-filter-chip-ignore
+                               th:attr="placeholder=#{admin.starmap.filter.type}">
+                    </div>
                 </div>
-                <div class="starmap-filter">
-                    <label for="starmap-objects-type" class="visually-hidden" th:text="#{admin.starmap.filter.type}">Typ</label>
-                    <input type="text" id="starmap-objects-type" name="type" autocomplete="off" data-filter-chip-ignore
-                           th:attr="placeholder=#{admin.starmap.filter.type}">
+            </form>
+            <div class="card card--flush">
+                <div class="table-responsive">
+                    <table class="data-table data-table--stack">
+                        <thead>
+                        <tr>
+                            <th th:text="#{admin.starmap.col.name}">Name</th>
+                            <th th:text="#{admin.starmap.col.type}">Typ</th>
+                            <th th:text="#{admin.starmap.col.system}">System</th>
+                            <th th:text="#{admin.starmap.col.position}">Position</th>
+                            <th th:text="#{admin.starmap.col.hideInStarmap}">P4K: ausgeblendet</th>
+                            <th class="cell-status" th:text="#{admin.starmap.col.visibility}">Sichtbarkeit</th>
+                            <th th:text="#{admin.starmap.col.override}">Einstellung</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.starmap.col.actions}">Aktionen</span></th>
+                        </tr>
+                        </thead>
+                        <tbody id="starmap-objects" aria-busy="true">
+                        </tbody>
+                    </table>
                 </div>
+                <div id="starmap-objects-empty" class="empty-state" data-testid="empty-state" hidden>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.starmap.objects.empty.title', 'admin.starmap.objects.empty', null)}"></th:block>
+                </div>
+                <nav id="starmap-objects-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
             </div>
-        </form>
-        <div class="card card--flush">
-            <div class="table-responsive">
-                <table class="data-table data-table--stack">
-                    <thead>
-                    <tr>
-                        <th th:text="#{admin.starmap.col.name}">Name</th>
-                        <th th:text="#{admin.starmap.col.type}">Typ</th>
-                        <th th:text="#{admin.starmap.col.system}">System</th>
-                        <th th:text="#{admin.starmap.col.position}">Position</th>
-                        <th th:text="#{admin.starmap.col.hideInStarmap}">P4K: ausgeblendet</th>
-                        <th class="cell-status" th:text="#{admin.starmap.col.visibility}">Sichtbarkeit</th>
-                        <th th:text="#{admin.starmap.col.override}">Einstellung</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.starmap.col.actions}">Aktionen</span></th>
-                    </tr>
-                    </thead>
-                    <tbody id="starmap-objects" aria-busy="true">
-                    </tbody>
-                </table>
-            </div>
-            <div id="starmap-objects-empty" class="empty-state" data-testid="empty-state" hidden>
-                <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.starmap.objects.empty.title', 'admin.starmap.objects.empty', null)}"></th:block>
-            </div>
-            <nav id="starmap-objects-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
         </div>
     </section>
 
     <section class="starmap-section" aria-labelledby="starmap-links-title" data-testid="starmap-links">
         <h2 id="starmap-links-title" class="starmap-section-title" th:text="#{admin.starmap.links.title}">UEX-Verknüpfungen</h2>
         <p class="form-hint" th:text="#{admin.starmap.links.hint}">Eine von Hand gesetzte Verknüpfung behält der Import bei.</p>
-        <form id="starmap-links-filter" class="no-track" role="search">
-            <div class="toolbar">
-                <div class="starmap-filter">
-                    <label for="starmap-links-kind" class="visually-hidden" th:text="#{admin.starmap.filter.kind}">UEX-Tabelle</label>
-                    <select id="starmap-links-kind" name="kind" data-testid="starmap-links-kind" data-filter-chip-ignore>
-                        <option th:each="k : ${placeKinds}" th:value="${k}" th:selected="${k == 'CITY'}"
-                                th:text="#{${'admin.starmap.kind.' + k}}">Stadt</option>
-                    </select>
+        <div class="list-panel">
+            <form id="starmap-links-filter" class="no-track" role="search">
+                <div class="toolbar">
+                    <div class="starmap-filter">
+                        <label for="starmap-links-kind" class="visually-hidden" th:text="#{admin.starmap.filter.kind}">UEX-Tabelle</label>
+                        <select id="starmap-links-kind" name="kind" data-testid="starmap-links-kind" data-filter-chip-ignore>
+                            <option th:each="k : ${placeKinds}" th:value="${k}" th:selected="${k == 'CITY'}"
+                                    th:text="#{${'admin.starmap.kind.' + k}}">Stadt</option>
+                        </select>
+                    </div>
+                    <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('starmap-links-query', 'query', null, 'admin.starmap.filter.placeSearch')}"></th:block>
+                    <label class="krt-switch" for="starmap-links-unlinked">
+                        <input type="checkbox" role="switch" id="starmap-links-unlinked" name="unlinkedOnly" data-testid="starmap-links-unlinked" data-filter-chip-ignore>
+                        <span th:text="#{admin.starmap.filter.unlinkedOnly}">Nur unverknüpfte</span>
+                    </label>
                 </div>
-                <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('starmap-links-query', 'query', null, 'admin.starmap.filter.placeSearch')}"></th:block>
-                <label class="krt-switch" for="starmap-links-unlinked">
-                    <input type="checkbox" role="switch" id="starmap-links-unlinked" name="unlinkedOnly" data-testid="starmap-links-unlinked" data-filter-chip-ignore>
-                    <span th:text="#{admin.starmap.filter.unlinkedOnly}">Nur unverknüpfte</span>
-                </label>
+            </form>
+            <div class="card card--flush">
+                <div class="table-responsive">
+                    <table class="data-table data-table--stack">
+                        <thead>
+                        <tr>
+                            <th th:text="#{admin.starmap.col.uexName}">UEX-Name</th>
+                            <th th:text="#{admin.starmap.col.system}">System</th>
+                            <th th:text="#{admin.starmap.col.linkedObject}">Verknüpftes Objekt</th>
+                            <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.starmap.col.actions}">Aktionen</span></th>
+                        </tr>
+                        </thead>
+                        <tbody id="starmap-links" aria-busy="true">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="starmap-links-empty" class="empty-state" data-testid="empty-state" hidden>
+                    <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.starmap.links.empty.title', 'admin.starmap.links.empty', null)}"></th:block>
+                </div>
+                <nav id="starmap-links-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
             </div>
-        </form>
-        <div class="card card--flush">
-            <div class="table-responsive">
-                <table class="data-table data-table--stack">
-                    <thead>
-                    <tr>
-                        <th th:text="#{admin.starmap.col.uexName}">UEX-Name</th>
-                        <th th:text="#{admin.starmap.col.system}">System</th>
-                        <th th:text="#{admin.starmap.col.linkedObject}">Verknüpftes Objekt</th>
-                        <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.starmap.col.actions}">Aktionen</span></th>
-                    </tr>
-                    </thead>
-                    <tbody id="starmap-links" aria-busy="true">
-                    </tbody>
-                </table>
-            </div>
-            <div id="starmap-links-empty" class="empty-state" data-testid="empty-state" hidden>
-                <th:block th:replace="~{kernel/fragments/components :: emptyStateBody('admin.starmap.links.empty.title', 'admin.starmap.links.empty', null)}"></th:block>
-            </div>
-            <nav id="starmap-links-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
         </div>
     </section>
 </main>

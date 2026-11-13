@@ -52,15 +52,16 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * The Lager pages that pool several units carry the „Alle meine Org-Einheiten" notice while the
- * member's context spans their units (REQ-ORG-024): the Lager overview and the „Einheitslager" show
- * it, a selected unit removes it, and „Mein Lager" never shows it because it does not follow the
- * selection.
+ * Verifies that the Lager scope notice describes the effective context of the stock (REQ-ORG-024).
  */
 @SpringBootTest
 class LagerAllMyOrgUnitsNoticeRenderTest {
 
   private static final String NOTICE = "data-testid=\"all-my-org-units-notice\"";
+
+  private static final String MEMBER_STOCK_SCOPE =
+      "Bestände der Org-Einheiten, auf deren Lager du Zugriff hast";
+  private static final String ADMIN_STOCK_SCOPE = "aller Org-Einheiten zusammen";
 
   @Autowired private WebApplicationContext context;
 
@@ -105,11 +106,28 @@ class LagerAllMyOrgUnitsNoticeRenderTest {
     assertThat(render(path, ContextKind.ALL_MY_ORG_UNITS, null)).contains(NOTICE);
   }
 
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void theOverviewDescribesTheMembersAccessibleOrgUnits() throws Exception {
+    assertThat(render("/inventory", ContextKind.ALL_MY_ORG_UNITS, null))
+        .contains(MEMBER_STOCK_SCOPE)
+        .doesNotContain(ADMIN_STOCK_SCOPE);
+  }
+
+  @Test
+  @WithMockUser(roles = {"ADMIN", "KRT_MEMBER"})
+  void theOverviewNamesAllOrgUnitsForAnUnpinnedAdmin() throws Exception {
+    assertThat(render("/inventory", ContextKind.ALL_ORG_UNITS, null))
+        .contains(ADMIN_STOCK_SCOPE)
+        .doesNotContain(NOTICE, MEMBER_STOCK_SCOPE);
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"/inventory", "/inventory?storage=all"})
   @WithMockUser(roles = "KRT_MEMBER")
   void aPooledLagerPageDropsTheNoticeOnceAUnitIsSelected(String path) throws Exception {
-    assertThat(render(path, ContextKind.ORG_UNIT, UUID.randomUUID())).doesNotContain(NOTICE);
+    assertThat(render(path, ContextKind.ORG_UNIT, UUID.randomUUID()))
+        .doesNotContain(NOTICE, MEMBER_STOCK_SCOPE, ADMIN_STOCK_SCOPE);
   }
 
   @Test

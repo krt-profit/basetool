@@ -109,6 +109,14 @@ public class JobOrderCreatePageController {
             .map(option -> option.orgUnitId().toString())
             .distinct()
             .collect(Collectors.joining(",")));
+    if (!model.containsAttribute("auecOrderForm")) {
+      JobOrderForm auecForm = new JobOrderForm();
+      UUID auecResponsible = choices.suggestedAuecResponsibleOrgUnitId();
+      auecForm.setResponsibleOrgUnitId(
+          auecResponsible != null ? auecResponsible : choices.suggestedResponsibleOrgUnitId());
+      auecForm.setRequestingOrgUnitId(choices.suggestedRequestingOrgUnitId());
+      model.addAttribute("auecOrderForm", auecForm);
+    }
     JobOrderForm materialForm = (JobOrderForm) model.getAttribute("jobOrderForm");
     if (materialForm != null) {
       materialForm.setResponsibleOrgUnitId(

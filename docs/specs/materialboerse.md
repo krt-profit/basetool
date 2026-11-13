@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-10-10.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
 > **Owner area:** MARKET · **Related ADRs:** [ADR-0082](../adr/0082-materialboerse-offer-model.md),
 > [ADR-0086](../adr/0086-materialboerse-partial-offer-amount.md),
 > [ADR-0087](../adr/0087-materialboerse-item-offers.md),
@@ -44,7 +44,7 @@ Markdown description, an optional minimum quality (0–1000, for both kinds) and
 so none of the offer's stock-derived rules apply (no clamp-on-read, no ratchet, no
 one-active-per-row). Other members signal "Ich kann liefern" and the requester is notified; the
 supplier names stay owner-only exactly like the interessenten of an offer. Requests live on the same
-`/materialboerse` page as the second of two tabs („Angebote" / „Gesuche"), each narrowed by the
+`/materialboerse` page as the second of two views („Angebote" / „Gesuche"), each narrowed by the
 scope segment „Alle · Meine", and the page head's one create menu reads „Angebot erstellen" (entries
 „Material anbieten" / „Item anbieten") on the Angebote and „Gesuch erstellen" („Material suchen" /
 „Item suchen") on the Gesuche (REQ-MARKET-009/-018). The request model is a **sibling aggregate** (`MaterialExchangeRequest`, its
@@ -326,11 +326,12 @@ events. See [`audit.md`](audit.md) (REQ-AUDIT-001/002).
 full offer right) using only design-system classes/tokens; `materialboerse.css` and
 `pages/materialboerse.css` are page composition only. The page head (REQ-UI-027) carries **one**
 create action, an outline menu button „Angebot erstellen ▾" whose overflow-menu panel offers
-„Material anbieten" and „Item anbieten" (on the Gesuche tab the same slot is „Gesuch erstellen ▾",
-REQ-MARKET-018). Below it the tabs „Angebote (n)" / „Gesuche (n)" (board totals, filter-independent)
-and a toolbar: the scope segment „Alle n · Meine n" (the active view's totals), the always-visible
-search (material or player), the „Filter" popover with min. quality, min. quantity (on the
-**effective** amount = offered, capped at current stock) and „Ohne gestohlene" — each active one
+„Material anbieten" and „Item anbieten" (in the Gesuche view the same slot is „Gesuch erstellen ▾",
+REQ-MARKET-018). The toolbar opens with the view segment „Angebote (n)" / „Gesuche (n)" (board
+totals, filter-independent) and the scope segment „Alle n · Meine n" (the active view's totals),
+followed by the always-visible search (material or player). The „Filter" popover contains min.
+quality, min. quantity (on the **effective** amount = offered, capped at current stock) and
+„Ohne gestohlene" — each active one
 shown as a removable chip with „Alle zurücksetzen" — and, on the right, a compact sort menu (Qualität
 ↓ · Menge ↓ · Name A–Z · Neueste zuerst — no "nur ohne Interessenten"). A master row shows the name,
 the anbieter with affiliation badges, „Q <quality>" and the quantity right-aligned; the detail shows
@@ -357,10 +358,10 @@ with a filter popover, chips and a sort menu; `view`/`scope` parameters added, `
 fallbacks.*
 
 **Acceptance**
-- [ ] Filter/tab/segment/sort changes and writes never trigger a full-page reload.
+- [ ] Filter, view, scope and sort changes and writes never trigger a full-page reload.
 - [ ] `?view=requests&scope=mine` opens the own requests; `?mode=requests&tab=mein` opens the same
   view when `view`/`scope` are absent.
-- [ ] The page head holds exactly one create menu for the active tab; its entries open the existing
+- [ ] The page head holds exactly one create menu for the active view. Its entries open the existing
   release / item / request dialogs.
 - [ ] The remark is server-rendered Markdown; the CTA/modal use no `confirm/alert/prompt`.
 - [ ] Master-list rows are native `<button>`s stripped of UA button chrome — no light `buttonface` fill on unselected rows and no beveled/white border around entries (#1184).
@@ -600,7 +601,7 @@ quantity + releasable picker), `InventoryCheckoutService#ratchetBoardOffersToSto
 ### REQ-MARKET-015 — Post a request (Gesuch) for a material or item
 
 A `KRT_MEMBER` posts a wanted-listing via the "Material suchen" / "Item suchen" entries of the
-„Gesuch erstellen" menu (shown when the Gesuche tab is active). A request is one of two kinds (`MaterialExchangeRequestKind` ∈
+„Gesuch erstellen" menu (shown in the Gesuche view). A request is one of two kinds (`MaterialExchangeRequestKind` ∈
 `{MATERIAL, ITEM}`, a **sibling aggregate** to the offer, ADR-0116): a **material** request names a
 catalogue `Material` (picked from the material-catalogue type-ahead, not the caller's Lager) and a
 desired quantity in the material's own unit (SCU or Stück per `Material.quantityType`); an **item**
@@ -669,18 +670,18 @@ duplicate is an idempotent success, never a 500.
 `MaterialRequestService#signalFulfillment`/`#withdrawFulfillment`, `MaterialRequestBoardService#detailDto`,
 `MaterialExchangeRequestInterest`
 
-### REQ-MARKET-018 — UI: one board, two tabs and a scope segment, mode-aware create menu, live update, live multi-user sync
+### REQ-MARKET-018 — UI: one board, view and scope segments, mode-aware create menu, live update, live multi-user sync
 
-`/materialboerse` renders offers and requests as two views of **one** master-detail board: the tabs
-„Angebote (n)" / „Gesuche (n)" pick the view and the toolbar segment „Alle n · Meine n" the scope, so
+`/materialboerse` renders offers and requests as two views of **one** master-detail board. In its
+toolbar, the segment „Angebote (n)" / „Gesuche (n)" picks the view and „Alle n · Meine n" the scope, so
 the former four combinations stay reachable (`?view=offers|requests&scope=all|mine`, REQ-MARKET-009).
-All counts are filter-independent board totals; the segment shows the active view's. On the Gesuche
-the page head's create menu reads „Gesuch erstellen" with the entries „Material suchen" / „Item
-suchen". One toolbar serves both views (search, min quality on the request's stated floor, min
-desired quantity, sort); „Ohne gestohlene" is offers-only and is hidden and disabled on the Gesuche.
-Each view keeps its own stored filters (REQ-UI-017), written back into the shared toolbar on a tab
-switch. A request row shows the subject, the requester with badges, „Q≥ <min quality>" when set and
-the desired quantity; the detail shows when it was posted, three figures (Min. Qualität, Menge,
+The board counts are filter-independent, and the scope segment shows the active view's totals.
+In the Gesuche view the page head's create menu reads „Gesuch erstellen" with the entries „Material
+suchen" / „Item suchen". One toolbar serves both views (search, min quality on the request's
+stated floor, min desired quantity, sort). „Ohne gestohlene" is available in the offers view.
+Each view keeps its own stored filters (REQ-UI-017), written back into the shared toolbar when the
+view changes. A request row shows the subject, the requester with badges, „Q≥ <min quality>" when
+set and the desired quantity. The detail shows when it was posted, three figures (Min. Qualität, Menge,
 Lieferanten) and „Ich kann liefern". The
 create/edit modal carries the Material/Item radio, the catalogue pickers
 (material search + item search, REQ-MARKET-012), the optional min-quality field (both kinds) and the desired
@@ -697,8 +698,8 @@ refreshes only the visible board (the `requests` key never re-pulls the offers l
 relabelled CTAs → one create menu per tab; one shared toolbar with per-view stored filters.*
 
 **Acceptance**
-- [ ] Switching tabs, the scope segment, filters, sort and every write never triggers a full-page
-reload; the create menu follows the active tab.
+- [ ] View and scope switches, filters, sorting and writes update the board in place.
+  The create menu follows the active view.
 - [ ] A request create/deactivate/fulfilment by one member refreshes the Gesuche board of another
 member viewing it, with no description body, supplier identity or location crossing the socket.
 - [ ] The `MATERIALBOARD` whitelist is exactly `{board, requests}` and every `sendChanged` key across

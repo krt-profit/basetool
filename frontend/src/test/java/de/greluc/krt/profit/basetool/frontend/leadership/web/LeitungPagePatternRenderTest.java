@@ -223,6 +223,7 @@ class LeitungPagePatternRenderTest {
     assertThat(squadronPane.substring(0, squadronPane.indexOf('>'))).doesNotContain("hidden");
     assertThat(squadronPane)
         .contains("Staffel · Logistik")
+        .contains("role=\"tablist\"")
         .containsPattern("data-lt-panel=\"members\"[^>]*hidden")
         .doesNotContainPattern("data-lt-panel=\"groups\" hidden")
         .contains("class=\"data-table data-table--stack unit-roster leitung-rank-table\"")
@@ -236,6 +237,7 @@ class LeitungPagePatternRenderTest {
     String olPane = pane(html, OL);
     assertThat(olPane.substring(0, olPane.indexOf('>'))).contains("hidden");
     assertThat(olPane.split("btn--cta", -1)).hasSize(2);
+    assertThat(olPane).contains("<h3 class=\"card-title\">").doesNotContain("role=\"tablist\"");
     assertThat(olPane)
         .contains("data-leitung-open=\"add-ol\"")
         .containsPattern("class=\"chip chip--primary\">Grand Admiral<")
@@ -244,10 +246,14 @@ class LeitungPagePatternRenderTest {
 
     String bereichPane = pane(html, BEREICH);
     assertThat(bereichPane.split("btn--cta", -1)).hasSize(2);
+    assertThat(bereichPane)
+        .contains("<h3 class=\"card-title\">")
+        .doesNotContain("role=\"tablist\"");
     assertThat(bereichPane).contains("Bereich · Forschung").contains("remove-bereich-role");
 
     String skPane = pane(html, SK);
     assertThat(skPane.split("btn--cta", -1)).hasSize(2);
+    assertThat(skPane).contains("<h3 class=\"card-title\">").doesNotContain("role=\"tablist\"");
     assertThat(skPane)
         .contains("Spezialkommando · Logistik")
         .contains("data-leitung-open=\"add-sk\"")

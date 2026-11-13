@@ -16,7 +16,7 @@
     }
 
     .op-tabs {
-        margin: var(--space-6) 0 var(--space-4);
+        margin-block-start: var(--space-6);
         padding: 0;
     }
 
@@ -295,11 +295,6 @@
     }
     .op-md-head > label {
         margin: 0;
-    }
-    .op-md-views {
-        padding: 0;
-        background-color: transparent;
-        border-bottom: 0;
     }
     .md-toolbar {
         display: flex;

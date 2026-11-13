@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.microsoft.playwright.Browser;
@@ -64,11 +65,13 @@ class JobOrderMoneyE2eTest {
   private static final String AMOUNT = "9007199254740993";
   private static final String GROUPED_AMOUNT = "9.007.199.254.740.993";
 
-  /** Submits the localized target through the browser's native form navigation. */
+  /** Submits an explicitly chosen unit and localized target through native form navigation. */
   @Test
   void nativeCreateSubmitsCanonicalTargetAndRedirects() {
     assumeTrue(STACK.managesStack(), "requires the isolated managed order stack");
-    new BackendSeeder().ensureIridiumMembership(USERNAME, PASSWORD);
+    BackendSeeder seeder = new BackendSeeder();
+    seeder.ensureIridiumMembership(USERNAME, PASSWORD);
+    String profitArea = profitAreaId(seeder);
     String baseUrl = STACK.baseUrl();
     try (Playwright playwright = Playwright.create();
         Browser browser = E2eSupport.launchBrowser(playwright, true);
@@ -77,6 +80,8 @@ class JobOrderMoneyE2eTest {
       Page page = context.newPage();
       E2eSupport.login(page, baseUrl, USERNAME, PASSWORD);
       E2eSupport.navigate(page, baseUrl + "/orders/create?lang=de");
+      page.getByTestId("order-mode-auec").click();
+      assertThat(page.locator("#auec-responsible-org-unit")).hasValue(profitArea);
       fillCreateForm(page, IRIDIUM, IRIDIUM, "6000000");
       assertEquals("6.000.000", shownAmount(page.getByTestId("order-auec-target")));
       var request =
@@ -87,10 +92,29 @@ class JobOrderMoneyE2eTest {
       assertEquals("POST", request.method());
       assertTrue(
           request.headers().get("content-type").startsWith("application/x-www-form-urlencoded"));
-      assertTrue(List.of(request.postData().split("&")).contains("target=6000000"));
+      List<String> fields = List.of(request.postData().split("&"));
+      assertTrue(fields.contains("target=6000000"));
+      assertTrue(fields.contains("responsibleOrgUnitId=" + IRIDIUM));
       awaitCreatedOrder(page, baseUrl);
       assertThat(page.getByTestId("order-money-target")).containsText("6.000.000");
     }
+  }
+
+  private static String profitAreaId(BackendSeeder seeder) {
+    var units =
+        JsonParser.parseString(seeder.getBody(USERNAME, PASSWORD, "/api/v1/org-units"))
+            .getAsJsonArray();
+    for (JsonElement element : units) {
+      JsonObject unit = element.getAsJsonObject();
+      JsonElement department = unit.get("department");
+      if ("BEREICH".equals(unit.get("kind").getAsString())
+          && department != null
+          && !department.isJsonNull()
+          && "PROFIT".equals(department.getAsString())) {
+        return unit.get("id").getAsString();
+      }
+    }
+    throw new IllegalStateException("No Profit area in the managed stack");
   }
 
   /** Records one Bank-free provision and reads the same committed outcome after response loss. */

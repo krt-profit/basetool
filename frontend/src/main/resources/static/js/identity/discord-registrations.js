@@ -128,7 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function selectTab(tab, focus) {
         tabs.forEach((other) => {
             const selected = other === tab;
-            other.classList.toggle('active', selected);
             other.setAttribute('aria-selected', selected ? 'true' : 'false');
             other.tabIndex = selected ? 0 : -1;
             const panel = document.getElementById(

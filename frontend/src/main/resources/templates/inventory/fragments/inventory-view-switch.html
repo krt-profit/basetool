@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="viewSwitch(storage)" class="krt-segmented" data-lager-view-switch th:aria-label="#{inventory.items.view.aria}"
+     th:data-lager-view-error="${storage == 'my'} ? #{error.inventory.personal.load} : (${storage == 'all'} ? #{error.inventory.global.load} : #{error.inventory.aggregate.load})">
+    <a th:href="${storage == null} ? @{/inventory} : @{/inventory(storage=${storage})}" class="krt-segmented__item"
+       th:attr="aria-current=${view != 'items'} ? 'page' : null"
+       data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
+    <a th:href="${storage == null} ? @{/inventory(view='items')} : @{/inventory(storage=${storage}, view='items')}" class="krt-segmented__item"
+       th:attr="aria-current=${view == 'items'} ? 'page' : null"
+       data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
+</nav>
+</body>
+</html>

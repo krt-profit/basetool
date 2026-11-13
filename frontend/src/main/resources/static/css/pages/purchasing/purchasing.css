@@ -1,9 +1,6 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .purchasing-tabs {
-        margin-bottom: var(--space-4);
-    }
     .purchasing-actions {
         display: flex;
         flex-wrap: wrap;

@@ -23,11 +23,12 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 import java.util.List;
 import java.util.UUID;
 
-/** Mirrors current creation capability, offered unit choices and one authorized proposed pair. */
+/** Mirrors current creation choices and authorized defaults for each order form. */
 @DtoMirror
 public record JobOrderCreateOptionsDto(
     boolean canCreate,
     List<JobOrderCreateUnitOptionDto> responsibleOptions,
     List<JobOrderCreateUnitOptionDto> requestingOptions,
     UUID suggestedResponsibleOrgUnitId,
-    UUID suggestedRequestingOrgUnitId) {}
+    UUID suggestedRequestingOrgUnitId,
+    UUID suggestedAuecResponsibleOrgUnitId) {}

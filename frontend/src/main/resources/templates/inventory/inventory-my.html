@@ -25,19 +25,13 @@
     </th:block>
     </th:block>
 
+    <div id="inventory-workspace">
+    <th:block th:fragment="inventoryView">
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
-
-    <div class="tab-nav lager-tabs" role="tablist" th:aria-label="#{inventory.items.view.aria}">
-        <a th:href="@{/inventory(storage='my')}" class="tab" role="tab"
-           th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
-           data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
-        <a th:href="@{/inventory(storage='my', view='items')}" class="tab" role="tab"
-           th:classappend="${view == 'items'} ? ' active' : ''" th:aria-selected="${view == 'items'}"
-           data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
-    </div>
 
     <section class="list-panel">
     <div class="toolbar lager-toolbar">
+        <nav th:replace="~{inventory/fragments/inventory-view-switch :: viewSwitch(storage='my')}"></nav>
         <form th:if="${view != 'items'}" th:action="@{/inventory}" method="get" id="myFilterForm" class="my-inventory-filter lager-filter-form no-track">
             <input type="hidden" name="storage" value="my">
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='personalScope', labelKey='inventory.filter.scope',
@@ -369,6 +363,8 @@
         </div>
     </div>
     </section>
+    </th:block>
+    </div>
 
     <div id="bulkCheckoutBar" class="form-actions--sticky lager-selection-bar" role="region"
          th:aria-label="#{inventory.bulk.bar.label}" data-testid="lager-selection-bar" hidden>

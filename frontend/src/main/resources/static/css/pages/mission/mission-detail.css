@@ -96,6 +96,7 @@
         }
     }
     .mission-page > .alert {
+        margin-block-start: var(--space-4);
         margin-inline: var(--page-gutter);
     }
     .mission-head-sticky > .page-head {
@@ -143,6 +144,7 @@
         color: var(--color-gray-2-text);
     }
     .mission-head-dock > .tab-nav {
+        margin-block-end: 0;
         padding-inline: calc(var(--page-gutter) - 4px);
     }
 
@@ -258,7 +260,7 @@
         }
     }
     .tab-panes {
-        padding: 14px var(--page-gutter) 18px;
+        padding: var(--space-4) var(--page-gutter) 18px;
     }
     .tab-pane {
         display: none;

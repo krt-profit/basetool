@@ -1,7 +1,6 @@
 @layer base, components, page, utilities;
 
 @layer page {
-    .p4k-jobs,
     .p4k-panel {
         margin-top: var(--space-6);
     }
@@ -19,14 +18,36 @@
         gap: var(--space-3);
     }
 
+    .p4k-list-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .p4k-list-toolbar > .form-hint {
+        margin: 0;
+    }
+
+    [data-p4k-jobs-table][hidden] {
+        display: none;
+    }
+
+    .p4k-list-empty {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+    }
+
     .p4k-review-filters {
         align-items: end;
-        margin-bottom: var(--space-3);
     }
 
     .p4k-review-filters .form-group {
         flex: 1 1 14rem;
         min-width: 0;
+        margin: 0;
+    }
+
+    .p4k-review-filters select {
+        inline-size: 100%;
     }
 
     .p4k-review-heading {

@@ -96,6 +96,8 @@ class AdminPersonalBlueprintsPageControllerMvcTest {
         .contains("id=\"krt-bp-edit-modal\"")
         .contains("id=\"krt-bp-delete-modal\"")
         .contains("id=\"krt-bp-import-modal\"")
+        .contains("class=\"list-panel krt-bp-import-list\"")
+        .contains("id=\"krt-bp-import-body\"")
         .contains("personal-inventory-blueprints-import.js");
   }
 

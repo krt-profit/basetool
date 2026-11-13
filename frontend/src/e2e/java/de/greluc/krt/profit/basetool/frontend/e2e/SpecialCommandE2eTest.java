@@ -201,6 +201,8 @@ class SpecialCommandE2eTest {
         assertThat(page.locator("#members-box"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("#add-member-btn")).isVisible();
+        assertThat(page.locator("#members-box h2#sk-members-heading")).isVisible();
+        assertThat(page.locator("#members-box [role='tablist']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "special-command-member-page-redirect");
         throw failure;

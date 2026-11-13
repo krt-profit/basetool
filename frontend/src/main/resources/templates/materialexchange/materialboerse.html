@@ -51,26 +51,21 @@
         </th:block>
     </th:block>
 
-    <nav class="tab-nav mb-tabs" role="tablist" th:aria-label="#{materialboerse.title}">
-        <button type="button" class="tab" role="tab" data-mb-mode="offers" data-testid="mb-tab-offers"
-                aria-controls="mb-board"
-                th:classappend="${activeMode != 'requests'} ? 'active'"
-                th:aria-selected="${activeMode != 'requests'}">
-            <span th:text="#{materialboerse.mode.offers}">Angebote</span>
-            <span class="tab-count" th:text="${countAll}">0</span>
-        </button>
-        <button type="button" class="tab" role="tab" data-mb-mode="requests" data-testid="mb-tab-requests"
-                aria-controls="mb-board"
-                th:classappend="${activeMode == 'requests'} ? 'active'"
-                th:aria-selected="${activeMode == 'requests'}">
-            <span th:text="#{materialboerse.mode.requests}">Gesuche</span>
-            <span class="tab-count" th:text="${countReqAll}">0</span>
-        </button>
-    </nav>
-
     <section class="list-panel">
     <form id="mb-filter-form" class="no-track mb-toolbar" method="get" th:action="@{/materialboerse}">
         <div class="toolbar">
+            <div class="krt-segmented" role="group" th:aria-label="#{materialboerse.title}">
+                <button type="button" class="krt-segmented__item" data-mb-mode="offers" data-testid="mb-tab-offers"
+                        aria-controls="mb-board" th:aria-pressed="${activeMode != 'requests'}">
+                    <span th:text="#{materialboerse.mode.offers}">Angebote</span>
+                    <span class="krt-segmented__count" th:text="${countAll}">0</span>
+                </button>
+                <button type="button" class="krt-segmented__item" data-mb-mode="requests" data-testid="mb-tab-requests"
+                        aria-controls="mb-board" th:aria-pressed="${activeMode == 'requests'}">
+                    <span th:text="#{materialboerse.mode.requests}">Gesuche</span>
+                    <span class="krt-segmented__count" th:text="${countReqAll}">0</span>
+                </button>
+            </div>
             <th:block th:replace="~{kernel/fragments/components :: segmented(name='scope', labelKey='materialboerse.scope.label', selected=${activeScope},
                 options=${ {{value: 'all', labelKey: 'filter.all', count: scopeCountAll}, {value: 'mine', labelKey: 'materialboerse.scope.mine', count: scopeCountMine}} })}"></th:block>
             <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('mb-search', 'q', ${filterQ}, 'materialgesuch.filter.search.placeholder')}"></th:block>
@@ -110,7 +105,7 @@
         <th:block th:replace="~{kernel/fragments/components :: filterChips('mb-filter-form')}"></th:block>
     </form>
 
-    <div id="mb-board" class="card card--flush mb-board" role="tabpanel">
+    <div id="mb-board" class="card card--flush mb-board">
         <th:block th:fragment="board">
             <div th:if="${activeMode == 'requests'}" id="mg-listwrap">
                 <th:block th:replace="~{materialexchange/fragments/materialgesuch-board :: requestList}"></th:block>

@@ -38,6 +38,7 @@ import { krtFilterPanel } from '/js/kernel/krt-filter-panel.js';
 import { krtInventory } from '/js/inventory/inventory-common.js';
 import { krtHerkunft } from '/js/inventory/inventory-herkunft.js';
 import { inventoryHooks } from '/js/inventory/inventory-hooks.js';
+import { bindLagerViewSwitch } from '/js/inventory/inventory-view-switch.js';
 
 const myLager = /** @type {KrtInventoryApi} */ (krtInventory).createLager({
     triggerPrefix: 'inv-my',
@@ -973,6 +974,7 @@ function filterMyInventory() {
             return response.text();
         })
         .then((html) => {
+            if (!container.isConnected) return;
             krtFetch.replaceWithTrustedHtml(container, html);
             myLager.restoreExpandedTree();
         })
@@ -1042,7 +1044,7 @@ const inventoryMy = krtPageSections.create({
                   return !!document.querySelector('[data-assoc-pop]:not([hidden])');
               },
               refresh() {
-                  filterMyInventory();
+                  void afterViewSwitch(filterMyInventory);
               },
           }
         : undefined,
@@ -1067,13 +1069,14 @@ krtPageSections.create({
                   return !!document.querySelector('[data-assoc-pop]:not([hidden])');
               },
               refresh() {
-                  filterMyInventory();
+                  void afterViewSwitch(filterMyInventory);
               },
           }
         : undefined,
 });
 
-document.addEventListener('DOMContentLoaded', () => {
+/** Restores the current view's saved filters and synchronizes the filter controls. */
+function initializeViewFilters() {
     const filtersRestored = restoreMyInventoryFilters();
     if (
         /** @type {HTMLCollectionOf<HTMLInputElement>} */ (
@@ -1123,6 +1126,16 @@ document.addEventListener('DOMContentLoaded', () => {
     krtFilterPanel.refresh('myFilterPanel');
     krtFilterChips.refresh();
     if (filtersRestored) filterMyInventory();
+}
+document.addEventListener('DOMContentLoaded', initializeViewFilters);
+const afterViewSwitch = bindLagerViewSwitch({
+    container: '#inventory-workspace',
+    fragmentValue: 'view',
+    onViewChanged() {
+        clearBulkSelection();
+        initializeViewFilters();
+        myLager.restoreExpandedTree();
+    },
 });
 
 document.addEventListener('change', (event) => {

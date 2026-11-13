@@ -147,7 +147,10 @@ class InventoryIndexListPatternRenderTest {
     return new AggregatedInventoryDto(material, null, 512.0, 700.0, 12.5, lowStock);
   }
 
-  /** The material view renders on the pattern: head, tabs, row link, numeric cells, foot. */
+  /**
+   * The material view renders on the pattern: head, segmented toolbar, row link, numeric cells,
+   * foot.
+   */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void materialViewRendersTheListPattern() throws Exception {
@@ -168,8 +171,12 @@ class InventoryIndexListPatternRenderTest {
         .doesNotContainPattern("class=\"[^\"]*krtm-");
     assertThat(html).doesNotContain("btn--cta").contains("class=\"krt-segmented\"");
     assertThat(html)
-        .contains("data-testid=\"lager-view-material\"")
-        .contains("data-testid=\"lager-view-items\"")
+        .containsPattern(
+            "(?s)id=\"inventory-results\""
+                + " class=\"list-panel\".*?class=\"toolbar\".*?class=\"krt-segmented\"[^>]*data-lager-view-switch.*?class=\"card"
+                + " card--flush\"")
+        .containsPattern("data-testid=\"lager-view-material\"[^>]*aria-current=\"page\"")
+        .containsPattern("href=\"/inventory\\?view=items\"[^>]*data-testid=\"lager-view-items\"")
         .contains("class=\"data-table data-table--stack\"")
         .containsPattern(
             "class=\"row-link\"[^>]*href=\"/inventory\\?storage=all&amp;materialIds=" + MATERIAL_ID)
@@ -178,6 +185,19 @@ class InventoryIndexListPatternRenderTest {
         .contains(">12,500 SCU<")
         .contains("data-list-total=\"1\"")
         .doesNotContain("data-testid=\"empty-state\"");
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void resultsFragmentCarriesTheToolbarWithTheNewSelection() throws Exception {
+    String html = render(emptyPage(), "view=items&fragment=results");
+
+    assertThat(html)
+        .contains("data-lager-view-switch")
+        .containsPattern("href=\"/inventory\"[^>]*data-testid=\"lager-view-material\"")
+        .containsPattern("data-testid=\"lager-view-items\"[^>]*aria-current=\"page\"")
+        .contains("class=\"card card--flush\"")
+        .doesNotContain("class=\"page-head\"");
   }
 
   /** A material with a low minimum stock level carries the „Niedrig" badge (REQ-INV-068). */

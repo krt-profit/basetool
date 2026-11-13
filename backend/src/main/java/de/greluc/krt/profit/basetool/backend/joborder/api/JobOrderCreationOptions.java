@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.api;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyService;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchySnapshot;
 import de.greluc.krt.profit.basetool.backend.scope.api.AccessGateService;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import java.util.Comparator;
@@ -71,7 +72,8 @@ public class JobOrderCreationOptions {
    * @return a fail-closed answer when no eligible responsible unit or active unit writer exists
    */
   public @NotNull JobOrderCreateOptionsDto current() {
-    Set<UUID> eligibleIds = profitHierarchy.eligibleUnitIds();
+    ProfitHierarchySnapshot hierarchy = profitHierarchy.snapshot();
+    Set<UUID> eligibleIds = hierarchy.eligibleUnitIds();
     if (eligibleIds.isEmpty()) {
       return unavailable();
     }
@@ -94,28 +96,26 @@ public class JobOrderCreationOptions {
     if (eligible.isEmpty() || !requesterWriter) {
       return unavailable();
     }
-    List<JobOrderCreateUnitOptionDto> responsible = eligible;
     List<JobOrderCreateUnitOptionDto> requesting =
         active.stream().filter(option -> responsibleWriter || option.canWrite()).toList();
-    JobOrderCreateUnitOptionDto proposedRequester =
+    UUID proposedRequester =
         requesting.stream()
             .filter(JobOrderCreateUnitOptionDto::canWrite)
             .findFirst()
-            .orElse(requesting.getFirst());
-    JobOrderCreateUnitOptionDto proposedResponsible =
-        responsible.stream()
-            .filter(option -> proposedRequester.canWrite() || option.canWrite())
+            .orElseThrow()
+            .orgUnitId();
+    UUID proposedResponsible = eligible.getFirst().orgUnitId();
+    UUID auecResponsible =
+        eligible.stream()
+            .map(JobOrderCreateUnitOptionDto::orgUnitId)
+            .filter(id -> id.equals(hierarchy.profitRootId()))
             .findFirst()
-            .orElseThrow();
+            .orElse(proposedResponsible);
     return new JobOrderCreateOptionsDto(
-        true,
-        responsible,
-        requesting,
-        proposedResponsible.orgUnitId(),
-        proposedRequester.orgUnitId());
+        true, eligible, requesting, proposedResponsible, proposedRequester, auecResponsible);
   }
 
   private static JobOrderCreateOptionsDto unavailable() {
-    return new JobOrderCreateOptionsDto(false, List.of(), List.of(), null, null);
+    return new JobOrderCreateOptionsDto(false, List.of(), List.of(), null, null, null);
   }
 }

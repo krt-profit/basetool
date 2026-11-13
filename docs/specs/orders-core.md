@@ -150,8 +150,11 @@ or a writer of the proposed responsible unit may create an order on behalf of th
 
 The creation affordance and form for all three kinds use the current backend `canCreateJobOrders` and
 `GET /api/v1/orders/create-options` projection. Options carry per-unit writer flags and one
-currently permitted proposed pair; the frontend does not reconstruct authority or enumerate all
-pairs. The backend revalidates the selected pair when creating. All create transports consume the
+currently permitted proposed pair. The projection also carries the canonical active Profit area
+as the aUEC responsible suggestion when available among the eligible choices. It uses the
+same writable requester and falls back to the generic responsible suggestion if the root is
+unavailable in the choices. The frontend consumes the projected suggestions and writer flags.
+The backend revalidates the selected pair when creating. All create transports consume the
 returned order identity and open its central detail page. A reader without a permitted pair gets
 no create action and cannot open the form. Workspace and unit-work view capabilities remain
 independent of creation and individual action rights.

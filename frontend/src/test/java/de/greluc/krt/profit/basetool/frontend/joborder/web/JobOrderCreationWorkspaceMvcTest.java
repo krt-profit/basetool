@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.frontend.joborder.web;
 
+import static org.hamcrest.Matchers.hasProperty;
+import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -182,7 +184,12 @@ class JobOrderCreationWorkspaceMvcTest extends JobOrderPageMvcTestBase {
         .andExpect(redirectedUrl("/orders/create"))
         .andExpect(flash().attribute("errorToast", "orders.money.create.error"))
         .andExpect(flash().attribute("startInAuecMode", true))
-        .andExpect(flash().attribute("auecTarget", AUEC_FORM.target()));
+        .andExpect(flash().attribute("auecTarget", AUEC_FORM.target()))
+        .andExpect(
+            flash()
+                .attribute(
+                    "auecOrderForm",
+                    hasProperty("responsibleOrgUnitId", is(AUEC_FORM.responsibleOrgUnitId()))));
     verify(backendApiClient, never()).post(eq("/api/v1/orders/auec"), any(), eq(JobOrderDto.class));
     verifyNoInteractions(liveSyncLocalBus);
   }

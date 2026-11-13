@@ -69,7 +69,7 @@
 
     .tab-panes {
         border: var(--border-hairline);
-        border-top: none;
+        border-radius: var(--radius-box);
         background: var(--color-bg-dark-gray);
     }
     .tab-panes .tab-pane {

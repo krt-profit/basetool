@@ -123,6 +123,8 @@ inventing full original quantities or quality.
 
 > **Implementation and acceptance scope:** MATERIAL, ITEM and aUEC use the shared JobOrder workspace. The specifications record the requirements and verification for [shared access and lifecycle](docs/specs/orders-core.md), [material contributions](docs/specs/orders-material-claims.md), [aUEC procurement](docs/specs/orders-auec.md) and [Kartellbank handling](docs/specs/orders-auec-bank.md).
 
+The aUEC creation form preselects the active Profit area as the processing unit when it is available. The requesting-unit selection and creation authority follow the shared order rules.
+
 The README is the overview; everything else lives in dedicated, versioned docs:
 
 | Document                                                                                         | Purpose                                                                                                                                                                                                                                                         |

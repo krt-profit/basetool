@@ -4,7 +4,6 @@
     <title th:text="#{nav.inventory} + ' - ' + ${appTitle}">Lagerverwaltung - Profit Basetool</title>
     <th:block th:fragment="extraLinks">
 <link rel="stylesheet" th:href="@{/css/inventory/inventory-lager.css}">
-<link rel="stylesheet" th:href="@{/css/pages/inventory/inventory-index.css}">
     </th:block>
 </head>
 <body>
@@ -17,23 +16,18 @@
         </th:block>
     </th:block>
 
-    <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
     <div th:if="${isAllSquadronsMode}" class="alert alert-info" th:text="#{inventory.index.all_squadrons_notice}">
-        Aggregation across all squadrons. Select a single squadron to filter.
+        This overview shows stock across all org units. Select an org unit to see its stock.
     </div>
-    <div th:replace="~{kernel/fragments/components :: allMyOrgUnitsNotice}"></div>
+    <div th:if="${isAllMyOrgUnitsMode}" class="alert alert-info" data-testid="all-my-org-units-notice" th:text="#{inventory.index.all_my_units_notice}">This overview combines the stock of all your org units.</div>
 
-    <div class="tab-nav inventory-tabs" role="tablist" th:aria-label="#{inventory.items.view.aria}">
-        <a th:href="@{/inventory}" class="tab" role="tab"
-           th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
-           data-testid="lager-view-material" th:text="#{inventory.items.view.material}">Material</a>
-        <a th:href="@{/inventory(view='items')}" class="tab" role="tab"
-           th:classappend="${view == 'items'} ? ' active' : ''" th:aria-selected="${view == 'items'}"
-           data-testid="lager-view-items" th:text="#{inventory.items.view.items}">Items</a>
-    </div>
-
-    <div id="inventory-results" class="card card--flush">
+    <section id="inventory-results" class="list-panel">
         <th:block th:fragment="inventoryResults">
+        <div class="toolbar">
+            <nav th:replace="~{inventory/fragments/inventory-view-switch :: viewSwitch(storage=null)}"></nav>
+        </div>
+        <div class="card card--flush">
+        <div th:if="${error}" class="alert alert-danger" role="alert" th:text="#{__${error}__}">Fehler</div>
         <th:block th:if="${view != 'items'}">
         <div class="table-responsive" th:if="${!#lists.isEmpty(aggregated)}">
             <table class="data-table data-table--stack">
@@ -116,8 +110,9 @@
 
         <th:block th:replace="~{kernel/fragments/components :: listFoot(pageResponse=${inventoryPage}, baseUrl='/inventory?view=items')}"></th:block>
         </th:block>
+        </div>
         </th:block>
-    </div>
+    </section>
 </main>
 </th:block>
 <th:block th:fragment="pageTail">

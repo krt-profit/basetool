@@ -408,30 +408,27 @@
         }
     }
 
+    .krt-bp-import-list {
+        margin-bottom: 0;
+    }
+
     .krt-bp-import-summary {
+        flex-basis: 100%;
         color: var(--color-gray-1);
-        margin: 0 0 0.75rem;
-    }
-
-    .krt-bp-import-toolbar {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        margin-bottom: 0.75rem;
-    }
-
-    .krt-bp-import-toolbar .btn {
-        min-height: 44px;
     }
 
     .krt-bp-import-body {
         max-height: 60vh;
         overflow-y: auto;
+        padding: var(--space-3) var(--space-4);
+        background-color: var(--surface-inset);
+        border-end-start-radius: calc(var(--radius-box) - 1px);
+        border-end-end-radius: calc(var(--radius-box) - 1px);
         text-align: left;
     }
 
-    .krt-bp-imp-group {
-        margin-bottom: 1.25rem;
+    .krt-bp-imp-group + .krt-bp-imp-group {
+        margin-top: var(--space-4);
     }
 
     .krt-bp-imp-group-title {

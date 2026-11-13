@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.controller;
 
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -69,6 +70,7 @@ class JobOrderCreateOptionsIntegrationTest {
   private Squadron responsible;
   private Squadron requester;
   private UUID caller;
+  private UUID profitRootId;
 
   @BeforeEach
   void seed() {
@@ -80,7 +82,8 @@ class JobOrderCreateOptionsIntegrationTest {
             ? hierarchy.createBereich(
                 "Creation Profit " + tag, "CP" + tag, null, null, Department.PROFIT)
             : units.findById(roots.getFirst()).orElseThrow();
-    responsible = squadron("Creation responsible " + tag, profit);
+    profitRootId = profit.getId();
+    responsible = squadron("0 Creation responsible " + tag, profit);
     requester = squadron("Creation requester " + tag, null);
     User user = new User();
     user.setId(UUID.randomUUID());
@@ -134,8 +137,9 @@ class JobOrderCreateOptionsIntegrationTest {
         .andExpect(
             jsonPath("$.requestingOptions[?(@.orgUnitId == '" + requester.getId() + "')].canWrite")
                 .value(org.hamcrest.Matchers.contains(!responsibleSide)))
-        .andExpect(jsonPath("$.suggestedResponsibleOrgUnitId").isNotEmpty())
-        .andExpect(jsonPath("$.suggestedRequestingOrgUnitId").isNotEmpty());
+        .andExpect(jsonPath("$.suggestedResponsibleOrgUnitId").value(not(profitRootId.toString())))
+        .andExpect(jsonPath("$.suggestedRequestingOrgUnitId").value(grant.toString()))
+        .andExpect(jsonPath("$.suggestedAuecResponsibleOrgUnitId").value(profitRootId.toString()));
     mvc.perform(
             get("/api/v1/me/capabilities")
                 .with(
