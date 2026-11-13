@@ -95,6 +95,8 @@
     }
     .orders-create__form > .form-actions--sticky {
         justify-content: flex-end;
+        border-bottom-left-radius: calc(var(--radius-box) - 1px);
+        border-bottom-right-radius: calc(var(--radius-box) - 1px);
         margin: 0 calc(-1 * var(--space-6)) calc(-1 * var(--space-6));
     }
     .item-line {

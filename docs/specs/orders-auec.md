@@ -461,10 +461,12 @@ audit commit in one transaction.
 ### REQ-ORDERS-067 — Few contextual actions provide truthful live feedback
 
 The common overview and central detail remain the workspace. Creation requires requester unit,
-responsible Profit unit, contact and target. The optional comment field uses the same localized
-placeholder as the material and item order forms. Holders, recipients, commitments
-and Bank details can follow later. Show only kind-relevant inputs. After create, open the order
-detail and retain the list/filter return context.
+responsible Profit unit, contact and target. The creation form numbers the order section and the
+separate optional comment section. The comment shares the localized placeholder of the material
+and item order forms and shows a live character count and its 1000-character limit. The sticky
+action bar shows the exact localized target and the selected requesting unit as they are entered.
+Holders, recipients, commitments and Bank details can follow later. Show only kind-relevant inputs.
+After create, open the order detail and retain the list/filter return context.
 Use the shared create transport in REQ-FE-006. AJAX submits the form and follows the server's
 detail target. A native form submission redirects to the same detail.
 An invalid native form returns the entered fields without writing. A backend create attempt that

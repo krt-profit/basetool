@@ -107,7 +107,23 @@ class JobOrderMoneyE2eTest {
       try {
         E2eSupport.login(page, baseUrl, USERNAME, PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/orders/create?lang=de");
-        String orderPath = createOrder(page, baseUrl, IRIDIUM);
+        fillCreateForm(page, IRIDIUM, IRIDIUM, GROUPED_AMOUNT);
+        Locator summary = page.getByTestId("order-auec-summary");
+        String requester =
+            page.locator("#auec-requesting-org-unit option:checked").innerText().strip();
+        assertThat(summary).hasText(GROUPED_AMOUNT + " aUEC · für " + requester);
+        Locator target = page.getByTestId("order-auec-target");
+        target.fill("");
+        assertThat(summary).hasText("für " + requester);
+        target.fill(GROUPED_AMOUNT);
+
+        Locator comment = page.locator("#auec-comment");
+        Locator counter = page.locator("#auec-comment-count");
+        assertThat(counter).hasText("0 / 1000");
+        comment.fill("Test");
+        assertThat(counter).hasText("4 / 1000");
+        page.getByTestId("order-auec-submit").click();
+        String orderPath = awaitCreatedOrder(page, baseUrl);
         assertThat(page.getByTestId("order-money-target")).containsText(GROUPED_AMOUNT);
         assertThat(page.locator("#tab-materials, #tab-items")).hasCount(0);
 
