@@ -80,6 +80,7 @@ public class BankLedgerService {
   private final BankPostingWriter writer;
   private final BankBookingGuards guards;
   private final BankLinkedDecisions linkedDecisions;
+  private final BankWipeResetBooking resetBooking;
 
   /**
    * Books a deposit (REQ-BANK-004): one positive account leg on the receiving account and one
@@ -826,62 +827,33 @@ public class BankLedgerService {
             .collect(
                 Collectors.toMap(
                     BankAccount::getId, a -> postingRepository.accountBalance(a.getId())));
-    List<BankHolderBalance> holderBalances =
+    Map<UUID, BigDecimal> holderBalances =
         holderPostingRepository.holderTotals().stream()
-            .filter(h -> h.amount().signum() != 0)
-            .toList();
-
-    int accountsReset =
-        (int) accountBalances.values().stream().filter(b -> b.signum() != 0).count();
-    int stashesZeroed = holderBalances.size();
-    if (accountsReset == 0 && stashesZeroed == 0) {
+            .collect(Collectors.toMap(BankHolderBalance::holderId, BankHolderBalance::amount));
+    BankWipeResetBooking.Booked booked =
+        resetBooking.book(accounts, accountBalances, holderBalances);
+    if (booked.transactionId() == null) {
       log.info("Bank wipe reset executed: nothing to zero (idempotent no-op).");
       return new BankWipeResetResultDto(0, 0, BigDecimal.ZERO);
-    }
-
-    Instant now = Instant.now();
-    BankTransaction tx =
-        writer.persistTransaction(
-            BankTransactionType.WIPE_RESET,
-            "SC wipe reset",
-            null,
-            null,
-            null,
-            BigDecimal.ZERO,
-            now,
-            null);
-    BigDecimal totalZeroed = BigDecimal.ZERO;
-    for (BankAccount account : accounts) {
-      BigDecimal balance = Objects.requireNonNull(accountBalances.get(account.getId()));
-      if (balance.signum() != 0) {
-        writer.persistAccountPosting(tx, account, balance.negate(), now);
-        totalZeroed = totalZeroed.add(balance);
-      }
-    }
-    Map<UUID, BankHolder> holders =
-        writer.loadHolders(holderBalances.stream().map(BankHolderBalance::holderId).toList());
-    for (BankHolderBalance slice : holderBalances) {
-      BankHolder holder = writer.requireHolder(holders, slice.holderId());
-      writer.persistHolderPosting(tx, holder, slice.amount().negate(), now);
     }
 
     bankAuditService.record(
         BankAuditEventType.WIPE_RESET_EXECUTED,
         null,
-        tx.getId(),
+        booked.transactionId(),
         null,
         "accounts="
-            + accountsReset
+            + booked.accounts()
             + ", stashes="
-            + stashesZeroed
+            + booked.stashes()
             + ", totalZeroed="
-            + totalZeroed.toPlainString());
+            + booked.total().toPlainString());
     log.info(
         "Bank wipe reset executed: accounts={}, stashes={}, totalZeroed={}",
-        accountsReset,
-        stashesZeroed,
-        totalZeroed);
-    return new BankWipeResetResultDto(accountsReset, stashesZeroed, totalZeroed);
+        booked.accounts(),
+        booked.stashes(),
+        booked.total());
+    return new BankWipeResetResultDto(booked.accounts(), booked.stashes(), booked.total());
   }
 
   /**

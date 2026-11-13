@@ -114,4 +114,15 @@ public interface BankLinkedPayments {
    * @param attempt the exact linked attempt
    */
   void cancelUnexecuted(@NotNull UUID requestId, @NotNull BankLinkedAttempt attempt);
+
+  /**
+   * Cancels a pending linked request for a currency wipe whose owner already cancelled the attempt
+   * under its held guard (REQ-PATCH-043); the owner is not called back.
+   *
+   * @param requestId the pending request
+   * @param attempt the exact linked attempt
+   * @param patchChangeId the patch change, kept as the request's cancel reason
+   */
+  void cancelForCurrencyWipe(
+      @NotNull UUID requestId, @NotNull BankLinkedAttempt attempt, @NotNull UUID patchChangeId);
 }
