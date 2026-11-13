@@ -32,14 +32,35 @@ import org.jetbrains.annotations.Nullable;
  * @param previousLabel the latest patch change's label, or {@code null} before the first
  * @param previousLiveAt the latest patch change's live time, or {@code null} before the first
  * @param presets the options each patch kind presets, never {@code null} once constructed
+ * @param groups the catalogue types each wipe group claims, never {@code null} once constructed
  */
 @DtoMirror
 public record PatchChangeFormDto(
-    String suggestedLabel, String previousLabel, Instant previousLiveAt, List<Preset> presets) {
+    String suggestedLabel,
+    String previousLabel,
+    Instant previousLiveAt,
+    List<Preset> presets,
+    List<Group> groups) {
 
-  /** Copies the presets, so a missing list reads as none. */
+  /** Copies the lists, so a missing list reads as none. */
   public PatchChangeFormDto {
     presets = presets == null ? List.of() : List.copyOf(presets);
+    groups = groups == null ? List.of() : List.copyOf(groups);
+  }
+
+  /**
+   * Returns the catalogue types a wipe group claims.
+   *
+   * @param group the wipe group
+   * @return its types; none when the backend sent none for it
+   */
+  @NotNull
+  public List<WipeGroupType> typesOf(@NotNull WipeGroup group) {
+    return groups.stream()
+        .filter(entry -> entry.group() == group)
+        .map(Group::types)
+        .findFirst()
+        .orElse(List.of());
   }
 
   /**
@@ -64,4 +85,18 @@ public record PatchChangeFormDto(
    * @param options its preset
    */
   public record Preset(PatchKind kind, PatchChangeOptions options) {}
+
+  /**
+   * Mirror of the catalogue types a wipe group claims.
+   *
+   * @param group the wipe group
+   * @param types its types, never {@code null} once constructed
+   */
+  public record Group(WipeGroup group, List<WipeGroupType> types) {
+
+    /** Copies the types, so a missing list reads as none. */
+    public Group {
+      types = types == null ? List.of() : List.copyOf(types);
+    }
+  }
 }

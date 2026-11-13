@@ -12,7 +12,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.dangerzone', eyebrowKey='nav.admin.group.system', titleText=#{admin.patchChange.title})}"></th:block>
 
     <span id="pc-i18n" hidden
-          th:attr="data-triggered=#{admin.patchChange.triggered},data-trigger-error=#{admin.patchChange.error.trigger},data-trigger-label=#{admin.patchChange.trigger},data-confirm-label=#{admin.patchChange.confirm.label},data-previous=#{admin.patchChange.previous},data-preview-error=#{admin.patchChange.preview.error},data-preview-empty=#{admin.patchChange.preview.empty},data-corrected=#{admin.patchChange.correct.success},data-correct-error=#{admin.patchChange.correct.error},data-conflict=#{admin.patchChange.correct.conflict},data-refresh-error=#{admin.patchChange.history.refreshError}"></span>
+          th:attr="data-triggered=#{admin.patchChange.triggered},data-trigger-error=#{admin.patchChange.error.trigger},data-trigger-label=#{admin.patchChange.trigger},data-confirm-label=#{admin.patchChange.confirm.label},data-previous=#{admin.patchChange.previous},data-preview-error=#{admin.patchChange.preview.error},data-preview-empty=#{admin.patchChange.preview.empty},data-corrected=#{admin.patchChange.correct.success},data-correct-error=#{admin.patchChange.correct.error},data-conflict=#{admin.patchChange.correct.conflict},data-refresh-error=#{admin.patchChange.history.refreshError},data-exception-chip=#{admin.patchChange.exceptions.chip},data-exception-rows=#{admin.patchChange.exceptions.rows},data-exception-remove=#{admin.patchChange.exceptions.remove},data-exception-pick=#{admin.patchChange.exceptions.pick},data-exception-duplicate=#{admin.patchChange.exceptions.duplicate},data-exception-limit=#{admin.patchChange.exceptions.limit},data-exception-keep=#{admin.patchChange.exceptions.mode.KEEP},data-exception-wipe=#{admin.patchChange.exceptions.mode.WIPE}"></span>
     <ul id="pc-count-labels" hidden>
         <li th:each="kind : ${countKinds}" th:data-count-kind="${kind}"
             th:text="#{|admin.patchChange.count.${kind}|}">Raffinerieauftr&auml;ge storniert</li>
@@ -62,13 +62,29 @@
                     <tr>
                         <th scope="col" th:text="#{admin.patchChange.wipe.column.group}">Wipe-Gruppe</th>
                         <th scope="col" th:text="#{admin.patchChange.wipe.column.contents}">Enth&auml;lt</th>
+                        <th scope="col" class="pc-num" th:text="#{admin.patchChange.wipe.column.rows}">Posten</th>
+                        <th scope="col" class="pc-num" th:text="#{admin.patchChange.wipe.column.members}">Mitglieder</th>
                         <th scope="col" class="cell-status pc-switch-cell" th:text="#{admin.patchChange.wipe.column.active}">Aktiv</th>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="group : ${wipeGroups}">
+                    <tr th:each="group : ${wipeGroups}" th:data-pc-group="${group}" th:data-testid="|pc-group-row-${group}|">
                         <td><span class="cell-title" th:id="|pc-group-${group}|" th:text="#{|admin.patchChange.wipeGroup.${group}|}">Verbrauchsg&uuml;ter</span></td>
-                        <td th:text="#{|admin.patchChange.wipeGroup.${group}.contents|}">Essen, Trinken, Medpens, FPS-Verbrauchsg&uuml;ter, Magazine, Munition</td>
+                        <td th:attr="data-label=#{admin.patchChange.wipe.column.contents}">
+                            <div class="stack gap-1" th:with="types=${form.typesOf(group)}">
+                                <span th:text="#{|admin.patchChange.wipeGroup.${group}.contents|}">Essen, Trinken, Medpens, FPS-Verbrauchsg&uuml;ter, Magazine, Munition</span>
+                                <details th:unless="${#lists.isEmpty(types)}" class="pc-types">
+                                    <summary th:text="#{admin.patchChange.wipe.types}">Katalogtypen</summary>
+                                    <ul class="cluster gap-1 pc-type-list">
+                                        <li th:each="type : ${types}" class="chip chip--data"
+                                            th:with="sourceLabel=#{|admin.patchChange.typeSource.${type.source()}|}"
+                                            th:text="#{admin.patchChange.typeSource.entry(${sourceLabel}, ${type.value()})}">Typ Food</li>
+                                    </ul>
+                                </details>
+                            </div>
+                        </td>
+                        <td class="pc-num" data-pc-group-rows th:attr="data-label=#{admin.patchChange.wipe.column.rows}">&ndash;</td>
+                        <td class="pc-num" data-pc-group-members th:attr="data-label=#{admin.patchChange.wipe.column.members}">&ndash;</td>
                         <td class="cell-status pc-switch-cell">
                             <label class="krt-switch">
                                 <input type="checkbox" role="switch" name="wipeGroup" th:value="${group}"
@@ -80,7 +96,50 @@
                     </tbody>
                 </table>
             </div>
-            <p class="form-hint pc-hint" th:text="#{admin.patchChange.wipe.hint}">Der Wipe wirkt erst mit einem sp&auml;teren Release; die Auswahl wird schon gespeichert.</p>
+            <p class="form-hint pc-hint" th:text="#{admin.patchChange.wipe.hint}">Gel&ouml;scht wird nur, was vor der Live-Zeit angelegt wurde.</p>
+
+            <div class="pc-exceptions" data-pc-exceptions data-testid="pc-exceptions"
+                 th:attr="data-limit=${exceptionLimit}">
+                <h4 class="pc-minor-heading" id="pc-exceptions-title" th:text="#{admin.patchChange.exceptions.title}">Ausnahmen (einzelne Items / Materialien)</h4>
+                <p class="form-hint pc-hint" th:text="#{admin.patchChange.exceptions.hint}">Eine Ausnahme beh&auml;lt ein Item oder Material trotz eingeschalteter Gruppe oder l&ouml;scht es zus&auml;tzlich.</p>
+                <div id="pc-exception-list" class="filter-chips pc-exception-list" aria-labelledby="pc-exceptions-title"
+                     data-testid="pc-exception-list"></div>
+                <p id="pc-exception-empty" class="form-hint pc-hint" data-testid="pc-exception-empty"
+                   th:text="#{admin.patchChange.exceptions.empty}">Keine Ausnahmen.</p>
+                <div class="pc-exception-add">
+                    <div class="form-group">
+                        <label for="pc-exception-target" th:text="#{admin.patchChange.exceptions.target}">Katalog</label>
+                        <select id="pc-exception-target" data-testid="pc-exception-target">
+                            <option th:each="target : ${exceptionTargets}" th:value="${target}"
+                                    th:text="#{|admin.patchChange.exceptions.target.${target}|}">Item</option>
+                        </select>
+                    </div>
+                    <div class="form-group" data-pc-exception-entry="GAME_ITEM">
+                        <label for="pc-exception-item" th:text="#{admin.patchChange.exceptions.entry}">Eintrag</label>
+                        <select id="pc-exception-item" data-krt-combobox="remote-game-items" data-testid="pc-exception-item">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    <div class="form-group" data-pc-exception-entry="MATERIAL" hidden>
+                        <label for="pc-exception-material" th:text="#{admin.patchChange.exceptions.entry}">Eintrag</label>
+                        <select id="pc-exception-material" data-krt-combobox="remote-materials" data-testid="pc-exception-material">
+                            <option value=""></option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pc-exception-mode" th:text="#{admin.patchChange.exceptions.mode}">Wirkung</label>
+                        <select id="pc-exception-mode" data-testid="pc-exception-mode">
+                            <option th:each="mode : ${exceptionModes}" th:value="${mode}"
+                                    th:text="#{|admin.patchChange.exceptions.mode.${mode}|}">behalten</option>
+                        </select>
+                    </div>
+                    <button type="button" id="pc-exception-add" class="btn btn-ghost" data-testid="pc-exception-add">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-plus"/></svg>
+                        <span th:text="#{admin.patchChange.exceptions.add}">Ausnahme hinzuf&uuml;gen</span>
+                    </button>
+                </div>
+                <p id="pc-exception-error" class="form-hint pc-hint pc-error" role="alert" hidden data-testid="pc-exception-error"></p>
+            </div>
 
             <h3 class="pc-subheading" th:text="#{admin.patchChange.effects.title}">Weitere Wirkungen</h3>
             <div class="pc-effects">
@@ -180,6 +239,9 @@
                                         <span th:each="group : ${wipeGroups}" th:if="${p.options().wipes(group)}" class="chip"
                                               th:text="#{|admin.patchChange.wipeGroup.${group}|}">Verbrauchsg&uuml;ter</span>
                                     </th:block>
+                                    <span th:each="exception : ${p.wipeExceptions()}" class="chip chip--data"
+                                          th:with="entryName=${exception.name()} ?: #{admin.patchChange.exceptions.unknownEntry},modeLabel=#{|admin.patchChange.exceptions.mode.${exception.mode()}|}"
+                                          th:text="#{admin.patchChange.exceptions.chip(${entryName}, ${modeLabel})}">Quantanium: behalten</span>
                                     <span th:if="${p.options().cancelRefineryOrders()}" class="chip"
                                           th:text="#{admin.patchChange.chip.cancelRefineryOrders}">Raffinerie beendet</span>
                                     <span th:if="${p.options().currencyWipe()}" class="chip chip--danger"

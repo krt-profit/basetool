@@ -25,8 +25,11 @@ import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeFormDto;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeOptions;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCount;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchKind;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionTarget;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeGroup;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -80,7 +83,8 @@ public class AdminPatchChangePageController {
    * @param fragment {@code history} for the history fragment; anything else renders the page
    * @param model receives {@code history}, {@code wipeGroups} and, on a failed read, {@code
    *     historyError}; for the page also {@code form}, {@code defaults}, {@code defaultKind},
-   *     {@code kinds} and {@code countKinds}, or {@code formError}
+   *     {@code kinds}, {@code countKinds}, {@code exceptionTargets}, {@code exceptionModes} and
+   *     {@code exceptionLimit}, or {@code formError}
    * @return {@code patchchange/admin/patch-change}, or its history fragment
    */
   @NotNull
@@ -95,6 +99,9 @@ public class AdminPatchChangePageController {
     model.addAttribute("defaultKind", DEFAULT_KIND);
     model.addAttribute("kinds", List.of(PatchKind.values()));
     model.addAttribute("countKinds", List.of(PatchCount.values()));
+    model.addAttribute("exceptionTargets", List.of(WipeExceptionTarget.values()));
+    model.addAttribute("exceptionModes", List.of(WipeExceptionMode.values()));
+    model.addAttribute("exceptionLimit", PatchChangeOptions.MAX_WIPE_EXCEPTIONS);
     return "patchchange/admin/patch-change";
   }
 

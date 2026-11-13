@@ -46,7 +46,12 @@ import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCount;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCountDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchKind;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.TriggerPatchChangeRequest;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeException;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionDto;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionTarget;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeGroup;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipePreviewDto;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -75,6 +80,7 @@ class AdminPatchChangeRelayControllerMvcTest {
   private static final String PAGE = "/admin/settings/patch-change";
   private static final UUID ID = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000a4");
   private static final Instant LIVE_AT = Instant.parse("2026-11-14T20:00:00Z");
+  private static final UUID MATERIAL = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000b1");
 
   private static final PatchChangeOptions REBUILD =
       new PatchChangeOptions(Set.of(WipeGroup.CONSUMABLES), true, false, true);
@@ -117,7 +123,8 @@ class AdminPatchChangeRelayControllerMvcTest {
                 "4.5",
                 "4.4",
                 LIVE_AT,
-                List.of(new PatchChangeFormDto.Preset(PatchKind.REBUILD, REBUILD))));
+                List.of(new PatchChangeFormDto.Preset(PatchKind.REBUILD, REBUILD)),
+                List.of()));
 
     mockMvc
         .perform(get(PAGE + "/form").header("X-Requested-With", "XMLHttpRequest"))
@@ -135,7 +142,9 @@ class AdminPatchChangeRelayControllerMvcTest {
     when(backendApiClient.post(ADMIN + "/preview", request, PatchChangePreviewDto.class))
         .thenReturn(
             new PatchChangePreviewDto(
-                LIVE_AT, List.of(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 3L))));
+                LIVE_AT,
+                List.of(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 3L)),
+                null));
 
     mockMvc
         .perform(
@@ -147,6 +156,52 @@ class AdminPatchChangeRelayControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.counts[0].kind").value("REFINERY_ORDERS_CANCELED"))
         .andExpect(jsonPath("$.counts[0].value").value(3));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void thePreviewRelaysTheExceptionsAndBringsBackTheWipeBreakdown() throws Exception {
+    WipeException keep =
+        new WipeException(WipeExceptionTarget.MATERIAL, MATERIAL, WipeExceptionMode.KEEP);
+    PatchChangeOptions withException =
+        new PatchChangeOptions(Set.of(WipeGroup.CONSUMABLES), Set.of(keep), true, false, true);
+    PatchChangePreviewRequest request = new PatchChangePreviewRequest(LIVE_AT, withException);
+    when(backendApiClient.post(ADMIN + "/preview", request, PatchChangePreviewDto.class))
+        .thenReturn(
+            new PatchChangePreviewDto(
+                LIVE_AT,
+                List.of(new PatchCountDto(PatchCount.STOCK_ROWS_WIPED, 12L)),
+                new WipePreviewDto(
+                    List.of(new WipePreviewDto.GroupCount(WipeGroup.CONSUMABLES, 12L, 3L)),
+                    List.of(
+                        new WipePreviewDto.ExceptionCount(
+                            new WipeExceptionDto(
+                                WipeExceptionTarget.MATERIAL,
+                                MATERIAL,
+                                WipeExceptionMode.KEEP,
+                                "Quantanium"),
+                            4L,
+                            2L)))));
+
+    mockMvc
+        .perform(
+            post(PAGE + "/preview")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    "{\"liveAt\":\"2026-11-14T20:00:00Z\",\"options\":{\"wipeGroups\":"
+                        + "[\"CONSUMABLES\"],\"wipeExceptions\":[{\"target\":\"MATERIAL\","
+                        + "\"id\":\""
+                        + MATERIAL
+                        + "\",\"mode\":\"KEEP\"}],\"cancelRefineryOrders\":true,"
+                        + "\"currencyWipe\":false,\"homeLocationPrompt\":true}}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.counts[0].kind").value("STOCK_ROWS_WIPED"))
+        .andExpect(jsonPath("$.wipe.groups[0].group").value("CONSUMABLES"))
+        .andExpect(jsonPath("$.wipe.groups[0].rows").value(12))
+        .andExpect(jsonPath("$.wipe.exceptions[0].exception.name").value("Quantanium"))
+        .andExpect(jsonPath("$.wipe.exceptions[0].rows").value(4));
   }
 
   @Test
@@ -175,7 +230,16 @@ class AdminPatchChangeRelayControllerMvcTest {
     when(backendApiClient.post(ADMIN, request, PatchChangeDto.class))
         .thenReturn(
             new PatchChangeDto(
-                ID, 0L, "4.5", PatchKind.REBUILD, LIVE_AT, LIVE_AT, "Admin", REBUILD, List.of()));
+                ID,
+                0L,
+                "4.5",
+                PatchKind.REBUILD,
+                LIVE_AT,
+                LIVE_AT,
+                "Admin",
+                REBUILD,
+                List.of(),
+                List.of()));
 
     mockMvc
         .perform(
@@ -224,7 +288,16 @@ class AdminPatchChangeRelayControllerMvcTest {
     when(backendApiClient.patch(ADMIN + "/{id}/label", request, PatchChangeDto.class, ID))
         .thenReturn(
             new PatchChangeDto(
-                ID, 3L, "4.4.1", PatchKind.REBUILD, LIVE_AT, LIVE_AT, "Admin", REBUILD, List.of()));
+                ID,
+                3L,
+                "4.4.1",
+                PatchKind.REBUILD,
+                LIVE_AT,
+                LIVE_AT,
+                "Admin",
+                REBUILD,
+                List.of(),
+                List.of()));
 
     mockMvc
         .perform(
