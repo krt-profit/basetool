@@ -76,6 +76,8 @@ public final class P4kImportContext {
   /** The matched manufacturers by P4K GUID, for the items and ships of the run. */
   private final Map<UUID, Manufacturer> manufacturerByGuid = new HashMap<>();
 
+  private Set<UUID> auxiliaryManufacturerGuids = Set.of();
+
   /** The matched or created resource groups by P4K GUID, for the commodities of the run. */
   private final Map<UUID, MaterialCategory> resourceGroupByGuid = new HashMap<>();
 
@@ -187,7 +189,6 @@ public final class P4kImportContext {
     this.runId = runId;
     this.createItemsAndShips = createItemsAndShips;
     this.report = new P4kImportReport(adminClosed);
-    indexRepeated(P4kKind.MANUFACTURER, catalogue.manufacturers());
     indexRepeated(P4kKind.ITEM, catalogue.items());
     indexRepeated(P4kKind.SHIP, catalogue.ships());
     indexRepeated(P4kKind.COMMODITY, catalogue.commodities());
@@ -408,6 +409,17 @@ public final class P4kImportContext {
     return parsed == null ? null : manufacturerByGuid.get(parsed);
   }
 
+  /** Keeps the GUIDs whose source records represent paint logos or shops. */
+  void indexAuxiliaryManufacturers(@NotNull Set<UUID> guids) {
+    auxiliaryManufacturerGuids = Set.copyOf(guids);
+  }
+
+  /** Checks whether an incoming manufacturer reference points to a known auxiliary record. */
+  boolean isAuxiliaryManufacturer(@Nullable String guid) {
+    UUID parsed = P4kGuids.parse(guid);
+    return parsed != null && auxiliaryManufacturerGuids.contains(parsed);
+  }
+
   /**
    * Indexes a matched or created resource group for the commodities of the run.
    *
@@ -515,7 +527,7 @@ public final class P4kImportContext {
    * @param kind the kind
    * @param records the records of the kind
    */
-  private void indexRepeated(@NotNull P4kKind kind, @NotNull List<? extends P4kRecord> records) {
+  void indexRepeated(@NotNull P4kKind kind, @NotNull List<? extends P4kRecord> records) {
     repeatedClassNames.put(kind, repeated(records, P4kRecord::className));
     repeatedNames.put(kind, repeated(records, P4kRecord::nameEn));
   }

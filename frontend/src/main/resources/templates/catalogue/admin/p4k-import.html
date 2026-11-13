@@ -235,10 +235,58 @@
     </section>
 
     <section class="p4k-jobs" aria-labelledby="krt-p4k-cases-title">
-        <h2 id="krt-p4k-cases-title" class="p4k-section-title" th:text="#{admin.p4kImport.review.title}">Zu prüfen</h2>
-        <p class="form-hint" th:text="#{admin.p4kImport.review.hint}">Behalten lässt den Datensatz unverändert; Ausblenden nimmt ihn aus allen Auswahllisten.</p>
+        <h2 id="krt-p4k-cases-title" class="p4k-section-title" th:text="#{admin.p4kImport.review.title}">Review list</h2>
+        <p class="form-hint" th:text="#{admin.p4kImport.workspace.hint}">Filter by type or reason. Open a case to compare P4K, UEX and SC Wiki.</p>
+        <div class="p4k-review-filters">
+            <div class="form-group">
+                <label for="krt-p4k-review-kind" th:text="#{admin.p4kImport.workspace.kind}">Type</label>
+                <select id="krt-p4k-review-kind" class="form-input">
+                    <option value="" th:text="#{admin.p4kImport.workspace.allKinds}">All types</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="krt-p4k-review-reason" th:text="#{admin.p4kImport.workspace.reason}">Reason</label>
+                <select id="krt-p4k-review-reason" class="form-input">
+                    <option value="" th:text="#{admin.p4kImport.workspace.allReasons}">All reasons</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="krt-p4k-review-readiness" th:text="#{admin.p4kImport.workspace.readiness}">Readiness</label>
+                <select id="krt-p4k-review-readiness" class="form-input">
+                    <option value="" th:text="#{admin.p4kImport.workspace.allReadiness}">All statuses</option>
+                </select>
+            </div>
+
+        </div>
         <div class="card card--flush">
-            <div class="table-responsive">
+            <th:block th:replace="~{::reviewTable('krt-p4k-cases')}"></th:block>
+            <p id="krt-p4k-cases-empty" class="text-muted" hidden th:text="#{admin.p4kImport.review.empty}">No open cases.</p>
+            <nav id="krt-p4k-cases-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+        </div>
+        <section id="krt-p4k-review-group" class="card p4k-review-pane" aria-labelledby="krt-p4k-review-group-title" tabindex="-1" hidden>
+            <div class="p4k-review-heading">
+                <h3 id="krt-p4k-review-group-title" th:text="#{admin.p4kImport.workspace.members}">Cases in group</h3>
+                <button type="button" class="btn btn-ghost btn-xs" id="krt-p4k-review-close-group"
+                        th:text="#{admin.p4kImport.workspace.close}">Close</button>
+            </div>
+            <div id="krt-p4k-review-batch" hidden></div>
+            <th:block th:replace="~{::reviewTable('krt-p4k-review-members')}"></th:block>
+            <nav id="krt-p4k-review-members-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
+        </section>
+        <section id="krt-p4k-review-detail" class="card p4k-review-pane" aria-labelledby="krt-p4k-review-detail-title" tabindex="-1" hidden>
+            <div class="p4k-review-heading">
+                <h3 id="krt-p4k-review-detail-title" th:text="#{admin.p4kImport.workspace.detailTitle}">Compare candidates</h3>
+                <button type="button" class="btn btn-ghost btn-xs" data-review-close
+                        th:text="#{admin.p4kImport.workspace.close}">Close</button>
+            </div>
+            <div id="krt-p4k-review-detail-content" aria-live="polite"></div>
+        </section>
+    </section>
+
+</main>
+</th:block>
+<th:block th:fragment="reviewTable(bodyId)">
+    <div class="table-responsive">
                 <table class="data-table data-table--stack">
                     <thead>
                     <tr>
@@ -250,15 +298,10 @@
                         <th class="cell-actions"><span class="visually-hidden" th:text="#{admin.p4kImport.jobs.col.actions}">Aktionen</span></th>
                     </tr>
                     </thead>
-                    <tbody id="krt-p4k-cases">
+                    <tbody th:id="${bodyId}">
                     </tbody>
                 </table>
             </div>
-            <p id="krt-p4k-cases-empty" class="text-muted" hidden th:text="#{admin.p4kImport.review.empty}">Keine offenen Fälle.</p>
-            <nav id="krt-p4k-cases-pager" class="pagination" hidden th:aria-label="#{general.pagination.aria}"></nav>
-        </div>
-    </section>
-</main>
 </th:block>
 <th:block th:fragment="pageTail">
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
@@ -322,6 +365,75 @@
         'toastHidden': /*[[#{admin.p4kImport.review.toast.hidden}]]*/ 'Hidden.',
         'toastAssigned': /*[[#{admin.p4kImport.review.toast.assigned}]]*/ 'Category assigned.',
         'conflict': /*[[#{admin.p4kImport.review.toast.conflict}]]*/ 'The case changed meanwhile.',
+        'reviewDetails': /*[[#{admin.p4kImport.workspace.reviewDetails}]]*/ 'Candidates',
+        'reviewGroupCount': /*[[#{admin.p4kImport.workspace.reviewGroupCount}]]*/ '{0} open cases',
+        'reviewGroupOpen': /*[[#{admin.p4kImport.workspace.reviewGroupOpen}]]*/ 'Show cases',
+        'reviewPreview': /*[[#{admin.p4kImport.workspace.reviewPreview}]]*/ 'Preview',
+        'reviewCancel': /*[[#{admin.p4kImport.workspace.reviewCancel}]]*/ 'Cancel',
+        'reviewConfirm': /*[[#{admin.p4kImport.workspace.reviewConfirm}]]*/ 'Confirm',
+        'reviewCorrectionCancelled': /*[[#{admin.p4kImport.workspace.reviewCorrectionCancelled}]]*/ 'Queued correction cancelled.',
+        'reviewAction.CANCEL_SHIP_REPAIR': /*[[#{admin.p4kImport.workspace.reviewAction.CANCEL_SHIP_REPAIR}]]*/ 'Cancel queued correction',
+        'reviewEffect.CANCEL_SHIP_REPAIR': /*[[#{admin.p4kImport.workspace.reviewEffect.CANCEL_SHIP_REPAIR}]]*/ 'Cancel the queued GUID correction and return the case to review.',
+        'reviewCorrectionQueued': /*[[#{admin.p4kImport.workspace.reviewCorrectionQueued}]]*/ 'Correction queued for import.',
+        'reviewReadiness.WAITING_FOR_IMPORT': /*[[#{admin.p4kImport.workspace.reviewReadiness.WAITING_FOR_IMPORT}]]*/ 'Correction queued for a complete import',
+        'reviewAction.CORRECT_P4K_GUID': /*[[#{admin.p4kImport.workspace.reviewAction.CORRECT_P4K_GUID}]]*/ 'Queue correction for the next import',
+        'reviewEffect.CORRECT_P4K_GUID': /*[[#{admin.p4kImport.workspace.reviewEffect.CORRECT_P4K_GUID}]]*/ 'A complete import with compatible ship data checks both GUIDs and applies the queued correction.',
+        'reviewApplied': /*[[#{admin.p4kImport.workspace.reviewApplied}]]*/ 'Review action applied.',
+        'reviewCandidates': /*[[#{admin.p4kImport.workspace.reviewCandidates}]]*/ 'Possible targets',
+        'reviewNoCandidates': /*[[#{admin.p4kImport.workspace.reviewNoCandidates}]]*/ 'No targets found for this case.',
+        'reviewDetailUnavailable': /*[[#{admin.p4kImport.workspace.reviewDetailUnavailable}]]*/ 'The case details could not be loaded.',
+        'reviewCode': /*[[#{admin.p4kImport.workspace.reviewCode}]]*/ 'Source code',
+        'reviewCaseKey': /*[[#{admin.p4kImport.workspace.reviewCaseKey}]]*/ 'Case key',
+        'reviewClass': /*[[#{admin.p4kImport.workspace.reviewClass}]]*/ 'Game class',
+        'reviewP4kGuid': /*[[#{admin.p4kImport.workspace.reviewP4kGuid}]]*/ 'P4K GUID',
+        'reviewWikiUuid': /*[[#{admin.p4kImport.workspace.reviewWikiUuid}]]*/ 'SC Wiki UUID',
+        'reviewUexIds': /*[[#{admin.p4kImport.workspace.reviewUexIds}]]*/ 'UEX IDs',
+        'reviewRecordPath': /*[[#{admin.p4kImport.workspace.reviewRecordPath}]]*/ 'P4K record path',
+        'reviewContextPath': /*[[#{admin.p4kImport.workspace.reviewContextPath}]]*/ 'Context',
+        'reviewCurrentRow': /*[[#{admin.p4kImport.workspace.reviewCurrentRow}]]*/ 'Basetool entry',
+        'reviewOtherRow': /*[[#{admin.p4kImport.workspace.reviewOtherRow}]]*/ 'Other Basetool entry',
+        'reviewReadiness.ACTIONABLE': /*[[#{admin.p4kImport.workspace.reviewReadiness.ACTIONABLE}]]*/ 'Action available',
+        'reviewReadiness.CHECK_REQUIRED': /*[[#{admin.p4kImport.workspace.reviewReadiness.CHECK_REQUIRED}]]*/ 'Check the match',
+        'reviewReadiness.BLOCKED': /*[[#{admin.p4kImport.workspace.reviewReadiness.BLOCKED}]]*/ 'Match blocked',
+        'reviewAction.INSPECT': /*[[#{admin.p4kImport.workspace.reviewAction.INSPECT}]]*/ 'Comparison entry',
+        'reviewAction.ATTACH_MANUFACTURER_ALIAS': /*[[#{admin.p4kImport.workspace.reviewAction.ATTACH_MANUFACTURER_ALIAS}]]*/ 'Link P4K manufacturer as an alias',
+        'reviewAction.KEEP_MANUFACTURER_NAME': /*[[#{admin.p4kImport.workspace.reviewAction.KEEP_MANUFACTURER_NAME}]]*/ 'Keep the existing manufacturer name',
+        'reviewAction.MERGE_MANUFACTURER': /*[[#{admin.p4kImport.workspace.reviewAction.MERGE_MANUFACTURER}]]*/ 'Merge manufacturers',
+        'reviewAction.ATTACH_P4K': /*[[#{admin.p4kImport.workspace.reviewAction.ATTACH_P4K}]]*/ 'Link P4K record',
+        'reviewAction.MERGE_ITEM': /*[[#{admin.p4kImport.workspace.reviewAction.MERGE_ITEM}]]*/ 'Merge items',
+        'reviewAction.LINK_UEX_PLACE': /*[[#{admin.p4kImport.workspace.reviewAction.LINK_UEX_PLACE}]]*/ 'Link UEX location',
+        'reviewAction.LINK_UEX_TERMINAL': /*[[#{admin.p4kImport.workspace.reviewAction.LINK_UEX_TERMINAL}]]*/ 'Link UEX terminal',
+        'reviewEffect.ATTACH_MANUFACTURER_ALIAS': /*[[#{admin.p4kImport.workspace.reviewEffect.ATTACH_MANUFACTURER_ALIAS}]]*/ 'This P4K GUID will be added as an alias of the existing manufacturer.',
+        'reviewEffect.KEEP_MANUFACTURER_NAME': /*[[#{admin.p4kImport.workspace.reviewEffect.KEEP_MANUFACTURER_NAME}]]*/ 'The existing manufacturer name will be confirmed for this conflict.',
+        'reviewEffect.MERGE_MANUFACTURER': /*[[#{admin.p4kImport.workspace.reviewEffect.MERGE_MANUFACTURER}]]*/ 'The proposed manufacturer will be retained. Source identities and references will move to it.',
+        'reviewEffect.ATTACH_P4K': /*[[#{admin.p4kImport.workspace.reviewEffect.ATTACH_P4K}]]*/ 'The case’s P4K GUID will be assigned to the displayed catalogue entry.',
+        'reviewEffect.MERGE_ITEM': /*[[#{admin.p4kImport.workspace.reviewEffect.MERGE_ITEM}]]*/ 'The proposed catalogue entry will be retained. References to the merged item will follow it.',
+        'reviewEffect.LINK_UEX_PLACE': /*[[#{admin.p4kImport.workspace.reviewEffect.LINK_UEX_PLACE}]]*/ 'The UEX location will be linked to the selected starmap object.',
+        'reviewEffect.LINK_UEX_TERMINAL': /*[[#{admin.p4kImport.workspace.reviewEffect.LINK_UEX_TERMINAL}]]*/ 'The shop will be linked to the selected UEX terminal.',
+        'reviewEvidence.EXACT_SCWIKI_UUID': /*[[#{admin.p4kImport.workspace.reviewEvidence.EXACT_SCWIKI_UUID}]]*/ 'Same SC Wiki UUID',
+        'reviewEvidence.EXACT_CLASS': /*[[#{admin.p4kImport.workspace.reviewEvidence.EXACT_CLASS}]]*/ 'Same game class',
+        'reviewEvidence.EXACT_UEX_ID': /*[[#{admin.p4kImport.workspace.reviewEvidence.EXACT_UEX_ID}]]*/ 'Same UEX ID',
+        'reviewEvidence.EXACT_P4K_GUID': /*[[#{admin.p4kImport.workspace.reviewEvidence.EXACT_P4K_GUID}]]*/ 'Same P4K GUID',
+        'reviewEvidence.SAME_NAME': /*[[#{admin.p4kImport.workspace.reviewEvidence.SAME_NAME}]]*/ 'Same name',
+        'reviewEvidence.SAME_CODE': /*[[#{admin.p4kImport.workspace.reviewEvidence.SAME_CODE}]]*/ 'Same code',
+        'reviewEvidence.SAME_PLACE': /*[[#{admin.p4kImport.workspace.reviewEvidence.SAME_PLACE}]]*/ 'Same location',
+        'reviewEvidence.SAME_TYPE': /*[[#{admin.p4kImport.workspace.reviewEvidence.SAME_TYPE}]]*/ 'Same type',
+        'reviewEvidence.PARENT_LINK': /*[[#{admin.p4kImport.workspace.reviewEvidence.PARENT_LINK}]]*/ 'Matching parent',
+        'reviewEvidence.P4K_VARIANT': /*[[#{admin.p4kImport.workspace.reviewEvidence.P4K_VARIANT}]]*/ 'P4K variant of the entry',
+        'reviewEvidence.CURRENT_ROW': /*[[#{admin.p4kImport.workspace.reviewEvidence.CURRENT_ROW}]]*/ 'Currently assigned entry',
+        'reviewEvidence.OTHER_P4K_GUID': /*[[#{admin.p4kImport.workspace.reviewEvidence.OTHER_P4K_GUID}]]*/ 'Different P4K GUID assigned',
+        'reviewEvidence.DIFFERENT_MANUFACTURER': /*[[#{admin.p4kImport.workspace.reviewEvidence.DIFFERENT_MANUFACTURER}]]*/ 'Different manufacturer',
+        'reviewEvidence.DIFFERENT_CLASS': /*[[#{admin.p4kImport.workspace.reviewEvidence.DIFFERENT_CLASS}]]*/ 'Different game class',
+        'reviewEvidence.SHOP_NAME_MATCH': /*[[#{admin.p4kImport.workspace.reviewEvidence.SHOP_NAME_MATCH}]]*/ 'Matching shop name',
+        'reviewSelectCase': /*[[#{admin.p4kImport.workspace.reviewSelectCase}]]*/ 'Select case',
+        'reviewSelectPage': /*[[#{admin.p4kImport.workspace.reviewSelectPage}]]*/ 'Select page',
+        'reviewClearSelection': /*[[#{admin.p4kImport.workspace.reviewClearSelection}]]*/ 'Clear selection',
+        'reviewSelected': /*[[#{admin.p4kImport.workspace.reviewSelected}]]*/ '{0} selected',
+        'reviewBatchKeep': /*[[#{admin.p4kImport.workspace.reviewBatchKeep}]]*/ 'Keep selected',
+        'reviewBatchHide': /*[[#{admin.p4kImport.workspace.reviewBatchHide}]]*/ 'Hide selected',
+        'reviewBatchKeepEffect': /*[[#{admin.p4kImport.workspace.reviewBatchKeepEffect}]]*/ 'The {0} selected cases will be marked as reviewed. Their entries will be kept.',
+        'reviewBatchHideEffect': /*[[#{admin.p4kImport.workspace.reviewBatchHideEffect}]]*/ 'The entries of the {0} selected cases will be hidden from pickers.',
+        'reviewBatchApplied': /*[[#{admin.p4kImport.workspace.reviewBatchApplied}]]*/ 'Selected cases reviewed.',
         'dueDetail': /*[[#{admin.p4kImport.due.detail}]]*/ 'UEX: {0} · SC Wiki: {1} · last import: {2}',
         'dueUnknown': /*[[#{admin.p4kImport.due.unknown}]]*/ 'unknown',
         'dueNoRun': /*[[#{admin.p4kImport.due.noRun}]]*/ 'none of known version',

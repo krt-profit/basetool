@@ -97,6 +97,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.GameItemNamePrec
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemIdentityCompatibility;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ItemReconciliationIndex;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kDisplayName;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.P4kManufacturerRecordPath;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiItemPasses;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
@@ -417,6 +418,7 @@ class ArchitectureTest {
           ItemIdentityCompatibility.class,
           ItemReconciliationIndex.class,
           P4kDisplayName.class,
+          P4kManufacturerRecordPath.class,
           ScWikiItemPasses.class,
           ScWikiProperties.class,
           CommodityMiningData.class,
@@ -1364,7 +1366,7 @@ class ArchitectureTest {
 
   @Test
   void leafHelpersMustStayDependencyLeaves() {
-    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 133);
+    assertClassFloor("leafHelpersMustStayDependencyLeaves", LEAF_HELPERS, 134);
     leafHelpersMustStayDependencyLeavesRule(
             LEAF_HELPERS, LEAF_HELPERS.or(MODEL_CODE).or(REPOSITORY_CODE), ROOT_PACKAGE)
         .check(CLASSES);

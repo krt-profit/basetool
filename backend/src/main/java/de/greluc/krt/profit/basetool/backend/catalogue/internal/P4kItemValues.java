@@ -105,8 +105,18 @@ record P4kItemValues(
    * @param row the row
    */
   void storeOn(@NotNull GameItem row) {
+    storeOn(row, manufacturer);
+  }
+
+  /**
+   * Writes the values and the manufacturer resolved for this row into its {@code p4k_*} columns.
+   *
+   * @param row the row
+   * @param storedManufacturer the resolved or previously established P4K manufacturer
+   */
+  void storeOn(@NotNull GameItem row, @Nullable Manufacturer storedManufacturer) {
     row.setP4kName(name);
-    row.setP4kManufacturer(manufacturer);
+    row.setP4kManufacturer(storedManufacturer);
     row.setP4kType(type);
     row.setP4kSubType(subType);
     row.setP4kSize(size);

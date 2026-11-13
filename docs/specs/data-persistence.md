@@ -1187,7 +1187,7 @@ added to both. `deletion_request` sits with identity, as do the GDPR classes onc
 | `identity` | 7 | `app_user`, `deletion_request`, `role`, `role_permissions`, `terms_acceptance`, `user_approval_event`, `user_roles` |
 | `audit` | 1 | `audit_event` |
 | `notification` | 3 | `notification`, `notification_rule`, `notification_rule_selector` |
-| `catalogue` | 53 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_scwiki_identity`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
+| `catalogue` | 54 | `blueprint`, `blueprint_category`, `blueprint_dismantle_return`, `blueprint_ingredient`, `blueprint_modifier_segment`, `blueprint_requirement_group`, `blueprint_requirement_modifier`, `blueprint_summary_property`, `city`, `external_sync_report`, `external_sync_run`, `faction`, `frequency_type`, `game_item`, `game_item_price`, `game_item_redirect`, `game_item_stat`, `job_type`, `jurisdiction`, `location`, `manufacturer`, `manufacturer_p4k_alias`, `manufacturer_scwiki_identity`, `manufacturer_uex_company`, `material`, `material_category`, `material_external_alias`, `material_occurrence`, `material_price`, `moon`, `orbit`, `outpost`, `p4k_import_change`, `p4k_import_job`, `p4k_import_job_payload`, `p4k_import_run`, `p4k_import_run_kind`, `p4k_review_case`, `planet`, `poi`, `refinery_yield`, `refining_method`, `ship_type`, `ship_type_loadout_port`, `ship_type_p4k_variant`, `ship_type_paint`, `ship_type_uex_alias`, `shop`, `shop_item`, `space_station`, `star_system`, `starmap_object`, `terminal`, `uex_category` |
 | `orgunit` | 3 | `kommando_group`, `org_unit`, `org_unit_membership` |
 | `scope` | 1 | `member_active_org_unit` |
 | `admin` | 1 | `system_setting` |
@@ -1251,7 +1251,8 @@ listed with its reason:
   `p4k_import_job.created_by`, the enqueuing admin's id on an import job, pruned to seven days
   after every import run; `p4k_import_run.created_by`, the applying admin's id on a run, which
   is never pruned, REQ-P4K-005; `p4k_review_case.resolved_by`, the admin who resolved a review
-  case, never pruned, REQ-P4K-016).
+  case, never pruned, REQ-P4K-016, and `p4k_review_case.ship_repair_by`, the administrator who
+  queued a pending identity repair, moved to `resolved_by` when the import applies it, REQ-P4K-049).
 - **Export** (REQ-SEC-058, the `PersonalDataExportSection` participants of the modules): a
   section selects the member's rows by it, or it is listed as not exported. Today 44 columns are exported and 15 are not, each of which names the
   member as the actor on somebody else's or the organisation's record, or mirrors an exported

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.catalogue.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -32,8 +33,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportChangeDto;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kImportRunDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewApplyRequest;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewBatchMember;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewBatchRequest;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewCandidate;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewCaseDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewGroupDto;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewOptions;
 import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewResolveRequest;
+import de.greluc.krt.profit.basetool.frontend.catalogue.model.P4kReviewWorkspaceDetailDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
@@ -63,6 +71,8 @@ import org.springframework.web.context.WebApplicationContext;
 class AdminP4kImportPageControllerMvcTest {
 
   private static final String BASE = "/api/v1/catalog/admin/import/p4k";
+  private static final String WORKSPACE = "/admin/p4k-import/review-workspace";
+  private static final UUID TARGET = UUID.fromString("00000000-0000-4000-8000-0000000000a4");
   private static final String REPORT = "/changes?kind={kind}&type={type}&page={page}&size={size}";
   private static final UUID RUN = UUID.fromString("00000000-0000-4000-8000-0000000000a1");
   private static final UUID ADMIN = UUID.fromString("00000000-0000-4000-8000-0000000000a2");
@@ -85,14 +95,14 @@ class AdminP4kImportPageControllerMvcTest {
     return new PageResponse<>(rows, page, 25, rows.size(), totalPages, List.of());
   }
 
-  private static P4kReviewCaseDto hiddenCase() {
+  private static P4kReviewCaseDto reviewCase(String resolution) {
     return new P4kReviewCaseDto(
         CASE.toString(),
         4,
         "SHIP",
         UUID.randomUUID().toString(),
         "SEEDED_NOT_CREATABLE",
-        "REVIEWED",
+        resolution == null ? "OPEN" : "REVIEWED",
         "ANVL_Hornet_F7C_Mk2_AI_Super",
         "Anvil F7C Hornet Mk II",
         null,
@@ -101,8 +111,8 @@ class AdminP4kImportPageControllerMvcTest {
         null,
         RUN.toString(),
         "2026-11-01T10:00:00Z",
-        "HIDE",
-        "2026-11-02T10:00:00Z");
+        resolution,
+        resolution == null ? null : "2026-11-02T10:00:00Z");
   }
 
   @Test
@@ -123,6 +133,10 @@ class AdminP4kImportPageControllerMvcTest {
             "id=\"krt-p4k-report-type\"",
             "id=\"krt-p4k-report-pager\"",
             "id=\"krt-p4k-cases\"",
+            "id=\"krt-p4k-review-kind\"",
+            "id=\"krt-p4k-review-readiness\"",
+            "id=\"krt-p4k-review-reason\"",
+            "id=\"krt-p4k-review-detail\"",
             "id=\"krt-p4k-mark-anyway\"",
             "/js/catalogue/p4k-report.js",
             "Markierung trotzdem anwenden");
@@ -262,7 +276,7 @@ class AdminP4kImportPageControllerMvcTest {
             new P4kReviewResolveRequest("HIDE", null, null, 3L),
             P4kReviewCaseDto.class,
             CASE))
-        .thenReturn(hiddenCase());
+        .thenReturn(reviewCase("HIDE"));
     when(backendApiClient.post(
             resolve,
             new P4kReviewResolveRequest("HIDE", null, null, 2L),
@@ -288,8 +302,148 @@ class AdminP4kImportPageControllerMvcTest {
   }
 
   @Test
+  @WithMockUser(roles = "ADMIN")
+  void theWorkspace_relaysGroupFiltersAndMemberPaging() throws Exception {
+    UUID groupId = UUID.fromString("00000000-0000-4000-8000-0000000000a5");
+    P4kReviewCaseDto representative = reviewCase(null);
+    P4kReviewGroupDto group =
+        new P4kReviewGroupDto(
+            groupId.toString(),
+            "SHIP",
+            "SEEDED_NOT_CREATABLE",
+            "Hornet AI",
+            "CHECK_REQUIRED",
+            "ships/anvil",
+            101,
+            true,
+            representative);
+    when(backendApiClient.get(
+            eq(
+                BASE
+                    + "/review-workspace?kind={kind}&reason={reason}&readiness={readiness}&page={page}&size={size}"),
+            anyTypeRef(),
+            eq("SHIP"),
+            eq("SEEDED_NOT_CREATABLE"),
+            eq("CHECK_REQUIRED"),
+            eq(1),
+            eq(25)))
+        .thenReturn(page(List.of(group), 1, 2));
+    when(backendApiClient.get(
+            eq(BASE + "/review-workspace/groups/{id}?page={page}&size={size}"),
+            anyTypeRef(),
+            eq(groupId),
+            eq(1),
+            eq(100)))
+        .thenReturn(new PageResponse<>(List.of(representative), 1, 100, 101, 2, List.of()));
+
+    mockMvc
+        .perform(
+            get(WORKSPACE)
+                .param("kind", "SHIP")
+                .param("reason", "SEEDED_NOT_CREATABLE")
+                .param("readiness", "CHECK_REQUIRED")
+                .param("page", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].count").value(101))
+        .andExpect(jsonPath("$.content[0].contextPath").value("ships/anvil"))
+        .andExpect(jsonPath("$.content[0].readiness").value("CHECK_REQUIRED"))
+        .andExpect(jsonPath("$.content[0].batchable").value(true));
+    mockMvc
+        .perform(get(WORKSPACE + "/groups/{id}", groupId).param("page", "1").param("size", "100"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].id").value(CASE.toString()))
+        .andExpect(jsonPath("$.size").value(100));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theWorkspace_relaysCandidateEvidenceAndTheConfirmedVersions() throws Exception {
+    P4kReviewCaseDto review = reviewCase(null);
+    P4kReviewCandidate candidate =
+        new P4kReviewCandidate(
+            "ATTACH_P4K",
+            TARGET.toString(),
+            7L,
+            null,
+            "Hornet AI",
+            "ANVL_Hornet_F7C_Mk2_AI_Super",
+            null,
+            review.guid(),
+            List.of(216),
+            List.of("EXACT_SCWIKI_UUID", "EXACT_CLASS"));
+    when(backendApiClient.get(
+            BASE + "/review-workspace/{caseId}", P4kReviewWorkspaceDetailDto.class, CASE))
+        .thenReturn(
+            new P4kReviewWorkspaceDetailDto(
+                review,
+                "ships/anvil/hornet",
+                new P4kReviewOptions("ACTIONABLE", null, List.of(candidate))));
+    when(backendApiClient.post(
+            BASE + "/review-workspace/{caseId}/apply",
+            new P4kReviewApplyRequest("ATTACH_P4K", TARGET, 7L, null, 4L),
+            P4kReviewCaseDto.class,
+            CASE))
+        .thenReturn(reviewCase("APPLIED"));
+
+    mockMvc
+        .perform(get(WORKSPACE + "/{caseId}", CASE))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.recordPath").value("ships/anvil/hornet"))
+        .andExpect(jsonPath("$.options.candidates[0].uexIds[0]").value(216))
+        .andExpect(jsonPath("$.options.candidates[0].evidence[0]").value("EXACT_SCWIKI_UUID"));
+    mockMvc
+        .perform(
+            post(WORKSPACE + "/{caseId}/apply", CASE)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"action":"ATTACH_P4K","targetId":"%s","targetVersion":7,"version":4}
+                    """
+                        .formatted(TARGET)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.resolution").value("APPLIED"));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void theWorkspace_relaysOnlyTheSelectedMembersOfABatch() throws Exception {
+    UUID groupId = UUID.fromString("00000000-0000-4000-8000-0000000000a5");
+    mockMvc
+        .perform(
+            post(WORKSPACE + "/groups/{id}/resolve", groupId)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"resolution":"KEEP","members":[{"id":"%s","version":4}]}
+                    """
+                        .formatted(CASE)))
+        .andExpect(status().isNoContent());
+    verify(backendApiClient)
+        .post(
+            BASE + "/review-workspace/groups/{id}/resolve",
+            new P4kReviewBatchRequest("KEEP", List.of(new P4kReviewBatchMember(CASE, 4L))),
+            Void.class,
+            groupId);
+  }
+
+  @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void aMember_isRefused() throws Exception {
     mockMvc.perform(get("/admin/p4k-import/review-cases")).andExpect(status().isForbidden());
+    mockMvc.perform(get(WORKSPACE)).andExpect(status().isForbidden());
+    mockMvc.perform(get(WORKSPACE + "/{caseId}", CASE)).andExpect(status().isForbidden());
+    mockMvc
+        .perform(
+            post(WORKSPACE + "/{caseId}/apply", CASE)
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"action":"ATTACH_P4K","targetId":"%s","targetVersion":7,"version":4}
+                    """
+                        .formatted(TARGET)))
+        .andExpect(status().isForbidden());
   }
 }

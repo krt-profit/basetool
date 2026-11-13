@@ -24,8 +24,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kLocalisedText;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kManufacturerDto;
 import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -36,18 +38,19 @@ import org.springframework.stereotype.Component;
  * Reconciles the catalogue's {@code manufacturers} with {@code manufacturer} (REQ-P4K-020,
  * REQ-P4K-021): match by P4K GUID, SC Wiki UUID and name, never by abbreviation; write the name,
  * the abbreviation from {@code code}, the German name and both descriptions the catalogue leads;
- * leave a name another row holds on the review list; stamp and index each match for the items and
- * ships of the run. An unmatched manufacturer is created only for an item or ship the run seeds.
+ * leave a name another row holds on the review list. Auxiliary records and reviewed aliases can
+ * resolve references without leading the brand's fields.
  */
 @Component
 @RequiredArgsConstructor
 public class P4kManufacturerReconciler {
 
   private final ManufacturerRepository manufacturerRepository;
+  private final ManufacturerP4kAliasRepository p4kAliases;
+  private final P4kRunResolvedCases resolvedCases;
 
   /**
-   * Reconciles every manufacturer and holds the unmatched ones for {@link #seed} and {@link
-   * #finish}.
+   * Reconciles canonical manufacturer records and holds the unmatched ones for seeding.
    *
    * @param manufacturers the catalogue's manufacturers
    * @param context the run
@@ -61,6 +64,21 @@ public class P4kManufacturerReconciler {
             _ -> null,
             Manufacturer::getName);
     context.indexManufacturerRows(rows);
+    Set<UUID> aliasGuids = new HashSet<>();
+    for (ManufacturerP4kAlias alias : p4kAliases.findLinkedAliases()) {
+      if (rows.byP4kUuid(alias.getP4kUuid()).isEmpty()) {
+        aliasGuids.add(alias.getP4kUuid());
+        context.indexManufacturer(alias.getP4kUuid(), alias.getManufacturer());
+      }
+    }
+    context.indexRepeated(
+        P4kKind.MANUFACTURER,
+        manufacturers.stream()
+            .filter(record -> !P4kManufacturerRecordPath.isAuxiliary(record.recordPath()))
+            .filter(record -> !aliasGuids.contains(record.parsedGuid()))
+            .toList());
+    Set<UUID> auxiliaryGuids = new HashSet<>();
+    Set<UUID> canonicalGuids = new HashSet<>();
     P4kRowMatcher<Manufacturer> matcher =
         new P4kRowMatcher<>(
             P4kKind.MANUFACTURER,
@@ -72,6 +90,21 @@ public class P4kManufacturerReconciler {
             rows::byName,
             _ -> false);
     for (P4kManufacturerDto manufacturer : manufacturers) {
+      UUID guid = manufacturer.parsedGuid();
+      if (P4kManufacturerRecordPath.isAuxiliary(manufacturer.recordPath())) {
+        if (guid != null) {
+          auxiliaryGuids.add(guid);
+        }
+        observeAuxiliary(manufacturer, guid, rows, aliasGuids, context);
+        continue;
+      }
+      if (guid != null) {
+        canonicalGuids.add(guid);
+      }
+      if (guid != null && aliasGuids.contains(guid)) {
+        context.getReport().matched(P4kKind.MANUFACTURER, false);
+        continue;
+      }
       matcher.reconcile(
           manufacturer,
           null,
@@ -79,17 +112,46 @@ public class P4kManufacturerReconciler {
           false,
           context,
           rows,
-          (row, guid) -> {
-            context.indexManufacturer(guid, row);
-            return write(row, manufacturer, guid, context);
+          (row, matchedGuid) -> {
+            context.indexManufacturer(matchedGuid, row);
+            return write(row, manufacturer, matchedGuid, context);
           },
-          guid -> {
-            if (guid == null) {
+          unmatchedGuid -> {
+            if (unmatchedGuid == null) {
               context.getReport().unmatched(P4kKind.MANUFACTURER, manufacturer);
             } else {
-              context.holdUnmatchedManufacturer(guid, manufacturer);
+              context.holdUnmatchedManufacturer(unmatchedGuid, manufacturer);
             }
           });
+    }
+    auxiliaryGuids.removeAll(canonicalGuids);
+    context.indexAuxiliaryManufacturers(auxiliaryGuids);
+    if (context.isApply() && !auxiliaryGuids.isEmpty()) {
+      resolvedCases.settleWithin(
+          P4kKind.MANUFACTURER,
+          List.of(P4kReviewReason.GUID_CONFLICT, P4kReviewReason.NAME_CONFLICT),
+          Set.of(),
+          auxiliaryGuids::contains,
+          context.getNow());
+    }
+  }
+
+  private static void observeAuxiliary(
+      @NotNull P4kManufacturerDto record,
+      @Nullable UUID guid,
+      @NotNull P4kRowIndex<Manufacturer> rows,
+      @NotNull Set<UUID> aliases,
+      @NotNull P4kImportContext context) {
+    Optional<Manufacturer> exact = guid == null ? Optional.empty() : rows.byP4kUuid(guid);
+    if (guid != null && exact.isPresent()) {
+      Manufacturer row = exact.get();
+      context.indexManufacturer(guid, row);
+      context.stamp(P4kKind.MANUFACTURER, record, row, guid);
+      context.getReport().matched(P4kKind.MANUFACTURER, false);
+    } else if (guid != null && aliases.contains(guid)) {
+      context.getReport().matched(P4kKind.MANUFACTURER, false);
+    } else {
+      context.getReport().unmatched(P4kKind.MANUFACTURER, record);
     }
   }
 

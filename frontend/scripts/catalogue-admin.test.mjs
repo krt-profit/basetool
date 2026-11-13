@@ -50,6 +50,7 @@ const STUBS = {
         'const krtModal = { open(id) { __ui.opened.push(id); }, close(id) { __ui.closed.push(id); } };',
     '/js/kernel/krt-fetch.js': [
         'const krtFetch = {',
+        '  get(url, opts) { return __net.read(url, opts || {}); },',
         '  getJson(url, opts) { return __net.read(url, opts || {}); },',
         '  write(opts) { __net.writes.push(opts); return Promise.resolve({ ok: false }); },',
         '};',
@@ -76,6 +77,7 @@ const LINK_ADMIN_AS_IMPORTED = [
     'const filterValue = (id) => ($(id) ? $(id).value.trim() : "");',
     'const idOf = (entry) => entry.id || "";',
     'const jsonReader = () => (url, target) => krtFetch.getJson(url, { key: target });',
+    'const forgetRead = () => {};',
     'const sendLinkChange = (change) => { __ui.linkChanges.push(change); return Promise.resolve(false); };',
     'const showCandidates = () => {};',
     'const swapRow = () => null;',
@@ -99,9 +101,12 @@ class FakeElement {
         this.hidden = false;
         this.dataset = {};
         this.markup = null;
+        this.listeners = {};
     }
 
-    addEventListener() {}
+    addEventListener(type, listener) {
+        this.listeners[type] = listener;
+    }
 
     querySelectorAll() {
         return [];
@@ -283,12 +288,14 @@ await test('a target emptied without a read drops the answer still pending', asy
 
 /**
  * Loads the P4K report module with a transport whose reads the test settles by URL.
+ *
+ * @param {Record<string, FakeElement>} [elements] the mounted review elements
  */
-function p4kReport() {
+function p4kReport(elements = {}) {
     const reads = [];
     const page = load(
         'catalogue/p4k-report.js',
-        {},
+        elements,
         (url) => {
             const read = pending();
             reads.push({ url, ...read });
@@ -307,65 +314,174 @@ function p4kReport() {
         read.resolve(body);
         await new Promise((resolve) => setTimeout(resolve, 0));
     };
-    return { fn: page.fn, reads, answer, ui: page.ui, live: page.live };
+    const paths = () => reads.map(({ url }) => url.replace('/admin/p4k-import', ''));
+    return { fn: page.fn, paths, answer, ui: page.ui, live: page.live };
 }
 
-await test('after an APPLY the assignment options reload before the refreshed cases render', async () => {
-    const report = p4kReport();
+await test('after an APPLY the assignment options reload before the review queue renders', async () => {
+    const cases = new FakeElement('krt-p4k-cases');
+    const report = p4kReport({ [cases.id]: cases });
     report.fn('refreshAfterApply')();
-    const paths = () => report.reads.map((r) => r.url.replace('/admin/p4k-import', ''));
+    const { paths } = report;
+    const queueRequested = () => paths().some((path) => path.startsWith('/review-workspace?'));
     assert.ok(paths().includes('/resource-groups'), 'the resource groups reload');
     assert.ok(paths().includes('/materials'), 'the materials reload');
-    assert.ok(
-        !paths().some((p) => p.startsWith('/review-cases')),
-        'the cases wait for the options',
-    );
+    assert.ok(!queueRequested(), 'the review queue waits for the options');
     await report.answer('/resource-groups', [{ id: 'g-new', name: 'New group' }]);
+    assert.ok(!queueRequested(), 'the review queue still waits for materials');
     await report.answer('/materials', [{ id: 'm-new', name: 'New ore' }]);
-    assert.ok(paths().some((p) => p.startsWith('/review-cases')));
-    assert.deepEqual(
-        report.fn('groupOptions').map((o) => o.values[0]),
-        ['g-new'],
-    );
-    assert.deepEqual(
-        report.fn('materialOptions').map((o) => o.values[0]),
-        ['m-new'],
-    );
+    await report.answer('/review-workspace?', {
+        content: [
+            { count: 1, representative: { id: 'c-group', reason: 'NO_RESOURCE_GROUP' } },
+            { count: 1, representative: { id: 'c-material', reason: 'RESOURCE_JOIN_NONE' } },
+        ],
+        page: 0,
+        totalPages: 1,
+    });
+    assert.match(JSON.stringify(cases.markup[0]), /"g-new","New group"/);
+    assert.match(JSON.stringify(cases.markup[1]), /"m-new","New ore"/);
 });
 
-await test('a peer admin resolution or APPLY reloads the review cases and the runs in place', async () => {
+await test('a peer admin resolution or APPLY refreshes the workspace in place', async () => {
     const report = p4kReport();
     const room = report.live.sections.find((s) => s.topicClass === 'CATALOGUE_ADMIN');
     assert.ok(room, 'the page joins the admin catalogue room');
     assert.equal(room.topic, 'catalogue-admin');
     assert.deepEqual(Object.keys(room.sections).sort(), ['review', 'runs']);
-    const paths = () => report.reads.map((r) => r.url.replace('/admin/p4k-import', ''));
+    const { paths } = report;
 
     room.receiver.refresh(['review']);
-    assert.ok(
-        paths().some((p) => p.startsWith('/review-cases')),
-        'a resolution reloads the cases',
+    assert.deepEqual(
+        paths().map((path) => path.split('?')[0]),
+        ['/review-workspace'],
+        'a resolution reloads only the review queue',
     );
-    assert.ok(!paths().includes('/resource-groups'), 'without refetching the options');
-    assert.ok(!paths().some((p) => p.startsWith('/runs')), 'the runs stay');
+    await report.answer('/review-workspace?', { content: [], page: 0, totalPages: 0 });
 
+    const readsBeforeApply = paths().length;
     room.receiver.refresh(['runs', 'review']);
     assert.ok(
         paths().some((p) => p.startsWith('/runs')),
         'an APPLY reloads the runs',
     );
     assert.ok(paths().includes('/resource-groups'), 'and the options its cases offer');
+    assert.ok(paths().includes('/materials'), 'and the material options');
     assert.equal(report.ui.banners, 1, 'and the import-due banner');
+    await report.answer('/resource-groups', []);
+    await report.answer('/materials', []);
+    assert.ok(
+        paths()
+            .slice(readsBeforeApply)
+            .some((path) => path.startsWith('/review-workspace?')),
+        'an APPLY also reloads the review queue',
+    );
 });
 
-await test('resolving the last case of the last page reloads the page before it', async () => {
-    const report = p4kReport();
-    report.fn('loadCases')(2);
-    await report.answer('/review-cases?page=2', { content: [], page: 2, totalPages: 2 });
-    const paths = report.reads.map((r) => r.url.replace('/admin/p4k-import', ''));
-    assert.ok(paths.includes('/review-cases?page=1'), 'the last page that still holds cases');
-    await report.answer('/review-cases?page=1', { content: [], page: 1, totalPages: 2 });
-    assert.equal(report.fn('casesPage'), 1);
+await test('a detail refresh keeps the same preview and clears a stale one', async () => {
+    const panel = new FakeElement('krt-p4k-review-detail');
+    const content = new FakeElement('krt-p4k-review-detail-content');
+    panel.focus = () => {};
+    content.replaceChildren = () => {
+        content.markup = null;
+    };
+    const reads = [];
+    const page = load(
+        'catalogue/p4k-review-detail.js',
+        { [panel.id]: panel, [content.id]: content },
+        (url) => {
+            assert.equal(url, '/review-workspace/c-1');
+            const read = pending();
+            reads.push(read);
+            return read.promise;
+        },
+        { '/js/catalogue/catalogue-link-admin.js': LINK_ADMIN_AS_IMPORTED },
+    );
+    const answer = async (detail, status = 200) => {
+        assert.equal(reads.length, 1);
+        reads.shift().resolve({ status, ok: status === 200, json: async () => detail });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    const pane = page.fn('createReviewDetail')({
+        pageUrl: (path) => path,
+        t: (key) => key,
+        sections: { write: page.fn('krtFetch').write },
+    });
+    const Button = page.fn('HTMLButtonElement');
+    const click = (attribute) => {
+        const target = new Button(attribute);
+        target.dataset.reviewPreview = '0';
+        target.closest = (selector) => (selector === 'button' ? target : null);
+        target.hasAttribute = (name) => name === attribute;
+        panel.listeners.click({ target });
+    };
+    const confirm = new Button('confirm');
+    const focusCalls = [];
+    confirm.scrollIntoView = () => focusCalls.push('scroll');
+    confirm.focus = () => focusCalls.push('focus');
+    content.querySelector = () => confirm;
+
+    const detail = {
+        review: { id: 'c-1', version: 1 },
+        options: {
+            candidates: [{ action: 'ATTACH_P4K', targetId: 'target-1', targetVersion: 2 }],
+        },
+    };
+    pane.open('c-1');
+    await answer(detail);
+    click('data-review-preview');
+    const preview = content.markup;
+    assert.match(JSON.stringify(preview), /data-review-confirm/);
+
+    pane.refresh();
+    assert.equal(content.markup, preview, 'the preview remains usable during the read');
+    await answer(structuredClone(detail));
+    assert.equal(content.markup, preview, 'the same response preserves the preview DOM');
+    assert.deepEqual(focusCalls, ['scroll', 'focus'], 'refresh leaves focus in place');
+    click('data-review-confirm');
+    assert.equal(page.net.writes.length, 1);
+    assert.equal(page.net.writes[0].payload.version, 1);
+    assert.equal(page.net.writes[0].payload.targetVersion, 2);
+
+    pane.refresh();
+    await answer({ ...detail, review: { ...detail.review, version: 2 } });
+    assert.doesNotMatch(JSON.stringify(content.markup), /data-review-confirm/);
+    click('data-review-confirm');
+    assert.equal(page.net.writes.length, 1, 'the stale preview cannot send a write');
+
+    pane.refresh();
+    await answer(null, 404);
+    assert.equal(panel.hidden, true);
+    assert.equal(content.markup, null);
+});
+
+await test('refreshing a review queue that shrank reloads its last page', async () => {
+    const pager = new FakeElement('krt-p4k-cases-pager');
+    const cases = new FakeElement('krt-p4k-cases');
+    const report = p4kReport({ [pager.id]: pager, [cases.id]: cases });
+    const workspace = report.fn('reviewWorkspace');
+    workspace.init();
+    await report.answer('/resource-groups', []);
+    await report.answer('/materials', []);
+    await report.answer('/review-workspace?page=0', { content: [], page: 0, totalPages: 2 });
+
+    const next = new (report.fn('HTMLButtonElement'))('next');
+    next.dataset.page = '1';
+    next.closest = (selector) => (selector === 'button[data-page]' ? next : null);
+    pager.listeners.click({ target: next });
+    await report.answer('/review-workspace?page=1', {
+        content: [{ count: 2, name: 'Last group' }],
+        page: 1,
+        totalPages: 2,
+    });
+    workspace.refresh();
+    await report.answer('/review-workspace?page=1', { content: [], page: 1, totalPages: 1 });
+    await report.answer('/review-workspace?page=0', {
+        content: [{ count: 2, name: 'Remaining group' }],
+        page: 0,
+        totalPages: 1,
+    });
+    assert.match(JSON.stringify(cases.markup), /Remaining group/);
+    assert.equal(pager.hidden, true);
 });
 
 /**

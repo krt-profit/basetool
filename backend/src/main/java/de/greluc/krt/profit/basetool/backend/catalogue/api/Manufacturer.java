@@ -97,6 +97,7 @@ public class Manufacturer extends AbstractEntity<UUID> implements P4kKeyedRow {
    * (ADR-0023).
    */
   @Column(name = "uex_company_id", unique = true)
+  @Nullable
   private Integer uexCompanyId;
 
   /**
@@ -104,6 +105,7 @@ public class Manufacturer extends AbstractEntity<UUID> implements P4kKeyedRow {
    * Wiki entity cannot be linked to two local manufacturers.
    */
   @Column(name = "scwiki_uuid", unique = true)
+  @Nullable
   private UUID scwikiUuid;
 
   /** SC Wiki manufacturer short code (e.g. {@code "RSI"}, {@code "AEGS"}). */

@@ -74,7 +74,7 @@ tests:
               severity: warning
             exp_annotations:
               summary: "P4K review case open for more than 30 days"
-              description: "The oldest open P4K review case is older than 30 days. Resolve the cases on /admin/p4k-import as keep or hide (REQ-OBS-022, REQ-P4K-016)."
+              description: "The oldest open P4K review case is older than 30 days. Open /admin/p4k-import and review the oldest open group and its available source actions (REQ-OBS-022, REQ-P4K-049)."
 
   - name: a younger review case stays silent
     interval: 1m

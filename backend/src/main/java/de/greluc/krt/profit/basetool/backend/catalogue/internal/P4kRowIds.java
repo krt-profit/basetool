@@ -25,7 +25,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.p4k.P4kKind;
 import jakarta.persistence.EntityManager;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -80,11 +83,19 @@ final class P4kRowIds {
       @NotNull P4kKind kind,
       @NotNull P4kImportContext context) {
     Map<UUID, UUID> idByGuid = new HashMap<>();
+    Map<UUID, P4kKeyedRow> stamped = context.stampedRows(kind);
+    Set<UUID> updatedRows =
+        stamped.values().stream()
+            .map(P4kKeyedRow::getId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toUnmodifiableSet());
     entityManager
         .createQuery(P4kSweepTarget.of(kind).knownRowsQuery(), P4kKnownRow.class)
         .getResultList()
+        .stream()
+        .filter(row -> !updatedRows.contains(row.id()))
         .forEach(row -> idByGuid.put(row.guid(), row.id()));
-    for (Map.Entry<UUID, P4kKeyedRow> entry : context.stampedRows(kind).entrySet()) {
+    for (Map.Entry<UUID, P4kKeyedRow> entry : stamped.entrySet()) {
       UUID id = entry.getValue().getId();
       if (id != null) {
         idByGuid.put(entry.getKey(), id);

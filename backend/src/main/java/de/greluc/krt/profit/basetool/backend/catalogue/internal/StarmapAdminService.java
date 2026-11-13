@@ -229,7 +229,7 @@ public class StarmapAdminService {
         AuditDetails.of("kind", kind.name())
             .with("starmapObjectId", targetId)
             .with("previousStarmapObjectId", row.starmapObjectId()));
-    adminLiveSync.starmapChanged();
+    adminLiveSync.starmapLinksChanged();
     StarmapPlaceRow after = requireRow(kind, id);
     return toDto(after, target);
   }

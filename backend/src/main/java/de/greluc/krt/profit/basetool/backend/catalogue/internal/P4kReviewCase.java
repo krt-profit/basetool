@@ -31,6 +31,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -108,4 +109,88 @@ public class P4kReviewCase extends AbstractEntity<UUID> {
   @Column(name = "resolved_at")
   @Nullable
   private Instant resolvedAt;
+
+  /** The selected ship row, present while a base-identity repair waits for source data. */
+  @Setter(AccessLevel.NONE)
+  @Column(name = "ship_repair_row_id")
+  @Nullable
+  private UUID shipRepairRowId;
+
+  /** The P4K variant GUID still held by the selected ship. */
+  @Setter(AccessLevel.NONE)
+  @Column(name = "ship_repair_variant_guid")
+  @Nullable
+  private UUID shipRepairVariantGuid;
+
+  /** The current class of the stamped variant. */
+  @Setter(AccessLevel.NONE)
+  @Column(name = "ship_repair_variant_class", length = 255)
+  @Nullable
+  private String shipRepairVariantClass;
+
+  /** The confirmed class of the incoming base record. */
+  @Setter(AccessLevel.NONE)
+  @Column(name = "ship_repair_base_class", length = 255)
+  @Nullable
+  private String shipRepairBaseClass;
+
+  /** The reviewer who confirmed the repair. */
+  @Setter(AccessLevel.NONE)
+  @Column(name = "ship_repair_by")
+  @Nullable
+  private UUID shipRepairBy;
+
+  /**
+   * Whether a reviewer selected a repair that still needs verified P4K source data.
+   *
+   * @return whether the repair is pending
+   */
+  public boolean isShipRepairPending() {
+    return shipRepairRowId != null;
+  }
+
+  /**
+   * Records the row and both identities for revalidation on an eligible APPLY.
+   *
+   * @param shipId the selected ship row
+   * @param variantGuid the P4K GUID currently stamped on the row
+   * @param variantClass the currently stamped variant class
+   * @param baseClass the confirmed base class
+   * @param reviewer the administrator who confirmed the repair
+   */
+  void queueShipRepair(
+      @NotNull UUID shipId,
+      @NotNull UUID variantGuid,
+      @NotNull String variantClass,
+      @NotNull String baseClass,
+      @NotNull UUID reviewer) {
+    shipRepairRowId = shipId;
+    shipRepairVariantGuid = variantGuid;
+    shipRepairVariantClass = variantClass;
+    shipRepairBaseClass = baseClass;
+    shipRepairBy = reviewer;
+  }
+
+  /**
+   * Closes the pending case after its ship and dependent catalogue data were rebuilt.
+   *
+   * @param now the completion time
+   */
+  void finishShipRepair(@NotNull Instant now) {
+    rowId = shipRepairRowId;
+    status = P4kReviewStatus.REVIEWED;
+    resolution = P4kReviewResolution.APPLIED;
+    resolvedBy = shipRepairBy;
+    resolvedAt = now;
+    cancelShipRepair();
+  }
+
+  /** Discards the pending choice while leaving the original case open. */
+  void cancelShipRepair() {
+    shipRepairRowId = null;
+    shipRepairVariantGuid = null;
+    shipRepairVariantClass = null;
+    shipRepairBaseClass = null;
+    shipRepairBy = null;
+  }
 }

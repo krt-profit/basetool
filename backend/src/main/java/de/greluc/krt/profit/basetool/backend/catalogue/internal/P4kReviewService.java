@@ -108,6 +108,24 @@ public class P4kReviewService {
   }
 
   /**
+   * Reads the case and its source path for the review workspace.
+   *
+   * @param cases the cases to display
+   * @return the cases with the last report evidence
+   */
+  List<P4kReviewCaseSource> workspaceCases(@NotNull List<P4kReviewCase> cases) {
+    Map<UUID, String> names = rowNames(cases);
+    Map<RecordKey, P4kImportChange> reports = reviewRows(cases);
+    return cases.stream()
+        .map(review -> {
+          P4kImportChange report = reviewRow(review, reports);
+          return new P4kReviewCaseSource(
+              toDto(review, names, reports), report == null ? null : report.getRecordPath());
+        })
+        .toList();
+  }
+
+  /**
    * Resolves an open case as keep or hide, a {@code NO_RESOURCE_GROUP} case by assigning a resource
    * group to its material as an admin override no APPLY writes over ({@link
    * MaterialP4kOverride#RESOURCE_GROUP}), or a {@code RESOURCE_JOIN_NONE} / {@code
@@ -184,7 +202,7 @@ public class P4kReviewService {
       @Nullable UUID materialId,
       long version,
       @NotNull UUID adminId) {
-    if (resolution == P4kReviewResolution.RESOLVED) {
+    if (resolution == P4kReviewResolution.RESOLVED || resolution == P4kReviewResolution.APPLIED) {
       throw new BadRequestException("A review case is resolved as keep or hide.");
     }
     P4kReviewCase reviewCase =
@@ -193,6 +211,9 @@ public class P4kReviewService {
     OptimisticLock.checkRequired(reviewCase.getVersion(), version, P4kReviewCase.class, caseId);
     if (reviewCase.getStatus() != P4kReviewStatus.OPEN) {
       throw new BadRequestException("The review case is already resolved.");
+    }
+    if (reviewCase.isShipRepairPending()) {
+      throw new BusinessConflictException("The ship identity repair is waiting for an import.");
     }
     boolean groupCase = reviewCase.getReason() == P4kReviewReason.NO_RESOURCE_GROUP;
     boolean resourceCase = RESOURCE_JOINS.contains(reviewCase.getReason());
@@ -239,7 +260,8 @@ public class P4kReviewService {
               material == null
                   ? AuditEventType.CATALOGUE_P4K_REVIEW_GROUP_ASSIGNED
                   : AuditEventType.CATALOGUE_P4K_REVIEW_MATERIAL_ASSIGNED;
-          case RESOLVED -> throw new IllegalStateException("A run's resolution reached an admin.");
+          case APPLIED, RESOLVED ->
+              throw new IllegalStateException("A workspace resolution reached the legacy path.");
         },
         reviewCase.getId(),
         reviewCase.getGuid().toString(),
@@ -278,8 +300,8 @@ public class P4kReviewService {
   private Material caseMaterial(@NotNull P4kReviewCase reviewCase) {
     UUID rowId = reviewCase.getRowId();
     Material found = rowId == null ? null : materialRepository.findById(rowId).orElse(null);
-    if (found == null) {
-      throw new BadRequestException("The material of this case no longer exists.");
+    if (found == null || found.isP4kRetired()) {
+      throw new BadRequestException("The material of this case is no longer active.");
     }
     return found;
   }
@@ -391,9 +413,7 @@ public class P4kReviewService {
       @NotNull P4kReviewCase c,
       @NotNull Map<UUID, String> rowNames,
       @NotNull Map<RecordKey, P4kImportChange> records) {
-    P4kImportChange record =
-        records.get(
-            new RecordKey(c.getKind(), c.getGuid(), c.getReason().name(), c.getLastRunId()));
+    P4kImportChange record = reviewRow(c, records);
     return new P4kReviewCaseDto(
         c.getId(),
         Objects.requireNonNullElse(c.getVersion(), 0L),
@@ -411,6 +431,13 @@ public class P4kReviewService {
         c.getCreatedAt(),
         c.getResolution(),
         c.getResolvedAt());
+  }
+
+  @Nullable
+  private static P4kImportChange reviewRow(
+      P4kReviewCase c, Map<RecordKey, P4kImportChange> records) {
+    return records.get(
+        new RecordKey(c.getKind(), c.getGuid(), c.getReason().name(), c.getLastRunId()));
   }
 
   /**

@@ -136,6 +136,80 @@ class P4kShipBaseData {
   }
 
   /**
+   * Checks that refreshing this row cannot leave a stored fact dependent on the variant source.
+   *
+   * @param row the currently stamped ship
+   * @param base the verified base record
+   * @param context the current manufacturer mappings
+   * @return whether the normal writer has sufficient base evidence
+   */
+  boolean canRefreshBase(
+      @NotNull ShipType row, @NotNull P4kShipDto base, @NotNull P4kImportContext context) {
+    if ((row.getManufacturer() != null && context.manufacturer(base.manufacturerGuid()) == null)
+        || (row.getScu() != null && (!cargoComplete(base) || base.cargoScu() == null))
+        || (row.getNameDe() != null && P4kFields.germanName(base.name()) == null)
+        || (row.getNameKey() != null
+            && P4kFields.storedNameKey(P4kLocalisedText.keyOf(base.name())) == null)
+        || !canKeepText(row.getDescriptionEn(), P4kLocalisedText.enOf(base.description()))
+        || !canKeepText(row.getDescriptionDe(), P4kLocalisedText.deOf(base.description()))
+        || (base.insurance() == null && hasInsurance(row))) {
+      return false;
+    }
+    Integer oldCrew = row.getCrewMax();
+    Integer baseCrew = base.crewSize();
+    if (oldCrew != null
+        && oldCrew.equals(row.getCrewMin())
+        && baseCrew != null
+        && baseCrew > oldCrew) {
+      return false;
+    }
+    RefreshableFacts proof = new RefreshableFacts();
+    facts(row, base, proof);
+    return proof.complete;
+  }
+
+  /**
+   * Checks whether the fill-only writer can retain or fill a description during a repair.
+   *
+   * @param current the stored text
+   * @param incoming the base text
+   * @return whether the retained text cannot differ from the base
+   */
+  private static boolean canKeepText(@Nullable String current, @Nullable String incoming) {
+    return current == null || current.equals(incoming);
+  }
+
+  /**
+   * Checks whether an absent insurance block would retain a stored fact.
+   *
+   * @param row the currently stamped ship
+   * @return whether the row has an insurance fact
+   */
+  private static boolean hasInsurance(@NotNull ShipType row) {
+    return row.getInsuranceRestoreOnClaim() != null
+        || row.getInsuranceShipClassName() != null
+        || row.getInsuranceClaimMinutes() != null
+        || row.getInsuranceMandatoryClaimMinutes() != null
+        || row.getInsuranceExpediteFee() != null;
+  }
+
+  /** Records whether each populated fact has a replacement from the base. */
+  private static final class RefreshableFacts implements Sink {
+
+    private boolean complete = true;
+
+    @Override
+    public <V> void put(
+        @NotNull String column,
+        @Nullable V current,
+        @Nullable V incoming,
+        @NotNull Consumer<V> setter,
+        @NotNull Function<V, String> label) {
+      complete &= current == null || incoming != null;
+    }
+  }
+
+  /**
    * Reads a record's vehicle kind.
    *
    * @param ship the record
