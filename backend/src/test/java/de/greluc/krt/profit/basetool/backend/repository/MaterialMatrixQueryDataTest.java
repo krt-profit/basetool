@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPrice;
+import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialPriceOverviewDto;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Terminal;
@@ -43,6 +44,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -267,6 +269,38 @@ class MaterialMatrixQueryDataTest {
     assertThat(reloaded.getIsRefuel()).isFalse();
     assertThat(reloaded.getIsRepair()).isNull();
     assertThat(reloaded.getGameVersion()).isEqualTo("4.3.1");
+  }
+
+  @Test
+  void priceOverview_requiresAPositiveBuyOrSellPriceAtAVisibleTerminal() {
+    String prefix = "Overview-" + uid + "-";
+    Terminal visible = persistTerminal("Overview-" + area18, stanton, false, false, false);
+    Terminal hidden = persistTerminal("Overview-" + hiddenDock, stanton, false, false, true);
+    persistNeutralisedPrice(persistMaterial(prefix + "A-cleared"), visible);
+    persistPrice(
+        persistMaterial(prefix + "B-nonpositive"),
+        visible,
+        BigDecimal.ZERO,
+        BigDecimal.ONE.negate());
+    persistBuyPrice(persistMaterial(prefix + "C-hidden"), hidden, 500);
+    Material buyOnly = persistMaterial(prefix + "D-buy");
+    Material sellOnly = persistMaterial(prefix + "E-sell");
+    persistBuyPrice(buyOnly, visible, 50);
+    persistSellPrice(buyOnly, hidden, 999);
+    persistSellPrice(sellOnly, visible, 100);
+
+    Page<MaterialPriceOverviewDto> page =
+        materialRepository.getMaterialPriceOverview(prefix, PageRequest.of(0, 2, Sort.by("name")));
+
+    assertThat(page.getTotalElements()).isEqualTo(2);
+    assertThat(page.getContent())
+        .extracting(
+            MaterialPriceOverviewDto::id,
+            MaterialPriceOverviewDto::minPriceBuy,
+            MaterialPriceOverviewDto::maxPriceSell)
+        .containsExactly(
+            tuple(buyOnly.getId(), BigDecimal.valueOf(50), null),
+            tuple(sellOnly.getId(), null, BigDecimal.valueOf(100)));
   }
 
   private Material persistMaterial(String name) {

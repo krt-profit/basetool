@@ -230,10 +230,8 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Page<Material> findAllWithPrices(Pageable pageable);
 
   /**
-   * Per-material price summary used by the price-overview view: best (minimum) positive buy price
-   * and best (maximum) positive sell price across every non-hidden terminal, plus the material's
-   * category and UEX-style flag columns flattened into the DTO. {@code name} is an optional
-   * case-insensitive substring filter.
+   * Summarizes materials with a positive buy or sell price at a non-hidden terminal. The name
+   * filter matches a case-insensitive substring when supplied.
    */
   @Query(
       """
@@ -250,6 +248,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       WHERE (cast(:name as string) IS NULL
           OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:name as string), '%')) ESCAPE '\\')
       AND (p.terminal.hidden = false OR p.terminal.hidden IS NULL)
+      AND (p.priceBuy > 0 OR p.priceSell > 0)
       GROUP BY m.id, m.name, m.nameDe, c.id, c.name, c.version,
           m.isIllegal, m.isVolatileQt, m.isVolatileTime
       """)
