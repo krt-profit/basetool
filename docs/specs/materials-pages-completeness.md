@@ -17,6 +17,22 @@ in [ADR-0105](../adr/0105-materials-matrix-server-side-filtering.md).
 
 ## Requirements
 
+### REQ-UI-039 — Material cards require a positive trade price
+
+The material card list at `/materials` shows a material if at least one visible terminal has a
+positive buy or sell price for it. The backend price overview applies this rule before pagination.
+The rule applies to both the grouped and flat card lists.
+
+**Acceptance**
+
+- [ ] A material with only a positive buy price or only a positive sell price appears with that
+  price.
+- [ ] Materials with missing, zero or negative prices on both sides are excluded. Positive prices
+  at hidden terminals do not qualify a material or contribute to its displayed prices.
+- [ ] Pagination counts only qualifying materials.
+
+**Enforced by:** `MaterialMatrixQueryDataTest`. **Code:** `MaterialRepository.getMaterialPriceOverview`.
+
 ### REQ-UI-014 — The trade matrix is filtered server-side
 
 `GET /materials/overview` renders a virtual-scroll grid whose four filter dimensions — material
