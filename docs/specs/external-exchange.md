@@ -1,6 +1,6 @@
 > **Doc type:** Living spec — requirements accepted by the owner, built except where a status line
 > says otherwise (epic [#2078](https://github.com/krt-profit/basetool/issues/2078)). Last reviewed:
-> 2026-11-12.
+> 2026-11-13.
 > **Owner area:** XCH · **Related ADRs:** [ADR-0216](../adr/0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md),
 > [ADR-0217](../adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md),
 > [ADR-0218](../adr/0218-exchange-sync-semantics.md),
@@ -12,7 +12,8 @@
 > [ADR-0341](../adr/0341-the-p4k-catalogue-leads-a-ship-types-base-data-and-ship-types-match-by-class-name-before-name.md),
 > [ADR-0343](../adr/0343-a-personal-blueprint-is-keyed-by-its-produced-items-guid.md),
 > [ADR-0345](../adr/0345-the-p4k-starmap-tree-leads-and-uex-locations-link-to-it.md),
-> [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md)
+> [ADR-0351](../adr/0351-refinery-orders-are-an-exchange-resource-with-direct-writes.md),
+> [ADR-0379](../adr/0379-the-coarse-ship-origin-is-exchanged.md)
 > **The bank on the exchange:** its route family, switch, limits and refusal codes live in
 > [`bank-exchange.md`](bank-exchange.md) (`REQ-BXCH-*`, [ADR-0354](../adr/0354-bank-resources-on-the-exchange.md)).
 
@@ -1230,8 +1231,8 @@ lowers or removes is audited by that book-out (`MARKET_OFFER_REDUCED`, `MARKET_O
 
 `link` attaches a client ship to an existing server ship; `upsert` and `remove` carry the ship's
 `version`. A client links before it creates, so a Fleetview import is never duplicated. Purchase
-data is never sent. Detaching a ship from a mission by removal is reported in
-`detachedFromMissions` and audited (`MISSION_UNIT_UPDATED`). Writes are audited in the Hangar domain
+data is never sent; the one exception is the coarse ship origin (REQ-XCH-057, ADR-0379).
+Detaching a ship from a mission by removal is reported in `detachedFromMissions` and audited (`MISSION_UNIT_UPDATED`). Writes are audited in the Hangar domain
 with the external client. A ship's `name` is optional and up to 255 characters, as in the web: an
 unnamed ship is sent without it, and an upsert may leave it out (owner decision 2026-09-27). An
 `upsert` sets the ship as sent: a `name` or `location` it leaves out is cleared, and only an absent
@@ -1257,8 +1258,9 @@ applies.
   *`ExchangeShipWriteControllerTest`.*
 - [x] A batch naming another member's ship never locks its row: the owner's concurrent edit does not
   hold it up. *`ExchangeShipWriteControllerTest`.*
-- [x] The feed carries the member's own ships only, without purchase data, and answers a ship given
-  to another member as a tombstone. *`ExchangeShipControllerTest`.*
+- [x] The feed carries the member's own ships only, without purchase data beyond the coarse origin
+  (REQ-XCH-057), and answers a ship given to another member as a tombstone.
+  *`ExchangeShipControllerTest`.*
 - [x] A ship carries its org unit and `orgUnitVersion`, a ship without one no `orgUnit`; a change
   of a ship's unit, and a rename of a unit, bring its ships into the next delta pull and no other
   ship. *`ExchangeShipControllerTest`, `ExchangeWireContractTest`.*
@@ -3816,6 +3818,49 @@ bulk undo. `ExchangeRefineryOrderStateTest` pins the journal state's JSON shape.
 **Status:** implemented — #3168 (journal, undo of create, update and goods ops), #3169 (undo of
 cancel and delete), #3170 (undo of a pickup without store lines), #3171 (undo of a pickup with
 store lines)
+
+### REQ-XCH-057 — The member's own client reads and writes a ship's coarse origin
+
+Every ship of `GET /exchange/v1/me/ships` carries `origin`: `PLEDGE`, `IN_GAME` or `UNKNOWN`, the
+ship origin of REQ-HANGAR-017 as the ship reads it. A ship locked to `PLEDGE` — one from a hangar
+file import or with a pledge id — always reads `PLEDGE`, whatever was chosen before. The narrow
+exception to "purchase data is never sent" (REQ-XCH-017) is this one value: a pledge id, a purchase
+date or a price never leaves the Basetool (ADR-0379, which narrows ADR-0295).
+
+- **Write.** An `upsert` may send `origin`. Leaving it out keeps the stored origin, and a create
+  without it stores `UNKNOWN` (#3250). A change of the origin goes through the Hangar's own update,
+  is part of the ship's `version` like a web edit, and is audited as `HANGAR_SHIP_UPDATED` with the
+  field name `origin` and the client, never the value (REQ-HANGAR-004).
+- **Lock.** On a locked ship another value than `PLEDGE` rejects that op with `ORIGIN_LOCKED`; the
+  rest of the batch still applies. `PLEDGE` changes nothing.
+- **Feed.** The lock is written outside the ship's `version` (ADR-0295), but the import's write
+  brings the ship into the feed, so a client learns the new `PLEDGE` without a new snapshot.
+  `V418` writes every ship once, so each ship is in the feed again with its origin.
+- **Journal and undo.** The ship journal state records the origin (REQ-XCH-022); an undo restores
+  it, except on a ship an import locked since, and an older state without it keeps the stored one.
+- **Scope.** No new scope: `exchange.hangar.read` reads it and `exchange.hangar.write` writes it.
+  Additive in `v1` (REQ-XCH-026), with one dated entry in the Exchange changelog.
+
+**Acceptance**
+
+- [x] The snapshot and the feed carry `origin`; a locked ship reads `PLEDGE` and comes into the
+  feed when an import locks it, without a new `version`. *`ExchangeShipControllerTest`.*
+- [x] A create takes the sent origin or `UNKNOWN`; an origin change moves the `version`, and an
+  update without `origin` keeps it. *`ExchangeShipWriteControllerTest`.*
+- [x] A locked ship rejects another origin with `ORIGIN_LOCKED` and takes `PLEDGE` as no change.
+  *`ExchangeShipWriteControllerTest`.*
+- [x] The journal state records the origin; an undo restores it except on a ship locked since.
+  *`ExchangeJournalStateTest`.*
+- [x] `origin` is published in `ship.schema.json` and the ship `upsert` of
+  `change-set.schema.json`, with its field class. *`ExchangeFieldRatchetTest`,
+  `ExchangeSchemasTest`.*
+
+**Enforced by:** `ExchangeShipControllerTest`, `ExchangeShipWriteControllerTest`,
+`ExchangeJournalStateTest`, `ExchangeFieldRatchetTest` · **Code:** `ExchangeShipFeedService`,
+`ExchangeShipWriteService`, `ExchangeShipJournal`, `ShipRepository#EXCHANGE_SHIPS`,
+`ship.schema.json`, `change-set.schema.json`, `V418__add_ship_origin.sql` · **Docs:**
+[`docs/exchange/resources/ships.md`](../exchange/resources/ships.md) · **Issues:** #3329 (epic
+#3328), decisions #3250 and #3255
 
 ## Threat model
 

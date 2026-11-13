@@ -25,6 +25,7 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipTypeMatcher;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
@@ -68,8 +69,10 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Per ship type, each entry is matched to one ship already in the hangar — first by pledge id,
  * then to a ship without a pledge id (preferring the same insurance) — and only the entries left
- * over create ships. A matched ship takes the entry's production status and pledge data; existing
- * ships are never deleted (REQ-HANGAR-015). Unmatched names are reported in {@code skippedShips}.
+ * over create ships. A ship bought in-game is never matched. A matched ship takes the entry's
+ * production status and pledge data; existing ships are never deleted (REQ-HANGAR-015). Every
+ * created or matched ship is locked to the origin {@code PLEDGE}, outside its version
+ * (REQ-HANGAR-017). Unmatched names are reported in {@code skippedShips}.
  */
 @Service
 @RequiredArgsConstructor
@@ -139,6 +142,9 @@ public class HangarImportService {
     Map<UUID, List<Ship>> hangarByTypeId = new HashMap<>();
     if (!entriesByTypeId.isEmpty()) {
       for (Ship ship : shipRepository.lockAllOwnedByOrderById(userId)) {
+        if (ship.effectiveOrigin() == ShipOrigin.IN_GAME) {
+          continue;
+        }
         hangarByTypeId
             .computeIfAbsent(ship.getShipType().getId(), _ -> new ArrayList<>())
             .add(ship);
@@ -259,6 +265,7 @@ public class HangarImportService {
         entry.insurance() != null ? entry.insurance() : FleetExportParser.DEFAULT_INSURANCE);
     ship.setFitted(false);
     ship.setName(entry.individualName());
+    ship.setOrigin(ShipOrigin.PLEDGE);
     applyImported(ship, entry);
     shipRepository.save(ship);
     tally.created++;
@@ -266,8 +273,9 @@ public class HangarImportService {
   }
 
   /**
-   * Writes an entry's production status and pledge data onto a ship; values the entry does not
-   * carry stay as they are.
+   * Locks a ship's origin to {@code PLEDGE} and writes an entry's production status and pledge data
+   * onto it; values the entry does not carry stay as they are. None of them is part of the ship's
+   * version (ADR-0295).
    *
    * @param ship the ship to update
    * @param entry the upload entry
@@ -276,6 +284,10 @@ public class HangarImportService {
   static boolean applyImported(
       @NotNull Ship ship, @NotNull FleetExportParser.FleetImportEntry entry) {
     boolean changed = false;
+    if (!ship.isOriginLocked()) {
+      ship.setOriginLocked(true);
+      changed = true;
+    }
     if (entry.productionStatus() != null
         && entry.productionStatus() != ship.getProductionStatus()) {
       ship.setProductionStatus(entry.productionStatus());

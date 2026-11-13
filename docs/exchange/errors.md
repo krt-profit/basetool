@@ -87,6 +87,7 @@ codes, whichever side refuses it.
 | `UNIT_MISMATCH` | The quantity's unit does not match the material's; also a refinery store line's. | Fix the unit. |
 | `LOCATION_UNKNOWN` | The place has no warehouse location; for a refinery order, it has no location. | Offer a place from `catalog/locations`. |
 | `LINK_TARGET_TAKEN` | The server ship is already linked to another external id of this installation. | Pull and re-link. |
+| `ORIGIN_LOCKED` | A ship `upsert` sends another `origin` than `PLEDGE` for a ship a hangar import or a pledge id locked to `PLEDGE`. | Take `PLEDGE` from the feed; resend without `origin` or with `PLEDGE`. |
 | `VERSION_CONFLICT` | As above, for this op only; also an `upsert` without `shipId` for an id this installation already linked, and a refinery-order op whose counter of a section it touches is stale or missing ([counters](resources/refinery-orders.md#counters-in-a-change-set)). | Pull, merge, retry this op. |
 | `NOT_PERMITTED` | An org-stock op on a pool whose unit the member is not a Logistician of, a `move-holder` into such a pool or to the entry's own holder in another pool, or an op on an entry that is unknown, personal or in another pool. | Do not retry; offer only the units the org stock marks `logistician: true`. |
 | `HOLDER_UNKNOWN` | An org-stock `book-in` or `move-holder` names a holder who is not on the receiving unit's roster. | Read the roster again and let the member pick. |

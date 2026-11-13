@@ -124,6 +124,8 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeGate;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeMirrorProperties;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.KnownExchangeClients;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOriginDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipPledgeDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarService;
@@ -525,6 +527,8 @@ class ArchitectureTest {
           SubjectAuthentication.class,
           TermsConsentCheck.class,
           ShipDto.class,
+          ShipOrigin.class,
+          ShipOriginDto.class,
           ShipPledgeDto.class,
           ShipProductionStatus.class,
           LocationDto.class,

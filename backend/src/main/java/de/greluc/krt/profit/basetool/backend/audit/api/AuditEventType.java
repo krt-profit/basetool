@@ -524,12 +524,14 @@ public enum AuditEventType {
   MARKET_AUDIT_PURGED(AuditDomain.MARKET),
   /** A ship was added to a hangar, by its owner or by an admin. */
   HANGAR_SHIP_CREATED(AuditDomain.HANGAR),
-  /** A ship's type, name, insurance, fitted flag or location was edited. */
+  /** A ship's type, name, insurance, fitted flag, location or origin was edited. */
   HANGAR_SHIP_UPDATED(AuditDomain.HANGAR),
   /** A ship's owning org unit was changed after creation (REQ-HANGAR-009). */
   HANGAR_SHIP_ORG_UNIT_CHANGED(AuditDomain.HANGAR),
   /** The owning org unit of a selection of ships was changed in one action (REQ-HANGAR-010). */
   HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED(AuditDomain.HANGAR),
+  /** The origin of a selection of ships was changed in one action (REQ-HANGAR-018). */
+  HANGAR_SHIPS_BULK_ORIGIN_CHANGED(AuditDomain.HANGAR),
   /** A ship was deleted; mission units it crewed were detached first. */
   HANGAR_SHIP_DELETED(AuditDomain.HANGAR),
   /** A member emptied their own hangar in one go. */

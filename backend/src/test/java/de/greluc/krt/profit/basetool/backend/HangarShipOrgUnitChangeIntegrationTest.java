@@ -298,7 +298,7 @@ class HangarShipOrgUnitChangeIntegrationTest {
             .content(
                 objectMapper.writeValueAsString(
                     new ShipRequestDto(
-                        name, fighter.getId(), "LTI", null, false, shipVersion, null))));
+                        name, fighter.getId(), "LTI", null, false, shipVersion, null, null))));
   }
 
   private static @NotNull RequestPostProcessor as(@NotNull User caller) {

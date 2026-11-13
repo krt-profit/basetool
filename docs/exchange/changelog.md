@@ -3,6 +3,16 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-13
+
+- **New: the ship's `origin`.** Every ship in `GET /exchange/v1/me/ships` carries `origin`:
+  `PLEDGE`, `IN_GAME` or `UNKNOWN` ([ships](resources/ships.md#a-ship)). An `upsert` may send it;
+  leaving it out keeps the ship's origin, and a new ship without it is `UNKNOWN`. A ship from a
+  hangar file import, or with a pledge id, is locked to `PLEDGE`: it always reads `PLEDGE` and
+  refuses any other value with the new reason `ORIGIN_LOCKED`. A ship is in the feed again when an
+  import locks it. This coarse origin is the one exception to "purchase data is never exchanged";
+  pledge ids, dates and prices stay out. Additive: a reader that ignores `origin` keeps working.
+
 ## 2026-11-09
 
 - **New: refinery orders.** A client reads and writes the member's own refinery work orders and

@@ -24,10 +24,12 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.OfferedLocations;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -133,7 +135,8 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
   /**
    * Removes, updates or recreates a ship to match its earlier state, including its earlier org unit
    * while it is one of the member's stampable units; a recreated ship gets a new id and does not
-   * rejoin mission units, and one whose unit is not restored is stamped like a client's create.
+   * rejoin mission units, and one whose unit is not restored is stamped like a client's create. The
+   * earlier origin is restored unless an import has since locked the ship.
    *
    * @param scope the member and the member's stampable units
    * @param rawId the ship's id
@@ -170,7 +173,8 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
             locationId,
             before.fitted(),
             ship.map(Ship::getVersion).orElse(null),
-            null);
+            null,
+            ship.filter(Ship::isOriginLocked).isPresent() ? null : before.origin());
     RecordedOrgUnit unit = before.orgUnit();
     if (unit != null && unit.id() != null && !scope.stampableUnits().get().contains(unit.id())) {
       unit = null;
@@ -273,6 +277,7 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
    * @param insurance the stored insurance, or {@code null}
    * @param location the location, or {@code null}
    * @param fitted whether it is fitted
+   * @param origin the origin the ship read as, or {@code null} when the state does not record it
    * @param orgUnit the org unit, or {@code null} when the state does not record it
    */
   record State(
@@ -281,10 +286,11 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
       @Nullable String insurance,
       @Nullable UUID location,
       boolean fitted,
+      @Nullable ShipOrigin origin,
       @Nullable RecordedOrgUnit orgUnit) {
 
     /**
-     * Captures a ship's synced fields and its org unit.
+     * Captures a ship's synced fields, with the origin it reads as, and its org unit.
      *
      * @param ship the ship
      * @return its state
@@ -296,6 +302,7 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
           ship.getInsurance(),
           ship.getLocation() == null ? null : ship.getLocation().getId(),
           ship.isFitted(),
+          ship.effectiveOrigin(),
           new RecordedOrgUnit(orgUnitIdOf(ship)));
     }
 
@@ -307,7 +314,13 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
      */
     static @NotNull State of(@NotNull ShipRequestDto dto) {
       return new State(
-          dto.shipTypeId(), dto.name(), dto.insurance(), dto.locationId(), dto.fitted(), null);
+          dto.shipTypeId(),
+          dto.name(),
+          dto.insurance(),
+          dto.locationId(),
+          dto.fitted(),
+          dto.origin(),
+          null);
     }
 
     /**
@@ -317,12 +330,12 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
      */
     @NotNull
     State synced() {
-      return new State(shipType, name, insurance, location, fitted, null);
+      return new State(shipType, name, insurance, location, fitted, origin, null);
     }
 
     /**
-     * Turns the state into the journal's JSON shape: the five synced fields always, {@code orgUnit}
-     * when the state records it.
+     * Turns the state into the journal's JSON shape: the five synced fields always, {@code origin}
+     * and {@code orgUnit} when the state records them.
      *
      * @return the state as the journal stores it
      */
@@ -334,6 +347,9 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
       state.put("insurance", insurance);
       state.put("location", location == null ? null : location.toString());
       state.put("fitted", fitted);
+      if (origin != null) {
+        state.put("origin", origin.name());
+      }
       if (orgUnit != null) {
         state.put("orgUnit", orgUnit.id() == null ? null : orgUnit.id().toString());
       }
@@ -356,7 +372,8 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
 
     /**
      * Reads a state the journal stores, from any version of the writer; an older state without
-     * {@code orgUnit}, or one whose unit is no unit id, records no unit.
+     * {@code orgUnit}, or one whose unit is no unit id, records no unit, and one without a known
+     * {@code origin} records no origin.
      *
      * @param node the state
      * @return the state
@@ -377,7 +394,21 @@ public class ExchangeShipJournal implements ExchangeEntryRestorer {
           ExchangeJournalJson.text(node, "insurance"),
           ExchangeJournalJson.uuid(node, "location"),
           fitted != null && fitted.asBoolean(),
+          origin(ExchangeJournalJson.text(node, "origin")),
           unit);
+    }
+
+    /**
+     * Reads a journaled origin.
+     *
+     * @param raw the stored name, or {@code null}
+     * @return the origin, or {@code null} when none or no known one is stored
+     */
+    private static @Nullable ShipOrigin origin(@Nullable String raw) {
+      return Arrays.stream(ShipOrigin.values())
+          .filter(origin -> origin.name().equals(raw))
+          .findFirst()
+          .orElse(null);
     }
   }
 

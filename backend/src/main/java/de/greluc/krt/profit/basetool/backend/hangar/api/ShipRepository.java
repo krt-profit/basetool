@@ -51,7 +51,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       SELECT new
       de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository$ExchangeShipRow(
       s.id, s.version, s.name, t.id, t.name, s.insurance, l.id, l.name, c.idCity,
-      st.idSpaceStation, s.fitted, o, s.owningOrgUnitVersion) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l
+      st.idSpaceStation, s.fitted, o, s.owningOrgUnitVersion, s.origin, s.originLocked)
+      FROM Ship s JOIN s.shipType t LEFT JOIN s.location l
       LEFT JOIN l.city c LEFT JOIN l.spaceStation st LEFT JOIN s.owningOrgUnit o
       WHERE s.owner.id = :member
       """;
@@ -316,6 +317,18 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Page<Ship> findByOwnerId(UUID ownerId, Pageable pageable);
 
   /**
+   * The personal-hangar origin filter on the effective origin: a ship locked by an import reads as
+   * {@code PLEDGE} whatever origin it stores (REQ-HANGAR-017).
+   */
+  String EFFECTIVE_ORIGIN_FILTER =
+      """
+      AND (:origin IS NULL
+      OR (s.originLocked = false AND s.origin = :origin)
+      OR (s.originLocked = true
+      AND :origin = de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin.PLEDGE))
+      """;
+
+  /**
    * One page of the calling user's own ships, ordered server-side by the hangar's multi-key
    * comparator and optionally filtered by a case-insensitive search term (REQ-HANGAR-002).
    *
@@ -326,6 +339,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param search optional case-insensitive ship-type/manufacturer name filter; {@code null}/blank
    *     returns every ship the user owns
    * @param fitted optional fitted filter; {@code null} returns fitted and unfitted ships
+   * @param origin optional filter on the effective origin; {@code null} returns every origin
    * @param pageable page and size only; the ordering lives in the query, so pass it unsorted
    * @return one ordered page of the user's ships
    */
@@ -340,22 +354,25 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN FETCH s.owningOrgUnit
           WHERE s.owner.id = :ownerId
           AND (:fitted IS NULL OR s.fitted = :fitted)
-          AND (cast(:search as string) IS NULL
-          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-          ) ORDER BY
-          LOWER(COALESCE(m.name, '')) ASC,
-          LOWER(COALESCE(st.name, '')) ASC,
-          CASE WHEN s.insurance = 'LTI' THEN 1
-          WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3
-          ELSE 2 END ASC,
-          CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0
-          ELSE cast(s.insurance as integer) END DESC,
-          LOWER(COALESCE(l.name, '')) ASC,
-          CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,
-          LOWER(COALESCE(s.name, '')) ASC,
-          s.id ASC
-          """,
+          """
+              + EFFECTIVE_ORIGIN_FILTER
+              + """
+              AND (cast(:search as string) IS NULL
+              OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+              ) ORDER BY
+              LOWER(COALESCE(m.name, '')) ASC,
+              LOWER(COALESCE(st.name, '')) ASC,
+              CASE WHEN s.insurance = 'LTI' THEN 1
+              WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3
+              ELSE 2 END ASC,
+              CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0
+              ELSE cast(s.insurance as integer) END DESC,
+              LOWER(COALESCE(l.name, '')) ASC,
+              CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,
+              LOWER(COALESCE(s.name, '')) ASC,
+              s.id ASC
+              """,
       countQuery =
           """
           SELECT COUNT(s) FROM Ship s
@@ -363,15 +380,19 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN st.manufacturer m
           WHERE s.owner.id = :ownerId
           AND (:fitted IS NULL OR s.fitted = :fitted)
-          AND (cast(:search as string) IS NULL
-          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-          )
-          """)
+          """
+              + EFFECTIVE_ORIGIN_FILTER
+              + """
+              AND (cast(:search as string) IS NULL
+              OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+              OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+              )
+              """)
   Page<Ship> findByOwnerIdFiltered(
       @Param("ownerId") UUID ownerId,
       @Param("search") @Nullable String search,
       @Param("fitted") @Nullable Boolean fitted,
+      @Param("origin") @Nullable ShipOrigin origin,
       Pageable pageable);
 
   /**
@@ -474,6 +495,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param fitted whether the ship is fitted
    * @param orgUnit the org unit the ship belongs to, or {@code null} when it has none
    * @param orgUnitVersion the optimistic counter of the ship's org unit (ADR-0258)
+   * @param origin the origin the owner chose
+   * @param originLocked whether an import locked the origin to {@code PLEDGE} (REQ-HANGAR-017)
    */
   record ExchangeShipRow(
       UUID id,
@@ -488,5 +511,17 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       Integer uexSpaceStationId,
       boolean fitted,
       @Nullable OrgUnit orgUnit,
-      long orgUnitVersion) {}
+      long orgUnitVersion,
+      ShipOrigin origin,
+      boolean originLocked) {
+
+    /**
+     * Returns the origin the ship reads as: {@code PLEDGE} while locked, the chosen one otherwise.
+     *
+     * @return the effective origin
+     */
+    public ShipOrigin effectiveOrigin() {
+      return ShipOrigin.effective(origin, originLocked);
+    }
+  }
 }

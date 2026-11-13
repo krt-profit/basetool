@@ -5802,6 +5802,9 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "origin" : {
+            "type" : "string"
+          },
           "shipId" : {
             "type" : "string"
           },
@@ -5855,6 +5858,10 @@
             "type" : "integer",
             "format" : "int64",
             "minimum" : 0
+          },
+          "origin" : {
+            "type" : "string",
+            "pattern" : "^(PLEDGE|IN_GAME|UNKNOWN)$"
           },
           "override" : {
             "type" : "boolean"

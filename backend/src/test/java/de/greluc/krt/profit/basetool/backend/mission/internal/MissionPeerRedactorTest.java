@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.mission.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDto;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOriginDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipPledgeDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipProductionStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.PayoutPreference;
@@ -166,15 +168,17 @@ class MissionPeerRedactorTest {
   }
 
   /**
-   * A peer sees the ship's production status but never its owner's pledge data (REQ-HANGAR-015).
+   * A peer sees the ship's production status but never its owner's pledge data or origin
+   * (REQ-HANGAR-015, REQ-HANGAR-017).
    */
   @Test
-  void cleanupMissionForPeer_dropsTheShipsPledgeButKeepsItsStatus() {
+  void cleanupMissionForPeer_dropsTheShipsPledgeAndOriginButKeepsItsStatus() {
     MissionDto redacted =
         redactor.cleanupMissionForPeer(missionWithUnit(unitWithShipOwnedBy(fullUser())));
 
     ShipDto ship = redacted.assignedUnits().getFirst().ship();
     assertThat(ship.pledge()).isNull();
+    assertThat(ship.origin()).isNull();
     assertThat(ship.productionStatus()).isEqualTo(ShipProductionStatus.IN_CONCEPT);
   }
 
@@ -206,7 +210,8 @@ class MissionPeerRedactorTest {
             1L,
             0L,
             ShipProductionStatus.IN_CONCEPT,
-            new ShipPledgeDto("1001", LocalDate.of(2026, 1, 2), BigDecimal.TEN, "USD", true, true));
+            new ShipPledgeDto("1001", LocalDate.of(2026, 1, 2), BigDecimal.TEN, "USD", true, true),
+            new ShipOriginDto(ShipOrigin.IN_GAME, false));
     return new MissionUnitDto(
         UUID.randomUUID(), "Alpha", null, ship, 8.5, true, null, "note", 1L, List.of());
   }

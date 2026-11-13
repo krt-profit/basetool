@@ -194,6 +194,7 @@ GET /api/v1/game-items/{id}/catalogue | ItemCatalogueDetailsController#get | pre
 GET /api/v1/hangar/admin/users/{userId}/ships | HangarController#getUserShips | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/hangar/admin/users/{userId}/ships | HangarController#addUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/hangar/admin/users/{userId}/ships/bulk-org-unit | HangarController#bulkChangeUserShipsOrgUnit | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/hangar/admin/users/{userId}/ships/bulk-origin | HangarController#bulkChangeUserShipsOrigin | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 DELETE /api/v1/hangar/admin/users/{userId}/ships/{shipId} | HangarController#deleteUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/hangar/admin/users/{userId}/ships/{shipId} | HangarController#updateUserShip | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 PUT /api/v1/hangar/admin/users/{userId}/ships/{shipId}/org-unit | HangarController#changeUserShipOrgUnit | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
@@ -203,6 +204,7 @@ GET /api/v1/hangar/my-ships/readiness | HangarController#getMyReadiness | pre=is
 DELETE /api/v1/hangar/ships | HangarController#deleteAllMyShips | pre=hasAuthority('HANGAR_WRITE') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/hangar/ships | HangarController#addShip | pre=isAuthenticated() | url=POST /api/v1/hangar/ships -> authenticated
 POST /api/v1/hangar/ships/bulk-org-unit | HangarController#bulkChangeMyShipsOrgUnit | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
+POST /api/v1/hangar/ships/bulk-origin | HangarController#bulkChangeMyShipsOrigin | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/hangar/ships/home-location | HangarController#setHomeLocationForMyShips | pre=hasAnyAuthority('HANGAR_READ','HANGAR_WRITE','ROLE_ADMIN') | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 POST /api/v1/hangar/ships/reset-fitted | HangarController#resetAllFittedStatus | pre=@hangarAccessPolicy.canResetFitted() | url=/api/v1/hangar/** -> hasAnyAuthority(HANGAR_READ,HANGAR_WRITE,ROLE_ADMIN)
 DELETE /api/v1/hangar/ships/{id} | HangarController#deleteMyShip | pre=isAuthenticated() and @hangarAccessPolicy.canEditShip(#id) | url=DELETE /api/v1/hangar/ships/* -> authenticated
