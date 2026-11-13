@@ -40,6 +40,10 @@ public class PatchChangeMentionSource implements PersonMentionSource {
 
   @Override
   public @NotNull @Unmodifiable Set<String> exemptTables() {
-    return Set.of("patch_change", "patch_change_effect_count", "patch_change_wipe_group");
+    return Set.of(
+        "patch_change",
+        "patch_change_effect_count",
+        "patch_change_wipe_exception",
+        "patch_change_wipe_group");
   }
 }

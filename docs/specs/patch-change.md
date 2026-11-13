@@ -417,7 +417,8 @@ data go into any details.
 - [x] A wipe records each area's summary event once and no per-offer or per-ship event.
 
 **Enforced by:** `PatchChangeWipeIntegrationTest`, `SupplyPatchWipeServiceTest`,
-`MaterialExchangePatchWipeServiceTest`, `AdminAuditLogPageControllerTest` · **Code:**
+`MaterialExchangePatchWipeServiceTest`, `HangarPatchWipeServiceTest`,
+`AdminAuditLogPageControllerTest` · **Code:**
 `InventoryPatchWipeService`, `HangarPatchWipeService`, `SupplyPatchWipeService`,
 `MaterialExchangePatchWipeService`, `JobOrderPatchWipeService`
 
@@ -431,11 +432,12 @@ rolled-back trigger.
 
 **Acceptance**
 
-- [x] The supply and Materialbörse rooms are published after the commit, and none when nothing
-  changed.
-- [ ] The Lager, hangar and order rooms are asserted by a test.
+- [x] The supply, Materialbörse and member hangar rooms are published after the commit, and none
+  when nothing changed.
+- [ ] The Lager and order rooms are asserted by a test.
 
 **Enforced by:** `SupplyPatchWipeServiceTest`, `MaterialExchangePatchWipeServiceTest`,
-`LiveSyncTopicRegistryParityTest` (every room exists on both sides) · **Code:**
+`HangarPatchWipeServiceTest`, `LiveSyncTopicRegistryParityTest` (every room exists on both sides)
+· **Code:**
 `InventoryPatchWipeService`, `MaterialExchangePatchWipeService`, `SupplyPatchWipeService`,
 `HangarPatchWipeService`, `JobOrderStockWriteEligibility`
