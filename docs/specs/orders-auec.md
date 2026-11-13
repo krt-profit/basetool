@@ -130,6 +130,11 @@ with that occurrence. A later deliberate supporting participation and a new comm
 possible. Material's uncovered-capacity/proportional-cut policy
 ([REQ-ORDERS-024](orders-material-claims.md)) is not applied to money commitments.
 
+**Patch change (amendment, [REQ-PATCH-045](patch-change.md#req-patch-045--open-unit-commitments-from-before-the-live-time-end)).**
+A patch change's currency wipe ends every open commitment opened before its live time, with
+the reason `CURRENCY_WIPE`. Credited parts stay as history; a unit that still contributes
+commits anew. A commitment opened after the live time stays.
+
 **Acceptance**
 
 - [ ] A unit commits 6 million and explicitly provides 4 million: 2 million remains committed, not 10 million provided.
@@ -226,6 +231,14 @@ player's existing order holding or explicitly newly provided fee money. Do not s
 net return or decrease handover again for that fee. Preserve the original handover and return.
 The return is bounded by the returning recipient's effective net receipt for that designation.
 The corrected party can return money against the original designation's historical receipt.
+
+**Patch change (amendment, [REQ-PATCH-044](patch-change.md#req-patch-044--holdings-that-existed-at-the-live-time-become-real-shortages)).**
+A patch change's currency wipe books the real shortage itself: per holding, the part of the
+booked amount that existed at its live time and is still held, as its own operation that
+names the patch change. Past provision and credit stay, money added later stays, and target,
+net handover and status do not change; residual money from before the live time on a
+completed or cancelled order goes to zero, which clears "settlement open". The order's participant-readable history shows the
+shortage with the patch label (REQ-ORDERS-064). Nobody is notified.
 
 **Acceptance**
 
