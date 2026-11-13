@@ -439,8 +439,10 @@ REQ-HANGAR-002, REQ-UI-034
 ### REQ-HANGAR-017 — Every ship is pledged, bought in-game or of unknown origin
 
 Every ship MUST carry an origin: `PLEDGE` (bought on the RSI website), `IN_GAME` (bought with
-in-game currency) or `UNKNOWN`. A patch wipe (epic #3328) removes only `IN_GAME` ships and treats
-`UNKNOWN` like `PLEDGE`. Decisions #3250 and #3255; [ADR-0379](../adr/0379-the-coarse-ship-origin-is-exchanged.md).
+in-game currency) or `UNKNOWN`. A patch wipe removes only unlocked `IN_GAME` ships created before
+its live time, through the ordinary deletion path, and treats `UNKNOWN` like `PLEDGE`
+([REQ-PATCH-015](patch-change.md#req-patch-015--in-game-ships-go-through-the-ordinary-deletion-path)).
+Decisions #3250 and #3255; [ADR-0379](../adr/0379-the-coarse-ship-origin-is-exchanged.md).
 
 - **Version.** The origin is part of the ship's `version`: an origin change is an ordinary edit, and
   a concurrent edit with the old `version` gets the 409 conflict dialog.

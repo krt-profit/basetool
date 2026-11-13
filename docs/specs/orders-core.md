@@ -240,6 +240,14 @@ cancelled orders. The Bank-free writer checks this gate for settlement, financia
 identity maintenance on every affected order. Coupled Bank operations have the same prerequisite.
 Once valid responsibility is restored, ordinary rules apply.
 
+**Patch-change exception** ([REQ-PATCH-014](patch-change.md#req-patch-014--the-wipe-is-excepted-from-the-invalid-responsibility-gate),
+[ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md)): a patch
+change's stock wipe is a game fact, not an order write. It takes the shared hierarchy lock and every
+material, lot and row lock as an ordinary stock write does, and the affected orders must exist, but
+an order with invalid responsibility does not refuse it (`beforeGameFactStockLoss`,
+`assertGameFactMaterialLoss`). The order keeps its history and its invalid responsibility; the loss
+of its earmarked stock is genuine (ADR-0360).
+
 A supporting Staffel that becomes ineligible immediately loses active support and open promises;
 past contributions remain. Existing orders and legacy flags are not silently reparented.
 Migration preserves verifiable provenance, flags unresolved cases and does not invent an original

@@ -58,6 +58,8 @@ worth reading even if you know the domain.
 | **Patchwechsel / Patch change** | An admin's record of a Star Citizen patch and its options, made once for every org unit; its effects run at the trigger, all or nothing (REQ-PATCH-001, ADR-0380). Hotfixes are not recorded. |
 | **Patch-Art / Patch kind** | What a patch kept: **Rebuild** (a long-term persistence rebuild: stored items, materials, aUEC and ships survive) or **Full Wipe** (only pledged ships and blueprints survive). The kind presets a patch change's options (REQ-PATCH-002). |
 | **Live-Zeit / Live time** | When the patch went live in the game: the cutoff of every effect of its patch change, which touches only what was created or started before it, and fixed once triggered (REQ-PATCH-003, ADR-0381). |
+| **Wipe-Gruppe / Wipe group** | A fixed set of catalogue types a patch change can wipe: consumables, FPS equipment, ship components and vehicle weapons, raw, refined and no-refine materials, other items (whatever no group claims) and in-game ships (REQ-PATCH-010). |
+| **Ausnahme / Wipe exception** | A single game item, or a material in every quality, whose stock a patch change keeps although its group is wiped, or wipes although its group is not (REQ-PATCH-011). |
 | **Home-Location-Abfrage / Home-location phase** | The period in which members are asked at their next login for their new home location after a patch change, until each has chosen, the admin ends it or a newer patch change supersedes it (decision #3252). |
 
 ## 12.3 Architecture and operations

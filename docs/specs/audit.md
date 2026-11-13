@@ -648,8 +648,18 @@ The coverage list holds the **Patchwechsel** area
   `wipeGroups`, `refinery`, `currency`, `homeLocation` and one count per effect kind) and
   `PATCH_CHANGE_LABEL_CORRECTED` with `from` and `to`; `PATCH_CHANGE_AUDIT_EXPORTED` and
   `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. There is no target user,
-  and the details carry enums, instants, booleans and counts only. Each affected area records one
-  summary event of the trigger in its own trail (the refinery's above).
+  and the details carry enums, instants, booleans and counts only (`wipeExceptions` is the number
+  of exceptions). Each affected area records one summary event of the trigger in its own trail (the
+  refinery's above), the wipe's areas
+  ([REQ-PATCH-017](patch-change.md#req-patch-017--one-summary-event-per-affected-area)) these:
+  - **Lager** — `INVENTORY_WIPED_BY_PATCH` (details `rows`, `members`, `jobOrders`, `patchChange`
+    and the rows per wipe group, `WIPE_EXCEPTIONS` for the rows a wiping exception selects);
+  - **Hangar** — `HANGAR_SHIPS_WIPED_BY_PATCH` (`ships`, `owners`, `detachedUnits`, `patchChange`);
+  - **Bedarf & Spenden** — `DONATIONS_WITHDRAWN_BY_PATCH` (`withdrawn`, `patchChange`);
+  - **Materialbörse** — `MARKET_OFFERS_ENDED_BY_PATCH` (`offers`, `patchChange`);
+  - **Aufträge** — `JOB_ORDERS_STOCK_WIPED_BY_PATCH` (`jobOrders`, `patchChange`).
+  Each has the patch change as its subject, labelled by its patch label; single rows, ships, offers
+  and pledges are not audited one by one.
 
 The types are offered by the viewer's per-area event-type list and labelled in DE/EN
 (`admin.audit.domain.PATCH_CHANGE`, `admin.audit.event.*`, `pdf.audit.title.PATCH_CHANGE`); both
@@ -659,6 +669,8 @@ exhaustive domain switches carry the case. The area is exempt from `AuditDomainS
 
 - [x] A trigger records one `PATCH_CHANGE_TRIGGERED` and the refinery's one summary event; a label
   correction records `PATCH_CHANGE_LABEL_CORRECTED` (`PatchChangeTriggerIntegrationTest`).
+- [x] A wipe records each area's one summary event and no per-offer or per-ship event
+  (`PatchChangeWipeIntegrationTest`).
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
