@@ -19,8 +19,11 @@
 
 package de.greluc.krt.profit.basetool.backend.bank.web;
 
+import static de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -474,6 +477,70 @@ class JobOrderLinkedBankIntegrationTest {
     provide(order, terms)
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("WAITING"));
+  }
+
+  @Test
+  void linkedBankFundingHonoursTheActiveOrgUnit() throws Exception {
+    var seeder = new BankAccessSeeder(context);
+    UUID member = world.user(Actor.MEMBER);
+    seeder.seatLinkedOrderMember(member, responsible);
+    UUID local = seeder.seedLinkedOrderAccount(member, units.findById(responsible).orElseThrow());
+    UUID other = world.account(Account.OWN_ORG_UNIT);
+    UUID order = createOrder("600000");
+    String pin = responsible.toString();
+
+    mvc.perform(
+            get(MONEY + "/bank-accounts", order).with(writer()).header(ACTIVE_ORG_UNIT_HEADER, pin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.withdrawal[*].id").value(hasItem(local.toString())))
+        .andExpect(jsonPath("$.withdrawal[*].id").value(not(hasItem(other.toString()))))
+        .andExpect(jsonPath("$.transfer[*].id").value(not(hasItem(other.toString()))))
+        .andExpect(jsonPath("$.collection[*].id").value(hasItem(other.toString())))
+        .andExpect(jsonPath("$.designation[*].id").value(hasItem(other.toString())));
+
+    Map<String, ?> otherTerms = accountAuthorisationTerms(UUID.randomUUID(), other, "200000");
+    perform(
+            post(MONEY + "/provisions/preview", order)
+                .with(writer())
+                .header(ACTIVE_ORG_UNIT_HEADER, pin),
+            otherTerms)
+        .andExpect(status().isNotFound());
+    perform(
+            post(MONEY + "/provisions", order).with(writer()).header(ACTIVE_ORG_UNIT_HEADER, pin),
+            otherTerms)
+        .andExpect(status().isNotFound());
+    assertThat(ownLinkedRequests()).isEmpty();
+
+    var localTerms = accountAuthorisationTerms(UUID.randomUUID(), local, "200000");
+    perform(
+            post(MONEY + "/provisions/preview", order)
+                .with(writer())
+                .header(ACTIVE_ORG_UNIT_HEADER, pin),
+            localTerms)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.bank.disposition").value("PENDING"));
+    perform(
+            post(MONEY + "/provisions", order).with(writer()).header(ACTIVE_ORG_UNIT_HEADER, pin),
+            localTerms)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+
+    perform(
+            post(MONEY + "/recipients", order).with(writer()).header(ACTIVE_ORG_UNIT_HEADER, pin),
+            Map.of("bankAccountId", other))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.bankAccountId").doesNotExist());
+
+    reportDepositToAccount(order, other, "200000", "Order contributor");
+    confirmDepositToAccount("Order contributor", world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER));
+    mvc.perform(get(MONEY, order).with(writer()).header(ACTIVE_ORG_UNIT_HEADER, pin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.accountHoldings[?(@.amount == '200000')].id").isNotEmpty())
+        .andExpect(
+            jsonPath("$.accountHoldings[*].bankAccountId").value(not(hasItem(other.toString()))));
+    money(order)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.accountHoldings[*].bankAccountId").value(hasItem(other.toString())));
   }
 
   @Test

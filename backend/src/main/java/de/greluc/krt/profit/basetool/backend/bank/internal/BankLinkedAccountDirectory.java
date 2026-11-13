@@ -81,9 +81,15 @@ class BankLinkedAccountDirectory implements BankLinkedAccountOptions {
             scope.responsibleUnit(),
             actor,
             staff,
-            BankBookingRequestType.WITHDRAWAL),
+            BankBookingRequestType.WITHDRAWAL,
+            scope.pin()),
         debitRefs(
-            debitAccounts, scope.responsibleUnit(), actor, staff, BankBookingRequestType.TRANSFER),
+            debitAccounts,
+            scope.responsibleUnit(),
+            actor,
+            staff,
+            BankBookingRequestType.TRANSFER,
+            scope.pin()),
         custodians(staff.staff(), staff.actorId()));
   }
 
@@ -92,12 +98,13 @@ class BankLinkedAccountDirectory implements BankLinkedAccountOptions {
       UUID responsibleUnit,
       BankActor actor,
       BankStaffRights staff,
-      BankBookingRequestType type) {
+      BankBookingRequestType type,
+      @Nullable UUID pin) {
     return refs(
         available.stream()
             .filter(account ->
                 staff.canBook(type, account.getId())
-                    || access.admit(actor, account, null, type, BigDecimal.ONE)
+                    || access.admit(actor, account, pin, type, BigDecimal.ONE)
                         instanceof BankAdmission.Admitted),
         responsibleUnit);
   }

@@ -63,7 +63,9 @@ public class OrgUnitStampingService {
   @Nullable
   public OrgUnit resolveOrgUnitForClientCreate(@NotNull User targetUser) {
     Set<UUID> stampableOrgUnitIds = collectStampableOrgUnitIds(targetUser);
-    return stampableOrgUnitIds.size() == 1 ? load(stampableOrgUnitIds.iterator().next()) : null;
+    return stampableOrgUnitIds.size() == 1
+        ? loadActive(stampableOrgUnitIds.iterator().next())
+        : null;
   }
 
   /**
@@ -80,9 +82,11 @@ public class OrgUnitStampingService {
     Set<UUID> stampableOrgUnitIds = collectStampableOrgUnitIds(targetUser);
     UUID pinnedMembership = pinAmong(stampableOrgUnitIds);
     if (pinnedMembership != null) {
-      return load(pinnedMembership);
+      return loadActive(pinnedMembership);
     }
-    return stampableOrgUnitIds.size() == 1 ? load(stampableOrgUnitIds.iterator().next()) : null;
+    return stampableOrgUnitIds.size() == 1
+        ? loadActive(stampableOrgUnitIds.iterator().next())
+        : null;
   }
 
   /**
@@ -124,11 +128,7 @@ public class OrgUnitStampingService {
     if (!collectStampableOrgUnitIds(owner).contains(targetOrgUnitId)) {
       throw new BadRequestException("error.org_unit.owner_target_not_allowed");
     }
-    OrgUnit target = load(targetOrgUnitId);
-    if (!target.isActive()) {
-      throw new BadRequestException("error.org_unit.owner_target_not_allowed");
-    }
-    return target;
+    return loadActive(targetOrgUnitId);
   }
 
   /**
@@ -141,7 +141,7 @@ public class OrgUnitStampingService {
    * @return the resolved {@link OrgUnit}, or {@code null} when {@code targetUser} has no stampable
    *     unit and no pick names a unit.
    * @throws BadRequestException when the pick is outside the owner's stampable units and the
-   *     caller's editable scope, or the resolved unit does not exist
+   *     caller's editable scope, or the target is unknown or inactive
    * @throws OwnerOrgUnitRequiredException when several stampable units lack a pick or eligible pin
    */
   @Nullable
@@ -165,7 +165,7 @@ public class OrgUnitStampingService {
    * @return the resolved {@link OrgUnit}, or {@code null} when the creator has no stampable unit
    *     and neither a pick nor a pin names a unit
    * @throws BadRequestException on a pick that is neither a stampable unit of the creator nor
-   *     within the caller's editable scope
+   *     within the caller's editable scope, or the target is unknown or inactive
    * @throws OwnerOrgUnitRequiredException when several stampable units lack both a pick and a pin
    *     (REQ-ORG-023)
    */
@@ -182,15 +182,15 @@ public class OrgUnitStampingService {
    * Validates and resolves the target of an explicit reassignment of an aggregate's owning org unit
    * (REQ-ORG-018), without any auto-stamp fallback.
    *
-   * <p>An admin may pick any org unit or {@code null}. A non-admin may pick a direct membership or
-   * an org unit they may edit ({@link AccessGateService#canEditSquadron(UUID)}), and {@code null}
-   * only as a membershipless leadership caller.
+   * <p>An admin may pick any active org unit or {@code null}. A non-admin may pick an active unit
+   * in their membership or editable scope ({@link AccessGateService#canEditSquadron(UUID)}), and
+   * {@code null} only as a membershipless leadership caller.
    *
    * @param targetOrgUnitId the picker-supplied target org-unit id, or {@code null} for ownerless.
    * @return the resolved managed {@link OrgUnit}, or {@code null} for an ownerless target.
    * @throws org.springframework.security.access.AccessDeniedException when the caller may not
    *     assign to the requested target.
-   * @throws BadRequestException when a non-null target id does not resolve to a known org unit.
+   * @throws BadRequestException when a non-null target id names an unknown or inactive org unit.
    */
   @Nullable
   public OrgUnit resolveReassignTargetOrgUnit(@Nullable UUID targetOrgUnitId) {
@@ -208,10 +208,7 @@ public class OrgUnitStampingService {
       throw new AccessDeniedException(
           "Target org unit is neither a membership of the caller nor within their editable scope");
     }
-    return orgUnitRepository
-        .findById(targetOrgUnitId)
-        .orElseThrow(
-            () -> new BadRequestException("owningOrgUnitId does not resolve to a known org unit"));
+    return loadActive(targetOrgUnitId);
   }
 
   /**
@@ -273,7 +270,7 @@ public class OrgUnitStampingService {
    * @param stampablePin the pin a pick-less create is stamped on, or {@code null}
    * @return the resolved {@link OrgUnit}; never {@code null}.
    * @throws BadRequestException on a pick that is neither one of {@code memberOrgUnitIds} nor
-   *     within the caller's editable scope, or a resolved id that no longer exists.
+   *     within the caller's editable scope, or the target is unknown or inactive.
    * @throws OwnerOrgUnitRequiredException on a {@code null} choice with neither a stampable pin nor
    *     exactly one unit in {@code memberOrgUnitIds} (REQ-ORG-023).
    */
@@ -289,31 +286,46 @@ public class OrgUnitStampingService {
             "Selected owner org unit is neither a membership of the target user nor within the"
                 + " caller's editable scope");
       }
-      return load(owningOrgUnitId);
+      return loadActive(owningOrgUnitId);
     }
     if (stampablePin != null) {
-      return load(stampablePin);
+      return loadActive(stampablePin);
     }
     if (memberOrgUnitIds.size() == 1) {
-      return load(memberOrgUnitIds.iterator().next());
+      return loadActive(memberOrgUnitIds.iterator().next());
     }
     throw new OwnerOrgUnitRequiredException(
         "User belongs to multiple org units; owningOrgUnitId is required");
   }
 
   /**
-   * Loads a stamp target as its concrete, unproxied {@link OrgUnit} subtype.
+   * Loads an active assignment target as its concrete, unproxied {@link OrgUnit} subtype.
    *
-   * @param orgUnitId the stamp target
+   * @param orgUnitId the assignment target
    * @return the org unit; never {@code null}
-   * @throws BadRequestException when the id no longer resolves
+   * @throws BadRequestException when the id names an unknown or inactive org unit
    */
   @NotNull
-  private OrgUnit load(@NotNull UUID orgUnitId) {
-    return orgUnitRepository
-        .findById(orgUnitId)
-        .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
-        .orElseThrow(() ->
-            new BadRequestException("Picked owner org unit no longer resolves — repository miss"));
+  private OrgUnit loadActive(@NotNull UUID orgUnitId) {
+    OrgUnit target =
+        orgUnitRepository
+            .findById(orgUnitId)
+            .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
+            .orElseThrow(() ->
+                new BadRequestException("owningOrgUnitId does not resolve to a known org unit"));
+    requireActiveAssignmentTarget(target);
+    return target;
+  }
+
+  /**
+   * Rejects an inactive owner when a new row inherits its unit from an existing aggregate.
+   *
+   * @param target the assigned unit, or {@code null} for ownerless
+   * @throws BadRequestException when the assigned unit is inactive
+   */
+  public static void requireActiveAssignmentTarget(@Nullable OrgUnit target) {
+    if (target != null && !target.isActive()) {
+      throw new BadRequestException("error.org_unit.inactive_target");
+    }
   }
 }

@@ -82,9 +82,9 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   @Override
   @NotNull
   public BankLinkedOutcome submit(
-      @NotNull BankLinkedAttempt attempt, @NotNull BankLinkedPayment payment) {
+      @NotNull BankLinkedAttempt attempt, @NotNull BankLinkedPayment payment, @Nullable UUID pin) {
     BankLinkedDecisions.Prepared prepared = prepareSubmission(attempt, payment);
-    return admit(prepared, payment, feePolicy.snapshot(), null);
+    return admit(prepared, payment, feePolicy.snapshot(), null, pin);
   }
 
   @Override
@@ -93,7 +93,8 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
       @NotNull UUID previousRequestId,
       @NotNull BankLinkedAttempt previousAttempt,
       @NotNull BankLinkedAttempt nextAttempt,
-      @NotNull BankLinkedPayment payment) {
+      @NotNull BankLinkedPayment payment,
+      @Nullable UUID pin) {
     if (previousAttempt.id().equals(nextAttempt.id())
         || !previousAttempt.purpose().equals(nextAttempt.purpose())) {
       throw new BadRequestException("Replacement requires a fresh attempt for the same purpose");
@@ -102,7 +103,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
     BankBookingRequest previous = requests.replacementSource(previousRequestId, previousAttempt);
     RateSnapshot rate =
         new RateSnapshot(Objects.requireNonNull(previous.getLinkedAttempt()).getFeeRate());
-    return admit(prepared, payment, rate, previous);
+    return admit(prepared, payment, rate, previous, pin);
   }
 
   /**
@@ -129,6 +130,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
    * @param payment the immutable submitted terms
    * @param rate the authoritative rate for this payment
    * @param previous the verified failed Bank request for a replacement
+   * @param pin the trusted active org unit
    * @return the Bank outcome
    */
   @NotNull
@@ -136,12 +138,13 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
       @NotNull BankLinkedDecisions.Prepared prepared,
       @NotNull BankLinkedPayment payment,
       @NotNull RateSnapshot rate,
-      @Nullable BankBookingRequest previous) {
+      @Nullable BankBookingRequest previous,
+      @Nullable UUID pin) {
     if (!rate.equals(payment.terms().rate())) {
       throw new BadRequestException("The submitted fee rate does not match the payment fee basis");
     }
     BankActor actor = actors.of(prepared.actor());
-    requirePreliminaryAdmission(actor, payment);
+    requirePreliminaryAdmission(actor, payment, pin);
     BankLinkedBooking booking = normalize(payment, previous, this::lockActive);
     actor = actors.of(prepared.actor());
     BankStaffRights staff = policy.staffRights(actor);
@@ -150,7 +153,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
     BigDecimal fee = bankFee(payment, booking, rate);
     BankLinkedAttemptRecord record =
         new BankLinkedAttemptRecord(prepared.attempt(), rate.rate(), fee, samePlayer);
-    BankAdmission.Admitted routing = pendingRouting(actor, staff, booking);
+    BankAdmission.Admitted routing = pendingRouting(actor, staff, booking, pin);
     if (routing == null && booking.type() == BankBookingRequestType.HOLDER_TRANSFER) {
       ledger.lockHolderTransferFeeAccount(fee);
       if (!decisions.rights().staff()) {
@@ -175,8 +178,8 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
 
   @Override
   @NotNull
-  public Quote quote(@NotNull BankLinkedPayment payment) {
-    return quoteAdmission(payment, null);
+  public Quote quote(@NotNull BankLinkedPayment payment, @Nullable UUID pin) {
+    return quoteAdmission(payment, null, pin);
   }
 
   @Override
@@ -184,23 +187,25 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
   public Quote quoteReplacement(
       @NotNull BankLinkedPayment payment,
       @NotNull UUID requestId,
-      @NotNull BankLinkedAttempt attempt) {
+      @NotNull BankLinkedAttempt attempt,
+      @Nullable UUID pin) {
     var previous = requests.previewReplacementSource(requestId, attempt);
     var rate = new RateSnapshot(Objects.requireNonNull(previous.getLinkedAttempt()).getFeeRate());
     if (!rate.equals(payment.terms().rate())) {
       throw new BadRequestException("The submitted fee rate does not match the payment fee basis");
     }
-    return quoteAdmission(payment, previous);
+    return quoteAdmission(payment, previous, pin);
   }
 
-  private Quote quoteAdmission(BankLinkedPayment payment, @Nullable BankBookingRequest previous) {
+  private Quote quoteAdmission(
+      BankLinkedPayment payment, @Nullable BankBookingRequest previous, @Nullable UUID pin) {
     requireValidTerms(payment.terms());
     BankActor actor = caller.actor();
-    requirePreliminaryAdmission(actor, payment);
+    requirePreliminaryAdmission(actor, payment, pin);
     BankLinkedBooking booking = normalize(payment, previous, this::readActive);
     bookings.validateParties(booking, samePlayer(payment));
     BankStaffRights staff = policy.staffRights(actor);
-    boolean pending = pendingRouting(actor, staff, booking) != null;
+    boolean pending = pendingRouting(actor, staff, booking, pin) != null;
     BigDecimal debit = sourceDebit(booking, bankFee(payment, booking, payment.terms().rate()));
     if (!pending) {
       requireDirectTarget(staff, booking);
@@ -331,9 +336,10 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
    *
    * @param actor the authenticated Bank actor
    * @param payment the submitted linked command
+   * @param pin the trusted active org unit
    */
   private void requirePreliminaryAdmission(
-      @NotNull BankActor actor, @NotNull BankLinkedPayment payment) {
+      @NotNull BankActor actor, @NotNull BankLinkedPayment payment, @Nullable UUID pin) {
     AccountSelection selection =
         switch (payment) {
           case BankLinkedPayment.Deposit deposit ->
@@ -367,7 +373,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
     if (!rights.canBook(selection.type(), selection.accountId())) {
       requireAdmitted(
           policy.admit(
-              actor, selection.accountId(), null, selection.type(), payment.terms().amount()));
+              actor, selection.accountId(), pin, selection.type(), payment.terms().amount()));
     } else if (selection.targetId() != null
         && !rights.canSee(selection.targetId())
         && !policy.exceedsDirectBookingCeiling(
@@ -392,13 +398,15 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
    * @param actor the current requester
    * @param staff the current staff grants
    * @param booking the normalized booking
+   * @param pin the trusted active org unit
    * @return the request approval routing, or {@code null} when direct booking is allowed
    */
   @Nullable
   private BankAdmission.Admitted pendingRouting(
       @NotNull BankActor actor,
       @NotNull BankStaffRights staff,
-      @NotNull BankLinkedBooking booking) {
+      @NotNull BankLinkedBooking booking,
+      @Nullable UUID pin) {
     BankAccount account = booking.account();
     if (account == null) {
       return staff.staff() ? null : BankAdmission.Admitted.UNROUTED;
@@ -413,7 +421,7 @@ class BankLinkedPaymentsService implements BankLinkedPayments {
               && policy.exceedsDirectBookingCeiling(actor, account.getId(), booking.amount());
       return overCeiling ? policy.routeCartelDirectBooking(actor, account, booking.amount()) : null;
     }
-    return requireAdmitted(policy.admit(actor, account, null, booking.type(), booking.amount()));
+    return requireAdmitted(policy.admit(actor, account, pin, booking.type(), booking.amount()));
   }
 
   /**

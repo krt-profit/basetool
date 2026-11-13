@@ -2070,19 +2070,18 @@ class ArchitectureTest {
     }
   }
 
-  /**
-   * Only {@code OrgUnitBankAccessService} may couple an org-unit scope service with the
-   * bank-account repository (ADR-0020, ADR-0028), keeping the rest of the bank org-unit-blind.
-   */
+  /** Keeps active-org-unit scoping at the org-unit Bank and linked Order composition boundaries. */
   @Test
-  void orgUnitAwareBankSeamIsContainedToOneClass() {
+  void orgUnitAwareBankSeamsAreContainedToAdapters() {
     DescribedPredicate<JavaClass> selection =
         ORG_UNIT_SCOPE_TYPES.stream()
             .map(scopeType -> bridgesOrgUnitScopeAndTheBank(scopeType, BANK_DOMAIN))
             .reduce((left, right) -> left.or(right))
             .orElseThrow();
-    assertClassFloor("orgUnitAwareBankSeamIsContainedToOneClass", selection, 1);
-    orgUnitAwareBankSeamRule(selection, OrgUnitBankAccessService.class).check(CLASSES);
+    assertClassFloor("orgUnitAwareBankSeamsAreContainedToAdapters", selection, 2);
+    orgUnitAwareBankSeamRule(
+            selection, Set.of(OrgUnitBankAccessService.class, AuecBankComposition.class))
+        .check(CLASSES);
   }
 
   /**
@@ -2173,15 +2172,19 @@ class ArchitectureTest {
   }
 
   static ArchRule orgUnitAwareBankSeamRule(
-      DescribedPredicate<JavaClass> selection, Class<?> bridge) {
+      DescribedPredicate<JavaClass> selection, Set<Class<?>> bridges) {
     return classes()
         .that(selection)
-        .should()
-        .be(bridge)
-        .because(
-            "officer/lead bank access bridges org-unit oversight and the bank through exactly one"
-                + " sanctioned seam outside the bank domain (ADR-0020); BankSecurityService stays"
-                + " org-unit-blind (REQ-BANK-008)");
+        .should(
+            new ArchCondition<JavaClass>("be an approved Bank scope adapter") {
+              @Override
+              public void check(JavaClass type, ConditionEvents events) {
+                if (!classesIn(bridges).test(type)) {
+                  events.add(SimpleConditionEvent.violated(type, type.getName()));
+                }
+              }
+            })
+        .because("only Bank adapters may bridge org-unit scope into Bank (ADR-0020, ADR-0357)");
   }
 
   /**

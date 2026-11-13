@@ -324,7 +324,8 @@ record.
    queue before its order row. The movement, lifecycle change and audit commit together.
    Participants receive section invalidations after commit. An affected linked account can
    receive a targeted notice.
-4. A selected-Bank operation uses the Bank's normal admission and decision. The composition
+4. A selected-Bank operation uses the Bank's normal admission and decision, including the
+   active-unit check for member debits. The composition
    adapter applies the linked Order effect and both domains' audit in the decision transaction.
    Pending requests can bind available order funds. Participants receive live updates and
    grouped notices after commit.

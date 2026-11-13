@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.api;
 import java.util.List;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /** Minimal Bank references offered by an authorized linked Order action. */
 public interface BankLinkedAccountOptions {
@@ -43,13 +44,15 @@ public interface BankLinkedAccountOptions {
    * @param deposit whether the caller may deposit
    * @param designate whether the caller may designate a destination
    * @param debit whether the caller may provide from Bank funds
+   * @param pin the trusted active org unit, or {@code null} without a selection
    */
   record Scope(
       UUID responsibleUnit,
       UUID requestingUnit,
       boolean deposit,
       boolean designate,
-      boolean debit) {}
+      boolean debit,
+      @Nullable UUID pin) {}
 
   /**
    * Bounded references for the current financial action.

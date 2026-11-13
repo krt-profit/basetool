@@ -48,6 +48,7 @@ import de.greluc.krt.profit.basetool.backend.mission.api.MissionParticipantRepos
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionRepository;
 import de.greluc.krt.profit.basetool.backend.mission.api.MissionVisibility;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
+import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.time.Instant;
@@ -458,7 +459,27 @@ class MissionServiceSectionPatchTest {
   }
 
   @Test
-  void updateOwningOrgUnit_shouldReassignAndBumpOnlyItsCounter_whenVersionMatches() {
+  void addSubMission_shouldRejectAnInactiveInheritedUnit() {
+    Squadron inactiveUnit = new Squadron();
+    inactiveUnit.setActive(false);
+    existing.setOwningOrgUnit(inactiveUnit);
+    when(missionRepository.findById(missionId)).thenReturn(Optional.of(existing));
+    CreateSubMissionRequest request = mock(CreateSubMissionRequest.class);
+
+    BadRequestException exception =
+        assertThrows(
+            BadRequestException.class, () -> missionService.addSubMission(missionId, request));
+
+    assertEquals("error.org_unit.inactive_target", exception.getMessage());
+    verify(missionRepository, never()).save(any(Mission.class));
+  }
+
+  @Test
+  void updateOwningOrgUnit_shouldMoveFromAnInactiveUnitAndBumpOnlyItsCounter() {
+    Squadron previous = new Squadron();
+    previous.setId(UUID.randomUUID());
+    previous.setActive(false);
+    existing.setOwningOrgUnit(previous);
     UUID targetId = UUID.randomUUID();
     OrgUnit target = mock(OrgUnit.class);
     when(target.getKind()).thenReturn(OrgUnitKind.SQUADRON);

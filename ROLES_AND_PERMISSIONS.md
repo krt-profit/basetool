@@ -1005,7 +1005,9 @@ left untouched by this.
 
 **Linked aUEC Bank decisions.** An authorised purpose owner submits on behalf of the current
 authenticated member. Account-linked direct execution uses the corresponding staff grant and the
-KRT direct ceiling. The request and final approval use ordinary account admission, four-eyes and
+KRT direct ceiling. For member requests, ordinary account visibility and linked debits follow the
+active org unit. Deposit and transfer destinations follow the Bank's cross-unit rules. The request
+and final approval use ordinary account admission, four-eyes and
 staff attestation. Final authorisation of existing funds uses withdrawal authority and checks the
 full principal on one account. Bank staff can decide a linked custody transfer under the existing
 holder-transfer right. Both custodians must be registered Bank holders. Bank Management and Admin
@@ -1455,6 +1457,8 @@ backend serves every member) but no control that writes.
 - **A deactivated unit confers nothing** (REQ-ORG-032, ADR-0374 D10): its memberships stay stored
   for a reactivation, but give no reach, no officer, Logistician, Mission Manager or seat right, no
   leadership cascade, no SK roster management and no notices until the unit is active again.
+  It is unavailable as the owning-unit target of a new row or reassignment, including for admins.
+  Existing rows remain subject to the usual read and edit permissions.
 - **Role powers follow the active org unit** (REQ-ORG-032): with a unit selected, every column
   above acts in that unit only — officer, Logistician and Mission Manager rights, the Leitung writes,
   the org-unit bank's holder rights and approvals, material claims — admins included; „Alle meine

@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-11-09
 - **Deciders:** Repository owner (@greluc)
-- **Amends:** ADR-0021 (authorisation-only outcome), ADR-0254 (optional purpose command/outcome coverage)
+- **Amends:** ADR-0020 (scope adapters), ADR-0021 (authorisation-only outcome),
+  ADR-0254 (optional purpose command/outcome coverage)
 - **Related:** [orders-auec-bank.md](../specs/orders-auec-bank.md),
   [bank.md](../specs/bank.md), ADR-0232, ADR-0233, ADR-0287, ADR-0352, ADR-0353,
   [ADR-0358](0358-one-configured-transfer-fee-policy-serves-bank-and-orders.md)
@@ -35,6 +36,12 @@ Use a thin adapter in the existing application composition. It consumes only the
 and Bank APIs for this integration and owns neither aggregate nor monetary policy. JobOrder owns
 logical operations, submitted attempts and financial order effects. Bank owns admission, approvals,
 requests, custodians and ledger effects. Each module alone mutates its data.
+
+`AuecBankComposition` resolves the trusted active org-unit selection (REQ-ORG-032) and passes it
+as an explicit input to Bank source admission and independent account visibility. The Bank
+continues to decide what the selection narrows. `ArchitectureTest.orgUnitAwareBankSeamsAreContainedToAdapters`
+allows only this Order composition and `OrgUnitBankAccessService` to bridge the scope service
+and Bank code. Staff operations and Bank credit destinations retain their cross-unit policy.
 
 A narrow JobOrder-owned coordination port is implemented by the adapter. Bank-owned synchronous
 outcome/reversal SPIs connect through the adapter to narrow JobOrder commands. The lower modules
