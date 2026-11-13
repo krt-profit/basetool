@@ -273,15 +273,15 @@ the grant table.
 > against, their own org unit's account. This does **not** weaken the rule above:
 > `BankSecurityService` and the ledger stay 100% org-unit-blind. All org-unit logic is
 > isolated in one deliberately non-`Bank*`-named seam, `OrgUnitBankAccessService` (ADR-0020),
-> which is the **only** class permitted to bridge the org-unit scope services and the bank
-> (pinned by `ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`). The officer/lead
+> which is the sole scope adapter for the ordinary org-unit Bank surface
+> (pinned by `ArchitectureTest.orgUnitAwareBankSeamsAreContainedToAdapters`). The officer/lead
 > surface lives beside the bank-employee one at `/api/v1/bank/org-units/**` (moved there from
 > `/api/v1/org-units/bank/**` in wave 4 of the API cut) and is decided in that seam, not by a bank role.
 > The settings and booking-request flows of that surface run in `OrgUnitBankSettingsService` and
 > `OrgUnitBankRequestService`, which take every verdict from the seam and depend on no scope class
 > themselves (ADR-0266).
 >
-> **Amendment (epic #692, REQ-BANK-027):** the same seam — still the only org-unit bridge — extends this
+> **Amendment (epic #692, REQ-BANK-027):** the same org-unit Bank seam extends this
 > narrow capability **up the hierarchy**: a Bereichsleitung over its `AREA` account, the OL over the
 > `CARTEL` account, plus **view-only** drill-down into subordinate accounts. `BankSecurityService` and
 > the ledger stay 100% org-unit-blind; both ArchUnit pins remain in force.
@@ -925,9 +925,9 @@ org-unit-blind.
   delta/sparkline aggregates only.
 - [x] Each card shows the 30-day delta + sparkline trend, derived from the windowed posting slices
   with no per-account N+1 (`OrgUnitBankAccessServiceTest`, frontend `OrgUnitBankPageControllerMvcTest`).
-- [x] The seam is the only class bridging the org-unit scope services and the bank — any bank-domain class,
-  the accounts repository included (`ArchitectureTest.orgUnitAwareBankSeamIsContainedToOneClass`); `BankSecurityService`
-  never depends on an org-unit scope service (`bankClassesMustNotConsultOrgUnitScope`).
+- [x] `OrgUnitBankAccessService` is the scope adapter for this surface. The linked aUEC Order
+  integration uses its own adapter under ADR-0357 (`ArchitectureTest.orgUnitAwareBankSeamsAreContainedToAdapters`).
+  `BankSecurityService` never depends on an org-unit scope service (`bankClassesMustNotConsultOrgUnitScope`).
 - [x] A slim standalone page lists the overseen balances, gated to officers/leads, not
   `BANK_EMPLOYEE` (frontend `OrgUnitBankPageControllerMvcTest`).
 - [x] A client-side account-name live filter sits above the Konten list and hides non-matching
@@ -1282,7 +1282,7 @@ The org hierarchy (REQ-ORG-014) extends the epic-#666 officer/lead bank function
 the new levels, **without** weakening the bank's org-unit-blindness (REQ-BANK-008, ADR-0011): all new
 logic stays in the single non-`Bank*` seam `OrgUnitBankAccessService` (ADR-0020/0028); the ledger,
 `BankSecurityService` and the grant model are untouched, and both ArchUnit pins
-(`bankClassesMustNotConsultOrgUnitScope`, `orgUnitAwareBankSeamIsContainedToOneClass`) stay green.
+(`bankClassesMustNotConsultOrgUnitScope`, `orgUnitAwareBankSeamsAreContainedToAdapters`) stay green.
 
 - **Account identity:** `AREA` accounts are linked to a Bereich and `CARTEL` to the OL (replacing /
   constraining the free-form `areaName`, REQ-BANK-001).
@@ -1306,7 +1306,7 @@ logic stays in the single non-`Bank*` seam `OrgUnitBankAccessService` (ADR-0020/
   all `AREA` + all `ORG_UNIT`; no foreign-Bereich balance leaks.
 - [x] A Bereichsleitung can file a request on its `AREA` account and the OL on `CARTEL`; since
   REQ-BANK-039 a request on a **viewable subordinate** account is also permitted (no longer rejected).
-- [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay green;
+- [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamsAreContainedToAdapters` stay green;
   the existing officer flow and ledger tests are unchanged.
 
 **Implementation notes.** The linkage reuses the existing `bank_account.org_unit_id` FK — since
@@ -1337,7 +1337,7 @@ creation + cardinality), `V168BankAreaCartelLinkageMigrationTest` (CHECK relax +
 Two owner-approved refinements of the org-unit bank page (`/org-unit-bank`, REQ-BANK-021/-027),
 mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank stays org-unit-blind
 (REQ-BANK-008, ADR-0011) and both ArchUnit pins (`bankClassesMustNotConsultOrgUnitScope`,
-`orgUnitAwareBankSeamIsContainedToOneClass`) stay green:
+`orgUnitAwareBankSeamsAreContainedToAdapters`) stay green:
 
 - **Special accounts (Sonderkonten) are visible to Bereich/OL overseers — view-only.** A caller who
   holds a Bereich- or OL-level oversight seat (`is_bereichsleiter` / `is_bereichskoordinator` /
@@ -1373,7 +1373,7 @@ mediated entirely by the existing `OrgUnitBankAccessService` seam — the bank s
   scope check never permits it) — REQ-BANK-022 is unchanged.
 - [x] The page renders a special-account card labelled by its account type with a "view only" marker
   and no request button (frontend `OrgUnitBankPageControllerMvcTest`).
-- [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay
+- [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamsAreContainedToAdapters` stay
   green; the bank stays org-unit-blind.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (special-account view-only + active-only filter),
@@ -1952,7 +1952,8 @@ reuses the bank's org-unit-blind read/PDF code; both ArchUnit pins stay green.
 
 > **Linked Bank contract** — linked account actions retain Bank admission, limits
 > and explicit-actor policy. Authorisation-only uses corresponding debit admission, not the
-> unrestricted deposit rule. REQ-BANK-031 separately defines HOLDER_TRANSFER request/execution;
+> unrestricted deposit rule. Ordinary linked source-account admission uses the active org-unit
+> context (REQ-ORG-032, REQ-ORDERS-069). REQ-BANK-031 separately defines HOLDER_TRANSFER request/execution;
 > it gains no account-owner approval stage. Order roles alone confer no Bank booking grant.
 
 > **Amended by REQ-BANK-042:** the view-eligibility gate below governs **withdrawal and transfer**
@@ -2698,7 +2699,7 @@ Bank staff retain their independent notification and queue rights (REQ-BANK-026)
 - [x] A plain employee's direct KRT withdrawal/transfer above `T1` is **auto-filed** as the band-routed
   `PENDING` request and answered `202` (`BankBookingOutcomeDto.pendingRequest`), not booked and not a
   `409`; management/admin and the request-confirmation path are uncapped (ADR-0109).
-- [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamIsContainedToOneClass` stay green.
+- [x] `bankClassesMustNotConsultOrgUnitScope` and `orgUnitAwareBankSeamsAreContainedToAdapters` stay green.
 
 **Enforced by:** `OrgUnitBankAccessServiceTest` (band routing at create, `canApprove` per band,
 „Fremde Anträge" band filter, KRT notification union), `BankAccountServiceTest`

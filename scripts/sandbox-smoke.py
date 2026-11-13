@@ -97,12 +97,8 @@ class Smoke:
             self.step(label, status in (200, 201), f"{status} {json.dumps(answer)[:300]}")
             if path == "/exchange/v1/me/stock":
                 stock = answer
-            if path == "/exchange/v1/me/org-demand" and self.args.demand == "shown":
-                self.step("the org demand is not withheld", "reason" not in answer,
-                          json.dumps(answer)[:300])
-            if path == "/exchange/v1/me/org-demand" and self.args.demand == "withheld":
-                self.step("the org demand is withheld as NOT_PERMITTED",
-                          answer.get("reason") == "NOT_PERMITTED", json.dumps(answer)[:300])
+            if path == "/exchange/v1/me/org-demand":
+                self.check_org_demand(answer)
         refs = {}
         for kind, ref in [("BLUEPRINT", {"scRecord": "BP_CRAFT_SBXM_HELMET_01"}),
                           ("SHIP_TYPE", {"name": "Sandbox Miner"}),
@@ -138,6 +134,21 @@ class Smoke:
         if self.args.proof_limit:
             self.proof_limit()
         print(f"all {self.count} steps passed")
+
+    def check_org_demand(self, answer: dict) -> None:
+        """Checks the seeded demand of both memberships or the withheld response."""
+        detail = json.dumps(answer)[:600]
+        if self.args.demand == "withheld":
+            self.step("the org demand is withheld as NOT_PERMITTED",
+                      answer.get("reason") == "NOT_PERMITTED" and answer.get("materials") == []
+                      and answer.get("items") == [] and "orders" not in answer, detail)
+            return
+        self.step("the org demand is not withheld", "reason" not in answer, detail)
+        self.step("the org demand includes the Sandbox Squadron and IRIDIUM orders",
+                  any(line["material"]["name"] == "Sandbox Ore (Raw)"
+                      and line["source"] == "material-order" for line in answer["materials"])
+                  and any(line["item"]["name"] == "Sandbox Rifle" for line in answer["items"]),
+                  detail)
 
     def sync(self, label: str, path: str, body: dict) -> dict:
         """Sends a change set that must take every op, applied or unchanged.
@@ -280,8 +291,8 @@ def main() -> int:
                         help="also send the change-set conformance fixtures")
     parser.add_argument("--demand", choices=("shown", "withheld"), default="shown",
                         help="what the member's org demand must be: shown for sandbox-member, "
-                             "withheld for sandbox-member-2, whose only squadron takes no part in "
-                             "the profit sharing")
+                             "withheld for sandbox-member-2, whose only squadron is outside the "
+                             "active Profit hierarchy")
     parser.add_argument("--proof-limit", action="store_true",
                         help="finally flood the gateway until the member's proof cap answers "
                              "429 DPOP_PROOF_LIMIT; the member is refused for about 30 s after")

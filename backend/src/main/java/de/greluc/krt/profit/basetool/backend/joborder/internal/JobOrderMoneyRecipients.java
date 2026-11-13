@@ -90,7 +90,8 @@ public class JobOrderMoneyRecipients {
   private JobOrderEditor.MoneyEdit<JobOrderMoneyRecipientView> designateBank(
       JobOrder order, UUID accountId) {
     authorizeChange(order);
-    if (!bankAccountVisible(accountId)) {
+    JobOrderBankPort port = bankPort.getIfUnique();
+    if (port == null || !port.canSelectCreditAccount(accountId)) {
       throw new BadRequestException("orders.money.bank.accountUnavailable");
     }
     var existing =

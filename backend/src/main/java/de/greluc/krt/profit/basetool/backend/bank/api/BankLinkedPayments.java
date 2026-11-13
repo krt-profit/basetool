@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.bank.api;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /** Submits and cancels linked payments under the current actor in the caller's transaction. */
 public interface BankLinkedPayments {
@@ -30,10 +31,11 @@ public interface BankLinkedPayments {
    * Checks how Bank would admit these terms without recording an attempt.
    *
    * @param payment the proposed linked effect
+   * @param pin the trusted active org unit, or {@code null} without a selection
    * @return the expected routing and source debit
    */
   @NotNull
-  Quote quote(@NotNull BankLinkedPayment payment);
+  Quote quote(@NotNull BankLinkedPayment payment, @Nullable UUID pin);
 
   /**
    * Checks replacement admission using the failed request's retained Bank evidence.
@@ -41,13 +43,15 @@ public interface BankLinkedPayments {
    * @param payment the corrected proposed effect
    * @param requestId the failed request
    * @param attempt the failed request's linked identity
+   * @param pin the trusted active org unit, or {@code null} without a selection
    * @return the expected routing and source debit
    */
   @NotNull
   Quote quoteReplacement(
       @NotNull BankLinkedPayment payment,
       @NotNull UUID requestId,
-      @NotNull BankLinkedAttempt attempt);
+      @NotNull BankLinkedAttempt attempt,
+      @Nullable UUID pin);
 
   /**
    * Expected Bank result from the current admission policy.
@@ -62,10 +66,12 @@ public interface BankLinkedPayments {
    *
    * @param attempt the stable attempt identity and opaque purpose
    * @param payment the immutable submitted terms
+   * @param pin the trusted active org unit, or {@code null} without a selection
    * @return the synchronous pending, posted or authorised outcome
    */
   @NotNull
-  BankLinkedOutcome submit(@NotNull BankLinkedAttempt attempt, @NotNull BankLinkedPayment payment);
+  BankLinkedOutcome submit(
+      @NotNull BankLinkedAttempt attempt, @NotNull BankLinkedPayment payment, @Nullable UUID pin);
 
   /**
    * Replaces a rejected or cancelled linked request under current Bank admission.
@@ -74,6 +80,7 @@ public interface BankLinkedPayments {
    * @param previousAttempt the exact failed attempt and purpose
    * @param nextAttempt the fresh attempt identity for the same purpose
    * @param payment the complete revised terms using the failed attempt's rate
+   * @param pin the trusted active org unit, or {@code null} without a selection
    * @return the synchronous pending, posted or authorised outcome
    */
   @NotNull
@@ -81,7 +88,8 @@ public interface BankLinkedPayments {
       @NotNull UUID previousRequestId,
       @NotNull BankLinkedAttempt previousAttempt,
       @NotNull BankLinkedAttempt nextAttempt,
-      @NotNull BankLinkedPayment payment);
+      @NotNull BankLinkedPayment payment,
+      @Nullable UUID pin);
 
   /**
    * Requires the selected active custodian to belong to the expected registered member.

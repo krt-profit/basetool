@@ -116,12 +116,20 @@ public interface JobOrderBankPort {
   void requireCustodian(@NotNull UUID custodianId, @NotNull UUID userId);
 
   /**
-   * Checks current permission to select the account as the requester destination.
+   * Checks independent account visibility in the current Bank context.
    *
    * @param accountId the selected account
-   * @return whether the actor may view this active account
+   * @return whether the actor may view the account in the active context
    */
   boolean canSeeAccount(@NotNull UUID accountId);
+
+  /**
+   * Checks whether the actor may select this account as a cross-unit credit destination.
+   *
+   * @param accountId the selected destination
+   * @return whether the actor may select the account as a destination
+   */
+  boolean canSelectCreditAccount(@NotNull UUID accountId);
 
   /**
    * Returns only selectable Bank references for already authorized Order actions.

@@ -400,7 +400,7 @@ class ArchitectureRuleFailureTest {
         ArchitectureTest.orgUnitAwareBankSeamRule(
             ArchitectureTest.bridgesOrgUnitScopeAndTheBank(
                 OrgScopeFixture.class, ArchitectureTest.bankDomain(fixturesRoot)),
-            SanctionedBridge.class),
+            Set.of(SanctionedBridge.class)),
         BANK,
         "RogueBridge");
     assertReports(

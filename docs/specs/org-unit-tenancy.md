@@ -756,10 +756,11 @@ served by `MissionService.updateOwningOrgUnit` and recorded as the audited
    active context, which an admin holds within their own scope; a mission without a unit is left
    to an admin without a pin (REQ-SEC-065, REQ-ORG-032).
 2. Target gate `OrgUnitStampingService.resolveReassignTargetOrgUnit` — an **admin** may assign to any
-   OrgUnit or to ownerless; a **non-admin** may only pick a target that is one of their direct
-   memberships or within their editable scope (`canEditOrgUnit`, the REQ-ORG-016 cascade), and may
-   pick **ownerless only when membershipless** (mirroring who may create an ownerless mission). An
-   unknown target id is a 400; a disallowed target is a 403.
+   active OrgUnit or to ownerless; a **non-admin** may only pick an active target that is one of
+   their direct memberships or within their editable scope (`canEditOrgUnit`, the REQ-ORG-016
+   cascade), and may pick **ownerless only when membershipless** (mirroring who may create an
+   ownerless mission). An unknown or inactive target within the caller's assignable scope is a 400;
+   a disallowed target is a 403.
 
 **Re-scoping semantics.** Re-homing **retroactively** changes who may see/edit the mission via the
 existing `owningOrgUnit` + `is_internal` gates (REQ-ORG-003 and the `canSeeMission` / `holdsMissionManagerGrantFor`
@@ -781,8 +782,8 @@ badge in place (REQ-FE-001).
 
 - [x] A manager / scope-officer / admin reassigns a mission to an org unit they may assign to; the
   change is audited and visibility re-scopes per the gates.
-- [x] A non-admin picking a target outside their assignable scope is rejected (403); an unknown target
-  id is 400.
+- [x] A target outside a non-admin's assignable scope is rejected (403). Within the caller's
+  scope, an unknown or inactive target is rejected (400), including for an admin.
 - [x] A non-admin who holds a membership cannot set the mission ownerless; an admin (or a
   membershipless leadership caller) can.
 - [x] A stale `owningOrgUnitVersion` yields 409; a concurrent edit of another section (core / schedule)
@@ -1225,6 +1226,11 @@ detail gates, create-time stamping, role powers and the oversight reach (ADR-037
 - [x] A personal row created without a pick lands in the pin only when it is one of its owner's
   stampable units; a mission or operation lands in the honoured pin. A deactivated unit is no
   stampable unit, and an owner without `KRT Member` keeps a new personal row without a unit.
+- [x] Explicit picks for new rows, units inherited by sub-missions and mission ownership changes
+  require an active target, including when the caller has unrestricted admin scope. Existing rows
+  in deactivated units
+  can still be edited and moved to active units subject to their usual permissions
+  (`OrgUnitStampingStampableUnitsTest`, `ScopeKernelTest`, `MissionServiceSectionPatchTest`).
 - [x] Role powers act only in the pinned unit.
 - [x] A pinned admin manages, re-owns and edits the finance entries of only the pinned unit's
   missions and of no mission without a unit, an unpinned admin of every mission; a mission's

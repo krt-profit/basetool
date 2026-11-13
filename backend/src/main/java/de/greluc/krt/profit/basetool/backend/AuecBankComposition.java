@@ -35,11 +35,13 @@ import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankEffects.De
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankEffects.Outcome;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderBankPort;
 import de.greluc.krt.profit.basetool.backend.platform.api.AuthHelperService;
+import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,10 +57,11 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
   private final BankAccessPolicy access;
   private final BankActors actors;
   private final AuthHelperService auth;
+  private final RequestScopeResolver scope;
 
   @Override
   public void submit(@NotNull Payment payment) {
-    bank.submit(attempt(payment.attemptId(), payment.purposeRef()), toBank(terms(payment)));
+    bank.submit(attempt(payment.attemptId(), payment.purposeRef()), toBank(terms(payment)), pin());
   }
 
   @Override
@@ -67,7 +70,8 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
         predecessor.requestId(),
         attempt(predecessor.attemptId(), payment.purposeRef()),
         attempt(payment.attemptId(), payment.purposeRef()),
-        toBank(terms(payment)));
+        toBank(terms(payment)),
+        pin());
   }
 
   @Override
@@ -83,8 +87,17 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
 
   @Override
   public boolean canSeeAccount(@NotNull UUID accountId) {
+    return canViewAccount(accountId, pin());
+  }
+
+  @Override
+  public boolean canSelectCreditAccount(@NotNull UUID accountId) {
+    return canViewAccount(accountId, null);
+  }
+
+  private boolean canViewAccount(UUID accountId, @Nullable UUID pin) {
     return access
-        .accessTo(actors.of(auth.currentUserId().orElse(null)), accountId, null)
+        .accessTo(actors.of(auth.currentUserId().orElse(null)), accountId, pin)
         .has(BankAccountRight.VIEW);
   }
 
@@ -98,7 +111,7 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
     var options =
         accountOptions.candidates(
             new BankLinkedAccountOptions.Scope(
-                responsibleUnit, requestingUnit, canDeposit, canDesignate, canDebit));
+                responsibleUnit, requestingUnit, canDeposit, canDesignate, canDebit, pin()));
     return new AccountOptions(
         accounts(options.collection()),
         accounts(options.designation()),
@@ -167,7 +180,7 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
 
   @Override
   public @NotNull Quote quote(@NotNull Terms terms) {
-    var quote = bank.quote(toBank(terms));
+    var quote = bank.quote(toBank(terms), pin());
     return new Quote(quote.pending(), quote.sourceDebit());
   }
 
@@ -176,8 +189,15 @@ class AuecBankComposition implements JobOrderBankPort, BankLinkedEffectHandler {
       @NotNull Terms terms, @NotNull UUID purposeRef, @NotNull PreviousAttempt predecessor) {
     var quote =
         bank.quoteReplacement(
-            toBank(terms), predecessor.requestId(), attempt(predecessor.attemptId(), purposeRef));
+            toBank(terms),
+            predecessor.requestId(),
+            attempt(predecessor.attemptId(), purposeRef),
+            pin());
     return new Quote(quote.pending(), quote.sourceDebit());
+  }
+
+  private @Nullable UUID pin() {
+    return scope.currentPin().orElse(null);
   }
 
   private static Terms terms(Payment payment) {

@@ -152,7 +152,9 @@ class BankLinkedPaymentsIntegrationTest {
     BankLinkedOutcome result =
         as(
             Actor.EMPLOYEE_WITHDRAW,
-            () -> payments.submit(attempt, new Authorisation(account, holder, terms("6000000"))));
+            () ->
+                payments.submit(
+                    attempt, new Authorisation(account, holder, terms("6000000")), null));
     assertThat(result).isEqualTo(new BankLinkedOutcome.Authorised(attempt.id()));
     assertThat(balance("bank_posting", "account_id", account)).isEqualByComparingTo("6000000");
     assertThat(balance("bank_holder_posting", "holder_id", holder)).isEqualByComparingTo(custody);
@@ -184,7 +186,7 @@ class BankLinkedPaymentsIntegrationTest {
                     Actor.MEMBER,
                     () ->
                         payments.submit(
-                            attempt, new Authorisation(account, holder, terms("10000000")))))
+                            attempt, new Authorisation(account, holder, terms("10000000")), null)))
             .requestId();
 
     confirm(request, Actor.EMPLOYEE_WITHDRAW, holder, null, false)
@@ -216,7 +218,7 @@ class BankLinkedPaymentsIntegrationTest {
                     Actor.EMPLOYEE_WITHDRAW,
                     () ->
                         payments.submit(
-                            attempt, new Authorisation(account, holder, terms("4000")))))
+                            attempt, new Authorisation(account, holder, terms("4000")), null)))
             .requestId();
 
     assertThat(authorisationCount(attempt)).isZero();
@@ -248,7 +250,8 @@ class BankLinkedPaymentsIntegrationTest {
                                 account,
                                 holder,
                                 new Counterparty.Accountless("Unnamed Tool Account", null),
-                                terms("400")))))
+                                terms("400")),
+                            null)))
             .requestId();
     confirm(request, Actor.MANAGEMENT, holder, null, false)
         .andExpect(status().isOk())
@@ -283,7 +286,9 @@ class BankLinkedPaymentsIntegrationTest {
     assertThatThrownBy(() ->
             as(
                 Actor.MEMBER,
-                () -> payments.submit(attempt(), new HolderTransfer(source, target, mismatched))))
+                () ->
+                    payments.submit(
+                        attempt(), new HolderTransfer(source, target, mismatched), null)))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("fee rate");
   }
@@ -302,7 +307,8 @@ class BankLinkedPaymentsIntegrationTest {
                 as(
                     Actor.MEMBER,
                     () ->
-                        payments.submit(attempt(), new HolderTransfer(source, target, submitted))))
+                        payments.submit(
+                            attempt(), new HolderTransfer(source, target, submitted), null)))
             .requestId();
     settings.putSettingValue(FEE_SETTING, "0.01");
     assertThat(feePolicy.snapshot().rate()).isEqualByComparingTo("0.01");
@@ -340,7 +346,8 @@ class BankLinkedPaymentsIntegrationTest {
                             new HolderTransfer(
                                 source,
                                 target,
-                                new Terms(new BigDecimal("4000000"), originalRate, null, null)))))
+                                new Terms(new BigDecimal("4000000"), originalRate, null, null)),
+                            null)))
             .requestId();
     as(
         Actor.MEMBER,
@@ -362,7 +369,8 @@ class BankLinkedPaymentsIntegrationTest {
                             new HolderTransfer(
                                 source,
                                 target,
-                                new Terms(new BigDecimal("3000000"), originalRate, null, null)))))
+                                new Terms(new BigDecimal("3000000"), originalRate, null, null)),
+                            null)))
             .requestId();
 
     confirm(failed, Actor.EMPLOYEE, source, target, false)
@@ -386,7 +394,8 @@ class BankLinkedPaymentsIntegrationTest {
                 as(
                     Actor.MEMBER,
                     () ->
-                        payments.submit(attempt, new Authorisation(account, holder, terms("100")))))
+                        payments.submit(
+                            attempt, new Authorisation(account, holder, terms("100")), null)))
             .requestId();
     handler.preparation =
         action -> {
@@ -428,7 +437,9 @@ class BankLinkedPaymentsIntegrationTest {
                     Actor.MEMBER,
                     () ->
                         payments.submit(
-                            attempt(), new AccountTransfer(source, destination, terms("400000")))))
+                            attempt(),
+                            new AccountTransfer(source, destination, terms("400000")),
+                            null)))
             .requestId();
 
     var result =
@@ -473,7 +484,8 @@ class BankLinkedPaymentsIntegrationTest {
             as(
                 Actor.ADMIN,
                 () ->
-                    payments.submit(attempt, new AccountAuthorisation(account, terms("1000000")))))
+                    payments.submit(
+                        attempt, new AccountAuthorisation(account, terms("1000000")), null)))
         .isEqualTo(new BankLinkedOutcome.Authorised(attempt.id()));
     assertThat(
             jdbc.sql("SELECT count(*) FROM bank_authorisation WHERE id = :id AND holder_id IS NULL")
@@ -523,7 +535,8 @@ class BankLinkedPaymentsIntegrationTest {
                             new AccountDeposit(
                                 account,
                                 new Counterparty.Accountless("Actual account depositor", null),
-                                terms("400")))))
+                                terms("400")),
+                            null)))
             .requestId();
 
     confirm(request, Actor.ADMIN, custodian, null, false)
@@ -549,7 +562,8 @@ class BankLinkedPaymentsIntegrationTest {
                         payments.submit(
                             attempt(),
                             new AccountDeposit(
-                                account, new Counterparty.Member(depositor, null), terms("400")))))
+                                account, new Counterparty.Member(depositor, null), terms("400")),
+                            null)))
             .requestId();
     entityManager.flush();
     as(Actor.ADMIN, () -> anonymisation.anonymise(depositor, List.of()));
@@ -580,7 +594,8 @@ class BankLinkedPaymentsIntegrationTest {
                             new AccountDeposit(
                                 world.account(Account.OWN_ORG_UNIT),
                                 new Counterparty.Member(depositor, null),
-                                originalTerms))))
+                                originalTerms),
+                            null)))
             .requestId();
     mvc.perform(
             post(REQUESTS + "/" + failed + "/reject")
@@ -609,7 +624,8 @@ class BankLinkedPaymentsIntegrationTest {
                             first,
                             next,
                             new AccountDeposit(
-                                correctedAccount, new Counterparty.Retained(), originalTerms))))
+                                correctedAccount, new Counterparty.Retained(), originalTerms),
+                            null)))
             .requestId();
     confirm(replacement, Actor.ADMIN, custodian, null, false)
         .andExpect(status().isOk())
@@ -630,7 +646,8 @@ class BankLinkedPaymentsIntegrationTest {
                 as(
                     Actor.MEMBER,
                     () ->
-                        payments.submit(attempt, new Authorisation(account, holder, terms("100")))))
+                        payments.submit(
+                            attempt, new Authorisation(account, holder, terms("100")), null)))
             .requestId();
     handler.preparation =
         action -> {
@@ -667,7 +684,8 @@ class BankLinkedPaymentsIntegrationTest {
                             account,
                             holder,
                             new Counterparty.Accountless("Reversal Depositor", null),
-                            terms("500"))));
+                            terms("500")),
+                        null));
     entityManager.flush();
     handler.preparation =
         action -> {
@@ -700,7 +718,8 @@ class BankLinkedPaymentsIntegrationTest {
                     account,
                     holder,
                     new Counterparty.Accountless("Cap Depositor", null),
-                    terms("500"))));
+                    terms("500")),
+                null));
     entityManager.flush();
     BankExchangeRelay relay = new BankExchangeRelay(context);
     UUID member = world.user(Actor.STAFFELLEITER);
@@ -732,7 +751,8 @@ class BankLinkedPaymentsIntegrationTest {
                             holder,
                             new Counterparty.Member(world.user(Actor.EMPLOYEE_DEPOSIT), null),
                             GamePayment.SAME_PLAYER,
-                            terms("400"))));
+                            terms("400")),
+                        null));
     entityManager.flush();
     assertThat(balance("bank_posting", "account_id", account)).isEqualByComparingTo("999600");
     mvc.perform(
@@ -757,7 +777,9 @@ class BankLinkedPaymentsIntegrationTest {
     assertThatThrownBy(() ->
             as(
                 Actor.MEMBER,
-                () -> payments.submit(attempt, new Authorisation(account, holder, terms("100")))))
+                () ->
+                    payments.submit(
+                        attempt, new Authorisation(account, holder, terms("100")), null)))
         .isInstanceOf(NotFoundException.class);
     assertThat(authorisationCount(attempt)).isZero();
   }
@@ -779,7 +801,8 @@ class BankLinkedPaymentsIntegrationTest {
                             new Counterparty.Accountless(
                                 world.username(Actor.EMPLOYEE_DEPOSIT), null),
                             GamePayment.SAME_PLAYER,
-                            terms("100")))))
+                            terms("100")),
+                        null)))
         .isInstanceOf(BadRequestException.class);
     assertThat(balance("bank_posting", "account_id", account)).isEqualByComparingTo("1000000");
   }
@@ -795,7 +818,8 @@ class BankLinkedPaymentsIntegrationTest {
                     payments.submit(
                         attempt,
                         new Authorisation(
-                            account, world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER), terms("100")))))
+                            account, world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER), terms("100")),
+                        null)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("exactly one");
     assertThat(authorisationCount(attempt)).isZero();
@@ -814,7 +838,8 @@ class BankLinkedPaymentsIntegrationTest {
                     payments.submit(
                         attempt,
                         new Authorisation(
-                            account, world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER), terms("100")))))
+                            account, world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER), terms("100")),
+                        null)))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("exactly one");
     assertThat(authorisationCount(attempt)).isZero();
@@ -839,7 +864,8 @@ class BankLinkedPaymentsIntegrationTest {
                               world.account(Account.OWN_ORG_UNIT),
                               world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER),
                               new Counterparty.Accountless("Other Depositor", null),
-                              terms("500"))));
+                              terms("500")),
+                          null));
             }))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("Fixture owner declined the posting");

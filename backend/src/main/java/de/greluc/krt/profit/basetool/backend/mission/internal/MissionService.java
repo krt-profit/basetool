@@ -662,25 +662,28 @@ public class MissionService implements MissionCommands {
   }
 
   /**
-   * Creates a sub-mission under a parent mission; {@code parent} and the owning squadron come from
-   * the parent.
+   * Creates a sub-mission inheriting its parent mission's owning unit.
    *
    * @param parentMissionId path-resolved parent id (authoritative)
    * @param request create payload (validated at the controller boundary)
    * @return the persisted sub-mission entity
    * @throws NotFoundException when {@code parentMissionId} or {@code operationId} does not resolve
    * @throws AccessDeniedException when the caller may not link a mission to {@code operationId}
+   * @throws BadRequestException when the inherited unit is inactive or an internal sub-mission has
+   *     no unit
    */
   @Transactional
   public Mission addSubMission(
       @NotNull UUID parentMissionId, @NotNull CreateSubMissionRequest request) {
     Mission parent =
         Entities.require(missionRepository.findById(parentMissionId), "Parent mission not found");
+    OrgUnit owningOrgUnit = parent.getOwningOrgUnit();
+    OrgUnitStampingService.requireActiveAssignmentTarget(owningOrgUnit);
 
     Mission subMission = new Mission();
     applyCreatePayload(subMission, request.toMissionRequest());
     subMission.setParent(parent);
-    subMission.setOwningOrgUnit(parent.getOwningOrgUnit());
+    subMission.setOwningOrgUnit(owningOrgUnit);
     requireOwningOrgUnitForInternal(subMission.getIsInternal(), subMission.getOwningOrgUnit());
 
     validateMissionTimes(subMission);

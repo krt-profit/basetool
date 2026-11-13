@@ -78,3 +78,11 @@ because either one would otherwise pass while checking nothing:
 Each pin asserts a selection floor, so a shrinking selection fails the build, and each is proven
 able to fail once. The bridge set stays exactly `OrgUnitBankAccessService`; a second bridge still
 needs its own decision.
+
+## Amendment for aUEC order payments
+
+[ADR-0357](0357-optional-auec-bank-effects-use-a-thin-composition-adapter.md) adds
+`AuecBankComposition` as the adapter for the active org-unit context of linked order payments.
+`OrgUnitBankAccessService` still owns scoping for the ordinary org-unit Bank surface.
+`ArchitectureTest.orgUnitAwareBankSeamsAreContainedToAdapters` permits precisely these adapters,
+and `bankClassesMustNotConsultOrgUnitScope` keeps the scope service out of Bank domain classes.

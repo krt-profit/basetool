@@ -157,6 +157,24 @@ class OrgUnitStampingStampableUnitsTest {
   }
 
   @Test
+  void aCallerWithEditReachCannotExplicitlyAssignNewRowsToAnInactiveUnit() {
+    UUID inactiveUnitId = UUID.randomUUID();
+    Squadron inactiveUnit = new Squadron();
+    inactiveUnit.setId(inactiveUnitId);
+    inactiveUnit.setActive(false);
+    when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
+    when(accessGateService.canEditSquadron(inactiveUnitId)).thenReturn(true);
+    when(orgUnitRepository.findById(inactiveUnitId)).thenReturn(Optional.of(inactiveUnit));
+
+    assertThatThrownBy(() -> service.resolveOrgUnitForUnitOwnedAggregate(owner, inactiveUnitId))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("error.org_unit.inactive_target");
+    assertThatThrownBy(() -> service.resolveOrgUnitForPickerOutputNullable(owner, inactiveUnitId))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("error.org_unit.inactive_target");
+  }
+
+  @Test
   void aMissionWithoutAPickLandsOnTheHonouredPin() {
     when(userRepository.hasAnyRoleCode(owner.getId(), List.of(Roles.KRT_MEMBER))).thenReturn(true);
     when(requestScopeResolver.currentPin()).thenReturn(Optional.of(PINNED_STAFFEL));

@@ -69,7 +69,11 @@ For a return from a designated Bank account to a personal holding, the ordinary 
 uses that designation's account as the withdrawal source. The action offers the designation to
 current order unit writers with Bank access for that withdrawal and an available personal receipt.
 The Bank options disclose the source only when it is among that caller's admitted withdrawal
-accounts. The general order view retains its independent Bank account visibility check.
+accounts. The general order view checks independent Bank account visibility in the current
+active org-unit context (REQ-ORG-032). The same context governs ordinary source-account choices,
+previews, new submissions and replacements, including authorisation-only provision. A member
+may use their whole Bank reach with no selected unit. Cross-unit deposit and transfer-destination
+selection and Bank staff authority follow their own Bank rules.
 
 The order suggests the responsible unit's eligible collection account. An authorised designation
 can use the requesting unit's account or another eligible Bank account. The form uses the order's
@@ -88,6 +92,7 @@ million provision, regardless of how many related Bank records explain it.
 - [ ] The same provision is not counted again when later deposited, withdrawn or transferred in the Bank.
 - [ ] Ordinary progress/completion creates no implicit Bank transaction.
 - [ ] A receipt funded by a collection account is unavailable to a return into a personal holding and remains returnable to its original position.
+- [x] Ordinary source accounts outside a selected unit are absent and refused in preview and submit. Permitted cross-unit credit destinations remain selectable and the shared order view masks Bank account identifiers outside the active context.
 - [ ] Each new operation preselects Bank handling; an earlier Bank-free choice does not silently carry forward.
 - [ ] A denied, incomplete or unavailable Bank path produces no automatic Bank-free effect and does not bypass existing-fund approvals.
 
@@ -97,7 +102,8 @@ posting and audit checks to the example actors, units, named parties and order. 
 Profit Logistician and an ordinary member exercise the direct-handover path in
 `JobOrderMoneyE2eTest.contextualWriterCompletesWithoutBankOrCentralCollection`.
 `DomainMapTest`, `ModuleBaselineTest`, `ModularityTest` and `TableOwnershipTest` enforce the
-JobOrder module's independent boundary.
+JobOrder module's independent boundary. `JobOrderLinkedBankIntegrationTest.linkedBankFundingHonoursTheActiveOrgUnit`
+checks account choices, preview, submission and account visibility through HTTP and PostgreSQL.
 
 ### REQ-ORDERS-070 - Existing Bank funds require debit-equivalent authority before availability
 

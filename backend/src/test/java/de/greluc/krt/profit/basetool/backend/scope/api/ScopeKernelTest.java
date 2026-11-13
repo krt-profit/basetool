@@ -2995,18 +2995,29 @@ class ScopeKernelTest {
   /**
    * Tests for {@link OrgUnitStampingService#resolveReassignTargetOrgUnit(UUID)} — the
    * assignable-target gate of the mission owning-org-unit reassignment (REQ-ORG-018 / ADR-0050): an
-   * admin assigns anywhere or to ownerless; a non-admin only to a direct membership /
-   * editable-scope unit, and to ownerless only when membershipless.
+   * admin assigns to any active unit or to ownerless; a non-admin only to an active unit in their
+   * membership or editable scope, and to ownerless only when membershipless.
    */
   @Nested
   class ResolveReassignTargetOrgUnit {
 
     @Test
-    void admin_mayAssignToAnyExistingOrgUnit() {
+    void admin_mayAssignToAnyActiveOrgUnit() {
       when(authHelper.isAdmin()).thenReturn(true);
       when(orgUnitRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
 
       assertSame(squadronA, orgUnitStampingService.resolveReassignTargetOrgUnit(SQUADRON_A_ID));
+    }
+
+    @Test
+    void admin_mayNotAssignToInactiveOrgUnit() {
+      squadronA.setActive(false);
+      when(authHelper.isAdmin()).thenReturn(true);
+      when(orgUnitRepository.findById(SQUADRON_A_ID)).thenReturn(Optional.of(squadronA));
+
+      assertThrows(
+          BadRequestException.class,
+          () -> orgUnitStampingService.resolveReassignTargetOrgUnit(SQUADRON_A_ID));
     }
 
     @Test

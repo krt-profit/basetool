@@ -323,11 +323,13 @@ public class JobOrderLinkedMoneyRepair {
 
   private boolean repairAccountPermitted(
       JobOrder order, JobOrderLinkedMoneyAttempt prior, UUID accountId) {
-    if (commands.port().canSeeAccount(accountId)) {
-      return true;
-    }
-    return prior.getBankType() == JobOrderBankSelection.Type.DEPOSIT
-        && repairAccounts(order, prior).stream()
+    var bank = commands.port();
+    boolean visible =
+        prior.getBankType() == JobOrderBankSelection.Type.DEPOSIT
+            ? bank.canSelectCreditAccount(accountId)
+            : bank.canSeeAccount(accountId);
+    return visible
+        || repairAccounts(order, prior).stream()
             .anyMatch(account -> accountId.equals(account.id()));
   }
 

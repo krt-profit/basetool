@@ -270,14 +270,27 @@ final class BankAccessSeeder {
 
   LinkedOrderAccount seedLinkedOrderAccount(UUID applicant) {
     Squadron owner = orgUnit(new Squadron(), "Linked account owner", null, null);
-    BankAccount account = account(BankAccountType.ORG_UNIT, "Linked account", owner);
+    return new LinkedOrderAccount(seedLinkedOrderAccount(applicant, owner), owner.getId());
+  }
+
+  void seatLinkedOrderMember(UUID member, UUID unit) {
+    seat(
+        userRepository.findById(member).orElseThrow(),
+        orgUnitRepository.findById(unit).orElseThrow(),
+        MembershipRole.MEMBER);
+    entityManager.flush();
+  }
+
+  UUID seedLinkedOrderAccount(UUID applicant, OrgUnit owner) {
+    var type = owner instanceof Bereich ? BankAccountType.AREA : BankAccountType.ORG_UNIT;
+    BankAccount account = account(type, "Linked account", owner);
     BankAccountViewGrant grant = new BankAccountViewGrant();
     grant.setAccount(account);
     grant.setGranteeKind(BankAccountViewGranteeKind.USER);
     grant.setGranteeUserId(applicant);
     viewGrantRepository.save(grant);
     entityManager.flush();
-    return new LinkedOrderAccount(account.getId(), owner.getId());
+    return account.getId();
   }
 
   record LinkedOrderAccount(UUID accountId, UUID ownerId) {}
