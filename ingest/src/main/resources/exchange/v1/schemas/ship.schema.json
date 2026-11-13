@@ -84,7 +84,7 @@
         "IN_GAME",
         "UNKNOWN"
       ],
-      "description": "Whether the ship was pledged, bought in-game or is of unknown origin. A ship from a hangar import or with a pledge id always reads PLEDGE."
+      "description": "Whether the ship was pledged, bought in-game or is of unknown origin. A ship from a hangar import or with a pledge id always reads PLEDGE. The server always sends it; it stays optional in v1, which only grows."
     },
     "extensions": {
       "$ref": "extensions.schema.json"
@@ -95,7 +95,6 @@
     "version",
     "shipType",
     "insurance",
-    "fitted",
-    "origin"
+    "fitted"
   ]
 }
