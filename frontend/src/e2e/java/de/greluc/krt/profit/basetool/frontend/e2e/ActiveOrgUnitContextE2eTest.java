@@ -107,10 +107,7 @@ class ActiveOrgUnitContextE2eTest {
     }
   }
 
-  /**
-   * Without a choice the switcher says „Alle meine Org-Einheiten", the Lager says it shows all own
-   * units and lists both, and picking the Staffel narrows it to the Staffel.
-   */
+  /** The pooled Lager shows the access notice and both units' stock until a Staffel is selected. */
   @Test
   void withoutAChoiceTheLagerShowsBothUnitsUnderAllMyOrgUnits() {
     try (BrowserContext context = newContext()) {
@@ -119,7 +116,7 @@ class ActiveOrgUnitContextE2eTest {
         E2eSupport.login(page, STACK.baseUrl(), BOTH_USER, BOTH_PASSWORD);
         E2eSupport.navigate(page, STACK.baseUrl() + LAGER);
         assertThat(page.locator(SWITCHER)).hasValue("");
-        assertThat(page.getByTestId("all-my-org-units-notice")).isVisible(visible());
+        assertThat(page.getByTestId("inventory-scope-notice")).isVisible(visible());
         assertThat(group(page, staffelMaterialId)).isVisible(visible());
         assertThat(group(page, skMaterialId)).isVisible(visible());
 

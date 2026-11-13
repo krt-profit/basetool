@@ -57,11 +57,11 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class LagerAllMyOrgUnitsNoticeRenderTest {
 
-  private static final String NOTICE = "data-testid=\"all-my-org-units-notice\"";
+  private static final String NOTICE = "data-testid=\"inventory-scope-notice\"";
+  private static final String UNIT_WAREHOUSE_NOTICE = "data-testid=\"all-my-org-units-notice\"";
 
-  private static final String MEMBER_STOCK_SCOPE =
+  private static final String ACCESSIBLE_STOCK_SCOPE =
       "Bestände der Org-Einheiten, auf deren Lager du Zugriff hast";
-  private static final String ADMIN_STOCK_SCOPE = "aller Org-Einheiten zusammen";
 
   @Autowired private WebApplicationContext context;
 
@@ -99,27 +99,25 @@ class LagerAllMyOrgUnitsNoticeRenderTest {
         .getContentAsString();
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"/inventory", "/inventory?storage=all"})
+  @Test
   @WithMockUser(roles = "KRT_MEMBER")
-  void aPooledLagerPageCarriesTheNoticeUnderAllMyOrgUnits(String path) throws Exception {
-    assertThat(render(path, ContextKind.ALL_MY_ORG_UNITS, null)).contains(NOTICE);
+  void theOverviewDescribesTheMembersAccessibleStock() throws Exception {
+    assertThat(render("/inventory", ContextKind.ALL_MY_ORG_UNITS, null))
+        .contains(NOTICE, ACCESSIBLE_STOCK_SCOPE);
   }
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
-  void theOverviewDescribesTheMembersAccessibleOrgUnits() throws Exception {
-    assertThat(render("/inventory", ContextKind.ALL_MY_ORG_UNITS, null))
-        .contains(MEMBER_STOCK_SCOPE)
-        .doesNotContain(ADMIN_STOCK_SCOPE);
+  void theUnitWarehouseShowsTheSharedNoticeUnderAllMyOrgUnits() throws Exception {
+    assertThat(render("/inventory?storage=all", ContextKind.ALL_MY_ORG_UNITS, null))
+        .contains(UNIT_WAREHOUSE_NOTICE);
   }
 
   @Test
   @WithMockUser(roles = {"ADMIN", "KRT_MEMBER"})
-  void theOverviewNamesAllOrgUnitsForAnUnpinnedAdmin() throws Exception {
+  void theOverviewDescribesTheAccessibleStockForAnUnpinnedAdmin() throws Exception {
     assertThat(render("/inventory", ContextKind.ALL_ORG_UNITS, null))
-        .contains(ADMIN_STOCK_SCOPE)
-        .doesNotContain(NOTICE, MEMBER_STOCK_SCOPE);
+        .contains(NOTICE, ACCESSIBLE_STOCK_SCOPE);
   }
 
   @ParameterizedTest
@@ -127,13 +125,13 @@ class LagerAllMyOrgUnitsNoticeRenderTest {
   @WithMockUser(roles = "KRT_MEMBER")
   void aPooledLagerPageDropsTheNoticeOnceAUnitIsSelected(String path) throws Exception {
     assertThat(render(path, ContextKind.ORG_UNIT, UUID.randomUUID()))
-        .doesNotContain(NOTICE, MEMBER_STOCK_SCOPE, ADMIN_STOCK_SCOPE);
+        .doesNotContain(NOTICE, UNIT_WAREHOUSE_NOTICE);
   }
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void myLagerCarriesNoNoticeBecauseItDoesNotFollowTheSelection() throws Exception {
     assertThat(render("/inventory?storage=my", ContextKind.ALL_MY_ORG_UNITS, null))
-        .doesNotContain(NOTICE);
+        .doesNotContain(NOTICE, UNIT_WAREHOUSE_NOTICE);
   }
 }

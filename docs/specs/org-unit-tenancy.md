@@ -363,11 +363,10 @@ which renders in both the browser `<title>` tag and the sidebar brand logo text.
 
 The title, the switcher's selected entry and the owner pickers' preselection read the **effective**
 context the backend reports (REQ-ORG-008, REQ-ORG-032), never the raw session value, so they always
-name the context the data on the page was scoped by. The Lager overview uses context-specific
-copy. For `ALL_MY_ORG_UNITS`, the notice describes the pooled stock of the org units whose
-inventory the viewer can access through membership, cascading leadership reach or a contextual
-Logistician grant. These units can be squadrons, special commands, areas or the organisation's
-leadership unit. For an admin in `ALL_ORG_UNITS`, the notice describes stock across all org units.
+name the context the data on the page was scoped by. In both `ALL_MY_ORG_UNITS` and `ALL_ORG_UNITS`,
+the Lager overview notice describes the pooled stock of the org units whose inventory the viewer
+can access. In `ALL_MY_ORG_UNITS`, access can come from membership, cascading leadership reach or
+a contextual Logistician grant. In `ALL_ORG_UNITS`, the admin’s access covers all org units.
 
 In „Alle meine Org-Einheiten", the „Einheitslager" and the Hangar's unit overview use the shared
 `components :: allMyOrgUnitsNotice` fragment to describe their pooled data. „Mein Lager"
