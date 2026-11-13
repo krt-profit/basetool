@@ -30,12 +30,12 @@ public enum PatchCount {
   BANK_RESET_TOTAL,
   /** Pending Kartellbank requests submitted before the live time that end as cancelled. */
   BANK_REQUESTS_CANCELED,
-  /** aUEC order holdings that existed at the live time and are booked as a real shortage. */
+  /** Holdings of aUEC orders that existed at the live time and are booked as a real shortage. */
   AUEC_SHORTAGES,
   /** The sum of those shortages, in whole aUEC. */
   AUEC_SHORTAGE_TOTAL,
-  /** aUEC order Bank attempts waiting since before the live time that end as cancelled. */
+  /** Bank attempts of aUEC orders waiting since before the live time that end as cancelled. */
   AUEC_BANK_ATTEMPTS_CANCELED,
-  /** aUEC unit commitments opened before the live time that end. */
+  /** Unit commitments of aUEC orders opened before the live time that end. */
   AUEC_COMMITMENTS_ENDED
 }
