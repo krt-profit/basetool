@@ -1364,11 +1364,10 @@ Only a member who passes the web's job-order gate gets the demand: `ExchangeDema
 `RequestScopeResolver.canViewJobOrders()` — the same rule that opens the Aufträge area and the
 Materialbedarf (REQ-ORDERS-034) — before reading any order. Any other member gets `200` with two
 empty lists and `reason: "NOT_PERMITTED"`; a permitted member's answer carries no `reason`, even
-when nothing is open. The rule is evaluated with the exchange's reduced authorities (REQ-XCH-009),
-so it reduces to "a member, or a leadership seat above a member, of at least one profit-eligible
-unit" — an `ADMIN` role does not open it. It runs on every request, so a unit that loses its profit
-eligibility while its orders stay open stops showing its demand to members who have no other
-eligible unit. As on the web, the gate is per member: a permitted member sees the demand of every
+when nothing is open. The exchange uses reduced authorities (REQ-XCH-009). The member qualifies
+through membership in the active Profit area or one of its active squadrons or special commands,
+including reach granted by a leadership seat. The rule runs on every request, so losing the last
+qualifying unit withholds the feed even while orders stay open. A permitted member sees the demand of every
 unit they belong to (owner decision 2026-09-28, #2095). `reason` is an optional field of
 `org-demand.schema.json` with the one value `NOT_PERMITTED`; the gateway refuses any other value as
 a relay failure. *Corrected 2026-09-28: #2095 promised this gate and the `reason`, but the feed was
@@ -1378,8 +1377,8 @@ demand.*
 **Acceptance**
 
 - [x] A member who fails `canViewJobOrders` gets empty lists with `reason: NOT_PERMITTED` and no
-  order is read; a member who passes it gets the demand without a `reason`; a unit that loses its
-  profit eligibility stops showing its demand. *`ExchangeDemandServiceTest`,
+  order is read; a member who passes it gets the demand without a `reason`; losing the last
+  qualifying unit withholds the feed. *`ExchangeDemandServiceTest`,
   `ExchangeDemandControllerTest` (against the real gate and database), `ExchangeDemandParityTest`
   (the web's Materialbedarf is withheld by the same gate); `ExchangeOrgDemandRouteTest` relays the
   withheld answer and refuses an unknown `reason`; fixtures for both shapes under
@@ -2213,7 +2212,9 @@ The sandbox is `docker-compose.sandbox.yml` on the test stack, started, reset an
 ingest gateway client and third-party template (`sandbox-client`, `sandbox-suspended-client`,
 synthetic members with fixed ids), and `repo-lint.yml` fails when the committed realm is stale. A
 one-shot `sandbox-seed` applies `docker/sandbox/seed.sql` after the backend is healthy,
-idempotently. It publishes loopback ports only ([`docs/exchange/sandbox.md`](../exchange/sandbox.md)).
+idempotently. It seeds an active Profit area with Sandbox Squadron as a child and IRIDIUM outside
+the hierarchy. The two smoke-test accounts exercise the permitted and withheld org-demand
+responses. It publishes loopback ports only ([`docs/exchange/sandbox.md`](../exchange/sandbox.md)).
 
 The E2E stack runs the same Keycloak image and the ingest gateway (ADR-0225): the same generator
 writes the E2E realm (`frontend/src/e2e/resources/realm-export.e2e.json`) from the same base with the

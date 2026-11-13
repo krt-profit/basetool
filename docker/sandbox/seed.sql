@@ -27,11 +27,18 @@ WHERE u.id IN ('5a4d0000-0000-4000-8000-000000000001', '5a4d0000-0000-4000-8000-
                '5a4d0000-0000-4000-8000-000000000003')
 ON CONFLICT DO NOTHING;
 
+INSERT INTO org_unit (id, version, created_at, updated_at, kind, name, shorthand, active, department)
+VALUES ('5a4d0000-0000-4000-8000-000000000102', 0, now(), now(), 'BEREICH', 'Sandbox Profit',
+        'SBXP', true, 'PROFIT')
+ON CONFLICT DO NOTHING;
+
 INSERT INTO org_unit (id, version, created_at, updated_at, kind, name, shorthand, description,
-                      active, is_profit_eligible)
+                      active, parent_org_unit_id)
 VALUES ('5a4d0000-0000-4000-8000-000000000101', 0, now(), now(), 'SQUADRON', 'Sandbox Squadron',
-        'SBX', 'The second squadron of the local exchange sandbox', true, true)
-ON CONFLICT (id) DO NOTHING;
+        'SBX', 'The second squadron of the local exchange sandbox', true,
+        (SELECT id FROM org_unit WHERE kind = 'BEREICH' AND department = 'PROFIT' AND active))
+ON CONFLICT (id) DO UPDATE SET parent_org_unit_id = EXCLUDED.parent_org_unit_id
+WHERE org_unit.parent_org_unit_id IS NULL AND EXCLUDED.parent_org_unit_id IS NOT NULL;
 
 INSERT INTO org_unit_membership (user_id, org_unit_id, kind)
 VALUES ('5a4d0000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000001', 'SQUADRON'),
