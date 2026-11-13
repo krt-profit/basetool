@@ -119,6 +119,11 @@ class JobOrderMoneyOperation {
   @Column(nullable = false, updatable = false)
   private Instant recordedAt;
 
+  /** The patch change whose currency wipe booked this shortage; {@code null} for every other. */
+  @Nullable
+  @Column(updatable = false)
+  private UUID patchChangeId;
+
   JobOrderMoneyOperation(
       UUID orderId,
       UUID operationId,
@@ -214,6 +219,48 @@ class JobOrderMoneyOperation {
             noGameCost,
             noGameCost);
     fact.accountHoldingId = accountHoldingId;
+    return fact;
+  }
+
+  /**
+   * Creates the real shortage a currency wipe books on a personal holding (REQ-PATCH-044).
+   *
+   * @param orderId the order
+   * @param holderId the canonical holder
+   * @param amount the lost amount, positive whole aUEC
+   * @param patchChangeId the patch change the shortage is attributed to
+   * @return the shortage, recorded by no actor
+   */
+  static JobOrderMoneyOperation currencyWipeShortage(
+      UUID orderId, UUID holderId, BigDecimal amount, UUID patchChangeId) {
+    var fact =
+        marker(orderId, UUID.randomUUID(), holderId, null, amount, JobOrderMoneyKind.SHORTAGE);
+    fact.patchChangeId = patchChangeId;
+    return fact;
+  }
+
+  /**
+   * Creates the real shortage a currency wipe books on a Bank account position (REQ-PATCH-044).
+   *
+   * @param orderId the order
+   * @param accountHoldingId the order's position
+   * @param amount the lost amount, positive whole aUEC
+   * @param patchChangeId the patch change the shortage is attributed to
+   * @return the shortage, recorded by no actor
+   */
+  static JobOrderMoneyOperation accountCurrencyWipeShortage(
+      UUID orderId, UUID accountHoldingId, BigDecimal amount, UUID patchChangeId) {
+    var fact =
+        accountOperation(
+            orderId,
+            UUID.randomUUID(),
+            accountHoldingId,
+            null,
+            null,
+            JobOrderMoneyKind.SHORTAGE,
+            null,
+            amount);
+    fact.patchChangeId = patchChangeId;
     return fact;
   }
 
