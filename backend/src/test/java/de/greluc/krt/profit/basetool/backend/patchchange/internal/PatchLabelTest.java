@@ -46,6 +46,14 @@ class PatchLabelTest {
         .hasMessage("error.patch_change.label_invalid");
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"4.x", "abc", "4.4.1.2"})
+  void theConstructorRefusesWhatParseRefuses(String value) {
+    assertThatThrownBy(() -> new PatchLabel(value))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("error.patch_change.label_invalid");
+  }
+
   @Test
   void numbersCompareAsNumbersNotAsText() {
     assertThat(PatchLabel.parse("4.10").isAfter(PatchLabel.parse("4.9"))).isTrue();
