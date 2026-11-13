@@ -215,6 +215,7 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_PARTICIPATION_ENROLLED",
                   "JOB_ORDER_PARTICIPATION_ENDED",
                   "JOB_ORDER_MONEY_COMMITMENT_CHANGED",
+                  "JOB_ORDER_MONEY_CURRENCY_WIPED",
                   "QUALITY_TIER_CREATED",
                   "QUALITY_TIER_UPDATED",
                   "QUALITY_TIER_DEACTIVATED",
