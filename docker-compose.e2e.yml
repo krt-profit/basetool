@@ -35,7 +35,7 @@ services:
       APP_EXCHANGE_MIRROR_ENABLED: "true"
       APP_EXCHANGE_MIRROR_RECONCILE_INTERVAL: PT10S
       APP_SECURITY_INGEST_GATEWAY_CLIENT_IDS: basetool-ingest-gateway
-    extra_hosts: !override []
+    extra_hosts: !override {}
     volumes: !override
       - type: tmpfs
         target: /app/logs
@@ -51,7 +51,7 @@ services:
     environment:
       SERVER_HTTP2_ENABLED: "false"
       APP_SESSION_TYPE_ALLOW_LIST: enforce
-    extra_hosts: !override []
+    extra_hosts: !override {}
     volumes: !override
       - type: tmpfs
         target: /app/logs
@@ -63,7 +63,7 @@ services:
         tmpfs:
           mode: 0o777
   ingest-dev:
-    extra_hosts: !override []
+    extra_hosts: !override {}
     networks:
       net-backend-keycloak:
         aliases:

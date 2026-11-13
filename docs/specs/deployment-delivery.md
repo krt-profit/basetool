@@ -2103,6 +2103,11 @@ to the shared group and restores the defect exactly.
   properties. Catalogue-dependent flows bootstrap their own synthetic prices, terminals and location
   choices before the first cached read; neither a live upstream feed nor another test's side effects
   supply their preconditions.
+- [ ] The Compose E2E override clears the inherited static host mappings for backend, frontend
+  and ingest so Keycloak's network alias resolves the issuer from those containers.
+- [ ] The E2E and smoke workflows cache Playwright browsers by distribution release, CPU
+  architecture, engine and dependency catalog hash. A runner on another release downloads its
+  own browser binaries even when Playwright uses the same browser revision.
 - [ ] Every E2E and smoke test method runs under a three-minute timeout, so a browser call that is
   never answered fails that one test and names it, instead of holding the cell until the job's
   45-minute limit; a method that legitimately runs longer carries its own `@Timeout`.
@@ -2110,7 +2115,8 @@ to the shared group and restores the defect exactly.
 **Enforced by:** `frontend/src/e2e/resources/junit-platform.properties` (the default test timeout) ·
 `.github/workflows/e2e.yml` (`concurrency.group`, `jobs.e2e.if`,
 `jobs.build-stack.if`, `jobs.build-stack-main.if`, `jobs.exchange-label.if`, the `device` axis) ·
-`.github/actions/build-e2e-images` · `.github/scripts/build_e2e_images.sh` ·
+`.github/actions/build-e2e-images` · `.github/actions/cache-playwright-browsers` ·
+`.github/scripts/build_e2e_images.sh` ·
 `.github/scripts/check_e2e_gate_mirror.py` · `.github/scripts/check_e2e_device_matrix.py` ·
 `.github/workflows/repo-lint.yml` (`Repository gates` → `e2e-gate-mirror / …`) · **Decision:** [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md),
 [ADR-0311](../adr/0311-the-exchange-label-job-runs-only-on-events-that-can-change-its-verdict.md),

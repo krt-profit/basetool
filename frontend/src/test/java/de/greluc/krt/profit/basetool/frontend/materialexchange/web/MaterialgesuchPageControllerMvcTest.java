@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.materialexchange.web;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyClass;
 import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -149,9 +150,7 @@ class MaterialgesuchPageControllerMvcTest {
             content().string(containsString("master-detail master-detail--panes mb-md has-sel")));
   }
 
-  /**
-   * The full request board renders the material name, the tabs, the Markdown description + badge.
-   */
+  /** The request board renders its Markdown, material details and the selected segment count. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void page_requestsMode_rendersBoardAndMarkdownDescription() throws Exception {
@@ -168,7 +167,13 @@ class MaterialgesuchPageControllerMvcTest {
         .andExpect(content().string(containsString(">ALP<")))
         .andExpect(content().string(containsString("600")))
         .andExpect(content().string(containsString("data-mg-edit")))
-        .andExpect(content().string(containsString("<span class=\"tab-count\">1</span>")))
+        .andExpect(
+            content()
+                .string(
+                    matchesPattern(
+                        "(?s).*<button\\b(?=[^>]*\\sdata-testid=\"mb-tab-requests\")"
+                            + "(?=[^>]*\\saria-pressed=\"true\")[^>]*>(?:(?!</button>).)*"
+                            + "<span class=\"krt-segmented__count\">1</span>.*")))
         .andExpect(content().string(not(containsString("id=\"mb-listwrap\""))));
   }
 

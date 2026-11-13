@@ -1,0 +1,25 @@
+name: Cache Playwright browsers
+
+description: Cache browser binaries for the runner's distribution release and architecture.
+
+inputs:
+  browser:
+    description: Playwright browser engine.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Read runner distribution release
+      id: distribution
+      shell: bash
+      run: |
+        set -euo pipefail
+        . /etc/os-release
+        printf 'release=%s-%s\n' "$ID" "$VERSION_ID" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Playwright binaries
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ steps.distribution.outputs.release }}-${{ runner.arch }}-${{ inputs.browser }}-${{ hashFiles('gradle/libs.versions.toml') }}
