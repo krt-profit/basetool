@@ -290,7 +290,8 @@ triangles), thin technical markers framing content
   as the Lager's tree table. A frameless flush card inside a `.list-panel` hands on only the panel
   corners it sits in as the first or last visible child, so a table head under a toolbar stays
   square. A table in a flush card has no fill of its own; a `.master-list` box rounds its first
-  and last visible row.
+  and last visible row. A sticky form action bar that meets the bottom frame of a card takes
+  the same inner radius on both lower corners.
 - **Panes are not boxes.** A `.master-list` and a `.detail-pane` that share one framed box as
   frameless panes take no radius and no fill; the box paints, and the divider between them stays
   straight. The list pane is the scroll list: it fills its grid row, so its bottom corner is the
