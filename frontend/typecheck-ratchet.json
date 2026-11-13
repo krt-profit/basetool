@@ -250,6 +250,12 @@
       "orgunit/special-command-detail.js",
       "orgunit/special-commands.js"
     ],
+    "patchchange": [
+      "patchchange/admin-patch-change.js",
+      "patchchange/patch-change-form.js",
+      "patchchange/patch-change-history.js",
+      "patchchange/patch-change-messages.js"
+    ],
     "personalinventory": [
       "personalinventory/admin-personal-blueprints-purge.js",
       "personalinventory/personal-inventory-blueprint-stats.js",

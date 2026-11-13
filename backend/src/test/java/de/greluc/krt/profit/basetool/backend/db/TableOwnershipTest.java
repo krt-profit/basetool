@@ -109,6 +109,7 @@ class TableOwnershipTest {
           "supply",
           "purchasing",
           "exchange",
+          "patchchange",
           "privacy",
           "app");
 

@@ -38,6 +38,7 @@
       "notification::api",
       "operation::api",
       "orgunit::api",
+      "patchchange::api",
       "platform::api",
       "refinery::api",
       "scope::api",

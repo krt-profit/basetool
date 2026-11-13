@@ -39,6 +39,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryOrderWr
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryTransferNoticeService;
 import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
+import java.util.Optional;
 import org.springframework.context.ApplicationEventPublisher;
 
 /** Constructs the real inventory checkout graph around a test's explicit collaborators. */
@@ -64,7 +65,7 @@ public final class InventoryCheckoutFixtures {
             inventoryItemRepository, mock(OrderLinkedStockWriteObserver.class));
     var mergeService =
         new InventoryMergeService(
-            orderWrites, inventoryItemRepository, stockOfferLookup, auditRecorder);
+            orderWrites, inventoryItemRepository, stockOfferLookup, auditRecorder, Optional::empty);
     var transferNotices = new InventoryTransferNoticeService(userRepository, eventPublisher);
     var bulkService =
         new InventoryBulkRebookService(

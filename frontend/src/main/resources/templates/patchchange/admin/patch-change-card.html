@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="card">
+    <div class="bank-danger-card" data-testid="patch-change-card">
+        <div class="bank-danger-head">
+            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-reset"/></svg>
+            <h2 th:text="#{admin.patchChange.title}">Patchwechsel</h2>
+        </div>
+        <p th:text="#{admin.patchChange.card.text}">Erfasst einen Star-Citizen-Patch f&uuml;r alle Einheiten und f&uuml;hrt seine Wirkungen aus; die Live-Zeit entscheidet, was betroffen ist.</p>
+        <a class="btn btn-quiet-danger" th:href="@{/admin/settings/patch-change}" data-testid="patch-change-open"
+           th:text="#{admin.patchChange.card.open}">Patchwechsel erfassen</a>
+    </div>
+</th:block>
+</body>
+</html>

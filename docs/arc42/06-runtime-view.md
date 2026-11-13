@@ -338,3 +338,26 @@ record.
 
 See [the aUEC order contract](../specs/orders-auec.md) for settlement and correction, and the
 [Bank integration contract](../specs/orders-auec-bank.md) for coupled outcomes.
+
+## 6.14 An admin triggers a patch change
+
+1. The admin's page on the danger-zone tab loads the form's defaults: the label the latest P4K import
+   suggests, the previous patch change's label and live time, and each kind's preset. Every change
+   of the kind, the live time or an option asks the backend for a preview: each effect bean of the
+   `patchchange` module counts what its module would touch before the live time, read-only.
+2. Typing the label enables the trigger. The backend checks the typed label, assigns the patch
+   change's id and opens one transaction inside `PatchChangeWrites.runFor`, so the exchange's change
+   source writes `patch|<id>` into the transaction variable the feed triggers read.
+3. Under the history's advisory lock it checks the label against the previous one and the live time
+   against the previous live time and now, records the patch change and runs every effect bean in
+   order. Today the refinery effect locks the running orders started before the live time in id
+   order and cancels them with the patch change as their reason. An effect that refuses rolls the
+   whole patch change back.
+4. The record keeps the effects' counts; `PATCH_CHANGE_TRIGGERED` and each area's summary event
+   commit with it. After the commit the refinery pages and every open patch-change page refresh in
+   place, and the exchange feeds show the changes with the `patch` source and the patch change's
+   `{id, label}`.
+5. From then on the write-time stock merge skips every row created before the live time
+   ([ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)).
+
+The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-001…009).

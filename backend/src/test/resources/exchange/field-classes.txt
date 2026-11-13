@@ -448,6 +448,8 @@ refinery-draft.schema.json#/properties/model CLIENT_DATA
 refinery-draft.schema.json#/properties/schemaVersion IDENTIFIER
 refinery-draft.schema.json#/properties/tool CLIENT_DATA
 refinery-draft.schema.json#/properties/toolVersion CLIENT_DATA
+refinery-order.schema.json#/properties/canceledByPatch/properties/id IDENTIFIER
+refinery-order.schema.json#/properties/canceledByPatch/properties/label SHORT_NAME
 refinery-order.schema.json#/properties/clientKey IDENTIFIER
 refinery-order.schema.json#/properties/createdBy/properties/clientId IDENTIFIER
 refinery-order.schema.json#/properties/createdBy/properties/name SHORT_NAME
@@ -514,3 +516,5 @@ tombstone.schema.json#/properties/removedAt FACT_VALUE
 tombstone.schema.json#/properties/removedBy/properties/channel FACT_VALUE
 tombstone.schema.json#/properties/removedBy/properties/clientId IDENTIFIER
 tombstone.schema.json#/properties/removedBy/properties/installationId IDENTIFIER
+tombstone.schema.json#/properties/removedBy/properties/patchChange/properties/id IDENTIFIER
+tombstone.schema.json#/properties/removedBy/properties/patchChange/properties/label SHORT_NAME

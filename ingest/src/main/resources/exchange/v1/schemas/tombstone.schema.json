@@ -31,7 +31,8 @@
             "web",
             "app",
             "client",
-            "system"
+            "system",
+            "patch"
           ]
         },
         "clientId": {
@@ -43,6 +44,25 @@
           "minLength": 1,
           "maxLength": 128,
           "description": "The removing installation, when a client removed it."
+        },
+        "patchChange": {
+          "type": "object",
+          "description": "The patch change whose trigger removed the entry, for the patch channel.",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            }
+          },
+          "required": [
+            "id",
+            "label"
+          ]
         }
       },
       "required": [

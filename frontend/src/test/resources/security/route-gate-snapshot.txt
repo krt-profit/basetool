@@ -145,6 +145,11 @@
 /admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/settings/danger-zone GET -> AdminDangerZonePageController#dangerZone gate=class:hasRole('ADMIN') layout=yes
+/admin/settings/patch-change GET -> AdminPatchChangePageController#page gate=class:hasRole('ADMIN') layout=yes
+/admin/settings/patch-change POST headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#trigger gate=class:hasRole('ADMIN') layout=no
+/admin/settings/patch-change/form GET headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#form gate=class:hasRole('ADMIN') layout=no
+/admin/settings/patch-change/preview POST headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#preview gate=class:hasRole('ADMIN') layout=no
+/admin/settings/patch-change/{id}/label PATCH headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#correctLabel gate=class:hasRole('ADMIN') layout=no
 /admin/shops GET -> AdminShopsPageController#view gate=class:hasRole('ADMIN') layout=yes
 /admin/shops/entries GET -> AdminShopsController#shops gate=class:hasRole('ADMIN') layout=no
 /admin/shops/terminals GET -> AdminShopsController#terminals gate=class:hasRole('ADMIN') layout=no

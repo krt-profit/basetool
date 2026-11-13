@@ -236,6 +236,7 @@ public class AdminAuditLogPageController {
                   "REFINERY_METHODS_SYNCED",
                   "REFINERY_YIELDS_SYNCED",
                   "REFINERY_ORDERS_REASSIGNED",
+                  "REFINERY_ORDERS_CANCELED_BY_PATCH",
                   "REFINERY_AUDIT_EXPORTED",
                   "REFINERY_AUDIT_PURGED")),
           Map.entry(
@@ -521,7 +522,14 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_JOB_TYPE_DEACTIVATED",
                   "CATALOGUE_JOB_TYPE_ACTIVATED",
                   "CATALOGUE_AUDIT_EXPORTED",
-                  "CATALOGUE_AUDIT_PURGED")));
+                  "CATALOGUE_AUDIT_PURGED")),
+          Map.entry(
+              "PATCH_CHANGE",
+              List.of(
+                  "PATCH_CHANGE_TRIGGERED",
+                  "PATCH_CHANGE_LABEL_CORRECTED",
+                  "PATCH_CHANGE_AUDIT_EXPORTED",
+                  "PATCH_CHANGE_AUDIT_PURGED")));
 
   /** Reads the audit trails and the exchange registry. */
   private final AuditBackendClient auditClient;

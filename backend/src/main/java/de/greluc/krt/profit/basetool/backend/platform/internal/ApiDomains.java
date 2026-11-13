@@ -29,9 +29,9 @@ import org.jetbrains.annotations.Unmodifiable;
  * (REQ-API-018).
  *
  * <p>The table is the controller-to-domain map of the REST API cut ({@code
- * docs/modularisation/rest-api-cut.md}, "Today's surface"): 22 domains, every controller in exactly
- * one. A controller missing here is tagged {@link #UNASSIGNED}, which the document assertions
- * refuse.
+ * docs/modularisation/rest-api-cut.md}, "Today's surface") plus the patch-change module: 23
+ * domains, every controller in exactly one. A controller missing here is tagged {@link
+ * #UNASSIGNED}, which the document assertions refuse.
  */
 public final class ApiDomains {
 
@@ -53,6 +53,7 @@ public final class ApiDomains {
           Map.entry("AdminP4kImportController", "catalogue"),
           Map.entry("AdminP4kImportReportController", "catalogue"),
           Map.entry("AdminP4kReviewWorkspaceController", "catalogue"),
+          Map.entry("AdminPatchChangeController", "patchchange"),
           Map.entry("AdminStarmapController", "catalogue"),
           Map.entry("AdminShopController", "catalogue"),
           Map.entry("AdminPersonSearchController", "identity"),

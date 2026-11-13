@@ -174,7 +174,10 @@ class GdprParticipantCoverageTest {
               + " on the organisation's catalogue that is never pruned (REQ-P4K-016).",
           "p4k_review_case.ship_repair_by",
           "The reviewer of a pending catalogue repair; the actor remains attributed until"
-              + " completion (REQ-P4K-016).");
+              + " completion (REQ-P4K-016).",
+          "patch_change.triggered_by",
+          "The id of the admin who triggered a patch change, a pseudonymous record of an act on"
+              + " every org unit that is never pruned (REQ-PATCH-001).");
 
   /** Member references no export section selects, each with the reason. */
   static final Map<String, String> NOT_EXPORTED =
@@ -262,7 +265,10 @@ class GdprParticipantCoverageTest {
               "The admin who resolved a review case; an act on the organisation's catalogue."),
           Map.entry(
               "p4k_review_case.ship_repair_by",
-              "The reviewer who confirmed a pending repair on the organisation's catalogue."));
+              "The reviewer who confirmed a pending repair on the organisation's catalogue."),
+          Map.entry(
+              "patch_change.triggered_by",
+              "The admin who triggered a patch change; an act on every org unit's data."));
 
   /** Member references the account merge does not classify, each with the reason. */
   static final Map<String, String> NOT_MERGED =
@@ -277,7 +283,10 @@ class GdprParticipantCoverageTest {
           "The admin who resolved a review case; it stays with the act and is never the subject"
               + " of a merge.",
           "p4k_review_case.ship_repair_by",
-          "The reviewer who confirmed the repair; the identity remains attributed to the act.");
+          "The reviewer who confirmed the repair; the identity remains attributed to the act.",
+          "patch_change.triggered_by",
+          "The admin who triggered a patch change; it stays with the act and is never the subject"
+              + " of a merge.");
 
   @MockitoBean private RoleRepository roleRepository;
 

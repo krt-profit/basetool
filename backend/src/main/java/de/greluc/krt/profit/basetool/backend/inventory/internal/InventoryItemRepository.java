@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.ExchangeStockLotRow;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryScope;
 import de.greluc.krt.profit.basetool.backend.kernel.UuidArrayLiteral;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -729,7 +730,8 @@ public interface InventoryItemRepository
    * <p>Earmarks and {@code delivered} are not part of the key. {@code null} material, game item or
    * quality match only rows where that column is {@code NULL}. Rows backing a {@link
    * de.greluc.krt.profit.basetool.backend.materialexchange.internal.MaterialExchangeOffer} are
-   * excluded.
+   * excluded, and with a {@code createdFrom} so are the rows created before it or without a
+   * creation time (REQ-PATCH-004).
    *
    * @param userId the owning user of the stack; never {@code null}.
    * @param materialId the stack's material, or {@code null} for a game-item stack (matches rows
@@ -743,8 +745,10 @@ public interface InventoryItemRepository
    * @param stolen the stack's „gestohlen" flag; never {@code null} (REQ-INV-053).
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null} to match rows with
    *     no owning org unit.
-   * @return the locked matching rows (excluding offer-backed rows), oldest-first; never {@code
-   *     null}.
+   * @param createdFrom the merge cutoff, or {@code null} before the first patch change; older rows
+   *     and rows without a creation time never merge.
+   * @return the locked matching rows (excluding offer-backed and older rows), oldest-first; never
+   *     {@code null}.
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query(
@@ -756,8 +760,10 @@ public interface InventoryItemRepository
       ((:quality IS NULL AND i.quality IS NULL) OR i.quality = :quality) AND
       i.personal = :personal AND i.stolen = :stolen AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
-      :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
-      o.inventoryItemId = i.id) ORDER BY i.createdAt ASC, i.id ASC
+      :owningOrgUnitId) AND
+      (CAST(:createdFrom AS timestamp) IS NULL OR i.createdAt >= :createdFrom) AND NOT EXISTS
+      (SELECT 1 FROM MaterialExchangeOffer o WHERE o.inventoryItemId = i.id)
+      ORDER BY i.createdAt ASC, i.id ASC
       """)
   List<InventoryItem> findMergeGroupForUpdate(
       @Param("userId") UUID userId,
@@ -767,11 +773,12 @@ public interface InventoryItemRepository
       @Param("quality") @Nullable Integer quality,
       @Param("personal") Boolean personal,
       @Param("stolen") Boolean stolen,
-      @Param("owningOrgUnitId") @Nullable UUID owningOrgUnitId);
+      @Param("owningOrgUnitId") @Nullable UUID owningOrgUnitId,
+      @Param("createdFrom") @Nullable Instant createdFrom);
 
   /**
    * Material-stack overload of {@link #findMergeGroupForUpdate(UUID, UUID, UUID, UUID, Integer,
-   * Boolean, Boolean, UUID)} that passes {@code gameItemId = null}.
+   * Boolean, Boolean, UUID, Instant)} that passes {@code gameItemId = null}.
    *
    * @param userId the owning user of the stack; never {@code null}.
    * @param materialId the stack's material; never {@code null} on this overload.
@@ -781,8 +788,10 @@ public interface InventoryItemRepository
    * @param stolen the stack's „gestohlen" flag; never {@code null} (REQ-INV-053).
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null} to match rows with
    *     no owning org unit.
-   * @return the locked matching material rows (excluding offer-backed rows), oldest-first; never
-   *     {@code null}.
+   * @param createdFrom the merge cutoff, or {@code null} before the first patch change; older rows
+   *     and rows without a creation time never merge.
+   * @return the locked matching material rows (excluding offer-backed and older rows),
+   *     oldest-first; never {@code null}.
    */
   default List<InventoryItem> findMergeGroupForUpdate(
       UUID userId,
@@ -791,15 +800,24 @@ public interface InventoryItemRepository
       @Nullable Integer quality,
       Boolean personal,
       Boolean stolen,
-      @Nullable UUID owningOrgUnitId) {
+      @Nullable UUID owningOrgUnitId,
+      @Nullable Instant createdFrom) {
     return findMergeGroupForUpdate(
-        userId, materialId, null, locationId, quality, personal, stolen, owningOrgUnitId);
+        userId,
+        materialId,
+        null,
+        locationId,
+        quality,
+        personal,
+        stolen,
+        owningOrgUnitId,
+        createdFrom);
   }
 
   /**
    * Counts the material rows a book-in with the given stock identity would merge with, without
-   * locking them (REQ-INV-026). Same key and offer exclusion as {@link
-   * #findMergeGroupForUpdate(UUID, UUID, UUID, UUID, Integer, Boolean, Boolean, UUID)}.
+   * locking them (REQ-INV-026). Same key, offer exclusion and cutoff as {@link
+   * #findMergeGroupForUpdate(UUID, UUID, UUID, UUID, Integer, Boolean, Boolean, UUID, Instant)}.
    *
    * @param userId the owning user of the stack; never {@code null}.
    * @param materialId the stack's material; never {@code null}.
@@ -809,6 +827,8 @@ public interface InventoryItemRepository
    * @param stolen the stack's „gestohlen" flag; never {@code null}.
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null} to match rows with
    *     no owning org unit.
+   * @param createdFrom the merge cutoff, or {@code null} before the first patch change; older rows
+   *     and rows without a creation time never merge (REQ-PATCH-004).
    * @return the number of mergeable rows.
    */
   @Query(
@@ -817,8 +837,9 @@ public interface InventoryItemRepository
       i.material.id = :materialId AND i.location.id = :locationId AND i.quality = :quality AND
       i.personal = :personal AND i.stolen = :stolen AND
       ((:owningOrgUnitId IS NULL AND i.owningOrgUnit IS NULL) OR i.owningOrgUnit.id =
-      :owningOrgUnitId) AND NOT EXISTS (SELECT 1 FROM MaterialExchangeOffer o WHERE
-      o.inventoryItemId = i.id)
+      :owningOrgUnitId) AND
+      (CAST(:createdFrom AS timestamp) IS NULL OR i.createdAt >= :createdFrom) AND NOT EXISTS
+      (SELECT 1 FROM MaterialExchangeOffer o WHERE o.inventoryItemId = i.id)
       """)
   long countMergeCandidates(
       @Param("userId") UUID userId,
@@ -827,7 +848,8 @@ public interface InventoryItemRepository
       @Param("quality") Integer quality,
       @Param("personal") Boolean personal,
       @Param("stolen") Boolean stolen,
-      @Param("owningOrgUnitId") @Nullable UUID owningOrgUnitId);
+      @Param("owningOrgUnitId") @Nullable UUID owningOrgUnitId,
+      @Param("createdFrom") @Nullable Instant createdFrom);
 
   /**
    * Deletes every inventory row of the given user, personal and shared, as part of the hard account

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pageNumbers=false, pageDates=false, pageFocus=false, pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageContent=~{::pageContent}, pageToast=true, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="#{admin.patchChange.title} + ' - ' + ${appTitle}">Patchwechsel - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/pages/patchchange/admin-patch-change.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<main>
+    <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.dangerzone', eyebrowKey='nav.admin.group.system', titleText=#{admin.patchChange.title})}"></th:block>
+
+    <span id="pc-i18n" hidden
+          th:attr="data-triggered=#{admin.patchChange.triggered},data-trigger-error=#{admin.patchChange.error.trigger},data-trigger-label=#{admin.patchChange.trigger},data-confirm-label=#{admin.patchChange.confirm.label},data-previous=#{admin.patchChange.previous},data-preview-error=#{admin.patchChange.preview.error},data-preview-empty=#{admin.patchChange.preview.empty},data-corrected=#{admin.patchChange.correct.success},data-correct-error=#{admin.patchChange.correct.error},data-conflict=#{admin.patchChange.correct.conflict},data-refresh-error=#{admin.patchChange.history.refreshError}"></span>
+    <ul id="pc-count-labels" hidden>
+        <li th:each="kind : ${countKinds}" th:data-count-kind="${kind}"
+            th:text="#{|admin.patchChange.count.${kind}|}">Raffinerieauftr&auml;ge storniert</li>
+    </ul>
+
+    <div th:if="${formError != null}" class="alert alert-danger" role="alert" data-testid="pc-form-error"
+         th:text="#{${formError}}">Das Formular konnte nicht geladen werden.</div>
+
+    <form th:if="${form != null}" id="pc-form" class="pc-layout no-track" novalidate data-testid="pc-form"
+          th:attr="data-previous-label=${form.previousLabel()},data-previous-live-at=${form.previousLiveAt()}">
+        <section class="hud-box" aria-labelledby="pc-form-title">
+            <h2 id="pc-form-title" class="pc-heading" th:text="#{admin.patchChange.form.title}">Patchwechsel erfassen</h2>
+            <div class="pc-fields">
+                <fieldset class="form-group pc-kind">
+                    <legend th:text="#{admin.patchChange.kind}">Patch-Art</legend>
+                    <div class="krt-segmented" data-testid="pc-kind">
+                        <label class="krt-segmented__item" th:each="kind : ${kinds}"
+                               th:with="preset=${form.presetFor(kind)}" th:data-testid="|pc-kind-${kind}|">
+                            <input type="radio" name="kind" th:value="${kind}" th:checked="${kind == defaultKind}"
+                                   th:data-wipe-groups="${preset != null} ? ${#strings.setJoin(preset.wipeGroups(), ' ')} : ''"
+                                   th:attr="data-cancel-refinery-orders=${preset != null and preset.cancelRefineryOrders()},data-currency-wipe=${preset != null and preset.currencyWipe()},data-home-location-prompt=${preset != null and preset.homeLocationPrompt()}">
+                            <span th:text="#{|admin.patchChange.kind.${kind}|}">LTP-Rebuild</span>
+                        </label>
+                    </div>
+                </fieldset>
+                <div class="form-group">
+                    <label for="pc-label" th:text="#{admin.patchChange.label}">Patch-Bezeichnung</label>
+                    <input type="text" id="pc-label" name="label" maxlength="32" required autocomplete="off"
+                           spellcheck="false" th:value="${form.suggestedLabel()}" data-testid="pc-label">
+                    <p class="form-hint" th:text="#{admin.patchChange.label.hint}">Zwei oder drei Zahlen, z. B. 4.4 oder 4.4.1.</p>
+                </div>
+                <div class="form-group">
+                    <label for="pc-live-at" th:text="#{admin.patchChange.liveAt}">Live-Zeit (Stichtag)</label>
+                    <input type="datetime-local" id="pc-live-at" name="liveAt" step="60" data-testid="pc-live-at">
+                </div>
+            </div>
+            <p class="form-hint pc-hint" th:text="#{admin.patchChange.liveAt.hint}">Die Live-Zeit entscheidet, was betroffen ist: nur was vor ihr angelegt wurde. Nach dem Ausl&ouml;sen ist sie fest.</p>
+            <p id="pc-previous" class="form-hint pc-hint" data-testid="pc-previous"
+               th:hidden="${form.previousLabel() == null}"
+               th:with="previousAt=${form.previousLiveAt() != null} ? #{admin.patchChange.utc(${#temporals.format(form.previousLiveAt(), 'dd.MM.yyyy HH:mm', 'UTC')})} : ''"
+               th:text="${form.previousLabel() != null} ? #{admin.patchChange.previous(${form.previousLabel()}, ${previousAt})} : ''">Letzter Patchwechsel: 4.3, live seit 02.08.2026 18:00 UTC.</p>
+
+            <h3 class="pc-subheading" th:text="#{admin.patchChange.wipe.title}">Wipe</h3>
+            <div class="card card--flush">
+                <table class="data-table data-table--stack data-table--compact" data-testid="pc-wipe-groups">
+                    <thead>
+                    <tr>
+                        <th scope="col" th:text="#{admin.patchChange.wipe.column.group}">Wipe-Gruppe</th>
+                        <th scope="col" th:text="#{admin.patchChange.wipe.column.contents}">Enth&auml;lt</th>
+                        <th scope="col" class="cell-status pc-switch-cell" th:text="#{admin.patchChange.wipe.column.active}">Aktiv</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="group : ${wipeGroups}">
+                        <td><span class="cell-title" th:id="|pc-group-${group}|" th:text="#{|admin.patchChange.wipeGroup.${group}|}">Verbrauchsg&uuml;ter</span></td>
+                        <td th:text="#{|admin.patchChange.wipeGroup.${group}.contents|}">Essen, Trinken, Medpens, FPS-Verbrauchsg&uuml;ter, Magazine, Munition</td>
+                        <td class="cell-status pc-switch-cell">
+                            <label class="krt-switch">
+                                <input type="checkbox" role="switch" name="wipeGroup" th:value="${group}"
+                                       th:checked="${defaults != null and defaults.wipes(group)}"
+                                       th:attr="aria-labelledby=|pc-group-${group}|">
+                            </label>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="form-hint pc-hint" th:text="#{admin.patchChange.wipe.hint}">Der Wipe wirkt erst mit einem sp&auml;teren Release; die Auswahl wird schon gespeichert.</p>
+
+            <h3 class="pc-subheading" th:text="#{admin.patchChange.effects.title}">Weitere Wirkungen</h3>
+            <div class="pc-effects">
+                <label class="krt-switch">
+                    <input type="checkbox" role="switch" name="cancelRefineryOrders" data-testid="pc-option-refinery"
+                           th:checked="${defaults != null and defaults.cancelRefineryOrders()}">
+                    <span th:text="#{admin.patchChange.option.cancelRefineryOrders}">Laufende Raffinerieauftr&auml;ge beenden (vor der Live-Zeit begonnen)</span>
+                </label>
+                <label class="krt-switch">
+                    <input type="checkbox" role="switch" name="currencyWipe" data-testid="pc-option-currency"
+                           th:checked="${defaults != null and defaults.currencyWipe()}">
+                    <span th:text="#{admin.patchChange.option.currencyWipe}">W&auml;hrungs-Wipe: Bank-Reset und aUEC-Auftr&auml;ge</span>
+                </label>
+                <label class="krt-switch">
+                    <input type="checkbox" role="switch" name="homeLocationPrompt" data-testid="pc-option-home"
+                           th:checked="${defaults != null and defaults.homeLocationPrompt()}">
+                    <span th:text="#{admin.patchChange.option.homeLocationPrompt}">Home-Location-Abfrage beim n&auml;chsten Login</span>
+                </label>
+            </div>
+            <p class="form-hint pc-hint" th:text="#{admin.patchChange.effects.hint}">W&auml;hrungs-Wipe und Home-Location-Abfrage wirken erst mit einem sp&auml;teren Release; die Auswahl wird schon gespeichert.</p>
+        </section>
+
+        <aside class="hud-box pc-preview" aria-labelledby="pc-preview-title" data-testid="pc-preview">
+            <h2 id="pc-preview-title" class="pc-heading" th:text="#{admin.patchChange.preview.title}">Vorschau</h2>
+            <p class="form-hint pc-hint" th:text="#{admin.patchChange.preview.hint}">Aktualisiert sich bei jeder &Auml;nderung im Formular.</p>
+            <div id="pc-preview-counts" class="kpi-grid" aria-live="polite" aria-busy="true" data-testid="pc-preview-counts">
+                <p class="form-hint pc-hint" th:text="#{admin.patchChange.preview.loading}">Vorschau wird geladen&hellip;</p>
+            </div>
+            <p id="pc-preview-error" class="alert alert-danger pc-alert" role="alert" hidden data-testid="pc-preview-error"></p>
+            <p id="pc-currency-alert" class="alert alert-danger pc-alert" role="alert" data-testid="pc-currency-alert"
+               th:hidden="${defaults == null or !defaults.currencyWipe()}"
+               th:text="#{admin.patchChange.currencyWipe.alert}">W&auml;hrungs-Wipe setzt alle Kartellbank-Salden auf 0.</p>
+            <div class="pc-confirm">
+                <label for="pc-confirm" id="pc-confirm-label"
+                       th:text="#{admin.patchChange.confirm.label(${form.suggestedLabel() ?: ''})}">Zum Best&auml;tigen die Patch-Bezeichnung 4.4 eintippen</label>
+                <input type="text" id="pc-confirm" class="confirm-input" autocomplete="off" spellcheck="false"
+                       data-confirm-submit="pc-trigger" data-testid="pc-confirm"
+                       th:attr="data-confirm-token=${form.suggestedLabel() ?: ''},placeholder=${form.suggestedLabel() ?: ''}">
+                <button type="submit" id="pc-trigger" class="btn btn-danger" disabled data-testid="pc-trigger"
+                        th:text="#{admin.patchChange.trigger(${form.suggestedLabel() ?: ''})}">Patchwechsel 4.4 ausl&ouml;sen</button>
+            </div>
+        </aside>
+    </form>
+
+    <section class="stack gap-3" aria-labelledby="pc-history-title">
+        <h2 id="pc-history-title" class="pc-heading" th:text="#{admin.patchChange.history.title}">Historie</h2>
+        <div id="pc-history-host">
+            <th:block th:fragment="history">
+                <div th:if="${historyError != null}" class="alert alert-danger" role="alert" data-testid="pc-history-error"
+                     th:text="#{${historyError}}">Die Patchwechsel konnten nicht geladen werden.</div>
+                <div th:if="${historyError == null}" class="card card--flush">
+                    <table th:if="${!#lists.isEmpty(history)}" id="pc-history-table" class="data-table data-table--stack"
+                           data-testid="pc-history-table">
+                        <thead>
+                        <tr>
+                            <th scope="col" th:text="#{admin.patchChange.history.column.label}">Patch</th>
+                            <th scope="col" th:text="#{admin.patchChange.history.column.kind}">Art</th>
+                            <th scope="col" th:text="#{admin.patchChange.history.column.liveAt}">Live-Zeit</th>
+                            <th scope="col" th:text="#{admin.patchChange.history.column.triggered}">Ausgel&ouml;st</th>
+                            <th scope="col" th:text="#{admin.patchChange.history.column.counts}">Wirkungen</th>
+                            <th scope="col" th:text="#{admin.patchChange.history.column.options}">Optionen</th>
+                            <th scope="col" class="cell-actions"><span class="visually-hidden" th:text="#{admin.patchChange.history.column.actions}">Aktion</span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="p : ${history}" th:id="|pc-row-${p.id()}|" data-testid="pc-history-row"
+                            th:attr="data-patch-change-id=${p.id()},data-version=${p.version()},data-label=${p.label()}">
+                            <td><span class="data-value pc-row-label" th:text="${p.label()}">4.4</span></td>
+                            <td th:attr="data-label=#{admin.patchChange.history.column.kind}"
+                                th:text="#{|admin.patchChange.kind.${p.kind()}|}">LTP-Rebuild</td>
+                            <td th:attr="data-label=#{admin.patchChange.history.column.liveAt}">
+                                <time class="pc-local-time" th:datetime="${p.liveAt()}"
+                                      th:text="#{admin.patchChange.utc(${#temporals.format(p.liveAt(), 'dd.MM.yyyy HH:mm', 'UTC')})}">14.11.2026 20:00 UTC</time>
+                            </td>
+                            <td th:attr="data-label=#{admin.patchChange.history.column.triggered}">
+                                <div class="stack gap-1">
+                                    <span th:text="${p.triggeredBy()} ?: '–'">Admin</span>
+                                    <time class="pc-local-time text-muted" th:datetime="${p.triggeredAt()}"
+                                          th:text="#{admin.patchChange.utc(${#temporals.format(p.triggeredAt(), 'dd.MM.yyyy HH:mm', 'UTC')})}">14.11.2026 21:12 UTC</time>
+                                </div>
+                            </td>
+                            <td th:attr="data-label=#{admin.patchChange.history.column.counts}">
+                                <div class="cluster gap-1">
+                                    <span th:each="c : ${p.counts()}" class="chip chip--data"
+                                          th:with="countLabel=#{|admin.patchChange.count.${c.kind()}|}"
+                                          th:text="#{admin.patchChange.history.count(${countLabel}, ${c.value()})}">Raffinerieauftr&auml;ge storniert: 24</span>
+                                    <span th:if="${#lists.isEmpty(p.counts())}" class="text-muted">&ndash;</span>
+                                </div>
+                            </td>
+                            <td th:attr="data-label=#{admin.patchChange.history.column.options}">
+                                <div class="cluster gap-1">
+                                    <span th:if="${p.options().wipeGroups().isEmpty()}" class="chip chip--muted"
+                                          th:text="#{admin.patchChange.chip.wipeNone}">Kein Wipe</span>
+                                    <span th:if="${p.options().wipeGroups().size() == #lists.size(wipeGroups)}" class="chip"
+                                          th:text="#{admin.patchChange.chip.wipeAll}">Alle Wipe-Gruppen</span>
+                                    <th:block th:if="${!p.options().wipeGroups().isEmpty() and p.options().wipeGroups().size() < #lists.size(wipeGroups)}">
+                                        <span th:each="group : ${wipeGroups}" th:if="${p.options().wipes(group)}" class="chip"
+                                              th:text="#{|admin.patchChange.wipeGroup.${group}|}">Verbrauchsg&uuml;ter</span>
+                                    </th:block>
+                                    <span th:if="${p.options().cancelRefineryOrders()}" class="chip"
+                                          th:text="#{admin.patchChange.chip.cancelRefineryOrders}">Raffinerie beendet</span>
+                                    <span th:if="${p.options().currencyWipe()}" class="chip chip--danger"
+                                          th:text="#{admin.patchChange.chip.currencyWipe}">W&auml;hrungs-Wipe</span>
+                                    <span th:if="${p.options().homeLocationPrompt()}" class="chip"
+                                          th:text="#{admin.patchChange.chip.homeLocationPrompt}">Home-Location-Abfrage</span>
+                                </div>
+                            </td>
+                            <td class="cell-actions">
+                                <button type="button" class="btn btn-ghost btn-xs" data-pc-correct data-testid="pc-correct-open"
+                                        th:text="#{admin.patchChange.correct}">Bezeichnung korrigieren</button>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <th:block th:if="${#lists.isEmpty(history)}">
+                        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='admin.patchChange.history.empty',
+                            textKey='admin.patchChange.history.empty.text', emptyId='pc-history-empty')}"></th:block>
+                    </th:block>
+                </div>
+            </th:block>
+        </div>
+    </section>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='pc-correct-modal', titleKey='admin.patchChange.correct.title', body=~{::pc-correct-modal-body})}">
+        <th:block th:ref="pc-correct-modal-body">
+            <form id="pc-correct-form" class="no-track" novalidate data-testid="pc-correct-form">
+                <div class="krt-modal-body stack gap-3">
+                    <p th:text="#{admin.patchChange.correct.text}">Die Live-Zeit bleibt unver&auml;ndert.</p>
+                    <div class="form-group">
+                        <label for="pc-correct-label" th:text="#{admin.patchChange.correct.label}">Neue Bezeichnung</label>
+                        <input type="text" id="pc-correct-label" name="label" maxlength="32" required autocomplete="off"
+                               spellcheck="false" data-testid="pc-correct-label">
+                    </div>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="pc-correct-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn--cta" id="pc-correct-submit" data-testid="pc-correct-submit">
+                        <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>
+                        <span th:text="#{general.save}">Speichern</span>
+                    </button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+</main>
+</th:block>
+<th:block th:fragment="pageTail">
+<script type="module" th:src="@{/js/patchchange/admin-patch-change.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>

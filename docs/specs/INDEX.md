@@ -106,6 +106,7 @@ versioned transport, safe identity/presence handling, archived convergence, enri
 | Shared JobOrder model | [`orders-core.md`](orders-core.md) | Living | Common access, participation, writing and lifecycle for all order kinds (REQ-ORDERS-049…056) | ORDERS/ORG/SEC |
 | aUEC procurement orders | [`orders-auec.md`](orders-auec.md) | Living | Reported holdings, commitments, settlement, corrections and integrated acceptance (REQ-ORDERS-057…068) | ORDERS |
 | Optional aUEC order–Bank integration | [`orders-auec-bank.md`](orders-auec-bank.md) | Living | Default Bank handling, per-action Bank-free choice, linked authority and outcomes (REQ-ORDERS-069…076) | ORDERS/BANK |
+| Patch change — the admin's record of a Star Citizen patch and its effects | [`patch-change.md`](patch-change.md) | Living | Current — REQ-PATCH-001…009: the `patchchange` module and record, kinds and options, the live time as the criterion and the no-mixing rule (ADR-0380, ADR-0381), the all-or-nothing trigger with the refinery cancellation, the `patch` change source and `canceledByPatch` in the exchange feeds, the admin page with its history, the `PATCH_CHANGE` audit area; the wipe, the home-location phase, the form default, the currency wipe and the exchange resource follow (epic #3328) | PATCH |
 
 Architecture *decisions* (the "why we chose X over Y") live next door in
 [`docs/adr/`](../adr/README.md), not here. A spec says what must hold; an ADR records the
@@ -149,7 +150,7 @@ REQ-<AREA>-<NNN>     e.g. REQ-ORDERS-012, REQ-AUTH-003
 `<AREA>` is drawn from the same vocabulary as the issue "Affected Area" and the labels:
 `AUTH`, `SEC`, `ORG`, `ORDERS`, `INV`, `MISSION`, `REFINERY`, `HANGAR`, `BANK`,
 `ADMIN`, `UEX`, `UI`, `BE`, `FE`, `I18N`, `DATA`, `OPS`, `OBS`, `API`, `NOTIF`, `INGEST`,
-`AUDIT`, `ROLE`, `MARKET`, `XCH` (the external client exchange), `MOD` (backend module boundaries), `P4K` (the P4K catalogue import). Numbers are never reused, even
+`AUDIT`, `ROLE`, `MARKET`, `XCH` (the external client exchange), `MOD` (backend module boundaries), `P4K` (the P4K catalogue import), `PATCH` (the patch change). Numbers are never reused, even
 after a requirement is removed — mark it superseded instead: keep the heading, suffix it with
 `*(superseded)*` and open the body with a dated callout naming what replaced it (the convention
 `security-and-access.md` uses for REQ-SEC-018 / REQ-SEC-021). `REQ-APP-*` (e.g. `REQ-APP-SYNC-*`)

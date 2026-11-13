@@ -171,6 +171,21 @@ class LiveSyncTopicTest {
   }
 
   @Test
+  void parse_acceptsTheGlobalPatchChangeTopic_gatedByTheAdminRole() {
+    LiveSyncTopic topic = LiveSyncTopic.parse("patch-change");
+
+    assertThat(topic).isNotNull();
+    assertThat(topic.topicClass()).isEqualTo(LiveSyncTopicClass.PATCH_CHANGE);
+    assertThat(topic.resourceId()).isNull();
+    assertThat(LiveSyncTopic.parse("patch-change:" + UUID.randomUUID())).isNull();
+    assertThat(LiveSyncTopicClass.PATCH_CHANGE.requiredAnyRole()).containsExactly("ROLE_ADMIN");
+    assertThat(LiveSyncTopicClass.PATCH_CHANGE.authProbePath()).isNull();
+    assertThat(LiveSyncTopicClass.PATCH_CHANGE.presenceEnabled()).isFalse();
+    assertThat(LiveSyncTopicClass.PATCH_CHANGE.metricLabel()).isEqualTo("patch_change");
+    assertThat(LiveSyncTopicClass.PATCH_CHANGE.allowedSections()).containsExactly("history");
+  }
+
+  @Test
   void parse_acceptsTheMemberRoomOfOneMember_gatedByTheAdminRole() {
     UUID memberId = UUID.randomUUID();
     LiveSyncTopic topic = LiveSyncTopic.parse("member:" + memberId);

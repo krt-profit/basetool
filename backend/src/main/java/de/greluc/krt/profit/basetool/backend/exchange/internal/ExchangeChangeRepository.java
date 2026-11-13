@@ -152,7 +152,8 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
       value =
           """
           SELECT seq, changed_at AS changedAt, source_channel AS sourceChannel,
-                 source_client AS sourceClient, source_key AS sourceKey
+                 source_client AS sourceClient, source_key AS sourceKey,
+                 source_patch_change AS sourcePatchChange
           FROM exchange_change WHERE seq IN (:seqs)
           """,
       nativeQuery = true)
@@ -237,7 +238,8 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
     Instant getChangedAt();
 
     /**
-     * The writing channel: {@code web}, {@code app}, {@code client} or {@code system}.
+     * The writing channel: {@code web}, {@code app}, {@code client}, {@code system} or {@code
+     * patch}.
      *
      * @return the channel
      */
@@ -256,6 +258,13 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
      * @return the thumbprint, or {@code null}
      */
     String getSourceKey();
+
+    /**
+     * The patch change whose trigger wrote it (REQ-PATCH-007).
+     *
+     * @return the patch change's id, or {@code null} for every other channel
+     */
+    UUID getSourcePatchChange();
   }
 
   /** A changed key with the position of its latest entry. */

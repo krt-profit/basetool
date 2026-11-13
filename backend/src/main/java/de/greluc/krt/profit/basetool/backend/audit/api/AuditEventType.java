@@ -271,6 +271,11 @@ public enum AuditEventType {
   REFINERY_YIELDS_SYNCED(AuditDomain.REFINERY),
   /** A deleted user's refinery orders were bulk-reassigned to the fallback admin. */
   REFINERY_ORDERS_REASSIGNED(AuditDomain.REFINERY),
+  /**
+   * A patch change cancelled the running refinery orders started before its live time — one summary
+   * event per trigger with the count; the subject is the patch change (REQ-PATCH-006).
+   */
+  REFINERY_ORDERS_CANCELED_BY_PATCH(AuditDomain.REFINERY),
   /** The refinery audit log was exported as a PDF or JSON for a period. */
   REFINERY_AUDIT_EXPORTED(AuditDomain.REFINERY),
   /** Refinery audit rows older than an admin-chosen cutoff were purged (retention). */
@@ -843,7 +848,18 @@ public enum AuditEventType {
   /** The Katalog audit log was exported (REQ-AUDIT-003). */
   CATALOGUE_AUDIT_EXPORTED(AuditDomain.CATALOGUE),
   /** The Katalog audit log was purged (REQ-AUDIT-004). */
-  CATALOGUE_AUDIT_PURGED(AuditDomain.CATALOGUE);
+  CATALOGUE_AUDIT_PURGED(AuditDomain.CATALOGUE),
+  /**
+   * An admin triggered a patch change; the subject is the patch change with its label, the details
+   * carry the kind, the live time, the options and the counts (REQ-PATCH-009).
+   */
+  PATCH_CHANGE_TRIGGERED(AuditDomain.PATCH_CHANGE),
+  /** An admin corrected a patch change's label; the details carry the old and the new label. */
+  PATCH_CHANGE_LABEL_CORRECTED(AuditDomain.PATCH_CHANGE),
+  /** The patch-change audit log was exported (REQ-AUDIT-003). */
+  PATCH_CHANGE_AUDIT_EXPORTED(AuditDomain.PATCH_CHANGE),
+  /** The patch-change audit log was purged (REQ-AUDIT-004). */
+  PATCH_CHANGE_AUDIT_PURGED(AuditDomain.PATCH_CHANGE);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final @NotNull AuditDomain domain;

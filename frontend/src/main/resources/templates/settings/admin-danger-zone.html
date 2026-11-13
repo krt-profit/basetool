@@ -19,6 +19,7 @@
     <div th:if="${error != null}" class="alert alert-danger" role="alert" data-testid="bank-wipe-error"
          th:text="#{${error}}">Fehler.</div>
 
+    <th:block th:replace="~{patchchange/admin/patch-change-card :: card}"></th:block>
     <th:block th:replace="~{bank/admin/bank-wipe-card :: card}"></th:block>
     <th:block th:replace="~{blueprint/admin/blueprint-purge-card :: card}"></th:block>
 </main>

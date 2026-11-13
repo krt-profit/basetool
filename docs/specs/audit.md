@@ -171,7 +171,10 @@ web, naming its client (REQ-AUDIT-005):
 - **Raffinerie** — order create / update / cancel / store; refining-method reference CRUD; the
   scheduled UEX sync (one summary event per run and catalogue — `REFINERY_METHODS_SYNCED` /
   `REFINERY_YIELDS_SYNCED`, actor `system`); owner-reassignment on user deletion
-  (`REFINERY_ORDERS_REASSIGNED`). An exchange client's refinery-order writes (REQ-XCH-052)
+  (`REFINERY_ORDERS_REASSIGNED`); a patch change's cancellation of the running orders started
+  before its live time, one summary event per trigger (`REFINERY_ORDERS_CANCELED_BY_PATCH`, subject
+  the patch change with its label, details `canceled` and `patchChange`,
+  [REQ-PATCH-006](patch-change.md#req-patch-006--the-refinery-effect-ends-the-running-orders-started-before-the-live-time)). An exchange client's refinery-order writes (REQ-XCH-052)
   record the same events under the client's id: a create `REFINERY_ORDER_CREATED`, an update
   and a goods op `REFINERY_ORDER_UPDATED`, a cancel `REFINERY_ORDER_CANCELED` (the previous
   status, as the web's cancel), and a pickup without store lines (REQ-XCH-053)
@@ -635,11 +638,34 @@ counts them (REQ-OBS-011).
   their events (`P4kStarmapLinkTest`, `StarmapVisibilityTest`, `LocationStarmapNodeTest`).
 - [ ] The shop link records its event (planned above).
 
+#### The patch-change area (REQ-PATCH-009)
+
+The coverage list holds the **Patchwechsel** area
+([REQ-PATCH-009](patch-change.md#req-patch-009--the-audit-area-patchwechsel)):
+
+- **Patchwechsel** (`AuditDomain.PATCH_CHANGE`, `ADMIN` only) — `PATCH_CHANGE_TRIGGERED` at the
+  trigger (subject the patch change, labelled by its patch label; details `kind`, `liveAt`,
+  `wipeGroups`, `refinery`, `currency`, `homeLocation` and one count per effect kind) and
+  `PATCH_CHANGE_LABEL_CORRECTED` with `from` and `to`; `PATCH_CHANGE_AUDIT_EXPORTED` and
+  `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. There is no target user,
+  and the details carry enums, instants, booleans and counts only. Each affected area records one
+  summary event of the trigger in its own trail (the refinery's above).
+
+The types are offered by the viewer's per-area event-type list and labelled in DE/EN
+(`admin.audit.domain.PATCH_CHANGE`, `admin.audit.event.*`, `pdf.audit.title.PATCH_CHANGE`); both
+exhaustive domain switches carry the case. The area is exempt from `AuditDomainSilenceAnomaly`.
+
+**Acceptance**
+
+- [x] A trigger records one `PATCH_CHANGE_TRIGGERED` and the refinery's one summary event; a label
+  correction records `PATCH_CHANGE_LABEL_CORRECTED` (`PatchChangeTriggerIntegrationTest`).
+
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
-All fifteen logs are read on **one** admin page (`/admin/audit-log`) with a **tab switcher**
+All sixteen logs are read on **one** admin page (`/admin/audit-log`) with a **tab switcher**
 (Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen · Rollen ·
-Materialbörse · Hangar · Blueprints · Verbundene Anwendungen · Bedarf & Spenden · Ankauf · Katalog) built from the design-system `.tab-nav` component. The bank tab reads
+Materialbörse · Hangar · Blueprints · Verbundene Anwendungen · Bedarf & Spenden · Ankauf · Katalog ·
+Patchwechsel) built from the design-system `.tab-nav` component. The bank tab reads
 the existing `/api/v1/bank/admin/audit` endpoint; the generic area tabs read `/api/v1/audit/{domain}`;
 both DTO
 shapes are adapted into one uniform row view so a single
@@ -657,7 +683,7 @@ of `AuditDomainSilenceAnomaly` (REQ-OBS-011); sync outages are reported by the s
 
 **Acceptance**
 
-- [ ] An admin sees one tab per audited area (fifteen); switching a tab loads that area's log; filtering/paging stays in place.
+- [ ] An admin sees one tab per audited area (sixteen); switching a tab loads that area's log; filtering/paging stays in place.
 - [ ] `/admin/bank-audit` redirects to `/admin/audit-log?domain=BANK`.
 - [x] The client filter is offered on **every** tab, the bank included; selecting it reaches the
   backend as a query parameter and survives paging.

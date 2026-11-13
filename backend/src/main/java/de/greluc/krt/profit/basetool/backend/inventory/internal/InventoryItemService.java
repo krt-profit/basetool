@@ -42,7 +42,6 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.MissionEarmark;
 import de.greluc.krt.profit.basetool.backend.inventory.api.OverAllocationException;
 import de.greluc.krt.profit.basetool.backend.inventory.api.PoolEntryCommands;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockCommands;
-import de.greluc.krt.profit.basetool.backend.kernel.AppException;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.Entities;
@@ -503,68 +502,6 @@ public class InventoryItemService {
     provisionRecorder.recordInitial(saved, jobAllocations);
     return inventoryCheckoutService.mergeStockIfRequested(
         saved, Boolean.TRUE.equals(dto.mergeStock()));
-  }
-
-  /**
-   * Probes whether an Einbuchen with the given material stock identity would find a row to merge
-   * with (REQ-INV-026), resolving owner and owning org unit exactly as {@link #createInventoryItem}
-   * does.
-   *
-   * <p>Runs without a surrounding transaction so a refused org-unit resolution answers {@code
-   * false} instead of marking a shared transaction rollback-only.
-   *
-   * @param userId the member booked for, or {@code null} for the caller
-   * @param currentUserId the caller's id
-   * @param materialId the material being booked in
-   * @param locationId the target location
-   * @param quality the quality grade
-   * @param personal whether the row would be personal
-   * @param stolen whether the row would be marked „gestohlen"
-   * @param owningOrgUnitId the picked owning org unit, or {@code null} for the auto-stamp
-   * @return {@code true} when at least one mergeable row exists; {@code false} as well when the
-   *     booking itself would be refused
-   * @throws AccessDeniedException when the caller may not book for {@code userId}
-   */
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public boolean hasMergeCandidates(
-      UUID userId,
-      @NotNull UUID currentUserId,
-      @NotNull UUID materialId,
-      @NotNull UUID locationId,
-      int quality,
-      boolean personal,
-      boolean stolen,
-      UUID owningOrgUnitId) {
-    UUID targetUserId = userId != null ? userId : currentUserId;
-    boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
-    if (onBehalfOfSomeoneElse && !inventoryAccessPolicy.canManageUserInventory(targetUserId)) {
-      throw new AccessDeniedException(
-          "You are not allowed to inspect inventory items of other users");
-    }
-    if ((onBehalfOfSomeoneElse && personal)
-        || (stolen && !inventoryProperties.stolenMarkingEnabled())) {
-      return false;
-    }
-    User user = userRepository.findById(targetUserId).orElse(null);
-    if (user == null) {
-      return false;
-    }
-    OrgUnit owningOrgUnit;
-    try {
-      owningOrgUnit =
-          orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(user, owningOrgUnitId);
-    } catch (AppException refused) {
-      return false;
-    }
-    return inventoryItemRepository.countMergeCandidates(
-            targetUserId,
-            materialId,
-            locationId,
-            quality,
-            personal,
-            stolen,
-            owningOrgUnit != null ? owningOrgUnit.getId() : null)
-        > 0;
   }
 
   /**

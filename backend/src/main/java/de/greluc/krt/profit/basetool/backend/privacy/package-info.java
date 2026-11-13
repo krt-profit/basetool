@@ -40,6 +40,7 @@
       "notification::api",
       "operation::api",
       "orgunit::api",
+      "patchchange::api",
       "platform::api",
       "purchasing::api",
       "refinery::api",
