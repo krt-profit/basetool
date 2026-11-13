@@ -16,10 +16,8 @@
         </th:block>
     </th:block>
 
-    <div th:if="${isAllSquadronsMode}" class="alert alert-info" th:text="#{inventory.index.all_squadrons_notice}">
-        This overview shows stock across all org units. Select an org unit to see its stock.
-    </div>
-    <div th:if="${isAllMyOrgUnitsMode}" class="alert alert-info" data-testid="all-my-org-units-notice" th:text="#{inventory.index.all_my_units_notice}">This overview combines the stock of all your org units.</div>
+    <div th:if="${contextSpansOrgUnits}" class="alert alert-info" data-testid="inventory-scope-notice"
+         th:text="#{inventory.index.scope_notice}"></div>
 
     <section id="inventory-results" class="list-panel">
         <th:block th:fragment="inventoryResults">
