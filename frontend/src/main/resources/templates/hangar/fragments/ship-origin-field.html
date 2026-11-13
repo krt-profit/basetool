@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<fieldset th:fragment="shipOriginField(selected)" class="form-group ship-origin" data-testid="ship-origin" data-origin-field>
+    <legend th:text="#{hangar.ship.origin}">Herkunft</legend>
+    <th:block th:replace="~{kernel/fragments/components :: segmented(name='origin', labelKey='hangar.ship.origin',
+        selected=${selected}, variant='krt-segmented--block',
+        options=${ {{value: 'PLEDGE', labelKey: 'hangar.ship.origin.PLEDGE'},
+                    {value: 'IN_GAME', labelKey: 'hangar.ship.origin.IN_GAME'}} })}"></th:block>
+    <p class="form-hint" data-origin-locked-hint hidden th:text="#{hangar.ship.origin.locked}">Aus einem Import &ndash; fest als gepledged.</p>
+    <p class="form-hint" data-origin-unknown-hint hidden th:text="#{hangar.ship.origin.unknownHint}">Die Herkunft ist noch unbekannt.</p>
+    <p class="form-hint" th:text="#{hangar.ship.origin.help}">Ein Patch-Wipe entfernt nur ingame gekaufte Schiffe.</p>
+</fieldset>
+</body>
+</html>

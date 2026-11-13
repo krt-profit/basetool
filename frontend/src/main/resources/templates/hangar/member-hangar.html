@@ -25,6 +25,11 @@
       th:data-bulk-unit-success-partial="#{hangar.bulk.unit.success.partial}"
       th:data-bulk-unit-none="#{hangar.bulk.unit.none}"
       th:data-bulk-unit-error="#{error.hangar.ship.bulk_unit_change}"
+      th:data-bulk-origin-action="@{/admin/members/{id}/hangar/bulk-origin(id=${memberId})}"
+      th:data-bulk-origin-success="#{hangar.origin.bulk.success}"
+      th:data-bulk-origin-success-partial="#{hangar.origin.bulk.success.partial}"
+      th:data-bulk-origin-none="#{hangar.origin.bulk.none}"
+      th:data-bulk-origin-error="#{error.hangar.ship.bulk_origin_change}"
       th:data-conflict-title="#{frontend.ajax.conflict.title}"
       th:data-conflict-detail="#{frontend.ajax.conflict.detail}"
       th:data-conflict-reload="#{frontend.ajax.conflict.reload}"
@@ -130,6 +135,8 @@
                                         th:data-loc="${ship.location != null ? ship.location.id : ''}"
                                         th:data-fitted="${ship.fitted}"
                                         th:data-version="${ship.version}"
+                                        th:data-origin="${ship.origin != null ? ship.origin.value : ''}"
+                                        th:data-origin-locked="${ship.origin != null and ship.origin.locked}"
                                         th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                             </td>
                         </tr>
@@ -152,6 +159,10 @@
         <span class="form-actions__summary" aria-live="polite"><strong id="member-hangar-selection-count">0</strong> <span th:text="#{filter.selected}">ausgew&auml;hlt</span></span>
         <button type="button" class="btn btn-ghost" data-trigger="member-hangar-clear-selection"
                 data-testid="member-hangar-bulk-clear" th:text="#{hangar.bulk.clear}">Auswahl aufheben</button>
+        <button type="button" class="btn btn-outline" data-trigger="member-hangar-bulk-origin" data-origin="PLEDGE"
+                data-testid="member-hangar-bulk-origin-pledge" th:text="#{hangar.origin.bulk.pledge}">Als gepledged markieren</button>
+        <button type="button" class="btn btn-outline" data-trigger="member-hangar-bulk-origin" data-origin="IN_GAME"
+                data-testid="member-hangar-bulk-origin-in-game" th:text="#{hangar.origin.bulk.inGame}">Als ingame gekauft markieren</button>
         <button type="button" class="btn btn-outline" data-trigger="member-hangar-open-bulk-unit"
                 data-testid="member-hangar-bulk-unit-open"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg> <span th:text="#{hangar.ship.unit.change}">Einheit &auml;ndern</span></button>
     </div>
@@ -208,6 +219,7 @@
                     <input type="checkbox" id="member-ship-fitted" name="fitted">
                     <label for="member-ship-fitted" class="ship-fitted-label" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
+                <th:block th:replace="~{hangar/fragments/ship-origin-field :: shipOriginField(selected=null)}"></th:block>
                 <div id="member-ship-owner-picker-slot" th:with="activeSquadronId=${null}">
                 <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=null, required=true)}"></th:block>
                 </div>

@@ -439,8 +439,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Seeds one ship into the test user's own hangar via {@code POST /api/v1/hangar/ships}; the
-   * owning org unit is auto-stamped from the user's single membership.
+   * Seeds one pledged ship into the test user's own hangar via {@code POST /api/v1/hangar/ships};
+   * the owning org unit is auto-stamped from the user's single membership.
    *
    * @param username the Keycloak username of the test user (the ship owner)
    * @param password the Keycloak password of the test user
@@ -461,7 +461,7 @@ public final class BackendSeeder {
             + shipTypeId
             + "\",\"insurance\":\""
             + insurance
-            + "\",\"fitted\":false}");
+            + "\",\"fitted\":false,\"origin\":\"PLEDGE\"}");
   }
 
   /**

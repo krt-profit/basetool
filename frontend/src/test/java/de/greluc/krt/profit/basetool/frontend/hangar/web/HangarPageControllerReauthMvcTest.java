@@ -77,7 +77,7 @@ class HangarPageControllerReauthMvcTest {
   void anExpiredSessionInTheParallelShipReadRedirectsToLogin(RuntimeException sessionFailure)
       throws Exception {
     when(catalogs.loadPageContent(any(), any(), anyString())).thenAnswer(_ -> new ArrayList<>());
-    when(client.myShips(anyInt(), anyInt(), any(), any())).thenThrow(sessionFailure);
+    when(client.myShips(anyInt(), anyInt(), any(), any(), any())).thenThrow(sessionFailure);
 
     mockMvc.perform(get("/hangar").param("fragment", "results")).andExpect(redirectsToLogin());
   }
