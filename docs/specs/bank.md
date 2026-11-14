@@ -498,12 +498,13 @@ is idempotent (a second click on an all-zero bank is a no-op with a notice).
 **Patch change (amendment, [REQ-PATCH-041](patch-change.md#req-patch-041--the-bank-reset-offsets-the-balances-as-of-the-live-time),
 [REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled),
 ADR-0384).** A patch change with the currency wipe runs a second form of this reset at its
-trigger. Its `WIPE_RESET` offsets exactly the account and holder balances **as of the live
-time**, so every booking after the live time stays; it refuses with `BANK_OVERDRAFT` when
-that offset would overdraw an account. It cancels the pending requests submitted before the
-live time with the patch change as their reason, and its one `WIPE_RESET_EXECUTED` names the
-patch change, the live time and the number of cancelled requests. The button above keeps its
-behaviour.
+trigger. Its `WIPE_RESET` offsets the account and holder balances **as of the live time**, so
+every booking after the live time stays; an offset that would take an account or a holder below
+zero stops at zero, so no account is overdrawn (REQ-BANK-006) and the wipe always goes through.
+It cancels the pending requests submitted before the live time with the patch change as their
+reason, and its one `WIPE_RESET_EXECUTED` names the patch change, the live time, the number of
+cancelled requests and the number of accounts and holders whose offset stopped at zero. The
+button above keeps its behaviour.
 
 **Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only), `BankCurrencyWipeIntegrationTest` (reset as of the live time) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/internal/BankWipeResetBooking`, `bank/internal/BankCurrencyWipeService`, `bank/web/BankAdminController` · **Issues:** #556
 
