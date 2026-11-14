@@ -9,6 +9,7 @@
         position: absolute;
         top: calc(100% + 4px);
         right: 0;
+        translate: var(--overflow-menu-shift, 0) 0;
         z-index: var(--z-popover);
         min-width: min(240px, calc(100vw - 2 * var(--space-4)));
         display: flex;
