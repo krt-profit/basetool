@@ -107,7 +107,8 @@ export function bindBankAccounts(url, select, purpose, onChange, fixedAccount = 
     };
 
     /**
-     * Loads authorized references and reconciles the selected account.
+     * Loads authorized references and reconciles the selected account. A load that replaces one
+     * still waiting to suggest the responsible unit's account suggests it in its place.
      *
      * @param {string} [restored] the submitted account selected in the refused draft
      * @param {boolean} [initial] whether to suggest the responsible unit's account
@@ -119,9 +120,9 @@ export function bindBankAccounts(url, select, purpose, onChange, fixedAccount = 
         retainSelection = false,
     ) => {
         const request = ++generation;
+        suggest = initial || (loading && suggest);
         loading = true;
         desired = restored;
-        suggest = initial;
         if (!retainSelection) {
             accounts = emptyAccounts;
             sync();

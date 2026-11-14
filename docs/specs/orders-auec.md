@@ -512,6 +512,8 @@ audience. Preserve dirty input in the open form while refreshing server basis/ot
 An open commitment history stays expanded when a refreshed participation section still contains
 the same commitment. Its entries and links come from the refreshed section.
 An open Bank movement keeps the selected account and custodians while its options refresh.
+An editor that opens suggests the responsible unit's first eligible account, also when a refresh
+reloads the options before the opening read answers; it never replaces an account the member chose.
 Check the choices against the new options and obtain a fresh preview before saving.
 The status badge follows the latest lifecycle revision delivered with the money or header fragment,
 including while the money dialog is open.
@@ -539,7 +541,8 @@ every participant.
 - [ ] A completed order with residual money or Bank clarification still shows those facts.
 
 **Enforced by:** `JobOrderMoneyE2eTest` contains Bank-free recovery, live draft, holder maintenance,
-recipient correction and reassignment journeys. The Bank-default and coupled result cases belong
+recipient correction and reassignment journeys. `testOrdersMoneyBankJs` pins the account suggestion
+across a refresh. The Bank-default and coupled result cases belong
 to the Bank integration acceptance.
 
 The workspace exposes the minimal aUEC creation form, booked and available holdings, and the

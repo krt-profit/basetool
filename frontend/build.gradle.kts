@@ -984,6 +984,19 @@ val testHomeLocationJs =
     )
   }
 
+val testOrdersMoneyBankJs =
+  registerNodeScriptTest(
+    "testOrdersMoneyBankJs",
+    "Regression tests for the order money editors' Bank account choice: the opening suggestion survives a live refresh, a member's choice is never replaced.",
+    "scripts/orders-money-bank.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/joborder/orders-money-bank.js"),
+    )
+  }
+
 val testShortcutsJs =
   registerNodeScriptTest(
     "testShortcutsJs",
@@ -1294,6 +1307,7 @@ tasks.named("check").configure {
     testBankLiveSyncJs,
     testMemberRolesJs,
     testHomeLocationJs,
+    testOrdersMoneyBankJs,
     testSearchJs,
     testNumberFormatJs,
     testLocalisedNameJs,
