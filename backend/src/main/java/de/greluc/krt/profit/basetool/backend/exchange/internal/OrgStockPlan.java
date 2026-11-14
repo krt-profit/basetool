@@ -83,7 +83,23 @@ final class OrgStockPlan {
      */
     @Nullable
     UUID removedFrom();
+
+    /**
+     * Returns the existing entry this op names.
+     *
+     * @return the pool and entry an op on an existing entry names, or {@code null} for a book-in
+     */
+    @Nullable
+    EntryRef entry();
   }
+
+  /**
+   * An existing entry an op names, as the client sent it.
+   *
+   * @param poolUnitId the org unit whose pool the op names
+   * @param entryId the entry
+   */
+  record EntryRef(@NotNull UUID poolUnitId, @NotNull UUID entryId) {}
 
   /**
    * A book-in the Lager decides.
@@ -125,6 +141,11 @@ final class OrgStockPlan {
     public @Nullable UUID removedFrom() {
       return null;
     }
+
+    @Override
+    public @Nullable EntryRef entry() {
+      return null;
+    }
   }
 
   /**
@@ -153,6 +174,11 @@ final class OrgStockPlan {
     public @NotNull UUID removedFrom() {
       return request.entryId();
     }
+
+    @Override
+    public @NotNull EntryRef entry() {
+      return new EntryRef(request.poolUnitId(), request.entryId());
+    }
   }
 
   /**
@@ -180,6 +206,11 @@ final class OrgStockPlan {
     @Override
     public @NotNull UUID removedFrom() {
       return request.take().entryId();
+    }
+
+    @Override
+    public @NotNull EntryRef entry() {
+      return new EntryRef(request.take().poolUnitId(), request.take().entryId());
     }
   }
 
@@ -215,6 +246,11 @@ final class OrgStockPlan {
           ? null
           : request.take().entryId();
     }
+
+    @Override
+    public @NotNull EntryRef entry() {
+      return new EntryRef(request.take().poolUnitId(), request.take().entryId());
+    }
   }
 
   /**
@@ -242,6 +278,11 @@ final class OrgStockPlan {
     @Override
     public @Nullable UUID removedFrom() {
       return null;
+    }
+
+    @Override
+    public @NotNull EntryRef entry() {
+      return new EntryRef(request.poolUnitId(), request.entryId());
     }
   }
 
@@ -271,6 +312,11 @@ final class OrgStockPlan {
     public @NotNull UUID removedFrom() {
       return request.entryId();
     }
+
+    @Override
+    public @NotNull EntryRef entry() {
+      return new EntryRef(request.poolUnitId(), request.entryId());
+    }
   }
 
   /**
@@ -298,6 +344,11 @@ final class OrgStockPlan {
     @Override
     public @Nullable UUID removedFrom() {
       return null;
+    }
+
+    @Override
+    public @NotNull EntryRef entry() {
+      return new EntryRef(request.poolUnitId(), request.entryId());
     }
   }
 
@@ -335,6 +386,11 @@ final class OrgStockPlan {
     @Override
     public @Nullable UUID removedFrom() {
       return null;
+    }
+
+    @Override
+    public @NotNull EntryRef entry() {
+      return new EntryRef(request.poolUnitId(), request.entryId());
     }
   }
 }

@@ -39,6 +39,12 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   result item now names it in the same optional `patchChange`
   ([pushing against what a patch change removed](resources/patch-change.md#pushing-against-what-a-patch-change-removed)).
   No schema change beyond the description.
+- **New: org-stock refusals name the patch change.** An org-stock op on an entry a patch change
+  wiped was `NOT_PERMITTED` and is now `REMOVED_ELSEWHERE`. A stale op on an entry a patch change
+  moved stays `VERSION_CONFLICT`. Both name the patch change in the optional `results[].patchChange`
+  when the entry's own last change in its pool was the patch change's. Every other gone entry stays
+  `NOT_PERMITTED`
+  ([org stock](resources/org-stock.md#the-result)). No schema change beyond the description.
 - **Fixed: the sandbox client has the bank scopes.** The sandbox registry grants `sandbox-client`
   `exchange.bank.read`, `exchange.bank.request` and `exchange.bank.queue`, as the sandbox page
   promised, and the seed switches the bank on ([sandbox](sandbox.md#clients)). Nothing changes

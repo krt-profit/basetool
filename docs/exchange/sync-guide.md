@@ -106,6 +106,9 @@ resource lists what the patch change wiped, so you can apply the same list to yo
   `expectedQuantity`, and an `upsert` of a wiped ship as well; the result item names the patch
   change's `id`. Drop your pending change for that lot or ship and pull. A lot that kept rows from
   after the live time is no removed lot: a stale op on it is `VERSION_CONFLICT`.
+- An org-stock op on an entry the patch change wiped gets `REMOVED_ELSEWHERE`, and a stale op on an
+  entry it moved gets `VERSION_CONFLICT`; both name the patch change. The Basetool judges each entry
+  by its own last change ([org stock](resources/org-stock.md#the-result)).
 
 ## Full resync after a cursor expired
 

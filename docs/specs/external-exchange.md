@@ -3053,7 +3053,9 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   REQ-XCH-016 for the material, the place and the unit. The Lager decides its own refusals
   (`PoolEntryCommands`); every holder lot the batch touches takes its advisory lock first, then all
 their rows are locked in ascending id order (ADR-0229). `dryRun`
-  checks every op without writing.
+  checks every op without writing. An op on an entry a patch change wiped is `REMOVED_ELSEWHERE`
+  instead of `NOT_PERMITTED`. Such an op, and a `VERSION_CONFLICT` on an entry whose own last
+  change was a patch change's, name the patch change in `patchChange` (amendment, REQ-PATCH-057).
 - **Wire shape.** `change-set.schema.json#/$defs/orgStockChangeSet`; the answer is
   `change-result.schema.json`. Ids of units, entries, job orders and missions are the ones the org
   stock serves.
