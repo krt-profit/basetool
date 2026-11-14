@@ -124,16 +124,20 @@ class SessionGateFilterTest {
   }
 
   @Test
-  void aRequestForAGatesPageIsMarkedAndAnyOtherIsNot() throws Exception {
+  void aRequestForAGatesPageOrALegalPageIsMarkedAndAnyOtherIsNot() throws Exception {
     first.holding(true);
     MockHttpServletRequest gatePage = new MockHttpServletRequest("GET", "/first");
+    MockHttpServletRequest legalPage = new MockHttpServletRequest("GET", "/privacy");
     MockHttpServletRequest other = new MockHttpServletRequest("GET", "/missions");
 
     filter.doFilter(gatePage, new MockHttpServletResponse(), mock(FilterChain.class));
+    filter.doFilter(legalPage, new MockHttpServletResponse(), mock(FilterChain.class));
     filter.doFilter(other, new MockHttpServletResponse(), mock(FilterChain.class));
 
     try {
       RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(gatePage));
+      assertThat(GatePageRequest.isCurrent()).isTrue();
+      RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(legalPage));
       assertThat(GatePageRequest.isCurrent()).isTrue();
       RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(other));
       assertThat(GatePageRequest.isCurrent()).isFalse();

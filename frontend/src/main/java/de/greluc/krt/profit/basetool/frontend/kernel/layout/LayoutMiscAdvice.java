@@ -95,9 +95,9 @@ public class LayoutMiscAdvice {
   }
 
   /**
-   * Whether the request renders a session gate's page, an admin's recovery page included, which the
-   * layout marks so the page's scripts never hand the browser off to a gate's page again (ADR-0385,
-   * REQ-PATCH-063).
+   * Whether the request renders a session gate's page, an admin's recovery page included, or a
+   * legal page, which the layout marks so the page's scripts never hand the browser off to a gate's
+   * page (ADR-0385, REQ-PATCH-063, REQ-UI-021).
    *
    * @return {@code true} inside a request {@link GatePageRequest} marked
    */

@@ -31,6 +31,8 @@ import org.springframework.stereotype.Component;
  * Whether the purchasing surface is switched on (REQ-PUR-001), read from the backend and remembered
  * for a short while, because the sidebar asks on every page. A failed read answers {@code false}
  * and is not remembered, so a member the backend refuses never hides the entry from everyone else.
+ * A session gate's refusal is such a failure, because the sidebar also renders on the pages a gate
+ * leaves open; only a lost session propagates (ADR-0385).
  */
 @Component
 @RequiredArgsConstructor
@@ -54,14 +56,19 @@ public class PurchasingFeatureState {
     if (current != null && current.until().isAfter(Instant.now())) {
       return current.enabled();
     }
-    PurchasingStateDto state =
-        SectionFallback.load(log, "purchasing-navigation", requestState::read, null);
+    PurchasingStateDto state;
+    try {
+      state = requestState.read();
+    } catch (RuntimeException e) {
+      SectionFallback.rethrowIfReauthenticationRequired(e);
+      log.debug("Purchasing state unavailable: {}", e.getMessage());
+      return false;
+    }
     if (state == null) {
       return false;
     }
-    boolean enabled = state != null && state.enabled();
-    remembered = new Remembered(enabled, Instant.now().plus(TTL));
-    return enabled;
+    remembered = new Remembered(state.enabled(), Instant.now().plus(TTL));
+    return state.enabled();
   }
 
   /** Forgets the remembered answer, as an admin has just changed the switch. */

@@ -45,9 +45,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>UX only; the backend's session gates are the boundary. Runs after {@code
  * BackendRoleSyncFilter}. Assets, public documents, the authentication plumbing, the legal pages,
  * the approval waiting page and the pages of the gates up to the one asked are never held. An
- * anonymous visitor and the {@code test} profile pass. A request for a gate's page is marked as
- * {@link GatePageRequest}. A WebSocket handshake asks every gate afresh, never from a cached
- * verdict.
+ * anonymous visitor and the {@code test} profile pass. A request for a gate's page or a legal page
+ * is marked as {@link GatePageRequest}. A WebSocket handshake asks every gate afresh, never from a
+ * cached verdict.
  */
 @Slf4j
 @Component
@@ -64,7 +64,7 @@ public class SessionGateFilter extends OncePerRequestFilter {
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
     String path = PublicPaths.relativePath(request);
-    if (gates.isGatePage(path)) {
+    if (gates.isGatePage(path) || PublicPaths.isLegalPage(path)) {
       GatePageRequest.mark(request);
     }
     if (PublicPaths.isGateExempt(path)

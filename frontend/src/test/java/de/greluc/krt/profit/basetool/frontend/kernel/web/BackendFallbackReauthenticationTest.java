@@ -70,6 +70,9 @@ import de.greluc.krt.profit.basetool.frontend.orgunit.client.OrgUnitBackendClien
 import de.greluc.krt.profit.basetool.frontend.orgunit.web.AdminSpecialCommandsPageController;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.client.PersonalInventoryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.personalinventory.web.AdminPersonalInventoryPageController;
+import de.greluc.krt.profit.basetool.frontend.purchasing.client.PurchasingBackendClient;
+import de.greluc.krt.profit.basetool.frontend.purchasing.web.PurchasingFeatureState;
+import de.greluc.krt.profit.basetool.frontend.purchasing.web.PurchasingRequestState;
 import de.greluc.krt.profit.basetool.frontend.refinery.client.RefineryBackendClient;
 import de.greluc.krt.profit.basetool.frontend.refinery.web.RefineryOrderWriteController;
 import de.greluc.krt.profit.basetool.frontend.settings.client.SettingsBackendClient;
@@ -171,6 +174,7 @@ class BackendFallbackReauthenticationTest {
     REFINERY,
     SETTINGS,
     SUPPLY,
+    PURCHASING,
     QUALITY_TIERS,
     LAYOUT,
     SIDEBAR;
@@ -179,11 +183,12 @@ class BackendFallbackReauthenticationTest {
      * Tells whether the fallback belongs to the layout chrome, which renders on every page, the
      * gate-exempt ones included, and therefore degrades instead of handing the browser to a gate.
      *
-     * @return {@code true} for the layout context, the sidebar and the navigation's supply switch
+     * @return {@code true} for the layout context, the sidebar and the navigation's supply and
+     *     purchasing switches
      */
     boolean chrome() {
       return switch (this) {
-        case LAYOUT, SIDEBAR, SUPPLY -> true;
+        case LAYOUT, SIDEBAR, SUPPLY, PURCHASING -> true;
         case BANK,
             BLUEPRINT,
             CATALOGUE,
@@ -305,6 +310,12 @@ class BackendFallbackReauthenticationTest {
                     .updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, attributes);
         case SUPPLY ->
             () -> new SupplyFeatureState(rejecting(SupplyBackendClient.class, failure)).enabled();
+        case PURCHASING ->
+            () ->
+                new PurchasingFeatureState(
+                        new PurchasingRequestState(
+                            rejecting(PurchasingBackendClient.class, failure)))
+                    .enabled();
         case QUALITY_TIERS ->
             () -> new QualityTierCatalog(rejecting(BackendApiClient.class, failure)).all();
         case LAYOUT ->
