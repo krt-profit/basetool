@@ -59,6 +59,10 @@ against:
   against the last synced state.
 - Never re-add what the member removed elsewhere: a `REMOVED_ELSEWHERE` is shown to the member, and
   `override` is sent only after the member agreed.
+- After a patch change the server is the only relocator: synced lots and ships are never moved to a
+  home location by the client, a home-location choice is sent only after the member picked it, and a
+  `REMOVED_ELSEWHERE` naming a patch change drops the pending change instead of asking the member
+  ([patch change](resources/patch-change.md)).
 - Ships are linked to the member's existing ships before any new one is created.
 - After `410 CURSOR_EXPIRED`, reconcile a fresh snapshot against the last synced state; it is not an
   add-only first sync.
