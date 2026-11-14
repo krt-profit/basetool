@@ -28,7 +28,8 @@ import org.jetbrains.annotations.NotNull;
  * Follows a currency wipe of the game in the Kartellbank (REQ-PATCH-041, REQ-PATCH-042, ADR-0384):
  * the pending requests submitted before the live time are cancelled, and one wipe reset offsets the
  * balances as of the live time, so the bookings made after it stay. An offset that would take an
- * account or a holder below zero stops at zero.
+ * account or a holder below zero stops at zero. After a wipe reset that took effect at or after the
+ * live time, which already zeroed every balance of it, nothing is offset and nothing stops at zero.
  *
  * <p>A request linked to an order payment attempt is left to its owner, which cancels it through
  * {@link BankLinkedPayments#cancelForCurrencyWipe}.

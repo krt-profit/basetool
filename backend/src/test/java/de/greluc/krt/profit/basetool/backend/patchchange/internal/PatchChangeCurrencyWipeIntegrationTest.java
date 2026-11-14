@@ -28,6 +28,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccount;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountStatus;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankAccountType;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankDepositRequest;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolder;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderPostingRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderRepository;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankLedgerService;
+import de.greluc.krt.profit.basetool.backend.bank.internal.BankPostingRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
@@ -43,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -74,11 +85,13 @@ import tools.jackson.databind.json.JsonMapper;
  * Triggers a patch change with the currency wipe against PostgreSQL (REQ-PATCH-040, -044…046): the
  * aUEC holdings that existed at the live time and are still held become real shortages that name
  * the patch change, the commitments opened before it end, later money stays, a later wipe counts an
- * earlier wipe's shortages at that wipe's live time, and the job-order and Bank trails each record
- * one summary event.
+ * earlier wipe's shortages at that wipe's live time, a wipe after a standalone Bank reset since its
+ * live time counts no Bank reset and no stopped account, and the job-order and Bank trails each
+ * record one summary event.
  *
  * <p>Its live time lies in 2000, before every other test's rows; every row it writes is removed
- * afterwards, the patch changes included, because a leftover row would move the merge cutoff.
+ * afterwards, the patch changes and the Bank bookings included, because a leftover row would move
+ * the merge cutoff or count as a reset after another test's live time.
  */
 @SpringBootTest
 class PatchChangeCurrencyWipeIntegrationTest {
@@ -101,11 +114,18 @@ class PatchChangeCurrencyWipeIntegrationTest {
   @Autowired private RoleRepository roles;
   @Autowired private OrgUnitMembershipRepository memberships;
   @Autowired private JobOrderRepository orders;
+  @Autowired private BankLedgerService ledger;
+  @Autowired private BankAccountRepository bankAccounts;
+  @Autowired private BankHolderRepository bankHolders;
+  @Autowired private BankPostingRepository bankPostings;
+  @Autowired private BankHolderPostingRepository bankHolderPostings;
   @Autowired private TransactionTemplate transactions;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private JsonMapper json;
 
   private final List<UUID> createdOrders = new ArrayList<>();
+  private final List<UUID> createdBankAccounts = new ArrayList<>();
+  private final List<UUID> createdBankHolders = new ArrayList<>();
   private MockMvc mvc;
   private UUID responsible;
   private UUID requester;
@@ -162,6 +182,38 @@ class PatchChangeCurrencyWipeIntegrationTest {
       users.deleteAllById(List.of(writer, reader, admin));
       units.deleteAllById(List.of(responsible, requester));
     });
+    cleanBank();
+  }
+
+  /**
+   * Removes the Bank accounts and holders a test created with every booking on them, a standalone
+   * reset's legs on other accounts and holders included.
+   */
+  private void cleanBank() {
+    List<UUID> bookings = new ArrayList<>();
+    for (UUID account : createdBankAccounts) {
+      jdbc.update("DELETE FROM bank_audit_event WHERE account_id = ?", account);
+      bookings.addAll(
+          jdbc.queryForList(
+              "SELECT DISTINCT transaction_id FROM bank_posting WHERE account_id = ?",
+              UUID.class,
+              account));
+    }
+    for (UUID holder : createdBankHolders) {
+      bookings.addAll(
+          jdbc.queryForList(
+              "SELECT DISTINCT transaction_id FROM bank_holder_posting WHERE holder_id = ?",
+              UUID.class,
+              holder));
+    }
+    for (UUID transaction : Set.copyOf(bookings)) {
+      jdbc.update("DELETE FROM bank_audit_event WHERE transaction_id = ?", transaction);
+      jdbc.update("DELETE FROM bank_holder_posting WHERE transaction_id = ?", transaction);
+      jdbc.update("DELETE FROM bank_posting WHERE transaction_id = ?", transaction);
+      jdbc.update("DELETE FROM bank_transaction WHERE id = ?", transaction);
+    }
+    createdBankHolders.forEach(bankHolders::deleteById);
+    createdBankAccounts.forEach(bankAccounts::deleteById);
   }
 
   @Test
@@ -271,6 +323,39 @@ class PatchChangeCurrencyWipeIntegrationTest {
                 Timestamp.class,
                 order))
         .containsExactly(Timestamp.from(LIVE_AT));
+  }
+
+  @Test
+  void aWipeAfterAStandaloneBankResetCountsNoBankResetAndNoStoppedAccount() {
+    UUID account = bankAccount();
+    UUID holder = bankHolder();
+    backdateBooking(deposit(account, holder, "100"));
+    ledger.resetAllBalances();
+    deposit(account, holder, "50");
+    signInAdmin();
+
+    PatchChangePreviewDto preview =
+        trigger.preview(new PatchChangePreviewRequest(LIVE_AT, CURRENCY_WIPE));
+    PatchChangeDto recorded =
+        trigger.trigger(
+            new TriggerPatchChangeRequest(
+                LABEL, PatchKind.FULL_WIPE, LIVE_AT, CURRENCY_WIPE, LABEL));
+
+    List<PatchCountDto> nothingOffset =
+        List.of(
+            new PatchCountDto(PatchCount.BANK_RESET_TOTAL, 0),
+            new PatchCountDto(PatchCount.BANK_ACCOUNTS_CLAMPED, 0));
+    assertThat(preview.counts()).containsAll(nothingOffset);
+    assertThat(recorded.counts()).containsAll(nothingOffset);
+    assertThat(bankPostings.accountBalance(account)).isEqualByComparingTo("50");
+    assertThat(bankHolderPostings.holderTotal(holder)).isEqualByComparingTo("50");
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT details FROM bank_audit_event WHERE event_type = 'WIPE_RESET_EXECUTED'"
+                    + " AND details LIKE ?",
+                String.class,
+                "patchChange=" + recorded.id() + "%"))
+        .contains(" accounts=0 stashes=0 totalZeroed=0 clampedAccounts=0 clampedStashes=0 ");
   }
 
   @Test
@@ -422,6 +507,66 @@ class PatchChangeCurrencyWipeIntegrationTest {
         "UPDATE job_order_money_commitment SET opened_at = ? WHERE order_id = ?",
         Timestamp.from(BEFORE),
         order);
+  }
+
+  /**
+   * Opens a Bank area account.
+   *
+   * @return the account's id
+   */
+  private @NotNull UUID bankAccount() {
+    String name = "Wipe Bankkonto " + UUID.randomUUID();
+    BankAccount created = new BankAccount();
+    created.setAccountNo(String.format("KB-%04d", bankAccounts.nextAccountNoValue()));
+    created.setName(name);
+    created.setType(BankAccountType.AREA);
+    created.setAreaName(name);
+    created.setStatus(BankAccountStatus.ACTIVE);
+    UUID id = bankAccounts.save(created).getId();
+    createdBankAccounts.add(id);
+    return id;
+  }
+
+  /**
+   * Names an active Bank holder.
+   *
+   * @return the holder's id
+   */
+  private @NotNull UUID bankHolder() {
+    BankHolder created = new BankHolder();
+    created.setHandle("wipe-bank-holder-" + UUID.randomUUID());
+    created.setActive(true);
+    UUID id = bankHolders.save(created).getId();
+    createdBankHolders.add(id);
+    return id;
+  }
+
+  /**
+   * Books a Bank deposit now.
+   *
+   * @param account the account
+   * @param holder the receiving holder
+   * @param amount the whole aUEC
+   * @return the transaction
+   */
+  private @NotNull UUID deposit(
+      @NotNull UUID account, @NotNull UUID holder, @NotNull String amount) {
+    return ledger
+        .bookDeposit(new BankDepositRequest(account, holder, new BigDecimal(amount), null))
+        .id();
+  }
+
+  /**
+   * Moves a Bank transaction and its legs to before the live time.
+   *
+   * @param transaction the transaction
+   */
+  private void backdateBooking(@NotNull UUID transaction) {
+    Timestamp at = Timestamp.from(BEFORE);
+    jdbc.update("UPDATE bank_transaction SET created_at = ? WHERE id = ?", at, transaction);
+    jdbc.update("UPDATE bank_posting SET created_at = ? WHERE transaction_id = ?", at, transaction);
+    jdbc.update(
+        "UPDATE bank_holder_posting SET created_at = ? WHERE transaction_id = ?", at, transaction);
   }
 
   /** Signs the admin in for the trigger. */
