@@ -427,22 +427,81 @@ class LiveSyncSubscriptionAuthorizerTest {
     assertThat(authorizer.authorize(bank, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
     RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
     assertThat(request).isNotNull();
-    assertThat(request.getPath()).isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
+    assertThat(request.getPath()).isEqualTo("/api/v1/bank/org-units/accounts/" + bank.resourceId());
     assertThat(server.getRequestCount()).isEqualTo(1);
   }
 
   @Test
   void authorize_bankAccountPrimaryDeniesButFallbackAllows() throws Exception {
     LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
-    server.enqueue(new MockResponse().setResponseCode(403));
+    server.enqueue(new MockResponse().setResponseCode(404));
     server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
 
     assertThat(authorizer.authorize(bank, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
     RecordedRequest primary = server.takeRequest(2, TimeUnit.SECONDS);
-    assertThat(primary.getPath()).isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
+    assertThat(primary.getPath()).isEqualTo("/api/v1/bank/org-units/accounts/" + bank.resourceId());
     RecordedRequest fallback = server.takeRequest(2, TimeUnit.SECONDS);
-    assertThat(fallback.getPath())
+    assertThat(fallback.getPath()).isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
+  }
+
+  @Test
+  void authorize_bankAccountFallbackFirst_probesTheStaffReadFirst() throws Exception {
+    LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+
+    assertThat(
+            authorizer.authorize(
+                bank,
+                TOKEN,
+                PIN,
+                null,
+                null,
+                LiveSyncSubscriptionAuthorizer.ProbeOrder.FALLBACK_FIRST))
+        .isEqualTo(Decision.ALLOW);
+    RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
+    assertThat(request).isNotNull();
+    assertThat(request.getPath()).isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
+    assertThat(server.getRequestCount()).isEqualTo(1);
+  }
+
+  @Test
+  void authorize_bankAccountFallbackFirstRefused_triesTheOrgUnitReadNext() throws Exception {
+    LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(403));
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
+
+    assertThat(
+            authorizer.authorize(
+                bank,
+                TOKEN,
+                PIN,
+                null,
+                null,
+                LiveSyncSubscriptionAuthorizer.ProbeOrder.FALLBACK_FIRST))
+        .isEqualTo(Decision.ALLOW);
+    assertThat(server.takeRequest(2, TimeUnit.SECONDS).getPath())
+        .isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
+    assertThat(server.takeRequest(2, TimeUnit.SECONDS).getPath())
         .isEqualTo("/api/v1/bank/org-units/accounts/" + bank.resourceId());
+  }
+
+  @Test
+  void authorize_fallbackFirstOnAClassWithoutFallback_probesItsOnlyRead() throws Exception {
+    LiveSyncTopic order = LiveSyncTopic.parse("refinery-order:" + UUID.randomUUID());
+    server.enqueue(new MockResponse().setResponseCode(404));
+
+    assertThat(
+            authorizer.authorize(
+                order,
+                TOKEN,
+                PIN,
+                null,
+                null,
+                LiveSyncSubscriptionAuthorizer.ProbeOrder.FALLBACK_FIRST))
+        .isEqualTo(Decision.DENY);
+    assertThat(server.takeRequest(2, TimeUnit.SECONDS).getPath())
+        .isEqualTo("/api/v1/refinery-orders/" + order.resourceId());
+    assertThat(server.getRequestCount()).isEqualTo(1);
   }
 
   @Test

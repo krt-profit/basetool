@@ -331,6 +331,8 @@ interface KrtPageSectionsConfig {
         pill?: { id?: string; label?: () => string | null | undefined };
         /** An extra test that keeps a section from refreshing while it returns true. */
         busyTest?: (sectionKey: string, container: Element | '' | null) => boolean;
+        /** Asks the relay to authorize the room with its class's fallback read first. */
+        fallbackFirst?: boolean;
         /** Builds the receiver although the topic is not known yet, for a later `retarget`. */
         retargetable?: boolean;
         /**
@@ -518,6 +520,17 @@ interface KrtReceiverConfig {
     events?: { changed?: string; resync?: string };
     /** The topic room to subscribe to. */
     topic?: string;
+    /** Asks the relay to authorize the room with its class's fallback read first. */
+    fallbackFirst?: boolean;
+}
+
+/** How the relay authorizes a room `krtLiveSync.subscribe` joins. */
+interface KrtLiveSyncSubscribeOptions {
+    /**
+     * Authorize with the topic class's fallback read first, for a page that performs that read
+     * itself (the bank staff account page); the verdict is the same either way.
+     */
+    fallbackFirst?: boolean;
 }
 
 /** The handle `krtLiveSync.createReceiver` returns. */
@@ -541,7 +554,11 @@ interface KrtLiveSyncApi {
     /** Builds a receiver that applies inbound peer changes to the local DOM. */
     createReceiver(config: KrtReceiverConfig): KrtReceiver;
     /** Subscribes to a topic room and returns the subscription handle. */
-    subscribe(topic: string, handlers: KrtLiveSyncHandlers): { unsubscribe(): void };
+    subscribe(
+        topic: string,
+        handlers: KrtLiveSyncHandlers,
+        options?: KrtLiveSyncSubscribeOptions,
+    ): { unsubscribe(): void };
     /**
      * Broadcasts that one or more sections changed, so peers re-render them; the relay drops keys
      * outside the topic's whitelist. Needs no subscription to the room (ADR-0094).

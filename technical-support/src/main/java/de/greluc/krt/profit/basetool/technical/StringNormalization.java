@@ -32,14 +32,25 @@ import org.jetbrains.annotations.Nullable;
 public final class StringNormalization {
 
   /**
-   * The single free-text length cap, matching the longest free-text column in the schema. Shared by
-   * the JSON deserializer and the form editor so the limit is declared in exactly one place instead
-   * of being repeated as a bare {@code 8000} literal at each site.
+   * The default free-text length cap of the JSON deserializer and the form editor; a field that
+   * declares a larger maximum is capped at that maximum instead ({@link #capFor(int)}).
    */
   public static final int MAX_FREE_TEXT_LENGTH = 8000;
 
   /** Non-instantiable holder of static normalization helpers. */
   private StringNormalization() {}
+
+  /**
+   * The length cap of a field that declares at most {@code declaredMax} characters.
+   *
+   * @param declaredMax the field's declared maximum length, {@code 0} when it declares none
+   * @return {@code declaredMax} when it exceeds {@link #MAX_FREE_TEXT_LENGTH}, else {@link
+   *     #MAX_FREE_TEXT_LENGTH}
+   */
+  @Contract(pure = true)
+  public static int capFor(int declaredMax) {
+    return Math.max(MAX_FREE_TEXT_LENGTH, declaredMax);
+  }
 
   /**
    * NFC-normalizes an already-trimmed, non-null {@code value} and enforces {@code maxLength}.

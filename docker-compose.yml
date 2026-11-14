@@ -109,7 +109,7 @@ x-keycloak: &keycloak-template
         memory: 2560M
         cpus: '3.0'
         pids: 2048
-  environment:
+  environment: &keycloak-environment
     KC_HOSTNAME: ${BASETOOL_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}
     KC_HOSTNAME_STRICT: "true"
     KC_HTTP_RELATIVE_PATH: /auth
@@ -466,11 +466,16 @@ services:
       --http-management-scheme=http
       --log=console,file
       --log-file=/var/log/keycloak/keycloak.log
+    environment:
+      <<: *keycloak-environment
+      KRT_BACKEND_TRUSTSTORE_PATH: /run/secrets/internal-truststore.p12
+      KRT_BACKEND_TRUSTSTORE_PASSWORD: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:-${SERVER_SSL_KEY_STORE_PASSWORD:?SERVER_SSL_KEY_STORE_PASSWORD must be set in .env}}
     volumes:
       - ./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme:ro
       - /opt/basetool/keycloak/providers:/opt/keycloak/providers:ro
       - /var/log/basetool/keycloak:/var/log/keycloak
       - ${BASETOOL_KEYCLOAK_KEYSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/keystore.p12:ro
+      - ${BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}:/run/secrets/internal-truststore.p12:ro
     depends_on:
       db-keycloak:
         condition: service_healthy

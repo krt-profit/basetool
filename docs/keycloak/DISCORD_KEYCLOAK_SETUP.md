@@ -308,118 +308,86 @@ Set the **same** value on the backend and the Keycloak SPI:
 
 ### 7.2 Keycloak SPI env (keycloak container)
 
+Set in the host `basetool.env`:
+
 - `KRT_BACKEND_PRECHECK_URL` — `https://backend:11261/internal/discord/account-existence` (must be `https://`).
 - `KRT_DISCORD_SPI_SHARED_SECRET` — the same value as on the backend.
-- `KRT_BACKEND_TRUSTSTORE_PATH` — path inside the container to the truststore (see §7.3).
-- `KRT_BACKEND_TRUSTSTORE_PASSWORD` — its password.
+
+Not set by the operator — `docker-compose.yml` fixes both for the `prod` service, and the
+generated `quadlet/env.d/keycloak.env.tmpl` carries them; a value in `basetool.env` is ignored:
+
+- `KRT_BACKEND_TRUSTSTORE_PATH` — `/run/secrets/internal-truststore.p12`, the truststore of §7.3.
+- `KRT_BACKEND_TRUSTSTORE_PASSWORD` — `INTERNAL_TLS_TRUSTSTORE_PASSWORD`, else
+  `SERVER_SSL_KEY_STORE_PASSWORD`, the expression backend, frontend and ingest use for that store.
 
 ### 7.3 Truststore for the backend certificate
 
-The backend serves a self-signed certificate, so the Keycloak container must trust it. Export the
-backend's certificate from the shared keystore into a dedicated trust-only PKCS#12 store:
+The backend serves a leaf of the internal CA (REQ-SEC-070), so the SPI trusts that CA through the
+**CA-only internal truststore** backend, frontend and ingest already pin — minted by
+`scripts/mint-internal-tls.sh`, one entry, alias `ca`. Nothing is built or mounted by hand
+(ADR-0051 amendment):
+
+- **Production (Quadlet):** `quadlet/systemd/keycloak.container` mounts
+  `/etc/basetool/secrets/tls/truststore.p12` read-only at `/run/secrets/internal-truststore.p12`,
+  and `env.d/keycloak.env` sets the two variables of §7.2 to that path and password. The deploy's
+  mount pre-flight already requires the file, because the apps mount it too.
+- **`prod` compose service `keycloak`:** the same target, from
+  `${BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH:-${BASETOOL_KEYSTORE_HOST_PATH:-./keystore.p12}}` — the
+  host path the three apps use.
+
+The variable and the mount target both live in `docker-compose.yml`, and
+`scripts/generate-quadlet.test.sh` asserts the generated mount and both values, so they cannot drift
+apart. The store holds only the public CA certificate; Keycloak reads it as container uid 1000
+(host uid 100999), which its `root:root 0644` mode allows. A re-mint of the internal TLS material
+replaces the CA in this store along with everyone else's, so the precheck needs no rotation step of
+its own; restart keycloak with the apps
+([`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)).
+The store is in the backup as part of `/etc/basetool/secrets/tls` (`config/internal-tls.tar`).
+
+> [!note] The hand-built store is gone
+> From 2026-09-25 production trusted the backend through a hand-built
+> `/etc/basetool/secrets/backend-truststore.p12`, mounted by a hand-installed drop-in
+> `keycloak.container.d/50-backend-truststore.conf` and named by `KRT_BACKEND_TRUSTSTORE_PATH` /
+> `_PASSWORD` in `basetool.env`. The drop-in was later lost without anything noticing, and the
+> precheck failed open at every start. The managed mount replaces all three; a host that still
+> carries them removes them once —
+> [`deployment.md` → *One-time cleanup*](../deployment.md#one-time-cleanup-the-hand-built-precheck-truststore).
+
+**Verify** — the store is mounted and the Keycloak startup log does not contain the load failure
+(`BASETOOL_UID`, `UPOD` as in [`deployment.md`](../deployment.md)):
 
 ```bash
-# Export the backend cert (use the alias in your keystore.p12) ...
-keytool -exportcert -rfc \
-  -keystore keystore.p12 -storetype PKCS12 -storepass "$SERVER_SSL_KEY_STORE_PASSWORD" \
-  -alias <backend-cert-alias> -file backend.crt
-
-# ... and import it into a trust-only store the SPI loads.
-keytool -importcert -noprompt \
-  -keystore backend-truststore.p12 -storetype PKCS12 -storepass "$KRT_BACKEND_TRUSTSTORE_PASSWORD" \
-  -alias backend -file backend.crt
-```
-
-Mount it read-only into the keycloak container **at exactly the path `KRT_BACKEND_TRUSTSTORE_PATH`
-names** — the variable and the mount target are one fact written twice, and nothing checks that
-they agree. On production the variable is `/run/secrets/backend-truststore.p12`, so that is the
-mount target there; `/opt/keycloak/conf/backend-truststore.p12` works equally well as long as the
-variable says the same. The environment variables are plumbed already; the mount is deliberately
-left to the operator so a deployment without the precheck is unaffected.
-
-> [!warning] Corrected 2026-09-25 — on production this step had never been done
-> Production's `.env` set `KRT_BACKEND_TRUSTSTORE_PATH=/run/secrets/backend-truststore.p12` and a
-> password, but no truststore existed on the host and no drop-in mounted one. Keycloak logged
-> `Failed to load the backend truststore; the Discord account-existence precheck will fail open until it is fixed.`
-> (`NoSuchFileException`) at every start, over at least seven days of history, so the duplicate-account
-> guard (REQ-SEC-022) was failing open. It was fixed on 2026-09-25 ~15:52 UTC with the commands
-> below. This section also used to mount to `/opt/keycloak/conf/…` while production's variable
-> named `/run/secrets/…` — following it verbatim would have mounted the file where the SPI does not
-> look.
-
-On the **production** (rootless Podman) host the mount is a Quadlet **drop-in** beside the generated
-unit — `deploy.sh` never touches a unit's `.container.d/` directory, so it survives every release
-(production's keycloak drop-in directory also holds `30-log-driver.conf`). The truststore holds only
-public certificates, so it may be world-readable; Keycloak reads it as container uid 1000 (host uid
-100999). The install and the drop-in, **as run on production 2026-09-25** (as root; `$W` is the
-scratch directory the store was built in, `BASETOOL_UID=$(id -u basetool)`):
-
-```bash
-install -o root -g root -m 0644 "$W/backend-truststore.p12" /etc/basetool/secrets/backend-truststore.p12
-restorecon -F /etc/basetool/secrets/backend-truststore.p12
-rm -rf "$W"
-D=/etc/containers/systemd/users/${BASETOOL_UID}/keycloak.container.d
-printf '[Container]\nVolume=/etc/basetool/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
-chown deploy:deploy "$D/50-backend-truststore.conf"; chmod 0644 "$D/50-backend-truststore.conf"
-${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # restarts backend, frontend, ingest too (Requires=) -- ~2 min outage, see §3d
-```
-
-`$D` already existed on production (it holds `30-log-driver.conf`); on a host where it does not,
-create it first with `install -d -o deploy -g deploy -m 0755 "$D"`. Afterwards
-`${UPOD} exec keycloak ls /run/secrets` lists `backend-truststore.p12`.
-
-The host has no JDK: the store is built through the backend image's `keytool` in a scratch
-directory the rootless container can write to. The full block as run, build included, is
-[`deployment.md` → *Step 2f*](../deployment.md#step-2f--the-keycloak-spi-prechecks-truststore).
-**Neither the store nor the drop-in is captured by `backup.sh`**; a host rebuilt from backup needs
-this section again.
-
-**Verify** — the Keycloak startup log must not contain the load failure:
-
-```bash
+${UPOD} exec keycloak ls /run/secrets      # internal-truststore.p12 and keystore.p12
 journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'   # 0
 ```
 
-On a local Docker Compose stack, use a compose override instead (mount target = the variable):
-
-```yaml
-services:
-  keycloak:
-    volumes:
-      - /etc/basetool/secrets/backend-truststore.p12:/opt/keycloak/conf/backend-truststore.p12:ro
-```
+**Local stacks:** `keycloak-dev` (the `dev` profile) does not configure the precheck. It passes
+`KRT_BACKEND_PRECHECK_URL`, `KRT_DISCORD_SPI_SHARED_SECRET` and the two truststore variables through
+from `.env`, all empty by default, and mounts no truststore, so the gate skips the second stage.
+Only the `prod` profile's `keycloak` carries the wiring above.
 
 If the truststore is missing or wrong, the precheck simply fails open (the login proceeds to the
-normal PENDING queue) — silently for the member, so the log is the only witness: a missing or
-unreadable store is the `Failed to load the backend truststore` `WARN` at every Keycloak start, a
-wrong one an `Account-existence probe could not reach the backend (…)` `WARN` per first login. Rotate the secret by changing it on both
-services; rebuild the truststore when the backend certificate is rotated.
+normal PENDING queue) — silently for the member. A missing or unreadable store is the
+`Failed to load the backend truststore` `WARN` at every Keycloak start, on which the Loki alert
+`KeycloakBackendTruststoreUnreadable` fires for 30 minutes; a store that loads but does not trust
+the backend is an `Account-existence probe could not reach the backend (…)` `WARN` per first login,
+on which `KeycloakAccountExistenceProbeFailing` fires for an hour.
+Rotate the secret by changing it on both services.
 
-**After the per-service internal TLS rollout** (REQ-SEC-070) the backend serves a leaf of the
-internal CA, so the truststore holds **the CA** instead of a backend certificate — import
-`/etc/basetool/secrets/tls/ca.crt` under its own alias (`-alias internal-ca`) next to the old entry
-(alias `backend`) in step 2 of the rollout, and delete the `backend` entry in step 4
-([`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)).
-From then on a re-mint changes the CA, and this truststore with it. Production's store was built
-with both entries on 2026-09-25 (step 2f) and holds **only `internal-ca`** since step 4 the same
-evening (~17:58 UTC; the `backend` alias deleted on a `basetool`-owned working copy — the installed
-store is root-owned, so `keytool` cannot edit it in place; the command is
-[`deployment.md` → *Step 4*](../deployment.md#step-4--drop-the-old-certificate), 4c).
-
-> [!warning] A release rollback to 1.11.0 or older silently disables the precheck
-> *(added 2026-09-25)* 1.11.0's units put the backend back on the old shared certificate, which this
-> truststore no longer trusts. Nothing goes down: the probe's handshake fails, the login falls
-> through to the PENDING queue, and the only witness is the `Account-existence probe could not
-> reach the backend (…)` `WARN` per first login. Re-import the `backend` alias (the old shared
-> certificate, `/etc/basetool/secrets/tls/legacy-shared.crt`) — or install production's
-> `/etc/basetool/secrets/backend-truststore.p12.backup-20260925-175805` — and restart keycloak **before** promoting.
+> [!warning] A release rollback past the managed mount silently disables the precheck
+> A release from before this wiring mounts no truststore into keycloak and reads the two
+> truststore variables from `basetool.env`, which after the one-time cleanup names none. The SPI
+> then uses the JVM's default truststore, which does not hold the internal CA. Nothing goes down:
+> the probe's handshake fails, the login falls through to the PENDING queue, and the only witness is
+> the `Account-existence probe could not reach the backend (…)` `WARN` per first login, until a
+> release with the mount is back.
 
 ### 7.4 Verify
 
 - The Keycloak startup log carries **no** `Failed to load the backend truststore` line
   (`journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'`
-  → `0`). Without this check a misconfigured precheck looks exactly like a working one with no
-  collisions to deny.
+  → `0`), and `KeycloakBackendTruststoreUnreadable` is not firing. Without this check a
+  misconfigured precheck looks exactly like a working one with no collisions to deny.
 - A new Discord login whose username / server nickname / e-mail matches an existing account → denied
   with the "account already exists, link instead" page; no session, no new account.
 - A new, non-colliding Discord login → lands PENDING as before.

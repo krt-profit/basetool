@@ -1879,5 +1879,7 @@
       "serviceAccountClientId": "basetool-ingest-gateway",
       "username": "service-account-basetool-ingest-gateway"
     }
-  ]
+  ],
+  "webAuthnPolicyPasswordlessRequireResidentKey": "not specified",
+  "webAuthnPolicyPasswordlessResidentKey": "required"
 }

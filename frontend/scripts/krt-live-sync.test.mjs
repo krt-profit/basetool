@@ -130,6 +130,33 @@ test('an indeterminate deny schedules a jittered re-subscribe and re-sends it', 
     assert.deepEqual(ws.sent, [{ type: 'subscribe', topic: 'operation:1' }]);
 });
 
+test('a fallback-first room carries the flag on every subscribe frame it sends', () => {
+    const h = harness();
+    h.sync.subscribe('bank:1', {}, { fallbackFirst: true });
+    const first = h.sockets[0];
+    first.open();
+    assert.deepEqual(first.sent, [{ type: 'subscribe', topic: 'bank:1', fallbackFirst: true }]);
+
+    first.sent.length = 0;
+    first.message(indeterminate('bank:1'));
+    h.fire(h.live()[0]);
+    assert.deepEqual(first.sent, [{ type: 'subscribe', topic: 'bank:1', fallbackFirst: true }]);
+
+    first.close(1006);
+    h.fire(h.live()[0]);
+    const second = h.sockets[1];
+    second.open();
+    assert.deepEqual(second.sent, [{ type: 'subscribe', topic: 'bank:1', fallbackFirst: true }]);
+});
+
+test('a room without the option sends the plain subscribe frame', () => {
+    const h = harness();
+    h.sync.subscribe('bank:1', {});
+    const ws = h.sockets[0];
+    ws.open();
+    assert.deepEqual(ws.sent, [{ type: 'subscribe', topic: 'bank:1' }]);
+});
+
 test('re-subscribe attempts are bounded and then the topic stays denied', () => {
     const h = harness(1);
     h.sync.subscribe('operation:1', {});

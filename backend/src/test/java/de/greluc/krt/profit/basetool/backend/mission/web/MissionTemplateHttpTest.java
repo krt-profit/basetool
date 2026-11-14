@@ -160,6 +160,27 @@ class MissionTemplateHttpTest {
   }
 
   @Test
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  void choicesForAMemberOfSeveralUnitsWithoutAPickAreAnEmptyPage() throws Exception {
+    UUID first = createOwner();
+    UUID second = createOwner();
+    User planner = createPlanner(first, second);
+    try {
+      mvc.perform(
+              get(CHOICES).with(member().jwt(token -> token.subject(planner.getId().toString()))))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.content").isEmpty())
+          .andExpect(jsonPath("$.totalElements").value(0));
+    } finally {
+      memberships.deleteById(new OrgUnitMembershipId(planner.getId(), first));
+      memberships.deleteById(new OrgUnitMembershipId(planner.getId(), second));
+      users.deleteById(planner.getId());
+      orgUnits.deleteById(first);
+      orgUnits.deleteById(second);
+    }
+  }
+
+  @Test
   void replacingPlanningRowsAdvancesRevisionAndRejectsStaleDeletion() throws Exception {
     UUID owner = createOwner();
     MvcResult saved = create(owner, "Recovery");
@@ -655,6 +676,11 @@ class MissionTemplateHttpTest {
   }
 
   private JwtRequestPostProcessor planner(UUID owner) {
+    User planner = owner == null ? createPlanner() : createPlanner(owner);
+    return member().jwt(token -> token.subject(planner.getId().toString()));
+  }
+
+  private User createPlanner(UUID... owners) {
     User planner = new User();
     planner.setId(UUID.randomUUID());
     planner.setUsername("template-planner-" + planner.getId());
@@ -663,7 +689,7 @@ class MissionTemplateHttpTest {
     planner.getRoles().add(roles.findByCode(Roles.KRT_MEMBER).orElseThrow());
     users.saveAndFlush(planner);
 
-    if (owner != null) {
+    for (UUID owner : owners) {
       OrgUnitMembership membership = new OrgUnitMembership();
       membership.setId(new OrgUnitMembershipId(planner.getId(), owner));
       membership.setUser(planner);
@@ -671,7 +697,7 @@ class MissionTemplateHttpTest {
       membership.setJoinedAt(Instant.now());
       memberships.saveAndFlush(membership);
     }
-    return member().jwt(token -> token.subject(planner.getId().toString()));
+    return planner;
   }
 
   private UUID createOwner() {

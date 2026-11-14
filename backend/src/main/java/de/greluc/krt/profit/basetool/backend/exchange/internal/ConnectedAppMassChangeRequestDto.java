@@ -33,7 +33,8 @@ import java.time.Instant;
  * @param installationKey the installation that sent it
  * @param resource {@code blueprints}, {@code stock}, {@code ships}, {@code org-stock} or {@code
  *     refinery-orders}
- * @param changeSet the change set as the client sent it, as JSON
+ * @param changeSet the change set as the client sent it, as JSON, at most {@link
+ *     #MAX_CHANGE_SET_LENGTH} characters
  * @param stagedAt when the gateway staged it, in UTC
  */
 public record ConnectedAppMassChangeRequestDto(
@@ -41,5 +42,9 @@ public record ConnectedAppMassChangeRequestDto(
     @NotBlank @Size(max = 64) String installationKey,
     @NotBlank @Pattern(regexp = "^(blueprints|stock|ships|org-stock|refinery-orders)$")
         String resource,
-    @NotBlank @Size(max = 524288) String changeSet,
-    @NotNull Instant stagedAt) {}
+    @NotBlank @Size(max = MAX_CHANGE_SET_LENGTH) String changeSet,
+    @NotNull Instant stagedAt) {
+
+  /** The longest staged change set a preview or confirmation accepts, in characters. */
+  public static final int MAX_CHANGE_SET_LENGTH = 524_288;
+}

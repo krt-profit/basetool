@@ -108,7 +108,8 @@ class ActiveOrgUnitContextE2eTest {
   }
 
   /**
-   * The unit warehouse shows the shared notice and both units' stock until a Staffel is selected.
+   * The Einheitslager shows the shared „Alle meine Org-Einheiten" notice and both units' stock
+   * until a Staffel is selected.
    */
   @Test
   void withoutAChoiceTheLagerShowsBothUnitsUnderAllMyOrgUnits() {

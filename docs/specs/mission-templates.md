@@ -118,7 +118,9 @@ missions. The create flow navigates to the new mission's management tab (REQ-FE-
 **API.** Under `/api/v1/missions`, `GET /template-choices` returns a bounded `PageResponse` ordered
 by name and ID (REQ-API-005). `GET /template-preview/{templateId}` returns the scoped planning data
 and revision. Both accept the optional `owningOrgUnitId` query parameter and return
-`Cache-Control: private, no-store` (REQ-SEC-031). A preview outside the resolved scope or with an
+`Cache-Control: private, no-store` (REQ-SEC-031). Without a pick or honoured pin, a member of several
+units has no effective owner yet (REQ-ORG-023), so `GET /template-choices` answers an empty page,
+never an error. A preview outside the resolved scope or with an
 unknown template ID returns 404. `POST /api/v1/missions` accepts optional `units` planning rows and
 `templateSelection: {id, version}`. A stale, deleted or inaccessible selected revision returns
 `409 MISSION_TEMPLATE_STALE`. Callers may omit the selection and submit the rows as manual data.
@@ -135,3 +137,5 @@ unknown template ID returns 404. `POST /api/v1/missions` accepts optional `units
   a deliberate retry.
 - [ ] Saved goals, steps and unit planning rows are independently editable and survive template
   deletion.
+- [x] A member of several units without a pick or pin gets an empty template-choices page, with the
+  request committed rather than rolled back (`MissionTemplateHttpTest`).

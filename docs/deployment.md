@@ -242,8 +242,8 @@ staging, monitoring state, the deploy account's state in `/var/lib/basetool/depl
 | `/etc/basetool/basetool.env` | `deploy:deploy 0640` | every environment value the stack reads | the role repairs owner/mode; `deploy.sh` reads it, `render-env-d.py` renders `env.d/` from it. Keep it **LF**: a CRLF file hands the pre-flight a path ending in `\r` (`required file missing` for a file that exists). |
 | `/etc/basetool/env.d/<svc>.env` | `deploy:basetool 0640`, dir `2750` | per-service environment, one closed allow-list each | **generated** on every config change; never edit — edit `basetool.env` |
 | `/etc/basetool/secrets/keystore.p12` | `root:110000 0640` + ACL `u:100999:r`, `u:basetool:r` | the shared internal TLS keystore (backend, frontend, ingest, keycloak) | ACL for keycloak and for the backup helper; see [rotation](#internal-keystore-and-certificate-rotation) |
-| `/etc/basetool/secrets/tls/` | `basetool:basetool 0755`; `<svc>.p12` `0640` (apps `root:110000` + ACL `u:basetool:r`, keycloak `root:root` + ACL `u:100999:r`, `u:basetool:r`); `truststore.p12`, `ca.crt` `root:root 0644` | the per-service internal TLS material (REQ-SEC-070) — absent on a host until its rollout step 2; **present on production since 2026-09-25**, nothing mounts it before step 3 | minted by the owner with `mint-internal-tls.sh`; see [Internal TLS](#internal-tls-per-service-certificates-from-a-private-ca) |
-| `/etc/basetool/secrets/backend-truststore.p12` | `root:root 0644` (public certificates only) | PKCS#12 trust store for the Keycloak SPI's account-existence precheck (REQ-SEC-022): alias `backend` = the shared certificate, alias `internal-ca` = `/etc/basetool/secrets/tls/ca.crt` | mounted into keycloak at the path `basetool.env`'s `KRT_BACKEND_TRUSTSTORE_PATH` names (`/run/secrets/backend-truststore.p12` on production) by the hand-installed drop-in `keycloak.container.d/50-backend-truststore.conf`; built 2026-09-25 — see [`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate). **Neither the file nor the drop-in is captured by `backup.sh`**: a host rebuilt from backup must rebuild both |
+| `/etc/basetool/secrets/tls/` | `basetool:basetool 0755`; `<svc>.p12` `0640` (apps `root:110000` + ACL `u:basetool:r`, keycloak `root:root` + ACL `u:100999:r`, `u:basetool:r`); `truststore.p12`, `ca.crt` `root:root 0644` | the per-service internal TLS material (REQ-SEC-070) — absent on a host until its rollout step 2; **present on production since 2026-09-25**; the units mount it from step 3 on — `truststore.p12` in the three apps and in keycloak, whose Discord precheck trusts the backend through it (REQ-SEC-022) | minted by the owner with `mint-internal-tls.sh`; see [Internal TLS](#internal-tls-per-service-certificates-from-a-private-ca) |
+| `/etc/basetool/secrets/backend-truststore.p12` (+ `.backup-*`), `keycloak.container.d/50-backend-truststore.conf` | — | **obsolete**: the Keycloak precheck's former hand-built truststore and the hand-installed drop-in that mounted it | nothing reads either once the managed keycloak mount is deployed — the precheck trusts `tls/truststore.p12` (REQ-SEC-022, ADR-0051 amendment). Remove them, with the `KRT_BACKEND_TRUSTSTORE_*` lines of `basetool.env`, once per host: [One-time cleanup](#one-time-cleanup-the-hand-built-precheck-truststore) |
 | `/etc/basetool/realm-export.json` | `root:100999` + ACL `u:basetool:r` | Keycloak realm seed, bind-mounted into keycloak | only seeds an empty realm; the live realm is in `db-keycloak` |
 | `/var/lib/basetool/redis/users.acl` | `root:root 0644` | Redis ACL, one user per service, **rendered** by `render-redis-acl.py` (SHA-256 hashes, no password) and **with** a `user default …` line | without that line redis resets `default` to `nopass`; check `grep -c '^user default ' …` = 1 — see [The Redis ACL](#the-redis-acl) |
 | `/etc/basetool/deploy/ghcr-pull-token` | `deploy:deploy 0600`, dir `0700` | classic PAT, `read:packages` only | optional sidecar `ghcr-pull-token.expiry` (ISO date) |
@@ -2047,15 +2047,16 @@ sets.
 >   exists.`; `/etc/basetool/secrets/tls` holds `backend.p12 ca.crt frontend.p12 ingest.p12 keycloak.p12
 >   legacy-shared.crt truststore.p12`; `basetool-ca.crt` carries two anchors; edge, Prometheus and
 >   blackbox restarted with no edge verify error. **2f** turned up a pre-existing defect — the SPI
->   truststore `basetool.env` named had never existed — and was done by building it (see 2f below and
->   [`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)).
+>   truststore `basetool.env` named had never existed — and was done by building one by hand;
+>   keycloak's mount of the internal truststore has since replaced it (see 2f below).
 > - **Step 3** — done with **v1.12.0** (promote run 36168223771 at 17:39 UTC, deploy 17:38–17:44
 >   UTC): backend, frontend, ingest and Keycloak mount `/etc/basetool/secrets/tls/<service>.p12`, the
 >   three apps mount `/etc/basetool/secrets/tls/truststore.p12` as the internal truststore, and all four
 >   answer `Verification: OK` against `/etc/basetool/secrets/tls/ca.crt` with `-verify_hostname`.
 > - **Step 4** — done 17:58–18:03 UTC, the owner's choice the same evening rather than a day
->   later. `basetool-ca.crt` is the CA alone (one anchor), the SPI truststore holds only
->   `internal-ca`, `truststore.p12` only `ca`, and `basetool-cert-expiry` reports the CA's expiry (2036).
+>   later. `basetool-ca.crt` is the CA alone (one anchor), the then hand-built SPI truststore held
+>   only `internal-ca`, `truststore.p12` only `ca`, and `basetool-cert-expiry` reports the CA's
+>   expiry (2036).
 >   The step-4 command as documented **failed** on the root-owned truststore and was redone with a
 >   working copy at 18:01 — the step below is now written in that form (see *As run on
 >   production*). **Rollout complete on production.** A release rollback to 1.11.0 or older now
@@ -2078,7 +2079,7 @@ states so a rollback can be read off it:
 | `BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH` → `/run/secrets/internal-truststore.p12` | baked, as above | `/etc/basetool/secrets/keystore.p12` | `/etc/basetool/secrets/tls/truststore.p12` |
 | `BASETOOL_TRUSTSTORE_HOST_PATH` → `/run/secrets/truststore.p12` (REQ-OPS-022's JVM-truststore default; production's JVM truststore is the role's separate `jvm-truststore.p12` drop-in) | baked, as above | `/etc/basetool/secrets/keystore.p12` — the shared **private key**, mounted into all three apps | `/etc/basetool/secrets/tls/truststore.p12`, so no container holds the old key |
 | `/etc/basetool/monitoring/certs/basetool-ca.crt` (edge, Prometheus, blackbox) | host file | the shared certificate | the internal CA |
-| `/etc/basetool/secrets/backend-truststore.p12` (Keycloak SPI precheck, if configured) | host file + a hand-installed keycloak drop-in | the backend's shared certificate (alias `backend`) | the internal CA only (alias `internal-ca`; both from step 2f to step 4) |
+| `KRT_BACKEND_TRUSTSTORE_PATH` / `_PASSWORD` (Keycloak SPI precheck) | `docker-compose.yml` → the generated keycloak unit and `env.d/keycloak.env` (before: host `basetool.env` + a hand-installed keycloak drop-in) | a hand-built `/etc/basetool/secrets/backend-truststore.p12` with the shared certificate (alias `backend`) | `/run/secrets/internal-truststore.p12`, the same `tls/truststore.p12` the apps mount, with their password (ADR-0051 amendment) |
 
 The four `*_KEYSTORE_HOST_PATH` and the two truststore paths are **baked**: setting them in `basetool.env` does
 nothing on the Podman host (`check-conformance.py` → `env-reaches-the-units` says so). They moved
@@ -2195,8 +2196,8 @@ cat /etc/basetool/secrets/tls/ca.crt /etc/basetool/secrets/tls/legacy-shared.crt
 restorecon -F /etc/basetool/monitoring/certs/basetool-ca.crt
 ${UCTL} restart edge.service prometheus.service blackbox-exporter.service
 
-# 2f. Only if the Keycloak SPI precheck is configured (KRT_BACKEND_TRUSTSTORE_PATH in basetool.env) --
-#     see "Step 2f" below: it may have to BUILD the truststore, not just extend it.
+# 2f. Nothing for the Keycloak SPI precheck: it trusts truststore.p12 (2c) through the keycloak
+#     unit's mount -- see "Step 2f" below.
 ```
 
 Expected: the mint prints `The CA key no longer exists.`; `ls` shows `backend.p12 ca.crt
@@ -2208,77 +2209,33 @@ may stay, nothing mounts it yet.
 
 #### Step 2f — the Keycloak SPI precheck's truststore
 
-The account-existence precheck (REQ-SEC-022) calls the backend from inside Keycloak and trusts it
-through its own PKCS#12 store, named by `basetool.env`'s `KRT_BACKEND_TRUSTSTORE_PATH` (a path **inside**
-the keycloak container) and mounted there by a drop-in the operator installs
-([`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)).
-Check first, read-only, that the store really exists — **do not assume it**:
+Nothing to do. The account-existence precheck (REQ-SEC-022) calls the backend from inside Keycloak
+and trusts it through the CA-only internal truststore: the keycloak unit mounts
+`/etc/basetool/secrets/tls/truststore.p12` at `/run/secrets/internal-truststore.p12`, and
+`docker-compose.yml` fixes `KRT_BACKEND_TRUSTSTORE_PATH` to that path and
+`KRT_BACKEND_TRUSTSTORE_PASSWORD` to the apps' expression for the same store
+(`INTERNAL_TLS_TRUSTSTORE_PASSWORD`, else `SERVER_SSL_KEY_STORE_PASSWORD`; ADR-0051 amendment). The
+trust this rollout widens in 2c and narrows in 4b therefore reaches the precheck as it reaches the
+apps, once keycloak restarts.
+
+Verify after any keycloak restart (read-only):
 
 ```bash
-sed -n 's/^KRT_BACKEND_TRUSTSTORE_PATH=//p' /etc/basetool/basetool.env          # empty: skip 2f entirely
-ls -l /etc/basetool/secrets/backend-truststore.p12
-ls -l /etc/containers/systemd/users/${BASETOOL_UID}/keycloak.container.d/
-journalctl CONTAINER_NAME=keycloak --since -7d -o cat | grep -c 'Failed to load the backend truststore'   # must be 0
+${UPOD} exec keycloak ls /run/secrets      # internal-truststore.p12 and keystore.p12
+journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'   # 0
 ```
 
-> [!warning] Found on production 2026-09-25: the variable was set, the store never existed
-> `basetool.env` named `/run/secrets/backend-truststore.p12` (with a password), but no such file was on the
-> host and no drop-in mounted one, so Keycloak logged
-> `WARN [BackendTrustSupport] Failed to load the backend truststore; the Discord account-existence precheck will fail open until it is fixed.: java.nio.file.NoSuchFileException: /run/secrets/backend-truststore.p12`
-> at every start, over at least seven days of log history: the duplicate-account guard was **failing
-> open on production**. Fixed ~15:52 UTC the same day by building the store with **both** entries
-> and installing the drop-in, as below; no truststore warning since.
+A start that cannot read the store also fires the Loki alert `KeycloakBackendTruststoreUnreadable`
+for 30 minutes.
 
-**If the store is missing**, build it with both entries — alias `backend` = the current shared
-certificate (what the backend serves until step 3), alias `internal-ca` = the new CA (what it
-serves from step 3) — through the backend image's `keytool`, with the password `basetool.env` already
-holds, in a scratch directory the rootless container can write to, then install it root-owned.
-**As run on production 2026-09-25 (~15:52 UTC)**, as root from `/`, after step 2, with `BASETOOL_UID`,
-`UCTL` and `UPOD` from the prelude:
-
-```bash
-T=/etc/basetool/secrets/tls
-# a scratch dir the rootless container (root in it = basetool on the host) can write into; /root is not traversable for basetool
-W=$(mktemp -d /etc/basetool/secrets/.kc-trust.XXXXXX)
-cp "$T/legacy-shared.crt" "$T/ca.crt" "$W/"; chown -R basetool:basetool "$W"; chmod 0700 "$W"; chmod 0644 "$W"/*.crt
-IMG=$(${UPOD} container inspect backend --format '{{.ImageName}}')
-export KRT_TS_PASSWORD="$(sed -n 's/^KRT_BACKEND_TRUSTSTORE_PASSWORD=//p' /etc/basetool/basetool.env | tail -1)"
-[ -n "$KRT_TS_PASSWORD" ] || { echo "KRT_BACKEND_TRUSTSTORE_PASSWORD is empty"; exit 1; }
-for a in backend:legacy-shared.crt internal-ca:ca.crt; do
-  sudo --preserve-env=KRT_TS_PASSWORD -u basetool podman run --rm --user 0 -e KRT_TS_PASSWORD \
-    --entrypoint keytool -v "$W":/work "${IMG}" -importcert -noprompt -storetype PKCS12 \
-    -alias "${a%%:*}" -file "/work/${a##*:}" -keystore /work/backend-truststore.p12 \
-    -storepass:env KRT_TS_PASSWORD
-done
-unset KRT_TS_PASSWORD
-install -o root -g root -m 0644 "$W/backend-truststore.p12" /etc/basetool/secrets/backend-truststore.p12
-restorecon -F /etc/basetool/secrets/backend-truststore.p12
-rm -rf "$W"
-D=/etc/containers/systemd/users/${BASETOOL_UID}/keycloak.container.d
-printf '[Container]\nVolume=/etc/basetool/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
-chown deploy:deploy "$D/50-backend-truststore.conf"; chmod 0644 "$D/50-backend-truststore.conf"
-${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # restarts backend, frontend, ingest too (Requires=) -- ~2 min outage
-${UCTL} start backend.service ingest.service frontend.service   # returns once they are healthy again, not before
-```
-
-Output on production: `Certificate was added to keystore` twice; the drop-in landed beside the
-existing `30-log-driver.conf`. Two things the block takes for granted that another host may not
-have: the drop-in directory `$D` already existed on production (create it first with
-`install -d -o deploy -g deploy -m 0755 "$D"` where it does not), and the mount target
-`/run/secrets/backend-truststore.p12` is production's `KRT_BACKEND_TRUSTSTORE_PATH` — on any host
-it must be exactly what that variable names.
-
-**If the store exists**, add only the CA the same way (one `-importcert` with `-alias internal-ca`
-on a working copy in such a scratch directory, then `install` it back), and restart keycloak. The
-installed store is `root:root 0644`, which the container's root (= `basetool` on the host) cannot
-write: copy it **into** `$W` together with `ca.crt` *before* the `chown -R basetool:basetool "$W"`, never
-point `keytool` at `/etc/basetool/secrets/backend-truststore.p12` itself.
-
-Verify: `journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'`
-is `0`, and `${UPOD} exec keycloak ls /run/secrets` lists `backend-truststore.p12` (both held on
-production since 2026-09-25). The drop-in survives every release (`deploy.sh` never touches a
-`.container.d/`), but **neither it nor the store is in the backup**. **Rollback:** remove the
-drop-in, `daemon-reload`, restart keycloak — the precheck fails open again, which is where it was.
+> [!note] What this step used to be
+> On production on 2026-09-25 this step found that the store `basetool.env` named had never
+> existed — the precheck had failed open for at least seven days — and built one by hand:
+> `/etc/basetool/secrets/backend-truststore.p12` (aliases `backend` and `internal-ca`), mounted by
+> the hand-installed drop-in `keycloak.container.d/50-backend-truststore.conf`. That drop-in was
+> later lost with nothing to notice it, and the precheck failed open again until the managed mount
+> replaced both. What is left of them on a host goes with the
+> [one-time cleanup](#one-time-cleanup-the-hand-built-precheck-truststore).
 
 ### Step 3 — serve the new certificates
 
@@ -2314,11 +2271,10 @@ empty input prints "no TLS errors" just the same.)*
 17:39 UTC, the deploy 17:38–17:44 UTC): all four services `Verification: OK` against `ca.crt` with
 `-verify_hostname`, each on its own leaf, the apps on the CA-only truststore.
 
-**kcadm after step 3** *(added 2026-09-25; still untested on production after v1.12.0)*: the documented kcadm session trusts
-`/run/secrets/keystore.p12` inside the keycloak container. From this release on, that path is
-Keycloak's own leaf keystore, and the keycloak unit mounts no truststore. The session probably keeps
-working, but nobody has verified it; the fallback, and whether keycloak should mount the CA-only
-truststore, are an open question in
+**kcadm after step 3**: the documented kcadm session trusts `/run/secrets/keystore.p12` inside the
+keycloak container, which from step 3 on is Keycloak's own leaf keystore. The keycloak unit also
+mounts the CA-only internal truststore at `/run/secrets/internal-truststore.p12`, the fallback
+anchor should that fail —
 [`keycloak/README.md` → *Runbook — a kcadm session on the production container*](keycloak/README.md#runbook--a-kcadm-session-on-the-production-container).
 **Rollback:** re-promote the previous release (the old units mount the shared keystore, which is
 untouched and still trusted by every client).
@@ -2326,11 +2282,11 @@ untouched and still trusted by every client).
 ### Step 4 — drop the old certificate
 
 Once step 3 has run without TLS errors (the plan said a day; production did it the same evening, see
-below). Every store step 4 edits is **root-owned** by then — `truststore.p12` since 2d,
-`backend-truststore.p12` since 2f — and root inside the rootless container is `basetool` on the host, so
-`keytool` cannot write either in place. Each one is edited on an `basetool`-owned working copy and
-`install`ed back, the pattern 2f already used. Do all file changes first and restart once at the
-end: the restart of keycloak and the apps is a ~2-minute full outage, and one is enough.
+below). The store step 4 edits is **root-owned** by then — `truststore.p12` since 2d — and root
+inside the rootless container is `basetool` on the host, so `keytool` cannot write it in place. It
+is edited on a `basetool`-owned working copy and `install`ed back. Do all file changes first and
+restart once at the end: the restart of keycloak and the apps is a ~2-minute full outage, and one
+is enough.
 
 ```bash
 T=/etc/basetool/secrets/tls; S=$(date +%Y%m%d-%H%M%S)
@@ -2339,7 +2295,6 @@ IMG=$(${UPOD} container inspect backend --format '{{.ImageName}}')
 # 4a. Backups beside the originals -- the rollback below, and the basis of a release rollback.
 cp -p "$T/truststore.p12" "$T/truststore.p12.backup-$S"
 cp -p /etc/basetool/monitoring/certs/basetool-ca.crt "/etc/basetool/monitoring/certs/basetool-ca.crt.backup-$S"
-cp -p /etc/basetool/secrets/backend-truststore.p12 "/etc/basetool/secrets/backend-truststore.p12.backup-$S"   # only if 2f was done
 
 # 4b. The internal truststore: delete legacy-shared on a working copy, check, install back.
 W=$(mktemp -d /etc/basetool/secrets/.tls-trust.XXXXXX)
@@ -2356,20 +2311,8 @@ install -o root -g root -m 0644 "$W/truststore.p12" "$T/truststore.p12"
 restorecon -F "$T/truststore.p12"
 rm -rf "$W"
 
-# 4c. Only if 2f was done: the SPI truststore keeps internal-ca alone -- same pattern, its own password.
-W=$(mktemp -d /etc/basetool/secrets/.kc-trust.XXXXXX)
-cp /etc/basetool/secrets/backend-truststore.p12 "$W/"; chown -R basetool:basetool "$W"; chmod 0700 "$W"
-export KRT_TS_PASSWORD="$(sed -n 's/^KRT_BACKEND_TRUSTSTORE_PASSWORD=//p' /etc/basetool/basetool.env | tail -1)"
-sudo --preserve-env=KRT_TS_PASSWORD -u basetool podman run --rm --user 0 -e KRT_TS_PASSWORD \
-  --entrypoint keytool -v "$W":/work "${IMG}" \
-  -delete -alias backend -storetype PKCS12 -keystore /work/backend-truststore.p12 -storepass:env KRT_TS_PASSWORD
-sudo --preserve-env=KRT_TS_PASSWORD -u basetool podman run --rm --user 0 -e KRT_TS_PASSWORD \
-  --entrypoint keytool -v "$W":/work "${IMG}" \
-  -list -storetype PKCS12 -keystore /work/backend-truststore.p12 -storepass:env KRT_TS_PASSWORD   # one entry: internal-ca
-unset KRT_TS_PASSWORD
-install -o root -g root -m 0644 "$W/backend-truststore.p12" /etc/basetool/secrets/backend-truststore.p12
-restorecon -F /etc/basetool/secrets/backend-truststore.p12
-rm -rf "$W"
+# 4c. Nothing for the Keycloak SPI precheck: it trusts truststore.p12 (4b) through the keycloak
+#     unit's mount, and the restart in 4e loads it.
 
 # 4d. The edge, Prometheus and blackbox anchor: the CA alone.
 install -m 0644 "$T/ca.crt" /etc/basetool/monitoring/certs/basetool-ca.crt
@@ -2379,7 +2322,6 @@ grep -c 'BEGIN CERTIFICATE' /etc/basetool/monitoring/certs/basetool-ca.crt    # 
 # 4e. Restart. One combined job: systemd orders it along Requires= and restarts each unit once.
 ${UCTL} restart edge.service prometheus.service blackbox-exporter.service
 ${UCTL} restart keycloak.service backend.service ingest.service frontend.service   # ~2 min full outage
-#   (without 2f: ${UCTL} restart backend.service ingest.service frontend.service)
 systemctl start basetool-cert-expiry.service      # the metric now reports the CA's own expiry
 ```
 
@@ -2395,8 +2337,10 @@ is `0`, the edge serves the app, and in Prometheus
 > /work/truststore.p12` directly against `-v /etc/basetool/secrets/tls:/work`. On production that failed
 > with `keytool error: java.io.FileNotFoundException: /work/truststore.p12 (Permission denied)`:
 > 2d had made the store `root:root 0644`, and the container's root is `basetool` on the host. The rest of
-> the step went through — the three backups (paths in the box below), `basetool-ca.crt` with one anchor, the
-> SPI truststore down to `internal-ca` on a working copy (4c), the edge/Prometheus/blackbox restart
+> the step went through — the three backups (two in the box below; the third, of the hand-built SPI
+> store, goes with the [one-time cleanup](#one-time-cleanup-the-hand-built-precheck-truststore)),
+> `basetool-ca.crt` with one anchor, the then hand-built SPI truststore down to `internal-ca` on a
+> working copy, the edge/Prometheus/blackbox restart
 > and one combined `${UCTL} restart keycloak.service backend.service ingest.service frontend.service`.
 > That restart cost the edge's maintenance page **74, 121 and 7** 5xx answers per minute over
 > 17:58–18:00. At 18:01 the truststore was redone exactly as 4b above (`-list` showed only `ca`),
@@ -2412,29 +2356,28 @@ backup carries `config/internal-tls.tar`.
 
 **Rollback:** `install -o root -g root -m 0644` each `*.backup-$S` file from 4a back over its
 original, `restorecon -F` each, and restart as in 4e. Without the backups: re-import
-`legacy-shared.crt` into `truststore.p12` and `backend` into the SPI truststore on working copies
-as in 4b/4c (copy the `.crt` into `$W` too; `-importcert -noprompt -storetype PKCS12 -alias … -file
-/work/…`), rebuild the bundle as in 2e, restart the same units.
+`legacy-shared.crt` into `truststore.p12` on a working copy as in 4b (copy the `.crt` into `$W`
+too; `-importcert -noprompt -storetype PKCS12 -alias … -file /work/…`), rebuild the bundle as in
+2e, restart the same units.
 
 > [!important] A release rollback to 1.11.0 or older needs the old certificate trusted again first
 > *(added 2026-09-25, after step 4 on production)* 1.11.0's units mount the shared `keystore.p12`
 > as every service's identity again, and after step 4 nothing trusts it: the edge, Prometheus and
-> blackbox would refuse every upstream. **And the Discord duplicate-account precheck would fail
-> open again, silently** (REQ-SEC-022): the SPI truststore holds only `internal-ca`, so Keycloak's
-> call to a backend back on the shared certificate fails its handshake — no outage, the guard just
-> stops working, and the only signal is the `Account-existence probe could not reach the backend`
-> `WARN` per first login. **Before** `promote.yml -f version=1.11.0`, undo step 4 as in its rollback
-> above:
+> blackbox would refuse every upstream. **And the Discord duplicate-account precheck fails open,
+> silently** (REQ-SEC-022) — as on a rollback to any release from before keycloak's managed
+> truststore mount: such a keycloak unit mounts no truststore for the precheck, and after the
+> [one-time cleanup](#one-time-cleanup-the-hand-built-precheck-truststore) `basetool.env` names
+> none, so Keycloak's call to the backend fails its handshake. No outage; the guard stops working
+> until a release with the mount is back, and the only signal is the `Account-existence probe could
+> not reach the backend` `WARN` per first login. **Before** `promote.yml -f version=1.11.0`, undo
+> step 4 as in its rollback above:
 >
 > 1. `legacy-shared` back into `/etc/basetool/secrets/tls/truststore.p12`, so services still on 1.12.0
 >    during the lock-step restarts accept those already back on the shared certificate;
-> 2. the old certificate back into `basetool-ca.crt` (edge, Prometheus, blackbox restarted);
-> 3. the `backend` alias (the old shared certificate, `/etc/basetool/secrets/tls/legacy-shared.crt`)
->    back into `/etc/basetool/secrets/backend-truststore.p12`, then restart keycloak.
+> 2. the old certificate back into `basetool-ca.crt` (edge, Prometheus, blackbox restarted).
 >
-> Production's step-4 backups are `/etc/basetool/secrets/tls/truststore.p12.backup-20260925-175805`,
-> `/etc/basetool/monitoring/certs/basetool-ca.crt.backup-20260925-175805` and
-> `/etc/basetool/secrets/backend-truststore.p12.backup-20260925-175805` (plus
+> Production's step-4 backups are `/etc/basetool/secrets/tls/truststore.p12.backup-20260925-175805`
+> and `/etc/basetool/monitoring/certs/basetool-ca.crt.backup-20260925-175805` (plus
 > `/etc/basetool/basetool.env.backup-20260925-175805-step4`). A rollback to **1.10.0 or older** also needs
 > `REDIS_DEFAULT_USER` back on ([The Redis ACL](#the-redis-acl)) and the frontend client back to
 > public (`--frontend-client public --apply` through a new provisioner session,
@@ -2444,8 +2387,66 @@ as in 4b/4c (copy the `.crt` into `$W` too; `-importcert -noprompt -storetype PK
 then the same widening (old CA as second anchor) → switch → narrowing. No single leaf can be
 re-issued, by design — the CA key is gone. The ownership trap holds here too: `keytool` may write
 in place only into a directory and stores that are still `basetool`-owned, as the fresh mint's are
-before its 2d-style `chown`; every edit of a store that is already root-owned — the narrowing, the
-SPI truststore — goes through a working copy as in 4b/4c.
+before its 2d-style `chown`; every edit of a store that is already root-owned — the narrowing —
+goes through a working copy as in 4b. The Keycloak precheck trusts the same `truststore.p12`, so a
+rotation needs no step of its own for it; keycloak restarts with the apps.
+
+### One-time cleanup: the hand-built precheck truststore
+
+Once per host, after the first deploy of the release whose keycloak unit mounts the internal
+truststore (ADR-0051 amendment; that deploy restarts keycloak, and with it the app). The precheck
+then reads `/run/secrets/internal-truststore.p12`, and three leftovers of the hand-built setup are
+obsolete — nothing reads them:
+
+- `/etc/basetool/secrets/backend-truststore.p12` and its backups (on production
+  `backend-truststore.p12.backup-20260925-175805`);
+- the drop-in `keycloak.container.d/50-backend-truststore.conf`, where it still exists (production
+  had already lost it);
+- the `KRT_BACKEND_TRUSTSTORE_PATH` / `KRT_BACKEND_TRUSTSTORE_PASSWORD` lines in
+  `/etc/basetool/basetool.env`. `env.d/keycloak.env` takes both from its template
+  (`quadlet/env.d/keycloak.env.tmpl`), so removing them changes no rendered file and needs no
+  restart.
+
+**Every step after the read-only first one is a production write and needs @greluc's explicit yes,
+in chat, per step** ([`production-host-access.md`](agents/production-host-access.md)). As root on
+the host, with the prelude of this section:
+
+```bash
+# 1. Read-only: the release is live and keycloak loaded the internal truststore at its last start.
+grep -c '^Volume=/etc/basetool/secrets/tls/truststore.p12:/run/secrets/internal-truststore.p12:ro$' \
+  /etc/containers/systemd/users/${BASETOOL_UID}/keycloak.container                          # 1
+grep -c '^KRT_BACKEND_TRUSTSTORE_PATH=/run/secrets/internal-truststore.p12$' /etc/basetool/env.d/keycloak.env   # 1
+SINCE=$(${UCTL} show keycloak.service -p ActiveEnterTimestamp --value); echo "$SINCE"      # the deploy's restart
+journalctl CONTAINER_NAME=keycloak --since "$SINCE" -o cat | grep -c 'Failed to load the backend truststore'   # 0
+ls -l /etc/basetool/secrets/backend-truststore.p12* /etc/containers/systemd/users/${BASETOOL_UID}/keycloak.container.d/
+grep -c '^KRT_BACKEND_TRUSTSTORE_' /etc/basetool/basetool.env       # counts only; never print the lines
+
+# 2. The drop-in, where it still exists -- before the store, so no later start mounts a missing file.
+D=/etc/containers/systemd/users/${BASETOOL_UID}/keycloak.container.d
+if [ -e "$D/50-backend-truststore.conf" ]; then rm "$D/50-backend-truststore.conf" && ${UCTL} daemon-reload; fi
+
+# 3. The obsolete store and its backups.
+rm -f /etc/basetool/secrets/backend-truststore.p12 /etc/basetool/secrets/backend-truststore.p12.backup-*
+
+# 4. The two basetool.env lines, with a backup beside the file.
+cp -p /etc/basetool/basetool.env /etc/basetool/basetool.env.backup-$(date +%Y%m%d-%H%M%S)
+"${EDITOR:-vi}" /etc/basetool/basetool.env      # delete the KRT_BACKEND_TRUSTSTORE_PATH and _PASSWORD lines
+stat -c '%U:%G %a' /etc/basetool/basetool.env       # deploy:deploy 640; chown deploy:deploy and chmod 0640 when an editor changed it
+sudo -u deploy /opt/basetool/scripts/render-env-d.py --check \
+  --env /etc/basetool/basetool.env --templates /opt/basetool/quadlet/env.d --out /etc/basetool/env.d
+```
+
+Step 1 must show `1`, `1` and `0` before anything is removed: a missing `1` means the release is
+not deployed yet, and a nonzero count means keycloak cannot read the internal truststore — fix that
+first (the `KeycloakBackendTruststoreUnreadable` description lists the checks). A running keycloak
+keeps a removed drop-in's mount until its next restart, which then starts without it.
+
+Verify: `ls /etc/basetool/secrets/backend-truststore.p12* "$D/50-backend-truststore.conf"` finds
+nothing, `grep -c '^KRT_BACKEND_TRUSTSTORE_' /etc/basetool/basetool.env` is `0`, and
+`render-env-d.py --check` reports every file matching (exit `0`) — the removal changed nothing
+keycloak reads. **Rollback:** move the `basetool.env` backup back; the removed store and drop-in
+are not restored, because nothing reads them. A rollback to a release from before the managed
+mount runs the precheck without a truststore (fail-open, see the box above).
 
 ---
 
@@ -2530,9 +2531,9 @@ systemctl start basetool-deploy.timer
 Then run `check-conformance.py --ssh greluc@<host> --sudo --only scrape-targets-up --only
 containers-running` from the workstation. The monitoring-side follow-ups — Grafana's own
 certificate, the `blackbox-internal-tls` probes, what to check in the meta-monitoring dashboard —
-are in [`monitoring/README.md`](../monitoring/README.md). If Keycloak's Discord precheck uses a
-backend truststore (`KRT_BACKEND_TRUSTSTORE_PATH` in `basetool.env`), rebuild it from the new certificate
-per [`keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
+are in [`monitoring/README.md`](../monitoring/README.md). Keycloak's Discord precheck has no store
+of its own to rebuild: a release with the managed keycloak mount points it at the internal
+truststore ([Step 2f](#step-2f--the-keycloak-spi-prechecks-truststore)).
 
 **Rollback:** move `keystore.p12.bak` back, repeat steps 4–6. The next nightly backup captures the
 new keystore; restic does not carry POSIX ACLs, so a restore re-applies step 4 by hand.

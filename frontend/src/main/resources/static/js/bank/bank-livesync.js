@@ -47,8 +47,9 @@ function bankAccountId() {
 /**
  * Declares one bank room's sections, topic and receiver.
  *
- * @param {{ topicClass: string, topic: string, coalesceMs?: number, sections: Record<string, { container: string, fragmentValue: string }> }} room
- *     the room's topic, receiver coalescing delay and section map
+ * @param {{ topicClass: string, topic: string, coalesceMs?: number, fallbackFirst?: boolean, sections: Record<string, { container: string, fragmentValue: string }> }} room
+ *     the room's topic, receiver coalescing delay, whether the relay authorizes it with its
+ *     fallback read first, and section map
  * @returns {KrtPageSections} the room's section seam
  */
 function bankRoom(room) {
@@ -65,6 +66,7 @@ function bankRoom(room) {
         topic: room.topic,
         receiver: {
             coalesceMs: room.coalesceMs,
+            fallbackFirst: room.fallbackFirst,
             pill: { label: bankLiveSyncUpdates },
         },
     });
@@ -149,9 +151,11 @@ export function initLiveSyncReceivers() {
 
     const accountId = bankAccountId();
     if (accountId && document.querySelector('#bank-account-results')) {
+        // The staff page reads the staff account, the BANK_ACCOUNT fallback read.
         bankRoom({
             topicClass: 'BANK_ACCOUNT',
             topic: `bank:${accountId}`,
+            fallbackFirst: true,
             sections: {
                 account: { container: '#bank-account-results', fragmentValue: 'accountBody' },
                 bookings: { container: '#bank-account-results', fragmentValue: 'accountBody' },

@@ -25,7 +25,10 @@ import de.greluc.krt.profit.basetool.backend.platform.api.ScheduledJob;
 import de.greluc.krt.profit.basetool.backend.platform.api.TaskMetrics;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.function.IntSupplier;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -37,7 +40,8 @@ import org.springframework.stereotype.Component;
  * a one-hour initial delay.
  *
  * <p>Checks {@code krt.scwiki.scheduler-enabled}, then runs each sync in dependency order under the
- * {@link SyncCoordinator}; a failing step does not abort the others ({@link #runStep}).
+ * {@link SyncCoordinator}; a failing step does not abort the others ({@link #attempt}), and a sweep
+ * that leaves a slice incomplete fails naming each such slice and its outcome.
  */
 @Slf4j
 @Component
@@ -105,27 +109,59 @@ public class ScWikiScheduler {
 
   private int runAllSyncSteps(String version) {
     try {
-      SyncRunService.Result[] results = {
-        runStep(
-            "commodity", SyncAggregate.COMMODITY, version, commoditySyncService::syncCommodities),
-        runStep("vehicle", SyncAggregate.SHIP_TYPE, version, vehicleSyncService::syncVehicles),
-        runStep("item", SyncAggregate.GAME_ITEM, version, itemSyncService::syncItems),
-        runStep(
-            "blueprint", SyncAggregate.BLUEPRINT, version, blueprintSyncService::syncBlueprints),
-        runStep(
-            "manufacturer",
-            SyncAggregate.MANUFACTURER,
-            version,
-            manufacturerSyncService::syncManufacturers)
-      };
-      if (java.util.Arrays.stream(results).anyMatch(result -> !result.complete())) {
+      Map<SyncAggregate, SyncRunService.Result> results = new EnumMap<>(SyncAggregate.class);
+      runStep(
+          results,
+          "commodity",
+          SyncAggregate.COMMODITY,
+          version,
+          commoditySyncService::syncCommodities);
+      runStep(
+          results, "vehicle", SyncAggregate.SHIP_TYPE, version, vehicleSyncService::syncVehicles);
+      runStep(results, "item", SyncAggregate.GAME_ITEM, version, itemSyncService::syncItems);
+      runStep(
+          results,
+          "blueprint",
+          SyncAggregate.BLUEPRINT,
+          version,
+          blueprintSyncService::syncBlueprints);
+      runStep(
+          results,
+          "manufacturer",
+          SyncAggregate.MANUFACTURER,
+          version,
+          manufacturerSyncService::syncManufacturers);
+      String incomplete =
+          results.entrySet().stream()
+              .filter(entry -> !entry.getValue().complete())
+              .map(entry -> entry.getKey() + "=" + entry.getValue().status())
+              .collect(Collectors.joining(", "));
+      if (!incomplete.isEmpty()) {
         throw new IllegalStateException(
-            "SC Wiki sync did not completely apply every catalogue slice");
+            "SC Wiki sync did not completely apply every catalogue slice: " + incomplete);
       }
-      return java.util.Arrays.stream(results).mapToInt(SyncRunService.Result::count).sum();
+      return results.values().stream().mapToInt(SyncRunService.Result::count).sum();
     } finally {
       masterDataCacheEvictionService.evictScWikiSyncedMasterData();
     }
+  }
+
+  /**
+   * Runs one sync step and records its outcome under its slice.
+   *
+   * @param results the outcomes of this sweep, by slice
+   * @param label short name of the step for the error log line
+   * @param aggregate independently applied catalogue slice
+   * @param version frozen upstream build
+   * @param step the sync invocation, returning the number of rows it wrote
+   */
+  private void runStep(
+      Map<SyncAggregate, SyncRunService.Result> results,
+      String label,
+      SyncAggregate aggregate,
+      String version,
+      IntSupplier step) {
+    results.put(aggregate, attempt(label, aggregate, version, step));
   }
 
   /**
@@ -137,7 +173,7 @@ public class ScWikiScheduler {
    * @param step the sync invocation, returning the number of rows it wrote
    * @return durable outcome, or a failed outcome when the step threw
    */
-  private SyncRunService.Result runStep(
+  private SyncRunService.Result attempt(
       String label, SyncAggregate aggregate, String version, IntSupplier step) {
     boolean enabled =
         switch (aggregate) {

@@ -1,9 +1,11 @@
 # ADR-0051 — Deny a colliding Discord first-login via a fail-open backend account-existence precheck
 
-- **Status:** Accepted
+- **Status:** Accepted — amended 2026-11-13 (in production the SPI trusts the CA-only internal
+  truststore that the generated keycloak unit mounts, replacing the hand-built store and its
+  drop-in) — see the amendment below
 - **Date:** 2026-06-29
 - **Deciders:** @greluc
-- **Related:** spec REQ-SEC-022 · REQ-DATA-006 · REQ-SEC-016/017 · ADR-0030 · ADR-0036 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
+- **Related:** spec REQ-SEC-022 · REQ-DATA-006 · REQ-SEC-016/017 · REQ-SEC-070 · REQ-OBS-014 · ADR-0030 · ADR-0036 · ADR-0211 · runbook `docs/keycloak/DISCORD_KEYCLOAK_SETUP.md`
 
 ## Context
 
@@ -80,3 +82,61 @@ certificate validation, so a trust failure simply fails open rather than connect
   (which REQ-DATA-006 forbids) and knows nothing about the Discord per-guild server nickname.
 - **Plain HTTP or a trust-all `SSLContext`** for the backend call — rejected outright: HTTPS only, and
   certificate validation is never disabled; an untrusted cert fails open instead.
+
+## Amendment — 2026-11-13: the SPI trusts the internal truststore the keycloak unit mounts
+
+**Context.** The decision left the truststore to the operator: a dedicated PKCS#12 store, named by
+`KRT_BACKEND_TRUSTSTORE_PATH` / `KRT_BACKEND_TRUSTSTORE_PASSWORD` in the host `basetool.env` and
+mounted by hand. On production that was a hand-built `/etc/basetool/secrets/backend-truststore.p12`,
+mounted by a hand-installed Quadlet drop-in `keycloak.container.d/50-backend-truststore.conf`. The
+drop-in disappeared — its whole directory with it — and nothing noticed: Keycloak logged `Failed to
+load the backend truststore` (`NoSuchFileException: /run/secrets/backend-truststore.p12`) at every
+start and the precheck failed open, the state the internal-TLS rollout had already found and fixed
+once on 2026-09-25. A file outside the release and outside the backup is not guaranteed to stay, and
+a fail-open check causes no outage by which its loss would be noticed. Since ADR-0211 the backend
+serves a leaf of the internal CA, and backend, frontend and ingest already pin a CA-only truststore
+for exactly that leaf.
+
+**Decision** (@greluc, 2026-11-13):
+
+1. In production the SPI trusts the backend through the **CA-only internal truststore**
+   (`scripts/mint-internal-tls.sh`, alias `ca`; REQ-SEC-070), not through a store of its own.
+2. The prod `keycloak` service in `docker-compose.yml` mounts it read-only at
+   `/run/secrets/internal-truststore.p12` from `BASETOOL_INTERNAL_TRUSTSTORE_HOST_PATH`, which the
+   generated Quadlet unit bakes to `/etc/basetool/secrets/tls/truststore.p12`. The same service
+   fixes `KRT_BACKEND_TRUSTSTORE_PATH` to that path and `KRT_BACKEND_TRUSTSTORE_PASSWORD` to the
+   expression the three apps use for the store (`INTERNAL_TLS_TRUSTSTORE_PASSWORD`, else
+   `SERVER_SSL_KEY_STORE_PASSWORD`). The host `basetool.env` no longer chooses either, and the
+   variable and the mount target live in one file. `scripts/generate-quadlet.test.sh` asserts the
+   generated mount and both values. `keycloak-dev` keeps the precheck unconfigured.
+3. The hand-built store, its drop-in and the two `basetool.env` lines are obsolete; removing them is
+   a one-time, owner-approved host cleanup (`docs/deployment.md` → *One-time cleanup*).
+4. The Loki alert **`KeycloakBackendTruststoreUnreadable`** (warning) fires on the SPI's `Failed to
+   load the backend truststore` line for 30 minutes after a Keycloak start that could not read the
+   store, and **`KeycloakAccountExistenceProbeFailing`** (warning) fires for an hour on the
+   per-login `Account-existence probe could not reach the backend` line, which a store that loads
+   but does not trust the backend writes (production logged it with `PKIX path building failed` on
+   2026-11-12). `scripts/check-loki-rule-signatures.py` holds both to verbatim production lines
+   (REQ-OBS-014).
+
+**Consequences.**
+
+- The precheck's trust follows every internal-TLS re-mint with no step of its own. The deploy's
+  mount pre-flight already requires the file, because the apps mount it, so no new host file becomes
+  mandatory; the file is in the backup with `/etc/basetool/secrets/tls`.
+- The SPI trusts any leaf of the internal CA rather than one pinned certificate. The JDK HTTP
+  client checks the name it dials (`backend`), which only the backend's leaf carries (ADR-0211).
+- Deploying the change restarts keycloak, and with it the application (`Requires=`). A rollback to a
+  release from before it runs the precheck without a truststore once the cleanup has run: it fails
+  open until the release is replaced.
+- A store that loads but does not trust the backend still shows only as the per-login
+  `Account-existence probe could not reach the backend` `WARN`; the alert covers the unreadable
+  store, the failure that happened twice.
+
+**Considered and not taken.**
+
+- **Keep a separate store, with its drop-in installed by the Ansible role.** It would survive a
+  host rebuild, but it is still a second store holding the same CA, with a password of its own and
+  a re-mint step of its own.
+- **Pin the backend's leaf instead of the CA.** Every re-mint replaces the leaf, and no other
+  internal client pins a leaf; the CA is the anchor ADR-0211 decided on.

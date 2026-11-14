@@ -958,6 +958,8 @@ assert_eq "$(query "$state" "scope_names('optional', 'basetool-sc-extractor')")"
   "the extractor may request nothing but its exchange scopes and offline_access"
 assert_eq "$(query "$state" "[d['realm'].get(k) for k in ('oauth2DeviceCodeLifespan', 'oauth2DevicePollingInterval', 'loginTheme')]")" \
   "[600, 5, 'krt-theme']" "the device code lifespan, polling interval and login theme are pinned"
+assert_eq "$(query "$state" "[d['realm'].get(k) for k in ('webAuthnPolicyPasswordlessRequireResidentKey', 'webAuthnPolicyPasswordlessResidentKey')]")" \
+  "['not specified', 'required']" "the passkey policy states residentKey alone, not the deprecated requireResidentKey"
 output="$(run_provisioner "$state" --apply)"
 assert_contains "$output" "No changes" "a second run changes nothing"
 rm -rf "$state"

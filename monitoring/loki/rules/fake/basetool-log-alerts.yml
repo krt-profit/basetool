@@ -49,6 +49,24 @@ groups:
           summary: "Keycloak ERROR-level log rate elevated"
           description: "Keycloak is logging ERRORs at an elevated rate — check the Discord SPI fail-open precheck path in particular."
 
+      - alert: KeycloakBackendTruststoreUnreadable
+        expr: 'sum(count_over_time({app="keycloak"} |= "Failed to load the backend truststore" [30m])) > 0'
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Keycloak could not load the backend truststore; the Discord account-existence precheck fails open"
+          description: "The Keycloak SPI logged at start that it cannot read KRT_BACKEND_TRUSTSTORE_PATH, so every first-login account-existence precheck fails its TLS handshake and lets the login through (REQ-SEC-022). The line is written once per Keycloak start, so the alert fires for 30 minutes after such a start. Check that keycloak.container mounts /etc/basetool/secrets/tls/truststore.p12 at /run/secrets/internal-truststore.p12 and that the file exists and opens with INTERNAL_TLS_TRUSTSTORE_PASSWORD (else SERVER_SSL_KEY_STORE_PASSWORD), then restart keycloak."
+
+      - alert: KeycloakAccountExistenceProbeFailing
+        expr: 'sum(count_over_time({app="keycloak"} |= "Account-existence probe could not reach the backend" [1h])) > 0'
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Keycloak's Discord account-existence precheck could not reach the backend; it failed open"
+          description: "A Discord first login ran the account-existence precheck and could not complete it (the line names the cause, e.g. SSLHandshakeException / PKIX path building failed, a timeout or a refused connection), so the login went through unchecked (REQ-SEC-022). A PKIX failure means the truststore loaded but does not trust the backend's leaf: compare /etc/basetool/secrets/tls/truststore.p12 with the CA that signed backend.p12. A timeout or refusal during a backend restart is transient."
+
       - alert: FrontendKeycloakBackchannelFailing
         expr: 'sum(count_over_time({app="frontend"} |~ "PrematureCloseException" != "R:backend" != "//backend:" [10m])) > 10'
         for: 5m

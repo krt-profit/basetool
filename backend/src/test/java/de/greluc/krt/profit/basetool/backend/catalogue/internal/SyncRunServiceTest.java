@@ -28,6 +28,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
@@ -47,6 +51,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 /** Verifies durable attempt lifecycle, nested counts and failure classification. */
 @ExtendWith(MockitoExtension.class)
@@ -113,6 +118,47 @@ class SyncRunServiceTest {
             "applied=3",
             "failed=1",
             "sweep=SKIPPED");
+  }
+
+  @Test
+  void partialAttempt_logsTheCountersThatMadeItPartial() {
+    Logger serviceLog = (Logger) LoggerFactory.getLogger(SyncRunService.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    serviceLog.addAppender(appender);
+    try {
+      service.run(
+          SyncSourceSystem.SCWIKI,
+          SyncAggregate.SHIP_TYPE,
+          "4.10.2-LIVE",
+          () -> {
+            progress.fetched(311, 311, true);
+            progress.applied(310);
+            progress.invalidateCensus();
+            progress.sweep(false);
+            return 310;
+          });
+      service.run(
+          SyncSourceSystem.SCWIKI,
+          SyncAggregate.COMMODITY,
+          "4.10.2-LIVE",
+          () -> {
+            progress.fetched(2, 2, true);
+            progress.applied(2);
+            progress.sweep(true);
+            return 2;
+          });
+    } finally {
+      serviceLog.detachAppender(appender);
+    }
+
+    assertThat(appender.list)
+        .filteredOn(event -> event.getLevel() == Level.WARN)
+        .singleElement()
+        .extracting(ILoggingEvent::getFormattedMessage)
+        .isEqualTo(
+            "Catalogue attempt SCWIKI SHIP_TYPE applied partially: fetched=311, valid=311,"
+                + " applied=310, skipped=0, failed=0, censusComplete=false, sweep=SKIPPED");
   }
 
   @Test

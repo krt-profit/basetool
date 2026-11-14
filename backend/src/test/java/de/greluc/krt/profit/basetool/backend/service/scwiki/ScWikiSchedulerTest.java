@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.service.scwiki;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,6 +28,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.MasterDataCacheEvictionService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiBlueprintSyncService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiClient;
@@ -36,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiManufactur
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiProperties;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiScheduler;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ScWikiVehicleSyncService;
+import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncAggregate;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncCoordinator;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunService;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.SyncRunStatus;
@@ -50,6 +56,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 /** Unit tests for {@link ScWikiScheduler} — master-switch gating and cross-scheduler exclusion. */
 @ExtendWith(MockitoExtension.class)
@@ -190,6 +197,31 @@ class ScWikiSchedulerTest {
             .counter()
             .count(),
         "a failing catalogue slice must fail the umbrella sync outcome");
+  }
+
+  @Test
+  void schedule_namesEachIncompleteSlice_whenASliceAppliesPartially() {
+    when(properties.schedulerEnabled()).thenReturn(true);
+    doReturn(new SyncRunService.Result(0, SyncRunStatus.PARTIAL))
+        .when(syncRuns)
+        .run(any(), eq(SyncAggregate.SHIP_TYPE), any(), any());
+    Logger taskLog = (Logger) LoggerFactory.getLogger(TaskMetrics.class);
+    ListAppender<ILoggingEvent> appender = new ListAppender<>();
+    appender.start();
+    taskLog.addAppender(appender);
+    try {
+      scheduler.scheduleScWikiSync();
+    } finally {
+      taskLog.detachAppender(appender);
+    }
+
+    assertThat(appender.list)
+        .filteredOn(event -> event.getLevel() == Level.ERROR)
+        .singleElement()
+        .extracting(event -> event.getThrowableProxy().getMessage())
+        .isEqualTo(
+            "SC Wiki sync did not completely apply every catalogue slice: SHIP_TYPE=PARTIAL");
+    verify(manufacturerSyncService).syncManufacturers();
   }
 
   @Test
