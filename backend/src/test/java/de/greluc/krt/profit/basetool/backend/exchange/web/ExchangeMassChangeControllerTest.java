@@ -40,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.RoleRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.kernel.StringNormalization;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.Timestamp;
@@ -198,6 +199,33 @@ class ExchangeMassChangeControllerTest {
                 Integer.class,
                 member))
         .isEqualTo(1);
+  }
+
+  @Test
+  void aChangeSetLongerThanTheFreeTextCapIsPreviewedAndApplied() throws Exception {
+    List<String> products = new ArrayList<>();
+    for (int i = 0; i < 130; i++) {
+      String key = product("Long Range Precision Rifle Mk " + i);
+      owns(key);
+      products.add(key);
+    }
+    String changeSet = removeAll(products);
+    assertThat(changeSet).hasSizeGreaterThan(StringNormalization.MAX_FREE_TEXT_LENGTH);
+    mockMvc
+        .perform(clientWrite("blueprints", changeSet.replace("]}", "],\"dryRun\":true}")))
+        .andExpect(status().isOk());
+
+    massChange("preview", staged("blueprints", changeSet))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.dryRun").value(true))
+        .andExpect(jsonPath("$.applied").value(130));
+    assertThat(owned()).hasSize(130);
+
+    massChange("confirm", staged("blueprints", changeSet))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.dryRun").value(false))
+        .andExpect(jsonPath("$.applied").value(130));
+    assertThat(owned()).isEmpty();
   }
 
   @Test
