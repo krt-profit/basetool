@@ -359,7 +359,7 @@ public class ExchangeShipWriteService
       return ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT);
     }
     if (op.version() == null || !op.version().equals(ship.getVersion())) {
-      return ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT);
+      return staleVersion(caller, ownedId);
     }
     String linked = links.externalOf(ownedId);
     if (linked != null && !linked.equals(externalId)) {
@@ -495,11 +495,29 @@ public class ExchangeShipWriteService
     }
     Ship ship = locked.get();
     UUID ownedId = Objects.requireNonNull(shipId);
-    if (touched.contains(ownedId) || !version.equals(ship.getVersion())) {
+    if (touched.contains(ownedId)) {
       return ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT);
+    }
+    if (!version.equals(ship.getVersion())) {
+      return staleVersion(caller, ownedId);
     }
     touched.add(ownedId);
     return ExchangeChangeSetAdapter.write(new Remove(ownedId, State.of(ship)));
+  }
+
+  /**
+   * Plans the refusal of an op that sent an older version of the member's ship, naming the patch
+   * change when the ship's latest change came from one (REQ-PATCH-053).
+   *
+   * @param caller the caller
+   * @param shipId the ship
+   * @return the plan
+   */
+  private @NotNull Planned<Change> staleVersion(
+      @NotNull ExchangeCaller caller, @NotNull UUID shipId) {
+    return ExchangeChangeSetAdapter.versionConflict(
+        patchRemovals.latestPatchChangeOf(
+            caller.member(), ExchangeFeedResource.SHIP, shipId.toString()));
   }
 
   /**

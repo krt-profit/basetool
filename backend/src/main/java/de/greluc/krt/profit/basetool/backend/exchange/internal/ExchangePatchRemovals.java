@@ -30,7 +30,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Names the patch change behind a feed entry's change, for the {@code REMOVED_ELSEWHERE} refusal of
- * a push against a lot or ship a patch change moved or wiped (REQ-PATCH-053).
+ * a push against a lot or ship a patch change moved or wiped, and for the {@code VERSION_CONFLICT}
+ * of a push that did not see such a change yet (REQ-PATCH-053).
  */
 @Component
 @RequiredArgsConstructor
@@ -40,6 +41,25 @@ class ExchangePatchRemovals {
   private static final String PATCH_CHANNEL = "patch";
 
   private final PatchChangeLabels patchChangeLabels;
+  private final ExchangeChangeRepository changeRepository;
+
+  /**
+   * Names the patch change behind an entry's latest change in the member's feed.
+   *
+   * @param member the member whose feed holds the entry
+   * @param resource the entry's resource
+   * @param key the entry's key
+   * @return the patch change with its current label, or {@code null} when the latest change came
+   *     from another channel or the feed holds none
+   */
+  @Nullable
+  ExchangePatchChangeRefDto latestPatchChangeOf(
+      @NotNull UUID member, @NotNull ExchangeFeedResource resource, @NotNull String key) {
+    return changeRepository
+        .findLatestForKey(member, resource.name(), key)
+        .map(this::patchChangeOf)
+        .orElse(null);
+  }
 
   /**
    * Names the patch change that made a change.

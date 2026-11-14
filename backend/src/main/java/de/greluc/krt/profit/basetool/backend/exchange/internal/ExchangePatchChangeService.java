@@ -69,7 +69,7 @@ public class ExchangePatchChangeService {
     return new ExchangePatchChangeDto(
         view.current() == null ? null : current(view.current()),
         new ExchangePatchChangeDto.HomeLocation(
-            prompt.state(),
+            prompt.state().name(),
             prompt.patchChangeId() == null || prompt.label() == null
                 ? null
                 : new ExchangePatchChangeRefDto(prompt.patchChangeId(), prompt.label()),
@@ -111,25 +111,26 @@ public class ExchangePatchChangeService {
     return new ExchangePatchChangeDto.Current(
         current.id(),
         current.label(),
-        current.kind(),
+        current.kind().name(),
         current.liveAt(),
         new ExchangePatchChangeDto.Options(
             current.wipeGroups().stream()
                 .map(group ->
                     new ExchangePatchChangeDto.GroupEntry(
-                        group.group(),
+                        group.group().name(),
                         group.selected(),
                         group.types().stream()
                             .map(type ->
-                                new ExchangePatchChangeDto.TypeKey(type.source(), type.value()))
+                                new ExchangePatchChangeDto.TypeKey(
+                                    type.source().name(), type.value()))
                             .toList()))
                 .toList(),
             current.wipeExceptions().stream()
                 .map(exception ->
                     new ExchangePatchChangeDto.ExceptionEntry(
                         new ExchangeItemRefDto(exception.id().toString(), exception.name()),
-                        exception.target(),
-                        exception.mode()))
+                        exception.target().name(),
+                        exception.mode().name()))
                 .toList(),
             current.cancelRefineryOrders(),
             current.currencyWipe(),

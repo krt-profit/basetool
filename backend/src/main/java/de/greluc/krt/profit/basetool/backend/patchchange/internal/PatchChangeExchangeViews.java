@@ -21,10 +21,10 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeExchangeReader;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeExchangeView;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -63,7 +63,7 @@ class PatchChangeExchangeViews implements PatchChangeExchangeReader {
     return new PatchChangeExchangeView.Current(
         record.getId(),
         record.getLabel(),
-        record.getKind().name(),
+        record.getKind(),
         record.getLiveAt(),
         Arrays.stream(WipeGroup.values())
             .map(group -> wipeGroup(group, options.wipeGroups().contains(group)))
@@ -83,16 +83,12 @@ class PatchChangeExchangeViews implements PatchChangeExchangeReader {
    */
   private static @NotNull PatchChangeExchangeView.GroupEntry wipeGroup(
       @NotNull WipeGroup group, boolean selected) {
-    return new PatchChangeExchangeView.GroupEntry(
-        group.name(),
-        selected,
-        WipeGroupTypes.typesOf(group).stream()
-            .map(type -> new PatchChangeExchangeView.TypeKey(type.source().name(), type.value()))
-            .toList());
+    return new PatchChangeExchangeView.GroupEntry(group, selected, WipeGroupTypes.typesOf(group));
   }
 
   /**
-   * Names the exceptions whose catalogue entry still exists, ordered by name.
+   * Names every exception as stored, ordered by name; an exception whose catalogue entry was
+   * deleted since keeps its stored key, comes last and carries no name.
    *
    * @param options the patch change's options
    * @return the exceptions
@@ -104,15 +100,13 @@ class PatchChangeExchangeViews implements PatchChangeExchangeReader {
     }
     WipeExceptionCatalogue.Names names = exceptionCatalogue.names(options.wipeExceptions());
     return options.wipeExceptions().stream()
-        .filter(exception -> names.of(exception) != null)
         .map(exception ->
             new PatchChangeExchangeView.ExceptionEntry(
-                exception.target().name(),
-                exception.id(),
-                Objects.requireNonNull(names.of(exception)),
-                exception.mode().name()))
+                exception.target(), exception.id(), names.of(exception), exception.mode()))
         .sorted(
-            Comparator.comparing(PatchChangeExchangeView.ExceptionEntry::name)
+            Comparator.comparing(
+                    PatchChangeExchangeView.ExceptionEntry::name,
+                    Comparator.nullsLast(Comparator.<String>naturalOrder()))
                 .thenComparing(PatchChangeExchangeView.ExceptionEntry::id))
         .toList();
   }
@@ -126,7 +120,7 @@ class PatchChangeExchangeViews implements PatchChangeExchangeReader {
   private static @NotNull PatchChangeExchangeView.HomeLocation homeLocation(
       @NotNull HomeLocationPromptDto prompt) {
     return new PatchChangeExchangeView.HomeLocation(
-        prompt.state().name(),
+        prompt.state(),
         prompt.patchChangeId(),
         prompt.label(),
         prompt.liveAt(),

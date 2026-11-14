@@ -20,17 +20,23 @@
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockWipeRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockWipeShare;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -43,17 +49,17 @@ import org.jetbrains.annotations.Unmodifiable;
  */
 final class WipeSelection {
 
-  /** The name the rows a wiping exception selects are counted under. */
-  static final String EXCEPTIONS = "WIPE_EXCEPTIONS";
-
   /** The rows of each stock group that no exception names. */
   private final Map<WipeGroup, Bucket> groups;
 
   /** The rows of each exception's entry. */
   private final Map<WipeException, Bucket> exceptions;
 
-  /** The rows the options wipe, under the name the Lager's summary event counts them by. */
-  private final Map<String, Set<UUID>> wiped;
+  /**
+   * The rows the options wipe, by the share the Lager's summary event counts them under: the
+   * groups in declaration order, the wiping exceptions last. Built once and never changed.
+   */
+  private final @Unmodifiable Map<StockWipeShare, Set<UUID>> wiped;
 
   /** The members who hold a wiped row. */
   private final Set<UUID> wipedHolders;
@@ -63,18 +69,34 @@ final class WipeSelection {
    *
    * @param groups the rows by stock group
    * @param exceptions the rows by exception
-   * @param wiped the wiped rows by name
+   * @param wiped the wiped rows by share, copied in the shares' order
    * @param wipedHolders the holders of the wiped rows
    */
   private WipeSelection(
       @NotNull Map<WipeGroup, Bucket> groups,
       @NotNull Map<WipeException, Bucket> exceptions,
-      @NotNull Map<String, Set<UUID>> wiped,
+      @NotNull Map<StockWipeShare, Set<UUID>> wiped,
       @NotNull Set<UUID> wipedHolders) {
     this.groups = groups;
     this.exceptions = exceptions;
-    this.wiped = wiped;
+    this.wiped = ordered(wiped);
     this.wipedHolders = wipedHolders;
+  }
+
+  /**
+   * Copies the wiped rows into a map no one else holds, in the shares' order, each set copied too.
+   *
+   * @param wiped the wiped rows by share
+   * @return the unmodifiable copy
+   */
+  private static @NotNull @Unmodifiable Map<StockWipeShare, Set<UUID>> ordered(
+      @NotNull Map<StockWipeShare, Set<UUID>> wiped) {
+    Map<StockWipeShare, Set<UUID>> copy = new LinkedHashMap<>();
+    Stream.<StockWipeShare>concat(
+            Arrays.stream(WipeGroup.values()), Stream.of(WipeExceptionShare.WIPE_EXCEPTIONS))
+        .filter(wiped::containsKey)
+        .forEach(share -> copy.put(share, Set.copyOf(wiped.get(share))));
+    return Collections.unmodifiableMap(copy);
   }
 
   /**
@@ -94,24 +116,24 @@ final class WipeSelection {
                 new CatalogueEntry(exception.target(), exception.id()), exception));
     Map<WipeGroup, Bucket> groups = new EnumMap<>(WipeGroup.class);
     Map<WipeException, Bucket> exceptions = new HashMap<>();
-    Map<String, Set<UUID>> wiped = new LinkedHashMap<>();
+    Map<StockWipeShare, Set<UUID>> wiped = new HashMap<>();
     Set<UUID> wipedHolders = new HashSet<>();
     for (StockWipeRow row : rows) {
       WipeException exception = exceptionByEntry.get(CatalogueEntry.of(row));
       boolean wipes;
-      String name;
+      StockWipeShare share;
       if (exception != null) {
         exceptions.computeIfAbsent(exception, _ -> new Bucket()).add(row);
         wipes = exception.mode() == WipeExceptionMode.WIPE;
-        name = EXCEPTIONS;
+        share = WipeExceptionShare.WIPE_EXCEPTIONS;
       } else {
         WipeGroup group = WipeGroupTypes.groupOf(row);
         groups.computeIfAbsent(group, _ -> new Bucket()).add(row);
         wipes = options.wipeGroups().contains(group);
-        name = group.name();
+        share = group;
       }
       if (wipes) {
-        wiped.computeIfAbsent(name, _ -> new LinkedHashSet<>()).add(row.id());
+        wiped.computeIfAbsent(share, _ -> new HashSet<>()).add(row.id());
         wipedHolders.add(row.holderId());
       }
     }
@@ -126,21 +148,22 @@ final class WipeSelection {
   @NotNull
   @Unmodifiable
   Set<UUID> wipedRowIds() {
-    Set<UUID> ids = new LinkedHashSet<>();
-    wiped.values().forEach(ids::addAll);
-    return Collections.unmodifiableSet(ids);
+    return wiped.values().stream()
+        .flatMap(Set::stream)
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   /**
-   * Returns the wiped rows under the names the Lager's summary event counts them by: a group's
-   * name, or {@link #EXCEPTIONS}.
+   * Returns the wiped rows by the share the Lager's summary event counts them under: their stock
+   * group, or {@link WipeExceptionShare#WIPE_EXCEPTIONS}; the groups in declaration order, the
+   * exceptions last.
    *
-   * @return the wiped rows by name
+   * @return the wiped rows by share
    */
   @NotNull
   @Unmodifiable
-  Map<String, Set<UUID>> wipedRowsByGroup() {
-    return Collections.unmodifiableMap(wiped);
+  Map<StockWipeShare, Set<UUID>> wipedRowsByShare() {
+    return wiped;
   }
 
   /**

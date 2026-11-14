@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;

@@ -44,11 +44,11 @@ import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeWrites;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeDto;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeOptions;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeTrigger;
-import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchKind;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.TriggerPatchChangeRequest;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.WipeException;
-import de.greluc.krt.profit.basetool.backend.patchchange.internal.WipeExceptionMode;
-import de.greluc.krt.profit.basetool.backend.patchchange.internal.WipeExceptionTarget;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.Timestamp;
@@ -268,6 +268,22 @@ class ExchangePatchChangeControllerTest {
   }
 
   @Test
+  void anExceptionWhoseCatalogueEntryWasDeletedStaysInTheReadByItsStoredKey() throws Exception {
+    trigger();
+    jdbc.update("DELETE FROM material WHERE id = ?", material);
+
+    mockMvc
+        .perform(relayed(get(PATH), READ))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.patchChange.options.wipeExceptions.length()").value(1))
+        .andExpect(
+            jsonPath("$.patchChange.options.wipeExceptions[0].entry.bt").value(material.toString()))
+        .andExpect(jsonPath("$.patchChange.options.wipeExceptions[0].entry.name").doesNotExist())
+        .andExpect(jsonPath("$.patchChange.options.wipeExceptions[0].target").value("MATERIAL"))
+        .andExpect(jsonPath("$.patchChange.options.wipeExceptions[0].mode").value("KEEP"));
+  }
+
+  @Test
   void theChoiceRelocatesTheMemberOnceAsTheClient() throws Exception {
     UUID own = row(port, null);
     PatchChangeDto recorded = trigger();
@@ -367,6 +383,65 @@ class ExchangePatchChangeControllerTest {
         .andExpect(jsonPath("$.results[0].reason").value("REMOVED_ELSEWHERE"))
         .andExpect(jsonPath("$.results[0].patchChange.id").value(recorded.id().toString()))
         .andExpect(jsonPath("$.results[0].patchChange.label").value("0.1"));
+  }
+
+  @Test
+  void aStalePushAgainstALotThePatchChangePartlyMovedIsAVersionConflictNamingIt()
+      throws Exception {
+    row(port, null);
+    row(port, null, Instant.now());
+    PatchChangeDto recorded = trigger();
+    choose(home).andExpect(status().isOk());
+
+    mockMvc
+        .perform(
+            relayed(post("/api/v1/exchange/me/stock/changes"), "exchange.stock.write")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"ops":[{"op":"set-quantity","material":{"bt":"%s"},
+                             "location":{"name":"%s"},"quality":500,"stolen":false,
+                             "quantity":{"amount":3,"unit":"SCU"},
+                             "expectedQuantity":{"amount":2,"unit":"SCU"}}]}
+                    """
+                        .formatted(material, nameOf(port))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.applied").value(0))
+        .andExpect(jsonPath("$.results[0].result").value("rejected"))
+        .andExpect(jsonPath("$.results[0].reason").value("VERSION_CONFLICT"))
+        .andExpect(jsonPath("$.results[0].patchChange.id").value(recorded.id().toString()))
+        .andExpect(jsonPath("$.results[0].patchChange.label").value("0.1"));
+  }
+
+  @Test
+  void aStaleUpsertOfAShipThePatchChangeMovedIsAVersionConflictNamingIt() throws Exception {
+    UUID ship = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO ship (id, version, name, ship_type_id, owner_id, insurance, location_id,"
+            + " created_at) VALUES (?, 0, 'Moved', ?, ?, 'LTI', ?, ?)",
+        ship,
+        shipType,
+        member,
+        port,
+        Timestamp.from(BEFORE));
+    PatchChangeDto recorded = trigger();
+    choose(home).andExpect(status().isOk()).andExpect(jsonPath("$.ships").value(1));
+
+    mockMvc
+        .perform(
+            relayed(post("/api/v1/exchange/me/ships/changes"), "exchange.hangar.write")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"ops":[{"op":"upsert","externalId":"vk-2","shipId":"%s","version":0,
+                             "shipType":{"bt":"%s"},"name":"Moved",
+                             "insurance":{"kind":"LTI"}}]}
+                    """
+                        .formatted(ship, shipType)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.results[0].result").value("rejected"))
+        .andExpect(jsonPath("$.results[0].reason").value("VERSION_CONFLICT"))
+        .andExpect(jsonPath("$.results[0].patchChange.id").value(recorded.id().toString()));
   }
 
   @Test
@@ -532,6 +607,19 @@ class ExchangePatchChangeControllerTest {
    * @return its id
    */
   private @NotNull UUID row(@NotNull UUID location, @Nullable UUID pool) {
+    return row(location, pool, BEFORE);
+  }
+
+  /**
+   * Inserts one of the member's stock rows of one SCU.
+   *
+   * @param location the location
+   * @param pool the org unit it is held for, or {@code null} for personal stock
+   * @param createdAt when the row was created
+   * @return its id
+   */
+  private @NotNull UUID row(
+      @NotNull UUID location, @Nullable UUID pool, @NotNull Instant createdAt) {
     UUID id = UUID.randomUUID();
     jdbc.update(
         """
@@ -545,7 +633,7 @@ class ExchangePatchChangeControllerTest {
         location,
         pool == null,
         pool,
-        Timestamp.from(BEFORE));
+        Timestamp.from(createdAt));
     return id;
   }
 }

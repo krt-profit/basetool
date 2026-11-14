@@ -17,13 +17,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.patchchange.internal;
+package de.greluc.krt.profit.basetool.backend.patchchange.api;
+
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockWipeShare;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * The fixed wipe groups a patch change can select (REQ-PATCH-002, REQ-PATCH-010): every group but
- * the in-game ships selects stock rows by the catalogue types {@link WipeGroupTypes} assigns it.
+ * the in-game ships selects stock rows by the catalogue types the module assigns it. A stock group
+ * is also the share its wiped rows are counted under in the Lager's summary event.
  */
-public enum WipeGroup {
+public enum WipeGroup implements StockWipeShare {
   /** Food, drinks, medpens and other FPS consumables, magazines and ammunition. */
   CONSUMABLES,
   /** Armour, weapons, clothing and the other weapon attachments. */
@@ -48,5 +52,15 @@ public enum WipeGroup {
    */
   public boolean selectsStock() {
     return this != IN_GAME_SHIPS;
+  }
+
+  /**
+   * Returns the group's name, the key the Lager's summary event counts its wiped rows under.
+   *
+   * @return the constant's name
+   */
+  @Override
+  public @NotNull String countKey() {
+    return name();
   }
 }

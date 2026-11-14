@@ -17,16 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.patchchange.internal;
+package de.greluc.krt.profit.basetool.backend.patchchange.api;
 
-/** Where a member stands in the latest home-location phase (REQ-PATCH-021, REQ-PATCH-022). */
-public enum MemberRelocationState {
-  /** No phase asked the member: none ever ran, or the account is younger than its live time. */
-  NOT_ASKED,
-  /** The phase is open and the member has not chosen. */
-  PENDING,
-  /** The member has chosen and relocated in the phase. */
-  RELOCATED,
-  /** An admin ended the phase before the member chose. */
-  PHASE_ENDED
+/**
+ * What a Star Citizen patch kept, which presets the options of its patch change (REQ-PATCH-002). A
+ * hotfix changes nothing and is never recorded.
+ */
+public enum PatchKind {
+  /** A long-term persistence rebuild: stored items, materials, aUEC and ships survive. */
+  REBUILD,
+  /** A full wipe: only pledged ships and blueprints survive. */
+  FULL_WIPE
 }

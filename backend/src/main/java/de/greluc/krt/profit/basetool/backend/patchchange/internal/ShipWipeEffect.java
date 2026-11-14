@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipPatchWipe;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;

@@ -19,6 +19,9 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import java.util.EnumSet;

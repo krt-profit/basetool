@@ -27,6 +27,7 @@ import de.greluc.krt.profit.basetool.backend.inventory.api.StockChangeReason;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockPatchWipe;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockWipeResult;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockWipeRow;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockWipeShare;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncPublisher;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopic;
 import de.greluc.krt.profit.basetool.backend.livesync.api.LiveSyncTopicClass;
@@ -88,12 +89,12 @@ public class InventoryPatchWipeService implements StockPatchWipe {
   @Override
   @Transactional(propagation = Propagation.MANDATORY)
   public @NotNull StockWipeResult wipe(
-      @NotNull Map<String, ? extends Collection<UUID>> rowsByGroup,
+      @NotNull Map<? extends StockWipeShare, ? extends Collection<UUID>> rowsByShare,
       @NotNull UUID patchChangeId,
       @NotNull String patchLabel) {
     return orderWrites.duringGameFactLoss(() -> {
       Set<UUID> ids = new LinkedHashSet<>();
-      rowsByGroup.values().forEach(ids::addAll);
+      rowsByShare.values().forEach(ids::addAll);
       orderWrites.assertRows(ids);
       Set<UUID> orders =
           new HashSet<>(InventoryOrderWrites.readBatches(ids, rows::findAllocatedOrderIds));
@@ -106,7 +107,7 @@ public class InventoryPatchWipeService implements StockPatchWipe {
               .with("members", holders)
               .with("jobOrders", orders.size())
               .with("patchChange", patchChangeId);
-      rowsByGroup.forEach((group, groupRows) -> details.with(group, groupRows.size()));
+      rowsByShare.forEach((share, shareRows) -> details.with(share.countKey(), shareRows.size()));
       auditRecorder.record(
           AuditEventType.INVENTORY_WIPED_BY_PATCH, patchChangeId, patchLabel, null, details);
       if (removed > 0) {
