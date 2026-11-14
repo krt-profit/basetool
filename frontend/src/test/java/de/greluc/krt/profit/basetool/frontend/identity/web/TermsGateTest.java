@@ -17,21 +17,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.kernel.security;
+package de.greluc.krt.profit.basetool.frontend.identity.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateFilter;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateHandoff;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import jakarta.servlet.FilterChain;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,21 +51,23 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
- * Behaviour of the frontend consent gate (REQ-SEC-028), including that it never blocks the terms,
- * privacy policy or imprint.
+ * Behaviour of the frontend consent gate (REQ-SEC-028) as the session-gate filter runs it,
+ * including that it never blocks the terms, privacy policy or imprint.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class TermsAcceptanceGateFilterTest {
+class TermsGateTest {
 
-  @Mock private BackendApiClient backendApiClient;
+  @Mock private IdentityBackendClient identityClient;
   @Mock private FilterChain filterChain;
 
-  private TermsAcceptanceGateFilter filter;
+  private TermsGate gate;
+  private SessionGateFilter filter;
 
   @BeforeEach
   void setUp() {
-    filter = new TermsAcceptanceGateFilter(backendApiClient, new MockEnvironment());
+    gate = new TermsGate(identityClient);
+    filter = new SessionGateFilter(new SessionGates(List.of(gate)), new MockEnvironment());
     SecurityContextHolder.getContext()
         .setAuthentication(
             new UsernamePasswordAuthenticationToken(
@@ -160,8 +165,7 @@ class TermsAcceptanceGateFilterTest {
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
 
-    verify(backendApiClient, org.mockito.Mockito.times(1))
-        .get(eq("/api/v1/terms/status"), eq(TermsStatusDto.class));
+    verify(identityClient, times(1)).termsStatus();
     verify(filterChain, never()).doFilter(any(), any());
   }
 
@@ -176,7 +180,7 @@ class TermsAcceptanceGateFilterTest {
     request.setSession(new org.springframework.mock.web.MockHttpSession());
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
 
-    TermsAcceptanceGateFilter.clearCachedVerdict(request);
+    gate.forget(request);
     stubStatus(true);
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
 
@@ -215,11 +219,11 @@ class TermsAcceptanceGateFilterTest {
     stubStatus(false);
 
     assertThat(invoke("/css/kernel/styles.css").getRedirectedUrl()).isNull();
-    verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));
+    verify(identityClient, never()).termsStatus();
   }
 
   /**
-   * Public documents skip the gate, sharing the {@code PublicPaths} list with {@link
+   * Public documents skip the gate, sharing the {@code PublicPaths} list with {@code
    * BackendRoleSyncFilter}.
    */
   @Test
@@ -229,7 +233,7 @@ class TermsAcceptanceGateFilterTest {
     for (String path : new String[] {"/robots.txt", "/manifest.webmanifest"}) {
       assertThat(invoke(path).getRedirectedUrl()).as(path).isNull();
     }
-    verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));
+    verify(identityClient, never()).termsStatus();
   }
 
   /** An anonymous visitor has no account to record consent against and is left alone. */
@@ -238,7 +242,7 @@ class TermsAcceptanceGateFilterTest {
     SecurityContextHolder.clearContext();
 
     assertThat(invoke("/missions").getRedirectedUrl()).isNull();
-    verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));
+    verify(identityClient, never()).termsStatus();
   }
 
   /**
@@ -248,7 +252,7 @@ class TermsAcceptanceGateFilterTest {
    */
   @Test
   void failsOpenWhenTheBackendIsUnreachable() throws Exception {
-    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+    when(identityClient.termsStatus())
         .thenThrow(new BackendServiceException("backend down", null, 503));
 
     assertThat(invoke("/missions").getRedirectedUrl()).isNull();
@@ -270,8 +274,8 @@ class TermsAcceptanceGateFilterTest {
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
 
-    verify(backendApiClient, times(1)).get(any(String.class), eq(TermsStatusDto.class));
-    assertThat(TermsAcceptanceGateFilter.RECHECK_MILLIS)
+    verify(identityClient, times(1)).termsStatus();
+    assertThat(TermsGate.RECHECK_MILLIS)
         .as("the cache must expire far inside the 30-day session lifetime")
         .isLessThan(java.time.Duration.ofHours(1).toMillis());
   }
@@ -288,10 +292,10 @@ class TermsAcceptanceGateFilterTest {
     request.setRequestURI("/missions");
     request.setSession(new org.springframework.mock.web.MockHttpSession());
 
-    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isFalse();
+    assertThat(gate.knownHolding(request)).isFalse();
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
 
-    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isTrue();
+    assertThat(gate.knownHolding(request)).isTrue();
   }
 
   /**
@@ -303,7 +307,7 @@ class TermsAcceptanceGateFilterTest {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
     request.setSession(new org.springframework.mock.web.MockHttpSession());
 
-    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isFalse();
+    assertThat(gate.knownHolding(request)).isFalse();
   }
 
   /** Recording consent discards the verdict at once, rather than leaving it stale until it ages. */
@@ -314,11 +318,11 @@ class TermsAcceptanceGateFilterTest {
     request.setRequestURI("/missions");
     request.setSession(new org.springframework.mock.web.MockHttpSession());
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
-    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isTrue();
+    assertThat(gate.knownHolding(request)).isTrue();
 
-    TermsAcceptanceGateFilter.clearCachedVerdict(request);
+    gate.forget(request);
 
-    assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isFalse();
+    assertThat(gate.knownHolding(request)).isFalse();
   }
 
   /** A WebSocket handshake is let through and marked, never redirected. */
@@ -379,8 +383,7 @@ class TermsAcceptanceGateFilterTest {
 
   /** Stubs the backend consent status. */
   private void stubStatus(boolean accepted) {
-    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
-        .thenReturn(new TermsStatusDto(accepted, "v1"));
+    when(identityClient.termsStatus()).thenReturn(new TermsStatusDto(accepted, "v1"));
   }
 
   /**
@@ -389,7 +392,7 @@ class TermsAcceptanceGateFilterTest {
    */
   @Test
   void redirectsToTheLoginWhenTheTokenCannotBeRefreshed() throws Exception {
-    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+    when(identityClient.termsStatus())
         .thenThrow(new ReauthenticationRequiredException("token gone", null));
 
     MockHttpServletResponse response = invoke("/missions");
@@ -405,7 +408,7 @@ class TermsAcceptanceGateFilterTest {
    */
   @Test
   void signalsReauthenticationToAnAjaxCallerInsteadOfRedirecting() throws Exception {
-    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+    when(identityClient.termsStatus())
         .thenThrow(new ReauthenticationRequiredException("token gone", null));
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/missions/x/ajax");
     request.setRequestURI("/missions/x/ajax");
@@ -427,7 +430,7 @@ class TermsAcceptanceGateFilterTest {
    */
   @Test
   void handsTheSseStreamOffToTheLoginWhenTheTokenCannotBeRefreshed() throws Exception {
-    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+    when(identityClient.termsStatus())
         .thenThrow(new ReauthenticationRequiredException("token gone", null));
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/notifications/stream");
     request.setRequestURI("/notifications/stream");
@@ -447,7 +450,7 @@ class TermsAcceptanceGateFilterTest {
   /** An exempt path is decided by the path alone, before any consent read or token refresh. */
   @Test
   void anExemptPathPassesWithoutAskingTheBackendEvenWhenTheTokenIsGone() throws Exception {
-    when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
+    when(identityClient.termsStatus())
         .thenThrow(new ReauthenticationRequiredException("token gone", null));
 
     for (String path :
@@ -457,7 +460,7 @@ class TermsAcceptanceGateFilterTest {
       assertThat(response.getStatus()).as(path).isEqualTo(200);
     }
     verify(filterChain, times(4)).doFilter(any(), any());
-    verify(backendApiClient, never()).get(any(String.class), eq(TermsStatusDto.class));
+    verify(identityClient, never()).termsStatus();
   }
 
   /**

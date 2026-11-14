@@ -342,13 +342,7 @@ public class InventoryAggregationService {
             filter.nonStolenOnly());
 
     LowStockSubjects low = stockLevelService.lowSubjects();
-    Set<UUID> pending =
-        relocationMarks.pendingHolders(
-            stacks.stream()
-                .map(InventoryStackAggregate::user)
-                .filter(Objects::nonNull)
-                .map(User::getId)
-                .toList());
+    Set<UUID> pending = relocationMarks.pendingHoldersOf(stacks, InventoryStackAggregate::user);
     return buildGroupedFromStacks(stacks, pending).stream()
         .map(group ->
             group.withLowStock(
@@ -508,13 +502,7 @@ public class InventoryAggregationService {
             attributes.hasItemClasses(),
             attributes.itemClassesOrNull());
     LowStockSubjects low = stockLevelService.lowSubjects();
-    Set<UUID> pending =
-        relocationMarks.pendingHolders(
-            stacks.stream()
-                .map(InventoryItemStackAggregate::user)
-                .filter(Objects::nonNull)
-                .map(User::getId)
-                .toList());
+    Set<UUID> pending = relocationMarks.pendingHoldersOf(stacks, InventoryItemStackAggregate::user);
     return buildGroupedFromItemStacks(stacks, pending).stream()
         .map(group ->
             group.withLowStock(

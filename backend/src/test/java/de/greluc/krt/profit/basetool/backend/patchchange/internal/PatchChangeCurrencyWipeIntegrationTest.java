@@ -41,6 +41,7 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.ProfitHierarchyFixtures;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import java.sql.Timestamp;
 import java.time.Instant;

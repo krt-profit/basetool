@@ -33,9 +33,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Carries a session gate's verdict across a WebSocket handshake from the servlet filter to the
- * handshake interceptor: the consent gate's (REQ-SEC-028) or the home-location gate's
- * (REQ-PATCH-020), REQ-FE-015.
+ * Hands a request a {@link SessionGate} holds off to the gate's page, and carries the verdict
+ * across a WebSocket handshake from the servlet filter to the handshake interceptor (REQ-SEC-028,
+ * REQ-PATCH-020, REQ-FE-015).
  *
  * <p>The gate lets the upgrade through and marks it, because a refused upgrade looks like a dropped
  * connection and causes endless reconnects; the socket is then closed with a terminal code that
@@ -47,7 +47,7 @@ public final class SessionGateHandoff {
    * Request attribute holding the gate page's URL on a marked handshake. Namespaced like the gates'
    * session attributes; never set for any other kind of request.
    */
-  private static final String REQUEST_ATTRIBUTE = "krt.terms.gate.websocket";
+  private static final String REQUEST_ATTRIBUTE = "krt.sessionGate.websocket";
 
   private SessionGateHandoff() {}
 
@@ -59,7 +59,7 @@ public final class SessionGateHandoff {
    * @param request the held request
    * @param response its response
    * @param chain the rest of the filter chain, which only a marked WebSocket upgrade continues
-   * @param gate the gate's page and the signals that name it
+   * @param gate the gate that holds the request
    * @throws IOException if writing the response fails
    * @throws ServletException if the rest of the chain fails
    */
@@ -67,23 +67,36 @@ public final class SessionGateHandoff {
       @NotNull HttpServletRequest request,
       @NotNull HttpServletResponse response,
       @NotNull FilterChain chain,
-      @NotNull Gate gate)
+      @NotNull SessionGate gate)
       throws IOException, ServletException {
+    String url = pageUrl(request, gate);
     if (isEventStream(request)) {
-      writeOneShotEvent(response, gate.sseEvent(), gate.url());
+      writeOneShotEvent(response, gate.sseEvent(), url);
       return;
     }
     if (isAjax(request)) {
       response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-      response.setHeader(gate.ajaxHeader(), gate.url());
+      response.setHeader(gate.ajaxHeader(), url);
       return;
     }
     if (isWebSocketUpgrade(request)) {
-      mark(request, gate.url());
+      mark(request, url);
       chain.doFilter(request, response);
       return;
     }
-    response.sendRedirect(gate.url());
+    response.sendRedirect(url);
+  }
+
+  /**
+   * Builds the URL of a gate's page the browser is sent to.
+   *
+   * @param request the current request, whose context path the URL starts with
+   * @param gate the gate
+   * @return the context path followed by the gate's page path
+   */
+  public static @NotNull String pageUrl(
+      @NotNull HttpServletRequest request, @NotNull SessionGate gate) {
+    return request.getContextPath() + gate.pagePath();
   }
 
   /**
@@ -109,13 +122,4 @@ public final class SessionGateHandoff {
         ? url
         : null;
   }
-
-  /**
-   * A gate's page and the signals that name it to a held request.
-   *
-   * @param url the context-relative URL of the gate's page
-   * @param sseEvent the name of the one-shot event an {@code EventSource} gets
-   * @param ajaxHeader the response header an AJAX caller gets
-   */
-  record Gate(@NotNull String url, @NotNull String sseEvent, @NotNull String ajaxHeader) {}
 }

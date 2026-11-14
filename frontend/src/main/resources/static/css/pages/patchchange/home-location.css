@@ -72,6 +72,9 @@
         align-items: flex-start;
         gap: var(--space-3);
     }
+    .hl-confirm[hidden] {
+        display: none;
+    }
     .hl-confirm .form-hint {
         margin: 0;
     }

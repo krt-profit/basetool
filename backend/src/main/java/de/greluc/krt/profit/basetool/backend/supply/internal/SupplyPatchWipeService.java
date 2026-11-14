@@ -43,6 +43,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Withdraws the pledges on stock a game patch wiped (REQ-PATCH-013): each pledge is withdrawn as
@@ -92,12 +94,7 @@ public class SupplyPatchWipeService implements SupplyPatchWipe {
         null,
         AuditDetails.of("withdrawn", pledges.size()).with("patchChange", patchChangeId));
     if (!pledges.isEmpty()) {
-      meterRegistry
-          .counter(
-              SupplyMetricNames.SUPPLY_DONATIONS,
-              MetricNames.TAG_STATUS,
-              DonationStatus.WITHDRAWN.name())
-          .increment(pledges.size());
+      countWithdrawnAfterCommit(pledges.size());
       liveSyncPublisher.publishAfterCommit(
           LiveSyncTopic.global(LiveSyncTopicClass.SUPPLY_NEEDS), NEED_SECTIONS);
       units.forEach(unit ->
@@ -105,5 +102,26 @@ public class SupplyPatchWipeService implements SupplyPatchWipe {
               LiveSyncTopic.of(LiveSyncTopicClass.SUPPLY_DONATIONS, unit), List.of("donations")));
     }
     return pledges.size();
+  }
+
+  /**
+   * Counts the withdrawn donations once the trigger's transaction commits, so a refused patch
+   * change counts nothing.
+   *
+   * @param withdrawn how many donations the wipe withdrew
+   */
+  private void countWithdrawnAfterCommit(int withdrawn) {
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            meterRegistry
+                .counter(
+                    SupplyMetricNames.SUPPLY_DONATIONS,
+                    MetricNames.TAG_STATUS,
+                    DonationStatus.WITHDRAWN.name())
+                .increment(withdrawn);
+          }
+        });
   }
 }

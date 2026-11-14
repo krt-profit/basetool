@@ -256,7 +256,8 @@ class LiveSyncSyncHandshakeInterceptorTest {
             new ServletServerHttpRequest(servletRequest), response, wsHandler, attributes);
 
     assertThat(proceed).isTrue();
-    assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_TERMS_GATE)).isEqualTo("/terms/accept");
+    assertThat(attributes.get(LiveSyncWebSocketHandler.ATTR_SESSION_GATE))
+        .isEqualTo("/terms/accept");
   }
 
   /** An unmarked handshake — the overwhelmingly common case — carries no gate attribute. */
@@ -264,7 +265,7 @@ class LiveSyncSyncHandshakeInterceptorTest {
   void unmarkedHandshakeCarriesNoConsentGateAttribute() {
     interceptor.beforeHandshake(request, response, wsHandler, attributes);
 
-    assertThat(attributes).doesNotContainKey(LiveSyncWebSocketHandler.ATTR_TERMS_GATE);
+    assertThat(attributes).doesNotContainKey(LiveSyncWebSocketHandler.ATTR_SESSION_GATE);
   }
 
   @Test

@@ -78,7 +78,7 @@ class InventoryMergeProbeTest {
         orgUnitStampingService,
         inventoryAccessPolicy,
         new InventoryProperties(enabled),
-        Optional::empty);
+        _ -> Optional.empty());
   }
 
   @Test

@@ -54,7 +54,7 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
  * then holds needs: the OAuth2 access token, the active-org-unit pin ({@link
  * ActiveSquadronContext}) and the caller's authorities. The token is obtained through the
  * single-flight authorized-client manager, so an expired one is refreshed before it is captured
- * (REQ-SEC-012). It also relays the consent gate's mark via {@link #relayTermsGate}. A missing or
+ * (REQ-SEC-012). It also relays a session gate's mark via {@link #relaySessionGate}. A missing or
  * already expired token never blocks the handshake and is not captured; subscribes that need a
  * backend probe then fail closed. The token's expiry is recorded: once it lapses, the handler
  * closes a socket that holds a room whose class needs a check, and any other socket on its next
@@ -87,7 +87,7 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
       @NotNull WebSocketHandler wsHandler,
       @NotNull Map<String, Object> attributes) {
     attributes.put(LiveSyncWebSocketHandler.ATTR_MULTIPLEXED, Boolean.TRUE);
-    relayTermsGate(request, attributes);
+    relaySessionGate(request, attributes);
     UUID activeOrgUnit = ActiveSquadronContext.get();
     if (activeOrgUnit != null) {
       attributes.put(LiveSyncWebSocketHandler.ATTR_ACTIVE_ORG_UNIT, activeOrgUnit);
@@ -148,14 +148,14 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
    * @param request the handshake request, carrying the gate's mark as a request attribute
    * @param attributes the future WebSocket-session attributes
    */
-  private static void relayTermsGate(
+  private static void relaySessionGate(
       @NotNull ServerHttpRequest request, @NotNull Map<String, Object> attributes) {
     if (!(request instanceof ServletServerHttpRequest servletRequest)) {
       return;
     }
     String gateUrl = SessionGateHandoff.gateUrl(servletRequest.getServletRequest());
     if (gateUrl != null) {
-      attributes.put(LiveSyncWebSocketHandler.ATTR_TERMS_GATE, gateUrl);
+      attributes.put(LiveSyncWebSocketHandler.ATTR_SESSION_GATE, gateUrl);
     }
   }
 

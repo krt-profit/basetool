@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

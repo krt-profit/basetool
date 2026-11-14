@@ -160,6 +160,20 @@ interface ExchangeChangeSetAdapter<S, C> {
   }
 
   /**
+   * Plans the refusal of an op that expected an older state of its entry, naming the patch change
+   * when the entry's latest change came from one (REQ-PATCH-053).
+   *
+   * @param patchChange the patch change behind the entry's latest change, or {@code null} when it
+   *     came from another channel
+   * @param <C> the resource's planned change
+   * @return the plan
+   */
+  static <C> @NotNull Planned<C> versionConflict(@Nullable ExchangePatchChangeRefDto patchChange) {
+    return new Skip<>(
+        new Outcome(ExchangeOps.REJECTED, ExchangeReasons.VERSION_CONFLICT, null, patchChange));
+  }
+
+  /**
    * The result of one op as the client sees it.
    *
    * @param result {@code applied}, {@code unchanged}, {@code unmatched}, {@code ambiguous} or
@@ -167,8 +181,8 @@ interface ExchangeChangeSetAdapter<S, C> {
    * @param reason the error-registry code of a refusal, or {@code null}
    * @param written the entry an applied op wrote, or the existing entry a refusal names; {@code
    *     null} for resources whose result names no entry
-   * @param patchChange the patch change that removed the entry a {@code REMOVED_ELSEWHERE} refusal
-   *     names, or {@code null}
+   * @param patchChange the patch change behind the change a {@code REMOVED_ELSEWHERE} or {@code
+   *     VERSION_CONFLICT} refusal names, or {@code null}
    */
   record Outcome(
       @NotNull String result,

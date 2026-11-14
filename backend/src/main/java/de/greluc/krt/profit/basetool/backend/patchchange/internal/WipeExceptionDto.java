@@ -19,6 +19,8 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

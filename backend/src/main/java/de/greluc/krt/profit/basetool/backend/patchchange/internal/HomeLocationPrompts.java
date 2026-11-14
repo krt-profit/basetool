@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRelocation;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRelocationCount;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocation;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocationCount;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.MemberRelocationState;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Comparator;

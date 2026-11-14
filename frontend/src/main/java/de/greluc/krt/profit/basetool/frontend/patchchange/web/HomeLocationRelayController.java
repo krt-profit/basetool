@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.patchchange.web;
 
 import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResponses.relay;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.security.HomeLocationGateFilter;
 import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.ChooseHomeLocationRequest;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.RelocationResultDto;
@@ -49,6 +48,9 @@ public class HomeLocationRelayController {
   /** Relays the choice. */
   private final PatchChangeBackendClient patchChangeClient;
 
+  /** The gate whose cached verdict the choice discards. */
+  private final HomeLocationGate homeLocationGate;
+
   /**
    * Relays the caller's final choice; the page navigates into the tool afterwards.
    *
@@ -56,9 +58,7 @@ public class HomeLocationRelayController {
    * @param request the current request, whose session caches the gate's verdict
    * @return what moved, or the relayed backend refusal with its localised detail
    */
-  @PostMapping(
-      value = HomeLocationGateFilter.GATE_PATH,
-      headers = "X-Requested-With=XMLHttpRequest")
+  @PostMapping(value = HomeLocationGate.PAGE_PATH, headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> chooseHomeLocation(
       @RequestBody @NotNull ChooseHomeLocationRequest choice, @NotNull HttpServletRequest request) {
     return relay(
@@ -66,7 +66,7 @@ public class HomeLocationRelayController {
         "choose the caller's home location (ajax)",
         () -> {
           RelocationResultDto result = patchChangeClient.chooseMyHomeLocation(choice);
-          HomeLocationGateFilter.clearCachedVerdict(request);
+          homeLocationGate.forget(request);
           return ResponseEntity.ok(result);
         });
   }

@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.ChooseHomeLocationRequest;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.CorrectPatchChangeLabelRequest;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationPromptDto;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationStatusDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeFormDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangePreviewDto;
@@ -140,6 +141,17 @@ public class PatchChangeBackendClient {
   @Nullable
   public HomeLocationPromptDto myHomeLocationPrompt() {
     return backendApiClient.get(MY_HOME_LOCATION, HomeLocationPromptDto.class);
+  }
+
+  /**
+   * Reads whether the caller must choose a new home location before using the platform, the cheap
+   * check the home-location gate asks (REQ-PATCH-020).
+   *
+   * @return the status, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public HomeLocationStatusDto myHomeLocationStatus() {
+    return backendApiClient.get(MY_HOME_LOCATION + "/status", HomeLocationStatusDto.class);
   }
 
   /**

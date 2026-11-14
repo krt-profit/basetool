@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

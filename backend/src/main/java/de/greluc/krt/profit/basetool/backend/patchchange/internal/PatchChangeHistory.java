@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.P4kPatchVersionReader;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;

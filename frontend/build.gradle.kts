@@ -933,6 +933,35 @@ val testMemberRolesJs =
     )
   }
 
+val testHomeLocationJs =
+  registerNodeScriptTest(
+    "testHomeLocationJs",
+    "Regression tests for the member's home-location page: the relocation summary, the way on into the tool and a refusal, never a navigation by itself.",
+    "scripts/home-location.test.mjs",
+    "npmSetup",
+  ) {
+    inputs.file(layout.projectDirectory.file("scripts/flatten-module.mjs"))
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/patchchange/home-location.js"),
+    )
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/patchchange/home-location-common.js",
+      ),
+    )
+    inputs.file(
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/patchchange/patch-change-messages.js",
+      ),
+    )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-i18n.js"),
+    )
+    inputs.file(
+      layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-number-format.js"),
+    )
+  }
+
 val testShortcutsJs =
   registerNodeScriptTest(
     "testShortcutsJs",
@@ -1242,6 +1271,7 @@ tasks.named("check").configure {
     testBoardSyncJs,
     testBankLiveSyncJs,
     testMemberRolesJs,
+    testHomeLocationJs,
     testSearchJs,
     testNumberFormatJs,
     testLocalisedNameJs,

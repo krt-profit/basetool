@@ -510,13 +510,16 @@ offer. The offered quantity is therefore never increased by a merge. The locking
 offer-backed rows it sees, and the merge asks again once the group is locked, since a release locks
 its row (ADR-0362) and an offer released while the merge waited is not seen by the locking read.
 
-**No mixing across a patch change** ([REQ-PATCH-004](patch-change.md#req-patch-004--no-mixing-a-row-from-before-the-live-time-never-merges),
-[ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)). A row created
-before the latest patch change's live time takes no part in the merge: it is never a survivor that
-absorbs another row and never folded into one, and the Einbuchen probe does not count it. The write
-lands its own row instead, so a pre-patch row holds only pre-patch stock and a patch change's
-effects can select it by its creation time; a candidate row without a creation time counts as
-older. Before the first patch change every row takes part.
+**No mixing while a relocation is pending** ([REQ-PATCH-004](patch-change.md#req-patch-004--no-mixing-a-row-a-relocation-still-moves-never-merges),
+[ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)). While a member's
+relocation is pending in the open home-location phase, a row of that member created before the
+phase's live time, or without a creation time, takes no part in the merge: it is never a survivor
+that absorbs another row and never folded into one, and the Einbuchen probe does not count it. The
+write lands its own row instead, so the pre-patch row holds only pre-patch stock and the
+relocation selects it by its creation time. Once the member relocates, or the phase ends or is
+superseded, the member's rows merge again; before the first phase every row takes part. The one
+exception is an upward provision correction, which adds its quantity in place to the row the
+provision came from, pre-patch or not (owner decision D3).
 
 **Concurrency.** The merge group is loaded `FOR UPDATE` (pessimistic write lock) so two racing
 same-stack writers serialise instead of double-counting or losing stock — this re-introduces, **only
@@ -549,12 +552,14 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
   offer-backed rows untouched.
 - [ ] Each fold records one `INVENTORY_ITEM_MERGED` audit event; the unified viewer's Lager filter
   lists it.
-- [x] A row created before the latest patch change's live time is neither survivor nor folded, and
-  the probe does not count it (REQ-PATCH-004).
+- [x] While its holder's relocation is pending, a row created before the phase's live time or
+  without a creation time is neither survivor nor folded, and the probe does not count it; an
+  upward provision correction still adds to it (REQ-PATCH-004).
 
 **Enforced by:** `InventoryStockMergeTest`, `InventoryItemServiceTest`,
 `InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest`,
 `InventoryMergeProbeTest`, `InventoryMergeGroupDataTest`, `InventoryMergeCutoffTest`,
+`PatchChangeMergeCutoffTest`, `MaterialProvisionCorrectionDuringRelocationIntegrationTest`,
 `InventoryPageControllerMvcTest` ·
 **Code:** `InventoryCheckoutService#mergeStockIfRequested`,
 `InventoryItemRepository#findMergeGroupForUpdate`, `InventoryMergeProbe#hasMergeCandidates`,

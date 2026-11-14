@@ -27,8 +27,8 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationReq
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.observability.MetricNames;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.HomeLocationGateFilter;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.TermsAcceptanceGateFilter;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGate;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
@@ -123,7 +123,7 @@ public class NotificationPageController {
   private static final long STREAM_TIMEOUT_MS = Duration.ofMinutes(30).toMillis();
   private static final String REGISTRATION_ID = "keycloak";
 
-  /** Upper bound on cause-chain traversal in {@link #isTermsGateSignal(Throwable)} (loop guard). */
+  /** Upper bound on cause-chain traversal in {@link #isGateSignal} (loop guard). */
   private static final int MAX_CAUSE_DEPTH = 25;
 
   private final NotificationBackendClient notificationClient;
@@ -134,6 +134,9 @@ public class NotificationPageController {
 
   /** Applies the role inheritance before a notification's target is chosen for the viewer. */
   private final RoleHierarchy roleHierarchy;
+
+  /** The session gates whose backend refusal hands the stream off to the gate's page. */
+  private final SessionGates sessionGates;
 
   /** Live browser-to-backend SSE relays open on this instance (relay-connections gauge source). */
   private final AtomicInteger relayConnections = new AtomicInteger();
@@ -547,15 +550,14 @@ public class NotificationPageController {
    * Terminates the relayed SSE stream on a backend error.
    *
    * <p>A re-authentication signal first sends a named {@code reauth} event carrying the login path;
-   * a refusal of the consent gate or the home-location gate sends that gate's one-shot event with
-   * its page's URL. Every error completes the emitter cleanly, never with {@code
-   * completeWithError}.
+   * a session gate's refusal sends that gate's one-shot event with its page's URL. Every error
+   * completes the emitter cleanly, never with {@code completeWithError}.
    *
    * @param emitter the browser-facing emitter to terminate
    * @param error the error raised by the backend stream subscription
    * @param contextPath the servlet context path the gate pages' URLs start with
    */
-  private static void handleStreamError(SseEmitter emitter, Throwable error, String contextPath) {
+  private void handleStreamError(SseEmitter emitter, Throwable error, String contextPath) {
     if (ReauthenticationRequiredException.isReauthSignal(error)) {
       log.debug("Notification stream needs re-authentication; signalling the browser to re-login");
       try {
@@ -567,19 +569,11 @@ public class NotificationPageController {
       }
       return;
     }
-    if (isGateSignal(error, BackendServiceException.CODE_TERMS_NOT_ACCEPTED)) {
-      handOffToGate(
-          emitter,
-          TermsAcceptanceGateFilter.SSE_GATE_EVENT,
-          contextPath + TermsAcceptanceGateFilter.CONSENT_PATH);
-      return;
-    }
-    if (isGateSignal(error, BackendServiceException.CODE_HOME_LOCATION_REQUIRED)) {
-      handOffToGate(
-          emitter,
-          HomeLocationGateFilter.SSE_GATE_EVENT,
-          contextPath + HomeLocationGateFilter.GATE_PATH);
-      return;
+    for (SessionGate gate : sessionGates.all()) {
+      if (isGateSignal(error, gate.problemCode())) {
+        handOffToGate(emitter, gate.sseEvent(), contextPath + gate.pagePath());
+        return;
+      }
     }
     log.debug(
         "Notification stream dropped ({}); completing cleanly, poll fallback keeps the badge fresh",
@@ -606,8 +600,7 @@ public class NotificationPageController {
 
   /**
    * Reports whether {@code error} or its cause chain is the backend's 403 refusal of a session
-   * gate, matched on the problem {@code code}: missing Terms of Use consent (REQ-SEC-028) or a
-   * missing home-location choice (REQ-PATCH-020).
+   * gate, matched on the gate's problem {@code code} (REQ-SEC-028, REQ-PATCH-020).
    *
    * @param error the error raised by the backend stream subscription
    * @param code the gate's problem code

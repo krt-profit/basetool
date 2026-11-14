@@ -178,7 +178,7 @@ every `/api/**` operation, since both rate limiters answer it there.
 > `fieldErrors` — the fields this requirement calls the contract — and its properties carried no
 > `type`, because the OpenAPI 3.1 writer ignores the 3.0 setter the customizer used; `429` was
 > documented on one operation. Five producers are missing from the list above and are sanctioned
-> the same way: `TermsAcceptanceAccessFilter` (403 `TERMS_NOT_ACCEPTED`), `ActingMemberFilter`
+> the same way: `SessionGateAccessFilter` (403 `TERMS_NOT_ACCEPTED`, `HOME_LOCATION_REQUIRED`), `ActingMemberFilter`
 > (403 `ACTING_MEMBER_REFUSED`), `IdentityProviderUnavailableFilter` (503 `SERVICE_UNAVAILABLE`),
 > `SubjectRateLimitingFilter` (429 `RATE_LIMIT_EXCEEDED`) and `RequestBodySizeLimitFilter` (413
 > `REQUEST_BODY_TOO_LARGE`); `PendingApprovalAccessFilter` also answers `NO_ROLE`.

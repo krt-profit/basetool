@@ -34,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendSideChannels;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.PageResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SecurityConfig;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import de.greluc.krt.profit.basetool.frontend.notification.client.NotificationBackendClient;
 import de.greluc.krt.profit.basetool.frontend.notification.model.NotificationDto;
@@ -72,7 +73,8 @@ class NotificationPageControllerTest {
         new BackendSideChannels(mock(WebClient.class), null),
         mock(OAuth2AuthorizedClientManager.class),
         new SimpleMeterRegistry(),
-        SecurityConfig.roleHierarchy());
+        SecurityConfig.roleHierarchy(),
+        new SessionGates(List.of()));
   }
 
   /** Builds a backend notifications page with {@code count} rows and the given paging math. */

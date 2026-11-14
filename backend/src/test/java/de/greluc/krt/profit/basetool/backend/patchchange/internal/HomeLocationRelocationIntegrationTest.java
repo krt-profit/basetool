@@ -35,6 +35,8 @@ import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemSer
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationChoiceRefusedException;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationChoiceRefusedException.Reason;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.MemberRelocationState;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.RelocationPendingException;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectAuthentication;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;

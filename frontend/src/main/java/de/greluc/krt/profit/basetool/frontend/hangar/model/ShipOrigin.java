@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
 import java.util.Arrays;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -52,10 +53,21 @@ public enum ShipOrigin {
    * #IN_GAME}.
    *
    * @param raw the submitted value
-   * @return the chosen origin's name, or {@code null} for none or any other value
+   * @return the chosen origin, or {@code null} for none or any other value
    */
-  public static @Nullable String choiceOf(@Nullable String raw) {
+  public static @Nullable ShipOrigin choiceOf(@Nullable String raw) {
     ShipOrigin origin = parse(raw);
-    return origin == null || origin == UNKNOWN ? null : origin.name();
+    return origin == UNKNOWN ? null : origin;
+  }
+
+  /**
+   * Names an optional origin as the backend's write payloads carry it.
+   *
+   * @param origin the origin, or {@code null}
+   * @return the constant's name, or {@code null} for none
+   */
+  @Contract("null -> null; !null -> !null")
+  public static @Nullable String nameOf(@Nullable ShipOrigin origin) {
+    return origin == null ? null : origin.name();
   }
 }

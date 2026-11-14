@@ -30,14 +30,12 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrigin;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -73,9 +71,9 @@ public class MemberHangarShipProxyController {
   @PostMapping(value = "/add", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> addShip(
       @PathVariable @NotNull UUID userId, @RequestBody @Nullable ShipRequestDto request) {
-    String origin = request == null ? null : ShipOrigin.choiceOf(request.origin());
+    ShipOrigin origin = request == null ? null : ShipOrigin.choiceOf(request.origin());
     if (isIncomplete(request) || origin == null) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -91,7 +89,7 @@ public class MemberHangarShipProxyController {
                   request.fitted(),
                   null,
                   request.owningOrgUnitId(),
-                  origin));
+                  origin.name()));
           return ResponseEntity.noContent().build();
         });
   }
@@ -111,7 +109,7 @@ public class MemberHangarShipProxyController {
       @PathVariable @NotNull UUID shipId,
       @RequestBody @Nullable ShipRequestDto request) {
     if (isIncomplete(request)) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -128,7 +126,7 @@ public class MemberHangarShipProxyController {
                   request.fitted(),
                   request.version(),
                   null,
-                  ShipOrigin.choiceOf(request.origin())));
+                  ShipOrigin.nameOf(ShipOrigin.choiceOf(request.origin()))));
           return ResponseEntity.noContent().build();
         });
   }
@@ -168,7 +166,7 @@ public class MemberHangarShipProxyController {
       @PathVariable @NotNull UUID shipId,
       @RequestBody @Nullable ShipOrgUnitRequestDto request) {
     if (request == null || request.owningOrgUnitVersion() == null) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -192,7 +190,7 @@ public class MemberHangarShipProxyController {
       @PathVariable @NotNull UUID userId,
       @RequestBody @Nullable ShipBulkOrgUnitRequestDto request) {
     if (request == null || request.shipIds() == null || request.shipIds().isEmpty()) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -218,7 +216,7 @@ public class MemberHangarShipProxyController {
       @PathVariable @NotNull UUID userId, @RequestBody @Nullable ShipBulkOriginRequestDto request) {
     ShipBulkOriginRequestDto valid = BulkOriginRequests.validated(request);
     if (valid == null) {
-      return BulkOriginRequests.validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -241,17 +239,5 @@ public class MemberHangarShipProxyController {
         || request.shipTypeId() == null
         || request.insurance() == null
         || request.insurance().isBlank();
-  }
-
-  /**
-   * Builds the {@code 422} {@code problem+json} with the {@code VALIDATION} code the page shows as
-   * a toast.
-   *
-   * @return a {@code 422} {@code problem+json} response
-   */
-  private static @NotNull ResponseEntity<Object> validationError() {
-    return ResponseEntity.status(422)
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(Map.of("status", 422, "code", "VALIDATION"));
   }
 }

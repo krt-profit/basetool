@@ -114,7 +114,7 @@ batch may update or remove a ship only once. How an op that is not applied is re
 | A ship type that matches several | `ambiguous` | `AMBIGUOUS` |
 | A place without a warehouse location | `rejected` | `LOCATION_UNKNOWN` |
 | `link` or `upsert` of a ship this installation links to another id | `rejected` | `LINK_TARGET_TAKEN` |
-| `upsert` or `remove` with a `version` the ship no longer has, or of a ship an earlier op of the batch changed | `rejected` | `VERSION_CONFLICT` |
+| `upsert` or `remove` with a `version` the ship no longer has, or of a ship an earlier op of the batch changed | `rejected` | `VERSION_CONFLICT`; for a stale `version` after a patch change moved the ship the result item names it in `patchChange` ([patch change](patch-change.md#pushing-against-what-a-patch-change-removed)) |
 | `upsert` without `shipId` for an id this installation already linked | `rejected` | `VERSION_CONFLICT` |
 | `upsert` of a ship the web, the app, the system, another client, another installation or a patch change removed | `rejected` | `REMOVED_ELSEWHERE`; for a patch change the result item names it in `patchChange` |
 | `upsert` naming an `orgUnit` the member does not directly belong to | `rejected` | `ORG_UNIT_NOT_ALLOWED` |

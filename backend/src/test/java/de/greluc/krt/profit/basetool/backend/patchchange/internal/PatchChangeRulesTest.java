@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;

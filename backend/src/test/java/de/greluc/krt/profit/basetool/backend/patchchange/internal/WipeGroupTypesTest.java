@@ -25,6 +25,8 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipComponentType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockWipeRow;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroupType;
 import java.util.Arrays;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;

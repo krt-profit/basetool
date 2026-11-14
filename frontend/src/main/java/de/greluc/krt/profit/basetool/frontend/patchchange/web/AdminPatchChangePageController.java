@@ -21,10 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.patchchange.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
-import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeDto;
-import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeFormDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeOptions;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCount;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchKind;
@@ -33,7 +29,6 @@ import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionTar
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeGroup;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,7 +49,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequestMapping(AdminPatchChangePageController.PAGE)
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-@Slf4j
 public class AdminPatchChangePageController {
 
   /** The page's path, also the base of its relay endpoints. */
@@ -63,17 +57,14 @@ public class AdminPatchChangePageController {
   /** The {@code fragment} value that renders only the history, for the in-place swap. */
   static final String HISTORY_FRAGMENT = "history";
 
-  /** The kind the form starts with, and returns to after a trigger. */
-  static final PatchKind DEFAULT_KIND = PatchKind.REBUILD;
-
   /** The message key shown in place of the history when it cannot be read. */
   static final String HISTORY_ERROR = "admin.patchChange.error.history";
 
   /** The message key shown in place of the form when its defaults cannot be read. */
   static final String FORM_ERROR = "admin.patchChange.error.form";
 
-  /** Talks to the backend. */
-  private final PatchChangeBackendClient patchChangeClient;
+  /** Reads the page's backend data. */
+  private final PatchChangePageReader pageReader;
 
   /**
    * Renders the page, or with {@code fragment=history} only its history. A history that cannot be
@@ -90,13 +81,21 @@ public class AdminPatchChangePageController {
   @NotNull
   @GetMapping
   public String page(@Nullable @RequestParam(required = false) String fragment, Model model) {
-    loadHistory(model);
     model.addAttribute("wipeGroups", List.of(WipeGroup.values()));
     if (HISTORY_FRAGMENT.equals(fragment)) {
+      putHistory(pageReader.history(), model);
       return "patchchange/admin/patch-change :: history";
     }
-    loadForm(model);
-    model.addAttribute("defaultKind", DEFAULT_KIND);
+    PatchChangePageReader.AdminPage page = pageReader.adminPage();
+    putHistory(page.history(), model);
+    page.form()
+        .ifPresentOrElse(
+            form -> {
+              model.addAttribute("form", form.form());
+              model.addAttribute("defaults", form.defaults());
+            },
+            () -> model.addAttribute("formError", FORM_ERROR));
+    model.addAttribute("defaultKind", PatchChangePageReader.DEFAULT_KIND);
     model.addAttribute("kinds", List.of(PatchKind.values()));
     model.addAttribute("countKinds", List.of(PatchCount.values()));
     model.addAttribute("exceptionTargets", List.of(WipeExceptionTarget.values()));
@@ -106,40 +105,16 @@ public class AdminPatchChangePageController {
   }
 
   /**
-   * Puts the history into the model, or an empty one with {@code historyError} when the backend
-   * cannot be read.
+   * Maps the history into the model, with {@code historyError} when it was unavailable.
    *
+   * @param history the history the reader returned
    * @param model the page's model
    */
-  private void loadHistory(@NotNull Model model) {
-    boolean loaded =
-        SectionFallback.run(
-            log,
-            "patch-change-history",
-            () -> {
-              List<PatchChangeDto> history = patchChangeClient.history();
-              model.addAttribute("history", history == null ? List.of() : history);
-            });
-    if (!loaded) {
-      model.addAttribute("history", List.of());
+  private static void putHistory(
+      @NotNull PatchChangePageReader.History history, @NotNull Model model) {
+    model.addAttribute("history", history.entries());
+    if (!history.available()) {
       model.addAttribute("historyError", HISTORY_ERROR);
     }
-  }
-
-  /**
-   * Puts the form defaults and the default kind's preset into the model, or {@code formError} when
-   * the backend cannot be read or sends no defaults.
-   *
-   * @param model the page's model
-   */
-  private void loadForm(@NotNull Model model) {
-    PatchChangeFormDto form =
-        SectionFallback.load(log, "patch-change-form", patchChangeClient::form, null);
-    if (form == null) {
-      model.addAttribute("formError", FORM_ERROR);
-      return;
-    }
-    model.addAttribute("form", form);
-    model.addAttribute("defaults", form.presetFor(DEFAULT_KIND));
   }
 }

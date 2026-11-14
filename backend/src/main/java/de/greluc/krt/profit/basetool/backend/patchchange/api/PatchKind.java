@@ -17,12 +17,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.frontend.kernel.model;
+package de.greluc.krt.profit.basetool.backend.patchchange.api;
 
 /**
- * Frontend mirror of the backend's home-location gate status (REQ-PATCH-020).
- *
- * @param required {@code true} while the caller must still choose a new home location
+ * What a Star Citizen patch kept, which presets the options of its patch change (REQ-PATCH-002). A
+ * hotfix changes nothing and is never recorded.
  */
-@DtoMirror
-public record HomeLocationStatusDto(boolean required) {}
+public enum PatchKind {
+  /** A long-term persistence rebuild: stored items, materials, aUEC and ships survive. */
+  REBUILD,
+  /** A full wipe: only pledged ships and blueprints survive. */
+  FULL_WIPE
+}

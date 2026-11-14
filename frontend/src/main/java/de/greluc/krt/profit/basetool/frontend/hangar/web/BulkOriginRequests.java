@@ -21,11 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.hangar.web;
 
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrigin;
-import java.util.Map;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 
 /**
  * The checks a bulk origin request passes in the frontend before it is forwarded, shared by „Meine
@@ -46,19 +42,7 @@ final class BulkOriginRequests {
     if (request == null || request.shipIds() == null || request.shipIds().isEmpty()) {
       return null;
     }
-    String origin = ShipOrigin.choiceOf(request.origin());
-    return origin == null ? null : new ShipBulkOriginRequestDto(request.shipIds(), origin);
-  }
-
-  /**
-   * Builds the {@code 422} {@code problem+json} with code {@code VALIDATION} that the hangar pages
-   * show as an error toast.
-   *
-   * @return the response
-   */
-  static @NotNull ResponseEntity<Object> validationError() {
-    return ResponseEntity.status(422)
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(Map.of("status", 422, "code", "VALIDATION"));
+    ShipOrigin origin = ShipOrigin.choiceOf(request.origin());
+    return origin == null ? null : new ShipBulkOriginRequestDto(request.shipIds(), origin.name());
   }
 }

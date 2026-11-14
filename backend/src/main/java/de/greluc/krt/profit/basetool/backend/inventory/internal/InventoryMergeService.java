@@ -58,9 +58,10 @@ public class InventoryMergeService {
    * <p>Always applies to {@code PIECE} materials and game items; for {@code SCU} only when {@code
    * clientRequestedMerge} is set. The group is locked {@code FOR UPDATE}, and rows backing a
    * Materialbörse offer are never changed or folded; the offers are checked again once the group is
-   * locked, since an offer released while the lock waited is not excluded by the locking read. A
-   * row created before the merge cutoff neither survives a merge nor is folded (REQ-PATCH-004).
-   * Must run inside the caller's transaction.
+   * locked, since an offer released while the lock waited is not excluded by the locking read.
+   * While the holder's merge cutoff stands, a row created before it or without a creation time
+   * neither survives a merge nor is folded (REQ-PATCH-004). Must run inside the caller's
+   * transaction.
    *
    * @param row the just-written target row (managed); the merge survivor
    * @param clientRequestedMerge the per-action opt-in for an {@code SCU} material (ignored for
@@ -82,8 +83,8 @@ public class InventoryMergeService {
     if (stockOfferLookup.isOffered(row.getId())) {
       return row;
     }
-    final Instant cutoff = mergeCutoff.cutoff().orElse(null);
-    if (cutoff != null && row.getCreatedAt() != null && row.getCreatedAt().isBefore(cutoff)) {
+    final Instant cutoff = mergeCutoff.cutoffFor(row.getUser().getId()).orElse(null);
+    if (cutoff != null && (row.getCreatedAt() == null || row.getCreatedAt().isBefore(cutoff))) {
       return row;
     }
 

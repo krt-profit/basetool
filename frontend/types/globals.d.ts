@@ -579,15 +579,15 @@ interface KrtReauthApi {
 }
 
 /**
- * Terms-of-Use consent-gate helper installed by `krt-fetch.js` (REQ-SEC-028); navigates the
- * browser when the gate appears mid-session.
+ * Session-gate helper installed by `krt-fetch.js` (REQ-SEC-028, REQ-PATCH-020); navigates the
+ * browser to a gate's page when a gate appears mid-session.
  */
-interface KrtTermsGateApi {
-    /** Navigates to the consent page and returns true when the response demanded consent. */
+interface KrtSessionGateApi {
+    /** Navigates to the gate's page and returns true when the response carried a gate's header. */
     check(response: Response): boolean;
     /**
-     * Navigates the window to a same-origin consent path, for gate signals without a Response
-     * (the `terms-gate` SSE event, the `/ws/sync` close reason).
+     * Navigates the window to a same-origin gate path, for gate signals without a Response
+     * (a session gate's SSE event, the `/ws/sync` close reason).
      */
     redirect(url?: string | null): boolean;
 }

@@ -98,7 +98,8 @@ public final class PatchCounts {
   /**
    * Returns the counts by kind.
    *
-   * @return an unmodifiable view in the kinds' declaration order
+   * @return the counts in the kinds' declaration order; unmodifiable, and the map behind it is
+   *     owned by this set and never changes
    */
   public @NotNull @Unmodifiable Map<PatchCount, Long> asMap() {
     return values;

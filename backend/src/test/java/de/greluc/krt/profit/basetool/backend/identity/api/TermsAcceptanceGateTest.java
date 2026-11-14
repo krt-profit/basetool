@@ -28,10 +28,12 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.backend.kernel.AppProblemProperties;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
+import de.greluc.krt.profit.basetool.backend.platform.api.SessionGateAccessFilter;
 import de.greluc.krt.profit.basetool.backend.support.BoundProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +45,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.support.StaticMessageSource;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -52,12 +55,13 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Behaviour of the backend consent boundary (REQ-SEC-028); the exemptions for the consent endpoints
- * are critical, since refusing them would block everyone permanently.
+ * Behaviour of the backend consent boundary (REQ-SEC-028), the consent gate run by the session-gate
+ * filter; the exemptions for the consent endpoints are critical, since refusing them would block
+ * everyone permanently.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class TermsAcceptanceAccessFilterTest {
+class TermsAcceptanceGateTest {
 
   private static final UUID USER_ID = UUID.randomUUID();
 
@@ -66,7 +70,7 @@ class TermsAcceptanceAccessFilterTest {
 
   private MeterRegistry meterRegistry;
   private RefusedSubjectWindow refusedSubjects;
-  private TermsAcceptanceAccessFilter filter;
+  private SessionGateAccessFilter filter;
 
   @BeforeEach
   void setUp() {
@@ -76,13 +80,13 @@ class TermsAcceptanceAccessFilterTest {
     messages.addMessage("problem.terms_not_accepted.detail", java.util.Locale.ENGLISH, "Accept.");
     meterRegistry = new SimpleMeterRegistry();
     filter =
-        new TermsAcceptanceAccessFilter(
-            termsConsentCheck,
+        new SessionGateAccessFilter(
+            List.of(
+                new TermsAcceptanceGate(termsConsentCheck, refusedSubjects, new MockEnvironment())),
             messages,
             new ProblemResponseFactory(BoundProperties.defaults(AppProblemProperties.class)),
             new ObjectMapper(),
-            meterRegistry,
-            refusedSubjects);
+            meterRegistry);
     authenticateWithSubject(USER_ID.toString());
   }
 
@@ -256,6 +260,32 @@ class TermsAcceptanceAccessFilterTest {
 
     assertThat(invoke("/api/v1/missions").getStatus()).isEqualTo(200);
     verify(termsConsentCheck, never()).hasAcceptedCurrentTerms(any());
+  }
+
+  /** The {@code test} profile stands the gate down unless the property re-arms it. */
+  @Test
+  void theTestProfileDisarmsTheGateUnlessReArmed() {
+    MockEnvironment test = new MockEnvironment();
+    test.setActiveProfiles("test");
+
+    assertThat(
+            new TermsAcceptanceGate(termsConsentCheck, refusedSubjects, test)
+                .holds(auth(), USER_ID))
+        .isFalse();
+    test.setProperty(TermsAcceptanceGate.ARMED_IN_TEST, "true");
+    assertThat(
+            new TermsAcceptanceGate(termsConsentCheck, refusedSubjects, test)
+                .holds(auth(), USER_ID))
+        .isTrue();
+  }
+
+  /**
+   * Returns the installed authentication.
+   *
+   * @return the current authentication
+   */
+  private static org.springframework.security.core.Authentication auth() {
+    return SecurityContextHolder.getContext().getAuthentication();
   }
 
   /**

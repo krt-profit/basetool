@@ -17,12 +17,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.patchchange.internal;
+package de.greluc.krt.profit.basetool.backend.inventory.api;
 
-/** Which catalogue a wipe exception names its entry in (REQ-PATCH-011). */
-public enum WipeExceptionTarget {
-  /** A game item, every row of it. */
-  GAME_ITEM,
-  /** A material, every row of it in every quality. */
-  MATERIAL
+import org.jetbrains.annotations.NotNull;
+
+/**
+ * One share of the stock a game patch wiped, as the Lager's summary event counts it
+ * (REQ-PATCH-017): a wipe group, or the exceptions that wipe their entries. Implemented by the
+ * patch-change module.
+ */
+public interface StockWipeShare {
+
+  /**
+   * Returns the key the summary event counts the share's rows under.
+   *
+   * @return the key, e.g. {@code CONSUMABLES}
+   */
+  @NotNull
+  String countKey();
 }

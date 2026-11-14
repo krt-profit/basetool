@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.patchchange.internal;
+package de.greluc.krt.profit.basetool.backend.patchchange.api;
 
 /** What a wipe exception does with its game item or material (REQ-PATCH-011). */
 public enum WipeExceptionMode {

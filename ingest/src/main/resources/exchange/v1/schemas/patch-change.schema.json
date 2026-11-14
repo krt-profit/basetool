@@ -170,7 +170,7 @@
       "properties": {
         "entry": {
           "$ref": "item-ref.schema.json",
-          "description": "The item or material, named by its bt and display name as the stock feed names it."
+          "description": "The item or material, named by its bt and display name as the stock feed names it; an entry removed from the catalogue since keeps its bt and carries no name."
         },
         "target": {
           "type": "string",

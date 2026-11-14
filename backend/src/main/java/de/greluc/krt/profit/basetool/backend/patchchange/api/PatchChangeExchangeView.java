@@ -30,8 +30,6 @@ import org.jetbrains.annotations.Unmodifiable;
  * What an exchange client reads of the patch change for its member (REQ-PATCH-050): the latest
  * patch change with its options, and the member's state in the latest home-location phase.
  *
- * <p>Enumerated values travel as their constant names, which the exchange contract publishes.
- *
  * @param current the latest patch change, or {@code null} before the first
  * @param homeLocation the member's home-location prompt
  */
@@ -43,11 +41,12 @@ public record PatchChangeExchangeView(
    *
    * @param id the patch change
    * @param label its current label
-   * @param kind the patch kind's name, {@code REBUILD} or {@code FULL_WIPE}
+   * @param kind the patch kind
    * @param liveAt the live time, the cutoff of every effect
    * @param wipeGroups every wipe group in declaration order, with its catalogue types and whether
    *     the patch change selected it
-   * @param wipeExceptions the wipe exceptions whose catalogue entry still exists
+   * @param wipeExceptions every wipe exception as stored, also one whose catalogue entry was
+   *     deleted
    * @param cancelRefineryOrders whether running refinery orders started before the live time ended
    * @param currencyWipe whether the currency wipe ran
    * @param homeLocationPrompt whether the members were asked for a new home location
@@ -55,7 +54,7 @@ public record PatchChangeExchangeView(
   public record Current(
       @NotNull UUID id,
       @NotNull String label,
-      @NotNull String kind,
+      @NotNull PatchKind kind,
       @NotNull Instant liveAt,
       @NotNull @Unmodifiable List<GroupEntry> wipeGroups,
       @NotNull @Unmodifiable List<ExceptionEntry> wipeExceptions,
@@ -66,37 +65,33 @@ public record PatchChangeExchangeView(
   /**
    * One wipe group (REQ-PATCH-010).
    *
-   * @param group the group's name, e.g. {@code CONSUMABLES}
+   * @param group the group
    * @param selected whether the patch change wiped it
    * @param types the catalogue types it claims, none for the other items
    */
   public record GroupEntry(
-      @NotNull String group, boolean selected, @NotNull @Unmodifiable List<TypeKey> types) {}
-
-  /**
-   * One catalogue type a wipe group claims (REQ-PATCH-010).
-   *
-   * @param source the name of the catalogue fact it is compared with, e.g. {@code ITEM_TYPE}
-   * @param value the type key, e.g. {@code Food}
-   */
-  public record TypeKey(@NotNull String source, @NotNull String value) {}
+      @NotNull WipeGroup group,
+      boolean selected,
+      @NotNull @Unmodifiable List<WipeGroupType> types) {}
 
   /**
    * One wipe exception (REQ-PATCH-011).
    *
-   * @param target the catalogue's name, {@code GAME_ITEM} or {@code MATERIAL}
-   * @param id the game item's or material's id
-   * @param name its current catalogue name
-   * @param mode the mode's name, {@code KEEP} or {@code WIPE}
+   * @param target the catalogue the entry belongs to
+   * @param id the game item's or material's id, the exception's stored key
+   * @param name its current catalogue name, or {@code null} once the entry was deleted
+   * @param mode whether the entry was kept or wiped
    */
   public record ExceptionEntry(
-      @NotNull String target, @NotNull UUID id, @NotNull String name, @NotNull String mode) {}
+      @NotNull WipeExceptionTarget target,
+      @NotNull UUID id,
+      @Nullable String name,
+      @NotNull WipeExceptionMode mode) {}
 
   /**
    * The member's state in the latest home-location phase (REQ-PATCH-021, REQ-PATCH-022).
    *
-   * @param state the state's name: {@code NOT_ASKED}, {@code PENDING}, {@code RELOCATED} or {@code
-   *     PHASE_ENDED}
+   * @param state the member's state in the phase
    * @param patchChangeId the phase's patch change, or {@code null} when no phase ever asked
    * @param label its label, or {@code null} when no phase ever asked
    * @param liveAt its live time, or {@code null} when no phase ever asked
@@ -106,7 +101,7 @@ public record PatchChangeExchangeView(
    * @param preview what the relocation would move per current location; empty unless pending
    */
   public record HomeLocation(
-      @NotNull String state,
+      @NotNull MemberRelocationState state,
       @Nullable UUID patchChangeId,
       @Nullable String label,
       @Nullable Instant liveAt,

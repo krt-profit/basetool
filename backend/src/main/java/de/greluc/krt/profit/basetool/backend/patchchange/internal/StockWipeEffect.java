@@ -75,7 +75,7 @@ class StockWipeEffect implements PatchEffect {
     int offers = market.end(rows, run.patchChangeId(), run.label());
     int donations = supply.withdraw(rows, run.patchChangeId(), run.label());
     StockWipeResult result =
-        stock.wipe(selection.wipedRowsByGroup(), run.patchChangeId(), run.label());
+        stock.wipe(selection.wipedRowsByShare(), run.patchChangeId(), run.label());
     jobOrders.recordStockLoss(result.jobOrders(), run.patchChangeId(), run.label());
     return counts(result.rows(), result.holders(), result.jobOrders().size(), offers, donations);
   }

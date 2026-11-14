@@ -27,7 +27,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilte
 import de.greluc.krt.profit.basetool.backend.exchange.internal.BankExchangeRoutes;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ExchangeCapability;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
-import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter;
+import de.greluc.krt.profit.basetool.backend.kernel.CoreProblemCode;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.platform.api.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.testsupport.exchange.ExchangeSeam;
@@ -334,7 +334,7 @@ class ExchangeRelaySeamParityTest {
       @NotNull Set<String> passedThrough, @NotNull Set<String> translated) throws Exception {
     Set<String> passed =
         Set.of(
-            (String) staticField(TermsAcceptanceAccessFilter.class, "CODE_TERMS_NOT_ACCEPTED"),
+            CoreProblemCode.TERMS_NOT_ACCEPTED.code(),
             (String) staticField(PendingApprovalAccessFilter.class, "CODE_PENDING_APPROVAL"),
             (String) staticField(PendingApprovalAccessFilter.class, "CODE_NO_ROLE"),
             (String) staticField(ActingMemberFilter.class, "CODE_ACTING_MEMBER_REFUSED"),

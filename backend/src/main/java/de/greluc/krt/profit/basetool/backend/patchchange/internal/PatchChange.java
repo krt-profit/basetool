@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.kernel.AbstractEntity;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;

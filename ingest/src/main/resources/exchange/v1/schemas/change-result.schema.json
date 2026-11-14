@@ -55,7 +55,7 @@
           },
           "patchChange": {
             "type": "object",
-            "description": "The patch change that moved or wiped the lot or ship a REMOVED_ELSEWHERE refusal names; absent for a removal from any other channel.",
+            "description": "The patch change behind the change a refusal answers: the one that moved or wiped the lot or ship a REMOVED_ELSEWHERE refusal names, or the one that made the lot's or ship's last change a VERSION_CONFLICT did not see; absent when that change came from any other channel.",
             "properties": {
               "id": {
                 "type": "string",

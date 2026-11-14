@@ -61,7 +61,8 @@ tombstones as [blueprints](blueprints.md#reading-the-set--get-exchangev1mebluepr
 
 When a Star Citizen patch ends the running refinery jobs, an admin records the patch change once
 for everyone. Every `OPEN` or `IN_PROGRESS` order that started before the patch went live (an order
-without `startedAt` counts from its creation) is then cancelled: it arrives in the feed with the
+without `startedAt` counts from its creation, one without either time as started before) is then
+cancelled: it arrives in the feed with the
 status `CANCELED` and `canceledByPatch: {id, label}`, for example
 `{"id": "3f0c…", "label": "4.4"}`. Orders started after the patch went live stay as they are. Close
 the order on your side as cancelled; nothing was deleted and no yield was booked. An admin may

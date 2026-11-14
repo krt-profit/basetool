@@ -21,25 +21,31 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockMergeCutoff;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The no-mixing rule's answer to the Lager (REQ-PATCH-004, ADR-0381): rows created before the
- * latest patch change's live time never merge.
+ * The no-mixing rule's answer to the Lager (REQ-PATCH-004, ADR-0381): a holder's rows from before
+ * the open home-location phase's live time never merge while that holder's relocation is pending in
+ * it. The wipe runs at the trigger and needs no window of its own.
  */
 @Component
 @RequiredArgsConstructor
 class PatchChangeMergeCutoff implements StockMergeCutoff {
 
-  private final PatchChangeRepository repository;
+  private final HomeLocationPhases phases;
 
   @Override
   @Transactional(readOnly = true)
-  public @NotNull Optional<Instant> cutoff() {
-    return repository.findLatestLiveAt();
+  public @NotNull Optional<Instant> cutoffFor(@NotNull UUID holderId) {
+    return phases
+        .open()
+        .filter(phase -> !phases.pendingAmong(phase, List.of(holderId)).isEmpty())
+        .map(HomeLocationPhase::liveAt);
   }
 }

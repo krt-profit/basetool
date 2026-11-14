@@ -107,12 +107,7 @@ class JobOrderCurrencyWipeService implements JobOrderCurrencyWipe {
       boolean bound = attempt.bindingActive();
       attempt.cancelForCurrencyWipe(patchChangeId);
       if (bound != attempt.bindingActive() && attempt.getSourceBinding().signum() > 0) {
-        UUID holding = attempt.getAccountHoldingId();
-        if (holding == null) {
-          plan.ledger().holder(attempt.personalHolderId()).recordChange();
-        } else {
-          Objects.requireNonNull(plan.ledger().accountHoldings().get(holding)).recordChange();
-        }
+        plan.ledger().recordChange(attempt.personalHolderId(), attempt.getAccountHoldingId());
       }
       port.cancelForCurrencyWipe(
           Objects.requireNonNull(attempt.getRequestId()),
@@ -134,19 +129,17 @@ class JobOrderCurrencyWipeService implements JobOrderCurrencyWipe {
       @NotNull JobOrderCurrencyWipePlanner.Plan plan,
       @NotNull UUID patchChangeId) {
     for (JobOrderCurrencyWipePlanner.Shortage shortage : plan.shortages()) {
+      plan.ledger().recordChange(shortage.holderId(), shortage.accountHoldingId());
       UUID holderId = shortage.holderId();
-      if (holderId != null) {
-        plan.ledger().holder(holderId).recordChange();
-        operations.save(
-            JobOrderMoneyOperation.currencyWipeShortage(
-                orderId, holderId, shortage.amount(), patchChangeId));
-      } else {
-        UUID holdingId = Objects.requireNonNull(shortage.accountHoldingId());
-        Objects.requireNonNull(plan.ledger().accountHoldings().get(holdingId)).recordChange();
-        operations.save(
-            JobOrderMoneyOperation.accountCurrencyWipeShortage(
-                orderId, holdingId, shortage.amount(), patchChangeId));
-      }
+      operations.save(
+          holderId != null
+              ? JobOrderMoneyOperation.currencyWipeShortage(
+                  orderId, holderId, shortage.amount(), patchChangeId)
+              : JobOrderMoneyOperation.accountCurrencyWipeShortage(
+                  orderId,
+                  Objects.requireNonNull(shortage.accountHoldingId()),
+                  shortage.amount(),
+                  patchChangeId));
     }
   }
 
@@ -192,7 +185,7 @@ class JobOrderCurrencyWipeService implements JobOrderCurrencyWipe {
     @NotNull
     AuditDetails details() {
       return AuditDetails.of("orders", orders)
-          .with("holdings", shortages)
+          .with("shortages", shortages)
           .with("shortageTotal", shortageTotal.toPlainString())
           .with("attemptsCancelled", attempts)
           .with("commitmentsEnded", commitmentsEnded);

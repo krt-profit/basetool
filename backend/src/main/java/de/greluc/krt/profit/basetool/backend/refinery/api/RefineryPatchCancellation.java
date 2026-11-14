@@ -26,7 +26,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Ends the refinery orders a game patch ended (REQ-PATCH-006): every {@code OPEN} or {@code
  * IN_PROGRESS} order of every member that started before the patch's live time, an order without a
- * start counting from its creation.
+ * start counting from its creation and one with neither as started before.
  */
 public interface RefineryPatchCancellation {
 

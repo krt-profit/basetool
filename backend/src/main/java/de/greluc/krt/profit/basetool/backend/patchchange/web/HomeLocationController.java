@@ -19,7 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.web;
 
-import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationGateAccessFilter;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationGate;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.ChooseHomeLocationRequest;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.HomeLocationPhases;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.HomeLocationPromptDto;
@@ -47,7 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
  * The home-location gate leaves these endpoints open to a pending member.
  */
 @RestController
-@RequestMapping(HomeLocationGateAccessFilter.PROMPT_PATH)
+@RequestMapping(HomeLocationGate.PROMPT_PATH)
 @RequiredArgsConstructor
 @PreAuthorize("isAuthenticated()")
 public class HomeLocationController {

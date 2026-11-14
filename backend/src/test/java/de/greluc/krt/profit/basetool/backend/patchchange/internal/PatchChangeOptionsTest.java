@@ -21,6 +21,10 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

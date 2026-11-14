@@ -24,7 +24,9 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.ActorRef;
 import de.greluc.krt.profit.basetool.backend.notification.api.events.NoticeEvent;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -46,18 +48,40 @@ public class HangarAdminNotifier {
    * Announces an admin's change of one ship.
    *
    * @param memberId the ship's owner
-   * @param changeCode {@code ADDED}, {@code UPDATED}, {@code DELETED} or {@code ORG_UNIT_CHANGED}
+   * @param changeCode what the admin did
    * @param ship the ship, named by its type only
    */
-  public void shipChanged(@NotNull UUID memberId, @NotNull String changeCode, @NotNull Ship ship) {
+  void shipChanged(
+      @NotNull UUID memberId, @NotNull HangarChangeCode changeCode, @NotNull Ship ship) {
     tell(
         memberId,
         actor ->
             HangarNotices.hangarChanged(
                 memberId,
-                changeCode,
+                changeCode.name(),
                 ship.getShipType() == null ? ActorRef.UNKNOWN_NAME : ship.getShipType().getName(),
                 actor));
+  }
+
+  /**
+   * Announces an admin's bulk change of a member's ships: the ship when one changed, a summary with
+   * the count when several did, nothing when none did.
+   *
+   * @param memberId the ships' owner
+   * @param changed the ships the change applied to
+   * @param changeCode what the admin did, for the notice about a single ship
+   * @param summary builds the summary notice from the count and the acting admin
+   */
+  void shipsChanged(
+      @NotNull UUID memberId,
+      @NotNull List<Ship> changed,
+      @NotNull HangarChangeCode changeCode,
+      @NotNull BiFunction<Integer, ActorRef, NoticeEvent> summary) {
+    if (changed.size() == 1) {
+      shipChanged(memberId, changeCode, changed.getFirst());
+    } else if (changed.size() > 1) {
+      tell(memberId, actor -> summary.apply(changed.size(), actor));
+    }
   }
 
   /**

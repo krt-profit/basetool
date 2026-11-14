@@ -20,10 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.GameItemKind;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.MaterialType;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockWipeRow;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,11 +64,14 @@ class WipeSelectionTest {
 
     assertThat(selection.wipedRowIds())
         .containsExactlyInAnyOrder(medpenOfAda.id(), medpenOfBea.id(), quantaniumOfBea.id());
-    assertThat(selection.wipedRowsByGroup())
-        .isEqualTo(
-            Map.of(
-                "CONSUMABLES", Set.of(medpenOfAda.id(), medpenOfBea.id()),
-                "MATERIALS_RAW", Set.of(quantaniumOfBea.id())));
+    assertThat(selection.wipedRowsByShare())
+        .containsExactly(
+            Map.entry(WipeGroup.CONSUMABLES, Set.of(medpenOfAda.id(), medpenOfBea.id())),
+            Map.entry(WipeGroup.MATERIALS_RAW, Set.of(quantaniumOfBea.id())));
+    assertThatThrownBy(() -> selection.wipedRowsByShare().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> selection.wipedRowsByShare().get(WipeGroup.CONSUMABLES).clear())
+        .isInstanceOf(UnsupportedOperationException.class);
     assertThat(selection.wipedMembers()).isEqualTo(2);
   }
 
@@ -90,13 +97,10 @@ class WipeSelectionTest {
     WipeSelection selection =
         WipeSelection.of(rows, options(Set.of(WipeGroup.CONSUMABLES), Set.of(wipeRifle)));
 
-    assertThat(selection.wipedRowsByGroup())
-        .isEqualTo(
-            Map.of(
-                "CONSUMABLES",
-                Set.of(medpenOfAda.id(), medpenOfBea.id()),
-                WipeSelection.EXCEPTIONS,
-                Set.of(rifleOfAda.id())));
+    assertThat(selection.wipedRowsByShare())
+        .containsExactly(
+            Map.entry(WipeGroup.CONSUMABLES, Set.of(medpenOfAda.id(), medpenOfBea.id())),
+            Map.entry(WipeExceptionShare.WIPE_EXCEPTIONS, Set.of(rifleOfAda.id())));
     assertThat(selection.exceptionTally(wipeRifle)).isEqualTo(new WipeSelection.Tally(1, 1));
     assertThat(selection.groupTally(WipeGroup.FPS_EQUIPMENT))
         .isEqualTo(new WipeSelection.Tally(0, 0));

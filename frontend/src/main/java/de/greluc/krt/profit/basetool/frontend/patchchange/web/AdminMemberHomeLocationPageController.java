@@ -19,16 +19,10 @@
 
 package de.greluc.krt.profit.basetool.frontend.patchchange.web;
 
-import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
-import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
-import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationPromptDto;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,7 +44,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequestMapping(AdminMemberHomeLocationPageController.PAGE)
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('" + Roles.ADMIN + "')")
-@Slf4j
 public class AdminMemberHomeLocationPageController {
 
   /** The page's path, also the path of its relay endpoint. */
@@ -63,7 +56,7 @@ public class AdminMemberHomeLocationPageController {
   static final String PROMPT_ERROR = "admin.memberHomeLocation.error.load";
 
   /** Reads the member's prompt and the member. */
-  private final PatchChangeBackendClient patchChangeClient;
+  private final HomeLocationPageReader pageReader;
 
   /**
    * Renders the tab, or with {@code fragment=content} only its content. A prompt that cannot be
@@ -81,39 +74,17 @@ public class AdminMemberHomeLocationPageController {
       @PathVariable @NotNull UUID userId,
       @Nullable @RequestParam(required = false) String fragment,
       Model model) {
+    boolean contentOnly = CONTENT_FRAGMENT.equals(fragment);
+    HomeLocationPageReader.MemberTab tab = pageReader.memberTab(userId, !contentOnly);
     model.addAttribute("memberId", userId);
-    HomeLocationPromptDto prompt =
-        SectionFallback.load(
-            log,
-            "member-home-location",
-            () -> patchChangeClient.memberHomeLocationPrompt(userId),
-            null);
-    if (prompt == null) {
-      model.addAttribute("promptError", PROMPT_ERROR);
-    } else {
-      model.addAttribute("prompt", prompt);
-    }
-    if (CONTENT_FRAGMENT.equals(fragment)) {
+    tab.prompt()
+        .ifPresentOrElse(
+            prompt -> model.addAttribute("prompt", prompt),
+            () -> model.addAttribute("promptError", PROMPT_ERROR));
+    if (contentOnly) {
       return "patchchange/admin/member-home-location :: content";
     }
-    UserDto member =
-        SectionFallback.load(
-            log, "member-home-location-member", () -> patchChangeClient.member(userId), null);
-    model.addAttribute("memberName", memberName(member));
+    model.addAttribute("memberName", tab.memberName().orElse(null));
     return "patchchange/admin/member-home-location";
-  }
-
-  /**
-   * Picks the name the page head shows for the member.
-   *
-   * @param member the member, or {@code null} when it could not be read
-   * @return the effective name, or {@code null} when none is known
-   */
-  @Contract("null -> null")
-  private static @Nullable String memberName(@Nullable UserDto member) {
-    if (member == null) {
-      return null;
-    }
-    return member.effectiveName() != null ? member.effectiveName() : member.username();
   }
 }

@@ -86,9 +86,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class HangarService {
 
-  /** The {@code changeCode} of an admin's notice that a ship moved to another org unit. */
-  private static final String ORG_UNIT_CHANGED = "ORG_UNIT_CHANGED";
-
   private final ShipRepository shipRepository;
   private final UserRepository userRepository;
   private final ShipTypeRepository shipTypeRepository;
@@ -457,7 +454,7 @@ public class HangarService {
       long owningOrgUnitVersion) {
     ShipMove move = moveShip(memberId, shipId, orgUnitId, owningOrgUnitVersion);
     if (move.moved()) {
-      adminNotifier.shipChanged(memberId, ORG_UNIT_CHANGED, move.ship());
+      adminNotifier.shipChanged(memberId, HangarChangeCode.ORG_UNIT_CHANGED, move.ship());
     }
     return move.ship();
   }
@@ -540,13 +537,11 @@ public class HangarService {
   public @NotNull ShipBulkOrgUnitResultDto bulkChangeShipOrgUnitByAdmin(
       @NotNull UUID memberId, @NotNull List<UUID> shipIds, @Nullable UUID orgUnitId) {
     BulkMove move = moveShips(memberId, shipIds, orgUnitId);
-    int moved = move.movedShips().size();
-    if (moved == 1) {
-      adminNotifier.shipChanged(memberId, ORG_UNIT_CHANGED, move.movedShips().getFirst());
-    } else if (moved > 1) {
-      adminNotifier.tell(
-          memberId, actor -> HangarNotices.shipsOrgUnitChanged(memberId, moved, actor));
-    }
+    adminNotifier.shipsChanged(
+        memberId,
+        move.movedShips(),
+        HangarChangeCode.ORG_UNIT_CHANGED,
+        (count, actor) -> HangarNotices.shipsOrgUnitChanged(memberId, count, actor));
     return move.result();
   }
 
@@ -561,17 +556,14 @@ public class HangarService {
    */
   private @NotNull BulkMove moveShips(
       @NotNull UUID userId, @NotNull List<UUID> shipIds, @Nullable UUID orgUnitId) {
-    List<UUID> distinctIds = shipIds.stream().distinct().toList();
-    List<Ship> ships = shipRepository.lockAllByIdOrderById(distinctIds);
-    if (ships.size() != distinctIds.size()) {
-      throw new NotFoundException("Ship not found");
-    }
-    ships.forEach(ship -> ShipOwnership.requireOwner(ship, userId));
-    List<Ship> moving =
-        ships.stream()
-            .filter(ship -> !Objects.equals(orgUnitIdOf(ship.getOwningOrgUnit()), orgUnitId))
-            .toList();
-    int skipped = ships.size() - moving.size();
+    BulkShipSelection selection =
+        BulkShipSelection.lock(
+            shipRepository,
+            userId,
+            shipIds,
+            ship -> !Objects.equals(orgUnitIdOf(ship.getOwningOrgUnit()), orgUnitId));
+    List<Ship> moving = selection.changing();
+    int skipped = selection.skipped();
     if (moving.isEmpty()) {
       return new BulkMove(List.of(), new ShipBulkOrgUnitResultDto(0, skipped));
     }
@@ -801,7 +793,7 @@ public class HangarService {
             member,
             dto,
             orgUnitStampingService.resolveOrgUnitForAdminOnBehalf(member, dto.owningOrgUnitId()));
-    adminNotifier.shipChanged(memberId, "ADDED", ship);
+    adminNotifier.shipChanged(memberId, HangarChangeCode.ADDED, ship);
     return ship;
   }
 
@@ -817,7 +809,7 @@ public class HangarService {
   public Ship updateShipByAdmin(
       @NotNull UUID memberId, @NotNull UUID shipId, @NotNull ShipRequestDto dto) {
     Ship ship = updateShip(memberId, shipId, dto);
-    adminNotifier.shipChanged(memberId, "UPDATED", ship);
+    adminNotifier.shipChanged(memberId, HangarChangeCode.UPDATED, ship);
     return ship;
   }
 
@@ -833,7 +825,7 @@ public class HangarService {
     Ship ship = shipRepository.findById(shipId).orElse(null);
     int detached = deleteShip(memberId, shipId);
     if (ship != null) {
-      adminNotifier.shipChanged(memberId, "DELETED", ship);
+      adminNotifier.shipChanged(memberId, HangarChangeCode.DELETED, ship);
     }
     return detached;
   }

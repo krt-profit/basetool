@@ -65,7 +65,11 @@ public final class InventoryCheckoutFixtures {
             inventoryItemRepository, mock(OrderLinkedStockWriteObserver.class));
     var mergeService =
         new InventoryMergeService(
-            orderWrites, inventoryItemRepository, stockOfferLookup, auditRecorder, Optional::empty);
+            orderWrites,
+            inventoryItemRepository,
+            stockOfferLookup,
+            auditRecorder,
+            _ -> Optional.empty());
     var transferNotices = new InventoryTransferNoticeService(userRepository, eventPublisher);
     var bulkService =
         new InventoryBulkRebookService(

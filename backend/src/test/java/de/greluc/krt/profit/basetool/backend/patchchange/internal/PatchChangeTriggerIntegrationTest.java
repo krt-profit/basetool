@@ -32,6 +32,7 @@ import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.refinery.api.RefineryOrderStatus;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrder;
 import de.greluc.krt.profit.basetool.backend.refinery.internal.RefineryOrderRepository;
@@ -117,6 +118,8 @@ class PatchChangeTriggerIntegrationTest {
     UUID runningWithoutStart = persistOrder(RefineryOrderStatus.IN_PROGRESS, null);
     jdbc.update(
         "UPDATE refinery_order SET created_at = ? WHERE id = ?", ts(BEFORE), runningWithoutStart);
+    UUID undated = persistOrder(RefineryOrderStatus.OPEN, null);
+    jdbc.update("UPDATE refinery_order SET created_at = NULL WHERE id = ?", undated);
     UUID openAfter = persistOrder(RefineryOrderStatus.OPEN, AFTER);
     UUID completedBefore = persistOrder(RefineryOrderStatus.COMPLETED, BEFORE);
     ExchangeCaller caller = new ExchangeCaller(owner, "versekit", "k".repeat(43));
@@ -124,12 +127,16 @@ class PatchChangeTriggerIntegrationTest {
 
     PatchChangeDto recorded = trigger.trigger(request("0.1", LIVE_AT));
 
+    assertThat(countOf(recorded.counts(), PatchCount.REFINERY_ORDERS_CANCELED))
+        .as("undated orders other tests left behind are cancelled too")
+        .isGreaterThanOrEqualTo(3);
     assertThat(recorded.counts())
-        .contains(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 2))
         .extracting(PatchCountDto::kind)
         .contains(PatchCount.MEMBERS_ASKED);
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.CANCELED);
     assertThat(statusOf(runningWithoutStart)).isEqualTo(RefineryOrderStatus.CANCELED);
+    assertThat(statusOf(undated)).isEqualTo(RefineryOrderStatus.CANCELED);
+    assertThat(reasonOf(undated)).isEqualTo(recorded.id());
     assertThat(statusOf(openAfter)).isEqualTo(RefineryOrderStatus.OPEN);
     assertThat(statusOf(completedBefore)).isEqualTo(RefineryOrderStatus.COMPLETED);
     assertThat(reasonOf(openBefore)).isEqualTo(recorded.id());
@@ -142,7 +149,8 @@ class PatchChangeTriggerIntegrationTest {
                 String.class,
                 owner,
                 recorded.id()))
-        .containsExactlyInAnyOrder(openBefore.toString(), runningWithoutStart.toString());
+        .containsExactlyInAnyOrder(
+            openBefore.toString(), runningWithoutStart.toString(), undated.toString());
     assertThat(auditCount("PATCH_CHANGE_TRIGGERED", recorded.id())).isEqualTo(1L);
     assertThat(auditCount("REFINERY_ORDERS_CANCELED_BY_PATCH", recorded.id())).isEqualTo(1L);
 
@@ -242,10 +250,9 @@ class PatchChangeTriggerIntegrationTest {
             new PatchChangePreviewRequest(
                 LIVE_AT, PatchChangeOptions.presetFor(PatchKind.FULL_WIPE)));
 
-    assertThat(preview.counts())
-        .contains(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 1))
-        .extracting(PatchCountDto::kind)
-        .contains(PatchCount.MEMBERS_ASKED);
+    assertThat(countOf(preview.counts(), PatchCount.REFINERY_ORDERS_CANCELED))
+        .isGreaterThanOrEqualTo(1);
+    assertThat(preview.counts()).extracting(PatchCountDto::kind).contains(PatchCount.MEMBERS_ASKED);
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.OPEN);
     assertThat(history.history()).isEmpty();
   }
@@ -260,6 +267,20 @@ class PatchChangeTriggerIntegrationTest {
   private static TriggerPatchChangeRequest request(String label, Instant liveAt) {
     return new TriggerPatchChangeRequest(
         label, PatchKind.REBUILD, liveAt, PatchChangeOptions.presetFor(PatchKind.REBUILD), label);
+  }
+
+  /**
+   * Reads one kind's count out of a trigger's or preview's counts.
+   *
+   * @param counts the counts
+   * @param kind the kind
+   * @return the kind's count, {@code 0} when it is missing
+   */
+  private static long countOf(@NotNull List<PatchCountDto> counts, @NotNull PatchCount kind) {
+    return counts.stream()
+        .filter(count -> count.kind() == kind)
+        .mapToLong(PatchCountDto::value)
+        .sum();
   }
 
   /**

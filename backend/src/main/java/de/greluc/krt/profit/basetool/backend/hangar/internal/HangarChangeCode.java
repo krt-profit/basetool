@@ -17,16 +17,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package de.greluc.krt.profit.basetool.backend.patchchange.internal;
+package de.greluc.krt.profit.basetool.backend.hangar.internal;
 
-/** Where a member stands in the latest home-location phase (REQ-PATCH-021, REQ-PATCH-022). */
-public enum MemberRelocationState {
-  /** No phase asked the member: none ever ran, or the account is younger than its live time. */
-  NOT_ASKED,
-  /** The phase is open and the member has not chosen. */
-  PENDING,
-  /** The member has chosen and relocated in the phase. */
-  RELOCATED,
-  /** An admin ended the phase before the member chose. */
-  PHASE_ENDED
+/**
+ * What an admin did to one of a member's ships, the {@code changeCode} of the member's notice
+ * (REQ-HANGAR-008); the notice carries the constant's name.
+ */
+enum HangarChangeCode {
+  /** The admin added the ship. */
+  ADDED,
+  /** The admin changed the ship's values, its origin included. */
+  UPDATED,
+  /** The admin deleted the ship. */
+  DELETED,
+  /** The admin moved the ship to another org unit or out of one. */
+  ORG_UNIT_CHANGED
 }

@@ -364,8 +364,7 @@ public class ExchangeStockWriteService
         plan.add(
             move != null
                 ? ExchangeChangeSetAdapter.write(new Rebooking(i, move, null))
-                : ExchangeChangeSetAdapter.skip(
-                    decision.refusal() == null ? UNCHANGED : REJECTED, decision.refusal()));
+                : unwritten(caller, lot.key(), decision.refusal(), latest));
         continue;
       }
       boolean retired = Objects.requireNonNull(catalogue.get(i)).retired();
@@ -374,7 +373,8 @@ public class ExchangeStockWriteService
       if (removedByPatch != null) {
         decided = ExchangeChangeSetAdapter.removedByPatch(removedByPatch);
       } else if (current.compareTo(expected) != 0) {
-        decided = ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT);
+        decided =
+            ExchangeChangeSetAdapter.versionConflict(patchChangeOf(caller, lot.key(), latest));
       } else if (current.compareTo(target) == 0) {
         decided = ExchangeChangeSetAdapter.skip(UNCHANGED, null);
       } else if (retired && rise.signum() > 0 && !cover.covers(lot.catalogueId(), rise)) {
@@ -539,6 +539,45 @@ public class ExchangeStockWriteService
         || Boolean.TRUE.equals(op.override())) {
       return null;
     }
+    return patchChangeOf(caller, lotKey, latest);
+  }
+
+  /**
+   * Plans a share or unshare that moves nothing: unchanged without a refusal, and a version
+   * conflict naming the patch change behind the lot's latest change (REQ-PATCH-053).
+   *
+   * @param caller the caller
+   * @param lotKey the lot's key
+   * @param refusal the ledger's refusal, or {@code null} when the op found what it asked for
+   * @param latest the latest change of each lot read so far in this decision; filled on a miss
+   * @return the plan
+   */
+  private @NotNull Planned<StockWrite> unwritten(
+      @NotNull ExchangeCaller caller,
+      @NotNull String lotKey,
+      @Nullable String refusal,
+      @NotNull Map<String, Optional<ExchangeChange>> latest) {
+    if (refusal == null) {
+      return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
+    }
+    return VERSION_CONFLICT.equals(refusal)
+        ? ExchangeChangeSetAdapter.versionConflict(patchChangeOf(caller, lotKey, latest))
+        : ExchangeChangeSetAdapter.skip(REJECTED, refusal);
+  }
+
+  /**
+   * Names the patch change behind a lot's latest change.
+   *
+   * @param caller the caller
+   * @param lotKey the lot's key
+   * @param latest the latest change of each lot read so far in this decision; filled on a miss
+   * @return the patch change, or {@code null} when the lot's latest change came from another
+   *     channel or the feed holds none
+   */
+  private @Nullable ExchangePatchChangeRefDto patchChangeOf(
+      @NotNull ExchangeCaller caller,
+      @NotNull String lotKey,
+      @NotNull Map<String, Optional<ExchangeChange>> latest) {
     return latest(caller, lotKey, latest).map(patchRemovals::patchChangeOf).orElse(null);
   }
 

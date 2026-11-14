@@ -535,7 +535,7 @@ with the selection bar of REQ-HANGAR-010 / -012.
   goes up, so an edit dialog opened before the action 409s.
 - **Audit.** One `HANGAR_SHIPS_BULK_ORIGIN_CHANGED` summary (REQ-HANGAR-004) with `changed` and
   `skipped`, never the origin, no names, no per-ship events; nothing when nothing changed.
-- **Notice.** On the admin path the member hears one notice per action, after the commit:
+- **Notice.** On the admin path the member hears one notice per action, after the commit (decided by the owner on the review of #3423, D2):
   `HANGAR_CHANGED_BY_ADMIN` with `changeCode` `UPDATED` and the ship type when one ship changed, a
   summary `HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN` with the count when several did (seeded rule
   `V419`, `EVENT_RECIPIENT`, actor excluded; [`hangar-notifications.md`](hangar-notifications.md)

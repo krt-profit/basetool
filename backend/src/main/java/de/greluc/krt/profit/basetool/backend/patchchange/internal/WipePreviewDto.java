@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;

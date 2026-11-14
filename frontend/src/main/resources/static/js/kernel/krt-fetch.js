@@ -198,21 +198,20 @@ function maybeReauthenticate(response) {
 const SESSION_GATE_HEADERS = ['X-Terms-Acceptance-Required', 'X-Home-Location-Required'];
 
 /**
- * If response carries a session gate's header (the consent's, REQ-SEC-028, or the home
- * location's, REQ-PATCH-020), navigates to the page it names and returns true; otherwise returns
- * false. Safe to call with any Response.
+ * If response carries a session gate's header (REQ-SEC-028, REQ-PATCH-020), navigates to the page
+ * it names and returns true; otherwise returns false. Safe to call with any Response.
  *
  * @param {Response} response the response to inspect
  * @returns {boolean} true when the browser was sent to a gate's page
  */
-function maybeTermsGate(response) {
+function maybeSessionGate(response) {
     if (!response || !response.headers || typeof response.headers.get !== 'function') {
         return false;
     }
     for (const header of SESSION_GATE_HEADERS) {
         const target = response.headers.get(header);
         if (target) {
-            return termsGateRedirect(target);
+            return sessionGateRedirect(target);
         }
     }
     return false;
@@ -220,13 +219,13 @@ function maybeTermsGate(response) {
 
 /**
  * Navigates the window to a session gate's page, refusing anything that is not a same-origin
- * absolute path. Also used by the SSE `terms-gate` and `home-location-gate` events and the
- * /ws/sync 4003 close, which carry a bare URL.
+ * absolute path. Also used by the session gates' SSE events and the /ws/sync 4003 close, which
+ * carry a bare URL.
  *
  * @param {string | null | undefined} url the gate page's path the server named
  * @returns {boolean} true when the browser was sent to the gate's page
  */
-function termsGateRedirect(url) {
+function sessionGateRedirect(url) {
     const target = safeSameOriginUrl(url);
     if (!target) {
         return false;
@@ -238,8 +237,8 @@ function termsGateRedirect(url) {
 /** @type {KrtReauthApi} */
 export const krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
 
-/** @type {KrtTermsGateApi} */
-export const krtTermsGate = { check: maybeTermsGate, redirect: termsGateRedirect };
+/** @type {KrtSessionGateApi} */
+export const krtSessionGate = { check: maybeSessionGate, redirect: sessionGateRedirect };
 
 /**
  * Assembles the headers shared by {@link write} and {@link submitForm}: Accept,
@@ -393,7 +392,7 @@ async function get(url, opts) {
             readAborters.delete(options.key);
         }
     }
-    if (maybeReauthenticate(response) || maybeTermsGate(response)) {
+    if (maybeReauthenticate(response) || maybeSessionGate(response)) {
         return null;
     }
     if (response.redirected) {
@@ -782,7 +781,7 @@ async function send(opts, buildInit, url) {
             return { ok: false, status: response.status, body };
         }
 
-        if (maybeTermsGate(response)) {
+        if (maybeSessionGate(response)) {
             return { ok: false, status: response.status, body };
         }
 

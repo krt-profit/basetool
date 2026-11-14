@@ -376,6 +376,21 @@ class JobOrderMoneyLedger {
       return Objects.requireNonNull(identities.get(canonical(identities, id)));
     }
 
+    /**
+     * Moves the revision of the position a change of the order's money touches: the Bank account
+     * position when one is named, otherwise the member's personal holder.
+     *
+     * @param holderId the personal holder, used when no account position is named
+     * @param accountHoldingId the Bank account position, or {@code null} for the personal holder
+     */
+    void recordChange(@Nullable UUID holderId, @Nullable UUID accountHoldingId) {
+      if (accountHoldingId == null) {
+        holder(Objects.requireNonNull(holderId)).recordChange();
+      } else {
+        Objects.requireNonNull(accountHoldings.get(accountHoldingId)).recordChange();
+      }
+    }
+
     private static void add(
         Map<UUID, BigDecimal> balances,
         Map<UUID, JobOrderMoneyHolder> identities,
