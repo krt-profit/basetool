@@ -71,6 +71,11 @@
                 <th:block th:replace="~{kernel/fragments/components :: toolbarSearch('hangar-ship-filter', 'search', ${search}, 'hangar.filter.placeholder')}"></th:block>
                 <th:block th:replace="~{kernel/fragments/components :: segmented(name='fitted', labelKey='hangar.fit.label', selected=${fitted},
                     options=${ {{value: '', labelKey: 'filter.all'}, {value: 'true', labelKey: 'hangar.fit.ready'}, {value: 'false', labelKey: 'hangar.fit.notReady'}} })}"></th:block>
+                <label class="krt-switch" for="hangar-origin-unknown" data-filter-chip-ignore>
+                    <input type="checkbox" role="switch" id="hangar-origin-unknown" name="origin" value="UNKNOWN"
+                           data-testid="hangar-origin-unknown-filter" th:checked="${origin == 'UNKNOWN'}">
+                    <span th:text="#{hangar.origin.filter.unknown}">Herkunft unbekannt</span>
+                </label>
                 <span class="toolbar__spacer"></span>
                 <span class="toolbar__count" id="hangar-fit-summary" data-testid="hangar-fit-summary"
                       th:hidden="${fittedShipCount == null or totalShipCount == 0}"
@@ -79,10 +84,15 @@
             <input type="hidden" name="size" th:value="${pageSize}">
         </form>
 
+        <p id="hangar-origin-hint" class="alert alert-info" role="status" data-testid="hangar-origin-hint"
+           th:hidden="${unknownOriginCount == null or unknownOriginCount == 0}"
+           th:text="${unknownOriginCount != null} ? #{hangar.origin.hint(${unknownOriginCount})} : ''">3 Schiffe haben noch keine Herkunft.</p>
+
         <div id="hangar-results" class="card card--flush" th:data-live-sync-topic="${hangarLiveSyncTopic}">
         <th:block th:fragment="hangarResults">
             <div hidden id="hangar-stats" data-testid="hangar-stats"
-                 th:data-total="${totalShipCount}" th:data-fitted="${fittedShipCount}"></div>
+                 th:data-total="${totalShipCount}" th:data-fitted="${fittedShipCount}"
+                 th:data-unknown-origin="${unknownOriginCount}"></div>
             <div class="table-responsive" th:if="${!#lists.isEmpty(myShips)}">
                 <table class="data-table data-table--stack hangar-table">
                     <thead>
@@ -167,6 +177,8 @@
                                         th:data-loc="${ship.location != null ? ship.location.id : ''}"
                                         th:data-fitted="${ship.fitted}"
                                         th:data-version="${ship.version}"
+                                        th:data-origin="${ship.origin != null ? ship.origin.value : ''}"
+                                        th:data-origin-locked="${ship.origin != null and ship.origin.locked}"
                                         th:title="#{hangar.ship.edit}" th:aria-label="#{hangar.ship.edit}"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-edit"/></svg></button>
                             </td>
                         </tr>
@@ -174,10 +186,10 @@
                 </table>
             </div>
 
-            <th:block th:if="${#lists.isEmpty(myShips) and error == null and search == null and fitted == ''}">
+            <th:block th:if="${#lists.isEmpty(myShips) and error == null and search == null and fitted == '' and origin == ''}">
                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='hangar.empty', textKey='hangar.empty.text')}"></th:block>
             </th:block>
-            <th:block th:if="${#lists.isEmpty(myShips) and error == null and (search != null or fitted != '')}">
+            <th:block th:if="${#lists.isEmpty(myShips) and error == null and (search != null or fitted != '' or origin != '')}">
                 <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='hangar.filter.no_results', textKey='hangar.filter.no_results.text',
                     actionHref=@{/hangar(size=${pageSize})}, actionKey='hangar.filter.clear')}"></th:block>
             </th:block>
@@ -193,6 +205,10 @@
             <span class="form-actions__summary" aria-live="polite"><strong id="hangar-selection-count">0</strong> <span th:text="#{filter.selected}">ausgew&auml;hlt</span></span>
             <button type="button" class="btn btn-ghost" data-trigger="hangar-clear-selection"
                     data-testid="hangar-bulk-clear" th:text="#{hangar.bulk.clear}">Auswahl aufheben</button>
+            <button type="button" class="btn btn-outline" data-trigger="hangar-bulk-origin" data-origin="PLEDGE"
+                    data-testid="hangar-bulk-origin-pledge" th:text="#{hangar.origin.bulk.pledge}">Als gepledged markieren</button>
+            <button type="button" class="btn btn-outline" data-trigger="hangar-bulk-origin" data-origin="IN_GAME"
+                    data-testid="hangar-bulk-origin-in-game" th:text="#{hangar.origin.bulk.inGame}">Als ingame gekauft markieren</button>
             <button type="button" class="btn btn-outline" data-trigger="hangar-open-bulk-unit"
                     data-testid="hangar-bulk-unit-open"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg> <span th:text="#{hangar.ship.unit.change}">Einheit &auml;ndern</span></button>
         </div>
@@ -260,7 +276,9 @@
                         </tbody>
                         <tbody th:if="${canSeeHangarOwnerDetails and hasDetails}" class="hangar-tree__owners" th:id="${groupId}" hidden>
                             <tr th:each="detail : ${item.details}" class="hangar-tree__owner" data-testid="squadron-owner-row">
-                                <td><span class="hangar-tree__owner-name" th:text="${detail.ownerName}">greluc</span></td>
+                                <td><span class="hangar-tree__owner-name" th:text="${detail.ownerName}">greluc</span>
+                                    <span th:if="${detail.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
+                                          th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span></td>
                                 <td class="num hangar-tree__owner-gap"></td>
                                 <td>
                                     <div class="hangar-tree__owner-meta">
@@ -340,7 +358,8 @@
                 </fieldset>
                 <div class="form-group">
                     <label for="ship-location" th:text="#{hangar.ship.location}">Ort</label>
-                    <select id="ship-location" name="locationId" th:field="*{locationId}">
+                    <select id="ship-location" name="locationId" th:field="*{locationId}"
+                            th:data-default-location="${shipLocationDefault}" data-testid="hangar-ship-location">
                         <option value="" th:text="#{hangar.ship.select_location}">Bitte wählen...</option>
                         <option th:each="loc : ${locations}" th:value="${loc.id}" th:text="${loc.name}"></option>
                     </select>
@@ -350,6 +369,7 @@
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
                     <label for="ship-fitted" class="ship-fitted-label" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
+                <th:block th:replace="~{hangar/fragments/ship-origin-field :: shipOriginField(selected=*{origin})}"></th:block>
                 <div id="ship-owner-picker-slot" data-testid="ship-owner-picker-slot">
                 <th:block th:replace="~{kernel/fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 </div>
@@ -497,6 +517,11 @@
         bulkUnitSuccessPartial: /*[[#{hangar.bulk.unit.success.partial}]]*/ 'Einheit bei {0} Schiffen geaendert, {1} waren bereits dort.',
         bulkUnitNone:          /*[[#{hangar.bulk.unit.none}]]*/ 'Keine Aenderung.',
         bulkUnitError:         /*[[#{error.hangar.ship.bulk_unit_change}]]*/ 'Aendern fehlgeschlagen.',
+        bulkOriginSuccess:        /*[[#{hangar.origin.bulk.success}]]*/ 'Herkunft bei {0} Schiffen gesetzt.',
+        bulkOriginSuccessPartial: /*[[#{hangar.origin.bulk.success.partial}]]*/ 'Herkunft bei {0} Schiffen gesetzt, {1} uebersprungen.',
+        bulkOriginNone:           /*[[#{hangar.origin.bulk.none}]]*/ 'Keine Aenderung.',
+        bulkOriginError:          /*[[#{error.hangar.ship.bulk_origin_change}]]*/ 'Aendern fehlgeschlagen.',
+        originHintTemplate: /*[[#{hangar.origin.hint}]]*/ '{0} Schiffe haben noch keine Herkunft.',
         homeBodyTemplate: /*[[#{hangar.home_location.modal.body}]]*/ 'Setzt den Ort von {0} Schiff(en) auf die gewaehlte Home-Location.',
         fitSummaryTemplate: /*[[#{hangar.fitSummary}]]*/ '{0} von {1} einsatzbereit'
     };

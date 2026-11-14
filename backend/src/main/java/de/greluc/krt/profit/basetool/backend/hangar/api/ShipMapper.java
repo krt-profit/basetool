@@ -39,26 +39,43 @@ import org.mapstruct.Named;
 public interface ShipMapper {
   /**
    * Maps a {@link Ship} to its DTO, publishing the owning org unit as {@code owningSquadron} and
-   * leaving out the pledge data, which only {@link #toOwnerDto} carries (REQ-HANGAR-015).
+   * leaving out the pledge data and the origin, which only {@link #toOwnerDto} carries
+   * (REQ-HANGAR-015, REQ-HANGAR-017).
    *
    * @param ship the entity to project; {@code null} returns {@code null}
-   * @return the ship DTO without pledge data
+   * @return the ship DTO without pledge data and origin
    */
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "pledge", ignore = true)
+  @Mapping(target = "origin", ignore = true)
+  @Mapping(target = "relocationPending", ignore = true)
+  @Mapping(target = "withRelocationPending", ignore = true)
   ShipDto toDto(Ship ship);
 
   /**
-   * Maps a {@link Ship} to its DTO including the imported pledge data, for the owner and for admins
-   * (REQ-HANGAR-015).
+   * Maps a {@link Ship} to its DTO including the imported pledge data and the origin, for the owner
+   * and for admins (REQ-HANGAR-015, REQ-HANGAR-017).
    *
    * @param ship the entity to project; {@code null} returns {@code null}
-   * @return the ship DTO with pledge data
+   * @return the ship DTO with pledge data and origin
    */
   @Named("withPledge")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "pledge", source = "ship")
+  @Mapping(target = "origin", source = "ship")
+  @Mapping(target = "relocationPending", ignore = true)
+  @Mapping(target = "withRelocationPending", ignore = true)
   ShipDto toOwnerDto(Ship ship);
+
+  /**
+   * Reads a ship's origin as it reads everywhere, with whether it is locked.
+   *
+   * @param ship the entity to read
+   * @return the effective origin and the lock, or {@code null} for no ship
+   */
+  default @Nullable ShipOriginDto originOf(@Nullable Ship ship) {
+    return ship == null ? null : new ShipOriginDto(ship.effectiveOrigin(), ship.isOriginLocked());
+  }
 
   /**
    * Collects the imported pledge columns of a ship.

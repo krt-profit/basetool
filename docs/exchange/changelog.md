@@ -3,6 +3,79 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-14
+
+- **New: `cancelledByPatch` on bank requests.** A request that a patch change's currency wipe
+  cancelled carries `cancelledByPatch: {id, label}`, the patch change with its current label; every
+  other request leaves the field out ([bank](resources/bank.md#own-requests)). New in
+  `bank-request.schema.json`: the optional `cancelledByPatch`.
+- **New: the relocation after a patch change.** When a patch change asks the members for a new home
+  location, the Basetool moves each member's lots and ships from before the patch's live time to the
+  chosen home once the member has chosen. A relocated lot arrives as a tombstone for the old key and
+  an item for the new key, both from the channel `patch` with the patch change's `id`; a moved ship
+  arrives with its new location and a new `version` ([patch changes](sync-guide.md#patch-changes)).
+- **New: the error `RELOCATION_PENDING`.** Until the member has chosen, a change set that writes one
+  of those lots or ships answers `409 RELOCATION_PENDING` and writes nothing, from the member's own
+  client and from another member's client on a pool lot the member holds; reads and new stock still
+  work ([errors](errors.md#request-errors)). No schema changes.
+- **New: the patch-change resource.** `GET /exchange/v1/me/patch-change` (scope
+  `exchange.patch.read`) answers the latest patch change with its `id`, label, kind, live time and
+  options: every wipe group with the keys of its catalogue types and whether it was wiped, the
+  exceptions, the refinery option, the currency wipe and the home-location prompt. Beside it the
+  member's state in the latest home-location phase, the chosen home location and when, the home
+  locations on offer and, while the member is pending, what would move from each current location
+  ([patch change](resources/patch-change.md)). New: `patch-change.schema.json`.
+- **New: the home-location choice.** `POST /exchange/v1/me/patch-change/home-location` (scope
+  `exchange.patch.write`, granted only with `exchange.patch.read`) makes the member's choice with the
+  web's rules and relocates the member in the same request; it counts one write. A second choice
+  answers `409 HOME_LOCATION_ALREADY_CHOSEN`, a choice without an open phase asking the member
+  `409 HOME_LOCATION_NOT_ASKED`, a location not on offer `400 HOME_LOCATION_NOT_OFFERED`
+  ([choosing](resources/patch-change.md#choosing-the-home-location--post-exchangev1mepatch-changehome-location)).
+  New: `#/$defs/homeLocationChoice` and `#/$defs/homeLocationChosen`.
+- **New: `results[].patchChange` on `REMOVED_ELSEWHERE`.** A stock op against a lot a patch change
+  emptied is refused `REMOVED_ELSEWHERE` whatever its `expectedQuantity`, and a ship `upsert` of a
+  ship a patch change wiped likewise; the result item names the patch change `{id, label}`
+  ([pushing against what a patch change removed](resources/patch-change.md#pushing-against-what-a-patch-change-removed)).
+  New in `change-result.schema.json`: the optional `results[].patchChange`.
+- **New: `results[].patchChange` on `VERSION_CONFLICT`.** A stale stock op against a lot a patch
+  change moved in part, and a stale ship `upsert` or `remove` of a ship it moved, stay
+  `VERSION_CONFLICT`; when the lot's or the ship's last change came from a patch change, the
+  result item now names it in the same optional `patchChange`
+  ([pushing against what a patch change removed](resources/patch-change.md#pushing-against-what-a-patch-change-removed)).
+  No schema change beyond the description.
+- **New: org-stock refusals name the patch change.** An org-stock op on an entry a patch change
+  wiped was `NOT_PERMITTED` and is now `REMOVED_ELSEWHERE`. A stale op on an entry a patch change
+  moved stays `VERSION_CONFLICT`. Both name the patch change in the optional `results[].patchChange`
+  when the entry's own last change in its pool was the patch change's. Every other gone entry stays
+  `NOT_PERMITTED`
+  ([org stock](resources/org-stock.md#the-result)). No schema change beyond the description.
+- **Fixed: the sandbox client has the bank scopes.** The sandbox registry grants `sandbox-client`
+  `exchange.bank.read`, `exchange.bank.request` and `exchange.bank.queue`, as the sandbox page
+  promised, and the seed switches the bank on ([sandbox](sandbox.md#clients)). Nothing changes
+  outside the sandbox.
+- **Changed: deleted wipe exceptions stay in the patch-change read.** An exception whose item or
+  material was removed from the catalogue since is no longer left out: its `entry` keeps its `bt`
+  and carries no `name` ([patch change](resources/patch-change.md)). No schema change.
+
+## 2026-11-13
+
+- **New: the ship's `origin`.** Every ship in `GET /exchange/v1/me/ships` carries `origin`:
+  `PLEDGE`, `IN_GAME` or `UNKNOWN` ([ships](resources/ships.md#a-ship)). An `upsert` may send it;
+  leaving it out keeps the ship's origin, and a new ship without it is `UNKNOWN`. A ship from a
+  hangar file import, or with a pledge id, is locked to `PLEDGE`: it always reads `PLEDGE` and
+  refuses any other value with the new reason `ORIGIN_LOCKED`. A ship is in the feed again when an
+  import locks it. This coarse origin is the one exception to "purchase data is never exchanged";
+  pledge ids, dates and prices stay out. Additive: a reader that ignores `origin` keeps working.
+- **New: the `patch` change source.** When an admin records a Star Citizen patch change, the
+  changes its trigger makes reach the feeds from the new channel `patch`. A tombstone's `removedBy`
+  then carries `patchChange: {id, label}`; the `id` names every entry one patch change caused
+  ([sync guide](sync-guide.md#tombstones-and-never-re-adding)). New in
+  `tombstone.schema.json`: the channel value `patch` and the optional `removedBy.patchChange`.
+- **New: `canceledByPatch` on refinery orders.** A running order the patch change ended arrives
+  with the status `CANCELED` and `canceledByPatch: {id, label}`
+  ([orders a patch ended](resources/refinery-orders.md#orders-a-patch-ended)). New in
+  `refinery-order.schema.json`: the optional `canceledByPatch`.
+
 ## 2026-11-09
 
 - **New: refinery orders.** A client reads and writes the member's own refinery work orders and

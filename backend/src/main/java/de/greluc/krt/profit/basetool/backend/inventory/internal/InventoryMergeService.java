@@ -23,8 +23,10 @@ import de.greluc.krt.profit.basetool.backend.audit.api.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.audit.api.AuditRecorder;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
+import de.greluc.krt.profit.basetool.backend.inventory.api.StockMergeCutoff;
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockOfferLookup;
 import de.greluc.krt.profit.basetool.backend.kernel.ScuAmounts;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -46,6 +48,9 @@ public class InventoryMergeService {
   private final StockOfferLookup stockOfferLookup;
   private final AuditRecorder auditRecorder;
 
+  /** From when on rows take part in the merge (REQ-PATCH-004). */
+  private final StockMergeCutoff mergeCutoff;
+
   /**
    * Folds every other row with the same physical stock identity into {@code row} (REQ-INV-026):
    * amounts summed, distinct notes concatenated, earmarks unioned, siblings deleted.
@@ -53,8 +58,10 @@ public class InventoryMergeService {
    * <p>Always applies to {@code PIECE} materials and game items; for {@code SCU} only when {@code
    * clientRequestedMerge} is set. The group is locked {@code FOR UPDATE}, and rows backing a
    * Materialbörse offer are never changed or folded; the offers are checked again once the group is
-   * locked, since an offer released while the lock waited is not excluded by the locking read. Must
-   * run inside the caller's transaction.
+   * locked, since an offer released while the lock waited is not excluded by the locking read.
+   * While the holder's merge cutoff stands, a row created before it or without a creation time
+   * neither survives a merge nor is folded (REQ-PATCH-004). Must run inside the caller's
+   * transaction.
    *
    * @param row the just-written target row (managed); the merge survivor
    * @param clientRequestedMerge the per-action opt-in for an {@code SCU} material (ignored for
@@ -76,6 +83,10 @@ public class InventoryMergeService {
     if (stockOfferLookup.isOffered(row.getId())) {
       return row;
     }
+    final Instant cutoff = mergeCutoff.cutoffFor(row.getUser().getId()).orElse(null);
+    if (cutoff != null && (row.getCreatedAt() == null || row.getCreatedAt().isBefore(cutoff))) {
+      return row;
+    }
 
     final List<InventoryItem> group =
         gameItemRow
@@ -87,7 +98,8 @@ public class InventoryMergeService {
                 null,
                 row.getPersonal(),
                 row.getStolen(),
-                row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null)
+                row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null,
+                cutoff)
             : inventoryItemRepository.findMergeGroupForUpdate(
                 row.getUser().getId(),
                 Objects.requireNonNull(material).getId(),
@@ -95,7 +107,8 @@ public class InventoryMergeService {
                 row.getQuality(),
                 row.getPersonal(),
                 row.getStolen(),
-                row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null);
+                row.getOwningOrgUnit() != null ? row.getOwningOrgUnit().getId() : null,
+                cutoff);
 
     final List<InventoryItem> candidates =
         group.stream().filter(candidate -> !candidate.getId().equals(row.getId())).toList();

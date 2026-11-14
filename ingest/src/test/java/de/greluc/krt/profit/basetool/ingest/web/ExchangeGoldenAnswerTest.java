@@ -142,7 +142,7 @@ class ExchangeGoldenAnswerTest {
   private static final String SHIP_PAGE =
       "{\"items\":[{\"shipId\":\"0b9f6c1e-2a3d-4e5f-8a7b-9c0d1e2f3a4b\",\"version\":0,"
           + "\"shipType\":{\"bt\":\"7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f\",\"name\":\"Cutlass"
-          + " Black\"},\"insurance\":{\"kind\":\"LTI\"},\"fitted\":false,\"orgUnit\":{\"id\":\"0d6f3c1a-5b2e-4f7a-9c8d-1e2f3a4b5c6d\",\"name\":\"Staffel"
+          + " Black\"},\"insurance\":{\"kind\":\"LTI\"},\"origin\":\"PLEDGE\",\"fitted\":false,\"orgUnit\":{\"id\":\"0d6f3c1a-5b2e-4f7a-9c8d-1e2f3a4b5c6d\",\"name\":\"Staffel"
           + " Nord\",\"shorthand\":\"NORD\",\"kind\":\"SQUADRON\"},\"orgUnitVersion\":1}],"
           + "\"removed\":[],\"nextCursor\":\"f1.9.0\",\"hasMore\":false}";
 
@@ -504,6 +504,12 @@ class ExchangeGoldenAnswerTest {
                 "change-set--refineryOrderChangeSet/valid/create-then-update-by-client-key.json")));
     routes.put("route-get-org-demand", get("/me/org-demand"));
     routes.put("route-get-org-units", get("/me/org-units"));
+    routes.put("route-get-patch-change", get("/me/patch-change"));
+    routes.put(
+        "route-post-patch-change-home-location",
+        post(
+            "/me/patch-change/home-location",
+            fixture("patch-change--homeLocationChoice/valid/choice.json")));
     routes.put("route-get-org-stock", get("/org-stock"));
     routes.put(
         "route-post-org-stock-changes",
@@ -583,6 +589,9 @@ class ExchangeGoldenAnswerTest {
             fixture("change-result/valid/refinery-orders.json");
         case "GET /api/v1/exchange/me/org-demand" -> fixture("org-demand/valid/both-lists.json");
         case "GET /api/v1/exchange/me/org-units" -> fixture("org-unit-list/valid/all-kinds.json");
+        case "GET /api/v1/exchange/me/patch-change" -> fixture("patch-change/valid/pending.json");
+        case "POST /api/v1/exchange/me/patch-change/home-location" ->
+            fixture("patch-change--homeLocationChosen/valid/chosen.json");
         case "GET /api/v1/exchange/org-stock" -> fixture("page--orgStockPage/valid/snapshot.json");
         case "GET /api/v1/exchange/org-stock/members" ->
             fixture("org-stock-members/valid/roster.json");

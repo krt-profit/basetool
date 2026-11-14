@@ -25,13 +25,11 @@ import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -68,7 +66,7 @@ public class HangarShipOrgUnitProxyController {
   public ResponseEntity<Object> changeShipOrgUnit(
       @PathVariable @NotNull UUID id, @RequestBody @Nullable ShipOrgUnitRequestDto request) {
     if (request == null || request.owningOrgUnitVersion() == null) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -90,7 +88,7 @@ public class HangarShipOrgUnitProxyController {
   public ResponseEntity<Object> bulkChangeShipOrgUnit(
       @RequestBody @Nullable ShipBulkOrgUnitRequestDto request) {
     if (request == null || request.shipIds() == null || request.shipIds().isEmpty()) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -99,17 +97,5 @@ public class HangarShipOrgUnitProxyController {
           ShipBulkOrgUnitResultDto result = hangarClient.bulkChangeShipOrgUnit(request);
           return ResponseEntity.ok(result != null ? result : new ShipBulkOrgUnitResultDto(0, 0));
         });
-  }
-
-  /**
-   * Builds the {@code 422} {@code problem+json} with code {@code VALIDATION} that the hangar page
-   * shows as an error toast.
-   *
-   * @return the response
-   */
-  private static @NotNull ResponseEntity<Object> validationError() {
-    return ResponseEntity.status(422)
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(Map.of("status", 422, "code", "VALIDATION"));
   }
 }

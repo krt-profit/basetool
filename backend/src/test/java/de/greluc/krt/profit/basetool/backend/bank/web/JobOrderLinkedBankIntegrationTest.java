@@ -39,12 +39,16 @@ import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Holder;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessMatrix.Pin;
 import de.greluc.krt.profit.basetool.backend.bank.web.BankAccessSeeder.LinkedOrderAccount;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderCurrencyWipe;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitRepository;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.platform.api.OrgUnitContextualAuthority;
 import de.greluc.krt.profit.basetool.backend.scope.api.CustomJwtGrantedAuthoritiesConverter;
+import jakarta.persistence.EntityManager;
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -94,6 +98,8 @@ class JobOrderLinkedBankIntegrationTest {
   private static final String STAFF_REQUESTS = "/api/v1/bank/requests";
   private static final String ACCOUNTS = "/api/v1/bank/accounts";
   private static final String FEE_SETTING = "operation.transfer_fee_rate";
+  private static final Instant WIPE_LIVE_AT = Instant.parse("2000-01-01T00:00:00Z");
+  private static final Instant WIPE_BEFORE = Instant.parse("1999-06-01T00:00:00Z");
 
   @Autowired private ConfigurableWebApplicationContext context;
   @Autowired private CustomJwtGrantedAuthoritiesConverter authorities;
@@ -102,6 +108,8 @@ class JobOrderLinkedBankIntegrationTest {
   @Autowired private JsonMapper json;
   @Autowired private JdbcTemplate jdbc;
   @Autowired private TransactionTemplate transactions;
+  @Autowired private JobOrderCurrencyWipe currencyWipe;
+  @Autowired private EntityManager entityManager;
 
   private final List<LinkedOrderAccount> supplementalAccounts = new ArrayList<>();
   private BankAccessWorld world;
@@ -1545,6 +1553,59 @@ class JobOrderLinkedBankIntegrationTest {
         .andExpect(jsonPath("$.status").value("CONFIRMED"));
     outcome(order, paid).andExpect(status().isOk()).andExpect(jsonPath("$.state").value("POSTED"));
     assertFigures(order, "600000", "0", "0", "CANCELLED");
+  }
+
+  @Test
+  void aCurrencyWipeCancelsTheAttemptsWaitingSinceBeforeTheLiveTimeWithTheirBankRequests()
+      throws Exception {
+    UUID order = createOrder("1000000");
+    UUID account = world.account(Account.OWN_ORG_UNIT);
+    UUID earlier = UUID.randomUUID();
+    UUID later = UUID.randomUUID();
+    provide(
+            order,
+            authorisation(earlier, account, world.holder(Holder.EMPLOYEE_DEPOSIT_HOLDER), "200000"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    provide(order, deposit(later, account, world.holder(Holder.MANAGEMENT_HOLDER), "600000"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    entityManager.flush();
+    jdbc.update(
+        "UPDATE job_order_linked_money_attempt SET submitted_at = ?"
+            + " WHERE order_id = ? AND operation_id = ?",
+        Timestamp.from(WIPE_BEFORE),
+        order,
+        earlier);
+    entityManager.clear();
+    UUID patchChange = UUID.randomUUID();
+
+    JobOrderCurrencyWipe.Effect effect = currencyWipe.apply(WIPE_LIVE_AT, patchChange, "0.1");
+
+    assertThat(effect.attemptsCancelled()).isEqualTo(1);
+    entityManager.flush();
+    entityManager.clear();
+    outcome(order, earlier)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("CANCELLED"));
+    outcome(order, later)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.state").value("WAITING"));
+    assertThat(
+            jdbc.queryForMap(
+                """
+                SELECT r.status AS status, r.cancelled_by_patch_change AS request_reason,
+                       a.cancelled_by_patch_change AS attempt_reason
+                FROM job_order_linked_money_attempt a
+                JOIN bank_booking_request r ON r.id = a.request_id
+                WHERE a.order_id = ? AND a.operation_id = ?
+                """,
+                order,
+                earlier))
+        .containsEntry("status", "CANCELLED")
+        .containsEntry("request_reason", patchChange)
+        .containsEntry("attempt_reason", patchChange);
+    assertThat(ownRequestOfType("DEPOSIT").path("status").asString()).isEqualTo("PENDING");
   }
 
   @ParameterizedTest

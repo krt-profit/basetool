@@ -199,6 +199,20 @@ public class ExchangeRelay {
               "The change set removes more than the mass-change guard allows without"
                   + " confirmation."),
           Map.entry(
+              "RELOCATION_PENDING",
+              "A stock lot or ship from before the patch change stays locked until its holder has"
+                  + " chosen a new home location in the Basetool; nothing was applied."),
+          Map.entry(
+              "HOME_LOCATION_NOT_ASKED",
+              "No open home-location phase asks the member for a choice; nothing was moved."),
+          Map.entry(
+              "HOME_LOCATION_ALREADY_CHOSEN",
+              "The member has chosen the home location for this patch change already; the choice"
+                  + " is final."),
+          Map.entry(
+              "HOME_LOCATION_NOT_OFFERED",
+              "The location is not one of the home locations on offer; nothing was moved."),
+          Map.entry(
               "BANK_JUSTIFICATION_REQUIRED",
               "A withdrawal or transfer from this account needs a justification."),
           Map.entry(

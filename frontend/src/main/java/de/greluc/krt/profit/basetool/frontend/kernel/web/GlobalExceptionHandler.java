@@ -21,11 +21,17 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.PublicPaths;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGate;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateHandoff;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.regex.Pattern;
@@ -86,12 +92,18 @@ public class GlobalExceptionHandler {
 
   private final MessageSource messageSource;
 
+  /** Tells which backend refusals belong to a session gate. */
+  private final SessionGates sessionGates;
+
   /**
    * Renders an i18n-resolved error page (or JSON toast snippet for XHR clients) from an RFC-7807
    * problem returned by the backend, preserving the correlation id for cross-tier debugging.
    *
    * <p>Both forms carry the backend's HTTP status, so a {@code fetch} that tests {@code
-   * response.ok} and a browser navigation see the failure as one.
+   * response.ok} and a browser navigation see the failure as one. A {@code 403} of a session gate
+   * discards the gate's cached verdict and sends the browser to the gate's page instead: a redirect
+   * for a navigation, a {@code 403} with the gate's header for an AJAX caller (ADR-0385). On a
+   * gate's own page it is shown like any other refusal, so the page never redirects to itself.
    *
    * @param ex the backend failure
    * @param request the current request, used to decide JSON-vs-HTML
@@ -104,6 +116,13 @@ public class GlobalExceptionHandler {
       @NotNull BackendServiceException ex,
       @NotNull HttpServletRequest request,
       @NotNull Model model) {
+    Optional<SessionGate> gate =
+        ex.getStatusCode() == HttpStatus.FORBIDDEN.value()
+            ? sessionGates.refusedBy(ex.getProblemCode())
+            : Optional.empty();
+    if (gate.isPresent() && !sessionGates.isGatePage(PublicPaths.relativePath(request))) {
+      return handOffToGate(gate.get(), request);
+    }
     Locale locale = LocaleContextHolder.getLocale();
     HttpStatus status = resolveStatus(ex.getStatusCode());
     String messageKey = CODE_TO_MESSAGE_KEY.getOrDefault(ex.getProblemCode(), DEFAULT_MESSAGE_KEY);
@@ -150,6 +169,27 @@ public class GlobalExceptionHandler {
       model.addAttribute("correlationId", ex.getCorrelationId());
     }
     return new ModelAndView("error/error", model.asMap(), status);
+  }
+
+  /**
+   * Discards a gate's cached verdict and sends the caller to the gate's page, the way the gate's
+   * filter does for a request it holds.
+   *
+   * @param gate the gate the backend refused for
+   * @param request the current request
+   * @return a {@code redirect:} view name for a navigation, or a {@code 403} carrying the gate's
+   *     header for an AJAX caller
+   */
+  private @NotNull Object handOffToGate(
+      @NotNull SessionGate gate, @NotNull HttpServletRequest request) {
+    gate.forget(request);
+    String url = SessionGateHandoff.pageUrl(request, gate);
+    log.debug(
+        "Backend refused {} for session gate {}", request.getRequestURI(), gate.problemCode());
+    if (wantsJson(request)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).header(gate.ajaxHeader(), url).build();
+    }
+    return "redirect:" + url;
   }
 
   /**
@@ -486,12 +526,13 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a joined parallel read's session loss through the central reauthentication response.
+   * Maps a joined parallel read's session loss through the central reauthentication response, and
+   * its session gate's refusal through the gate's hand-off.
    *
    * @param failure the joined read's failure
    * @param model the fallback error model
    * @param request the current request
-   * @return the reauthentication response or the ordinary error page
+   * @return the reauthentication response, the gate's hand-off or the ordinary error page
    */
   @NotNull
   @ExceptionHandler(CompletionException.class)
@@ -503,6 +544,11 @@ public class GlobalExceptionHandler {
       SectionFallback.rethrowIfReauthenticationRequired(failure);
     } catch (ReauthenticationRequiredException _) {
       return handleReauthenticationRequired(request);
+    }
+    Optional<SessionGateRefusalException> gateRefusal =
+        SectionFallback.sessionGateRefusalIn(failure);
+    if (gateRefusal.isPresent()) {
+      return handleBackendServiceException(gateRefusal.get(), request, model);
     }
     return new ModelAndView(
         handleException(failure, model, request), model.asMap(), HttpStatus.INTERNAL_SERVER_ERROR);

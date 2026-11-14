@@ -1,0 +1,74 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.backend.patchchange.api;
+
+import de.greluc.krt.profit.basetool.backend.kernel.ProblemCode;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpStatus;
+
+/**
+ * The problem codes of the patch change (REQ-API-019, ADR-0235).
+ *
+ * <p>The code string equals the constant's name.
+ */
+@RequiredArgsConstructor
+public enum PatchChangeProblemCode implements ProblemCode {
+
+  /** The caller must choose a new home location before using the platform (REQ-PATCH-020). */
+  HOME_LOCATION_REQUIRED(HttpStatus.FORBIDDEN),
+
+  /** The write changes stock or ships a pending relocation locks (REQ-PATCH-023). */
+  RELOCATION_PENDING(HttpStatus.CONFLICT),
+
+  /** No open home-location phase asks the member for a choice (REQ-PATCH-022). */
+  HOME_LOCATION_NOT_ASKED(HttpStatus.CONFLICT),
+
+  /** The member has chosen a home location in the open phase already (REQ-PATCH-022). */
+  HOME_LOCATION_ALREADY_CHOSEN(HttpStatus.CONFLICT),
+
+  /** The chosen location is no curated home location on offer (REQ-PATCH-021). */
+  HOME_LOCATION_NOT_OFFERED(HttpStatus.BAD_REQUEST);
+
+  /** The status the code is answered with. */
+  private final HttpStatus status;
+
+  /**
+   * Returns the wire value, which is the constant's name.
+   *
+   * @return the code string
+   */
+  @NotNull
+  @Override
+  public String code() {
+    return name();
+  }
+
+  /**
+   * Returns the status the code is answered with.
+   *
+   * @return the HTTP status
+   */
+  @NotNull
+  @Override
+  public HttpStatus status() {
+    return status;
+  }
+}

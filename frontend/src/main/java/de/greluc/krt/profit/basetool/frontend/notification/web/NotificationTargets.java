@@ -185,6 +185,7 @@ final class NotificationTargets {
           Map.entry("HANGAR_FITTED_RESET", page(HANGAR)),
           Map.entry("HANGAR_CHANGED_BY_ADMIN", page(HANGAR)),
           Map.entry("HANGAR_SHIPS_ORG_UNIT_CHANGED_BY_ADMIN", page(HANGAR)),
+          Map.entry("HANGAR_SHIPS_ORIGIN_CHANGED_BY_ADMIN", page(HANGAR)),
           Map.entry("BLUEPRINT_CHANGED_BY_ADMIN", page(BLUEPRINTS)),
           Map.entry("BLUEPRINT_PURGED_BY_ADMIN", page(BLUEPRINTS)),
           Map.entry(

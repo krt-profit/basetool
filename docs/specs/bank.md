@@ -495,7 +495,18 @@ is idempotent (a second click on an all-zero bank is a no-op with a notice).
   design system's bank patterns (specimen `components/BankPatterns/preview.html`).
 - [x] The audit log contains the summary event (actor, account count, total zeroed).
 
-**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/web/BankAdminController` · **Issues:** #556
+**Patch change (amendment, [REQ-PATCH-041](patch-change.md#req-patch-041--the-bank-reset-offsets-the-balances-as-of-the-live-time),
+[REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled),
+ADR-0384).** A patch change with the currency wipe runs a second form of this reset at its
+trigger. Its `WIPE_RESET` offsets the account and holder balances **as of the live time**, so
+every booking after the live time stays; an offset that would take an account or a holder below
+zero stops at zero, so no account is overdrawn (REQ-BANK-006) and the wipe always goes through.
+It cancels the pending requests submitted before the live time with the patch change as their
+reason, and its one `WIPE_RESET_EXECUTED` names the patch change, the live time, the number of
+cancelled requests and the number of accounts and holders whose offset stopped at zero. The
+button above keeps its behaviour.
+
+**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only), `BankCurrencyWipeIntegrationTest` (reset as of the live time) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/internal/BankWipeResetBooking`, `bank/internal/BankCurrencyWipeService`, `bank/web/BankAdminController` · **Issues:** #556
 
 ### REQ-BANK-014 — Account statement PDF (Kontoauszug)
 
@@ -977,7 +988,12 @@ caller to oversee the org unit; cancel requires owning the request). A request c
 raised against a `CLOSED` account. `GET /api/v1/bank/org-units/requests/page` reads the same
 own requests as one page, filtered by lifecycle state (`status`, repeatable; every state when
 omitted), newest first, with the total over all pages — a read-only call that is not audited. The
-dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
+dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it. A patch change with the currency
+wipe also cancels a pending request submitted before its live time, with the patch change as
+the reason; the request then reads `CANCELLED`, and every view of it names the patch change by its
+current label beneath the status („Patchwechsel 4.4"), while a request its requester withdrew
+shows the status alone
+([REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled)).
 
 **Acceptance**
 
@@ -993,6 +1009,10 @@ dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
   already-decided → 409 `BANK_REQUEST_NOT_PENDING`), with optimistic-lock echo.
 - [x] Request form (no holder field) + own-status list with a cancel action on the slim page,
   AJAX no-reload (frontend `OrgUnitBankPageControllerMvcTest`).
+- [x] A request a currency wipe cancelled names its patch change beneath the status in the own
+  list, the foreign list, the staff queue, the request page and the dashboard widget, read once
+  per page (`BankBookingRequestServiceTest`, `BankRequestPatchLabelsTest`, frontend
+  `BankRequestCancelledByPatchRenderTest`, `DashboardTradeWidgetsMvcTest`).
 
 **Enforced by:** `BankBookingRequestServiceTest`, `OrgUnitBankAccessServiceTest`, `OrgUnitBankControllerTest`, frontend `OrgUnitBankPageControllerMvcTest` · **Code:** `bank/internal/OrgUnitBankAccessService`, `bank/internal/BankBookingRequestService`, `bank/internal/BankBookingRequest`, `db/migration/V159`, frontend `bank/web/OrgUnitBankProxyController`, `templates/bank/org-unit-bank.html`, `static/js/bank/bank.js` · **Issues:** #666, #670, #672
 
@@ -3553,7 +3573,8 @@ REQ-BANK-046, REQ-BANK-068, REQ-BXCH-004 · **Issues:** #3113, #3119, #3159
 ### REQ-BANK-068 — One booking request has a page of its own
 
 `/bank/requests/{id}` shows one booking request: its type, status, approval state, account and
-target, amount, requester, justification and note, and once decided when, by whom and why. It is the
+target, amount, requester, justification and note, and once decided when, by whom and why; for a
+request a currency wipe cancelled the reason is the patch change (REQ-PATCH-042). It is the
 page the exchange staff queue's `link` opens (REQ-BXCH-005), so it is open to every signed-in member
 and the backend decides what it shows.
 

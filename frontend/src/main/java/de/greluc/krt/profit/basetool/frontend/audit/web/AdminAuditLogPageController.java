@@ -157,6 +157,7 @@ public class AdminAuditLogPageController {
                   "INVENTORY_BULK_CHECKED_OUT",
                   "INVENTORY_BULK_REBOOKED",
                   "INVENTORY_WIPED",
+                  "INVENTORY_WIPED_BY_PATCH",
                   "INVENTORY_RECEIVED_FROM_REFINERY",
                   "INVENTORY_RECEIVED_FROM_PRODUCTION",
                   "INVENTORY_HANDED_OVER",
@@ -207,6 +208,7 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED",
                   "JOB_ORDER_MATERIAL_UNLINKED",
                   "JOB_ORDER_INVENTORY_UNLINKED",
+                  "JOB_ORDERS_STOCK_WIPED_BY_PATCH",
                   "JOB_ORDER_HANDOVER_CREATED",
                   "JOB_ORDER_ITEM_HANDOVER_CREATED",
                   "JOB_ORDER_PRODUCTION_BOOKED",
@@ -215,6 +217,7 @@ public class AdminAuditLogPageController {
                   "JOB_ORDER_PARTICIPATION_ENROLLED",
                   "JOB_ORDER_PARTICIPATION_ENDED",
                   "JOB_ORDER_MONEY_COMMITMENT_CHANGED",
+                  "JOB_ORDER_MONEY_CURRENCY_WIPED",
                   "QUALITY_TIER_CREATED",
                   "QUALITY_TIER_UPDATED",
                   "QUALITY_TIER_DEACTIVATED",
@@ -236,6 +239,7 @@ public class AdminAuditLogPageController {
                   "REFINERY_METHODS_SYNCED",
                   "REFINERY_YIELDS_SYNCED",
                   "REFINERY_ORDERS_REASSIGNED",
+                  "REFINERY_ORDERS_CANCELED_BY_PATCH",
                   "REFINERY_AUDIT_EXPORTED",
                   "REFINERY_AUDIT_PURGED")),
           Map.entry(
@@ -339,6 +343,7 @@ public class AdminAuditLogPageController {
                   "MARKET_OFFER_DEACTIVATED",
                   "MARKET_OFFER_REDUCED",
                   "MARKET_OFFER_REMOVED",
+                  "MARKET_OFFERS_ENDED_BY_PATCH",
                   "MARKET_REMARK_UPDATED",
                   "MARKET_INTEREST_REGISTERED",
                   "MARKET_INTEREST_WITHDRAWN",
@@ -357,8 +362,10 @@ public class AdminAuditLogPageController {
                   "HANGAR_SHIP_UPDATED",
                   "HANGAR_SHIP_ORG_UNIT_CHANGED",
                   "HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED",
+                  "HANGAR_SHIPS_BULK_ORIGIN_CHANGED",
                   "HANGAR_SHIP_DELETED",
                   "HANGAR_EMPTIED",
+                  "HANGAR_SHIPS_WIPED_BY_PATCH",
                   "HANGAR_IMPORTED",
                   "HANGAR_FITTED_RESET",
                   "HANGAR_HOME_LOCATION_SET",
@@ -417,6 +424,7 @@ public class AdminAuditLogPageController {
                   "DONATION_RECEIVED",
                   "DONATION_DECLINED",
                   "DONATION_WITHDRAWN",
+                  "DONATIONS_WITHDRAWN_BY_PATCH",
                   "DONATION_RECORDED",
                   "SUPPLY_UNIT_SETTING_CHANGED",
                   "SUPPLY_SETTINGS_CHANGED",
@@ -520,7 +528,17 @@ public class AdminAuditLogPageController {
                   "CATALOGUE_JOB_TYPE_DEACTIVATED",
                   "CATALOGUE_JOB_TYPE_ACTIVATED",
                   "CATALOGUE_AUDIT_EXPORTED",
-                  "CATALOGUE_AUDIT_PURGED")));
+                  "CATALOGUE_AUDIT_PURGED")),
+          Map.entry(
+              "PATCH_CHANGE",
+              List.of(
+                  "PATCH_CHANGE_TRIGGERED",
+                  "PATCH_CHANGE_LABEL_CORRECTED",
+                  "PATCH_CHANGE_PHASE_ENDED",
+                  "PATCH_CHANGE_RELOCATED",
+                  "HOME_LOCATION_PREFERENCE_SET",
+                  "PATCH_CHANGE_AUDIT_EXPORTED",
+                  "PATCH_CHANGE_AUDIT_PURGED")));
 
   /** Reads the audit trails and the exchange registry. */
   private final AuditBackendClient auditClient;

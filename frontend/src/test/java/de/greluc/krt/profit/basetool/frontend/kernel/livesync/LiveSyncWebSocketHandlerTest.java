@@ -908,7 +908,7 @@ class LiveSyncWebSocketHandlerTest {
   @Test
   void consentGate_refusesTheSocketWithATerminalCloseCodeAndTheConsentUrl() throws Exception {
     FakeSession session = multiplexedSession(oidcUser("user-1", "Alice"));
-    session.attributes.put(LiveSyncWebSocketHandler.ATTR_TERMS_GATE, "/terms/accept");
+    session.attributes.put(LiveSyncWebSocketHandler.ATTR_SESSION_GATE, "/terms/accept");
 
     handler.afterConnectionEstablished(session);
 
@@ -926,7 +926,7 @@ class LiveSyncWebSocketHandlerTest {
     OidcUser bob = oidcUser("user-2", "Bob");
     for (int i = 0; i < LiveSyncWebSocketHandler.MAX_SOCKETS_PER_USER + 1; i++) {
       FakeSession gated = multiplexedSession(bob);
-      gated.attributes.put(LiveSyncWebSocketHandler.ATTR_TERMS_GATE, "/terms/accept");
+      gated.attributes.put(LiveSyncWebSocketHandler.ATTR_SESSION_GATE, "/terms/accept");
       handler.afterConnectionEstablished(gated);
     }
 
@@ -942,7 +942,7 @@ class LiveSyncWebSocketHandlerTest {
   void consentGate_dropsAnUnsendableConsentUrlButStillClosesTerminally() throws Exception {
     FakeSession session = multiplexedSession(oidcUser("user-1", "Alice"));
     session.attributes.put(
-        LiveSyncWebSocketHandler.ATTR_TERMS_GATE, "/" + "x".repeat(200) + "/terms/accept");
+        LiveSyncWebSocketHandler.ATTR_SESSION_GATE, "/" + "x".repeat(200) + "/terms/accept");
 
     handler.afterConnectionEstablished(session);
 

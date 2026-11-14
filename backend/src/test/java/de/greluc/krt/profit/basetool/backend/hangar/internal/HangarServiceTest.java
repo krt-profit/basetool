@@ -41,9 +41,11 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeMapper;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipDeletionObserver;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarRelocationGuard.LockedShips;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -55,16 +57,17 @@ import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -91,8 +94,32 @@ class HangarServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserService userService;
   @Mock private HangarUnitLiveSync unitLiveSync;
+  @Mock private HangarRelocationGuard relocationGuard;
 
-  @InjectMocks private HangarService hangarService;
+  private HangarService hangarService;
+
+  @BeforeEach
+  void setUp() {
+    hangarService =
+        new HangarService(
+            shipRepository,
+            userRepository,
+            shipTypeRepository,
+            locationRepository,
+            new HangarShipRemoval(
+                shipDeletionObserver, entityManager, shipRepository, unitLiveSync),
+            shipTypeMapper,
+            requestScopeResolver,
+            accessGateService,
+            orgUnitStampingService,
+            auditService,
+            eventPublisher,
+            userService,
+            unitLiveSync,
+            new HangarAdminNotifier(userService, eventPublisher),
+            relocationGuard);
+    lenient().when(relocationGuard.lockedFor(any())).thenReturn(LockedShips.NONE);
+  }
 
   @Test
   void testUpdateShipOptimisticLocking_ThrowsWhenVersionsDiffer() {
@@ -110,7 +137,7 @@ class HangarServiceTest {
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
 
     ShipRequestDto request =
-        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, 0L, null);
+        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, 0L, null, null);
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -122,12 +149,14 @@ class HangarServiceTest {
     UUID userId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 50);
     Page<Ship> page = new PageImpl<>(List.of(new Ship()));
-    when(shipRepository.findByOwnerIdFiltered(userId, "Cutlass", true, pageable)).thenReturn(page);
+    when(shipRepository.findByOwnerIdFiltered(userId, "Cutlass", true, null, pageable))
+        .thenReturn(page);
 
-    Page<Ship> result = hangarService.getMyShipsFiltered(userId, "  Cutlass  ", true, pageable);
+    Page<Ship> result =
+        hangarService.getMyShipsFiltered(userId, "  Cutlass  ", true, null, pageable);
 
     assertEquals(page, result);
-    verify(shipRepository).findByOwnerIdFiltered(userId, "Cutlass", true, pageable);
+    verify(shipRepository).findByOwnerIdFiltered(userId, "Cutlass", true, null, pageable);
   }
 
   @Test
@@ -135,11 +164,11 @@ class HangarServiceTest {
     UUID userId = UUID.randomUUID();
     Pageable pageable = PageRequest.of(0, 50);
     Page<Ship> page = new PageImpl<>(List.of());
-    when(shipRepository.findByOwnerIdFiltered(userId, null, null, pageable)).thenReturn(page);
+    when(shipRepository.findByOwnerIdFiltered(userId, null, null, null, pageable)).thenReturn(page);
 
-    hangarService.getMyShipsFiltered(userId, "   ", null, pageable);
+    hangarService.getMyShipsFiltered(userId, "   ", null, null, pageable);
 
-    verify(shipRepository).findByOwnerIdFiltered(userId, null, null, pageable);
+    verify(shipRepository).findByOwnerIdFiltered(userId, null, null, null, pageable);
   }
 
   @Test
@@ -236,7 +265,7 @@ class HangarServiceTest {
     when(shipTypeRepository.findById(typeId)).thenReturn(Optional.of(type));
     when(shipRepository.save(any(Ship.class))).thenReturn(ship);
 
-    ShipRequestDto request = new ShipRequestDto("Test", typeId, "LTI", null, false, 1L, null);
+    ShipRequestDto request = new ShipRequestDto("Test", typeId, "LTI", null, false, 1L, null, null);
 
     hangarService.updateShip(userId, shipId, request);
 
@@ -265,7 +294,7 @@ class HangarServiceTest {
     when(shipRepository.save(any(Ship.class))).thenReturn(ship);
 
     hangarService.updateShip(
-        userId, shipId, new ShipRequestDto("Test", typeId, "LTI", null, false, null, null));
+        userId, shipId, new ShipRequestDto("Test", typeId, "LTI", null, false, null, null, null));
 
     verifyNoInteractions(auditService);
     verifyNoInteractions(unitLiveSync);
@@ -353,10 +382,11 @@ class HangarServiceTest {
     when(b.getShipCount()).thenReturn(1L);
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(shipRepository.countFittedByOwnerScoped(false, null, Set.of())).thenReturn(List.of(a, b));
-    when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(4);
+    when(shipRepository.countFittedByOwnerScoped(false, null, Set.of(), Set.of(), null))
+        .thenReturn(List.of(a, b));
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(), Set.of(), null)).thenReturn(4);
     UUID unit = UUID.randomUUID();
-    when(shipRepository.findFittedOrgUnitIdsScoped(false, null, Set.of()))
+    when(shipRepository.findFittedOrgUnitIdsScoped(false, null, Set.of(), Set.of(), null))
         .thenReturn(List.of(unit));
     when(userService.currentActor()).thenReturn(ACTOR);
 
@@ -386,7 +416,8 @@ class HangarServiceTest {
     when(shipRepository.findById(shipId)).thenReturn(Optional.of(ship));
     when(userService.currentActor()).thenReturn(ACTOR);
     ShipRequestDto dto =
-        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null);
+        new ShipRequestDto(
+            "Test", UUID.randomUUID(), "LTI", null, false, null, null, ShipOrigin.PLEDGE);
     stubAdminAddFor(member, dto, ship);
 
     spied.addShipByAdmin(member, dto);
@@ -412,7 +443,8 @@ class HangarServiceTest {
     ship.setShipType(type);
     when(userService.currentActor()).thenReturn(ACTOR);
     ShipRequestDto dto =
-        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null);
+        new ShipRequestDto(
+            "Test", UUID.randomUUID(), "LTI", null, false, null, null, ShipOrigin.PLEDGE);
     stubAdminAddFor(ACTOR.id(), dto, ship);
 
     hangarService.addShipByAdmin(ACTOR.id(), dto);
@@ -430,7 +462,8 @@ class HangarServiceTest {
     ship.setShipType(type);
     when(userService.currentActor()).thenReturn(ACTOR);
     ShipRequestDto dto =
-        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, picked);
+        new ShipRequestDto(
+            "Test", UUID.randomUUID(), "LTI", null, false, null, picked, ShipOrigin.PLEDGE);
     User owner = stubAdminAddFor(member, dto, ship);
 
     hangarService.addShipByAdmin(member, dto);
@@ -468,12 +501,13 @@ class HangarServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of(reachedUnit, foreignUnit)));
     when(accessGateService.canActAsOfficerIn(reachedUnit)).thenReturn(true);
     when(accessGateService.canActAsOfficerIn(foreignUnit)).thenReturn(false);
-    when(shipRepository.resetAllFittedScoped(false, null, Set.of(reachedUnit))).thenReturn(2);
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(reachedUnit), Set.of(), null))
+        .thenReturn(2);
     when(userService.currentActor()).thenReturn(ACTOR);
 
     hangarService.resetAllFittedStatus();
 
-    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(reachedUnit));
+    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(reachedUnit), Set.of(), null);
   }
 
   @Test
@@ -482,30 +516,58 @@ class HangarServiceTest {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, pinned, Set.of(UUID.randomUUID())));
     when(accessGateService.canActAsOfficerIn(pinned)).thenReturn(true);
-    when(shipRepository.resetAllFittedScoped(false, null, Set.of(pinned))).thenReturn(0);
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(pinned), Set.of(), null))
+        .thenReturn(0);
 
     hangarService.resetAllFittedStatus();
 
-    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(pinned));
+    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(pinned), Set.of(), null);
   }
 
   @Test
   void resetAllFittedStatus_adminAllScope_staysUnnarrowed() {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(shipRepository.resetAllFittedScoped(true, null, Set.of())).thenReturn(0);
+    when(shipRepository.resetAllFittedScoped(true, null, Set.of(), Set.of(), null)).thenReturn(0);
 
     hangarService.resetAllFittedStatus();
 
-    verify(shipRepository).resetAllFittedScoped(true, null, Set.of());
+    verify(shipRepository).resetAllFittedScoped(true, null, Set.of(), Set.of(), null);
     verify(accessGateService, never()).canActAsOfficerIn(any());
+  }
+
+  @Test
+  void resetAllFittedStatus_leavesOutTheShipsTheRelocationLockKeepsFromTheCaller() {
+    UUID lockedOwner = UUID.randomUUID();
+    Instant liveAt = Instant.parse("2026-01-01T00:00:00Z");
+    ShipRepository.OwnerShipCount fitted = mock(ShipRepository.OwnerShipCount.class);
+    when(fitted.getOwnerId()).thenReturn(lockedOwner);
+    when(requestScopeResolver.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(shipRepository.countFittedByOwnerScoped(false, null, Set.of(), Set.of(), null))
+        .thenReturn(List.of(fitted));
+    when(relocationGuard.lockedFor(List.of(lockedOwner)))
+        .thenReturn(new LockedShips(Set.of(lockedOwner), liveAt));
+    when(shipRepository.countFittedByOwnerScoped(
+            false, null, Set.of(), Set.of(lockedOwner), liveAt))
+        .thenReturn(List.of());
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(), Set.of(lockedOwner), liveAt))
+        .thenReturn(0);
+
+    hangarService.resetAllFittedStatus();
+
+    verify(shipRepository)
+        .findFittedOrgUnitIdsScoped(false, null, Set.of(), Set.of(lockedOwner), liveAt);
+    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(), Set.of(lockedOwner), liveAt);
+    verifyNoInteractions(auditService);
   }
 
   @Test
   void resetAllFittedStatus_recordsOnlyWhenShipsChanged() {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(0, 4);
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(), Set.of(), null))
+        .thenReturn(0, 4);
     org.mockito.Mockito.lenient().when(userService.currentActor()).thenReturn(ACTOR);
 
     hangarService.resetAllFittedStatus();
@@ -545,7 +607,15 @@ class HangarServiceTest {
         .thenAnswer(i -> i.getArguments()[0]);
 
     ShipRequestDto request =
-        new ShipRequestDto("Picker Ship", shipTypeId, "LTI", null, false, null, pickedOrgUnitId);
+        new ShipRequestDto(
+            "Picker Ship",
+            shipTypeId,
+            "LTI",
+            null,
+            false,
+            null,
+            pickedOrgUnitId,
+            ShipOrigin.PLEDGE);
 
     Ship saved = hangarService.addShip(userId, request);
 
@@ -579,7 +649,8 @@ class HangarServiceTest {
         .thenAnswer(i -> i.getArguments()[0]);
 
     ShipRequestDto request =
-        new ShipRequestDto("Ownerless Ship", shipTypeId, "LTI", null, false, null, null);
+        new ShipRequestDto(
+            "Ownerless Ship", shipTypeId, "LTI", null, false, null, null, ShipOrigin.PLEDGE);
 
     Ship saved = hangarService.addShip(userId, request);
 
@@ -745,7 +816,8 @@ class HangarServiceTest {
     when(locationRepository.findById(location.getId())).thenReturn(Optional.of(location));
 
     ShipRequestDto request =
-        new ShipRequestDto("Ship", shipTypeId, "LTI", location.getId(), false, null, null);
+        new ShipRequestDto(
+            "Ship", shipTypeId, "LTI", location.getId(), false, null, null, ShipOrigin.PLEDGE);
 
     assertThrows(LocationNotOfferedException.class, () -> hangarService.addShip(userId, request));
     verify(shipRepository, never()).save(any(Ship.class));
@@ -763,7 +835,7 @@ class HangarServiceTest {
         userId,
         ship.getId(),
         new ShipRequestDto(
-            "Test", ship.getShipType().getId(), "LTI", location.getId(), false, null, null));
+            "Test", ship.getShipType().getId(), "LTI", location.getId(), false, null, null, null));
 
     verify(shipRepository).save(ship);
     assertSame(location, ship.getLocation());
@@ -778,7 +850,7 @@ class HangarServiceTest {
 
     ShipRequestDto request =
         new ShipRequestDto(
-            "Test", ship.getShipType().getId(), "LTI", location.getId(), false, null, null);
+            "Test", ship.getShipType().getId(), "LTI", location.getId(), false, null, null, null);
 
     assertThrows(
         LocationNotOfferedException.class,
@@ -807,6 +879,151 @@ class HangarServiceTest {
     when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
     when(shipTypeRepository.findById(type.getId())).thenReturn(Optional.of(type));
     return ship;
+  }
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.NullSource
+  @org.junit.jupiter.params.provider.EnumSource(value = ShipOrigin.class, names = "UNKNOWN")
+  void addShip_withoutAChosenOrigin_isRefused(ShipOrigin origin) {
+    UUID userId = UUID.randomUUID();
+    ShipRequestDto request =
+        new ShipRequestDto("Ship", UUID.randomUUID(), "LTI", null, false, null, null, origin);
+
+    assertThrows(BadRequestException.class, () -> hangarService.addShip(userId, request));
+    assertThrows(BadRequestException.class, () -> hangarService.addShipByAdmin(userId, request));
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  @Test
+  void addShip_storesTheChosenOrigin() {
+    UUID userId = UUID.randomUUID();
+    UUID shipTypeId = UUID.randomUUID();
+    stubCreateFor(userId, shipTypeId);
+    when(orgUnitStampingService.resolveOrgUnitForPickerOutputNullable(any(), isNull()))
+        .thenReturn(null);
+
+    Ship saved =
+        hangarService.addShip(
+            userId,
+            new ShipRequestDto(
+                "Ship", shipTypeId, "LTI", null, false, null, null, ShipOrigin.IN_GAME));
+
+    assertEquals(ShipOrigin.IN_GAME, saved.effectiveOrigin());
+    assertEquals(false, saved.isOriginLocked());
+  }
+
+  @Test
+  void addShipForClient_withoutAnOrigin_storesUnknown() {
+    UUID userId = UUID.randomUUID();
+    UUID shipTypeId = UUID.randomUUID();
+    stubCreateFor(userId, shipTypeId);
+
+    Ship saved =
+        hangarService.addShipForClient(
+            userId, new ShipRequestDto("Ship", shipTypeId, "LTI", null, false, null, null, null));
+
+    assertEquals(ShipOrigin.UNKNOWN, saved.effectiveOrigin());
+  }
+
+  @Test
+  void updateShip_changesTheOrigin_andAuditsTheFieldNameWithoutTheValue() {
+    Ship ship = ownShipOn(null);
+    when(shipRepository.save(any(Ship.class))).thenReturn(ship);
+
+    hangarService.updateShip(
+        ship.getOwner().getId(),
+        ship.getId(),
+        new ShipRequestDto(
+            "Test",
+            ship.getShipType().getId(),
+            "LTI",
+            null,
+            false,
+            null,
+            null,
+            ShipOrigin.IN_GAME));
+
+    assertEquals(ShipOrigin.IN_GAME, ship.getOrigin());
+    verify(auditService)
+        .record(
+            eq(AuditEventType.HANGAR_SHIP_UPDATED),
+            eq(ship.getId()),
+            any(),
+            eq(ship.getOwner().getId()),
+            argThat(
+                d -> d.toString().contains("changed=origin") && !d.toString().contains("IN_GAME")));
+  }
+
+  @Test
+  void updateShip_withoutAnOrigin_keepsTheStoredOne() {
+    Ship ship = ownShipOn(null);
+    ship.setOrigin(ShipOrigin.IN_GAME);
+    when(shipRepository.save(any(Ship.class))).thenReturn(ship);
+
+    hangarService.updateShip(
+        ship.getOwner().getId(),
+        ship.getId(),
+        new ShipRequestDto(
+            "Test", ship.getShipType().getId(), "LTI", null, false, null, null, null));
+
+    assertEquals(ShipOrigin.IN_GAME, ship.getOrigin());
+    verifyNoInteractions(auditService);
+  }
+
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(
+      value = ShipOrigin.class,
+      names = {"IN_GAME", "UNKNOWN"})
+  void updateShip_onALockedShip_refusesAnotherOrigin(ShipOrigin origin) {
+    User owner = new User();
+    owner.setId(UUID.randomUUID());
+    Ship ship = new Ship();
+    ship.setId(UUID.randomUUID());
+    ship.setOwner(owner);
+    ship.setOriginLocked(true);
+    when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
+
+    ShipRequestDto request =
+        new ShipRequestDto("Test", UUID.randomUUID(), "LTI", null, false, null, null, origin);
+
+    assertThrows(
+        BadRequestException.class,
+        () -> hangarService.updateShip(ship.getOwner().getId(), ship.getId(), request));
+    verify(shipRepository, never()).save(any(Ship.class));
+  }
+
+  @Test
+  void updateShip_onALockedShip_takesPledgeAsNoChange() {
+    Ship ship = ownShipOn(null);
+    ship.setOriginLocked(true);
+    when(shipRepository.save(any(Ship.class))).thenReturn(ship);
+
+    hangarService.updateShip(
+        ship.getOwner().getId(),
+        ship.getId(),
+        new ShipRequestDto(
+            "Test", ship.getShipType().getId(), "LTI", null, false, null, null, ShipOrigin.PLEDGE));
+
+    assertEquals(ShipOrigin.UNKNOWN, ship.getOrigin());
+    assertEquals(ShipOrigin.PLEDGE, ship.effectiveOrigin());
+    verifyNoInteractions(auditService);
+  }
+
+  /**
+   * Stubs the create path of an add without a unit: the owner, the ship type and a save that
+   * returns the saved ship.
+   *
+   * @param userId the owner
+   * @param shipTypeId the ship type
+   */
+  private void stubCreateFor(UUID userId, UUID shipTypeId) {
+    User user = new User();
+    user.setId(userId);
+    ShipType type = new ShipType();
+    type.setId(shipTypeId);
+    when(userRepository.findPlainById(userId)).thenReturn(Optional.of(user));
+    when(shipTypeRepository.findById(shipTypeId)).thenReturn(Optional.of(type));
+    when(shipRepository.save(any(Ship.class))).thenAnswer(i -> i.getArguments()[0]);
   }
 
   @Test

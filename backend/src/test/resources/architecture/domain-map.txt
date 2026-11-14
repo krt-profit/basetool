@@ -25,6 +25,7 @@ module operation 11
 module bank 11
 module supply 11
 module exchange 12
+module patchchange 12
 module purchasing 12
 module privacy 13
 module app 14
@@ -32,6 +33,7 @@ module app 14
 allow platform kernel
 allow joborder materialexchange
 allow refinery joborder
+allow exchange patchchange
 
 class AppMetricNames app composition root (plan 5.1 rank 14)
 class AuecBankComposition app coordinates the public JobOrder and Bank ports (ADR-0357)
@@ -180,4 +182,5 @@ package operation operation the operation module's package tree (plan 5.2)
 package personalinventory personalinventory the personal-inventory module's package tree (plan 5.2)
 package supply supply the supply module's package tree (supply and purchasing plan 5.1 rank 11)
 package purchasing purchasing the purchasing module's package tree (supply and purchasing plan 5.1 rank 12)
+package patchchange patchchange the patch-change module's package tree (ADR-0380)
 

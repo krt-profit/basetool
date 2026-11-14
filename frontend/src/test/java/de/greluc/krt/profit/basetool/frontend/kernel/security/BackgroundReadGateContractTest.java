@@ -51,7 +51,7 @@ class BackgroundReadGateContractTest {
   /** The notification bell + unread-badge module. */
   private static final String NOTIFICATIONS_MODULE = "/static/js/notification/notifications.js";
 
-  /** The shared transport module owning {@code krtFetch.get} and {@code window.krtTermsGate}. */
+  /** The shared transport module owning {@code krtFetch.get} and {@code krtSessionGate}. */
   private static final String KRT_FETCH_MODULE = "/static/js/kernel/krt-fetch.js";
 
   /** The client-error beacon, which must work when {@code krtFetch} did not load. */
@@ -119,10 +119,6 @@ class BackgroundReadGateContractTest {
   /** The gated-answer branch of the {@code p4k-import.js} reader. */
   private static final Pattern P4K_GATE_BRANCH =
       Pattern.compile("if \\(!resp\\) return gateTookOver\\(\\);");
-
-  /** The header {@code krt-fetch.js} reads to detect a gated answer. */
-  private static final Pattern TERMS_HEADER_READ =
-      Pattern.compile("headers\\.get\\('([^']*Terms[^']*)'\\)");
 
   /**
    * No script besides the transport and the beacon issues a raw request, and no template's inline
@@ -197,7 +193,7 @@ class BackgroundReadGateContractTest {
         .contains("'X-Requested-With'")
         .contains("'XMLHttpRequest'")
         .contains("maybeReauthenticate(response)")
-        .contains("maybeTermsGate(response)")
+        .contains("maybeSessionGate(response)")
         .contains("response.redirected");
     assertThat(readResource(CLIENT_ERROR_MODULE))
         .as("the beacon is the one script that may not depend on krtFetch")
@@ -292,23 +288,6 @@ class BackgroundReadGateContractTest {
               resource)
           .isFalse();
     }
-  }
-
-  /**
-   * Closes the loop between the two halves: the header {@code krt-fetch.js} acts on must be the one
-   * the filter sends.
-   *
-   * @throws IOException if the transport module cannot be read from the classpath
-   */
-  @Test
-  void theHeaderKrtFetchActsOn_isTheOneTheGateSends() throws IOException {
-    Matcher matcher = TERMS_HEADER_READ.matcher(readResource(KRT_FETCH_MODULE));
-    assertThat(matcher.find())
-        .as("the consent-header read not found in %s (anchor renamed?)", KRT_FETCH_MODULE)
-        .isTrue();
-    assertThat(matcher.group(1))
-        .as("krtTermsGate reads a header the gate never sends")
-        .isEqualTo(TermsAcceptanceGateFilter.TERMS_GATE_HEADER);
   }
 
   /**

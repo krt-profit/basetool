@@ -23,16 +23,20 @@ import static de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatcher
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.greluc.krt.profit.basetool.frontend.identity.model.MyHomeLocationResponse;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CachedCatalog;
+import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -118,6 +122,32 @@ class InventoryInputFormPatternRenderTest {
             "class=\"form-actions--sticky\">\\s*<a href=\"/inventory\\?storage=my\""
                 + " data-trigger=\"history-back\" class=\"btn btn-ghost\">Abbrechen</a>")
         .containsPattern("data-testid=\"inventory-input-submit\">.*<span>Einbuchen</span>");
+  }
+
+  /** A fresh form starts at the member's home location (REQ-PATCH-033). */
+  @Test
+  void aFreshFormStartsAtTheHomeLocation() throws Exception {
+    UUID home = UUID.fromString("5a1e0000-0000-4000-8000-00000000c001");
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef())).thenReturn(List.of());
+    when(backendApiClient.get("/api/v1/users/me/home-location", MyHomeLocationResponse.class))
+        .thenReturn(new MyHomeLocationResponse(home, 1L));
+    when(backendApiClient.getCached(eq(CachedCatalog.LOCATIONS_LOOKUP), anyTypeRef()))
+        .thenReturn(List.of(new LocationReferenceDto(home, "Lorville")));
+    MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+
+    String html =
+        mockMvc
+            .perform(
+                get("/inventory/input")
+                    .param("source", "my")
+                    .with(oidcLogin().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    assertThat(html).containsPattern("value=\"" + home + "\"[^>]*selected[^>]*>Lorville<");
   }
 
   /** The eyebrow follows the source: the global list for the admin, the overview otherwise. */

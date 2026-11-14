@@ -24,8 +24,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One of the member's own ships in the exchange feed; purchase data is never sent (REQ-XCH-017).
- * Absent optional fields are left out.
+ * One of the member's own ships in the exchange feed; purchase data is never sent, only the coarse
+ * origin (REQ-XCH-017, REQ-XCH-057, ADR-0379). Absent optional fields are left out.
  *
  * @param shipId the opaque ship id
  * @param externalId the calling installation's id for the ship, or {@code null} until it links one
@@ -37,6 +37,8 @@ import org.jetbrains.annotations.Nullable;
  * @param fitted whether the ship is fitted
  * @param orgUnit the org unit the ship belongs to, or {@code null} when it has none
  * @param orgUnitVersion the counter of the ship's org unit, which a change of the unit echoes
+ * @param origin {@code PLEDGE}, {@code IN_GAME} or {@code UNKNOWN}; a ship locked by an import
+ *     always reads {@code PLEDGE}
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExchangeShipDto(
@@ -49,4 +51,5 @@ public record ExchangeShipDto(
     @Nullable ExchangeLocationDto location,
     boolean fitted,
     @Nullable ExchangeOrgUnitDto orgUnit,
-    long orgUnitVersion) {}
+    long orgUnitVersion,
+    @NotNull String origin) {}

@@ -1933,7 +1933,8 @@ class InventoryPageControllerMvcTest {
             12.5,
             95.0,
             95,
-            1);
+            1,
+            false);
     GroupedInventoryDto group =
         new GroupedInventoryDto(
             new MaterialReferenceDto(materialId, "Quantanium", "SCU"),
@@ -1989,7 +1990,8 @@ class InventoryPageControllerMvcTest {
             7.0,
             80.0,
             80,
-            1);
+            1,
+            false);
     GroupedInventoryDto group =
         new GroupedInventoryDto(
             new MaterialReferenceDto(materialId, "Laranite", "SCU"),
@@ -2123,7 +2125,8 @@ class InventoryPageControllerMvcTest {
             3.0,
             null,
             null,
-            2);
+            2,
+            false);
     GroupedInventoryDto group =
         new GroupedInventoryDto(null, sampleGameItem(gameItemId), 3.0, null, null, List.of(stack));
 
@@ -2177,7 +2180,8 @@ class InventoryPageControllerMvcTest {
             5.0,
             null,
             null,
-            1);
+            1,
+            false);
     GroupedInventoryDto group =
         new GroupedInventoryDto(null, sampleGameItem(gameItemId), 5.0, null, null, List.of(stack));
 
@@ -2751,7 +2755,8 @@ class InventoryPageControllerMvcTest {
             10.0,
             700.0,
             700,
-            1);
+            1,
+            false);
     boolean itemsView = path.contains("view=items");
     GroupedInventoryDto group =
         itemsView

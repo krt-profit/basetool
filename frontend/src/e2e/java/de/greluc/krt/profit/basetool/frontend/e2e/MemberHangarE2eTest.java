@@ -192,6 +192,7 @@ class MemberHangarE2eTest {
         .selectOption(new SelectOption().setLabel("E2E Ship Type"));
     page.getByTestId("member-hangar-name").fill(name);
     page.getByTestId("segment-insuranceKind-lti").click();
+    page.getByTestId("segment-origin-in_game").click();
     Locator owner = page.locator("#member-ship-owner-picker-slot select");
     if (owner.count() > 0 && owner.isVisible()) {
       owner.selectOption(new SelectOption().setIndex(owner.inputValue().isEmpty() ? 1 : 0));

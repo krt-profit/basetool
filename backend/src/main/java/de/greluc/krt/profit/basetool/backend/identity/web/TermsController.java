@@ -39,8 +39,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Terms-of-Use consent endpoints (REQ-SEC-028).
  *
- * <p>Both endpoints are deliberately allowlisted in {@code TermsAcceptanceAccessFilter}: they are
- * the only API a user who has not yet accepted may reach, because refusing them would make the gate
+ * <p>Both endpoints are deliberately allowlisted in {@code TermsAcceptanceGate}: they are the only
+ * API a user who has not yet accepted may reach, because refusing them would make the gate
  * impossible to pass. They still require authentication — consent is recorded against a specific
  * account, so an anonymous caller has nothing to record.
  */

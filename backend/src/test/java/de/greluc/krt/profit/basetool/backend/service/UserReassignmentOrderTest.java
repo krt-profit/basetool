@@ -106,7 +106,8 @@ class UserReassignmentOrderTest {
           "180:IdentityUserReassignment|user_roles.user_id[role_id]"
               + "|app_user.approved_by_id,user_approval_event.user_id,"
               + "user_approval_event.decided_by_id,deletion_request.user_id,"
-              + "deletion_request.decided_by_id,terms_acceptance.user_id",
+              + "deletion_request.decided_by_id,terms_acceptance.user_id,"
+              + "member_home_location.user_id",
           "190:SupplyUserReassignment|supply_donation.donor_user_id,supply_donation.received_by,"
               + "supply_need.created_by|",
           "200:PurchasingUserReassignment|purchasing_delegate.user_id,"
@@ -115,7 +116,8 @@ class UserReassignmentOrderTest {
               + "purchasing_deal_delivery.recorded_by,purchasing_deal_delivery.accepted_by,"
               + "purchasing_deal_settlement.recorded_by,purchasing_setting.paused_by,"
               + "purchasing_unit_pause.paused_by|",
-          "210:NavigationUserReassignment|navigation_preferences.user_id|");
+          "210:NavigationUserReassignment|navigation_preferences.user_id|",
+          "220:PatchChangeUserReassignment||patch_change_relocation.user_id");
 
   @Autowired private UserAccountMergeService mergeService;
 
@@ -141,7 +143,7 @@ class UserReassignmentOrderTest {
   void noColumnIsDeclaredTwice() {
     List<String> all = new ArrayList<>(mergeService.followedColumns());
     all.addAll(mergeService.staysWithTheAct());
-    assertThat(all).doesNotHaveDuplicates().hasSize(87);
+    assertThat(all).doesNotHaveDuplicates().hasSize(89);
   }
 
   private static List<String> describe(List<UserReassignmentParticipant> participants) {

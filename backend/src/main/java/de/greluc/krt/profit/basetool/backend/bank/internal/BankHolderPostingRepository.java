@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.bank.internal;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -85,6 +86,34 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
    */
   @Query("SELECT COALESCE(SUM(p.amount), 0) FROM BankHolderPosting p WHERE p.holder.id = :holderId")
   BigDecimal holderTotal(@Param("holderId") UUID holderId);
+
+  /**
+   * Every holder's global custody immediately before an instant in one grouped statement, the basis
+   * of a currency wipe's reset (REQ-PATCH-041). Holders without an earlier leg produce no row.
+   *
+   * @param before exclusive upper bound
+   * @return one total per holder with a leg strictly before {@code before}
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderAmount(p.holder.id, SUM(p.amount))
+      FROM BankHolderPosting p WHERE p.createdAt < :before GROUP BY p.holder.id
+      """)
+  List<BankHolderAmount> holderAmountsBefore(@Param("before") Instant before);
+
+  /**
+   * The current global custody of the given holders in one grouped statement, which a currency
+   * wipe's reset must not take below zero (REQ-PATCH-041). Holders without a leg produce no row.
+   *
+   * @param holderIds the holders
+   * @return one total per holder with a leg
+   */
+  @Query(
+      """
+      SELECT new de.greluc.krt.profit.basetool.backend.bank.internal.BankHolderAmount(p.holder.id, SUM(p.amount))
+      FROM BankHolderPosting p WHERE p.holder.id IN :holderIds GROUP BY p.holder.id
+      """)
+  List<BankHolderAmount> holderAmountsOf(@Param("holderIds") Collection<UUID> holderIds);
 
   /**
    * Probes whether a holder appears on any holder-ledger leg — used by surfaces that must know

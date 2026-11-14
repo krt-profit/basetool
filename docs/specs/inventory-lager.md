@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-12.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
 > **Owner area:** INV · **Related ADRs:** ADR-0003, ADR-0097, ADR-0098, ADR-0101, ADR-0104,
 > ADR-0120, ADR-0124, ADR-0302
 
@@ -46,6 +46,14 @@ to-many allocations, not a stack dimension.
 ## Requirements
 
 ### REQ-INV-001 — Inventory is append-only by default (merge is the scoped exception)
+
+> [!note] Amended 2026-11-14 (ADR-0383) — the patch-change relocation moves rows in place
+> A patch change's relocation changes the location of a member's rows from before the live time
+> **in place**, the one exception to this rule: every row keeps its identity, earmarks, pledges and
+> offers, nothing merges, and the row's version advances
+> ([REQ-PATCH-025](patch-change.md#req-patch-025--the-relocation-moves-in-place)). Until the member
+> relocates, those rows are locked for everyone but the member and admins
+> ([REQ-PATCH-023](patch-change.md#req-patch-023--the-relocation-lock)).
 
 A write path does **not** fold a new or edited `InventoryItem` into a different existing row
 **unless the scoped stock merge of [REQ-INV-026](#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in)
@@ -449,6 +457,11 @@ removes are audited with the reason `stock`. `CheckoutType` is not part of the e
 
 ### REQ-INV-026 — Write-time stock merge for PIECE (auto) and SCU (per-action opt-in)
 
+> [!note] Amended 2026-11-14 (REQ-PATCH-033) — the Einbuchen form starts at the home location
+> A fresh Einbuchen form has the location of the member's profile setting „Meine Home Location"
+> preselected, and the merge probe below reads it like a chosen location
+> ([REQ-PATCH-033](patch-change.md#req-patch-033--the-home-location-prefills-the-location-of-three-forms)).
+
 A write that lands a row whose material's quantity type is **`PIECE`** (Stück) is merged into a
 single Lager entry with every existing row that shares its stock identity; a write whose material is
 **`SCU`** does the same **only when the caller opts in for that one action** — a modal checkbox that
@@ -497,6 +510,17 @@ offer. The offered quantity is therefore never increased by a merge. The locking
 offer-backed rows it sees, and the merge asks again once the group is locked, since a release locks
 its row (ADR-0362) and an offer released while the merge waited is not seen by the locking read.
 
+**No mixing while a relocation is pending** ([REQ-PATCH-004](patch-change.md#req-patch-004--no-mixing-a-row-a-relocation-still-moves-never-merges),
+[ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)). While a member's
+relocation is pending in the open home-location phase, a row of that member created before the
+phase's live time, or without a creation time, takes no part in the merge: it is never a survivor
+that absorbs another row and never folded into one, and the Einbuchen probe does not count it. The
+write lands its own row instead, so the pre-patch row holds only pre-patch stock and the
+relocation selects it by its creation time. Once the member relocates, or the phase ends or is
+superseded, the member's rows merge again; before the first phase every row takes part. The one
+exception is an upward provision correction, which adds its quantity in place to the row the
+provision came from, pre-patch or not (owner decision D3).
+
 **Concurrency.** The merge group is loaded `FOR UPDATE` (pessimistic write lock) so two racing
 same-stack writers serialise instead of double-counting or losing stock — this re-introduces, **only
 on the merge path**, the lost-update lock the append-only model (ADR-0003) had removed. The merge is
@@ -528,12 +552,17 @@ dataset matches the new write behaviour. `SCU` rows and offer-backed rows are le
   offer-backed rows untouched.
 - [ ] Each fold records one `INVENTORY_ITEM_MERGED` audit event; the unified viewer's Lager filter
   lists it.
+- [x] While its holder's relocation is pending, a row created before the phase's live time or
+  without a creation time is neither survivor nor folded, and the probe does not count it; an
+  upward provision correction still adds to it (REQ-PATCH-004).
 
 **Enforced by:** `InventoryStockMergeTest`, `InventoryItemServiceTest`,
 `InventoryItemServiceBookOutTest`, `InventoryItemServicePersonalRebookTest`,
-`InventoryMergeProbeTest`, `InventoryMergeGroupDataTest`, `InventoryPageControllerMvcTest` ·
+`InventoryMergeProbeTest`, `InventoryMergeGroupDataTest`, `InventoryMergeCutoffTest`,
+`PatchChangeMergeCutoffTest`, `MaterialProvisionCorrectionDuringRelocationIntegrationTest`,
+`InventoryPageControllerMvcTest` ·
 **Code:** `InventoryCheckoutService#mergeStockIfRequested`,
-`InventoryItemRepository#findMergeGroupForUpdate`, `InventoryItemService#hasMergeCandidates`,
+`InventoryItemRepository#findMergeGroupForUpdate`, `InventoryMergeProbe#hasMergeCandidates`,
 `InventoryItemRepository#countMergeCandidates`,
 `MaterialExchangeOfferRepository#existsByInventoryItemId` / `#findOfferedInventoryItemIds`,
 `InventoryItemService`,
@@ -1449,6 +1478,12 @@ stock of every org unit, an admin pinned to one org unit wipes only that unit's.
   removed rows (REQ-AUDIT-001); the unified viewer's Lager filter lists it.
 - **In place.** On success the page clears the grouped table through its existing filter swap, not
   a reload ([`frontend-ajax-mutations.md`](frontend-ajax-mutations.md) REQ-FE-005).
+- **Not the patch wipe.** A patch change's wipe
+  ([REQ-PATCH-012](patch-change.md#req-patch-012--the-stock-wipe-reaches-every-members-rows-created-before-the-live-time))
+  is a separate path for every member and org unit: it selects by wipe group, exception and live
+  time, reaches personal rows too, ends offers and withdraws pledges with their notices, and is
+  excepted from the invalid-responsibility gate (ADR-0382). This action stays the scoped clean-up
+  of pool stock.
 
 **Acceptance**
 

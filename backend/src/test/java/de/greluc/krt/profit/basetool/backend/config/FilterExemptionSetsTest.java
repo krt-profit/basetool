@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.greluc.krt.profit.basetool.backend.config.PathControlInventory.Endpoint;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter;
 import de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter;
-import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter;
+import de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceGate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -77,6 +77,8 @@ class FilterExemptionSetsTest {
           "/api/v1/exchange/me/installation",
           "/api/v1/exchange/me/org-demand",
           "/api/v1/exchange/me/org-units",
+          "/api/v1/exchange/me/patch-change",
+          "/api/v1/exchange/me/patch-change/home-location",
           "/api/v1/exchange/me/refinery-orders",
           "/api/v1/exchange/me/refinery-orders/changes",
           "/api/v1/exchange/me/ships",
@@ -104,8 +106,7 @@ class FilterExemptionSetsTest {
   @Test
   @DisplayName("the terms gate exempts exactly its four paths")
   void termsExemptionsAreExact() {
-    assertThat(TermsAcceptanceAccessFilter.EXEMPT_PATHS)
-        .containsExactlyInAnyOrderElementsOf(TERMS_EXEMPT);
+    assertThat(TermsAcceptanceGate.EXEMPT_PATHS).containsExactlyInAnyOrderElementsOf(TERMS_EXEMPT);
   }
 
   @Test
@@ -138,7 +139,7 @@ class FilterExemptionSetsTest {
     decided.addAll(TERMS_GATED);
     assertThat(PathControlInventory.unlistedBelow("/api/v1/terms", decided, endpoints))
         .as(
-            "a new /api/v1/terms mapping is gated by consent unless TermsAcceptanceAccessFilter"
+            "a new /api/v1/terms mapping is gated by consent unless TermsAcceptanceGate"
                 + " lists it; decide which, and list it in TERMS_EXEMPT or TERMS_GATED")
         .isEmpty();
   }

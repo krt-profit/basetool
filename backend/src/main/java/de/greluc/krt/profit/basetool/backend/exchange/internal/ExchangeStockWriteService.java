@@ -28,6 +28,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Material;
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeStockChangeSet;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryProperties;
 import de.greluc.krt.profit.basetool.backend.inventory.api.RebookCommands;
@@ -94,7 +95,7 @@ public class ExchangeStockWriteService
   static final String VERSION_CONFLICT = ExchangeReasons.VERSION_CONFLICT;
 
   /** The refusal of refilling a lot emptied by another channel or installation. */
-  static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";
+  static final String REMOVED_ELSEWHERE = ExchangeReasons.REMOVED_ELSEWHERE;
 
   /** The refusal of taking stock that is reserved for a job order or mission. */
   static final String STOCK_EARMARKED = "STOCK_EARMARKED";
@@ -110,6 +111,7 @@ public class ExchangeStockWriteService
   private final OrgUnitMembershipQueryService membershipQueryService;
   private final InventoryProperties inventoryProperties;
   private final ExchangeChangeRepository changeRepository;
+  private final ExchangePatchRemovals patchRemovals;
   private final ExchangeJournalService journalService;
   private final ExchangeJournalRepository journalRepository;
   private final ExchangeMassChangeGuard guard;
@@ -335,6 +337,7 @@ public class ExchangeStockWriteService
             ops.stream().anyMatch(op -> ExchangeStockChangeSet.SHARE.equals(op.op()))
                 ? membershipQueryService.findDirectMembershipOrgUnitIds(caller.member())
                 : Set.of());
+    Map<String, Optional<ExchangeChange>> latest = new HashMap<>();
     List<Planned<StockWrite>> plan = new ArrayList<>();
     for (int i = 0; i < ops.size(); i++) {
       if (early.get(i) != null) {
@@ -348,29 +351,37 @@ public class ExchangeStockWriteService
       BigDecimal current = quantities.computeIfAbsent(lot.key(), _ -> round(sum(rows), unit));
       BigDecimal expected = round(op.expectedQuantity().amount(), unit);
       BigDecimal target = round(op.quantity().amount(), unit);
+      ExchangePatchChangeRefDto removedByPatch =
+          removedByPatch(caller, op, lot.key(), current, expected, target, latest);
       if (ExchangeStockShares.isRebooking(op)) {
+        if (removedByPatch != null) {
+          plan.add(ExchangeChangeSetAdapter.removedByPatch(removedByPatch));
+          continue;
+        }
         ExchangeStockShares.Decision decision =
             ledger.decide(op, lot.stock(), lot.key(), unit, rows, current, expected, target);
         ExchangeStockShares.Move move = decision.move();
         plan.add(
             move != null
                 ? ExchangeChangeSetAdapter.write(new Rebooking(i, move, null))
-                : ExchangeChangeSetAdapter.skip(
-                    decision.refusal() == null ? UNCHANGED : REJECTED, decision.refusal()));
+                : unwritten(caller, lot.key(), decision.refusal(), latest));
         continue;
       }
       boolean retired = Objects.requireNonNull(catalogue.get(i)).retired();
       BigDecimal rise = target.subtract(current);
       Planned<StockWrite> decided;
-      if (current.compareTo(expected) != 0) {
-        decided = ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT);
+      if (removedByPatch != null) {
+        decided = ExchangeChangeSetAdapter.removedByPatch(removedByPatch);
+      } else if (current.compareTo(expected) != 0) {
+        decided =
+            ExchangeChangeSetAdapter.versionConflict(patchChangeOf(caller, lot.key(), latest));
       } else if (current.compareTo(target) == 0) {
         decided = ExchangeChangeSetAdapter.skip(UNCHANGED, null);
       } else if (retired && rise.signum() > 0 && !cover.covers(lot.catalogueId(), rise)) {
         decided = ExchangeChangeSetAdapter.skip(REJECTED, ExchangeLotCatalogue.ITEM_RETIRED);
       } else if (current.signum() == 0
           && !Boolean.TRUE.equals(op.override())
-          && removedElsewhere(caller, lot.key())) {
+          && removedElsewhere(caller, latest(caller, lot.key(), latest).orElse(null))) {
         decided = ExchangeChangeSetAdapter.skip(REJECTED, REMOVED_ELSEWHERE);
       } else if (rise.signum() < 0 && rise.negate().compareTo(round(free(rows), unit)) > 0) {
         decided = ExchangeChangeSetAdapter.skip(REJECTED, STOCK_EARMARKED);
@@ -502,20 +513,105 @@ public class ExchangeStockWriteService
   }
 
   /**
-   * Whether the lot's latest change was its emptying by another channel or installation.
+   * Names the patch change that emptied the lot an op asks something of (REQ-PATCH-053): the op
+   * expects stock the lot no longer holds or wants to fill it, and sends no {@code override}.
+   *
+   * @param caller the caller
+   * @param op the op
+   * @param lotKey the lot's key
+   * @param current the lot's quantity as the earlier ops leave it
+   * @param expected the quantity the client last saw
+   * @param target the quantity the op asks for
+   * @param latest the latest change of each lot read so far in this decision; filled on a miss
+   * @return the patch change, or {@code null} when the lot holds stock, the op asks for the empty
+   *     lot it finds, or its latest change came from another channel
+   */
+  private @Nullable ExchangePatchChangeRefDto removedByPatch(
+      @NotNull ExchangeCaller caller,
+      @NotNull ExchangeStockChangeSet.Op op,
+      @NotNull String lotKey,
+      @NotNull BigDecimal current,
+      @NotNull BigDecimal expected,
+      @NotNull BigDecimal target,
+      @NotNull Map<String, Optional<ExchangeChange>> latest) {
+    if (current.signum() != 0
+        || (expected.signum() == 0 && target.signum() == 0)
+        || Boolean.TRUE.equals(op.override())) {
+      return null;
+    }
+    return patchChangeOf(caller, lotKey, latest);
+  }
+
+  /**
+   * Plans a share or unshare that moves nothing: unchanged without a refusal, and a version
+   * conflict naming the patch change behind the lot's latest change (REQ-PATCH-053).
    *
    * @param caller the caller
    * @param lotKey the lot's key
+   * @param refusal the ledger's refusal, or {@code null} when the op found what it asked for
+   * @param latest the latest change of each lot read so far in this decision; filled on a miss
+   * @return the plan
+   */
+  private @NotNull Planned<StockWrite> unwritten(
+      @NotNull ExchangeCaller caller,
+      @NotNull String lotKey,
+      @Nullable String refusal,
+      @NotNull Map<String, Optional<ExchangeChange>> latest) {
+    if (refusal == null) {
+      return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
+    }
+    return VERSION_CONFLICT.equals(refusal)
+        ? ExchangeChangeSetAdapter.versionConflict(patchChangeOf(caller, lotKey, latest))
+        : ExchangeChangeSetAdapter.skip(REJECTED, refusal);
+  }
+
+  /**
+   * Names the patch change behind a lot's latest change.
+   *
+   * @param caller the caller
+   * @param lotKey the lot's key
+   * @param latest the latest change of each lot read so far in this decision; filled on a miss
+   * @return the patch change, or {@code null} when the lot's latest change came from another
+   *     channel or the feed holds none
+   */
+  private @Nullable ExchangePatchChangeRefDto patchChangeOf(
+      @NotNull ExchangeCaller caller,
+      @NotNull String lotKey,
+      @NotNull Map<String, Optional<ExchangeChange>> latest) {
+    return latest(caller, lotKey, latest).map(patchRemovals::patchChangeOf).orElse(null);
+  }
+
+  /**
+   * Reads a lot's latest feed entry once per decision.
+   *
+   * @param caller the caller
+   * @param lotKey the lot's key
+   * @param latest the entries read so far in this decision; filled on a miss
+   * @return the lot's latest entry, or empty when the feed holds none
+   */
+  private @NotNull Optional<ExchangeChange> latest(
+      @NotNull ExchangeCaller caller,
+      @NotNull String lotKey,
+      @NotNull Map<String, Optional<ExchangeChange>> latest) {
+    return latest.computeIfAbsent(
+        lotKey,
+        key ->
+            changeRepository.findLatestForKey(
+                caller.member(), ExchangeFeedResource.STOCK.name(), key));
+  }
+
+  /**
+   * Whether the lot's latest change was its emptying by another channel or installation.
+   *
+   * @param caller the caller
+   * @param change the lot's latest feed entry, or {@code null} when the feed holds none
    * @return {@code true} when a live tombstone of someone else stands
    */
-  private boolean removedElsewhere(@NotNull ExchangeCaller caller, @NotNull String lotKey) {
-    Optional<ExchangeChange> latest =
-        changeRepository.findLatestForKey(
-            caller.member(), ExchangeFeedResource.STOCK.name(), lotKey);
-    if (latest.isEmpty()) {
+  private static boolean removedElsewhere(
+      @NotNull ExchangeCaller caller, @Nullable ExchangeChange change) {
+    if (change == null) {
       return false;
     }
-    ExchangeChange change = latest.get();
     return !(CLIENT_CHANNEL.equals(change.getSourceChannel())
         && caller.clientId().equals(change.getSourceClient())
         && caller.installationKey().equals(change.getSourceKey()));

@@ -29,6 +29,9 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.StubSessionGate;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Locale;
@@ -65,6 +68,68 @@ class GlobalExceptionHandlerTest {
 
   private MessageSource messageSource;
   private GlobalExceptionHandler handler;
+  private final StubSessionGate gate =
+      new StubSessionGate("/gate", "X-Gate-Required", "gate-event", "GATE_REQUIRED");
+
+  @Test
+  void aSessionGatesRefusalOfANavigationRedirectsToTheGateAndForgetsItsVerdict() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/missions");
+    request.setContextPath("/basetool");
+
+    Object result =
+        handler.handleBackendServiceException(gateRefusal(403), request, new ConcurrentModel());
+
+    assertEquals("redirect:/basetool/gate", result);
+    assertEquals(1, gate.forgotten());
+  }
+
+  @Test
+  void aSessionGatesRefusalOfAnAjaxCallSendsTheGatesHeader() {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/missions/x");
+    request.addHeader("X-Requested-With", "XMLHttpRequest");
+
+    Object result =
+        handler.handleBackendServiceException(gateRefusal(403), request, new ConcurrentModel());
+
+    ResponseEntity<?> response = assertInstanceOf(ResponseEntity.class, result);
+    assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    assertEquals("/gate", response.getHeaders().getFirst("X-Gate-Required"));
+    assertEquals(1, gate.forgotten());
+  }
+
+  @Test
+  void aSessionGatesRefusalOnAGatesOwnPageIsShownInsteadOfRedirectingToItself() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/basetool/gate");
+    request.setContextPath("/basetool");
+
+    Object result =
+        handler.handleBackendServiceException(gateRefusal(403), request, new ConcurrentModel());
+
+    ModelAndView view = assertInstanceOf(ModelAndView.class, result);
+    assertEquals(HttpStatus.FORBIDDEN, view.getStatus());
+    assertEquals(0, gate.forgotten());
+  }
+
+  @Test
+  void theGatesCodeOnAnotherStatusIsAnOrdinaryError() {
+    Object result =
+        handler.handleBackendServiceException(
+            gateRefusal(409), htmlRequest(), new ConcurrentModel());
+
+    assertInstanceOf(ModelAndView.class, result);
+    assertEquals(0, gate.forgotten());
+  }
+
+  /**
+   * Builds the backend's refusal carrying the test gate's code.
+   *
+   * @param status the HTTP status
+   * @return the failure
+   */
+  private static BackendServiceException gateRefusal(int status) {
+    return new BackendServiceException(
+        "gated", null, status, "GATE_REQUIRED", "corr-gate", List.of(), null);
+  }
 
   @Test
   void joinedSessionLossUsesTheAjaxReauthenticationResponse() {
@@ -86,6 +151,44 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void aJoinedSessionGatesRefusalOfANavigationRedirectsToTheGate() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/parallel-read");
+
+    Object result =
+        handler.handleCompletionException(
+            new CompletionException(markedGateRefusal()), new ConcurrentModel(), request);
+
+    assertEquals("redirect:/gate", result);
+    assertEquals(1, gate.forgotten());
+  }
+
+  @Test
+  void aJoinedSessionGatesRefusalOfAnAjaxCallSendsTheGatesHeader() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/parallel-read");
+    request.addHeader("X-Requested-With", "XMLHttpRequest");
+
+    Object result =
+        handler.handleCompletionException(
+            new CompletionException(new IllegalStateException(markedGateRefusal())),
+            new ConcurrentModel(),
+            request);
+
+    ResponseEntity<?> response = assertInstanceOf(ResponseEntity.class, result);
+    assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    assertEquals("/gate", response.getHeaders().getFirst("X-Gate-Required"));
+    assertEquals(1, gate.forgotten());
+  }
+
+  /**
+   * Builds the refusal the backend marks as the test gate's.
+   *
+   * @return the failure
+   */
+  private static SessionGateRefusalException markedGateRefusal() {
+    return new SessionGateRefusalException("gated", null, 403, "GATE_REQUIRED", "corr-gate", null);
+  }
+
+  @Test
   void anOrdinaryJoinedFailureKeepsTheCentral500Page() {
     Object result =
         handler.handleCompletionException(
@@ -103,7 +206,7 @@ class GlobalExceptionHandlerTest {
     messageSource = Mockito.mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any(Locale.class)))
         .thenAnswer(inv -> inv.getArgument(0));
-    handler = new GlobalExceptionHandler(messageSource);
+    handler = new GlobalExceptionHandler(messageSource, new SessionGates(List.of(gate)));
     setAuthenticatedUser();
   }
 

@@ -24,17 +24,18 @@ import static de.greluc.krt.profit.basetool.frontend.kernel.web.BackendErrorResp
 import de.greluc.krt.profit.basetool.frontend.hangar.client.HangarBackendClient;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrigin;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
-import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,8 +46,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Frontend proxy of the admin member hangar's writes: add, edit and delete a ship of one member
- * (REQ-HANGAR-011) and change the org unit of one or several of its ships (REQ-HANGAR-012), each
- * through the backend's admin hangar paths and ending in an in-place list swap.
+ * (REQ-HANGAR-011), change the org unit of one or several of its ships (REQ-HANGAR-012) and the
+ * origin of several (REQ-HANGAR-018), each through the backend's admin hangar paths and ending in
+ * an in-place list swap.
  */
 @Slf4j
 @RestController
@@ -64,13 +66,14 @@ public class MemberHangarShipProxyController {
    * @param userId the member
    * @param request the ship payload as JSON
    * @return {@code 204} on success, {@code 422} with code {@code VALIDATION} on a missing required
-   *     field, or the relayed backend {@code problem+json}
+   *     field or origin, or the relayed backend {@code problem+json}
    */
   @PostMapping(value = "/add", headers = "X-Requested-With=XMLHttpRequest")
   public ResponseEntity<Object> addShip(
       @PathVariable @NotNull UUID userId, @RequestBody @Nullable ShipRequestDto request) {
-    if (isIncomplete(request)) {
-      return validationError();
+    ShipOrigin origin = request == null ? null : ShipOrigin.choiceOf(request.origin());
+    if (isIncomplete(request) || origin == null) {
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -85,7 +88,8 @@ public class MemberHangarShipProxyController {
                   request.locationId(),
                   request.fitted(),
                   null,
-                  request.owningOrgUnitId()));
+                  request.owningOrgUnitId(),
+                  origin.name()));
           return ResponseEntity.noContent().build();
         });
   }
@@ -105,7 +109,7 @@ public class MemberHangarShipProxyController {
       @PathVariable @NotNull UUID shipId,
       @RequestBody @Nullable ShipRequestDto request) {
     if (isIncomplete(request)) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -121,7 +125,8 @@ public class MemberHangarShipProxyController {
                   request.locationId(),
                   request.fitted(),
                   request.version(),
-                  null));
+                  null,
+                  ShipOrigin.nameOf(ShipOrigin.choiceOf(request.origin()))));
           return ResponseEntity.noContent().build();
         });
   }
@@ -161,7 +166,7 @@ public class MemberHangarShipProxyController {
       @PathVariable @NotNull UUID shipId,
       @RequestBody @Nullable ShipOrgUnitRequestDto request) {
     if (request == null || request.owningOrgUnitVersion() == null) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -185,7 +190,7 @@ public class MemberHangarShipProxyController {
       @PathVariable @NotNull UUID userId,
       @RequestBody @Nullable ShipBulkOrgUnitRequestDto request) {
     if (request == null || request.shipIds() == null || request.shipIds().isEmpty()) {
-      return validationError();
+      return HangarValidationProblem.response();
     }
     return relay(
         log,
@@ -194,6 +199,31 @@ public class MemberHangarShipProxyController {
           ShipBulkOrgUnitResultDto result =
               hangarClient.bulkChangeMemberShipOrgUnit(userId, request);
           return ResponseEntity.ok(result != null ? result : new ShipBulkOrgUnitResultDto(0, 0));
+        });
+  }
+
+  /**
+   * Marks a selection of the member's ships as pledged or bought in-game (REQ-HANGAR-018).
+   *
+   * @param userId the member
+   * @param request the selected ships and the origin
+   * @return {@code 200} with the changed and skipped counts, {@code 422} with code {@code
+   *     VALIDATION} for an empty selection or an origin other than {@code PLEDGE} or {@code
+   *     IN_GAME}, or the relayed backend {@code problem+json}
+   */
+  @PostMapping(value = "/bulk-origin", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> bulkChangeShipOrigin(
+      @PathVariable @NotNull UUID userId, @RequestBody @Nullable ShipBulkOriginRequestDto request) {
+    ShipBulkOriginRequestDto valid = BulkOriginRequests.validated(request);
+    if (valid == null) {
+      return HangarValidationProblem.response();
+    }
+    return relay(
+        log,
+        "bulk change member ship origin (ajax)",
+        () -> {
+          ShipBulkOriginResultDto result = hangarClient.bulkChangeMemberShipOrigin(userId, valid);
+          return ResponseEntity.ok(result != null ? result : new ShipBulkOriginResultDto(0, 0));
         });
   }
 
@@ -209,17 +239,5 @@ public class MemberHangarShipProxyController {
         || request.shipTypeId() == null
         || request.insurance() == null
         || request.insurance().isBlank();
-  }
-
-  /**
-   * Builds the {@code 422} {@code problem+json} with the {@code VALIDATION} code the page shows as
-   * a toast.
-   *
-   * @return a {@code 422} {@code problem+json} response
-   */
-  private static @NotNull ResponseEntity<Object> validationError() {
-    return ResponseEntity.status(422)
-        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
-        .body(Map.of("status", 422, "code", "VALIDATION"));
   }
 }

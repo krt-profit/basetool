@@ -2928,15 +2928,18 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
   or `SectionFallback.run(log, section, work)` and marks the section unavailable when it answers
   `false`, instead of its own `catch (Exception …)`. The helper lets a
   `ReauthenticationRequiredException` through, also when it arrives wrapped, so a page GET with an
-  expired session redirects to the login instead of rendering its sections' error banners. It logs
-  every other failure once and answers the fallback. A pure parse fallback (`Instant.parse`,
-  `Long.parseLong`, `UUID.fromString`, `RoundingMode.valueOf`) catches its specific exception.
+  expired session redirects to the login instead of rendering its sections' error banners. It lets
+  a session gate's refusal (`SessionGateRefusalException`, REQ-SEC-028, ADR-0385) through the same
+  way, so the page hands the member to the gate. It logs every other failure once and answers the
+  fallback. A pure parse fallback (`Instant.parse`, `Long.parseLong`, `UUID.fromString`,
+  `RoundingMode.valueOf`) catches its specific exception.
 - **A custom fallback guards session loss first.** A form-post fallback or a fallback with its own
   status/model contract calls `SectionFallback.rethrowIfReauthenticationRequired(failure)` before
   logging or publishing feedback. The same guard applies inside `CompletableFuture.exceptionally`
   callbacks; nested wrappers never convert session loss into an unavailable counter or empty list.
   The central `CompletionException` mapping delegates a joined failure to the same reauthentication
-  response, because a future can wrap the signal again after its fallback callback propagates it.
+  response, because a future can wrap the signal again after its fallback callback propagates it,
+  and a joined session gate's refusal to the gate's hand-off.
 - **A page reader is the place a page's section fallbacks live.** Where a page has section
   fallbacks, defaults or parallel loads, a per-domain page reader above the typed client reads it as
   one immutable record (ADR-0291; the job-order pages are the pilot, `JobOrderPageReader`). The

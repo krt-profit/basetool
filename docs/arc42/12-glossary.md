@@ -44,6 +44,7 @@ worth reading even if you know the domain.
 | **Mein Lager / Einheitslager** | The two options of the Lager tab. **Mein Lager** lists the member's own rows, personal and shared; the **Einheitslager** (`storage=all`) lists the shared stock of the units the member belongs to and of the units their Logistician grant reaches — never another unit's pool or anyone's personal rows (REQ-INV-002, REQ-ORG-003). |
 | **Umbuchen** | Transferring stock, individually or for a whole marked selection at once. |
 | **Pledge** | An RSI purchase in a member's hangar, one or more ships plus extras, with an id, a date, a price and whether it can be melted or gifted. An imported ship carries its pledge data, shown only to its owner and to admins (REQ-HANGAR-015, ADR-0295). |
+| **Ship origin** (Herkunft) | Whether a ship is pledged (`PLEDGE`, „Gepledged"), bought in-game (`IN_GAME`, „Ingame gekauft") or of unknown origin (`UNKNOWN`). A patch wipe removes only in-game ships; a ship from a file import or with a pledge id is locked to pledged. Private like the pledge data, exchanged with the member's own client (REQ-HANGAR-017, REQ-XCH-057, ADR-0379). |
 | **Gestohlen** | The marker on Lager stock that is stolen cargo (REQ-INV-053). Part of the stack identity, so stolen and legitimate stock never share a stack or merge; carried by every move, shown as a danger chip wherever stock appears, and gated by a server switch until the app release that shows it. |
 | **Materialbörse** | The org-wide exchange board. **Angebote** are offers of owned stock; **Gesuche** are requests, optionally with a minimum quality and a desired quantity. |
 | **Raffinerie** | Refinery — job orders, material handovers and the planet-aware materials matrix. |
@@ -54,6 +55,13 @@ worth reading even if you know the domain.
 | **Materialien** | The material catalogue everything points at, with its units and aliases; fed partly from UEX and the SC Wiki. |
 | **Buchungsantrag / Anträge** | An org unit's deposit or withdrawal request in the Kartellbank, confirmed or rejected by the bank officers. The **Bank** tab of **Meine Einheit** (`/org-unit-bank`) is a unit's own view of its account and requests. |
 | **Benachrichtigungen** | A per-user inbox fed by admin-maintained **Benachrichtigungsregeln** and pushed live. |
+| **Patchwechsel / Patch change** | An admin's record of a Star Citizen patch and its options, made once for every org unit; its effects run at the trigger, all or nothing (REQ-PATCH-001, ADR-0380). Hotfixes are not recorded. |
+| **Patch-Art / Patch kind** | What a patch kept: **Rebuild** (a long-term persistence rebuild: stored items, materials, aUEC and ships survive) or **Full Wipe** (only pledged ships and blueprints survive). The kind presets a patch change's options (REQ-PATCH-002). |
+| **Live-Zeit / Live time** | When the patch went live in the game: the cutoff of every effect of its patch change, which touches only what was created or started before it, and fixed once triggered (REQ-PATCH-003, ADR-0381). |
+| **Wipe-Gruppe / Wipe group** | A fixed set of catalogue types a patch change can wipe: consumables, FPS equipment, ship components and vehicle weapons, raw, refined and no-refine materials, other items (whatever no group claims) and in-game ships (REQ-PATCH-010). |
+| **Ausnahme / Wipe exception** | A single game item, or a material in every quality, whose stock a patch change keeps although its group is wiped, or wipes although its group is not (REQ-PATCH-011). |
+| **Home-Location-Abfrage / Home-location phase** | The period in which members are asked at their next login for their new home location after a patch change, until each has chosen, the admin ends it or a newer patch change supersedes it (decision #3252). |
+| **Währungs-Wipe / Currency wipe** | The option of a patch change that follows a wipe of the game's money: the Kartellbank is reset to its balances as of the live time, earlier Bank requests and order Bank attempts are cancelled, the aUEC holdings of the live time become real shortages and earlier commitments end (REQ-PATCH-040, ADR-0384). |
 
 ## 12.3 Architecture and operations
 

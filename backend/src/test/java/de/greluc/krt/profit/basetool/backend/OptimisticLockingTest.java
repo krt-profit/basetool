@@ -158,6 +158,7 @@ class OptimisticLockingTest {
                         null,
                         true,
                         initialVersion,
+                        null,
                         null);
                 ready.countDown();
                 if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {

@@ -2119,6 +2119,21 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
 - The `CATALOGUE` audit domain (ADR-0346) is excluded from `AuditDomainSilenceAnomaly` as well;
   its admin mutations are rare, and a sync outage is reported by the sync monitoring instead
   (`audit_domain_silence_alerts_13_silent_catalogue_is_exempt_test.yml`).
+- The `PATCH_CHANGE` audit domain ([REQ-PATCH-009](patch-change.md#req-patch-009--the-audit-area-patchwechsel))
+  is excluded from `AuditDomainSilenceAnomaly` too: patch changes come a few times a year
+  (`audit_domain_silence_alerts_14_silent_patch_change_is_exempt_test.yml`). The existing
+  `basetool_audit_events_total{domain}` counts the domain without a new metric.
+  A patch change's wipe ([REQ-PATCH-017](patch-change.md#req-patch-017--one-summary-event-per-affected-area))
+  adds no metric either: its summary events count under their areas' domains, the pledges it
+  withdraws count once each in `basetool_supply_donations_total{status="WITHDRAWN"}`, and the
+  DB-sampled gauges (open pledges, active offers, stock levels below minimum) see its deletes.
+- `basetool_patch_change_relocations_pending` gauge, sampled by the patch-change module's
+  `BusinessGaugeSource` (`PatchChangeBusinessGauges`): the members still to relocate in the open
+  home-location phase, `0` while none is open
+  ([REQ-PATCH-028](patch-change.md#req-patch-028--the-gauge-of-pending-relocations)). A count only, no
+  label. The operations dashboard `07-basetool-operations.json` shows it in the panel "Members still
+  to relocate after a patch change"; there is no alert rule, because the phase ends by itself once
+  everyone has chosen or an admin ends it.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most
@@ -2403,7 +2418,7 @@ the role tab's `member`,
 `hangar_own` and `blueprints_own`, the unit template room `mission_templates` (REQ-MISSION-035),
 and the unit hangar rooms `hangar_unit` and `hangar_units`,
 ADR-0260, the admin dashboard room `admin_dashboard`, ADR-0328, the member catalogue room
-`catalogue`, the admin starmap, shops and P4K import room `catalogue_admin`, and the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`), and
+`catalogue`, the admin starmap, shops and P4K import room `catalogue_admin`, the owner rooms `supply_needs`, `supply_donations` and `purchasing_deals`, and the admin patch-change room `patch_change` of REQ-PATCH-008), and
 the meter names stay put — a rename would break the `07` panels and this alert set.
 
 The backend and frontend share the `catalogue` section allow-list. Committed source changes publish

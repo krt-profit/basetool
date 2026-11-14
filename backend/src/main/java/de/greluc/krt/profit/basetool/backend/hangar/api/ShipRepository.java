@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipType;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnit;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -51,7 +52,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       SELECT new
       de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository$ExchangeShipRow(
       s.id, s.version, s.name, t.id, t.name, s.insurance, l.id, l.name, c.idCity,
-      st.idSpaceStation, s.fitted, o, s.owningOrgUnitVersion) FROM Ship s JOIN s.shipType t LEFT JOIN s.location l
+      st.idSpaceStation, s.fitted, o, s.owningOrgUnitVersion, s.origin, s.originLocked)
+      FROM Ship s JOIN s.shipType t LEFT JOIN s.location l
       LEFT JOIN l.city c LEFT JOIN l.spaceStation st LEFT JOIN s.owningOrgUnit o
       WHERE s.owner.id = :member
       """;
@@ -114,6 +116,45 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   List<Ship> lockAllOwnedByOrderById(@Param("owner") UUID owner);
 
   /**
+   * The ships a patch wipe removes (REQ-PATCH-015): bought in-game by the owner's choice, never a
+   * ship whose origin an import or a pledge id locked, created before the cutoff or undated.
+   */
+  String PATCH_WIPEABLE =
+      """
+      s.originLocked = false
+      AND s.origin = de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin.IN_GAME
+      AND (s.createdAt < :cutoff OR s.createdAt IS NULL)
+      """;
+
+  /**
+   * Counts the ships a patch wipe with the given live time removes.
+   *
+   * @param cutoff the patch's live time
+   * @return the number of ships
+   */
+  @Query("SELECT COUNT(s) FROM Ship s WHERE " + PATCH_WIPEABLE)
+  long countPatchWipeable(@Param("cutoff") Instant cutoff);
+
+  /**
+   * Counts the members who own a ship a patch wipe with the given live time removes.
+   *
+   * @param cutoff the patch's live time
+   * @return the number of distinct owners
+   */
+  @Query("SELECT COUNT(DISTINCT s.owner.id) FROM Ship s WHERE " + PATCH_WIPEABLE)
+  long countPatchWipeableOwners(@Param("cutoff") Instant cutoff);
+
+  /**
+   * Locks the ships a patch wipe with the given live time removes, in ascending id order.
+   *
+   * @param cutoff the patch's live time
+   * @return the ships, locked for this transaction, ordered by id
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT s FROM Ship s WHERE " + PATCH_WIPEABLE + " ORDER BY s.id")
+  List<Ship> lockPatchWipeable(@Param("cutoff") Instant cutoff);
+
+  /**
    * Counts a member's ships.
    *
    * @param owner the member
@@ -166,19 +207,27 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
 
   /**
    * OrgUnit-scoped variant of {@link #resetAllFitted()}: clears the {@code fitted} flag only on
-   * ships within the caller's scope triple.
+   * ships within the caller's scope triple, leaving out the ships the relocation lock keeps from
+   * the caller (REQ-PATCH-023).
    *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @param lockedOwners the owners whose ships from before {@code lockedBefore} stay as they are
+   * @param lockedBefore the open phase's live time, or {@code null} when nothing is locked
    * @return how many fitted ships were cleared; ships already unfitted are not counted
    */
   @Modifying(clearAutomatically = true)
-  @Query("UPDATE Ship s SET s.fitted = false WHERE s.fitted = true AND " + ShipScope.TRIPLE)
+  @Query(
+      "UPDATE Ship s SET s.fitted = false WHERE s.fitted = true AND "
+          + ShipScope.TRIPLE
+          + ShipRelocationScope.UNLOCKED)
   int resetAllFittedScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("lockedOwners") Collection<UUID> lockedOwners,
+      @Param("lockedBefore") @Nullable Instant lockedBefore);
 
   /**
    * Counts, per owner, the fitted ships {@link #resetAllFittedScoped} is about to clear
@@ -187,16 +236,21 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @param lockedOwners the owners whose ships from before {@code lockedBefore} are left out
+   * @param lockedBefore the open phase's live time, or {@code null} when nothing is locked
    * @return one row per owner with at least one fitted ship in scope
    */
   @Query(
       "SELECT s.owner.id AS ownerId, COUNT(s) AS shipCount FROM Ship s WHERE s.fitted = true AND "
           + ShipScope.TRIPLE
+          + ShipRelocationScope.UNLOCKED
           + " GROUP BY s.owner.id")
   List<OwnerShipCount> countFittedByOwnerScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("lockedOwners") Collection<UUID> lockedOwners,
+      @Param("lockedBefore") @Nullable Instant lockedBefore);
 
   /**
    * Lists the org units of the fitted ships {@link #resetAllFittedScoped} is about to clear, for
@@ -205,16 +259,21 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @param lockedOwners the owners whose ships from before {@code lockedBefore} are left out
+   * @param lockedBefore the open phase's live time, or {@code null} when nothing is locked
    * @return the distinct org unit ids; ships without a unit are left out
    */
   @Query(
       "SELECT DISTINCT s.owningOrgUnit.id FROM Ship s WHERE s.fitted = true"
           + " AND s.owningOrgUnit IS NOT NULL AND "
-          + ShipScope.TRIPLE)
+          + ShipScope.TRIPLE
+          + ShipRelocationScope.UNLOCKED)
   List<UUID> findFittedOrgUnitIdsScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("lockedOwners") Collection<UUID> lockedOwners,
+      @Param("lockedBefore") @Nullable Instant lockedBefore);
 
   /**
    * Lists the org units an owner's ships belong to, for the unit hangar live sync (ADR-0260).
@@ -249,15 +308,18 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * Bulk-sets the location of every ship owned by {@code ownerId}, backing the hangar "set home
    * location" action.
    *
-   * <p>Does not bump {@code @Version}; clears the persistence context so later reads in the same
-   * transaction see the new state.
+   * <p>Advances every updated ship's {@code @Version}, so a form opened before answers a stale edit
+   * with a conflict; clears the persistence context so later reads in the same transaction see the
+   * new state.
    *
    * @param ownerId the owning user id whose ships are updated
    * @param location the location to set on every matching ship
    * @return the number of ships updated
    */
   @Modifying(clearAutomatically = true)
-  @Query("UPDATE Ship s SET s.location = :location WHERE s.owner.id = :ownerId")
+  @Query(
+      "UPDATE Ship s SET s.location = :location, s.version = s.version + 1"
+          + " WHERE s.owner.id = :ownerId")
   int setLocationForOwner(@Param("ownerId") UUID ownerId, @Param("location") Location location);
 
   /**
@@ -316,6 +378,47 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Page<Ship> findByOwnerId(UUID ownerId, Pageable pageable);
 
   /**
+   * The personal-hangar origin filter on the effective origin: a ship locked by an import reads as
+   * {@code PLEDGE} whatever origin it stores (REQ-HANGAR-017).
+   */
+  String EFFECTIVE_ORIGIN_FILTER =
+      """
+      AND (:origin IS NULL
+      OR (s.originLocked = false AND s.origin = :origin)
+      OR (s.originLocked = true
+      AND :origin = de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin.PLEDGE))
+      """;
+
+  /**
+   * The personal-hangar search on ship-type or manufacturer name (REQ-HANGAR-002); a type without a
+   * manufacturer still matches on its own name.
+   */
+  String MY_SHIPS_SEARCH =
+      """
+      AND (cast(:search as string) IS NULL
+      OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+      OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
+      )
+      """;
+
+  /** The personal-hangar order of REQ-HANGAR-002, with the row id as the stable tiebreaker. */
+  String MY_SHIPS_ORDER =
+      """
+      ORDER BY
+      LOWER(COALESCE(m.name, '')) ASC,
+      LOWER(COALESCE(st.name, '')) ASC,
+      CASE WHEN s.insurance = 'LTI' THEN 1
+      WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3
+      ELSE 2 END ASC,
+      CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0
+      ELSE cast(s.insurance as integer) END DESC,
+      LOWER(COALESCE(l.name, '')) ASC,
+      CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,
+      LOWER(COALESCE(s.name, '')) ASC,
+      s.id ASC
+      """;
+
+  /**
    * One page of the calling user's own ships, ordered server-side by the hangar's multi-key
    * comparator and optionally filtered by a case-insensitive search term (REQ-HANGAR-002).
    *
@@ -326,6 +429,7 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param search optional case-insensitive ship-type/manufacturer name filter; {@code null}/blank
    *     returns every ship the user owns
    * @param fitted optional fitted filter; {@code null} returns fitted and unfitted ships
+   * @param origin optional filter on the effective origin; {@code null} returns every origin
    * @param pageable page and size only; the ordering lives in the query, so pass it unsorted
    * @return one ordered page of the user's ships
    */
@@ -340,22 +444,10 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN FETCH s.owningOrgUnit
           WHERE s.owner.id = :ownerId
           AND (:fitted IS NULL OR s.fitted = :fitted)
-          AND (cast(:search as string) IS NULL
-          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-          ) ORDER BY
-          LOWER(COALESCE(m.name, '')) ASC,
-          LOWER(COALESCE(st.name, '')) ASC,
-          CASE WHEN s.insurance = 'LTI' THEN 1
-          WHEN s.insurance IS NULL OR s.insurance = '0' THEN 3
-          ELSE 2 END ASC,
-          CASE WHEN s.insurance IS NULL OR s.insurance = 'LTI' OR s.insurance = '0' THEN 0
-          ELSE cast(s.insurance as integer) END DESC,
-          LOWER(COALESCE(l.name, '')) ASC,
-          CASE WHEN s.fitted = true THEN 0 ELSE 1 END ASC,
-          LOWER(COALESCE(s.name, '')) ASC,
-          s.id ASC
-          """,
+          """
+              + EFFECTIVE_ORIGIN_FILTER
+              + MY_SHIPS_SEARCH
+              + MY_SHIPS_ORDER,
       countQuery =
           """
           SELECT COUNT(s) FROM Ship s
@@ -363,15 +455,14 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
           LEFT JOIN st.manufacturer m
           WHERE s.owner.id = :ownerId
           AND (:fitted IS NULL OR s.fitted = :fitted)
-          AND (cast(:search as string) IS NULL
-          OR LOWER(st.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-          OR LOWER(m.name) LIKE LOWER(CONCAT('%', cast(:search as string), '%')) ESCAPE '\\'
-          )
-          """)
+          """
+              + EFFECTIVE_ORIGIN_FILTER
+              + MY_SHIPS_SEARCH)
   Page<Ship> findByOwnerIdFiltered(
       @Param("ownerId") UUID ownerId,
       @Param("search") @Nullable String search,
       @Param("fitted") @Nullable Boolean fitted,
+      @Param("origin") @Nullable ShipOrigin origin,
       Pageable pageable);
 
   /**
@@ -474,6 +565,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param fitted whether the ship is fitted
    * @param orgUnit the org unit the ship belongs to, or {@code null} when it has none
    * @param orgUnitVersion the optimistic counter of the ship's org unit (ADR-0258)
+   * @param origin the origin the owner chose
+   * @param originLocked whether an import locked the origin to {@code PLEDGE} (REQ-HANGAR-017)
    */
   record ExchangeShipRow(
       UUID id,
@@ -488,5 +581,17 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       Integer uexSpaceStationId,
       boolean fitted,
       @Nullable OrgUnit orgUnit,
-      long orgUnitVersion) {}
+      long orgUnitVersion,
+      ShipOrigin origin,
+      boolean originLocked) {
+
+    /**
+     * Returns the origin the ship reads as: {@code PLEDGE} while locked, the chosen one otherwise.
+     *
+     * @return the effective origin
+     */
+    public ShipOrigin effectiveOrigin() {
+      return ShipOrigin.effective(origin, originLocked);
+    }
+  }
 }

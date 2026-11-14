@@ -31,11 +31,13 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatal
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitChoice;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
 import de.greluc.krt.profit.basetool.backend.hangar.api.Ship;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipCommands;
+import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -88,7 +90,7 @@ public class ExchangeShipWriteService
   static final String LINK_TARGET_TAKEN = "LINK_TARGET_TAKEN";
 
   /** The refusal of bringing back a ship removed by another channel or installation. */
-  static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";
+  static final String REMOVED_ELSEWHERE = ExchangeReasons.REMOVED_ELSEWHERE;
 
   /** The refusal of an org unit outside the member's stampable units. */
   static final String ORG_UNIT_NOT_ALLOWED = ExchangeReasons.ORG_UNIT_NOT_ALLOWED;
@@ -96,12 +98,16 @@ public class ExchangeShipWriteService
   /** The refusal of a unit counter the ship no longer has. */
   static final String ORG_UNIT_VERSION_CONFLICT = "ORG_UNIT_VERSION_CONFLICT";
 
+  /** The refusal of another origin than {@code PLEDGE} for a ship an import locked. */
+  static final String ORIGIN_LOCKED = "ORIGIN_LOCKED";
+
   private final ExchangeResolveService resolveService;
   private final ExchangeLocationResolver locationResolver;
   private final ShipRepository shipRepository;
   private final ExchangeShipLinkRepository linkRepository;
   private final ShipCommands shipCommands;
   private final ExchangeChangeRepository changeRepository;
+  private final ExchangePatchRemovals patchRemovals;
   private final ExchangeJournalService journalService;
   private final ExchangeMassChangeGuard guard;
   private final ExchangeChangeSetRunner runner;
@@ -332,7 +338,8 @@ public class ExchangeShipWriteService
                   locationId,
                   Boolean.TRUE.equals(op.fitted()),
                   null,
-                  null),
+                  null,
+                  requestedOrigin(op)),
               unit));
     }
     UUID shipId = parse(op.shipId());
@@ -352,7 +359,7 @@ public class ExchangeShipWriteService
       return ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT);
     }
     if (op.version() == null || !op.version().equals(ship.getVersion())) {
-      return ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT);
+      return staleVersion(caller, ownedId);
     }
     String linked = links.externalOf(ownedId);
     if (linked != null && !linked.equals(externalId)) {
@@ -368,6 +375,10 @@ public class ExchangeShipWriteService
     if (move != null && !Objects.equals(op.orgUnitVersion(), move.expectedVersion())) {
       return ExchangeChangeSetAdapter.skip(REJECTED, ORG_UNIT_VERSION_CONFLICT);
     }
+    ShipOrigin origin = requestedOrigin(op);
+    if (origin != null && origin != ship.effectiveOrigin() && ship.isOriginLocked()) {
+      return ExchangeChangeSetAdapter.skip(REJECTED, ORIGIN_LOCKED);
+    }
     ShipRequestDto dto =
         new ShipRequestDto(
             op.name(),
@@ -376,7 +387,8 @@ public class ExchangeShipWriteService
             locationId,
             op.fitted() == null ? ship.isFitted() : op.fitted(),
             ship.getVersion(),
-            null);
+            null,
+            origin == null ? ship.effectiveOrigin() : origin);
     boolean changes = !State.of(ship).synced().equals(State.of(dto));
     if (!changes && move == null && linked != null) {
       return ExchangeChangeSetAdapter.skip(UNCHANGED, null);
@@ -392,7 +404,8 @@ public class ExchangeShipWriteService
 
   /**
    * Plans an upsert that names a ship the server no longer has: brought back when this installation
-   * removed it or the member agreed, refused when it was removed elsewhere.
+   * removed it or the member agreed, refused when it was removed elsewhere, naming the patch change
+   * that wiped it (REQ-PATCH-053).
    *
    * @param caller the caller
    * @param op the op
@@ -424,7 +437,10 @@ public class ExchangeShipWriteService
       return ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON);
     }
     if (!Boolean.TRUE.equals(op.override()) && !writtenBy(caller, tombstone.get())) {
-      return ExchangeChangeSetAdapter.skip(REJECTED, REMOVED_ELSEWHERE);
+      ExchangePatchChangeRefDto patchChange = patchRemovals.patchChangeOf(tombstone.get());
+      return patchChange == null
+          ? ExchangeChangeSetAdapter.skip(REJECTED, REMOVED_ELSEWHERE)
+          : ExchangeChangeSetAdapter.removedByPatch(patchChange);
     }
     UnitTarget unit = unitTarget(op);
     if (!unitAllowed(unit, memberships)) {
@@ -445,7 +461,8 @@ public class ExchangeShipWriteService
                 locationId,
                 Boolean.TRUE.equals(op.fitted()),
                 null,
-                null),
+                null,
+                requestedOrigin(op)),
             unit));
   }
 
@@ -478,11 +495,29 @@ public class ExchangeShipWriteService
     }
     Ship ship = locked.get();
     UUID ownedId = Objects.requireNonNull(shipId);
-    if (touched.contains(ownedId) || !version.equals(ship.getVersion())) {
+    if (touched.contains(ownedId)) {
       return ExchangeChangeSetAdapter.skip(REJECTED, VERSION_CONFLICT);
+    }
+    if (!version.equals(ship.getVersion())) {
+      return staleVersion(caller, ownedId);
     }
     touched.add(ownedId);
     return ExchangeChangeSetAdapter.write(new Remove(ownedId, State.of(ship)));
+  }
+
+  /**
+   * Plans the refusal of an op that sent an older version of the member's ship, naming the patch
+   * change when the ship's latest change came from one (REQ-PATCH-053).
+   *
+   * @param caller the caller
+   * @param shipId the ship
+   * @return the plan
+   */
+  private @NotNull Planned<Change> staleVersion(
+      @NotNull ExchangeCaller caller, @NotNull UUID shipId) {
+    return ExchangeChangeSetAdapter.versionConflict(
+        patchRemovals.latestPatchChangeOf(
+            caller.member(), ExchangeFeedResource.SHIP, shipId.toString()));
   }
 
   /**
@@ -733,6 +768,16 @@ public class ExchangeShipWriteService
       throw new BadRequestException("Missing " + name);
     }
     return value;
+  }
+
+  /**
+   * Reads the origin an upsert names.
+   *
+   * @param op the upsert
+   * @return the origin, or {@code null} when the op leaves it out
+   */
+  private static @Nullable ShipOrigin requestedOrigin(@NotNull ExchangeShipChangeSet.Op op) {
+    return op.origin() == null ? null : ShipOrigin.valueOf(op.origin());
   }
 
   /**

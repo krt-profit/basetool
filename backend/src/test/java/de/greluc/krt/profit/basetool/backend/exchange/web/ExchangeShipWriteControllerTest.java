@@ -369,6 +369,72 @@ class ExchangeShipWriteControllerTest {
     assertThat(ships(member)).isEqualTo(3);
   }
 
+  @Test
+  void aNewShipTakesTheSentOriginOrUnknown() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+
+    change(
+            ops(
+                withOrigin(
+                    upsert("vk-1", null, null, cutlass, "Bought", "{\"kind\":\"LTI\"}", null),
+                    "IN_GAME"),
+                upsert("vk-2", null, null, cutlass, "Unsure", "{\"kind\":\"LTI\"}", null)))
+        .andExpect(jsonPath("$.applied").value(2));
+
+    assertThat(originByName("Bought")).isEqualTo("IN_GAME");
+    assertThat(originByName("Unsure")).isEqualTo("UNKNOWN");
+  }
+
+  @Test
+  void anOriginChangeMovesTheVersionAndAnAbsentOriginKeepsIt() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID first = ship(member, "Blackbird", cutlass, "LTI");
+    change(ops(link("vk-1", first))).andExpect(jsonPath("$.applied").value(1));
+    String op = upsert("vk-1", first, 0L, cutlass, "Blackbird", "{\"kind\":\"LTI\"}", null);
+
+    change(ops(withOrigin(op, "PLEDGE"))).andExpect(jsonPath("$.applied").value(1));
+    assertThat(column("version", first)).isEqualTo(1L);
+
+    change(ops(upsert("vk-1", first, 1L, cutlass, "Blackbird", "{\"kind\":\"LTI\"}", null)))
+        .andExpect(jsonPath("$.unchanged").value(1));
+    assertThat(jdbc.queryForObject("SELECT origin FROM ship WHERE id = ?", String.class, first))
+        .isEqualTo("PLEDGE");
+  }
+
+  @Test
+  void aShipAnImportLockedReadsPledgeAndRefusesAnotherOrigin() throws Exception {
+    UUID cutlass = shipType("Cutlass Black");
+    UUID first = ship(member, "Blackbird", cutlass, "LTI");
+    jdbc.update("UPDATE ship SET origin_locked = TRUE WHERE id = ?", first);
+    change(ops(link("vk-1", first))).andExpect(jsonPath("$.applied").value(1));
+    String op = upsert("vk-1", first, 0L, cutlass, "Blackbird", "{\"kind\":\"LTI\"}", null);
+
+    change(ops(withOrigin(op, "IN_GAME"), withOrigin(op, "PLEDGE")))
+        .andExpect(jsonPath("$.results[0].result").value("rejected"))
+        .andExpect(jsonPath("$.results[0].reason").value("ORIGIN_LOCKED"))
+        .andExpect(jsonPath("$.unchanged").value(1));
+
+    assertThat(jdbc.queryForObject("SELECT origin FROM ship WHERE id = ?", String.class, first))
+        .isEqualTo("UNKNOWN");
+    assertThat(column("version", first)).isZero();
+  }
+
+  /**
+   * Adds an origin to an upsert op.
+   *
+   * @param op the upsert as JSON
+   * @param origin the origin's name
+   * @return the op as JSON
+   */
+  private static @NotNull String withOrigin(@NotNull String op, @NotNull String origin) {
+    return op.substring(0, op.length() - 1) + ",\"origin\":\"" + origin + "\"}";
+  }
+
+  private @NotNull String originByName(@NotNull String name) {
+    return jdbc.queryForObject(
+        "SELECT origin FROM ship WHERE owner_id = ? AND name = ?", String.class, member, name);
+  }
+
   /**
    * Adds an org unit and optionally its counter to an upsert op.
    *

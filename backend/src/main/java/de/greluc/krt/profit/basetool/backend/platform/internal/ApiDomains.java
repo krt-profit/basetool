@@ -29,9 +29,9 @@ import org.jetbrains.annotations.Unmodifiable;
  * (REQ-API-018).
  *
  * <p>The table is the controller-to-domain map of the REST API cut ({@code
- * docs/modularisation/rest-api-cut.md}, "Today's surface"): 22 domains, every controller in exactly
- * one. A controller missing here is tagged {@link #UNASSIGNED}, which the document assertions
- * refuse.
+ * docs/modularisation/rest-api-cut.md}, "Today's surface") plus the patch-change module: 23
+ * domains, every controller in exactly one. A controller missing here is tagged {@link
+ * #UNASSIGNED}, which the document assertions refuse.
  */
 public final class ApiDomains {
 
@@ -53,6 +53,8 @@ public final class ApiDomains {
           Map.entry("AdminP4kImportController", "catalogue"),
           Map.entry("AdminP4kImportReportController", "catalogue"),
           Map.entry("AdminP4kReviewWorkspaceController", "catalogue"),
+          Map.entry("AdminPatchChangeController", "patchchange"),
+          Map.entry("HomeLocationController", "patchchange"),
           Map.entry("AdminStarmapController", "catalogue"),
           Map.entry("AdminShopController", "catalogue"),
           Map.entry("AdminPersonSearchController", "identity"),
@@ -94,6 +96,7 @@ public final class ApiDomains {
           Map.entry("ExchangeNameWithholdingController", "exchange"),
           Map.entry("ExchangeOrgStockController", "exchange"),
           Map.entry("ExchangeOrgUnitController", "exchange"),
+          Map.entry("ExchangePatchChangeController", "exchange"),
           Map.entry("ExchangeRefineryOrderController", "exchange"),
           Map.entry("ExchangeShipController", "exchange"),
           Map.entry("ExchangeStockController", "exchange"),
@@ -135,6 +138,7 @@ public final class ApiDomains {
           Map.entry("MaterialRequestController", "materialexchange"),
           Map.entry("MeController", "identity"),
           Map.entry("MyBlueprintSharingController", "identity"),
+          Map.entry("MyHomeLocationController", "identity"),
           Map.entry("MyPayoutPreferenceController", "identity"),
           Map.entry("MemberMembershipController", "identity"),
           Map.entry("MissionCheckInController", "mission"),

@@ -77,6 +77,8 @@
                 <span class="cell-sub">
                     <span th:text="${#numbers.formatInteger(@moneyFormat.round(request.amount()), 1, 'DEFAULT')} + ' aUEC'">5.000 aUEC</span>
                     <th:block th:if="${request.accountName() != null}">· <span th:text="${request.accountName()}">ALF Betriebskonto</span></th:block>
+                    <th:block th:if="${request.cancelledByPatchLabel() != null}">· <span data-testid="dashboard-bank-requests-cancelled-by-patch"
+                          th:text="#{bank.request.cancelledByPatch(${request.cancelledByPatchLabel()})}">Patchwechsel 4.4</span></th:block>
                 </span>
             </a>
         </li>

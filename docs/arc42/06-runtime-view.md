@@ -338,3 +338,70 @@ record.
 
 See [the aUEC order contract](../specs/orders-auec.md) for settlement and correction, and the
 [Bank integration contract](../specs/orders-auec-bank.md) for coupled outcomes.
+
+## 6.14 An admin triggers a patch change
+
+1. The admin's page on the danger-zone tab loads the form's defaults: the label the latest P4K import
+   suggests, the previous patch change's label and live time, and each kind's preset. Every change
+   of the kind, the live time or an option asks the backend for a preview: each effect bean of the
+   `patchchange` module counts what its module would touch before the live time, read-only.
+2. Typing the label enables the trigger. The backend checks the typed label, assigns the patch
+   change's id and opens one transaction inside `PatchChangeWrites.runFor`, so the exchange's change
+   source writes `patch|<id>` into the transaction variable the feed triggers read.
+3. Under the history's advisory lock it checks the label against the previous one and the live time
+   against the previous live time and now, records the patch change and runs every effect bean in
+   order. The refinery effect locks the running orders started before the live time in id order and
+   cancels them with the patch change as their reason. The stock wipe reads the rows created before
+   the live time, classifies them by wipe group and exception, locks the selected rows through the
+   Lager's order planning (hierarchy, material scopes, lots, rows; the responsibility check excepted,
+   [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md)),
+   classifies them again on their locked facts, ends the offers and withdraws the pledges on them and
+   deletes them by id. The ship wipe locks the unlocked in-game ships created before the live time
+   and deletes them through the hangar's ordinary deletion path. With the currency wipe on, the
+   job orders lock every aUEC order with money from before the live time in id order under the
+   hierarchy guard, cancel the waiting Bank attempts with their Bank requests, book the holdings
+   of the live time as real shortages and end the earlier commitments; then the Bank cancels the
+   remaining earlier requests, locks every account and books one reset of the balances as of the
+   live time, each offset stopping at zero rather than overdrawing an account
+   ([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)). An effect
+   that refuses rolls the whole patch change back.
+4. The record keeps the effects' counts; `PATCH_CHANGE_TRIGGERED` and each area's summary event
+   commit with it. After the commit the refinery, order and Bank pages and every open
+   patch-change page refresh in place, and the exchange feeds show the changes with the `patch`
+   source and the patch change's `{id, label}`.
+5. From then on the write-time stock merge skips every row created before the live time
+   ([ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)).
+
+The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-001…018, -040…046).
+
+## 6.15 A member chooses a new home location after a patch change
+
+1. A trigger with the home-location option opens its phase. After the commit the asked members'
+   notification streams close; on reconnect the backend's `HomeLocationGate` (run by
+   `SessionGateAccessFilter`) refuses the stream with `403 HOME_LOCATION_REQUIRED`, and the
+   frontend relay hands the browser the event `home-location-gate`. A page load meets the frontend's
+   `HomeLocationGate` (run by `SessionGateFilter`) instead, an AJAX call the header
+   `X-Home-Location-Required`; a backend `403` of the gate discards the frontend's cached verdict
+   and hands the browser over at once (ADR-0385).
+2. The page `/home-location` reads the member's prompt: the curated home locations and, per current
+   location, the rows (with the pool shares) and ships from before the live time. An exchange client
+   reads the same prompt with the latest patch change and its wipe list through
+   `GET /exchange/v1/me/patch-change` and may send the choice through
+   `POST …/home-location`, which runs the same step 3 recorded as `CLIENT` (REQ-PATCH-050…052).
+3. The choice opens one transaction inside `PatchChangeWrites.runFor` of the phase. It takes the
+   history's lock in shared mode and re-checks the phase, claims the member's
+   `patch_change_relocation` row, takes the shared hierarchy lock, the lot locks of the old and new
+   lot keys in ascending order and the rows, moves the rows in place with a new version, then locks
+   the member's ships and moves them.
+4. `PATCH_CHANGE_RELOCATED` commits with it; after the commit the Lager, Materialbörse and hangar
+   rooms and the admin's patch-change room refresh, the exchange feed shows a tombstone for each old
+   lot key and an item for each new one from the `patch` source, and the gate lets the member
+   through on the next request. A client's later push against an old lot is `REMOVED_ELSEWHERE`
+   with the patch change's id (REQ-PATCH-053). Each moved pool row's org-stock feed entries name the
+   row, so a Logistician's stale op on it is `VERSION_CONFLICT` naming the patch change
+   (REQ-PATCH-057).
+
+Until then the member's rows and ships from before the live time are locked: the Lager's entity
+listener notes every row a writing transaction changes and checks them before the commit, the
+hangar checks its ship writes, and a write the lock forbids answers `409 RELOCATION_PENDING`
+(REQ-PATCH-020…029, [ADR-0383](../adr/0383-a-patch-change-relocation-moves-stock-in-place.md)).

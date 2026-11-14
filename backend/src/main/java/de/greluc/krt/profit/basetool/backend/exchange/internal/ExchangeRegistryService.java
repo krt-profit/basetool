@@ -156,14 +156,15 @@ public class ExchangeRegistryService {
    * @param request the new client
    * @return the saved client
    * @throws DuplicateEntityException when the client id is already registered
-   * @throws BadRequestException when {@code exchange.connect} is missing, the client id is one of
+   * @throws BadRequestException when {@code exchange.connect} is missing, {@code
+   *     exchange.patch.write} comes without {@code exchange.patch.read}, the client id is one of
    *     the Basetool's own, or the display name breaks {@link ExchangeDisplayNames}
    */
   @NotNull
   @Transactional
   public ExchangeClient createClient(@NotNull ExchangeClientCreateRequest request) {
     mirrorSync.lockSettings();
-    requireConnect(request.capabilities());
+    requireGrantable(request.capabilities());
     if (firstPartyClientIds.contains(request.clientId())) {
       throw new BadRequestException("error.exchange.client.reserved");
     }
@@ -199,7 +200,8 @@ public class ExchangeRegistryService {
    * @param id the registry id
    * @param request the new values and the version last seen
    * @return the saved client
-   * @throws BadRequestException when {@code exchange.connect} is missing or the display name breaks
+   * @throws BadRequestException when {@code exchange.connect} is missing, {@code
+   *     exchange.patch.write} comes without {@code exchange.patch.read}, or the display name breaks
    *     {@link ExchangeDisplayNames}
    */
   @NotNull
@@ -207,7 +209,7 @@ public class ExchangeRegistryService {
   public ExchangeClient updateClient(
       @NotNull UUID id, @NotNull ExchangeClientUpdateRequest request) {
     mirrorSync.lockSettings();
-    requireConnect(request.capabilities());
+    requireGrantable(request.capabilities());
     String displayName = requireDisplayName(request.displayName());
     ExchangeClient client = getClient(id);
     OptimisticLock.check(client.getVersion(), request.version(), ExchangeClient.class, id);
@@ -476,14 +478,20 @@ public class ExchangeRegistryService {
   }
 
   /**
-   * Refuses a capability set without the base capability.
+   * Refuses a capability set without the base capability, or with the patch-change write without
+   * its read (REQ-PATCH-052).
    *
    * @param capabilities the requested capabilities
-   * @throws BadRequestException when {@code exchange.connect} is missing
+   * @throws BadRequestException when {@code exchange.connect} is missing, or {@code
+   *     exchange.patch.write} comes without {@code exchange.patch.read}
    */
-  private static void requireConnect(@NotNull Set<ExchangeCapability> capabilities) {
+  private static void requireGrantable(@NotNull Set<ExchangeCapability> capabilities) {
     if (!capabilities.contains(ExchangeCapability.CONNECT)) {
       throw new BadRequestException("error.exchange.client.connectRequired");
+    }
+    if (capabilities.contains(ExchangeCapability.PATCH_WRITE)
+        && !capabilities.contains(ExchangeCapability.PATCH_READ)) {
+      throw new BadRequestException("error.exchange.client.patchWriteNeedsRead");
     }
   }
 

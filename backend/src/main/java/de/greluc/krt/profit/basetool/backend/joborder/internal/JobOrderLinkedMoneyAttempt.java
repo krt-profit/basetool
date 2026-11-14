@@ -170,6 +170,9 @@ class JobOrderLinkedMoneyAttempt {
 
   private Instant updatedAt;
 
+  /** The patch change whose currency wipe cancelled the attempt; {@code null} for every other. */
+  @Nullable private UUID cancelledByPatchChange;
+
   JobOrderLinkedMoneyAttempt(
       UUID orderId,
       UUID operationId,
@@ -347,6 +350,20 @@ class JobOrderLinkedMoneyAttempt {
       }
     }
     decisionActorId = actor;
+    updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+  }
+
+  /**
+   * Cancels the waiting attempt for a currency wipe with the patch change as its reason
+   * (REQ-PATCH-043); a reported actual payment keeps its binding, as after any cancellation.
+   *
+   * @param patchChangeId the patch change
+   */
+  void cancelForCurrencyWipe(UUID patchChangeId) {
+    requireState(JobOrderLinkedMoneyState.WAITING);
+    state = JobOrderLinkedMoneyState.CANCELLED;
+    cancelledByPatchChange = patchChangeId;
+    decisionActorId = null;
     updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
   }
 

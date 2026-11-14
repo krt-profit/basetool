@@ -28,6 +28,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.GatePageRequest;
 import java.util.List;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,8 +37,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.ClientAuthorizationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /** Pins the section-fallback contract of {@link SectionFallback} (REQ-FE-036). */
 class SectionFallbackTest {
@@ -172,6 +177,95 @@ class SectionFallbackTest {
   }
 
   @Test
+  void loadPropagatesASessionGatesRefusal() {
+    SessionGateRefusalException refusal = sessionGateRefusal();
+
+    assertThatThrownBy(() ->
+            SectionFallback.load(
+                log,
+                "rows",
+                () -> {
+                  throw refusal;
+                },
+                List.of()))
+        .isSameAs(refusal);
+    assertThat(appender.list).isEmpty();
+  }
+
+  @Test
+  void loadUnwrapsASessionGatesRefusalFromAJoinedFuture() {
+    SessionGateRefusalException refusal = sessionGateRefusal();
+
+    assertThatThrownBy(() ->
+            SectionFallback.load(
+                log,
+                "rows",
+                () -> {
+                  throw new CompletionException(refusal);
+                },
+                List.of()))
+        .isSameAs(refusal);
+  }
+
+  @Test
+  void runPropagatesASessionGatesRefusal() {
+    SessionGateRefusalException refusal = sessionGateRefusal();
+
+    assertThatThrownBy(() ->
+            SectionFallback.run(
+                log,
+                "stats",
+                () -> {
+                  throw refusal;
+                }))
+        .isSameAs(refusal);
+  }
+
+  @Test
+  void onAGatesOwnPageASessionGatesRefusalFallsBackInsteadOfHandingOffAgain() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/gate");
+    GatePageRequest.mark(request);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    try {
+      assertThat(
+              SectionFallback.load(
+                  log,
+                  "rows",
+                  () -> {
+                    throw sessionGateRefusal();
+                  },
+                  List.of("fallback")))
+          .containsExactly("fallback");
+      assertThat(
+              SectionFallback.run(
+                  log,
+                  "stats",
+                  () -> {
+                    throw new CompletionException(sessionGateRefusal());
+                  }))
+          .isFalse();
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+    assertThat(appender.list).extracting(ILoggingEvent::getLevel).containsOnly(Level.DEBUG);
+  }
+
+  @Test
+  void aForbiddenRefusalOfNoSessionGateFallsBack() {
+    List<String> result =
+        SectionFallback.load(
+            log,
+            "rows",
+            () -> {
+              throw new BackendServiceException(
+                  "forbidden", null, 403, "ACCESS_DENIED", null, List.of(), null);
+            },
+            List.of("fallback"));
+
+    assertThat(result).containsExactly("fallback");
+  }
+
+  @Test
   void runReportsSuccessAndFailure() {
     AtomicBoolean ran = new AtomicBoolean();
 
@@ -203,6 +297,11 @@ class SectionFallbackTest {
                   throw reauth;
                 }))
         .isSameAs(reauth);
+  }
+
+  private static SessionGateRefusalException sessionGateRefusal() {
+    return new SessionGateRefusalException(
+        "gated", null, 403, "ANY_GATE_REQUIRED", "corr-gate", null);
   }
 
   private static ReauthenticationRequiredException reauth() {

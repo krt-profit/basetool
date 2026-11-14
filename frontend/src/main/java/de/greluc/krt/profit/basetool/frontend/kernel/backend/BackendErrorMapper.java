@@ -158,7 +158,7 @@ public final class BackendErrorMapper {
     return switch (classify(error)) {
       case Problem(BackendServiceException parsed) -> {
         logProblem(parsed, method, uri);
-        if (!isExpectedAccessGateRefusal(parsed.getProblemCode())) {
+        if (!isExpectedAccessGateRefusal(parsed)) {
           count(
               parsed.getStatusCode() >= 500
                   ? MetricNames.REASON_BACKEND_5XX
@@ -208,17 +208,17 @@ public final class BackendErrorMapper {
   }
 
   /**
-   * Whether a problem code is one of the access gates refusing an authenticated user (pending
-   * approval, unaccepted terms, no role): expected and self-clearing (REQ-SEC-017, REQ-SEC-028,
-   * REQ-SEC-053), so logged at DEBUG and not counted as a failure.
+   * Whether a refusal is an access gate holding an authenticated user (a session gate's marked
+   * refusal, a pending approval, no role): expected and self-clearing (REQ-SEC-017, REQ-SEC-028,
+   * REQ-SEC-053, ADR-0385), so logged at DEBUG and not counted as a failure.
    *
-   * @param problemCode the RFC 7807 {@code code} the backend returned
+   * @param refusal the parsed backend refusal
    * @return {@code true} when the refusal is an expected access gate
    */
-  public static boolean isExpectedAccessGateRefusal(@NotNull String problemCode) {
-    return BackendServiceException.CODE_PENDING_APPROVAL.equals(problemCode)
-        || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(problemCode)
-        || BackendServiceException.CODE_NO_ROLE.equals(problemCode);
+  public static boolean isExpectedAccessGateRefusal(@NotNull BackendServiceException refusal) {
+    return refusal instanceof SessionGateRefusalException
+        || BackendServiceException.CODE_PENDING_APPROVAL.equals(refusal.getProblemCode())
+        || BackendServiceException.CODE_NO_ROLE.equals(refusal.getProblemCode());
   }
 
   /**
@@ -240,7 +240,7 @@ public final class BackendErrorMapper {
           parsed.getCorrelationId(),
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
-    } else if (isExpectedAccessGateRefusal(parsed.getProblemCode())) {
+    } else if (isExpectedAccessGateRefusal(parsed)) {
       log.debug(
           "Backend client error on {} {}: status={}, code={}, correlationId={}",
           method,

@@ -37,7 +37,7 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * Asserts the order of the security gates: pending approval, then terms acceptance, then the
+ * Asserts the order of the security gates: pending approval, then the session gates, then the
  * per-subject rate limiter, so a refused caller is told what they can act on and never spends or
  * dodges a rate token.
  *
@@ -48,6 +48,15 @@ class SecurityFilterChainOrderTest {
 
   @Autowired private FilterChainProxy filterChainProxy;
   @Autowired private ApplicationContext applicationContext;
+  @Autowired private List<SessionGate> sessionGates;
+
+  @Test
+  @DisplayName("the consent gate runs before the home-location gate")
+  void theSessionGatesRunConsentFirst() {
+    assertThat(sessionGates)
+        .extracting(gate -> gate.problemCode().code())
+        .containsExactly("TERMS_NOT_ACCEPTED", "HOME_LOCATION_REQUIRED");
+  }
 
   /**
    * Returns the simple class names of the API chain's filters, in order.
@@ -68,14 +77,14 @@ class SecurityFilterChainOrderTest {
     List<String> names = filterNames();
 
     int pending = names.indexOf("PendingApprovalAccessFilter");
-    int terms = names.indexOf("TermsAcceptanceAccessFilter");
+    int gates = names.indexOf("SessionGateAccessFilter");
     int subjectLimit = names.indexOf("SubjectRateLimitingFilter");
 
     assertThat(pending)
         .as("PendingApprovalAccessFilter must be registered in the chain")
         .isGreaterThanOrEqualTo(0);
-    assertThat(terms)
-        .as("TermsAcceptanceAccessFilter must be registered in the chain")
+    assertThat(gates)
+        .as("SessionGateAccessFilter must be registered in the chain")
         .isGreaterThanOrEqualTo(0);
     assertThat(subjectLimit)
         .as("SubjectRateLimitingFilter must be registered in the chain")
@@ -83,13 +92,12 @@ class SecurityFilterChainOrderTest {
 
     assertThat(pending)
         .as(
-            "pending-approval runs before the terms gate, so a member who is both pending and"
+            "pending-approval runs before the session gates, so a member who is both pending and"
                 + " unconsented is told the one they can act on")
-        .isLessThan(terms);
-    assertThat(terms)
+        .isLessThan(gates);
+    assertThat(gates)
         .as(
-            "the per-subject limiter runs after both refusing gates (ADR-0159 re-anchored it from"
-                + " the deleted AnonymousPageSizeFilter onto TermsAcceptanceAccessFilter); two"
+            "the per-subject limiter runs after the refusing gates (ADR-0159, ADR-0385); two"
                 + " addFilterAfter calls on one anchor end up reversed, so this is asserted rather"
                 + " than assumed")
         .isLessThan(subjectLimit);

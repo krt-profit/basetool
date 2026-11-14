@@ -175,6 +175,27 @@
       "minimum": 1,
       "maximum": 100,
       "description": "The whole percent a split deposit distributes; null without a split."
+    },
+    "cancelledByPatch": {
+      "type": "object",
+      "description": "The patch change whose currency wipe cancelled the request. Present only on a CANCELLED request a patch change cancelled.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "The patch change's id, the same in every feed entry the patch change caused."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "The patch label, e.g. 4.4; an admin may correct it later."
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
     }
   },
   "required": [

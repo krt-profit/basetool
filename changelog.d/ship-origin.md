@@ -1,0 +1,4 @@
+### Added
+
+- **Hangar: Herkunft eines Schiffs.** Jedes Schiff ist jetzt „Gepledged", „Ingame gekauft" oder „Herkunft unbekannt"; ein späterer Patch-Wipe entfernt nur ingame gekaufte Schiffe. Beim Hinzufügen ist die Wahl Pflicht, im Bearbeiten-Dialog und über die Auswahlleiste („Als gepledged markieren" / „Als ingame gekauft markieren") änderbar, auch für Admins im Mitglieder-Hangar. Importierte Schiffe und Schiffe mit Pledge-ID sind fest als gepledged; ein Hinweis zählt Schiffe mit unbekannter Herkunft, ein Schalter filtert sie.
+- **Exchange: `origin` am Schiff.** Verbundene Anwendungen lesen und schreiben die Herkunft eigener Schiffe (`PLEDGE`, `IN_GAME`, `UNKNOWN`); ein importiertes Schiff liest immer `PLEDGE` und lehnt anderes mit `ORIGIN_LOCKED` ab. Pledge-ID, Datum und Preis bleiben weiterhin privat.

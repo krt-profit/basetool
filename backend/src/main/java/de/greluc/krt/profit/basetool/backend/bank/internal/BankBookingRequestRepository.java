@@ -118,6 +118,39 @@ public interface BankBookingRequestRepository extends JpaRepository<BankBookingR
   Optional<BankBookingRequest> findByIdForUpdate(@Param("id") UUID id);
 
   /**
+   * Locks the requests in a status that were submitted before an instant and that no order payment
+   * attempt owns, in id order (REQ-PATCH-042).
+   *
+   * @param status the lifecycle state (the currency wipe passes {@code PENDING})
+   * @param before the exclusive upper bound of the submission time
+   * @return the locked requests
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      SELECT r FROM BankBookingRequest r
+      WHERE r.status = :status AND r.linkedAttempt IS NULL AND r.createdAt < :before
+      ORDER BY r.id
+      """)
+  List<BankBookingRequest> lockUnlinkedCreatedBefore(
+      @Param("status") BankBookingRequestStatus status, @Param("before") Instant before);
+
+  /**
+   * Counts the requests {@link #lockUnlinkedCreatedBefore} would lock, without locking.
+   *
+   * @param status the lifecycle state (the currency wipe passes {@code PENDING})
+   * @param before the exclusive upper bound of the submission time
+   * @return the number of such requests
+   */
+  @Query(
+      """
+      SELECT COUNT(r) FROM BankBookingRequest r
+      WHERE r.status = :status AND r.linkedAttempt IS NULL AND r.createdAt < :before
+      """)
+  long countUnlinkedCreatedBefore(
+      @Param("status") BankBookingRequestStatus status, @Param("before") Instant before);
+
+  /**
    * Returns one page of the requester's own requests in any of the given states, the "my requests"
    * list (REQ-BANK-022). Per-user isolation: callers only ever pass their own {@code sub}. An empty
    * status collection yields an empty page.

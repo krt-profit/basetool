@@ -238,6 +238,11 @@ return and settlement cases are part of the
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 
+> [!note] Amended 2026-11-14 (ADR-0383) — a patch change's relocation is excepted
+> A patch change's relocation still takes the shared hierarchy lock before its lot and row locks,
+> but validates no linked job order: it is a game fact and no order write, and it leaves every
+> earmark as it is ([REQ-PATCH-026](patch-change.md#req-patch-026--one-all-or-nothing-transaction-per-member-exactly-once)).
+
 The hierarchy foundation applies this prerequisite inside existing order and Inventory-owned
 linked-stock writes. All Inventory write transactions acquire the shared hierarchy lock before
 lot/row locks; organisational changes acquire its exclusive counterpart before the change and
@@ -255,6 +260,14 @@ cancelled orders. The Bank-free writer checks this gate for settlement, financia
 identity maintenance on every affected order. Coupled Bank operations have the same prerequisite.
 Once valid responsibility is restored, ordinary rules apply.
 
+**Patch-change exception** ([REQ-PATCH-014](patch-change.md#req-patch-014--the-wipe-is-excepted-from-the-invalid-responsibility-gate),
+[ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md)): a patch
+change's stock wipe is a game fact, not an order write. It takes the shared hierarchy lock and every
+material, lot and row lock as an ordinary stock write does, and the affected orders must exist, but
+an order with invalid responsibility does not refuse it (`beforeGameFactStockLoss`,
+`assertGameFactMaterialLoss`). The order keeps its history and its invalid responsibility; the loss
+of its earmarked stock is genuine (ADR-0360).
+
 A supporting Staffel that becomes ineligible immediately loses active support and open promises;
 past contributions remain. Existing orders and legacy flags are not silently reparented.
 Migration preserves verifiable provenance, flags unresolved cases and does not invent an original
@@ -262,6 +275,12 @@ Profit boundary or deleted contribution history. Unknown original history does n
 authorized explicit transfer into the actual Profit hierarchy: retain the missing past as unknown
 and record the new transfer completely. Concrete linked personal history remains readable
 where authorized; historical names alone do not create access.
+
+**Patch change (amendment, [REQ-PATCH-040](patch-change.md#req-patch-040--the-currency-wipe-follows-the-game-in-the-bank-and-the-auec-orders)).**
+A patch change's currency wipe is an explicit exception to this gate, because a patch change
+is a game fact: it cancels the waiting Bank attempts, books the real shortages and ends the
+commitments on an order with invalid responsibility as well. The order's responsibility and
+clarification stay as they are.
 
 **Acceptance**
 

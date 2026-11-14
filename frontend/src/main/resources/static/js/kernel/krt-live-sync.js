@@ -1,4 +1,4 @@
-import { krtTermsGate } from '/js/kernel/krt-fetch.js';
+import { krtSessionGate } from '/js/kernel/krt-fetch.js';
 
 const DEFAULT_COALESCE_MS = 400;
 
@@ -204,7 +204,7 @@ const syncSocket = (function () {
                 window.clearTimeout(reconnectTimer);
                 reconnectTimer = null;
             }
-            krtTermsGate.redirect(ev.reason);
+            krtSessionGate.redirect(ev.reason);
             return;
         }
         if (ev && ev.code === SOCKET_CAP_CLOSE_CODE) {

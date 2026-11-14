@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
@@ -58,10 +59,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Verifies against real Postgres that the Lager's list and stack reads issue the same number of SQL
@@ -205,10 +210,10 @@ class InventoryEarmarkReadNoNPlusOneTest {
     stats.setStatisticsEnabled(true);
     for (Map.Entry<String, Function<Seed, List<InventoryItemDto>>> read : reads.entrySet()) {
       stats.clear();
-      List<InventoryItemDto> fewRows = read.getValue().apply(few);
+      List<InventoryItemDto> fewRows = inOwnRequest(() -> read.getValue().apply(few));
       long fewStatements = stats.getPrepareStatementCount();
       stats.clear();
-      List<InventoryItemDto> manyRows = read.getValue().apply(many);
+      List<InventoryItemDto> manyRows = inOwnRequest(() -> read.getValue().apply(many));
       long manyStatements = stats.getPrepareStatementCount();
 
       assertThat(fewRows).as(read.getKey() + " rows for the small Lager").hasSize(FEW);
@@ -230,6 +235,24 @@ class InventoryEarmarkReadNoNPlusOneTest {
           .as(read.getKey() + " statements for " + MANY + " rows against " + FEW + " (N+1)")
           .isEqualTo(fewStatements)
           .isLessThanOrEqualTo(STATEMENT_BOUND);
+    }
+  }
+
+  /**
+   * Runs a read as an HTTP request of its own, so the request-scoped memos start empty for each
+   * measured read as they do in production.
+   *
+   * @param read the read
+   * @return the read's rows
+   */
+  private static List<InventoryItemDto> inOwnRequest(Supplier<List<InventoryItemDto>> read) {
+    RequestAttributes bound = RequestContextHolder.getRequestAttributes();
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    try {
+      return read.get();
+    } finally {
+      RequestContextHolder.setRequestAttributes(bound);
     }
   }
 

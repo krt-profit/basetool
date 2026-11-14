@@ -42,10 +42,12 @@ class OrgStockExecutor {
   private final PoolEntryCommands poolEntryCommands;
   private final ExchangeJournalService journalService;
   private final ExchangeLiveSync liveSync;
+  private final OrgStockRefusals refusals;
 
   /**
    * Locks every holder lot and entry the plan touches, then hands each op to the Lager, journals
-   * what it changed and refreshes the Lager pages afterwards.
+   * what it changed and refreshes the Lager pages afterwards; a refused op names the patch change
+   * behind its entry's last change (REQ-PATCH-057).
    *
    * @param caller the client, installation and writer
    * @param batch the change set's id
@@ -67,7 +69,7 @@ class OrgStockExecutor {
       public @NotNull Outcome run(@NotNull PoolWrite write) {
         PoolOutcome outcome = write.run(poolEntryCommands, dryRun);
         if (outcome.refusal() != null) {
-          return Outcome.rejected(outcome.refusal().name());
+          return refusals.outcome(write, outcome.refusal());
         }
         if (outcome.unchanged()) {
           return Outcome.UNCHANGED;

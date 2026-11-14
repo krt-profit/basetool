@@ -109,6 +109,12 @@ public enum AuditEventType {
   INVENTORY_BULK_REBOOKED(AuditDomain.INVENTORY),
   /** The admin emptied the whole (scoped) global warehouse — one summarizing event. */
   INVENTORY_WIPED(AuditDomain.INVENTORY),
+  /**
+   * A patch change wiped the stock rows created before its live time — one summary event per
+   * trigger with the rows per wipe group and the members affected; the subject is the patch change
+   * (REQ-PATCH-017).
+   */
+  INVENTORY_WIPED_BY_PATCH(AuditDomain.INVENTORY),
   /** A new inventory row was created from refinery output (cross-domain store). */
   INVENTORY_RECEIVED_FROM_REFINERY(AuditDomain.INVENTORY),
   /**
@@ -179,6 +185,12 @@ public enum AuditEventType {
   JOB_ORDER_MONEY_TARGET_CHANGED(AuditDomain.JOB_ORDER),
   /** A unit's outstanding aUEC commitment changed. */
   JOB_ORDER_MONEY_COMMITMENT_CHANGED(AuditDomain.JOB_ORDER),
+  /**
+   * A patch change's currency wipe booked the aUEC shortages, cancelled the waiting Bank attempts
+   * and ended the commitments: one summary event per trigger with the counts, whose subject is the
+   * patch change (REQ-PATCH-046).
+   */
+  JOB_ORDER_MONEY_CURRENCY_WIPED(AuditDomain.JOB_ORDER),
   /** An item job order was created. */
   JOB_ORDER_ITEM_CREATED(AuditDomain.JOB_ORDER),
   /** A material job order was edited (materials/handle/requesting unit). */
@@ -221,6 +233,11 @@ public enum AuditEventType {
   JOB_ORDER_MATERIAL_UNLINKED(AuditDomain.JOB_ORDER),
   /** A single inventory row was detached from a job order. */
   JOB_ORDER_INVENTORY_UNLINKED(AuditDomain.JOB_ORDER),
+  /**
+   * A patch change wiped stock earmarked for job orders — one summary event per trigger with the
+   * number of orders affected; the subject is the patch change (REQ-PATCH-017).
+   */
+  JOB_ORDERS_STOCK_WIPED_BY_PATCH(AuditDomain.JOB_ORDER),
   /** A material handover was recorded against a job order. */
   JOB_ORDER_HANDOVER_CREATED(AuditDomain.JOB_ORDER),
   /** An item handover was recorded against a job order. */
@@ -271,6 +288,11 @@ public enum AuditEventType {
   REFINERY_YIELDS_SYNCED(AuditDomain.REFINERY),
   /** A deleted user's refinery orders were bulk-reassigned to the fallback admin. */
   REFINERY_ORDERS_REASSIGNED(AuditDomain.REFINERY),
+  /**
+   * A patch change cancelled the running refinery orders started before its live time — one summary
+   * event per trigger with the count; the subject is the patch change (REQ-PATCH-006).
+   */
+  REFINERY_ORDERS_CANCELED_BY_PATCH(AuditDomain.REFINERY),
   /** The refinery audit log was exported as a PDF or JSON for a period. */
   REFINERY_AUDIT_EXPORTED(AuditDomain.REFINERY),
   /** Refinery audit rows older than an admin-chosen cutoff were purged (retention). */
@@ -500,6 +522,11 @@ public enum AuditEventType {
   MARKET_OFFER_REDUCED(AuditDomain.MARKET),
   /** A stock book-out emptied the row an offer stood on, and the offer went with it. */
   MARKET_OFFER_REMOVED(AuditDomain.MARKET),
+  /**
+   * A patch change wiped the stock the active offers stood on, and the offers ended — one summary
+   * event per trigger with the count; the subject is the patch change (REQ-PATCH-017).
+   */
+  MARKET_OFFERS_ENDED_BY_PATCH(AuditDomain.MARKET),
   /** An offer's trade remark was edited by its owner. */
   MARKET_REMARK_UPDATED(AuditDomain.MARKET),
   /** A member registered interest in an offer ("Interesse anmelden"). */
@@ -524,16 +551,23 @@ public enum AuditEventType {
   MARKET_AUDIT_PURGED(AuditDomain.MARKET),
   /** A ship was added to a hangar, by its owner or by an admin. */
   HANGAR_SHIP_CREATED(AuditDomain.HANGAR),
-  /** A ship's type, name, insurance, fitted flag or location was edited. */
+  /** A ship's type, name, insurance, fitted flag, location or origin was edited. */
   HANGAR_SHIP_UPDATED(AuditDomain.HANGAR),
   /** A ship's owning org unit was changed after creation (REQ-HANGAR-009). */
   HANGAR_SHIP_ORG_UNIT_CHANGED(AuditDomain.HANGAR),
   /** The owning org unit of a selection of ships was changed in one action (REQ-HANGAR-010). */
   HANGAR_SHIPS_BULK_ORG_UNIT_CHANGED(AuditDomain.HANGAR),
+  /** The origin of a selection of ships was changed in one action (REQ-HANGAR-018). */
+  HANGAR_SHIPS_BULK_ORIGIN_CHANGED(AuditDomain.HANGAR),
   /** A ship was deleted; mission units it crewed were detached first. */
   HANGAR_SHIP_DELETED(AuditDomain.HANGAR),
   /** A member emptied their own hangar in one go. */
   HANGAR_EMPTIED(AuditDomain.HANGAR),
+  /**
+   * A patch change deleted the in-game ships created before its live time — one summary event per
+   * trigger with the ships and owners; the subject is the patch change (REQ-PATCH-017).
+   */
+  HANGAR_SHIPS_WIPED_BY_PATCH(AuditDomain.HANGAR),
   /** A hangar or Fleetview export was imported and created ships. */
   HANGAR_IMPORTED(AuditDomain.HANGAR),
   /** The fitted flag was cleared on every ship in the caller's scope. */
@@ -642,6 +676,11 @@ public enum AuditEventType {
   DONATION_DECLINED(AuditDomain.SUPPLY),
   /** A donor withdrew a pledge (REQ-SUP-010). */
   DONATION_WITHDRAWN(AuditDomain.SUPPLY),
+  /**
+   * A patch change wiped the stock pledges were earmarked on, and the pledges were withdrawn — one
+   * summary event per trigger with the count; the subject is the patch change (REQ-PATCH-017).
+   */
+  DONATIONS_WITHDRAWN_BY_PATCH(AuditDomain.SUPPLY),
   /** A receiving unit recorded a donation it already received (REQ-SUP-011). */
   DONATION_RECORDED(AuditDomain.SUPPLY),
   /** An admin changed what an org unit does in the supply module (REQ-SUP-002). */
@@ -841,7 +880,35 @@ public enum AuditEventType {
   /** The Katalog audit log was exported (REQ-AUDIT-003). */
   CATALOGUE_AUDIT_EXPORTED(AuditDomain.CATALOGUE),
   /** The Katalog audit log was purged (REQ-AUDIT-004). */
-  CATALOGUE_AUDIT_PURGED(AuditDomain.CATALOGUE);
+  CATALOGUE_AUDIT_PURGED(AuditDomain.CATALOGUE),
+  /**
+   * An admin triggered a patch change; the subject is the patch change with its label, the details
+   * carry the kind, the live time, the options and the counts (REQ-PATCH-009).
+   */
+  PATCH_CHANGE_TRIGGERED(AuditDomain.PATCH_CHANGE),
+  /** An admin corrected a patch change's label; the details carry the old and the new label. */
+  PATCH_CHANGE_LABEL_CORRECTED(AuditDomain.PATCH_CHANGE),
+  /**
+   * An admin ended a home-location phase early; the subject is the patch change with its label, the
+   * details carry how many members were still pending (REQ-PATCH-027).
+   */
+  PATCH_CHANGE_PHASE_ENDED(AuditDomain.PATCH_CHANGE),
+  /**
+   * A member relocated after the home-location choice; the subject and the target are the member,
+   * the details carry the patch change, the location, the moved row and ship counts and who chose
+   * (REQ-PATCH-027).
+   */
+  PATCH_CHANGE_RELOCATED(AuditDomain.PATCH_CHANGE),
+  /**
+   * A member's profile setting "my home location" changed; the subject and the target are the
+   * member, the details carry the location and whether the member or a relocation set it
+   * (REQ-PATCH-032).
+   */
+  HOME_LOCATION_PREFERENCE_SET(AuditDomain.PATCH_CHANGE),
+  /** The patch-change audit log was exported (REQ-AUDIT-003). */
+  PATCH_CHANGE_AUDIT_EXPORTED(AuditDomain.PATCH_CHANGE),
+  /** The patch-change audit log was purged (REQ-AUDIT-004). */
+  PATCH_CHANGE_AUDIT_PURGED(AuditDomain.PATCH_CHANGE);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final @NotNull AuditDomain domain;

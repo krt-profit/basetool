@@ -63,9 +63,12 @@
 /admin/members/{userId}/hangar GET -> MemberHangarPageController#viewMemberHangar gate=class:hasRole('ADMIN') layout=yes
 /admin/members/{userId}/hangar/add POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#addShip gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/bulk-org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#bulkChangeShipOrgUnit gate=class:hasRole('ADMIN') layout=no
+/admin/members/{userId}/hangar/bulk-origin POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#bulkChangeShipOrigin gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/{shipId}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#deleteShip gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/{shipId}/org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#changeShipOrgUnit gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/{shipId}/update POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#updateShip gate=class:hasRole('ADMIN') layout=no
+/admin/members/{userId}/home-location GET -> AdminMemberHomeLocationPageController#page gate=class:hasRole('ADMIN') layout=yes
+/admin/members/{userId}/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMemberHomeLocationRelayController#chooseHomeLocation gate=class:hasRole('ADMIN') layout=no
 /admin/mission-data GET -> AdminMissionDataPageController#listData gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data GET params=[kind=squadrons] headers=[!X-Requested-With] -> LegacyAdminRedirectController#squadrons gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data/frequency-types POST -> AdminMissionDataPageController#createFrequencyType gate=class:hasRole('ADMIN') layout=yes
@@ -144,6 +147,12 @@
 /admin/settings POST -> AdminSettingsPageController#updateSettings gate=class:hasRole('ADMIN') layout=yes
 /admin/settings POST headers=[X-Requested-With=XMLHttpRequest] -> AdminSettingsPageController#updateSettingsAjax gate=class:hasRole('ADMIN') layout=yes
 /admin/settings/danger-zone GET -> AdminDangerZonePageController#dangerZone gate=class:hasRole('ADMIN') layout=yes
+/admin/settings/patch-change GET -> AdminPatchChangePageController#page gate=class:hasRole('ADMIN') layout=yes
+/admin/settings/patch-change POST headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#trigger gate=class:hasRole('ADMIN') layout=no
+/admin/settings/patch-change/form GET headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#form gate=class:hasRole('ADMIN') layout=no
+/admin/settings/patch-change/preview POST headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#preview gate=class:hasRole('ADMIN') layout=no
+/admin/settings/patch-change/{id}/label PATCH headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#correctLabel gate=class:hasRole('ADMIN') layout=no
+/admin/settings/patch-change/{id}/phase-end POST headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#endPhase gate=class:hasRole('ADMIN') layout=no
 /admin/shops GET -> AdminShopsPageController#view gate=class:hasRole('ADMIN') layout=yes
 /admin/shops/entries GET -> AdminShopsController#shops gate=class:hasRole('ADMIN') layout=no
 /admin/shops/terminals GET -> AdminShopsController#terminals gate=class:hasRole('ADMIN') layout=no
@@ -325,6 +334,7 @@
 /hangar/add POST -> HangarPageController#addShip gate=class:isAuthenticated() layout=yes
 /hangar/add POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#addShipAjax gate=class:isAuthenticated() layout=yes
 /hangar/bulk-org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> HangarShipOrgUnitProxyController#bulkChangeShipOrgUnit gate=class:isAuthenticated() layout=no
+/hangar/bulk-origin POST headers=[X-Requested-With=XMLHttpRequest] -> HangarShipOriginProxyController#bulkChangeShipOrigin gate=class:isAuthenticated() layout=no
 /hangar/home-location POST -> HangarPageController#setHomeLocation gate=class:isAuthenticated() layout=yes
 /hangar/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#setHomeLocationAjax gate=class:isAuthenticated() layout=yes
 /hangar/import/ships POST consumes=[multipart/form-data] -> HangarImportProxyController#importShips gate=method:isAuthenticated() layout=no
@@ -335,6 +345,8 @@
 /hangar/{id}/org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> HangarShipOrgUnitProxyController#changeShipOrgUnit gate=class:isAuthenticated() layout=no
 /hangar/{id}/update POST -> HangarPageController#updateShip gate=class:isAuthenticated() layout=yes
 /hangar/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#updateShipAjax gate=class:isAuthenticated() layout=yes
+/home-location GET -> HomeLocationPageController#page gate=class:isAuthenticated() layout=yes
+/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> HomeLocationRelayController#chooseHomeLocation gate=class:isAuthenticated() layout=no
 /impressum GET -> ImpressumController#showImpressum gate=none layout=yes
 /internal/client-error POST -> ClientErrorReportController#report gate=class:isAuthenticated() layout=no
 /inventory GET -> InventoryPageController#viewAggregatedInventory gate=class:isAuthenticated() layout=yes
@@ -654,6 +666,8 @@
 /profile/deletion-request POST headers=[X-Requested-With=XMLHttpRequest] -> DeletionRequestProxyController#request gate=method:isAuthenticated() layout=yes
 /profile/description POST -> ProfileController#updateDescription gate=class:isAuthenticated() layout=yes
 /profile/description POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileController#updateDescriptionAjax gate=class:isAuthenticated() layout=yes
+/profile/home-location POST -> ProfileHomeLocationController#updateHomeLocation gate=class:isAuthenticated() layout=yes
+/profile/home-location POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileHomeLocationProxyController#updateHomeLocation gate=class:isAuthenticated() layout=no
 /profile/name-withholding POST -> ProfileController#updateNameWithholding gate=class:isAuthenticated() layout=yes
 /profile/name-withholding POST headers=[X-Requested-With=XMLHttpRequest] consumes=[application/json] produces=[application/json] -> ProfileNameWithholdingProxyController#updateNameWithholding gate=class:isAuthenticated() layout=no
 /profile/notification-preferences GET params=[fragment=card] -> NotificationPreferenceProxyController#card gate=method:isAuthenticated() layout=yes

@@ -39,6 +39,8 @@ public enum StockChangeReason {
   REBOOK("rebook"),
   /** A wipe of the shared stock. */
   WIPE("wipe"),
+  /** A patch change's wipe of the stock created before its live time (REQ-PATCH-012). */
+  PATCH_WIPE("patch-wipe"),
   /** A job-order handover. */
   HANDOVER("handover"),
   /** A job-order production consuming stock. */

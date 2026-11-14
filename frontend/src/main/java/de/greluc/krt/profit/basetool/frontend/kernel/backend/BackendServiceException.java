@@ -63,17 +63,9 @@ public class BackendServiceException extends RuntimeException {
   public static final String CODE_PENDING_APPROVAL = "PENDING_APPROVAL";
 
   /**
-   * Problem code the backend's {@code TermsAcceptanceAccessFilter} returns until a user has
-   * accepted the Terms of Use (REQ-SEC-028). Like {@link #CODE_PENDING_APPROVAL} this is an
-   * expected, high-frequency 403 rather than a fault — after a wording change it is every member on
-   * every request — so {@code BackendApiClient} logs it at DEBUG instead of WARN.
-   */
-  public static final String CODE_TERMS_NOT_ACCEPTED = "TERMS_NOT_ACCEPTED";
-
-  /**
    * Problem code the backend answers every {@code /api} call with once the caller's token maps to
-   * no application role (REQ-SEC-053). Like {@link #CODE_PENDING_APPROVAL} and {@link
-   * #CODE_TERMS_NOT_ACCEPTED}, an expected 403 that is not counted as a backend-call failure.
+   * no application role (REQ-SEC-053). Like {@link #CODE_PENDING_APPROVAL}, an expected 403 that is
+   * not counted as a backend-call failure.
    */
   public static final String CODE_NO_ROLE = "NO_ROLE";
 
@@ -172,7 +164,8 @@ public class BackendServiceException extends RuntimeException {
 
   /**
    * Parses an RFC7807 Problem+JSON body produced by the backend and constructs a {@link
-   * BackendServiceException}. When the body cannot be parsed, the exception still carries the HTTP
+   * BackendServiceException}, or a {@link SessionGateRefusalException} when the body carries the
+   * session-gate marker. When the body cannot be parsed, the exception still carries the HTTP
    * status and {@link #CODE_UNKNOWN} so the advice layer can fall back to a generic localized
    * message.
    */
@@ -183,6 +176,7 @@ public class BackendServiceException extends RuntimeException {
     String code = deriveCodeFromStatus(status);
     String correlationId = null;
     String detail = null;
+    boolean sessionGate = false;
     List<FieldError> fieldErrors = new ArrayList<>();
 
     if (body != null && !body.isBlank()) {
@@ -197,6 +191,8 @@ public class BackendServiceException extends RuntimeException {
         if (root.hasNonNull("detail")) {
           detail = root.get("detail").asString();
         }
+        JsonNode marker = root.get(SessionGateRefusalException.MARKER_PROPERTY);
+        sessionGate = marker != null && marker.isBoolean() && marker.booleanValue();
         JsonNode fieldErrorsNode = root.get("fieldErrors");
         if (fieldErrorsNode != null && fieldErrorsNode.isArray()) {
           for (JsonNode fe : fieldErrorsNode) {
@@ -210,6 +206,9 @@ public class BackendServiceException extends RuntimeException {
     }
 
     String message = "Backend returned " + status + " [" + code + "]";
+    if (sessionGate) {
+      return new SessionGateRefusalException(message, cause, status, code, correlationId, detail);
+    }
     return new BackendServiceException(
         message, cause, status, code, correlationId, fieldErrors, detail);
   }

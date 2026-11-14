@@ -289,7 +289,8 @@ FROM (VALUES ('exchange.connect'), ('exchange.blueprints.read'), ('exchange.blue
              ('exchange.orgstock.read'), ('exchange.orgstock.details'),
              ('exchange.orgstock.write'), ('exchange.refinery.read'), ('exchange.refinery.write'),
              ('exchange.refinery.store'), ('exchange.drafts.blueprints'),
-             ('exchange.drafts.refinery')) AS c (capability)
+             ('exchange.drafts.refinery'), ('exchange.bank.read'), ('exchange.bank.request'),
+             ('exchange.bank.queue'), ('exchange.patch.read'), ('exchange.patch.write')) AS c (capability)
 UNION ALL
 SELECT '5a4d0000-0000-4000-8000-000000002302'::uuid, c.capability
 FROM (VALUES ('exchange.connect'), ('exchange.blueprints.read')) AS c (capability)
@@ -298,3 +299,7 @@ ON CONFLICT DO NOTHING;
 UPDATE exchange_settings
 SET enabled = true, updated_at = now(), version = version + 1
 WHERE id = 1 AND NOT enabled;
+
+UPDATE exchange_settings
+SET bank_enabled = true, bank_updated_at = now(), bank_version = bank_version + 1
+WHERE id = 1 AND NOT bank_enabled;

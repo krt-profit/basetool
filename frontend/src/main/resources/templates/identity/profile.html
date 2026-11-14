@@ -52,6 +52,7 @@
                     <li><a href="#profile-section-payout" th:text="#{profile.section.payout}">Auszahlung</a></li>
                     <li><a href="#profile-section-blueprints" th:text="#{profile.section.blueprints}">Blaupausen</a></li>
                     <li><a href="#profile-section-name-withholding" th:text="#{profile.nameWithholding.label}">Verbundene Anwendungen</a></li>
+                    <li><a href="#profile-section-home-location" th:text="#{profile.homeLocation.label}">Meine Home Location</a></li>
                     <li><a href="#profile-appearance-card" th:text="#{profile.appearance.title}">Darstellung</a></li>
                     <li><a href="#profile-notifications-card" th:text="#{profile.notifications.title}">Benachrichtigungen</a></li>
                     <li><a href="#profile-security-card" th:text="#{profile.security.title}">Zugang &amp; Sicherheit</a></li>
@@ -163,6 +164,32 @@
                             </div>
                             <noscript>
                                 <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.nameWithholding.save}">Save</button>
+                            </noscript>
+                        </fieldset>
+                    </form>
+
+                    <form id="profile-home-location-form" th:action="@{/profile/home-location}" method="post" th:object="${profileHomeLocationForm}"
+                          th:data-section-name="#{profile.homeLocation.label}">
+                        <input type="hidden" name="version" th:field="*{version}">
+                        <fieldset class="form-section" id="profile-section-home-location">
+                            <legend class="form-section__head">
+                                <span th:text="'6 · ' + #{profile.homeLocation.label}">6 · Meine Home Location</span>
+                                <span class="opt" th:text="'· ' + #{form.optional}">· optional</span>
+                            </legend>
+                            <div class="form-group">
+                                <label for="homeLocationId" class="form-label" th:text="#{profile.homeLocation.field}">Home Location</label>
+                                <select id="homeLocationId" name="homeLocationId" data-testid="profile-home-location-select"
+                                        th:disabled="${#lists.isEmpty(homeLocationOptions)}">
+                                    <option value="" disabled th:selected="*{homeLocationId == null}" th:text="#{profile.homeLocation.placeholder}">Home Location wählen</option>
+                                    <option th:each="loc : ${homeLocationOptions}" th:value="${loc.id}"
+                                            th:selected="${loc.id == profileHomeLocationForm.homeLocationId}" th:text="${loc.name}">Lorville</option>
+                                </select>
+                                <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.homeLocation.hint}">Füllt den Lagerort vor. Verschiebt nichts.</span></p>
+                                <p class="form-hint" th:if="${#lists.isEmpty(homeLocationOptions)}" data-testid="profile-home-location-empty"
+                                   th:text="#{profile.homeLocation.empty}">Es sind noch keine Home Locations gepflegt.</p>
+                            </div>
+                            <noscript>
+                                <button type="submit" class="btn btn-ghost btn-xs" th:text="#{profile.homeLocation.save}">Save</button>
                             </noscript>
                         </fieldset>
                     </form>

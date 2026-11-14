@@ -106,6 +106,8 @@ public abstract class InventoryItemMapper {
   @Mapping(target = "missionRest", expression = "java(missionRest(inventoryItem))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(inventoryItem))")
+  @Mapping(target = "relocationPending", ignore = true)
+  @Mapping(target = "relocationLocked", ignore = true)
   @Mapping(target = "withVersion", ignore = true)
   @Mapping(target = "withMissionAllocations", ignore = true)
   public abstract InventoryItemDto toDto(InventoryItem inventoryItem);

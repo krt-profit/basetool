@@ -74,7 +74,7 @@ class ExchangeStockAndShipRouteTest {
   private static final String SHIP_PAGE =
       """
       {"items":[{"shipId":"%s","version":0,"shipType":{"bt":"%s","name":"Cutlass Black"},
-                 "insurance":{"kind":"LTI"},"fitted":false}],
+                 "insurance":{"kind":"LTI"},"origin":"UNKNOWN","fitted":false}],
        "removed":[],"nextCursor":"f1.9.0","hasMore":false}
       """
           .formatted(UUID.randomUUID(), UUID.randomUUID());

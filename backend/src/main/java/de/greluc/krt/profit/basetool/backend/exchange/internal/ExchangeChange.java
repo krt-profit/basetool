@@ -68,9 +68,13 @@ public class ExchangeChange {
   @Column(name = "entity_key", nullable = false, updatable = false, length = 255)
   private String entityKey;
 
-  /** Who changed it: {@code web}, {@code app}, {@code client} or {@code system}. */
+  /** Who changed it: {@code web}, {@code app}, {@code client}, {@code system} or {@code patch}. */
   @Column(name = "source_channel", nullable = false, updatable = false, length = 8)
   private String sourceChannel;
+
+  /** The patch change whose trigger changed it, set exactly for the {@code patch} channel. */
+  @Column(name = "source_patch_change", updatable = false)
+  private UUID sourcePatchChange;
 
   /** The registry client id when a client changed it, otherwise {@code null}. */
   @Column(name = "source_client", updatable = false, length = 64)

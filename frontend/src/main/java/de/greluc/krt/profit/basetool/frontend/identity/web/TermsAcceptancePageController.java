@@ -23,7 +23,6 @@ import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.TermsAcceptanceGateFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +51,9 @@ public class TermsAcceptancePageController {
 
   /** Reads the consent state and the wording, and records the consent, on the backend. */
   private final IdentityBackendClient identityClient;
+
+  /** The consent gate, whose cached verdict the recorded consent discards. */
+  private final TermsGate termsGate;
 
   /**
    * Renders the consent page, or redirects a user who has already consented into the tool.
@@ -86,7 +88,7 @@ public class TermsAcceptancePageController {
   public @NotNull ResponseEntity<Void> recordAcceptance(@NotNull HttpServletRequest request) {
     try {
       identityClient.acceptTerms();
-      TermsAcceptanceGateFilter.clearCachedVerdict(request);
+      termsGate.forget(request);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
       log.warn("Terms acceptance could not be recorded in the backend.", e);

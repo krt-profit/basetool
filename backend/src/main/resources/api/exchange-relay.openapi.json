@@ -2397,6 +2397,234 @@
         "x-domain" : "exchange"
       }
     },
+    "/api/v1/exchange/me/patch-change" : {
+      "get" : {
+        "description" : "Gateway-only. The latest patch change with its kind, live time and options, every wipe group with the keys of its catalogue types and the exceptions; the member's state in the latest home-location phase, the chosen home location and when, the curated home locations on offer and, while pending, what the relocation would move per current location.",
+        "operationId" : "patchChange",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangePatchChangeDto"
+                }
+              }
+            },
+            "description" : "The patch change and the member's prompt",
+            "headers" : {
+              "Cache-Control" : {
+                "description" : "Caching policy: private, no-store",
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            }
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: the patch change and my home location",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
+    "/api/v1/exchange/me/patch-change/home-location" : {
+      "post" : {
+        "description" : "Gateway-only. The web's rules: only a curated home location on offer, once per member and phase, final. Runs the member's relocation in this request. No open phase asking the member answers 409 HOME_LOCATION_NOT_ASKED, a second choice 409 HOME_LOCATION_ALREADY_CHOSEN, a location not on offer 400 HOME_LOCATION_NOT_OFFERED.",
+        "operationId" : "chooseHomeLocation_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExchangeHomeLocationChoiceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExchangeHomeLocationChosenDto"
+                }
+              }
+            },
+            "description" : "The chosen home location and what moved"
+          },
+          "400" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Bad Request"
+          },
+          "401" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Unauthorized"
+          },
+          "403" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Forbidden"
+          },
+          "404" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Not Found"
+          },
+          "409" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Conflict"
+          },
+          "429" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Too Many Requests: a rate limit was exceeded (RATE_LIMIT_EXCEEDED); Retry-After says how many seconds to wait",
+            "headers" : {
+              "Retry-After" : {
+                "$ref" : "#/components/headers/Retry-After"
+              },
+              "X-Rate-Limit-Limit" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Limit"
+              },
+              "X-Rate-Limit-Remaining" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Remaining"
+              },
+              "X-Rate-Limit-Retry-After-Seconds" : {
+                "$ref" : "#/components/headers/X-Rate-Limit-Retry-After-Seconds"
+              }
+            }
+          },
+          "500" : {
+            "content" : {
+              "application/problem+json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProblemDetail"
+                }
+              }
+            },
+            "description" : "Internal Server Error"
+          }
+        },
+        "summary" : "Exchange: choose my home location",
+        "tags" : [ "exchange" ],
+        "x-domain" : "exchange"
+      }
+    },
     "/api/v1/exchange/me/refinery-orders" : {
       "get" : {
         "description" : "Gateway-only. Without a cursor a snapshot of the open and running orders, with one every order changed since it.",
@@ -4532,6 +4760,9 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "cancelledByPatch" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeRefDto"
+          },
           "client" : {
             "type" : "string"
           },
@@ -4975,6 +5206,134 @@
           }
         }
       },
+      "ExchangeHomeLocationChoiceRequest" : {
+        "type" : "object",
+        "properties" : {
+          "location" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        },
+        "required" : [ "location" ]
+      },
+      "ExchangeHomeLocationChosenDto" : {
+        "type" : "object",
+        "properties" : {
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeHomeLocationDto"
+          },
+          "rows" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "ships" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ExchangeHomeLocationDto" : {
+        "type" : "object",
+        "properties" : {
+          "guid" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "system" : {
+            "type" : "string"
+          },
+          "uex" : {
+            "$ref" : "#/components/schemas/UexRef"
+          }
+        }
+      },
+      "ExchangeHomeLocationPoolRows" : {
+        "type" : "object",
+        "properties" : {
+          "orgUnit" : {
+            "$ref" : "#/components/schemas/ExchangeHomeLocationPoolUnit"
+          },
+          "rows" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "ExchangeHomeLocationPoolUnit" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangeHomeLocationPreview" : {
+        "type" : "object",
+        "properties" : {
+          "location" : {
+            "$ref" : "#/components/schemas/ExchangeLocationDto"
+          },
+          "pools" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeHomeLocationPoolRows"
+            }
+          },
+          "rows" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "ships" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "ExchangeHomeLocationPrompt" : {
+        "type" : "object",
+        "properties" : {
+          "chosen" : {
+            "$ref" : "#/components/schemas/ExchangeHomeLocationDto"
+          },
+          "chosenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "liveAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "locations" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeHomeLocationDto"
+            }
+          },
+          "patchChange" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeRefDto"
+          },
+          "preview" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangeHomeLocationPreview"
+            }
+          },
+          "state" : {
+            "type" : "string"
+          }
+        }
+      },
       "ExchangeInstallationDto" : {
         "type" : "object",
         "properties" : {
@@ -5400,6 +5759,119 @@
           }
         }
       },
+      "ExchangePatchChange" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "liveAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "options" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeOptions"
+          }
+        }
+      },
+      "ExchangePatchChangeDto" : {
+        "type" : "object",
+        "properties" : {
+          "homeLocation" : {
+            "$ref" : "#/components/schemas/ExchangeHomeLocationPrompt"
+          },
+          "patchChange" : {
+            "$ref" : "#/components/schemas/ExchangePatchChange"
+          }
+        }
+      },
+      "ExchangePatchChangeOptions" : {
+        "type" : "object",
+        "properties" : {
+          "cancelRefineryOrders" : {
+            "type" : "boolean"
+          },
+          "currencyWipe" : {
+            "type" : "boolean"
+          },
+          "homeLocationPrompt" : {
+            "type" : "boolean"
+          },
+          "wipeExceptions" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangePatchWipeException"
+            }
+          },
+          "wipeGroups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangePatchWipeGroup"
+            }
+          }
+        }
+      },
+      "ExchangePatchChangeRefDto" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangePatchWipeException" : {
+        "type" : "object",
+        "properties" : {
+          "entry" : {
+            "$ref" : "#/components/schemas/ExchangeItemRefDto"
+          },
+          "mode" : {
+            "type" : "string"
+          },
+          "target" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ExchangePatchWipeGroup" : {
+        "type" : "object",
+        "properties" : {
+          "group" : {
+            "type" : "string"
+          },
+          "selected" : {
+            "type" : "boolean"
+          },
+          "types" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ExchangePatchWipeGroupType"
+            }
+          }
+        }
+      },
+      "ExchangePatchWipeGroupType" : {
+        "type" : "object",
+        "properties" : {
+          "source" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : "string"
+          }
+        }
+      },
       "ExchangeQuantityDto" : {
         "type" : "object",
         "properties" : {
@@ -5619,6 +6091,9 @@
       "ExchangeRefineryOrderDto" : {
         "type" : "object",
         "properties" : {
+          "canceledByPatch" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeRefDto"
+          },
           "clientKey" : {
             "type" : "string"
           },
@@ -5722,6 +6197,9 @@
           },
           "installationId" : {
             "type" : "string"
+          },
+          "patchChange" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeRefDto"
           }
         }
       },
@@ -5802,6 +6280,9 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "origin" : {
+            "type" : "string"
+          },
           "shipId" : {
             "type" : "string"
           },
@@ -5855,6 +6336,10 @@
             "type" : "integer",
             "format" : "int64",
             "minimum" : 0
+          },
+          "origin" : {
+            "type" : "string",
+            "pattern" : "^(PLEDGE|IN_GAME|UNKNOWN)$"
           },
           "override" : {
             "type" : "boolean"
@@ -6454,6 +6939,9 @@
           "opId" : {
             "type" : "string"
           },
+          "patchChange" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeRefDto"
+          },
           "reason" : {
             "type" : "string"
           },
@@ -6687,7 +7175,7 @@
           "code" : {
             "type" : "string",
             "description" : "The stable reason, one of the values in x-problem-codes (the ProblemCode registry, REQ-API-019). The exchange operations under /api/v1/exchange answer the codes of the frozen exchange contract instead (ExchangeProblemException). The list grows; a client treats an unknown code by its status.",
-            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_APPROVER_NOTE_REQUIRED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OPEN_REQUEST_CAP", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CATALOGUE_BLUEPRINT_RETIRED", "CATALOGUE_ITEM_RETIRED", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "LAST_ADMIN", "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER", "LOCATION_NOT_OFFERED", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "MISSION_TEMPLATE_STALE", "MONEY_PROVISION_REFUSED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "P4K_UPLOAD_REJECTED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RATE_LIMIT_EXCEEDED", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNKNOWN_ROLE_PERMISSION", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
+            "x-problem-codes" : [ "ACCESS_DENIED", "ACTING_MEMBER_REFUSED", "BAD_REQUEST", "BANK_ACCOUNT_CLOSED", "BANK_ACCOUNT_HAS_PENDING_REQUESTS", "BANK_ACCOUNT_NOT_EMPTY", "BANK_ALREADY_REVERSED", "BANK_APPROVER_NOTE_REQUIRED", "BANK_CARTEL_APPROVAL_REQUIRED", "BANK_FEE_EXCEEDS_AMOUNT", "BANK_FOUR_EYES_REQUIRED", "BANK_GRANTEE_MISSING_ROLE", "BANK_HOLDER_INACTIVE", "BANK_HOLDER_OVERDRAFT", "BANK_JUSTIFICATION_REQUIRED", "BANK_NOT_REVERSIBLE", "BANK_OPEN_REQUEST_CAP", "BANK_OVERDRAFT", "BANK_OWNER_APPROVAL_REQUIRED", "BANK_REQUEST_ALREADY_APPROVED", "BANK_REQUEST_NOT_PENDING", "BANK_SELF_TRANSFER", "BANK_SPLIT_NO_TARGETS", "BANK_SPLIT_TOO_SMALL", "BUSINESS_CONFLICT", "CATALOGUE_BLUEPRINT_RETIRED", "CATALOGUE_ITEM_RETIRED", "CONSTRAINT_VIOLATION", "DATA_INTEGRITY_VIOLATION", "DUPLICATE_ENTITY", "ENTITY_IN_USE", "EXTERNAL_SERVICE_ERROR", "HOME_LOCATION_ALREADY_CHOSEN", "HOME_LOCATION_NOT_ASKED", "HOME_LOCATION_NOT_OFFERED", "HOME_LOCATION_REQUIRED", "ILLEGAL_ARGUMENT", "INTERNAL_ERROR", "LAST_ADMIN", "LEADERSHIP_SEAT_REQUIRES_KRT_MEMBER", "LOCATION_NOT_OFFERED", "METHOD_NOT_ALLOWED", "MISSION_PARTICIPANT_REQUIRED", "MISSION_TEMPLATE_STALE", "MONEY_PROVISION_REFUSED", "NOT_ACCEPTABLE", "NOT_FOUND", "NO_ROLE", "OPTIMISTIC_LOCK", "OVER_ALLOCATION", "OWNER_ORG_UNIT_REQUIRED", "P4K_UPLOAD_REJECTED", "PENDING_APPROVAL", "PESSIMISTIC_LOCK", "PRODUCTION_ALLOCATION", "PURCHASING_ADVANCE_ABOVE_CLASS_SHARE", "PURCHASING_AMOUNT_EXCEEDS_NEED", "PURCHASING_BUDGET_EXCEEDED", "PURCHASING_COUNTERPARTY_IS_MEMBER", "PURCHASING_DEAL_STATE", "PURCHASING_DELEGATE_ACTIVE", "PURCHASING_DELIVERY_EXCEEDS_UNDELIVERED", "PURCHASING_DISABLED", "PURCHASING_FUNDING_ACCOUNT_MISSING", "PURCHASING_LIMIT_EXCEEDED", "PURCHASING_NEED_NOT_OPEN", "PURCHASING_NEED_NOT_PURCHASABLE", "PURCHASING_PARTNER_BLOCKED", "PURCHASING_PARTNER_NOT_KNOWN", "PURCHASING_PAUSED", "PURCHASING_PRICE_ABOVE_MAXIMUM", "PURCHASING_QUALITY_BELOW_TIER", "PURCHASING_SELF_ACCEPTANCE", "PURCHASING_SETTLEMENT_INVALID", "PURCHASING_TIER_NOT_ALLOWED", "PURCHASING_TOTAL_ABOVE_CLASS_MAXIMUM", "PURCHASING_TRANCHE_EXCEEDS_TOTAL", "RATE_LIMIT_EXCEEDED", "RELOCATION_PENDING", "REPORT_GENERATION_FAILED", "REQUEST_BODY_TOO_LARGE", "SERVICE_UNAVAILABLE", "SUPPLY_DISABLED", "SUPPLY_DONATION_DOES_NOT_FIT_NEED", "SUPPLY_DONATION_NOT_PLEDGED", "SUPPLY_NEED_NOT_OPEN", "SUPPLY_NEED_UNIT_MISMATCH", "SUPPLY_ROW_NOT_OWNED", "SUPPLY_UNIT_CANNOT_RAISE", "SUPPLY_UNIT_CANNOT_RECEIVE", "TERMS_NOT_ACCEPTED", "TYPE_MISMATCH", "UNAUTHENTICATED", "UNKNOWN_ROLE_PERMISSION", "UNSUPPORTED_MEDIA_TYPE", "VALIDATION_FAILED" ]
           },
           "correlationId" : {
             "type" : "string",
@@ -6723,6 +7211,10 @@
           "instance" : {
             "type" : "string",
             "format" : "uri"
+          },
+          "sessionGate" : {
+            "type" : "boolean",
+            "description" : "true on the 403 of a session gate, a step the member must take first (REQ-SEC-028, ADR-0385); absent on every other problem."
           },
           "status" : {
             "type" : "integer",

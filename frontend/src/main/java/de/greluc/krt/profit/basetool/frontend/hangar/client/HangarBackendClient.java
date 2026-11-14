@@ -24,8 +24,11 @@ import de.greluc.krt.profit.basetool.frontend.hangar.model.FleetviewImportRespon
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SetHomeLocationRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOrgUnitResultDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipBulkOriginResultDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrgUnitRequestDto;
+import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipOrigin;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.ShipRequestDto;
 import de.greluc.krt.profit.basetool.frontend.hangar.model.SquadronShipOverviewDto;
 import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
@@ -86,24 +89,32 @@ public class HangarBackendClient {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Reads one page of the caller's ships, filtered by fitted state and search term
-   * (REQ-HANGAR-002).
+   * Reads one page of the caller's ships, filtered by fitted state, origin and search term
+   * (REQ-HANGAR-002, REQ-HANGAR-017).
    *
    * @param page zero-based page index
    * @param size page size
    * @param fitted the fitted filter, or {@code null} for every ship
+   * @param origin the origin filter, or {@code null} for every ship
    * @param search the ship-type/manufacturer search term, or {@code null}/blank for none
    * @return the page, or {@code null} when the backend sent no body
    */
   @Nullable
   public PageResponse<ShipDto> myShips(
-      int page, int size, @Nullable Boolean fitted, @Nullable String search) {
+      int page,
+      int size,
+      @Nullable Boolean fitted,
+      @Nullable ShipOrigin origin,
+      @Nullable String search) {
     UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/hangar/my-ships")
             .queryParam("page", page)
             .queryParam("size", size);
     if (fitted != null) {
       uri.queryParam("fitted", fitted);
+    }
+    if (origin != null) {
+      uri.queryParam("origin", origin.name());
     }
     return withSearch(uri, search, SHIP_PAGE);
   }
@@ -181,6 +192,18 @@ public class HangarBackendClient {
       @NotNull ShipBulkOrgUnitRequestDto request) {
     return backendApiClient.post(
         "/api/v1/hangar/ships/bulk-org-unit", request, ShipBulkOrgUnitResultDto.class);
+  }
+
+  /**
+   * Marks a selection of the caller's ships as pledged or bought in-game (REQ-HANGAR-018).
+   *
+   * @param request the selected ships and the origin
+   * @return the changed and skipped counts, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipBulkOriginResultDto bulkChangeShipOrigin(@NotNull ShipBulkOriginRequestDto request) {
+    return backendApiClient.post(
+        "/api/v1/hangar/ships/bulk-origin", request, ShipBulkOriginResultDto.class);
   }
 
   /**
@@ -333,6 +356,21 @@ public class HangarBackendClient {
       @NotNull UUID memberId, @NotNull ShipBulkOrgUnitRequestDto request) {
     return backendApiClient.post(
         MEMBER_SHIPS + "/bulk-org-unit", request, ShipBulkOrgUnitResultDto.class, memberId);
+  }
+
+  /**
+   * Marks a selection of a member's ships as pledged or bought in-game on an admin's behalf
+   * (REQ-HANGAR-018).
+   *
+   * @param memberId the ships' owner
+   * @param request the selected ships and the origin
+   * @return the changed and skipped counts, or {@code null} when the backend sent no body
+   */
+  @Nullable
+  public ShipBulkOriginResultDto bulkChangeMemberShipOrigin(
+      @NotNull UUID memberId, @NotNull ShipBulkOriginRequestDto request) {
+    return backendApiClient.post(
+        MEMBER_SHIPS + "/bulk-origin", request, ShipBulkOriginResultDto.class, memberId);
   }
 
   /**

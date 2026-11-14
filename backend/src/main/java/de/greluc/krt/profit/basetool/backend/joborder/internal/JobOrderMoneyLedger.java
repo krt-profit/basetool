@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyAvailability.AccountReceipt;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -255,6 +256,25 @@ class JobOrderMoneyLedger {
           linkedAttempts);
     }
 
+    /**
+     * Folds only the facts recorded before the cutoff, at their current effective amounts and
+     * holder identities: the order's funds as they stood then, as corrected since (REQ-PATCH-044).
+     *
+     * @param cutoff the exclusive upper bound of the recording time
+     * @return the earlier ledger of the same order
+     */
+    Ledger before(Instant cutoff) {
+      return fold(
+          facts.stream().filter(fact -> fact.getRecordedAt().isBefore(cutoff)).toList(),
+          identities,
+          accountHoldings,
+          recipientAliases,
+          corrections,
+          revisions,
+          availability,
+          linkedAttempts);
+    }
+
     JobOrderMoneyAmounts effective(JobOrderMoneyOperation fact) {
       return amounts(fact, revisions);
     }
@@ -354,6 +374,21 @@ class JobOrderMoneyLedger {
 
     JobOrderMoneyHolder holder(UUID id) {
       return Objects.requireNonNull(identities.get(canonical(identities, id)));
+    }
+
+    /**
+     * Moves the revision of the position a change of the order's money touches: the Bank account
+     * position when one is named, otherwise the member's personal holder.
+     *
+     * @param holderId the personal holder, used when no account position is named
+     * @param accountHoldingId the Bank account position, or {@code null} for the personal holder
+     */
+    void recordChange(@Nullable UUID holderId, @Nullable UUID accountHoldingId) {
+      if (accountHoldingId == null) {
+        holder(Objects.requireNonNull(holderId)).recordChange();
+      } else {
+        Objects.requireNonNull(accountHoldings.get(accountHoldingId)).recordChange();
+      }
     }
 
     private static void add(

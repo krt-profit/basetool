@@ -152,7 +152,8 @@ steps; the first that fails ends it:
 | `location` resolves to a warehouse location, never created | `rejected` `LOCATION_UNKNOWN` |
 | `quantity` and `expectedQuantity` are in the material's unit — `PIECE` for an item | `rejected` `UNIT_MISMATCH` |
 | `stolen: true` needs the Basetool's stolen marking, which may be switched off | `rejected` `STOLEN_MARKING_DISABLED` |
-| The lot's stock is locked; its quantity must equal `expectedQuantity` | `rejected` `VERSION_CONFLICT` |
+| An empty lot whose last change was a patch change's, unless the op expects and keeps it empty or sends `override` | `rejected` `REMOVED_ELSEWHERE`, with the `patchChange` ([patch change](patch-change.md#pushing-against-what-a-patch-change-removed)) |
+| The lot's stock is locked; its quantity must equal `expectedQuantity` | `rejected` `VERSION_CONFLICT`, with the `patchChange` when the lot's last change was a patch change's ([patch change](patch-change.md#pushing-against-what-a-patch-change-removed)) |
 | A lot already at `quantity` | `unchanged` |
 | A rise of an item no longer in the game, beyond what the batch's falls of that item still cover | `rejected` `ITEM_RETIRED` |
 | An empty lot whose last change came from the web, the app, the system, another client or another installation | `rejected` `REMOVED_ELSEWHERE` |

@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -30,7 +31,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -40,11 +44,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration tests for {@link ShipRepository#findByOwnerIdFiltered} against real Postgres,
- * covering the Postgres-specific multi-key ordering and the server-side search (REQ-HANGAR-002).
+ * Integration tests for the personal-hangar queries of {@link ShipRepository} against real
+ * Postgres: the multi-key ordering and the server-side search (REQ-HANGAR-002), the bulk home
+ * location and the fitted reset the relocation lock narrows (REQ-PATCH-023).
  */
 @SpringBootTest
 @Transactional
@@ -58,6 +65,7 @@ class ShipRepositoryPersonalHangarTest {
   @Autowired private UserRepository userRepository;
   @Autowired private ManufacturerRepository manufacturerRepository;
   @Autowired private LocationRepository locationRepository;
+  @Autowired private JdbcTemplate jdbc;
 
   private User owner;
   private User otherOwner;
@@ -97,7 +105,8 @@ class ShipRepositoryPersonalHangarTest {
     saveShip("s-G", gladius, "LTI", false, area18);
 
     Page<Ship> page =
-        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(0, 50));
+        shipRepository.findByOwnerIdFiltered(
+            owner.getId(), null, null, null, PageRequest.of(0, 50));
 
     assertThat(page.getContent().stream().map(Ship::getName))
         .containsExactly("s-A", "s-A2", "s-C", "s-B", "s-D", "s-E", "s-F", "s-G", "s-H");
@@ -111,7 +120,8 @@ class ShipRepositoryPersonalHangarTest {
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), "cutlass-773", null, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(
+                    owner.getId(), "cutlass-773", null, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
@@ -119,14 +129,16 @@ class ShipRepositoryPersonalHangarTest {
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), "AEGIS-773", null, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(
+                    owner.getId(), "AEGIS-773", null, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
         .containsExactly("s-A", "s-G");
 
     assertThat(
-            shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(0, 50)))
+            shipRepository.findByOwnerIdFiltered(
+                owner.getId(), null, null, null, PageRequest.of(0, 50)))
         .hasSize(3);
   }
 
@@ -139,13 +151,13 @@ class ShipRepositoryPersonalHangarTest {
     saveShip("s-H", cutlass, "LTI", false, area18);
 
     Page<Ship> fitted =
-        shipRepository.findByOwnerIdFiltered(owner.getId(), null, true, PageRequest.of(0, 1));
+        shipRepository.findByOwnerIdFiltered(owner.getId(), null, true, null, PageRequest.of(0, 1));
     assertThat(fitted.getTotalElements()).isEqualTo(2L);
     assertThat(fitted.getContent().stream().map(Ship::getName)).containsExactly("s-A");
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), null, false, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(owner.getId(), null, false, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
@@ -153,11 +165,48 @@ class ShipRepositoryPersonalHangarTest {
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), "aegis-773", false, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(
+                    owner.getId(), "aegis-773", false, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
         .containsExactly("s-C");
+  }
+
+  /**
+   * The origin filter reads the effective origin: a ship an import locked counts as pledged, never
+   * as the origin it stores (REQ-HANGAR-017).
+   */
+  @Test
+  void findByOwnerIdFiltered_originFilterReadsTheEffectiveOrigin() {
+    saveShip("s-unknown", avenger, "LTI", false, area18);
+    Ship inGame = saveShip("s-in-game", avenger, "LTI", false, area18);
+    inGame.setOrigin(ShipOrigin.IN_GAME);
+    Ship pledged = saveShip("s-pledged", avenger, "LTI", false, area18);
+    pledged.setOrigin(ShipOrigin.PLEDGE);
+    Ship locked = saveShip("s-locked", avenger, "LTI", false, area18);
+    locked.setOriginLocked(true);
+    saveShipFor(otherOwner, "s-foreign", avenger, "LTI", false, area18);
+    shipRepository.flush();
+
+    assertThat(originNames(ShipOrigin.UNKNOWN)).containsExactly("s-unknown");
+    assertThat(originNames(ShipOrigin.IN_GAME)).containsExactly("s-in-game");
+    assertThat(originNames(ShipOrigin.PLEDGE)).containsExactlyInAnyOrder("s-locked", "s-pledged");
+    assertThat(
+            shipRepository
+                .findByOwnerIdFiltered(
+                    owner.getId(), null, null, ShipOrigin.UNKNOWN, PageRequest.of(0, 1))
+                .getTotalElements())
+        .isEqualTo(1L);
+  }
+
+  private List<String> originNames(ShipOrigin origin) {
+    return shipRepository
+        .findByOwnerIdFiltered(owner.getId(), null, null, origin, PageRequest.of(0, 50))
+        .getContent()
+        .stream()
+        .map(Ship::getName)
+        .toList();
   }
 
   /** The readiness counts only the owner's ships, and a hangar without ships reads zero. */
@@ -186,13 +235,13 @@ class ShipRepositoryPersonalHangarTest {
     saveShip("s-F", avenger, "0", false, area18);
 
     Page<Ship> first =
-        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(0, 2));
+        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, null, PageRequest.of(0, 2));
     assertThat(first.getTotalElements()).isEqualTo(5L);
     assertThat(first.getTotalPages()).isEqualTo(3);
     assertThat(first.getContent().stream().map(Ship::getName)).containsExactly("s-A", "s-A2");
 
     Page<Ship> second =
-        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(1, 2));
+        shipRepository.findByOwnerIdFiltered(owner.getId(), null, null, null, PageRequest.of(1, 2));
     assertThat(second.getContent().stream().map(Ship::getName)).containsExactly("s-C", "s-D");
   }
 
@@ -203,14 +252,14 @@ class ShipRepositoryPersonalHangarTest {
 
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(owner.getId(), null, null, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(owner.getId(), null, null, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
         .containsExactly("mine");
     assertThat(
             shipRepository
-                .findByOwnerIdFiltered(otherOwner.getId(), null, null, PageRequest.of(0, 50))
+                .findByOwnerIdFiltered(otherOwner.getId(), null, null, null, PageRequest.of(0, 50))
                 .getContent()
                 .stream()
                 .map(Ship::getName))
@@ -239,7 +288,7 @@ class ShipRepositoryPersonalHangarTest {
 
   private List<String> ownShips(String escapedFragment) {
     return shipRepository
-        .findByOwnerIdFiltered(owner.getId(), escapedFragment, null, PageRequest.of(0, 50))
+        .findByOwnerIdFiltered(owner.getId(), escapedFragment, null, null, PageRequest.of(0, 50))
         .getContent()
         .stream()
         .map(Ship::getName)
@@ -253,6 +302,61 @@ class ShipRepositoryPersonalHangarTest {
         .stream()
         .<Object>map(row -> row[0])
         .toList();
+  }
+
+  /** The bulk home location moves only the owner's ships and advances each one's version. */
+  @Test
+  void setLocationForOwner_movesTheOwnersShipsAndAdvancesTheirVersion() {
+    Ship mine = saveShip("s-A", avenger, "LTI", false, area18);
+    Ship theirs = saveShipFor(otherOwner, "s-B", avenger, "LTI", false, area18);
+    shipRepository.flush();
+    Long staleVersion = mine.getVersion();
+    Long foreignVersion = theirs.getVersion();
+
+    int updated = shipRepository.setLocationForOwner(owner.getId(), orison);
+
+    Ship moved = shipRepository.findById(mine.getId()).orElseThrow();
+    assertThat(updated).isEqualTo(1);
+    assertThat(moved.getLocation().getId()).isEqualTo(orison.getId());
+    assertThat(moved.getVersion()).isEqualTo(staleVersion + 1);
+    assertThat(shipRepository.findById(theirs.getId()).orElseThrow().getVersion())
+        .isEqualTo(foreignVersion);
+    assertThatThrownBy(() ->
+            OptimisticLock.checkOptionalClient(
+                moved.getVersion(), staleVersion, Ship.class, moved.getId()))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+  }
+
+  /**
+   * A fitted reset leaves out the locked owner's ships from before the cutoff and clears the rest;
+   * without a cutoff it leaves out nothing.
+   */
+  @Test
+  void resetAllFittedScoped_leavesOutTheLockedOwnersShipsFromBeforeTheCutoff() {
+    Instant cutoff = Instant.parse("2000-01-01T00:00:00Z");
+    Ship old = saveShip("s-old", avenger, "LTI", true, area18);
+    Ship young = saveShip("s-young", avenger, "LTI", true, area18);
+    Ship foreign = saveShipFor(otherOwner, "s-foreign", avenger, "LTI", true, area18);
+    shipRepository.flush();
+    jdbc.update(
+        "UPDATE ship SET created_at = ? WHERE id IN (?, ?)",
+        Timestamp.from(Instant.parse("1999-06-01T00:00:00Z")),
+        old.getId(),
+        foreign.getId());
+
+    shipRepository.resetAllFittedScoped(true, null, Set.of(), Set.of(owner.getId()), cutoff);
+
+    assertThat(fitted(old)).isTrue();
+    assertThat(fitted(young)).isFalse();
+    assertThat(fitted(foreign)).isFalse();
+
+    shipRepository.resetAllFittedScoped(true, null, Set.of(), Set.of(), null);
+
+    assertThat(fitted(old)).isFalse();
+  }
+
+  private boolean fitted(Ship ship) {
+    return shipRepository.findById(ship.getId()).orElseThrow().isFitted();
   }
 
   private User newUser(String username) {

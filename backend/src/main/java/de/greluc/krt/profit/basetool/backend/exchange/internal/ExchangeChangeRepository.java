@@ -152,7 +152,8 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
       value =
           """
           SELECT seq, changed_at AS changedAt, source_channel AS sourceChannel,
-                 source_client AS sourceClient, source_key AS sourceKey
+                 source_client AS sourceClient, source_key AS sourceKey,
+                 source_patch_change AS sourcePatchChange
           FROM exchange_change WHERE seq IN (:seqs)
           """,
       nativeQuery = true)
@@ -178,6 +179,25 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
       @Param("userId") UUID userId,
       @Param("resource") String resource,
       @Param("entityKey") String entityKey);
+
+  /**
+   * Returns the latest org-stock entry that names one shared row as written, ignoring the lot-level
+   * re-announces that name no row (REQ-PATCH-057).
+   *
+   * @param orgUnitId the unit whose pool feed holds the entries
+   * @param rowId the shared row
+   * @return the latest entry, or empty when the unit's feed names the row in none
+   */
+  @Query(
+      value =
+          """
+          SELECT * FROM exchange_change
+          WHERE org_unit_id = :orgUnitId AND resource = 'ORG_STOCK' AND org_entry_id = :rowId
+          ORDER BY tx DESC, seq DESC LIMIT 1
+          """,
+      nativeQuery = true)
+  Optional<ExchangeChange> findLatestForOrgEntry(
+      @Param("orgUnitId") UUID orgUnitId, @Param("rowId") UUID rowId);
 
   /**
    * Returns the latest retained feed epoch of every requested key in one scalar batch.
@@ -237,7 +257,8 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
     Instant getChangedAt();
 
     /**
-     * The writing channel: {@code web}, {@code app}, {@code client} or {@code system}.
+     * The writing channel: {@code web}, {@code app}, {@code client}, {@code system} or {@code
+     * patch}.
      *
      * @return the channel
      */
@@ -256,6 +277,13 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
      * @return the thumbprint, or {@code null}
      */
     String getSourceKey();
+
+    /**
+     * The patch change whose trigger wrote it (REQ-PATCH-007).
+     *
+     * @return the patch change's id, or {@code null} for every other channel
+     */
+    UUID getSourcePatchChange();
   }
 
   /** A changed key with the position of its latest entry. */

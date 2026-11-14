@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendErrorMapper;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.PublicPaths;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.time.Clock;
@@ -69,6 +70,9 @@ public class ActiveOrgUnitRestore {
   /** Reads the caller's stored choice from the backend. */
   @NotNull private final ActiveOrgUnitChoiceSource choiceSource;
 
+  /** Names the pages of the session gates, which never read the choice. */
+  @NotNull private final SessionGates sessionGates;
+
   /** The clock the retry wait is measured on. */
   @NotNull private final Clock clock;
 
@@ -76,10 +80,12 @@ public class ActiveOrgUnitRestore {
    * Creates the restore on the system clock.
    *
    * @param choiceSource reads the caller's stored choice
+   * @param sessionGates names the pages of the session gates
    */
   @Autowired
-  public ActiveOrgUnitRestore(@NotNull ActiveOrgUnitChoiceSource choiceSource) {
-    this(choiceSource, Clock.systemUTC());
+  public ActiveOrgUnitRestore(
+      @NotNull ActiveOrgUnitChoiceSource choiceSource, @NotNull SessionGates sessionGates) {
+    this(choiceSource, sessionGates, Clock.systemUTC());
   }
 
   /**
@@ -101,7 +107,7 @@ public class ActiveOrgUnitRestore {
     if (principal.equals(restoredFor)
         || retryPending(session)
         || PublicPaths.isAssetOrPublicDocument(path)
-        || PublicPaths.isAccessGatePage(path)) {
+        || sessionGates.isGatePage(path)) {
       return;
     }
     if (restoredFor == null && sessionPin(session) != null) {
@@ -114,7 +120,7 @@ public class ActiveOrgUnitRestore {
     } catch (ReauthenticationRequiredException _) {
       return;
     } catch (BackendServiceException e) {
-      if (BackendErrorMapper.isExpectedAccessGateRefusal(e.getProblemCode())) {
+      if (BackendErrorMapper.isExpectedAccessGateRefusal(e)) {
         log.debug(
             "An access gate refused reading the stored active org unit ({}); the next request"
                 + " reads it again",

@@ -28,11 +28,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 
 /**
  * The Gefahrenzone tab of the system settings ({@code /admin/settings/danger-zone}): the
- * destructive one-off actions, the bank wipe reset and deleting every user's blueprints
- * (REQ-UI-026, REQ-BANK-013).
+ * destructive one-off actions, the patch change, the bank wipe reset and deleting every user's
+ * blueprints (REQ-UI-026, REQ-BANK-013, REQ-PATCH-008).
  *
- * <p>The page only hosts the two action cards; their POST endpoints stay with their domains. The
- * result of a wipe reset arrives as flash attributes.
+ * <p>The page only hosts the action cards; their endpoints stay with their domains, and the patch
+ * change has a page of its own. The result of a wipe reset arrives as flash attributes.
  */
 @Controller
 @UsesLayoutModel

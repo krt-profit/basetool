@@ -20,8 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.exchange.api.ExchangeProblemException;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRemovedByDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeTombstoneDto;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeLabels;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -57,6 +59,7 @@ public class ExchangeFeedReader {
   private final ExchangeChangeRepository changeRepository;
   private final ExchangeInstallationRepository installationRepository;
   private final ExchangeChangeRetentionService retentionService;
+  private final PatchChangeLabels patchChangeLabels;
 
   /**
    * Clamps a requested page size.
@@ -254,6 +257,12 @@ public class ExchangeFeedReader {
             .collect(
                 Collectors.toMap(ExchangeChangeRepository.Origin::getSeq, Function.identity()));
     Map<String, String> installations = installationIds(member, latest.values());
+    Map<UUID, String> patchLabels =
+        patchChangeLabels.labels(
+            latest.values().stream()
+                .map(ExchangeChangeRepository.Origin::getSourcePatchChange)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
     Map<String, Removal> removals = new HashMap<>();
     for (ExchangeChangeRepository.ChangedKey key : delivered) {
       ExchangeChangeRepository.Origin change = Objects.requireNonNull(latest.get(key.getSeq()));
@@ -266,8 +275,8 @@ public class ExchangeFeedReader {
                   change.getSourceClient(),
                   change.getSourceKey() == null
                       ? null
-                      : installations.get(
-                          change.getSourceClient() + "|" + change.getSourceKey()))));
+                      : installations.get(change.getSourceClient() + "|" + change.getSourceKey()),
+                  ExchangePatchChangeRefDto.of(change.getSourcePatchChange(), patchLabels))));
     }
     return removals;
   }

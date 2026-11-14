@@ -25,6 +25,14 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "homeLocationPreference",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "home_location" : "Zzz Export Hub",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "termsAcceptances",
     "legalBasis" : "ART_15",
     "rows" : [ {
@@ -106,6 +114,18 @@
       "fitted" : false,
       "location" : "Zzz Export Hub",
       "created_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
+    "key" : "homeLocationChoices",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "patch" : "0.9",
+      "home_location" : "Zzz Export Hub",
+      "chosen_by" : "SELF",
+      "relocated_at" : "<instant>",
+      "rows_moved" : 3,
+      "ships_moved" : 1
     } ],
     "truncated" : false
   }, {

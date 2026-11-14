@@ -57,10 +57,12 @@ import de.greluc.krt.profit.basetool.frontend.kernel.backend.AppHttpProperties;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.CatalogueCacheEviction;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.IngestHandoffService;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.GlobalExceptionHandler;
 import de.greluc.krt.profit.basetool.frontend.support.RealBackendApiClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -269,7 +271,8 @@ class RelayedBackendStatusMvcTest {
             .build();
 
     MockMvcBuilders.standaloneSetup(controller.apply(failing))
-        .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))
+        .setControllerAdvice(
+            new GlobalExceptionHandler(new StaticMessageSource(), new SessionGates(List.of())))
         .build()
         .perform(request.header("X-Requested-With", "XMLHttpRequest"))
         .andExpect(status().isUnauthorized())
@@ -362,7 +365,8 @@ class RelayedBackendStatusMvcTest {
 
   private MockMvc mockMvc(Function<WebClient, Object> controller) {
     return MockMvcBuilders.standaloneSetup(controller.apply(webClient))
-        .setControllerAdvice(new GlobalExceptionHandler(new StaticMessageSource()))
+        .setControllerAdvice(
+            new GlobalExceptionHandler(new StaticMessageSource(), new SessionGates(List.of())))
         .build();
   }
 

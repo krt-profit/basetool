@@ -189,7 +189,6 @@ class ProblemCodeRegistryTest {
         List.of(
             "de.greluc.krt.profit.basetool.backend.platform.api.ProblemSupport",
             "de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException",
-            "de.greluc.krt.profit.basetool.backend.identity.api.TermsAcceptanceAccessFilter",
             "de.greluc.krt.profit.basetool.backend.identity.api.PendingApprovalAccessFilter",
             "de.greluc.krt.profit.basetool.backend.exchange.internal.ActingMemberFilter",
             "de.greluc.krt.profit.basetool.backend.platform.api.IdentityProviderUnavailableFilter",
@@ -329,7 +328,8 @@ class ProblemCodeRegistryTest {
 
   /**
    * The committed document lists exactly the registered codes on {@code ProblemDetail.code}, and
-   * documents {@code correlationId} and {@code fieldErrors}.
+   * documents {@code correlationId}, {@code fieldErrors} and the session gates' {@code sessionGate}
+   * marker.
    *
    * @throws IOException if the document cannot be read
    */
@@ -356,7 +356,15 @@ class ProblemCodeRegistryTest {
         .isEqualTo(
             new TreeSet<>(ProblemCodeRegistry.codes(ProblemCodeRegistry.registryEnums()).keySet()));
     assertThat(problem.path("properties").propertyNames())
-        .contains("code", "correlationId", "fieldErrors", "errors", "type", "title", "status");
+        .contains(
+            "code",
+            "correlationId",
+            "fieldErrors",
+            "errors",
+            "type",
+            "title",
+            "status",
+            "sessionGate");
     assertThat(problem.path("required").isMissingNode() || !hasCodeRequired(problem))
         .as("code stays optional (REQ-API-019)")
         .isTrue();

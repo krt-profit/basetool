@@ -96,7 +96,16 @@ public enum ExchangeCapability {
   BANK_REQUEST("exchange.bank.request"),
 
   /** Reading, as bank staff, the open requests the member may confirm or approve. */
-  BANK_QUEUE("exchange.bank.queue");
+  BANK_QUEUE("exchange.bank.queue"),
+
+  /** Reading the latest patch change and the member's home-location prompt (REQ-PATCH-050). */
+  PATCH_READ("exchange.patch.read"),
+
+  /**
+   * Making the member's home-location choice, granted only with {@link #PATCH_READ}
+   * (REQ-PATCH-052).
+   */
+  PATCH_WRITE("exchange.patch.write");
 
   /** The OAuth scope that carries this capability. */
   @Getter(onMethod_ = @__(@JsonValue))
