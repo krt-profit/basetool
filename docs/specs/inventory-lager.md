@@ -643,6 +643,7 @@ its localized problem `detail` is shown to the user (the throw sites carry
 `GlobalExceptionHandler#resolveDetail`), not swallowed into a generic failure toast. Each mutation is audited
 (`INVENTORY_ALLOCATION_ADDED` / `_CHANGED` / `_REMOVED`, REQ-AUDIT-001). The entry's `@Version` is the
 single optimistic-lock token for its allocations (an inverse-side slice change force-increments it).
+The increment covers the entry alone: its material's version stays as it is.
 Single and bulk releases, including releases caused by job-order state changes or deletion,
 retain the physical stock and advance only entries whose slices actually change. Each removed
 slice receives its Inventory removal audit in the same transaction. Repeating a release with

@@ -193,13 +193,14 @@ public interface InventoryItemRepository
 
   /**
    * Loads an entry for an allocation write under {@link LockModeType#OPTIMISTIC_FORCE_INCREMENT},
-   * so the entry's version guards its allocations too (REQ-INV-027).
+   * so the entry's version guards its allocations too (REQ-INV-027). The query fetches no
+   * association: Hibernate force-increments every entity the query loads, so a fetched material
+   * would take the increment as well.
    *
    * @param id the inventory entry id.
    * @return the entry under a forced version increment, or empty when unknown.
    */
   @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
-  @EntityGraph(attributePaths = {"material"})
   @Query("SELECT i FROM InventoryItem i WHERE i.id = :id")
   Optional<InventoryItem> findByIdForAllocationWrite(@Param("id") UUID id);
 
