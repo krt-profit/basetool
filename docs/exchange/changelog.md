@@ -27,8 +27,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   ([patch change](resources/patch-change.md)). New: `patch-change.schema.json`.
 - **New: the home-location choice.** `POST /exchange/v1/me/patch-change/home-location` (scope
   `exchange.patch.write`, granted only with `exchange.patch.read`) makes the member's choice with the
-  web's rules and relocates the member in the same request; it counts one write. A second choice
-  answers `409 HOME_LOCATION_ALREADY_CHOSEN`, a choice without an open phase asking the member
+  web's rules and relocates the member in the same request; it counts one write. The body names the
+  location and, in `patchChange`, the phase the member saw; while another phase is open the choice
+  answers `409 HOME_LOCATION_PHASE_CHANGED`. A second choice answers
+  `409 HOME_LOCATION_ALREADY_CHOSEN`, a choice without an open phase asking the member
   `409 HOME_LOCATION_NOT_ASKED`, a location not on offer `400 HOME_LOCATION_NOT_OFFERED`
   ([choosing](resources/patch-change.md#choosing-the-home-location--post-exchangev1mepatch-changehome-location)).
   New: `#/$defs/homeLocationChoice` and `#/$defs/homeLocationChosen`.

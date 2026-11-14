@@ -172,13 +172,15 @@ class ExchangePatchChangeRouteTest {
 
   @Test
   void aChoiceOutsideItsSchemaIsRefusedBeforeTheRelay() throws Exception {
-    call(
-            TOKEN,
-            HttpMethod.POST,
-            CHOICE_ROUTE,
-            example("patch-change--homeLocationChoice/invalid/location-by-name.json"))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+    for (String invalid : new String[] {"location-by-name.json", "without-patch-change.json"}) {
+      call(
+              TOKEN,
+              HttpMethod.POST,
+              CHOICE_ROUTE,
+              example("patch-change--homeLocationChoice/invalid/" + invalid))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("SCHEMA_INVALID"));
+    }
 
     verify(relay, never()).forward(any(), anyString(), any(), any(), any());
   }
@@ -187,7 +189,10 @@ class ExchangePatchChangeRouteTest {
   void theChoicesRefusalsReachTheClientWithTheirCodes() throws Exception {
     for (String code :
         new String[] {
-          "HOME_LOCATION_NOT_ASKED", "HOME_LOCATION_ALREADY_CHOSEN", "HOME_LOCATION_NOT_OFFERED"
+          "HOME_LOCATION_NOT_ASKED",
+          "HOME_LOCATION_ALREADY_CHOSEN",
+          "HOME_LOCATION_PHASE_CHANGED",
+          "HOME_LOCATION_NOT_OFFERED"
         }) {
       int status = "HOME_LOCATION_NOT_OFFERED".equals(code) ? 400 : 409;
       when(relay.forward(eq(HttpMethod.POST), eq(CHOICE_BACKEND), any(), any(), any()))

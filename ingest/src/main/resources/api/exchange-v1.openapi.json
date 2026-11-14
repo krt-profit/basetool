@@ -1260,7 +1260,7 @@
             }
           }
         },
-        "description": "The web's rules: only a curated home location on offer, once per member and phase, final. The Basetool relocates the member in this request. No open phase asking the member answers 409 HOME_LOCATION_NOT_ASKED, a second choice 409 HOME_LOCATION_ALREADY_CHOSEN, a location not on offer 400 HOME_LOCATION_NOT_OFFERED. Counts one unit of the daily write quota.",
+        "description": "The web's rules: only a curated home location on offer, once per member and phase, final, for the phase of the patch change the body names. The Basetool relocates the member in this request. No open phase asking the member answers 409 HOME_LOCATION_NOT_ASKED, another open phase than the named one 409 HOME_LOCATION_PHASE_CHANGED, a second choice 409 HOME_LOCATION_ALREADY_CHOSEN, a location not on offer 400 HOME_LOCATION_NOT_OFFERED. Counts one unit of the daily write quota.",
         "parameters": [
           {
             "$ref": "#/components/parameters/DPoP"
