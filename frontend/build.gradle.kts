@@ -945,10 +945,14 @@ val testHomeLocationJs =
       layout.projectDirectory.file("src/main/resources/static/js/patchchange/home-location.js"),
     )
     inputs.file(
-      layout.projectDirectory.file("src/main/resources/static/js/patchchange/home-location-common.js"),
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/patchchange/home-location-common.js",
+      ),
     )
     inputs.file(
-      layout.projectDirectory.file("src/main/resources/static/js/patchchange/patch-change-messages.js"),
+      layout.projectDirectory.file(
+        "src/main/resources/static/js/patchchange/patch-change-messages.js",
+      ),
     )
     inputs.file(
       layout.projectDirectory.file("src/main/resources/static/js/kernel/krt-i18n.js"),

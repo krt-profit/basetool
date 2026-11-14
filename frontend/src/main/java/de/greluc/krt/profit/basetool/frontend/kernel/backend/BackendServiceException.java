@@ -63,7 +63,7 @@ public class BackendServiceException extends RuntimeException {
   public static final String CODE_PENDING_APPROVAL = "PENDING_APPROVAL";
 
   /**
-   * Problem code the backend's {@code TermsAcceptanceAccessFilter} returns until a user has
+   * Problem code the backend's terms gate {@code TermsAcceptanceGate} returns until a user has
    * accepted the Terms of Use (REQ-SEC-028). Like {@link #CODE_PENDING_APPROVAL} this is an
    * expected, high-frequency 403 rather than a fault — after a wording change it is every member on
    * every request — so {@code BackendApiClient} logs it at DEBUG instead of WARN.
