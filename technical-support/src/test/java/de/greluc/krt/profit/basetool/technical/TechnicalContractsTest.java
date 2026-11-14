@@ -41,6 +41,13 @@ class TechnicalContractsTest {
   }
 
   @Test
+  void raisesTheLengthCapOnlyForALargerDeclaredMaximum() {
+    assertEquals(StringNormalization.MAX_FREE_TEXT_LENGTH, StringNormalization.capFor(0));
+    assertEquals(StringNormalization.MAX_FREE_TEXT_LENGTH, StringNormalization.capFor(255));
+    assertEquals(20_000, StringNormalization.capFor(20_000));
+  }
+
+  @Test
   void preservesDistinctBlankAndUnicodeStripContracts() {
     assertNull(StringNormalization.blankToNull(null));
     assertNull(StringNormalization.blankToNull("\u2003"));
