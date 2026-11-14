@@ -242,8 +242,8 @@ interface ExchangeChangeSetAdapter<S, C> {
      * The refusal of an op that expected an older state of its entry, naming the patch change when
      * the entry's latest change came from one (REQ-PATCH-054, REQ-PATCH-057).
      *
-     * @param patchChange the patch change behind the entry's latest change, or {@code null} when
-     *     it came from another channel
+     * @param patchChange the patch change behind the entry's latest change, or {@code null} when it
+     *     came from another channel
      * @return the outcome
      */
     static @NotNull Outcome versionConflict(@Nullable ExchangePatchChangeRefDto patchChange) {

@@ -181,8 +181,8 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
       @Param("entityKey") String entityKey);
 
   /**
-   * Returns the latest org-stock entry that names one shared row as written, ignoring the
-   * lot-level re-announces that name no row (REQ-PATCH-057).
+   * Returns the latest org-stock entry that names one shared row as written, ignoring the lot-level
+   * re-announces that name no row (REQ-PATCH-057).
    *
    * @param orgUnitId the unit whose pool feed holds the entries
    * @param rowId the shared row
