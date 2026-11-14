@@ -203,6 +203,7 @@ public class MemberManagementController {
       model.addAttribute("user", identityClient.user(id));
       return "identity/member-export";
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.error("Could not fetch member details", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.member.details.load");
       return "redirect:/members";
@@ -390,6 +391,7 @@ public class MemberManagementController {
         return "redirect:/profile";
       }
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "updateMember", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.member.update.failed");
       return "redirect:/members/"
@@ -442,6 +444,7 @@ public class MemberManagementController {
       body.put("version", currentUserVersion(id, form.version()));
       return ResponseEntity.ok(body);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       return relayBackendError("AJAX member update failed", e);
     }
   }
@@ -543,6 +546,7 @@ public class MemberManagementController {
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.user.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "deleteMember", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.user.delete");
     } catch (Exception e) {
@@ -568,6 +572,7 @@ public class MemberManagementController {
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of());
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       return relayBackendError("AJAX member delete failed", e);
     }
   }
@@ -587,6 +592,7 @@ public class MemberManagementController {
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of("syncedCount", syncedCount));
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       return relayBackendError("AJAX member sync failed", e);
     }
   }
@@ -610,6 +616,7 @@ public class MemberManagementController {
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(survivor);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       return relayBackendError("AJAX member consolidate failed", e);
     }
   }

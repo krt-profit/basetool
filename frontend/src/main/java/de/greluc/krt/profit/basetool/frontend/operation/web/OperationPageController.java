@@ -446,6 +446,7 @@ public class OperationPageController {
       operationClient.updateOperation(id, form);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       if (e.getStatusCode() == 409) {
         log.warn("Optimistic locking failure updating operation: {}", id);
         redirectAttributes.addFlashAttribute("errorMessage", "error.optimistic.locking");
@@ -480,6 +481,7 @@ public class OperationPageController {
       OperationPayoutStatusDto updated = operationClient.updatePayoutStatus(id, request);
       return ResponseEntity.ok(updated);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug(
           "Update payout paid-out flag failed with status {}: {}",
           e.getStatusCode(),

@@ -2936,7 +2936,9 @@ A backend failure is mapped once, by `BackendErrorMapper` (REQ-FE-029), and answ
 - **A custom fallback guards session loss and a session gate first.** A form-post fallback or a
   fallback with its own status/model contract calls `SectionFallback.rethrowHandOff(failure)` before
   logging or publishing feedback; it lets a lost session and a session gate's refusal through, the
-  latter except on a gate's own page (ADR-0385). The same guard applies inside
+  latter except on a gate's own page (ADR-0385). Every catch arm of a domain package whose caught
+  type can hold the refusal makes that call its first statement, or catches more narrowly
+  (`SessionGateHandOffArmTest`). The same guard applies inside
   `CompletableFuture.exceptionally` callbacks; nested wrappers never convert session loss or a
   gate's refusal into an unavailable counter or empty list. The AJAX relay `BackendErrorResponses`
   (`relay`, `propagateBackendError`, `withBackendStatus`) relays every other backend failure as

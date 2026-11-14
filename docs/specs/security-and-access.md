@@ -1916,9 +1916,16 @@ cannot exist in one locale only) · **Text:** `terms.list_4_1_5`, `terms.p_4_2` 
 > carries the problem property `sessionGate: true`, by which the frontend kernel tells a gate's
 > refusal without naming a gate's code: logged at `DEBUG`, not counted as a failed backend call, and
 > let through a page section's `SectionFallback`. When a gate's backend `403` reaches the frontend,
-> directly, inside a page section, a parallel read's or a form post's fallback, or through the
-> shared AJAX relay `BackendErrorResponses`, the frontend discards that gate's cached verdict and
-> hands the browser to the gate's page; only the layout chrome degrades instead. A WebSocket
+> directly, inside a page section, a parallel read's or a form post's fallback, a domain handler's
+> own catch arm, or through the shared AJAX relay `BackendErrorResponses`, the frontend discards
+> that gate's cached verdict and hands the browser to the gate's page; only the layout chrome
+> degrades instead: the layout context with the capabilities, the org units and the notification
+> badge, the squadron list, the navigation preferences and the supply and purchasing switches.
+> Every catch arm of a domain package whose caught type can hold the refusal hands it off first or
+> catches more narrowly (`SessionGateHandOffArmTest`). The legal pages and the open-source licences
+> stay readable for a held member: `SessionGateFilter` marks them like a gate's page, so a page
+> section falls back and the layout marks the page for the scripts, which then take a gate's
+> hand-off of a background call, stream or socket as handled without navigating. A WebSocket
 > handshake asks every gate afresh instead of reusing a cached verdict. Paths, headers, events, the
 > close code and the metrics are unchanged.
 > [!note] The go-live consent round — 2026-09-28 (epic #2078, #2092)
@@ -2147,11 +2154,19 @@ from this response blanks a legal document on a build nobody can redeploy.
   with a cached pass still warm; the layout chrome degrades instead.
   *`SharedFallbackSessionGateHandoffMvcTest`, `BackendErrorResponsesTest`,
   `BackendFallbackReauthenticationTest`.*
+- [x] A domain handler's own catch arm hands the refusal off as well, an AJAX arm with the gate's
+  header and a form post's arm with the redirect, while any other failure is still answered by the
+  arm; no arm of a domain package that can catch the refusal answers it itself.
+  *`DomainArmSessionGateHandoffMvcTest`, `SessionGateHandOffArmTest`.*
 - [x] A WebSocket handshake asks the gate despite a fresh cached "yes", so wording that came into
   force since marks the socket for its `4003` close. *`TermsGateTest`, `HomeLocationGateTest`.*
 - [x] On a gate's own page a gate refusal is never handed off again, so the page cannot redirect to
   itself: a page section falls back, a direct refusal is shown. *`SessionGateFilterTest`,
   `SectionFallbackTest`, `GlobalExceptionHandlerTest`, `SectionSessionGateHandoffMvcTest`.*
+- [x] A held member reads every legal page and the licences with each chrome read and the page's
+  own read refused by the gate, the purchasing switch's cache cold: the page answers `200` with
+  the chrome degraded and is marked for the scripts, never redirected to the gate.
+  *`GateExemptPageChromeMvcTest`, `SessionGateFilterTest`, `BackendFallbackReauthenticationTest`.*
 - [x] Every gate's refusal carries `sessionGate: true`, and the frontend kernel tells a gate's
   refusal by it alone. *`SessionGateAccessFilterTest`, `BackendErrorMapperTest`,
   `KernelGateCodeReachTest`.*
@@ -2166,7 +2181,12 @@ gates), `KernelGateCodeReachTest` (no kernel class file carries a gate's code),
 `SectionSessionGateHandoffMvcTest` (a section's gate refusal is handed off for both gates, and
 falls back on the gate's own page), `SharedFallbackSessionGateHandoffMvcTest` +
 `BackendErrorResponsesTest` + `BackendFallbackReauthenticationTest` (the relay's and the
-fallbacks' hand-off with a warm cached pass),
+fallbacks' hand-off with a warm cached pass), `DomainArmSessionGateHandoffMvcTest` (a handler's
+own catch arm hands off), `SessionGateHandOffArmTest` (no catch arm of a domain package that can
+catch a gate's refusal answers it itself), `SessionLossOnlyGuardConfinementTest` (the
+reauthentication-only guard stays with the gate machinery and the layout chrome),
+`GateExemptPageChromeMvcTest` (the legal pages and the licences render for a held member with
+every chrome read refused),
 `BackgroundReadGateContractTest` (the client half: every read goes through `krtFetch.get`,
 which sends the XHR marker, offers the answer to `krtSessionGate` and refuses a redirect; no raw request in
 any script or template; the polls disarm on a gated answer — pinned against the shipped JS and

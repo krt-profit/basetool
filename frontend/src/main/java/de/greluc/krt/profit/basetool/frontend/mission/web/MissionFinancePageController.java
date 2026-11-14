@@ -103,6 +103,7 @@ public class MissionFinancePageController {
               id, form.getParticipantId(), form.getNote(), form.getType(), form.getAmount()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "addFinanceEntry", id, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.add");
     } catch (Exception e) {
@@ -148,6 +149,7 @@ public class MissionFinancePageController {
               form.getNote(), form.getType(), form.getAmount(), form.getVersion()));
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "updateFinanceEntry", entryId, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.update");
     } catch (Exception e) {
@@ -176,6 +178,7 @@ public class MissionFinancePageController {
       missionClient.deleteFinanceEntry(id, entryId);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       BackendErrorLogging.warn(log, "deleteFinanceEntry", entryId, e);
       redirectAttributes.addFlashAttribute("errorToast", "error.finance.delete");
     } catch (Exception e) {

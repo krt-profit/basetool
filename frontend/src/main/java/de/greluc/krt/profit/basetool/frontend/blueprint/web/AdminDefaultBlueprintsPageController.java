@@ -257,6 +257,7 @@ public class AdminDefaultBlueprintsPageController {
       blueprintClient.addDefault(new DefaultBlueprintCreateRequest(key));
       return AddOutcome.ADDED;
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       if (e.getStatusCode() == HttpStatus.CONFLICT.value()) {
         return AddOutcome.SKIPPED;
       }

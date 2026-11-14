@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.model.RegistrationStatusD
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.BackendRoleSyncFilter;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -126,6 +127,7 @@ public class PendingApprovalPageController {
       RegistrationStatusDto dto = identityClient.registrationStatus();
       return dto == null ? null : dto.approvalStatus();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Approval status could not be read; reporting an unknown status.", e);
       return null;
     }

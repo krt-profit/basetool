@@ -368,6 +368,7 @@ public class AdminUexPageController {
       }
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Override update failed", e);
       redirectAttributes.addFlashAttribute("errorToast", "error.admin.uex.flag.update");
     } catch (Exception e) {

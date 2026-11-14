@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,6 +72,7 @@ public class TermsAcceptancePageController {
         return "redirect:/";
       }
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Terms status could not be read; rendering the consent page anyway.", e);
     }
     model.addAttribute("terms", identityClient.termsDocument());
@@ -91,6 +93,7 @@ public class TermsAcceptancePageController {
       termsGate.forget(request);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.warn("Terms acceptance could not be recorded in the backend.", e);
       return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
     }

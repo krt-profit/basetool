@@ -299,6 +299,7 @@ public class AdminSettingsPageController {
     } catch (NumberFormatException _) {
       return validationProblem("error.settings.invalid.format", locale);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Failed to update settings (ajax)", e);
       return propagateBackendError(e);
     }

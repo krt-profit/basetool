@@ -23,6 +23,7 @@ import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendCli
 import de.greluc.krt.profit.basetool.frontend.identity.model.ProfileHomeLocationForm;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +73,7 @@ public class ProfileHomeLocationController {
       identityClient.updateMyHomeLocation(form.toRequest());
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Home-location update failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");

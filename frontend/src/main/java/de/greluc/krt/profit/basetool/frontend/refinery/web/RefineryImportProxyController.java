@@ -121,6 +121,7 @@ public class RefineryImportProxyController {
       redirectAttributes.addFlashAttribute("importRowsSkipped", draft.rowsSkipped());
       return "redirect:/refinery-orders/create";
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       String detail = e.getProblemDetail();
       if (detail != null && !detail.isBlank()) {
         redirectAttributes.addFlashAttribute("importErrorText", detail);

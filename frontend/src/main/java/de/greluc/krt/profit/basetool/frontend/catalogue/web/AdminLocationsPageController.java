@@ -165,6 +165,7 @@ public class AdminLocationsPageController {
       cacheEviction.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Toggle location visibility failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -211,6 +212,7 @@ public class AdminLocationsPageController {
       cacheEviction.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Toggle home-location failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");

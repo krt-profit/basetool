@@ -38,8 +38,8 @@ import org.slf4j.event.Level;
  * failure whose cause chain carries the OAuth2 re-authentication signal, propagates to {@link
  * GlobalExceptionHandler}, which sends the browser to the login. Neither is a session gate's
  * refusal: a {@link SessionGateRefusalException}, also inside a cause chain, propagates so the
- * handler hands the browser to the gate (ADR-0385), except while a gate's own page renders ({@link
- * GatePageRequest}), where it falls back so the page cannot send the browser to itself. Every other
+ * handler hands the browser to the gate (ADR-0385), except while a gate's own page or a legal page
+ * renders ({@link GatePageRequest}), where it falls back so the page keeps the browser. Every other
  * runtime failure is logged once and answered with the fallback: a mapped {@link
  * BackendServiceException} at {@code DEBUG}, anything else at {@code WARN} or the level the caller
  * names. A custom fallback guards the same way with {@link #rethrowHandOff(Throwable)}.
@@ -60,7 +60,8 @@ public final class SectionFallback {
    *
    * <p>Only for code a session gate's refusal must not leave: a servlet filter, a gate's own status
    * read, the error handler and the layout chrome, which also renders on the pages a gate leaves
-   * open. A handler's fallback uses {@link #rethrowHandOff(Throwable)}.
+   * open, the navigation preferences and the supply and purchasing switches included. A handler's
+   * fallback uses {@link #rethrowHandOff(Throwable)}.
    *
    * @param failure the caught failure
    * @throws ReauthenticationRequiredException when the failure carries a reauthentication signal
@@ -71,13 +72,14 @@ public final class SectionFallback {
 
   /**
    * Propagates what a handler's fallback never answers, before it handles a failure: a direct or
-   * wrapped session loss, then a session gate's refusal unless a gate's own page is rendering, so
-   * {@link GlobalExceptionHandler} sends the browser to the login or to the gate (ADR-0385).
+   * wrapped session loss, then a session gate's refusal unless a gate's own page or a legal page is
+   * rendering, so {@link GlobalExceptionHandler} sends the browser to the login or to the gate
+   * (ADR-0385).
    *
    * @param failure the caught failure
    * @throws ReauthenticationRequiredException when the failure carries a reauthentication signal
-   * @throws SessionGateRefusalException when the failure carries a gate's refusal and no gate's
-   *     page is rendering
+   * @throws SessionGateRefusalException when the failure carries a gate's refusal and neither a
+   *     gate's page nor a legal page is rendering
    */
   public static void rethrowHandOff(@NotNull Throwable failure) {
     propagateHandOff(CUSTOM_FALLBACK, failure);

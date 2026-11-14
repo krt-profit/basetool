@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.joborder.model.MaterialCollectionE
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.kernel.model.LocationReferenceDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -79,6 +80,7 @@ public class MaterialCollectionPageController {
     try {
       entries = jobOrderClient.materialCollection(jobOrderId);
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.warn(
           "Could not load material collection for job order {}: {}", jobOrderId, e.getMessage());
     }
@@ -86,6 +88,7 @@ public class MaterialCollectionPageController {
     try {
       locations = jobOrderClient.locations();
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.warn("Could not load locations: {}", e.getMessage());
     }
 

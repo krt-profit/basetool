@@ -25,8 +25,9 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 
 /**
- * Marks the request that renders a session gate's own page, where a gate's refusal of a page
- * section falls back instead of handing the browser to the page it is already on (ADR-0385).
+ * Marks the request that renders a page the session gates keep the browser on, a gate's own page or
+ * a legal page, where a gate's refusal of a page section falls back instead of handing the browser
+ * to a gate's page (ADR-0385, REQ-UI-021).
  */
 public final class GatePageRequest {
 
@@ -36,7 +37,8 @@ public final class GatePageRequest {
   private GatePageRequest() {}
 
   /**
-   * Marks a request as rendering a gate's page, as {@link SessionGates#isGatePage} decides it.
+   * Marks a request as rendering a gate's page, as {@link SessionGates#isGatePage} decides it, or a
+   * legal page.
    *
    * @param request the request {@link SessionGateFilter} passes on
    */
@@ -45,7 +47,7 @@ public final class GatePageRequest {
   }
 
   /**
-   * Tells whether the request bound to the current thread renders a gate's page.
+   * Tells whether the request bound to the current thread renders a gate's page or a legal page.
    *
    * @return {@code true} only inside a request {@link #mark} marked
    */

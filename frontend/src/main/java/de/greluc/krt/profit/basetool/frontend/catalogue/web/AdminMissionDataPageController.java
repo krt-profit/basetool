@@ -254,6 +254,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Create JobType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.duplicate.jobtype");
@@ -308,6 +309,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update JobType failed", e);
       if (e.getStatusCode() == 409) {
         if ("concurrency-conflict".equals(e.getProblemType())) {
@@ -342,6 +344,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Delete JobType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.jobtype.in_use");
@@ -373,6 +376,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Activate JobType failed", e);
       return "redirect:/admin/mission-data?error=ActivateJobTypeFailed";
     } catch (Exception e) {
@@ -456,6 +460,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Update FrequencyType failed", e);
       if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
         redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
@@ -486,6 +491,7 @@ public class AdminMissionDataPageController {
       cacheEviction.clearStaticDataCache();
       redirectAttributes.addFlashAttribute("successToast", "notification.success.delete");
     } catch (BackendServiceException e) {
+      SectionFallback.rethrowHandOff(e);
       log.debug("Delete FrequencyType failed", e);
       if (e.getStatusCode() == 409) {
         redirectAttributes.addFlashAttribute("errorToast", "error.delete.frequency_type.in_use");
