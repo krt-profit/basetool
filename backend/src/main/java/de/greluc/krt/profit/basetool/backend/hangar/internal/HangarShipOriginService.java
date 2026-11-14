@@ -52,9 +52,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class HangarShipOriginService {
 
-  /** The {@code changeCode} of an admin's notice that one ship changed. */
-  private static final String UPDATED = "UPDATED";
-
   private final ShipRepository shipRepository;
   private final AuditRecorder auditRecorder;
   private final HangarAdminNotifier adminNotifier;
@@ -93,13 +90,11 @@ public class HangarShipOriginService {
   public @NotNull ShipBulkOriginResultDto bulkChangeOriginByAdmin(
       @NotNull UUID memberId, @NotNull List<UUID> shipIds, @Nullable ShipOrigin origin) {
     OriginChange change = change(memberId, shipIds, origin);
-    int changed = change.changedShips().size();
-    if (changed == 1) {
-      adminNotifier.shipChanged(memberId, UPDATED, change.changedShips().getFirst());
-    } else if (changed > 1) {
-      adminNotifier.tell(
-          memberId, actor -> HangarNotices.shipsOriginChanged(memberId, changed, actor));
-    }
+    adminNotifier.shipsChanged(
+        memberId,
+        change.changedShips(),
+        HangarChangeCode.UPDATED,
+        (count, actor) -> HangarNotices.shipsOriginChanged(memberId, count, actor));
     return change.result();
   }
 
@@ -115,17 +110,14 @@ public class HangarShipOriginService {
   private @NotNull OriginChange change(
       @NotNull UUID userId, @NotNull List<UUID> shipIds, @Nullable ShipOrigin origin) {
     ShipOrigin target = ShipOriginRules.requireChoice(origin);
-    List<UUID> distinctIds = shipIds.stream().distinct().toList();
-    List<Ship> ships = shipRepository.lockAllByIdOrderById(distinctIds);
-    if (ships.size() != distinctIds.size()) {
-      throw new NotFoundException("Ship not found");
-    }
-    ships.forEach(ship -> ShipOwnership.requireOwner(ship, userId));
-    List<Ship> changing =
-        ships.stream()
-            .filter(ship -> !ship.isOriginLocked() && ship.getOrigin() != target)
-            .toList();
-    int skipped = ships.size() - changing.size();
+    BulkShipSelection selection =
+        BulkShipSelection.lock(
+            shipRepository,
+            userId,
+            shipIds,
+            ship -> !ship.isOriginLocked() && ship.getOrigin() != target);
+    List<Ship> changing = selection.changing();
+    int skipped = selection.skipped();
     if (changing.isEmpty()) {
       return new OriginChange(List.of(), new ShipBulkOriginResultDto(0, skipped));
     }
