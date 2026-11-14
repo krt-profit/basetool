@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+## [v1.24.2](https://github.com/krt-profit/basetool/releases/tag/v1.24.2) - 2026-11-14
+
+### Fixed
+
+- **Lager.** Der Hinweis in der Übersicht erklärt, welche Lagerbestände zusammengefasst werden.
+
+- **Materialien.** Die Handelsliste zeigt nur noch Materialien mit mindestens einem positiven Einkaufs- oder Verkaufspreis.
+
+- **Lange Texte.** Missionsbeschreibungen und die Bemerkungen in Materialbörse und Materialgesuch
+  lassen sich wieder mit bis zu 20.000 Zeichen speichern, statt ab 8.000 Zeichen mit einem Fehler
+  abgelehnt zu werden.
+
+- **Verbundene Apps.** Große, zur Bestätigung zurückgehaltene Änderungspakete lassen sich wieder
+  in der Vorschau ansehen und bestätigen.
+
+- **Missionsvorlagen.** Wer mehreren Einheiten angehört und beim Anlegen einer Mission noch keine
+  Einheit gewählt hat, bekommt bei der Vorlagenauswahl keine Fehlermeldung mehr, sondern eine leere
+  Liste bis zur Wahl der Einheit.
+
+- **Navigation.** Eine Adresse, die denselben Parameter mehrfach enthält, öffnet die Seite wieder,
+  statt auf einer Fehlerseite zu landen.
+
+- **Erster Discord-Login.** Die Prüfung, die beim ersten Discord-Login eines bestehenden Mitglieds
+  ein zweites Konto verhindert, greift wieder; ohne eingebundenes Zertifikat hatte sie jede
+  Anmeldung ungeprüft passieren lassen. Neue Alarme melden, wenn diese Prüfung nicht laufen kann.
+
 ## [v1.24.1](https://github.com/krt-profit/basetool/releases/tag/v1.24.1) - 2026-11-13
 
 ### Changed
