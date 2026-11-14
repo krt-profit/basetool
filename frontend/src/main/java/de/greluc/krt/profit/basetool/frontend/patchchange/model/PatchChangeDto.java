@@ -35,6 +35,8 @@ import java.util.UUID;
  * @param triggeredAt when the admin triggered it
  * @param triggeredBy the triggering admin's display name, or {@code null} when the account is gone
  * @param options the options it was triggered with
+ * @param wipeExceptions its wipe exceptions with their entries' names, never {@code null} once
+ *     constructed
  * @param counts what its effects touched, one entry per kind
  * @param phase its home-location phase, or {@code null} when it did not ask for a home location
  */
@@ -48,5 +50,12 @@ public record PatchChangeDto(
     Instant triggeredAt,
     String triggeredBy,
     PatchChangeOptions options,
+    List<WipeExceptionDto> wipeExceptions,
     List<PatchCountDto> counts,
-    PatchChangePhaseDto phase) {}
+    PatchChangePhaseDto phase) {
+
+  /** Copies the exceptions, so a missing list reads as none. */
+  public PatchChangeDto {
+    wipeExceptions = wipeExceptions == null ? List.of() : List.copyOf(wipeExceptions);
+  }
+}

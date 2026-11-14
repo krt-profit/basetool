@@ -43,7 +43,12 @@ import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangePhase
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCount;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCountDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchKind;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeException;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionDto;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeExceptionTarget;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeGroup;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.WipeGroupType;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
@@ -76,6 +81,7 @@ class AdminPatchChangePageControllerMvcTest {
   private static final UUID ID = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000a4");
   private static final UUID OLDER_ID = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000a3");
   private static final Instant LIVE_AT = Instant.parse("2026-11-14T20:00:00Z");
+  private static final UUID MATERIAL = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000b1");
 
   private static final HomeLocationOptionDto LORVILLE =
       new HomeLocationOptionDto(
@@ -133,6 +139,14 @@ class AdminPatchChangePageControllerMvcTest {
             List.of(
                 new PatchChangeFormDto.Preset(PatchKind.REBUILD, REBUILD),
                 new PatchChangeFormDto.Preset(PatchKind.FULL_WIPE, FULL_WIPE)),
+            List.of(
+                new PatchChangeFormDto.Group(
+                    WipeGroup.CONSUMABLES,
+                    List.of(
+                        new WipeGroupType(WipeGroupType.Source.ITEM_TYPE, "Food"),
+                        new WipeGroupType(
+                            WipeGroupType.Source.ITEM_SUB_TYPE, "WeaponAttachment:Magazine"))),
+                new PatchChangeFormDto.Group(WipeGroup.OTHER_ITEMS, List.of())),
             homeLocations);
     when(backendApiClient.get(FORM, PatchChangeFormDto.class)).thenReturn(form);
     return form;
@@ -152,7 +166,17 @@ class AdminPatchChangePageControllerMvcTest {
             LIVE_AT,
             Instant.parse("2026-11-14T21:12:00Z"),
             "Admin Jo",
-            new PatchChangeOptions(Set.of(WipeGroup.CONSUMABLES), true, true, true),
+            new PatchChangeOptions(
+                Set.of(WipeGroup.CONSUMABLES),
+                Set.of(
+                    new WipeException(
+                        WipeExceptionTarget.MATERIAL, MATERIAL, WipeExceptionMode.KEEP)),
+                true,
+                true,
+                true),
+            List.of(
+                new WipeExceptionDto(
+                    WipeExceptionTarget.MATERIAL, MATERIAL, WipeExceptionMode.KEEP, "Quantanium")),
             List.of(
                 new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 1284L),
                 new PatchCountDto(PatchCount.MEMBERS_ASKED, 87L)),
@@ -167,6 +191,7 @@ class AdminPatchChangePageControllerMvcTest {
             Instant.parse("2026-08-02T18:40:00Z"),
             "Admin Jo",
             FULL_WIPE,
+            List.of(),
             List.of(),
             new PatchChangePhaseDto(PatchChangePhaseState.SUPERSEDED, 80L, 76L));
     when(backendApiClient.get(eq(HISTORY), anyTypeRef())).thenReturn(List.of(row, older));
@@ -229,6 +254,37 @@ class AdminPatchChangePageControllerMvcTest {
   }
 
   @Test
+  void theWipeSectionShowsEachGroupsTypesTheCountCellsAndTheExceptionEditor() throws Exception {
+    stubForm();
+    stubHistory();
+
+    mockMvc
+        .perform(get("/admin/settings/patch-change").with(admin()))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("exceptionTargets", List.of(WipeExceptionTarget.values())))
+        .andExpect(model().attribute("exceptionModes", List.of(WipeExceptionMode.values())))
+        .andExpect(model().attribute("exceptionLimit", PatchChangeOptions.MAX_WIPE_EXCEPTIONS));
+
+    assertThat(renderPage())
+        .contains("data-pc-group=\"CONSUMABLES\"")
+        .contains("Katalogtypen")
+        .contains(">Typ Food<")
+        .contains(">Typ:Untertyp WeaponAttachment:Magazine<")
+        .contains("data-pc-group-rows")
+        .contains("data-pc-group-members")
+        .contains("data-pc-exceptions")
+        .contains("data-limit=\"100\"")
+        .contains("id=\"pc-exception-target\"")
+        .containsPattern("id=\"pc-exception-item\"[^>]*data-krt-combobox=\"remote-game-items\"")
+        .containsPattern("id=\"pc-exception-material\"[^>]*data-krt-combobox=\"remote-materials\"")
+        .contains("zusätzlich löschen")
+        .contains("Ausnahme hinzufügen")
+        .contains("data-count-kind=\"STOCK_ROWS_WIPED\"")
+        .contains("Lagerposten gelöscht")
+        .doesNotContain("??admin.patchChange");
+  }
+
+  @Test
   void thePageSitsUnderTheDangerZoneTabAndJoinsThePatchChangeRoom() throws Exception {
     stubForm();
     stubHistory();
@@ -259,6 +315,7 @@ class AdminPatchChangePageControllerMvcTest {
         .contains("Raffinerieaufträge storniert: 1.284")
         .contains(">Verbrauchsgüter<")
         .contains("Währungs-Wipe")
+        .contains("Quantanium: behalten")
         .contains("data-pc-correct")
         .contains("Bezeichnung korrigieren")
         .contains("id=\"pc-correct-modal\"")
@@ -346,6 +403,7 @@ class AdminPatchChangePageControllerMvcTest {
                 null,
                 null,
                 List.of(new PatchChangeFormDto.Preset(PatchKind.REBUILD, REBUILD)),
+                List.of(),
                 List.of()));
     when(backendApiClient.get(eq(HISTORY), anyTypeRef())).thenReturn(List.of());
 

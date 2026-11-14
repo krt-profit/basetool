@@ -198,7 +198,16 @@ The receiving unit declines a pledge with a reason code (`WRONG_ITEM`, `NOT_NEED
 `QUALITY_TOO_LOW`, `DONOR_ABSENT`, `OTHER`); the donor withdraws an unreceived pledge. Both release the
 earmark.
 
-**Enforced by:** `SupplyDonationServiceTest` · **Code:** `supply/internal/SupplyDonationService`
+A patch change's wipe withdraws every pledge earmarked on a row it deletes
+([REQ-PATCH-013](patch-change.md#req-patch-013--what-depends-on-a-wiped-row-goes-with-it)): the
+pledge is withdrawn as its donor would withdraw it, with the usual notice, and keeps the patch
+change as its reason (`supply_donation.withdrawn_by_patch_change`, V423), which only a withdrawn
+donation holds; the earmark goes with the row. The supply trail records one summary event per
+trigger (`DONATIONS_WITHDRAWN_BY_PATCH`).
+
+**Enforced by:** `SupplyDonationServiceTest`, `SupplyPatchWipeServiceTest`,
+`PatchChangeWipeIntegrationTest` · **Code:** `supply/internal/SupplyDonationService`,
+`supply/internal/SupplyPatchWipeService`
 
 ### REQ-SUP-011 — Recorded donation
 

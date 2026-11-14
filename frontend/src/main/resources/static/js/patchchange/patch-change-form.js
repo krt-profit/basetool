@@ -25,6 +25,7 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
 import { initHomeLocations } from '/js/patchchange/patch-change-home-locations.js';
 import { format, localTime, readCountLabels } from '/js/patchchange/patch-change-messages.js';
+import { initWipeSection } from '/js/patchchange/patch-change-wipe.js';
 
 /** The page's path, also the base of its relay endpoints. */
 const BASE = '/admin/settings/patch-change';
@@ -138,9 +139,10 @@ function readForm() {
 }
 
 /**
- * Installs the patch-change form: the kind presets, the preview refreshed on every change, the
- * typed confirmation and the trigger, after which the history re-renders and the form starts over
- * from fresh defaults (REQ-PATCH-005, REQ-PATCH-008).
+ * Installs the patch-change form: the kind presets, the wipe section with its exceptions, the
+ * preview refreshed on every change, the typed confirmation and the trigger, after which the
+ * history re-renders and the form starts over from fresh defaults (REQ-PATCH-005, REQ-PATCH-008,
+ * REQ-PATCH-016).
  *
  * @param {KrtPageSections} sections the page's section seam
  * @param {PatchChangeMessages} i18n the page's localized strings
@@ -162,6 +164,7 @@ export function initPatchChangeForm(sections, i18n) {
 function wireForm(el, sections, i18n) {
     const countLabels = readCountLabels();
     const homeLocations = initHomeLocations(el.form, i18n);
+    const wipe = initWipeSection(el.form, i18n, runPreview);
     let previewSeq = 0;
     /** @type {number | null} */
     let previewTimer = null;
@@ -183,6 +186,7 @@ function wireForm(el, sections, i18n) {
             wipeGroups: inputs('wipeGroup')
                 .filter((group) => group.checked)
                 .map((group) => group.value),
+            wipeExceptions: wipe.exceptions(),
         };
         OPTION_NAMES.forEach((name) => {
             result[name] = inputs(name).some((option) => option.checked);
@@ -315,6 +319,7 @@ function wireForm(el, sections, i18n) {
             onSuccess(/** @type {ApiDto<'PatchChangePreviewDto'> | null} */ body) {
                 if (seq === previewSeq) {
                     showCounts(body && body.counts ? body.counts : []);
+                    wipe.showPreview(body ? body.wipe : null);
                 }
             },
             onError(_status, /** @type {ApiProblem | null} */ problem) {
@@ -349,6 +354,7 @@ function wireForm(el, sections, i18n) {
     function resetForm() {
         return readForm().then((fresh) => {
             el.form.reset();
+            wipe.clear();
             el.liveAt.value = localNow();
             el.label.value = fresh && fresh.suggestedLabel ? fresh.suggestedLabel : '';
             if (fresh) {
@@ -419,7 +425,12 @@ function wireForm(el, sections, i18n) {
     });
     el.form.addEventListener('change', (event) => {
         const target = event.target;
-        if (!(target instanceof HTMLInputElement) || target === el.label || target === el.confirm) {
+        if (
+            !(target instanceof HTMLInputElement) ||
+            target === el.label ||
+            target === el.confirm ||
+            target.closest('[data-pc-exceptions]')
+        ) {
             return;
         }
         if (target.name === 'kind') {

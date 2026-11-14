@@ -47,6 +47,8 @@ public class PatchChangeTrigger {
 
   private final PatchChangeRepository repository;
   private final PatchChangeEffects effects;
+  private final WipePreview wipePreview;
+  private final WipeExceptionCatalogue exceptionCatalogue;
   private final PatchChangeHistory history;
   private final PatchChangeLiveSync liveSync;
   private final AuditRecorder auditRecorder;
@@ -57,9 +59,9 @@ public class PatchChangeTrigger {
    * Counts what a patch change would touch now, only from what its live time selects.
    *
    * @param request the live time and options under preview
-   * @return the counts of every enabled effect
+   * @return the counts of every enabled effect and what each wipe group and exception would touch
    * @throws BadRequestException when the live time lies after now or not after the previous patch
-   *     change's
+   *     change's, or a wipe exception names an unknown entry or an entry twice
    */
   @Transactional(readOnly = true)
   public @NotNull PatchChangePreviewDto preview(@NotNull PatchChangePreviewRequest request) {
@@ -68,8 +70,10 @@ public class PatchChangeTrigger {
             request.liveAt(),
             Instant.now(),
             repository.findFirstByOrderByLiveAtDesc().orElse(null));
-    PatchCounts counts = effects.preview(new PatchChangePlan(liveAt, request.options()));
-    return new PatchChangePreviewDto(liveAt, counts.toDtos());
+    exceptionCatalogue.requireKnown(request.options().wipeExceptions());
+    PatchChangePlan plan = new PatchChangePlan(liveAt, request.options());
+    PatchCounts counts = effects.preview(plan);
+    return new PatchChangePreviewDto(liveAt, counts.toDtos(), wipePreview.breakdown(plan));
   }
 
   /**
@@ -78,8 +82,8 @@ public class PatchChangeTrigger {
    * @param request the label, kind, live time, options and the typed confirmation
    * @return the recorded patch change as its history row
    * @throws BadRequestException when the label is malformed or not higher than the previous one,
-   *     the confirmation differs from the label, or the live time lies after now or not after the
-   *     previous patch change's
+   *     the confirmation differs from the label, the live time lies after now or not after the
+   *     previous patch change's, or a wipe exception names an unknown entry or an entry twice
    */
   public @NotNull PatchChangeDto trigger(@NotNull TriggerPatchChangeRequest request) {
     PatchLabel label = PatchLabel.parse(request.label());
@@ -111,6 +115,7 @@ public class PatchChangeTrigger {
     Instant now = Instant.now();
     Instant liveAt = PatchChangeRules.requireLiveAt(request.liveAt(), now, previous);
     PatchChangeRules.requireLabelAfter(label, previous);
+    exceptionCatalogue.requireKnown(request.options().wipeExceptions());
     PatchChangePlan plan = new PatchChangePlan(liveAt, request.options());
     PatchChange record =
         repository.save(
@@ -144,6 +149,7 @@ public class PatchChangeTrigger {
                     .sorted()
                     .map(Enum::name)
                     .collect(Collectors.joining("+")))
+            .with("wipeExceptions", options.wipeExceptions().size())
             .with("refinery", options.cancelRefineryOrders())
             .with("currency", options.currencyWipe())
             .with("homeLocation", options.homeLocationPrompt());

@@ -44,6 +44,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
@@ -97,7 +98,7 @@ public class InventoryOrderWrites {
     }
     plan.stockPhase = true;
     assertOrders(orders);
-    observer.assertOrderLinkedMaterialWrite(
+    assertMaterialScopes(
         row.getMaterial() == null
             ? List.of()
             : orders.stream()
@@ -243,7 +244,7 @@ public class InventoryOrderWrites {
       plan.restorationRows.addAll(rowIds);
     }
     observedScopes(rowIds, requiredScopes);
-    observer.assertOrderLinkedMaterialWrite(List.of());
+    assertMaterialScopes(List.of());
     plan.restorationClosed = true;
     if (initial) {
       plan.restorationEvidence.addAll(evidence);
@@ -293,7 +294,7 @@ public class InventoryOrderWrites {
   void assertObservedTargets(
       Collection<UUID> orderIds, Collection<OrderMaterialScope> materialScopes) {
     assertOrders(orderIds);
-    observer.assertOrderLinkedMaterialWrite(materialScopes);
+    assertMaterialScopes(materialScopes);
   }
 
   /** Requests the complete initial scope union or validates a held subset after closure. */
@@ -567,7 +568,7 @@ public class InventoryOrderWrites {
       throw new de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException(
           "error.inventory.concurrent_scope_changed");
     }
-    observer.assertOrderLinkedMaterialWrite(List.of());
+    assertMaterialScopes(List.of());
     plan.stockPhase = true;
     for (long key : new TreeSet<>(lotKeys)) {
       if (plan.lots.add(key)) {
@@ -692,11 +693,18 @@ public class InventoryOrderWrites {
                             allocation.order(), Objects.requireNonNull(row.material()))))
             .distinct()
             .toList();
-    visitBatches(scopes, observer::assertOrderLinkedMaterialWrite);
+    visitBatches(scopes, this::assertMaterialScopes);
   }
 
-  private static <T> List<T> readBatches(
-      Collection<UUID> ids, Function<Collection<UUID>, List<T>> query) {
+  /**
+   * Runs an {@code IN}-list query over any number of ids, one query's worth at a time.
+   *
+   * @param ids the ids
+   * @param query the query over one batch
+   * @param <T> the result type
+   * @return the results of every batch, in batch order
+   */
+  static <T> List<T> readBatches(Collection<UUID> ids, Function<Collection<UUID>, List<T>> query) {
     if (ids.size() <= MAX_IDS_PER_QUERY) {
       return query.apply(ids);
     }
@@ -756,15 +764,22 @@ public class InventoryOrderWrites {
   }
 
   private Planning planning() {
+    return currentPlanning()
+        .orElseGet(() -> {
+          Planning current = new Planning(this);
+          TransactionSynchronizationManager.registerSynchronization(current);
+          return current;
+        });
+  }
+
+  private static Optional<Planning> currentPlanning() {
     for (TransactionSynchronization synchronization :
         TransactionSynchronizationManager.getSynchronizations()) {
       if (synchronization instanceof Planning current) {
-        return current;
+        return Optional.of(current);
       }
     }
-    Planning current = new Planning(this);
-    TransactionSynchronizationManager.registerSynchronization(current);
-    return current;
+    return Optional.empty();
   }
 
   /** A current allocation fact independent of managed entity collection state. */
@@ -812,6 +827,7 @@ public class InventoryOrderWrites {
     private final Set<InventoryItem> created = Collections.newSetFromMap(new IdentityHashMap<>());
     private boolean stockPhase;
     private boolean restorationClosed;
+    private boolean gameFactLoss;
 
     @Override
     public int getOrder() {
@@ -876,6 +892,54 @@ public class InventoryOrderWrites {
    * @param orderIds the affected target orders
    */
   public void assertOrders(@NotNull Collection<UUID> orderIds) {
-    visitBatches(orderIds, observer::beforeOrderLinkedStockWrite);
+    boolean gameFact = gameFactLoss();
+    visitBatches(
+        orderIds,
+        gameFact ? observer::beforeGameFactStockLoss : observer::beforeOrderLinkedStockWrite);
+  }
+
+  /**
+   * Runs a stock loss the game imposed, a patch change's wipe, which REQ-ORDERS-055 excepts from
+   * the responsibility check (REQ-PATCH-014, ADR-0382): every hierarchy, material, lot and row lock
+   * is taken as for any stock write, but an earmarked order with invalid responsibility does not
+   * refuse the action.
+   *
+   * @param action the stock action, run inside the caller's transaction
+   * @param <T> the action's result
+   * @return what the action returned
+   */
+  <T> T duringGameFactLoss(@NotNull Supplier<T> action) {
+    Planning plan = planning();
+    boolean outer = plan.gameFactLoss;
+    plan.gameFactLoss = true;
+    try {
+      return action.get();
+    } finally {
+      plan.gameFactLoss = outer;
+    }
+  }
+
+  /**
+   * Rejects unplanned material scopes after stock locks, with the responsibility check unless the
+   * action is a game-fact loss.
+   *
+   * @param scopes the actual material scopes
+   */
+  private void assertMaterialScopes(@NotNull Collection<OrderMaterialScope> scopes) {
+    if (gameFactLoss()) {
+      observer.assertGameFactMaterialLoss(scopes);
+    } else {
+      observer.assertOrderLinkedMaterialWrite(scopes);
+    }
+  }
+
+  /**
+   * Tells whether the running transaction's stock plan is a game-fact loss, without registering a
+   * plan.
+   *
+   * @return {@code true} inside {@link #duringGameFactLoss}
+   */
+  private static boolean gameFactLoss() {
+    return currentPlanning().map(plan -> plan.gameFactLoss).orElse(false);
   }
 }

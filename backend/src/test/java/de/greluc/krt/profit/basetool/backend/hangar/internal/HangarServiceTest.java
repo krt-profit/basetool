@@ -104,9 +104,9 @@ class HangarServiceTest {
             userRepository,
             shipTypeRepository,
             locationRepository,
-            shipDeletionObserver,
+            new HangarShipRemoval(
+                shipDeletionObserver, entityManager, shipRepository, unitLiveSync),
             shipTypeMapper,
-            entityManager,
             requestScopeResolver,
             accessGateService,
             orgUnitStampingService,

@@ -259,7 +259,8 @@
       "patchchange/patch-change-history.js",
       "patchchange/patch-change-home-locations.js",
       "patchchange/patch-change-messages.js",
-      "patchchange/patch-change-phase.js"
+      "patchchange/patch-change-phase.js",
+      "patchchange/patch-change-wipe.js"
     ],
     "personalinventory": [
       "personalinventory/admin-personal-blueprints-purge.js",

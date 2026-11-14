@@ -63,7 +63,7 @@ class PatchChangeBackendClientTest {
       new PatchChangeOptions(Set.of(WipeGroup.CONSUMABLES), true, false, true);
 
   private static final String OPTIONS_JSON =
-      "{\"wipeGroups\":[\"CONSUMABLES\"],\"cancelRefineryOrders\":true,"
+      "{\"wipeGroups\":[\"CONSUMABLES\"],\"wipeExceptions\":[],\"cancelRefineryOrders\":true,"
           + "\"currencyWipe\":false,\"homeLocationPrompt\":true}";
 
   private static final UUID MEMBER = UUID.fromString("3e3be3be-0000-4000-8000-000000000007");
@@ -143,6 +143,7 @@ class PatchChangeBackendClientTest {
                 Instant.parse("2026-11-14T21:12:00Z"),
                 "Admin",
                 REBUILD,
+                List.of(),
                 List.of(
                     new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 24L),
                     new PatchCountDto(PatchCount.MEMBERS_ASKED, 87L)),
@@ -173,7 +174,9 @@ class PatchChangeBackendClientTest {
     assertThat(preview)
         .isEqualTo(
             new PatchChangePreviewDto(
-                LIVE_AT, List.of(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 3L))));
+                LIVE_AT,
+                List.of(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 3L)),
+                null));
     assertThat(triggered).isNotNull();
     assertThat(triggered.label()).isEqualTo("4.5");
     backend.expect(

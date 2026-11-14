@@ -39,6 +39,14 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
  * @property {string} phaseEndError the fallback error of a phase end
  * @property {string} homeLocations the curated home locations, `{0}` their names
  * @property {string} homeLocationsNone the hint while no home location is curated
+ * @property {string} exceptionChip a wipe exception's chip, `{0}` the entry, `{1}` the mode
+ * @property {string} exceptionRows the rows a wipe exception touches, `{0}` the count
+ * @property {string} exceptionRemove the label of a chip's remove action, `{0}` the chip
+ * @property {string} exceptionPick the hint when no entry is chosen for an exception
+ * @property {string} exceptionDuplicate the hint when the entry already has an exception
+ * @property {string} exceptionLimit the hint at the most exceptions, `{0}` the limit
+ * @property {string} exceptionKeep the mode label of a keeping exception
+ * @property {string} exceptionWipe the mode label of a wiping exception
  */
 
 /**
@@ -66,6 +74,14 @@ export function readMessages() {
         phaseEndError: krtI18nText(data.phaseEndError, 'data-phase-end-error'),
         homeLocations: krtI18nText(data.homeLocations, 'data-home-locations'),
         homeLocationsNone: krtI18nText(data.homeLocationsNone, 'data-home-locations-none'),
+        exceptionChip: krtI18nText(data.exceptionChip, 'data-exception-chip'),
+        exceptionRows: krtI18nText(data.exceptionRows, 'data-exception-rows'),
+        exceptionRemove: krtI18nText(data.exceptionRemove, 'data-exception-remove'),
+        exceptionPick: krtI18nText(data.exceptionPick, 'data-exception-pick'),
+        exceptionDuplicate: krtI18nText(data.exceptionDuplicate, 'data-exception-duplicate'),
+        exceptionLimit: krtI18nText(data.exceptionLimit, 'data-exception-limit'),
+        exceptionKeep: krtI18nText(data.exceptionKeep, 'data-exception-keep'),
+        exceptionWipe: krtI18nText(data.exceptionWipe, 'data-exception-wipe'),
     };
 }
 

@@ -127,7 +127,7 @@ class PatchChangeTriggerIntegrationTest {
     assertThat(recorded.counts())
         .contains(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 2))
         .extracting(PatchCountDto::kind)
-        .containsExactly(PatchCount.REFINERY_ORDERS_CANCELED, PatchCount.MEMBERS_ASKED);
+        .contains(PatchCount.MEMBERS_ASKED);
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.CANCELED);
     assertThat(statusOf(runningWithoutStart)).isEqualTo(RefineryOrderStatus.CANCELED);
     assertThat(statusOf(openAfter)).isEqualTo(RefineryOrderStatus.OPEN);
@@ -187,8 +187,7 @@ class PatchChangeTriggerIntegrationTest {
   @Test
   void anOptionSwitchedOffLeavesItsAreaAlone() {
     UUID openBefore = persistOrder(RefineryOrderStatus.OPEN, BEFORE);
-    PatchChangeOptions withoutRefinery =
-        new PatchChangeOptions(Set.of(WipeGroup.CONSUMABLES), false, false, true);
+    PatchChangeOptions withoutRefinery = new PatchChangeOptions(Set.of(), false, false, true);
 
     PatchChangeDto recorded =
         trigger.trigger(
@@ -246,7 +245,7 @@ class PatchChangeTriggerIntegrationTest {
     assertThat(preview.counts())
         .contains(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 1))
         .extracting(PatchCountDto::kind)
-        .containsExactly(PatchCount.REFINERY_ORDERS_CANCELED, PatchCount.MEMBERS_ASKED);
+        .contains(PatchCount.MEMBERS_ASKED);
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.OPEN);
     assertThat(history.history()).isEmpty();
   }

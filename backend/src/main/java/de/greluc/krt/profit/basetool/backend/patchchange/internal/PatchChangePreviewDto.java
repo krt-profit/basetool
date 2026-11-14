@@ -30,6 +30,9 @@ import org.jetbrains.annotations.Unmodifiable;
  *
  * @param liveAt the live time the counts are taken at
  * @param counts one entry per kind an enabled effect reports
+ * @param wipe what each wipe group and each exception would touch, selected or not
  */
 public record PatchChangePreviewDto(
-    @NotNull Instant liveAt, @NotNull @Unmodifiable List<PatchCountDto> counts) {}
+    @NotNull Instant liveAt,
+    @NotNull @Unmodifiable List<PatchCountDto> counts,
+    @NotNull WipePreviewDto wipe) {}

@@ -109,6 +109,12 @@ public enum AuditEventType {
   INVENTORY_BULK_REBOOKED(AuditDomain.INVENTORY),
   /** The admin emptied the whole (scoped) global warehouse — one summarizing event. */
   INVENTORY_WIPED(AuditDomain.INVENTORY),
+  /**
+   * A patch change wiped the stock rows created before its live time — one summary event per
+   * trigger with the rows per wipe group and the members affected; the subject is the patch change
+   * (REQ-PATCH-017).
+   */
+  INVENTORY_WIPED_BY_PATCH(AuditDomain.INVENTORY),
   /** A new inventory row was created from refinery output (cross-domain store). */
   INVENTORY_RECEIVED_FROM_REFINERY(AuditDomain.INVENTORY),
   /**
@@ -227,6 +233,11 @@ public enum AuditEventType {
   JOB_ORDER_MATERIAL_UNLINKED(AuditDomain.JOB_ORDER),
   /** A single inventory row was detached from a job order. */
   JOB_ORDER_INVENTORY_UNLINKED(AuditDomain.JOB_ORDER),
+  /**
+   * A patch change wiped stock earmarked for job orders — one summary event per trigger with the
+   * number of orders affected; the subject is the patch change (REQ-PATCH-017).
+   */
+  JOB_ORDERS_STOCK_WIPED_BY_PATCH(AuditDomain.JOB_ORDER),
   /** A material handover was recorded against a job order. */
   JOB_ORDER_HANDOVER_CREATED(AuditDomain.JOB_ORDER),
   /** An item handover was recorded against a job order. */
@@ -511,6 +522,11 @@ public enum AuditEventType {
   MARKET_OFFER_REDUCED(AuditDomain.MARKET),
   /** A stock book-out emptied the row an offer stood on, and the offer went with it. */
   MARKET_OFFER_REMOVED(AuditDomain.MARKET),
+  /**
+   * A patch change wiped the stock the active offers stood on, and the offers ended — one summary
+   * event per trigger with the count; the subject is the patch change (REQ-PATCH-017).
+   */
+  MARKET_OFFERS_ENDED_BY_PATCH(AuditDomain.MARKET),
   /** An offer's trade remark was edited by its owner. */
   MARKET_REMARK_UPDATED(AuditDomain.MARKET),
   /** A member registered interest in an offer ("Interesse anmelden"). */
@@ -547,6 +563,11 @@ public enum AuditEventType {
   HANGAR_SHIP_DELETED(AuditDomain.HANGAR),
   /** A member emptied their own hangar in one go. */
   HANGAR_EMPTIED(AuditDomain.HANGAR),
+  /**
+   * A patch change deleted the in-game ships created before its live time — one summary event per
+   * trigger with the ships and owners; the subject is the patch change (REQ-PATCH-017).
+   */
+  HANGAR_SHIPS_WIPED_BY_PATCH(AuditDomain.HANGAR),
   /** A hangar or Fleetview export was imported and created ships. */
   HANGAR_IMPORTED(AuditDomain.HANGAR),
   /** The fitted flag was cleared on every ship in the caller's scope. */
@@ -655,6 +676,11 @@ public enum AuditEventType {
   DONATION_DECLINED(AuditDomain.SUPPLY),
   /** A donor withdrew a pledge (REQ-SUP-010). */
   DONATION_WITHDRAWN(AuditDomain.SUPPLY),
+  /**
+   * A patch change wiped the stock pledges were earmarked on, and the pledges were withdrawn — one
+   * summary event per trigger with the count; the subject is the patch change (REQ-PATCH-017).
+   */
+  DONATIONS_WITHDRAWN_BY_PATCH(AuditDomain.SUPPLY),
   /** A receiving unit recorded a donation it already received (REQ-SUP-011). */
   DONATION_RECORDED(AuditDomain.SUPPLY),
   /** An admin changed what an org unit does in the supply module (REQ-SUP-002). */

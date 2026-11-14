@@ -24,8 +24,20 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
  * adds the kinds it reports; the admin page shows one tile per kind.
  */
 public enum PatchCount {
+  /** Stock rows created before the live time that the wipe removes (REQ-PATCH-012). */
+  STOCK_ROWS_WIPED,
+  /** In-game ships created before the live time that the wipe removes (REQ-PATCH-015). */
+  IN_GAME_SHIPS_WIPED,
+  /** Members who hold a stock row the wipe removes (REQ-PATCH-016). */
+  STOCK_MEMBERS_AFFECTED,
   /** Refinery orders started before the live time that end as cancelled. */
   REFINERY_ORDERS_CANCELED,
+  /** Job orders with an earmark on a stock row the wipe removes (REQ-PATCH-013). */
+  JOB_ORDERS_AFFECTED,
+  /** Materialbörse offers that end because the wipe removes their stock (REQ-PATCH-013). */
+  MARKET_OFFERS_ENDED,
+  /** Donation pledges withdrawn because the wipe removes their stock (REQ-PATCH-013). */
+  DONATIONS_WITHDRAWN,
   /** The sum of the Kartellbank's account balances as of the live time, in whole aUEC. */
   BANK_RESET_TOTAL,
   /** Pending Kartellbank requests submitted before the live time that end as cancelled. */

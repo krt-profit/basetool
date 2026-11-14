@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 import org.jetbrains.annotations.NotNull;
@@ -33,6 +34,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param previousLiveAt the latest patch change's live time, the earliest a new live time may
  *     follow, or {@code null} before the first
  * @param presets the options each patch kind presets
+ * @param groups the catalogue types each wipe group claims, in the groups' declaration order
  * @param homeLocations the curated home locations a home-location phase would offer; empty when
  *     none is curated, which the form warns about (REQ-PATCH-021)
  */
@@ -41,6 +43,7 @@ public record PatchChangeFormDto(
     @Nullable String previousLabel,
     @Nullable Instant previousLiveAt,
     @NotNull @Unmodifiable List<Preset> presets,
+    @NotNull @Unmodifiable List<Group> groups,
     @NotNull @Unmodifiable List<HomeLocationOptionDto> homeLocations) {
 
   /**
@@ -50,4 +53,13 @@ public record PatchChangeFormDto(
    * @param options its preset
    */
   public record Preset(@NotNull PatchKind kind, @NotNull PatchChangeOptions options) {}
+
+  /**
+   * The catalogue types a wipe group claims (REQ-PATCH-010).
+   *
+   * @param group the wipe group
+   * @param types its types; none for the other items, which take what no group claims
+   */
+  @Schema(name = "PatchWipeGroupTypes")
+  public record Group(@NotNull WipeGroup group, @NotNull @Unmodifiable List<WipeGroupType> types) {}
 }

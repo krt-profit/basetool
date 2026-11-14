@@ -312,6 +312,18 @@ public interface MaterialExchangeOfferRepository
   }
 
   /**
+   * Deletes the given offers in one statement; the interest registered on them cascades.
+   *
+   * @param ids the offers, a {@code uuid[]} literal ({@link UuidArrayLiteral})
+   * @return the number of offers deleted
+   */
+  @Modifying
+  @Query(
+      value = "DELETE FROM material_exchange_offer WHERE id = ANY(CAST(:ids AS UUID[]))",
+      nativeQuery = true)
+  int deleteByIdArray(@Param("ids") String ids);
+
+  /**
    * Returns which of the given Lager rows back an offer of any status, read after the rows are
    * locked so a release committed while the caller waited is seen (REQ-INV-026).
    *

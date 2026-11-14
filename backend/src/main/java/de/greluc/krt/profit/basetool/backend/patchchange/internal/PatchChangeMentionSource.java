@@ -44,6 +44,7 @@ public class PatchChangeMentionSource implements PersonMentionSource {
         "patch_change",
         "patch_change_effect_count",
         "patch_change_relocation",
+        "patch_change_wipe_exception",
         "patch_change_wipe_group");
   }
 }

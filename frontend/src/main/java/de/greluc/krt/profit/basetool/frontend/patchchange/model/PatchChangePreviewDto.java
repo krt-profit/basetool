@@ -28,6 +28,8 @@ import java.util.List;
  *
  * @param liveAt the live time the counts select by
  * @param counts the counts of every enabled effect, one entry per kind
+ * @param wipe what each wipe group and each exception would touch, selected or not
  */
 @DtoMirror
-public record PatchChangePreviewDto(Instant liveAt, List<PatchCountDto> counts) {}
+public record PatchChangePreviewDto(
+    Instant liveAt, List<PatchCountDto> counts, WipePreviewDto wipe) {}

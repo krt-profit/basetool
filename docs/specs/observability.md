@@ -2104,6 +2104,10 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   is excluded from `AuditDomainSilenceAnomaly` too: patch changes come a few times a year
   (`audit_domain_silence_alerts_14_silent_patch_change_is_exempt_test.yml`). The existing
   `basetool_audit_events_total{domain}` counts the domain without a new metric.
+  A patch change's wipe ([REQ-PATCH-017](patch-change.md#req-patch-017--one-summary-event-per-affected-area))
+  adds no metric either: its summary events count under their areas' domains, the pledges it
+  withdraws count once each in `basetool_supply_donations_total{status="WITHDRAWN"}`, and the
+  DB-sampled gauges (open pledges, active offers, stock levels below minimum) see its deletes.
 - `basetool_patch_change_relocations_pending` gauge, sampled by the patch-change module's
   `BusinessGaugeSource` (`PatchChangeBusinessGauges`): the members still to relocate in the open
   home-location phase, `0` while none is open

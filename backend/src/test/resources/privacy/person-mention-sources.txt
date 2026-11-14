@@ -335,6 +335,7 @@ exempt-table|p4k_review_case
 exempt-table|patch_change
 exempt-table|patch_change_effect_count
 exempt-table|patch_change_relocation
+exempt-table|patch_change_wipe_exception
 exempt-table|patch_change_wipe_group
 exempt-table|planet
 exempt-table|poi

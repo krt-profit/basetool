@@ -34,6 +34,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -92,6 +93,14 @@ public class PatchChange extends AbstractEntity<UUID> {
   @Column(name = "wipe_group", nullable = false, length = 32)
   @Getter(AccessLevel.NONE)
   private Set<WipeGroup> wipeGroups = EnumSet.noneOf(WipeGroup.class);
+
+  /** The single game items and materials kept or wiped beside the groups. */
+  @ElementCollection
+  @CollectionTable(
+      name = "patch_change_wipe_exception",
+      joinColumns = @JoinColumn(name = "patch_change_id"))
+  @Getter(AccessLevel.NONE)
+  private Set<WipeException> wipeExceptions = new HashSet<>();
 
   /** Whether running refinery orders started before the live time end. */
   @Column(name = "cancel_refinery_orders", nullable = false, updatable = false)
@@ -157,6 +166,7 @@ public class PatchChange extends AbstractEntity<UUID> {
         options.wipeGroups().isEmpty()
             ? EnumSet.noneOf(WipeGroup.class)
             : EnumSet.copyOf(options.wipeGroups());
+    this.wipeExceptions = new HashSet<>(options.wipeExceptions());
     this.cancelRefineryOrders = options.cancelRefineryOrders();
     this.currencyWipe = options.currencyWipe();
     this.homeLocationPrompt = options.homeLocationPrompt();
@@ -180,7 +190,7 @@ public class PatchChange extends AbstractEntity<UUID> {
    */
   public @NotNull PatchChangeOptions options() {
     return new PatchChangeOptions(
-        wipeGroups, cancelRefineryOrders, currencyWipe, homeLocationPrompt);
+        wipeGroups, wipeExceptions, cancelRefineryOrders, currencyWipe, homeLocationPrompt);
   }
 
   /**
