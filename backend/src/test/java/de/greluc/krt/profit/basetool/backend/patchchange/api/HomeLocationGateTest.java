@@ -53,6 +53,7 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -134,6 +135,30 @@ class HomeLocationGateTest {
     assertThat(invoke(HomeLocationGate.STATUS_PATH).getStatus()).isEqualTo(200);
     assertThat(invoke("/api/v1/terms/status").getStatus()).isEqualTo(200);
     assertThat(invoke("/api/v1/users/me").getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  void leavesThePhaseRecoveryOpenToAPendingAdminOnly() throws Exception {
+    when(gateCheck.mustChoose(USER_ID)).thenReturn(true);
+    String phaseEnd = "/api/v1/patch-changes/admin/" + UUID.randomUUID() + "/phase-end";
+    String location = "/api/v1/locations/" + UUID.randomUUID();
+
+    assertThat(invoke(phaseEnd).getStatus()).isEqualTo(403);
+    assertThat(invoke(location).getStatus()).isEqualTo(403);
+
+    Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").subject(USER_ID.toString()).build();
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+    assertThat(invoke(phaseEnd).getStatus()).isEqualTo(200);
+    assertThat(invoke("/api/v1/patch-changes/admin").getStatus()).isEqualTo(200);
+    assertThat(invoke(location).getStatus()).isEqualTo(200);
+    assertThat(invoke("/api/v1/locations").getStatus()).isEqualTo(200);
+    assertThat(invoke("/api/v1/missions").getStatus()).isEqualTo(403);
+    assertThat(
+            invoke("/api/v1/patch-changes/admin/members/" + UUID.randomUUID() + "/home-location")
+                .getStatus())
+        .isEqualTo(403);
   }
 
   @Test

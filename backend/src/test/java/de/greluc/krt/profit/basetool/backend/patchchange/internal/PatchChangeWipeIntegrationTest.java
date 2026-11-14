@@ -97,6 +97,7 @@ class PatchChangeWipeIntegrationTest {
   private UUID gold;
   private UUID ration;
   private UUID rifle;
+  private UUID home;
 
   @BeforeEach
   void setUp() {
@@ -113,6 +114,7 @@ class PatchChangeWipeIntegrationTest {
     units.add(unit);
     location = UUID.randomUUID();
     TestPlaces.insertLocation(jdbc, location, "Wipe station " + location);
+    home = TestPlaces.insertHomeLocation(jdbc, "Wipe home " + UUID.randomUUID());
     shipType = UUID.randomUUID();
     jdbc.update("INSERT INTO ship_type (id, name) VALUES (?, ?)", shipType, "Wiper " + shipType);
     shipTypes.add(shipType);
@@ -136,6 +138,7 @@ class PatchChangeWipeIntegrationTest {
   void tearDown() {
     SecurityContextHolder.clearContext();
     jdbc.update("DELETE FROM patch_change");
+    TestPlaces.deleteLocation(jdbc, home);
     for (UUID mission : missions) {
       jdbc.update("DELETE FROM mission_unit WHERE mission_id = ?", mission);
       jdbc.update("DELETE FROM mission WHERE id = ?", mission);

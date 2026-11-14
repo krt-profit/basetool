@@ -428,6 +428,7 @@ public final class ExchangeSeam {
           "BANK_OPEN_REQUEST_CAP",
           "HOME_LOCATION_NOT_ASKED",
           "HOME_LOCATION_ALREADY_CHOSEN",
+          "HOME_LOCATION_PHASE_CHANGED",
           "HOME_LOCATION_NOT_OFFERED");
 
   /** The backend-wide codes the gateway translates into a code of the exchange registry. */

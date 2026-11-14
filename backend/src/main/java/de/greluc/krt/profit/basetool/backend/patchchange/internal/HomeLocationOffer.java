@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.LocationRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationChoiceRefusedException;
 import java.util.Comparator;
 import java.util.List;
@@ -55,6 +56,19 @@ class HomeLocationOffer {
         .map(HomeLocationOffer::toOption)
         .sorted(Comparator.comparing(HomeLocationOptionDto::name, String.CASE_INSENSITIVE_ORDER))
         .toList();
+  }
+
+  /**
+   * Refuses a home-location prompt that would offer nothing to choose (REQ-PATCH-063).
+   *
+   * @throws BadRequestException {@code error.patch_change.no_home_location_offered} when no curated
+   *     home location is on offer
+   */
+  @Transactional(readOnly = true)
+  void requireAnyOffered() {
+    if (curated().isEmpty()) {
+      throw new BadRequestException("error.patch_change.no_home_location_offered");
+    }
   }
 
   /**

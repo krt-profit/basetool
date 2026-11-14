@@ -30,6 +30,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.identity.internal.MemberHomeLocationService;
 import de.greluc.krt.profit.basetool.backend.inventory.api.InventoryItemDto;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationDimension;
+import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryAllocationWriteDto;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemNoteUpdateRequest;
 import de.greluc.krt.profit.basetool.backend.inventory.internal.InventoryItemService;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
@@ -46,6 +48,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -55,12 +59,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Runs a home-location phase against PostgreSQL (REQ-PATCH-021…027): who is asked, the choice and
@@ -91,8 +100,10 @@ class HomeLocationRelocationIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
   @Autowired private RelocationLocks locks;
   @Autowired private MemberHomeLocationService preferences;
+  @Autowired private PlatformTransactionManager transactionManager;
 
   private final List<UUID> locations = new ArrayList<>();
+  private final List<UUID> missions = new ArrayList<>();
   private UUID admin;
   private UUID member;
   private UUID newcomer;
@@ -116,9 +127,9 @@ class HomeLocationRelocationIntegrationTest {
     material = UUID.randomUUID();
     jdbc.update(
         """
-        INSERT INTO material (id, name, type, quantity_type, is_manual_raw_material,
+        INSERT INTO material (id, version, name, type, quantity_type, is_manual_raw_material,
                               is_job_order, is_visible, source_systems)
-        VALUES (?, ?, 'NO_REFINE', 'SCU', false, false, true, 'UEX_ONLY')
+        VALUES (?, 0, ?, 'NO_REFINE', 'SCU', false, false, true, 'UEX_ONLY')
         """,
         material,
         "Reloc ore " + material);
@@ -139,6 +150,10 @@ class HomeLocationRelocationIntegrationTest {
   void tearDown() {
     SecurityContextHolder.clearContext();
     jdbc.update("DELETE FROM patch_change");
+    for (UUID mission : missions) {
+      jdbc.update("DELETE FROM inventory_item_mission_allocation WHERE mission_id = ?", mission);
+      jdbc.update("DELETE FROM mission WHERE id = ?", mission);
+    }
     List<UUID> users = List.of(admin, member, newcomer, logistician);
     for (UUID user : users) {
       jdbc.update("DELETE FROM inventory_item WHERE user_id = ?", user);
@@ -193,7 +208,8 @@ class HomeLocationRelocationIntegrationTest {
 
     long pendingBefore = phases.countPending();
     authenticate(member, false);
-    RelocationResultDto result = relocations.relocate(member, home, RelocationChooser.SELF);
+    RelocationResultDto result =
+        relocations.relocate(member, recorded.id(), home, RelocationChooser.SELF);
 
     assertThat(pendingBefore).isPositive();
     assertThat(phases.countPending()).isEqualTo(pendingBefore - 1);
@@ -232,7 +248,8 @@ class HomeLocationRelocationIntegrationTest {
     assertThat(done.state()).isEqualTo(MemberRelocationState.RELOCATED);
     assertThat(done.chosen()).isNotNull().extracting(HomeLocationOptionDto::id).isEqualTo(home);
 
-    assertThatThrownBy(() -> relocations.relocate(member, home, RelocationChooser.SELF))
+    assertThatThrownBy(
+            () -> relocations.relocate(member, recorded.id(), home, RelocationChooser.SELF))
         .isInstanceOfSatisfying(
             HomeLocationChoiceRefusedException.class,
             refused -> assertThat(refused.getReason()).isEqualTo(Reason.ALREADY_CHOSEN))
@@ -242,11 +259,12 @@ class HomeLocationRelocationIntegrationTest {
 
   @Test
   void anAccountYoungerThanTheLiveTimeIsNotAskedAndCannotChoose() {
-    trigger("0.1", LIVE_AT);
+    PatchChangeDto recorded = trigger("0.1", LIVE_AT);
 
     assertThat(phases.mustChoose(newcomer)).isFalse();
     assertThat(prompts.promptFor(newcomer).state()).isEqualTo(MemberRelocationState.NOT_ASKED);
-    assertThatThrownBy(() -> relocations.relocate(newcomer, home, RelocationChooser.SELF))
+    assertThatThrownBy(
+            () -> relocations.relocate(newcomer, recorded.id(), home, RelocationChooser.SELF))
         .isInstanceOfSatisfying(
             HomeLocationChoiceRefusedException.class,
             refused -> assertThat(refused.getReason()).isEqualTo(Reason.NOT_ASKED));
@@ -254,9 +272,10 @@ class HomeLocationRelocationIntegrationTest {
 
   @Test
   void onlyACuratedHomeLocationCanBeChosen() {
-    trigger("0.1", LIVE_AT);
+    PatchChangeDto recorded = trigger("0.1", LIVE_AT);
 
-    assertThatThrownBy(() -> relocations.relocate(member, port, RelocationChooser.SELF))
+    assertThatThrownBy(
+            () -> relocations.relocate(member, recorded.id(), port, RelocationChooser.SELF))
         .isInstanceOfSatisfying(
             HomeLocationChoiceRefusedException.class,
             refused -> assertThat(refused.getReason()).isEqualTo(Reason.NOT_OFFERED))
@@ -271,7 +290,7 @@ class HomeLocationRelocationIntegrationTest {
     UUID later = row(port, true, null, null);
     jdbc.update("UPDATE inventory_item SET created_at = now() WHERE id = ?", later);
     UUID lockedShip = ship(port, BEFORE);
-    trigger("0.1", LIVE_AT);
+    PatchChangeDto recorded = trigger("0.1", LIVE_AT);
 
     authenticate(logistician, false);
     assertThatThrownBy(() -> note(locked, logistician, true))
@@ -289,7 +308,7 @@ class HomeLocationRelocationIntegrationTest {
     authenticate(admin, true);
     note(locked, admin, true);
 
-    relocations.relocate(member, home, RelocationChooser.ADMIN);
+    relocations.relocate(member, recorded.id(), home, RelocationChooser.ADMIN);
     authenticate(logistician, false);
     note(locked, logistician, true);
     assertThat(
@@ -299,6 +318,92 @@ class HomeLocationRelocationIntegrationTest {
                 member))
         .isEqualTo("ADMIN");
     assertThat(preferences.homeLocationOf(member).homeLocationId()).isEqualTo(home);
+  }
+
+  @Test
+  void theLockRefusesAnotherMembersEarmarkEditButNotTheHolders() {
+    UUID locked = row(port, false, null, BEFORE);
+    UUID mission = mission();
+    jdbc.update(
+        """
+        INSERT INTO inventory_item_mission_allocation (id, inventory_item_id, mission_id, amount,
+                                                       version, created_at, updated_at)
+        VALUES (?, ?, ?, 1, 0, now(), now())
+        """,
+        UUID.randomUUID(),
+        locked,
+        mission);
+    trigger("0.1", LIVE_AT);
+
+    authenticate(logistician, false);
+    assertThatThrownBy(() -> changeEarmark(locked, mission, 0.5, logistician))
+        .isInstanceOf(RelocationPendingException.class);
+    assertThatThrownBy(() -> removeEarmark(locked, mission, logistician))
+        .isInstanceOf(RelocationPendingException.class);
+    assertThat(earmarkOf(locked, mission)).isEqualTo(1.0);
+
+    authenticate(member, false);
+    changeEarmark(locked, mission, 0.5, member);
+    assertThat(earmarkOf(locked, mission)).isEqualTo(0.5);
+  }
+
+  @Test
+  void aWriteJudgesTheLockByTheOpenPhaseAndNotByTheRequestsMemo() {
+    UUID locked = row(port, true, null, BEFORE);
+    UUID lockedShip = ship(port, BEFORE);
+    RequestContextHolder.setRequestAttributes(
+        new ServletRequestAttributes(new MockHttpServletRequest()));
+    try {
+      assertThat(phases.open()).isEmpty();
+      trigger("0.1", LIVE_AT);
+
+      authenticate(logistician, false);
+      assertThatThrownBy(() -> note(locked, logistician, true))
+          .isInstanceOf(RelocationPendingException.class);
+      SecurityContextHolder.getContext().setAuthentication(new Relayed(member));
+      assertThatThrownBy(() -> hangar.deleteShip(member, lockedShip))
+          .isInstanceOf(RelocationPendingException.class);
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+  }
+
+  @Test
+  void aWriteThatJudgesTheLockIsRefusedWhileAnotherTransactionHoldsTheHistory()
+      throws InterruptedException {
+    UUID locked = row(port, true, null, BEFORE);
+    UUID later = row(port, true, null, null);
+    jdbc.update("UPDATE inventory_item SET created_at = now() WHERE id = ?", later);
+    trigger("0.1", LIVE_AT);
+    authenticate(logistician, false);
+
+    try (HeldHistory _ = HeldHistory.hold(transactionManager, jdbc)) {
+      assertThatThrownBy(() -> note(locked, logistician, true))
+          .isInstanceOf(BusinessConflictException.class)
+          .hasMessage("error.patch_change.history_busy");
+    }
+    assertThatThrownBy(() -> note(locked, logistician, true))
+        .isInstanceOf(RelocationPendingException.class);
+    note(later, logistician, true);
+  }
+
+  @Test
+  void aChoiceForAPhaseThatIsNoLongerTheOpenOneIsRefusedAndMovesNothing() {
+    UUID own = row(port, true, null, BEFORE);
+    PatchChangeDto first = trigger("0.1", LIVE_AT);
+    PatchChangeDto second = trigger("0.2", LATER_LIVE_AT);
+    authenticate(member, false);
+
+    assertThatThrownBy(() -> relocations.relocate(member, first.id(), home, RelocationChooser.SELF))
+        .isInstanceOfSatisfying(
+            HomeLocationChoiceRefusedException.class,
+            refused -> assertThat(refused.getReason()).isEqualTo(Reason.PHASE_CHANGED))
+        .hasMessage("error.patch_change.phase_changed");
+    assertThat(locationOf("inventory_item", own)).isEqualTo(port);
+    assertThat(phases.mustChoose(member)).isTrue();
+
+    relocations.relocate(member, second.id(), home, RelocationChooser.SELF);
+    assertThat(locationOf("inventory_item", own)).isEqualTo(home);
   }
 
   @Test
@@ -347,7 +452,7 @@ class HomeLocationRelocationIntegrationTest {
     jdbc.update("UPDATE inventory_item SET created_at = now() WHERE id = ?", later);
     UUID lockedShip = ship(port, BEFORE);
     ship(port, Instant.now());
-    trigger("0.1", LIVE_AT);
+    PatchChangeDto recorded = trigger("0.1", LIVE_AT);
 
     assertThat(stackEntries(port))
         .filteredOn(entry -> entry.id().equals(locked))
@@ -367,7 +472,7 @@ class HomeLocationRelocationIntegrationTest {
     authenticate(member, false);
     assertThat(locks.refusedAmong(List.of(member))).isEmpty();
 
-    relocations.relocate(member, home, RelocationChooser.SELF);
+    relocations.relocate(member, recorded.id(), home, RelocationChooser.SELF);
 
     authenticate(admin, true);
     assertThat(stackEntries(home)).noneMatch(InventoryItemDto::relocationPending);
@@ -432,6 +537,78 @@ class HomeLocationRelocationIntegrationTest {
         new InventoryItemNoteUpdateRequest("Note " + UUID.randomUUID(), version),
         caller,
         logisticianOfRow);
+  }
+
+  /**
+   * Changes the amount of a row's mission earmark on the web path.
+   *
+   * @param row the row
+   * @param mission the earmarked mission
+   * @param amount the new amount
+   * @param caller the calling member, acting as the row's logistician unless it holds the row
+   */
+  private void changeEarmark(
+      @NotNull UUID row, @NotNull UUID mission, double amount, @NotNull UUID caller) {
+    inventory.changeAllocation(
+        row,
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.MISSION, mission, amount, versionOf(row), null),
+        caller,
+        !caller.equals(member));
+  }
+
+  /**
+   * Removes a row's mission earmark on the web path.
+   *
+   * @param row the row
+   * @param mission the earmarked mission
+   * @param caller the calling member, acting as the row's logistician unless it holds the row
+   */
+  private void removeEarmark(@NotNull UUID row, @NotNull UUID mission, @NotNull UUID caller) {
+    inventory.removeAllocation(
+        row,
+        new InventoryAllocationWriteDto(
+            InventoryAllocationDimension.MISSION, mission, null, versionOf(row), null),
+        caller,
+        !caller.equals(member));
+  }
+
+  /**
+   * Reads the amount of a row's mission earmark.
+   *
+   * @param row the row
+   * @param mission the earmarked mission
+   * @return the earmarked amount
+   */
+  private @Nullable Double earmarkOf(@NotNull UUID row, @NotNull UUID mission) {
+    return jdbc.queryForObject(
+        "SELECT amount FROM inventory_item_mission_allocation"
+            + " WHERE inventory_item_id = ? AND mission_id = ?",
+        Double.class,
+        row,
+        mission);
+  }
+
+  /**
+   * Inserts a mission a row can be earmarked for.
+   *
+   * @return its id
+   */
+  private @NotNull UUID mission() {
+    UUID id = UUID.randomUUID();
+    jdbc.update("INSERT INTO mission (id, name, version) VALUES (?, 'Reloc op', 0)", id);
+    missions.add(id);
+    return id;
+  }
+
+  /**
+   * Reads a stock row's version.
+   *
+   * @param row the row
+   * @return its version
+   */
+  private @Nullable Long versionOf(@NotNull UUID row) {
+    return versionOf("inventory_item", row);
   }
 
   /**
@@ -578,6 +755,78 @@ class HomeLocationRelocationIntegrationTest {
                 ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
                 : List.of(new SimpleGrantedAuthority("ROLE_KRT_MEMBER")));
     SecurityContextHolder.getContext().setAuthentication(auth);
+  }
+
+  /**
+   * Holds the patch-change history's lock exclusively in another transaction, as a trigger does.
+   */
+  private static final class HeldHistory implements AutoCloseable {
+
+    private static final long WAIT_SECONDS = 30;
+
+    private final CountDownLatch release = new CountDownLatch(1);
+    private final Thread holder;
+
+    /**
+     * Starts the holding transaction.
+     *
+     * @param transactionManager opens the transaction on another connection
+     * @param jdbc takes the lock in it
+     */
+    private HeldHistory(
+        @NotNull PlatformTransactionManager transactionManager, @NotNull JdbcTemplate jdbc) {
+      CountDownLatch held = new CountDownLatch(1);
+      holder =
+          Thread.ofPlatform()
+              .start(() ->
+                  new TransactionTemplate(transactionManager)
+                      .executeWithoutResult(_ -> {
+                        jdbc.queryForObject(
+                            "SELECT 1 FROM pg_advisory_xact_lock("
+                                + PatchChangeRepository.HISTORY_LOCK_SPACE
+                                + ", 0)",
+                            Integer.class);
+                        held.countDown();
+                        awaitQuietly(release);
+                      }));
+      awaitQuietly(held);
+    }
+
+    /**
+     * Takes the history's lock in another transaction and returns once it holds it.
+     *
+     * @param transactionManager opens the transaction on another connection
+     * @param jdbc takes the lock in it
+     * @return the hold, released on close
+     */
+    private static @NotNull HeldHistory hold(
+        @NotNull PlatformTransactionManager transactionManager, @NotNull JdbcTemplate jdbc) {
+      return new HeldHistory(transactionManager, jdbc);
+    }
+
+    /**
+     * Ends the holding transaction and waits for it.
+     *
+     * @throws InterruptedException when the wait is interrupted
+     */
+    @Override
+    public void close() throws InterruptedException {
+      release.countDown();
+      holder.join(TimeUnit.SECONDS.toMillis(WAIT_SECONDS));
+    }
+
+    /**
+     * Waits for a latch, keeping the interrupt flag.
+     *
+     * @param latch the latch
+     */
+    private static void awaitQuietly(@NotNull CountDownLatch latch) {
+      try {
+        assertThat(latch.await(WAIT_SECONDS, TimeUnit.SECONDS)).isTrue();
+      } catch (InterruptedException _) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   /** An exchange client's relayed request on the member's behalf. */

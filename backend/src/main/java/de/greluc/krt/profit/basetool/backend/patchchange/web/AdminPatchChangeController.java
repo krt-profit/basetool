@@ -161,13 +161,14 @@ public class AdminPatchChangeController {
    * Chooses a member's new home location on the member's behalf and relocates the member.
    *
    * @param userId the member
-   * @param request the chosen home location
+   * @param request the chosen home location and the patch change whose phase the prompt showed
    * @return what moved
    */
   @PostMapping("/members/{userId}/home-location")
   @Operation(summary = "Choose a member's new home location on the member's behalf (admin).")
   public RelocationResultDto chooseMemberHomeLocation(
       @PathVariable UUID userId, @Valid @RequestBody ChooseHomeLocationRequest request) {
-    return relocations.relocate(userId, request.locationId(), RelocationChooser.ADMIN);
+    return relocations.relocate(
+        userId, request.patchChangeId(), request.locationId(), RelocationChooser.ADMIN);
   }
 }

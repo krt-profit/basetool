@@ -45,6 +45,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -60,8 +61,10 @@ class SessionGateAccessFilterTest {
 
   private static final UUID USER_ID = UUID.randomUUID();
 
-  private final FakeGate first = new FakeGate(Code.FIRST_REQUIRED, "/api/v1/first");
-  private final FakeGate second = new FakeGate(Code.SECOND_REQUIRED, "/api/v1/second");
+  private final FakeGate first =
+      new FakeGate(Code.FIRST_REQUIRED, "/api/v1/first", "/api/v1/first-repair/{id}");
+  private final FakeGate second =
+      new FakeGate(Code.SECOND_REQUIRED, "/api/v1/second", "/api/v1/second-repair/{id}");
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   private SessionGateAccessFilter filter;
@@ -160,6 +163,31 @@ class SessionGateAccessFilterTest {
   }
 
   @Test
+  void aGateLeavesItsAdminEndpointsOpenToAnAdminAndNothingElse() throws Exception {
+    second.holding = true;
+
+    assertThat(invoke("/api/v1/second-repair/7", mock(FilterChain.class)).getStatus())
+        .isEqualTo(403);
+
+    signInAsAdmin();
+    assertThat(invoke("/api/v1/second-repair/7", mock(FilterChain.class)).getStatus())
+        .isEqualTo(200);
+    assertThat(invoke("/api/v1/first-repair/7", mock(FilterChain.class)).getStatus())
+        .as("a later gate also leaves an earlier gate's admin endpoints open")
+        .isEqualTo(200);
+    assertThat(invoke("/api/v1/missions", mock(FilterChain.class)).getStatus()).isEqualTo(403);
+  }
+
+  @Test
+  void anEarlierGateKeepsALaterGatesAdminEndpointsClosedToAnAdmin() throws Exception {
+    first.holding = true;
+    signInAsAdmin();
+
+    assertThat(invoke("/api/v1/second-repair/7", mock(FilterChain.class)).getStatus())
+        .isEqualTo(403);
+  }
+
+  @Test
   void anEncodedSpellingNeitherBypassesAGateNorLosesAnExemption() throws Exception {
     first.holding = true;
 
@@ -179,6 +207,14 @@ class SessionGateAccessFilterTest {
     SecurityContextHolder.clearContext();
     assertThat(invoke("/api/v1/missions", mock(FilterChain.class)).getStatus()).isEqualTo(200);
     assertThat(first.asked).isZero();
+  }
+
+  /** Signs the test's caller in as an admin. */
+  private static void signInAsAdmin() {
+    Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject(USER_ID.toString()).build();
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new JwtAuthenticationToken(jwt, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
   }
 
   /**
@@ -221,6 +257,7 @@ class SessionGateAccessFilterTest {
 
     private final Code code;
     private final String exemptPath;
+    private final String adminExemptPath;
     private final List<UUID> refusedUsers = new ArrayList<>();
     private boolean holding;
     private int asked;
@@ -230,10 +267,13 @@ class SessionGateAccessFilterTest {
      *
      * @param code its problem code
      * @param exemptPath its one exempt endpoint
+     * @param adminExemptPath its one endpoint left open to an admin
      */
-    private FakeGate(@NotNull Code code, @NotNull String exemptPath) {
+    private FakeGate(
+        @NotNull Code code, @NotNull String exemptPath, @NotNull String adminExemptPath) {
       this.code = code;
       this.exemptPath = exemptPath;
+      this.adminExemptPath = adminExemptPath;
     }
 
     @Override
@@ -244,6 +284,11 @@ class SessionGateAccessFilterTest {
     @Override
     public @NotNull List<String> exemptPaths() {
       return List.of(exemptPath);
+    }
+
+    @Override
+    public @NotNull List<String> adminExemptPaths() {
+      return List.of(adminExemptPath);
     }
 
     @Override

@@ -85,15 +85,16 @@ public class ExchangePatchChangeService {
    * transaction, which the change feed attributes to the phase's patch change.
    *
    * @param caller the client, installation and member
+   * @param patchChangeId the patch change whose phase the client showed
    * @param locationId the chosen home location
    * @return the chosen home location and what moved
-   * @throws HomeLocationChoiceRefusedException when no open phase asks the member, the member chose
-   *     already or the location is not on offer
+   * @throws HomeLocationChoiceRefusedException when no open phase asks the member, another phase
+   *     than the shown one is open, the member chose already or the location is not on offer
    */
   public @NotNull ExchangeHomeLocationChosenDto choose(
-      @NotNull ExchangeCaller caller, @NotNull UUID locationId) {
+      @NotNull ExchangeCaller caller, @NotNull UUID patchChangeId, @NotNull UUID locationId) {
     PatchChangeExchangeWriter.Chosen chosen =
-        writer.chooseHomeLocation(caller.member(), locationId, caller.clientId());
+        writer.chooseHomeLocation(caller.member(), patchChangeId, locationId, caller.clientId());
     return new ExchangeHomeLocationChosenDto(
         homeLocation(chosen.location(), locationLinks.byId(Set.of(chosen.location().id()))),
         chosen.rows(),

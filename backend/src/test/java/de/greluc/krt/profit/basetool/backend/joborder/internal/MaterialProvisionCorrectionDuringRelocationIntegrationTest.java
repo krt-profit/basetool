@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.patchchange.internal.HomeLocationPh
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeOptions;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeTrigger;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.TriggerPatchChangeRequest;
+import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -68,9 +69,15 @@ class MaterialProvisionCorrectionDuringRelocationIntegrationTest
   @Autowired private PatchChangeTrigger trigger;
   @Autowired private HomeLocationPhases phases;
 
+  /** The curated home location the phase offers, or {@code null} before it opened. */
+  private UUID home;
+
   @AfterEach
   void removeThePatchChange() {
     jdbc.update("DELETE FROM patch_change");
+    if (home != null) {
+      TestPlaces.deleteLocation(jdbc, home);
+    }
   }
 
   @Test
@@ -137,6 +144,7 @@ class MaterialProvisionCorrectionDuringRelocationIntegrationTest
 
   /** Triggers, as an admin, a rebuild that wipes nothing and asks for a home location. */
   private void openHomeLocationPhase() {
+    home = TestPlaces.insertHomeLocation(jdbc, "Provision home " + UUID.randomUUID());
     Authentication previous = SecurityContextHolder.getContext().getAuthentication();
     User adminUser = new User();
     adminUser.setId(UUID.randomUUID());

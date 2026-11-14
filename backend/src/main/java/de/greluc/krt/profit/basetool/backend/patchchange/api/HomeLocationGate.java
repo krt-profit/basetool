@@ -38,7 +38,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>Runs after the consent gate. An exchange client's relayed request passes: the exchange keeps
  * reading and booking new stock, and the relocation lock refuses its writes on locked rows and
- * ships instead (REQ-PATCH-023).
+ * ships instead (REQ-PATCH-023). A pending admin keeps the phase's recovery (REQ-PATCH-063).
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -58,6 +58,20 @@ public class HomeLocationGate implements SessionGate {
   public static final List<String> EXEMPT_PATHS =
       List.of(PROMPT_PATH, STATUS_PATH, "/api/v1/users/me");
 
+  /**
+   * The endpoints a pending admin may still reach to recover a phase that offers no home location
+   * (REQ-PATCH-063): the admin's patch-change page with the phase end, and the location curation.
+   */
+  public static final List<String> ADMIN_EXEMPT_PATHS =
+      List.of(
+          "/api/v1/patch-changes/admin",
+          "/api/v1/patch-changes/admin/form",
+          "/api/v1/patch-changes/admin/preview",
+          "/api/v1/patch-changes/admin/{id}/label",
+          "/api/v1/patch-changes/admin/{id}/phase-end",
+          "/api/v1/locations",
+          "/api/v1/locations/{id}");
+
   /** Tells which members must still choose. */
   private final HomeLocationGateCheck gateCheck;
 
@@ -69,6 +83,11 @@ public class HomeLocationGate implements SessionGate {
   @Override
   public @NotNull @Unmodifiable List<String> exemptPaths() {
     return EXEMPT_PATHS;
+  }
+
+  @Override
+  public @NotNull @Unmodifiable List<String> adminExemptPaths() {
+    return ADMIN_EXEMPT_PATHS;
   }
 
   @Override

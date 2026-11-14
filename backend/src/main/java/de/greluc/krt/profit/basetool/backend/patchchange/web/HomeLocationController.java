@@ -82,14 +82,15 @@ public class HomeLocationController {
   /**
    * Stores the caller's choice and relocates the caller, once per phase.
    *
-   * @param request the chosen home location
+   * @param request the chosen home location and the patch change whose phase the prompt showed
    * @return what moved
    */
   @PostMapping
   @Operation(summary = "Choose the caller's new home location and relocate.")
   public RelocationResultDto chooseHomeLocation(
       @Valid @RequestBody ChooseHomeLocationRequest request) {
-    return relocations.relocate(caller(), request.locationId(), RelocationChooser.SELF);
+    return relocations.relocate(
+        caller(), request.patchChangeId(), request.locationId(), RelocationChooser.SELF);
   }
 
   /**

@@ -29,18 +29,24 @@ import org.jetbrains.annotations.NotNull;
 public interface PatchChangeExchangeWriter {
 
   /**
-   * Stores the member's choice in the open phase and relocates the member in one transaction.
+   * Stores the member's choice in the phase the client showed and relocates the member in one
+   * transaction.
    *
    * @param member the member the client acts for
+   * @param phaseId the patch change whose phase the client showed (REQ-PATCH-062)
    * @param locationId the chosen home location
    * @param clientId the registry id of the client that chose, recorded in the audit event
    * @return what moved
-   * @throws HomeLocationChoiceRefusedException when no open phase asks the member, the member chose
-   *     already or the location is not on offer; nothing moves then
+   * @throws HomeLocationChoiceRefusedException when no open phase asks the member, another phase
+   *     than the shown one is open, the member chose already or the location is not on offer;
+   *     nothing moves then
    */
   @NotNull
   Chosen chooseHomeLocation(
-      @NotNull UUID member, @NotNull UUID locationId, @NotNull String clientId);
+      @NotNull UUID member,
+      @NotNull UUID phaseId,
+      @NotNull UUID locationId,
+      @NotNull String clientId);
 
   /**
    * What a member's relocation moved.

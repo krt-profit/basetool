@@ -20,6 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -77,5 +79,14 @@ class PatchChangeMergeCutoffTest {
     when(phases.open()).thenReturn(Optional.empty());
 
     assertThat(cutoff.cutoffFor(holder)).isEmpty();
+  }
+
+  @Test
+  void aMergeReadsThePhaseForTheWriteAndNotTheRequestsMemo() {
+    when(phases.openForWrite()).thenReturn(Optional.of(PHASE));
+    when(phases.pendingAmong(PHASE, List.of(holder))).thenReturn(Set.of(holder));
+
+    assertThat(cutoff.cutoffForWrite(holder)).contains(LIVE_AT);
+    verify(phases, never()).open();
   }
 }

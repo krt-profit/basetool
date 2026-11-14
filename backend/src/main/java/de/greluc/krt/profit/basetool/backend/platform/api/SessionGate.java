@@ -56,6 +56,19 @@ public interface SessionGate {
   List<String> exemptPaths();
 
   /**
+   * Returns the endpoints the gate leaves open to an admin it holds, so an admin can still repair
+   * what the gate's step depends on (REQ-PATCH-063); a caller without {@code ROLE_ADMIN} stays held
+   * there. Matched like {@link #exemptPaths()}.
+   *
+   * @return the gate's endpoints open to an admin, none by default
+   */
+  @NotNull
+  @Unmodifiable
+  default List<String> adminExemptPaths() {
+    return List.of();
+  }
+
+  /**
    * Tells whether the gate holds an authenticated caller.
    *
    * @param authentication the caller's authentication

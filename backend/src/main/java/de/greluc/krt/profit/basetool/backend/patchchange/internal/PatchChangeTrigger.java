@@ -49,6 +49,7 @@ public class PatchChangeTrigger {
   private final PatchChangeEffects effects;
   private final WipePreview wipePreview;
   private final WipeExceptionCatalogue exceptionCatalogue;
+  private final HomeLocationOffer homeLocationOffer;
   private final PatchChangeHistory history;
   private final PatchChangeLiveSync liveSync;
   private final AuditRecorder auditRecorder;
@@ -83,7 +84,8 @@ public class PatchChangeTrigger {
    * @return the recorded patch change as its history row
    * @throws BadRequestException when the label is malformed or not higher than the previous one,
    *     the confirmation differs from the label, the live time lies after now or not after the
-   *     previous patch change's, or a wipe exception names an unknown entry or an entry twice
+   *     previous patch change's, a wipe exception names an unknown entry or an entry twice, or the
+   *     home-location prompt is on while no curated home location is on offer
    */
   public @NotNull PatchChangeDto trigger(@NotNull TriggerPatchChangeRequest request) {
     PatchLabel label = PatchLabel.parse(request.label());
@@ -116,6 +118,9 @@ public class PatchChangeTrigger {
     Instant liveAt = PatchChangeRules.requireLiveAt(request.liveAt(), now, previous);
     PatchChangeRules.requireLabelAfter(label, previous);
     exceptionCatalogue.requireKnown(request.options().wipeExceptions());
+    if (request.options().homeLocationPrompt()) {
+      homeLocationOffer.requireAnyOffered();
+    }
     PatchChangePlan plan = new PatchChangePlan(liveAt, request.options());
     PatchChange record =
         repository.save(

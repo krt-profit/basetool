@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
 import de.greluc.krt.profit.basetool.backend.identity.api.ApprovalStatus;
+import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import de.greluc.krt.profit.basetool.backend.kernel.RequestMemo;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationGateCheck;
 import java.time.Instant;
@@ -29,12 +30,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Answers who a home-location phase asks and who must still choose (REQ-PATCH-021, REQ-PATCH-024).
@@ -46,7 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class HomeLocationPhases implements HomeLocationGateCheck {
 
-  /** The open phase, read once per request; nothing in one request opens or ends it twice. */
+  /** The open phase as a read sees it, read once per request; a write reads it fresh instead. */
   private static final RequestMemo.Key<Optional<HomeLocationPhase>> OPEN_PHASE =
       RequestMemo.Key.of(HomeLocationPhases.class, "openPhase");
 
@@ -54,14 +59,43 @@ public class HomeLocationPhases implements HomeLocationGateCheck {
   private final PatchChangeRelocationRepository relocations;
 
   /**
-   * Returns the open home-location phase.
+   * Returns the open home-location phase: the one the current transaction read for a write, else
+   * the one read once per request.
    *
    * @return the phase, or empty when none is open
    */
   @Transactional(readOnly = true)
   public @NotNull Optional<HomeLocationPhase> open() {
+    WritePhase written = writePhase();
+    if (written != null) {
+      return Optional.ofNullable(written.phase);
+    }
     Optional<HomeLocationPhase> memo = RequestMemo.getIfBound(OPEN_PHASE, this::readOpen);
     return memo != null ? memo : readOpen();
+  }
+
+  /**
+   * Returns the open home-location phase for a write the relocation lock judges (REQ-PATCH-064):
+   * read fresh under the history's lock in shared mode, which the transaction holds until it ends,
+   * so no trigger or phase end commits before it does. Every later read of the transaction returns
+   * the same phase.
+   *
+   * @return the phase, or empty when none is open
+   * @throws BusinessConflictException {@code error.patch_change.history_busy} while a trigger, a
+   *     phase end or a label correction holds the history's lock or waits for it
+   */
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull Optional<HomeLocationPhase> openForWrite() {
+    WritePhase written = writePhase();
+    if (written != null) {
+      return Optional.ofNullable(written.phase);
+    }
+    if (!repository.tryLockHistoryShared()) {
+      throw new BusinessConflictException("error.patch_change.history_busy");
+    }
+    Optional<HomeLocationPhase> phase = readOpen();
+    TransactionSynchronizationManager.registerSynchronization(new WritePhase(phase.orElse(null)));
+    return phase;
   }
 
   @Override
@@ -175,5 +209,34 @@ public class HomeLocationPhases implements HomeLocationGateCheck {
         .findFirstByHomeLocationPromptTrueOrderByLiveAtDesc()
         .filter(record -> record.getPhaseEndedAt() == null)
         .map(HomeLocationPhase::of);
+  }
+
+  /**
+   * Finds the phase the current transaction read for a write.
+   *
+   * @return its record, or {@code null} when the transaction read none
+   */
+  private static @Nullable WritePhase writePhase() {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      return null;
+    }
+    for (TransactionSynchronization synchronization :
+        TransactionSynchronizationManager.getSynchronizations()) {
+      if (synchronization instanceof WritePhase written) {
+        return written;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The open phase one writing transaction read under the history's shared lock; it ends with the
+   * transaction.
+   */
+  @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+  private static final class WritePhase implements TransactionSynchronization {
+
+    /** The phase, or {@code null} when none was open. */
+    private final @Nullable HomeLocationPhase phase;
   }
 }

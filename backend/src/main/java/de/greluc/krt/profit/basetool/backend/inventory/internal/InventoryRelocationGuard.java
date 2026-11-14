@@ -21,13 +21,15 @@ package de.greluc.krt.profit.basetool.backend.inventory.internal;
 
 import de.greluc.krt.profit.basetool.backend.inventory.api.StockRelocationLock;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -35,10 +37,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /**
  * Holds every Lager write to existing rows against the relocation lock (REQ-PATCH-023): the rows
- * Hibernate updates or deletes in a writing transaction are noted as they flush, and before the
- * commit, once the transaction's last changes are flushed, a change to a row from before the open
- * home-location phase's live time is refused for anyone the lock refuses. A row a write only reads
- * is never refused, and a bulk statement, which flushes no entity, is not seen.
+ * Hibernate updates or deletes in a writing transaction, and the rows of the earmarks and pledges
+ * it writes, are noted as they flush, and before the commit, once the transaction's last changes
+ * are flushed, a change to a row from before the open home-location phase's live time is refused
+ * for anyone the lock refuses. The phase is read fresh under the lock the trigger shares
+ * (REQ-PATCH-064). A row a write only reads is never refused, and a bulk statement, which flushes
+ * no entity, is not seen.
  */
 @Component
 @RequiredArgsConstructor
@@ -50,7 +54,7 @@ class InventoryRelocationGuard {
   /** The Lager rows, flushed before the check. */
   private final InventoryItemRepository rows;
 
-  /** Arms the check of the current writing transaction once, when it loads a Lager row. */
+  /** Arms the check of the current writing transaction once. */
   void watch() {
     if (!TransactionSynchronizationManager.isSynchronizationActive()
         || TransactionSynchronizationManager.isCurrentTransactionReadOnly()
@@ -63,35 +67,38 @@ class InventoryRelocationGuard {
   }
 
   /**
-   * Notes a row the current transaction updates or deletes.
+   * Notes a row the current transaction updates or deletes, or whose earmark or pledge it writes.
+   * The row's holder and creation time are read at the check, once a new row carries its own.
    *
-   * @param holder the row's holder
-   * @param createdAt the row's creation time, or {@code null}
+   * @param row the row
    */
-  void changed(@NotNull UUID holder, @Nullable Instant createdAt) {
+  void changed(@NotNull InventoryItem row) {
+    watch();
     if (TransactionSynchronizationManager.getResource(this) instanceof Changes changes) {
-      changes.rows.add(new Change(holder, createdAt));
+      changes.rows.add(row);
     }
   }
 
   /**
    * Refuses the transaction's changes when one of them touches a locked row.
    *
-   * @param changes the changed rows
-   * @throws RuntimeException the lock's {@code 409 RELOCATION_PENDING} problem
+   * @param changed the changed rows
+   * @throws RuntimeException the lock's {@code 409 RELOCATION_PENDING} problem, or its {@code 409}
+   *     while a trigger holds the patch-change history
    */
-  private void check(@NotNull Set<Change> changes) {
-    if (changes.isEmpty()) {
+  private void check(@NotNull List<InventoryItem> changed) {
+    if (changed.isEmpty()) {
       return;
     }
-    Optional<Instant> liveAt = lock.openPhaseLiveAt();
-    if (liveAt.isEmpty()) {
+    Optional<Instant> cutoff = lock.writeCutoff();
+    if (cutoff.isEmpty()) {
       return;
     }
     Set<UUID> holders = new HashSet<>();
-    for (Change change : changes) {
-      if (change.createdAt() == null || change.createdAt().isBefore(liveAt.get())) {
-        holders.add(change.holder());
+    for (InventoryItem row : changed) {
+      Instant createdAt = row.getCreatedAt();
+      if (createdAt == null || createdAt.isBefore(cutoff.get())) {
+        holders.add(row.getUser().getId());
       }
     }
     if (!holders.isEmpty()) {
@@ -99,18 +106,10 @@ class InventoryRelocationGuard {
     }
   }
 
-  /**
-   * One changed row's holder and creation time.
-   *
-   * @param holder the holder
-   * @param createdAt the creation time, or {@code null}
-   */
-  private record Change(@NotNull UUID holder, @Nullable Instant createdAt) {}
-
   /** The rows one transaction changed, checked before its commit after the guard's flush. */
   private final class Changes implements TransactionSynchronization {
 
-    private final Set<Change> rows = new HashSet<>();
+    private final Set<InventoryItem> rows = Collections.newSetFromMap(new IdentityHashMap<>());
 
     @Override
     public int getOrder() {
@@ -121,7 +120,7 @@ class InventoryRelocationGuard {
     public void beforeCommit(boolean readOnly) {
       if (!readOnly) {
         InventoryRelocationGuard.this.rows.flush();
-        check(Set.copyOf(rows));
+        check(List.copyOf(rows));
       }
     }
 

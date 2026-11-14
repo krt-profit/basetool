@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.backend.platform.api;
 
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemCode;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
+import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -53,9 +54,10 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>The gates run in their order, and the first that holds the caller refuses; the refusal carries
  * {@code sessionGate: true} besides the gate's code. A gate leaves open its own exempt endpoints
- * and those of every gate before it. Non-{@code /api} and unauthenticated requests pass, and so
- * does a {@code sub} that is not a UUID. Paths are matched as {@link PathPattern}s on the decoded
- * path, so a percent-encoded spelling neither bypasses a gate nor loses an exemption.
+ * and those of every gate before it, and to a caller with {@code ROLE_ADMIN} also its own and the
+ * earlier gates' admin endpoints (REQ-PATCH-063). Non-{@code /api} and unauthenticated requests
+ * pass, and so does a {@code sub} that is not a UUID. Paths are matched as {@link PathPattern}s on
+ * the decoded path, so a percent-encoded spelling neither bypasses a gate nor loses an exemption.
  */
 @Slf4j
 public class SessionGateAccessFilter extends OncePerRequestFilter {
@@ -77,6 +79,9 @@ public class SessionGateAccessFilter extends OncePerRequestFilter {
    * gate's 403 from any other without knowing the gates' codes.
    */
   static final String SESSION_GATE_PROPERTY = "sessionGate";
+
+  /** The authority an admin's authentication carries; the role hierarchy never grants it. */
+  private static final String ADMIN_AUTHORITY = Roles.authority(Roles.ADMIN);
 
   /** Each gate with the endpoints it leaves open, in the gates' order. */
   private final List<Guard> guards;
@@ -141,8 +146,7 @@ public class SessionGateAccessFilter extends OncePerRequestFilter {
   private @Nullable SessionGate holding(
       @NotNull PathContainer path, @NotNull Authentication auth, @NotNull UUID userId) {
     for (Guard guard : guards) {
-      if (guard.exempt().stream().noneMatch(pattern -> pattern.matches(path))
-          && guard.gate().holds(auth, userId)) {
+      if (!guard.leavesOpen(path, auth) && guard.gate().holds(auth, userId)) {
         return guard.gate();
       }
     }
@@ -231,17 +235,20 @@ public class SessionGateAccessFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Pairs each gate with the endpoints it leaves open: its own and those of every gate before it.
+   * Pairs each gate with the endpoints it leaves open: its own and those of every gate before it,
+   * to every caller and to an admin.
    *
    * @param gates the gates in their order
    * @return the guards in the same order
    */
   private static @NotNull List<Guard> guards(@NotNull List<SessionGate> gates) {
     List<PathPattern> open = new ArrayList<>();
+    List<PathPattern> openToAdmin = new ArrayList<>();
     List<Guard> guards = new ArrayList<>();
     for (SessionGate gate : gates) {
       gate.exemptPaths().stream().map(PATH_PARSER::parse).forEach(open::add);
-      guards.add(new Guard(gate, List.copyOf(open)));
+      gate.adminExemptPaths().stream().map(PATH_PARSER::parse).forEach(openToAdmin::add);
+      guards.add(new Guard(gate, List.copyOf(open), List.copyOf(openToAdmin)));
     }
     return List.copyOf(guards);
   }
@@ -251,6 +258,28 @@ public class SessionGateAccessFilter extends OncePerRequestFilter {
    *
    * @param gate the gate
    * @param exempt its own exempt endpoints and those of every gate before it
+   * @param adminExempt its own admin endpoints and those of every gate before it
    */
-  private record Guard(@NotNull SessionGate gate, @NotNull List<PathPattern> exempt) {}
+  private record Guard(
+      @NotNull SessionGate gate,
+      @NotNull List<PathPattern> exempt,
+      @NotNull List<PathPattern> adminExempt) {
+
+    /**
+     * Tells whether the gate leaves a path open to a caller.
+     *
+     * @param path the decoded request path
+     * @param auth the caller's authentication
+     * @return {@code true} for an exempt endpoint, and for an admin endpoint when the caller holds
+     *     {@code ROLE_ADMIN}
+     */
+    private boolean leavesOpen(@NotNull PathContainer path, @NotNull Authentication auth) {
+      if (exempt.stream().anyMatch(pattern -> pattern.matches(path))) {
+        return true;
+      }
+      return adminExempt.stream().anyMatch(pattern -> pattern.matches(path))
+          && auth.getAuthorities().stream()
+              .anyMatch(authority -> ADMIN_AUTHORITY.equals(authority.getAuthority()));
+    }
+  }
 }

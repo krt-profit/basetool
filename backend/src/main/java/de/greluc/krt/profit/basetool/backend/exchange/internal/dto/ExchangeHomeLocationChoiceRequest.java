@@ -24,8 +24,11 @@ import java.util.UUID;
 
 /**
  * A member's home-location choice through an exchange client, in the shape of {@code
- * patch-change.schema.json#/$defs/homeLocationChoice} (REQ-PATCH-052).
+ * patch-change.schema.json#/$defs/homeLocationChoice} (REQ-PATCH-052, REQ-PATCH-062).
  *
  * @param location the id of one of the home locations the patch-change read offers
+ * @param patchChange the id of the patch change whose phase the read showed, {@code
+ *     homeLocation.patchChange.id}
  */
-public record ExchangeHomeLocationChoiceRequest(@NotNull UUID location) {}
+public record ExchangeHomeLocationChoiceRequest(
+    @NotNull UUID location, @NotNull UUID patchChange) {}

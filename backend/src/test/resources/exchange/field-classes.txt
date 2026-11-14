@@ -415,6 +415,7 @@ patch-change.schema.json#/$defs/homeLocation/properties/system SHORT_NAME
 patch-change.schema.json#/$defs/homeLocation/properties/uex/properties/id IDENTIFIER
 patch-change.schema.json#/$defs/homeLocation/properties/uex/properties/kind FACT_VALUE
 patch-change.schema.json#/$defs/homeLocationChoice/properties/location IDENTIFIER
+patch-change.schema.json#/$defs/homeLocationChoice/properties/patchChange IDENTIFIER
 patch-change.schema.json#/$defs/homeLocationChosen/properties/rows FACT_VALUE
 patch-change.schema.json#/$defs/homeLocationChosen/properties/ships FACT_VALUE
 patch-change.schema.json#/$defs/homeLocationPrompt/properties/chosenAt FACT_VALUE

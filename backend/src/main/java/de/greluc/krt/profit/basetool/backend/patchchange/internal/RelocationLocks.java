@@ -33,16 +33,19 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The relocation lock (REQ-PATCH-023, ADR-0383): until a member relocates in the open home-location
  * phase, their stock rows and ships from before its live time change only for the member and admins
  * on the web. An exchange client is refused always, the member's own included; a patch change's own
- * writes and work without a caller are never refused.
+ * writes and work without a caller are never refused. A write is judged by the phase read fresh
+ * under the history's lock the trigger shares (REQ-PATCH-064).
  */
 @Component
 @RequiredArgsConstructor
@@ -57,6 +60,15 @@ class RelocationLocks implements StockRelocationLock, ShipRelocationLock {
   }
 
   @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public @NotNull Optional<Instant> writeCutoff() {
+    if (judgedCaller().isEmpty()) {
+      return Optional.empty();
+    }
+    return phases.openForWrite().map(HomeLocationPhase::liveAt);
+  }
+
+  @Override
   public @NotNull @Unmodifiable Set<UUID> pendingAmong(@NotNull Collection<UUID> holders) {
     return phases.open().map(phase -> phases.pendingAmong(phase, holders)).orElse(Set.of());
   }
@@ -64,30 +76,80 @@ class RelocationLocks implements StockRelocationLock, ShipRelocationLock {
   @Override
   @Transactional(readOnly = true)
   public @NotNull @Unmodifiable Set<UUID> refusedAmong(@NotNull Collection<UUID> holders) {
-    if (holders.isEmpty() || PatchChangeWrites.current().isPresent()) {
+    if (holders.isEmpty()) {
       return Set.of();
     }
-    Optional<Authentication> caller = authHelper.currentAuthentication();
-    if (caller.isEmpty()) {
+    return judgedCaller()
+        .map(caller -> refused(caller, holders, phases.open().orElse(null)))
+        .orElse(Set.of());
+  }
+
+  @Override
+  @Transactional(propagation = Propagation.MANDATORY)
+  public void requireWritable(@NotNull Collection<UUID> holders) {
+    if (holders.isEmpty()) {
+      return;
+    }
+    Optional<Caller> caller = judgedCaller();
+    if (caller.isPresent()
+        && !refused(caller.get(), holders, phases.openForWrite().orElse(null)).isEmpty()) {
+      throw new RelocationPendingException();
+    }
+  }
+
+  /**
+   * Returns the holders a caller is refused for in a phase.
+   *
+   * @param caller the caller the lock judges
+   * @param holders the holders to look at
+   * @param phase the open phase, or {@code null} while none is open
+   * @return the pending holders, the caller itself left out on the web
+   */
+  private @NotNull @Unmodifiable Set<UUID> refused(
+      @NotNull Caller caller,
+      @NotNull Collection<UUID> holders,
+      @Nullable HomeLocationPhase phase) {
+    if (phase == null) {
       return Set.of();
     }
-    boolean client =
-        caller.get() instanceof SubjectAuthentication subject && subject.externalClient() != null;
-    if (!client && authHelper.isAdmin()) {
-      return Set.of();
-    }
-    Set<UUID> refused = new HashSet<>(pendingAmong(holders));
-    if (!client) {
-      authHelper.currentUserId().ifPresent(refused::remove);
+    Set<UUID> refused = new HashSet<>(phases.pendingAmong(phase, holders));
+    if (caller.self() != null) {
+      refused.remove(caller.self());
     }
     return Set.copyOf(refused);
   }
 
-  @Override
-  @Transactional(readOnly = true)
-  public void requireWritable(@NotNull Collection<UUID> holders) {
-    if (!refusedAmong(holders).isEmpty()) {
-      throw new RelocationPendingException();
+  /**
+   * Describes the current caller as the lock judges it.
+   *
+   * @return the caller, or empty when the lock never refuses it: a patch change's own write, work
+   *     without a caller, an admin on the web
+   */
+  private @NotNull Optional<Caller> judgedCaller() {
+    if (PatchChangeWrites.current().isPresent()) {
+      return Optional.empty();
     }
+    Optional<Authentication> authentication = authHelper.currentAuthentication();
+    if (authentication.isEmpty()) {
+      return Optional.empty();
+    }
+    boolean client =
+        authentication.get() instanceof SubjectAuthentication subject
+            && subject.externalClient() != null;
+    if (client) {
+      return Optional.of(new Caller(null));
+    }
+    if (authHelper.isAdmin()) {
+      return Optional.empty();
+    }
+    return Optional.of(new Caller(authHelper.currentUserId().orElse(null)));
   }
+
+  /**
+   * A caller the lock judges.
+   *
+   * @param self the member whose own rows the lock leaves to them, or {@code null} for an exchange
+   *     client, which the lock refuses on every pending holder's rows
+   */
+  private record Caller(@Nullable UUID self) {}
 }

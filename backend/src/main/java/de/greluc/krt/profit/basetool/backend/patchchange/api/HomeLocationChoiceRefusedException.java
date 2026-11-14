@@ -97,6 +97,10 @@ public final class HomeLocationChoiceRefusedException extends DomainProblem {
         PatchChangeProblemCode.HOME_LOCATION_ALREADY_CHOSEN,
         "error.patch_change.already_relocated"),
 
+    /** The choice names a phase that is no longer the open one. */
+    PHASE_CHANGED(
+        PatchChangeProblemCode.HOME_LOCATION_PHASE_CHANGED, "error.patch_change.phase_changed"),
+
     /** The location is no curated home location on offer. */
     NOT_OFFERED(
         PatchChangeProblemCode.HOME_LOCATION_NOT_OFFERED,
