@@ -47,8 +47,8 @@ import org.springframework.stereotype.Component;
 public class TermsAcceptanceGate implements SessionGate {
 
   /**
-   * Re-arms the consent gate under the {@code test} profile for a single test class; production
-   * is armed regardless.
+   * Re-arms the consent gate under the {@code test} profile for a single test class; production is
+   * armed regardless.
    */
   public static final String ARMED_IN_TEST = "app.security.terms.armed-in-test";
 

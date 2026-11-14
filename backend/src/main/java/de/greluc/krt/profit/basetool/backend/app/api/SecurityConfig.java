@@ -32,9 +32,9 @@ import de.greluc.krt.profit.basetool.backend.platform.api.JwtAudienceStartupChec
 import de.greluc.krt.profit.basetool.backend.platform.api.JwtAuthorizedPartyStartupCheck;
 import de.greluc.krt.profit.basetool.backend.platform.api.RateLimitProperties;
 import de.greluc.krt.profit.basetool.backend.platform.api.RefusedSubjectWindow;
+import de.greluc.krt.profit.basetool.backend.platform.api.SecurityProblemResponseHandler;
 import de.greluc.krt.profit.basetool.backend.platform.api.SessionGate;
 import de.greluc.krt.profit.basetool.backend.platform.api.SessionGateAccessFilter;
-import de.greluc.krt.profit.basetool.backend.platform.api.SecurityProblemResponseHandler;
 import de.greluc.krt.profit.basetool.backend.platform.api.SubjectRateLimitingFilter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -102,7 +102,6 @@ import tools.jackson.databind.ObjectMapper;
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-
 
   /** The Keycloak claim naming the client a token was issued to (ADR-0270). */
   static final String AUTHORIZED_PARTY_CLAIM = "azp";

@@ -268,10 +268,14 @@ class TermsAcceptanceGateTest {
     MockEnvironment test = new MockEnvironment();
     test.setActiveProfiles("test");
 
-    assertThat(new TermsAcceptanceGate(termsConsentCheck, refusedSubjects, test).holds(auth(), USER_ID))
+    assertThat(
+            new TermsAcceptanceGate(termsConsentCheck, refusedSubjects, test)
+                .holds(auth(), USER_ID))
         .isFalse();
     test.setProperty(TermsAcceptanceGate.ARMED_IN_TEST, "true");
-    assertThat(new TermsAcceptanceGate(termsConsentCheck, refusedSubjects, test).holds(auth(), USER_ID))
+    assertThat(
+            new TermsAcceptanceGate(termsConsentCheck, refusedSubjects, test)
+                .holds(auth(), USER_ID))
         .isTrue();
   }
 

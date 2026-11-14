@@ -502,8 +502,7 @@ public class InventoryAggregationService {
             attributes.hasItemClasses(),
             attributes.itemClassesOrNull());
     LowStockSubjects low = stockLevelService.lowSubjects();
-    Set<UUID> pending =
-        relocationMarks.pendingHoldersOf(stacks, InventoryItemStackAggregate::user);
+    Set<UUID> pending = relocationMarks.pendingHoldersOf(stacks, InventoryItemStackAggregate::user);
     return buildGroupedFromItemStacks(stacks, pending).stream()
         .map(group ->
             group.withLowStock(

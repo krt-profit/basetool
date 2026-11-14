@@ -91,7 +91,8 @@ class InventoryMergeCutoffTest {
   @Test
   void aHolderWithoutACutoffMergesEveryRowDatedOrNot() {
     InventoryMergeService unrestricted =
-        new InventoryMergeService(orderWrites, repository, offers, auditRecorder, _ -> Optional.empty());
+        new InventoryMergeService(
+            orderWrites, repository, offers, auditRecorder, _ -> Optional.empty());
     InventoryItem undated = pieceRow(null);
     when(repository.findMergeGroupForUpdate(
             eq(undated.getUser().getId()),

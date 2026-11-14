@@ -252,9 +252,7 @@ class PatchChangeTriggerIntegrationTest {
 
     assertThat(countOf(preview.counts(), PatchCount.REFINERY_ORDERS_CANCELED))
         .isGreaterThanOrEqualTo(1);
-    assertThat(preview.counts())
-        .extracting(PatchCountDto::kind)
-        .contains(PatchCount.MEMBERS_ASKED);
+    assertThat(preview.counts()).extracting(PatchCountDto::kind).contains(PatchCount.MEMBERS_ASKED);
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.OPEN);
     assertThat(history.history()).isEmpty();
   }

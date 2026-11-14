@@ -56,8 +56,8 @@ final class WipeSelection {
   private final Map<WipeException, Bucket> exceptions;
 
   /**
-   * The rows the options wipe, by the share the Lager's summary event counts them under: the
-   * groups in declaration order, the wiping exceptions last. Built once and never changed.
+   * The rows the options wipe, by the share the Lager's summary event counts them under: the groups
+   * in declaration order, the wiping exceptions last. Built once and never changed.
    */
   private final @Unmodifiable Map<StockWipeShare, Set<UUID>> wiped;
 
@@ -148,9 +148,7 @@ final class WipeSelection {
   @NotNull
   @Unmodifiable
   Set<UUID> wipedRowIds() {
-    return wiped.values().stream()
-        .flatMap(Set::stream)
-        .collect(Collectors.toUnmodifiableSet());
+    return wiped.values().stream().flatMap(Set::stream).collect(Collectors.toUnmodifiableSet());
   }
 
   /**

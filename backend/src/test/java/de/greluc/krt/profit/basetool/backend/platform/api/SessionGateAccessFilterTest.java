@@ -51,9 +51,9 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The one filter every session gate runs in (REQ-SEC-028, REQ-PATCH-020, ADR-0385): the gates run in
- * their order, the first holding gate refuses with its own code, and no gate refuses the endpoints
- * of itself or of an earlier gate.
+ * The one filter every session gate runs in (REQ-SEC-028, REQ-PATCH-020, ADR-0385): the gates run
+ * in their order, the first holding gate refuses with its own code, and no gate refuses the
+ * endpoints of itself or of an earlier gate.
  */
 class SessionGateAccessFilterTest {
 

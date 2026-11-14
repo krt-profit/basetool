@@ -33,8 +33,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 /**
- * The home-location gate (REQ-PATCH-020): a member who must still choose a new home location in
- * the open phase is refused with {@code HOME_LOCATION_REQUIRED}.
+ * The home-location gate (REQ-PATCH-020): a member who must still choose a new home location in the
+ * open phase is refused with {@code HOME_LOCATION_REQUIRED}.
  *
  * <p>Runs after the consent gate. An exchange client's relayed request passes: the exchange keeps
  * reading and booking new stock, and the relocation lock refuses its writes on locked rows and
@@ -74,8 +74,7 @@ public class HomeLocationGate implements SessionGate {
   @Override
   public boolean holds(@NotNull Authentication authentication, @NotNull UUID userId) {
     boolean exchangeClient =
-        authentication instanceof SubjectAuthentication subject
-            && subject.externalClient() != null;
+        authentication instanceof SubjectAuthentication subject && subject.externalClient() != null;
     return !exchangeClient && gateCheck.mustChoose(userId);
   }
 

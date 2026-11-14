@@ -31,8 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The no-mixing rule's answer to the Lager (REQ-PATCH-004, ADR-0381): a holder's rows from before
- * the open home-location phase's live time never merge while that holder's relocation is pending
- * in it. The wipe runs at the trigger and needs no window of its own.
+ * the open home-location phase's live time never merge while that holder's relocation is pending in
+ * it. The wipe runs at the trigger and needs no window of its own.
  */
 @Component
 @RequiredArgsConstructor

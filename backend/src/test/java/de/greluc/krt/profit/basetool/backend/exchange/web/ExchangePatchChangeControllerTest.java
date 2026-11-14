@@ -41,14 +41,14 @@ import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeWrites;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeDto;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeOptions;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeTrigger;
-import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.TriggerPatchChangeRequest;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.WipeException;
-import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
-import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberHeader;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import java.sql.Timestamp;
@@ -386,8 +386,7 @@ class ExchangePatchChangeControllerTest {
   }
 
   @Test
-  void aStalePushAgainstALotThePatchChangePartlyMovedIsAVersionConflictNamingIt()
-      throws Exception {
+  void aStalePushAgainstALotThePatchChangePartlyMovedIsAVersionConflictNamingIt() throws Exception {
     row(port, null);
     row(port, null, Instant.now());
     PatchChangeDto recorded = trigger();

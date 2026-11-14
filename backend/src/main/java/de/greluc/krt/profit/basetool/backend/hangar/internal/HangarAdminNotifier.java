@@ -64,8 +64,8 @@ public class HangarAdminNotifier {
   }
 
   /**
-   * Announces an admin's bulk change of a member's ships: the ship when one changed, a summary
-   * with the count when several did, nothing when none did.
+   * Announces an admin's bulk change of a member's ships: the ship when one changed, a summary with
+   * the count when several did, nothing when none did.
    *
    * @param memberId the ships' owner
    * @param changed the ships the change applied to

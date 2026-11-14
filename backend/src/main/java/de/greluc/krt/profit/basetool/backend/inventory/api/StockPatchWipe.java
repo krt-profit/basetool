@@ -74,8 +74,8 @@ public interface StockPatchWipe {
    * Records one summary event in the Lager's audit trail and refreshes the open Lager pages after
    * the commit.
    *
-   * @param rowsByShare the rows to delete, by the share the summary event counts them under, in
-   *     the order the event lists the shares
+   * @param rowsByShare the rows to delete, by the share the summary event counts them under, in the
+   *     order the event lists the shares
    * @param patchChangeId the patch change that wiped them
    * @param patchLabel its label, the summary event's subject label
    * @return what the wipe removed

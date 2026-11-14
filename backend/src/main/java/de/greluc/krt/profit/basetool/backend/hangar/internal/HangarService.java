@@ -86,7 +86,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class HangarService {
 
-
   private final ShipRepository shipRepository;
   private final UserRepository userRepository;
   private final ShipTypeRepository shipTypeRepository;

@@ -52,8 +52,8 @@ public class InventoryMergeProbe {
   /**
    * Probes whether an Einbuchen with the given material stock identity would find a row to merge
    * with, resolving owner and owning org unit exactly as {@link
-   * InventoryItemService#createInventoryItem} does; a row created before the booked member's
-   * merge cutoff never counts (REQ-PATCH-004).
+   * InventoryItemService#createInventoryItem} does; a row created before the booked member's merge
+   * cutoff never counts (REQ-PATCH-004).
    *
    * <p>Runs without a surrounding transaction so a refused org-unit resolution answers {@code
    * false} instead of marking a shared transaction rollback-only.

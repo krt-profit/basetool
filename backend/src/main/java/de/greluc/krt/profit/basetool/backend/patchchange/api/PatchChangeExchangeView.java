@@ -45,7 +45,8 @@ public record PatchChangeExchangeView(
    * @param liveAt the live time, the cutoff of every effect
    * @param wipeGroups every wipe group in declaration order, with its catalogue types and whether
    *     the patch change selected it
-   * @param wipeExceptions every wipe exception as stored, also one whose catalogue entry was deleted
+   * @param wipeExceptions every wipe exception as stored, also one whose catalogue entry was
+   *     deleted
    * @param cancelRefineryOrders whether running refinery orders started before the live time ended
    * @param currencyWipe whether the currency wipe ran
    * @param homeLocationPrompt whether the members were asked for a new home location

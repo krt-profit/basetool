@@ -106,8 +106,7 @@ class FilterExemptionSetsTest {
   @Test
   @DisplayName("the terms gate exempts exactly its four paths")
   void termsExemptionsAreExact() {
-    assertThat(TermsAcceptanceGate.EXEMPT_PATHS)
-        .containsExactlyInAnyOrderElementsOf(TERMS_EXEMPT);
+    assertThat(TermsAcceptanceGate.EXEMPT_PATHS).containsExactlyInAnyOrderElementsOf(TERMS_EXEMPT);
   }
 
   @Test

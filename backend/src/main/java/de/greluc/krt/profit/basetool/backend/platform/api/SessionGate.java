@@ -46,8 +46,8 @@ public interface SessionGate {
   ProblemCode problemCode();
 
   /**
-   * Returns the endpoints the gate leaves open to a member it holds, as exact path patterns
-   * matched on the decoded path.
+   * Returns the endpoints the gate leaves open to a member it holds, as exact path patterns matched
+   * on the decoded path.
    *
    * @return the gate's own exempt endpoints
    */
