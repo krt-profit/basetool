@@ -87,8 +87,7 @@ class PatchChangeExchangeViews implements PatchChangeExchangeReader {
         group.name(),
         selected,
         WipeGroupTypes.typesOf(group).stream()
-            .map(type ->
-                new PatchChangeExchangeView.TypeKey(type.source().name(), type.value()))
+            .map(type -> new PatchChangeExchangeView.TypeKey(type.source().name(), type.value()))
             .toList());
   }
 

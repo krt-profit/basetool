@@ -121,8 +121,7 @@ public class ExchangePatchChangeService {
                         group.selected(),
                         group.types().stream()
                             .map(type ->
-                                new ExchangePatchChangeDto.TypeKey(
-                                    type.source(), type.value()))
+                                new ExchangePatchChangeDto.TypeKey(type.source(), type.value()))
                             .toList()))
                 .toList(),
             current.wipeExceptions().stream()
