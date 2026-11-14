@@ -54,24 +54,25 @@ class E2eStackPortsParityTest {
       Pattern.compile("STACK_PORTS\\s*=\\s*List\\.of\\(([\\d,\\s]+)\\)");
 
   /**
-   * The extension checks exactly the ports the dev profile publishes.
+   * The extension checks exactly the ports the dev profile publishes; both sides are compared as
+   * the digit strings the two patterns capture.
    *
    * @throws IOException if one of the files cannot be read
    */
   @Test
   void theExtensionChecksEveryPortTheDevProfilePublishes() throws IOException {
     Matcher compose = LOOPBACK_PORT.matcher(Files.readString(COMPOSE, StandardCharsets.UTF_8));
-    List<Integer> published = new ArrayList<>();
+    List<String> published = new ArrayList<>();
     while (compose.find()) {
-      published.add(Integer.valueOf(compose.group(1)));
+      published.add(compose.group(1));
     }
     Matcher declared =
         STACK_PORTS.matcher(Files.readString(STACK_EXTENSION, StandardCharsets.UTF_8));
     assertThat(declared.find()).as("E2eStackExtension declares STACK_PORTS").isTrue();
-    List<Integer> checked =
+    List<String> checked =
         Arrays.stream(declared.group(1).split(","))
             .map(String::strip)
-            .map(Integer::valueOf)
+            .filter(port -> !port.isEmpty())
             .toList();
 
     assertThat(published).as("docker-compose.yml publishes the dev-profile ports").isNotEmpty();
