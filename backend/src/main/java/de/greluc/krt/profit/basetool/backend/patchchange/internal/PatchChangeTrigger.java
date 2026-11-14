@@ -118,10 +118,10 @@ public class PatchChangeTrigger {
     Instant liveAt = PatchChangeRules.requireLiveAt(request.liveAt(), now, previous);
     PatchChangeRules.requireLabelAfter(label, previous);
     exceptionCatalogue.requireKnown(request.options().wipeExceptions());
-    if (request.options().homeLocationPrompt()) {
+    PatchChangePlan plan = new PatchChangePlan(liveAt, request.options());
+    if (plan.options().homeLocationPrompt()) {
       homeLocationOffer.requireAnyOffered();
     }
-    PatchChangePlan plan = new PatchChangePlan(liveAt, request.options());
     PatchChange record =
         repository.save(
             new PatchChange(

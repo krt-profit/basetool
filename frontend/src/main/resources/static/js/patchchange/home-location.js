@@ -31,7 +31,7 @@ import { format } from '/js/patchchange/patch-change-messages.js';
 const PAGE_URL = '/home-location';
 
 /** The page read again after a choice for a phase that is no longer the open one. */
-const PHASE_CHANGED_URL = PAGE_URL + '?phaseChanged=true';
+const PHASE_CHANGED_URL = `${PAGE_URL}?phaseChanged=true`;
 
 /**
  * The localized strings of the home-location page, read once from the `#hl-i18n` holder.
