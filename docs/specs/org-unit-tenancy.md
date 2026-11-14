@@ -986,6 +986,9 @@ bank-only account can read the counterparty options.
 - [ ] A member with an honourable pin is stamped and sees no message at all.
 - [ ] The rejection stays a `400`; it is neither a conflict nor a permission failure.
 - [ ] A page-local `onError` handler renders the same wording as the central path.
+- [x] `OwnerOrgUnitRequiredException` leaves the caller's transaction committable
+  (`OrgUnitStampingService` does not roll back for it), so a read that treats "no owner yet" as an
+  empty answer can catch it and still commit (`MissionTemplateHttpTest`).
 
 **Enforced by:** `OrgUnitStampingServiceOwnerRequiredTest` (both entry points, the status, and the
 pinned negative), `InventoryPageControllerMvcTest` (preselect, placeholder, hidden on-behalf picker),

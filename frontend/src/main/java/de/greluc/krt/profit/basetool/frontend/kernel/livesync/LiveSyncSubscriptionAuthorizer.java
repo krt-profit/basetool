@@ -90,6 +90,17 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
+   * Which of a class's two resource reads runs first; a subscribing page asks for the read it
+   * performs itself, so the routine refusal of the other read never happens for it.
+   */
+  public enum ProbeOrder {
+    /** {@link LiveSyncTopicClass#authProbePath()} first, the fallback after a refusal. */
+    PRIMARY_FIRST,
+    /** {@link LiveSyncTopicClass#fallbackProbePath()} first, the primary read after a refusal. */
+    FALLBACK_FIRST
+  }
+
+  /**
    * Returns the verdict for an indeterminate authorization outcome: closed for every class that
    * needs a check (a backend probe, a capability, a local role or the socket's own subject), open
    * only for a class authorized by the socket's authentication alone, whose verdict is {@link
@@ -180,6 +191,33 @@ public class LiveSyncSubscriptionAuthorizer {
       @Nullable UUID activeOrgUnitId,
       @Nullable Set<String> authorities,
       @Nullable UUID subject) {
+    return authorize(
+        topic, accessToken, activeOrgUnitId, authorities, subject, ProbeOrder.PRIMARY_FIRST);
+  }
+
+  /**
+   * Decides whether a subscribe to {@code topic} is authorized, running a class's two resource
+   * reads in the given order; the order changes which read is tried first, never the verdict.
+   *
+   * @param topic the parsed topic being subscribed to
+   * @param accessToken the access token captured at handshake, or {@code null}
+   * @param activeOrgUnitId the org-unit pin captured at handshake, or {@code null}
+   * @param authorities the authorities captured at handshake, or {@code null}
+   * @param subject the socket's own user id captured at handshake, or {@code null}
+   * @param probeOrder which of {@link LiveSyncTopicClass#authProbePath()} and {@link
+   *     LiveSyncTopicClass#fallbackProbePath()} runs first; ignored for a class without a fallback
+   * @return {@link Decision#ALLOW}; {@link Decision#DENY} on an explicit refusal, a missing role or
+   *     a personal room of someone else; or {@link Decision#DENY_INDETERMINATE} when the outcome
+   *     was indeterminate
+   */
+  @NotNull
+  public Decision authorize(
+      @NotNull LiveSyncTopic topic,
+      @Nullable String accessToken,
+      @Nullable UUID activeOrgUnitId,
+      @Nullable Set<String> authorities,
+      @Nullable UUID subject,
+      @NotNull ProbeOrder probeOrder) {
     Set<String> requiredAnyRole = topic.topicClass().requiredAnyRole();
     if (topic.topicClass().personal()) {
       if (subject != null && subject.equals(topic.resourceId())) {
@@ -211,11 +249,18 @@ public class LiveSyncSubscriptionAuthorizer {
     }
     if (topic.resourceId() != null) {
       String resource = topic.resourceId().toString();
+      String primaryUri = probePath.replace("{id}", resource);
       String fallbackTemplate = topic.topicClass().fallbackProbePath();
-      String fallbackUri =
-          fallbackTemplate == null ? null : fallbackTemplate.replace("{id}", resource);
-      return probeResource(
-          topic, probePath.replace("{id}", resource), fallbackUri, accessToken, activeOrgUnitId);
+      if (fallbackTemplate == null) {
+        return probeResource(topic, primaryUri, null, accessToken, activeOrgUnitId);
+      }
+      String fallbackUri = fallbackTemplate.replace("{id}", resource);
+      return switch (probeOrder) {
+        case PRIMARY_FIRST ->
+            probeResource(topic, primaryUri, fallbackUri, accessToken, activeOrgUnitId);
+        case FALLBACK_FIRST ->
+            probeResource(topic, fallbackUri, primaryUri, accessToken, activeOrgUnitId);
+      };
     }
     String capabilityField = topic.topicClass().capabilityField();
     if (capabilityField != null) {
@@ -225,27 +270,28 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * Runs the primary authorization read and, only when it explicitly refuses (403/404), the
-   * fallback read ({@link LiveSyncTopicClass#BANK_ACCOUNT}), which then decides.
+   * Runs the first authorization read and, only when it explicitly refuses (403/404), the second
+   * read ({@link LiveSyncTopicClass#BANK_ACCOUNT}), which then decides.
    *
    * @param topic the topic, for logging
-   * @param primaryUri the resolved primary resource read URI
-   * @param fallbackUri the resolved fallback read URI, or {@code null} when the class has none
+   * @param firstUri the resolved resource read URI tried first
+   * @param secondUri the resolved read URI tried after a refusal, or {@code null} when the class
+   *     has only one
    * @param accessToken the captured bearer
    * @param activeOrgUnitId the captured pin, or {@code null}
    * @return the verdict
    */
   private Decision probeResource(
       LiveSyncTopic topic,
-      String primaryUri,
-      @Nullable String fallbackUri,
+      String firstUri,
+      @Nullable String secondUri,
       String accessToken,
       UUID activeOrgUnitId) {
-    Decision primary = probeOne(topic, primaryUri, accessToken, activeOrgUnitId);
-    if (primary != Decision.DENY || fallbackUri == null) {
-      return primary;
+    Decision first = probeOne(topic, firstUri, accessToken, activeOrgUnitId);
+    if (first != Decision.DENY || secondUri == null) {
+      return first;
     }
-    return probeOne(topic, fallbackUri, accessToken, activeOrgUnitId);
+    return probeOne(topic, secondUri, accessToken, activeOrgUnitId);
   }
 
   /**

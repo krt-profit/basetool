@@ -8,6 +8,8 @@ const DEFAULT_COALESCE_MS = 400;
  * @property {boolean} ackedOnce whether the relay acknowledged the subscription before
  * @property {number} deniedAttempts consecutive indeterminate denials
  * @property {number | null} resubscribeTimer the pending re-subscribe timer, if any
+ * @property {boolean} fallbackFirst whether the relay authorizes the room with its class's fallback
+ *     read first, because the page performs that read itself
  * @property {KrtLiveSyncHandlers} [handlers] the callbacks registered by `subscribe`
  */
 
@@ -72,6 +74,17 @@ const syncSocket = (function () {
         }
     }
 
+    /**
+     * @param {string} topic the topic room
+     * @param {TopicEntry} entry the topic's state
+     * @returns {{type: string, topic: string, fallbackFirst?: boolean}} the subscribe frame
+     */
+    function subscribeFrame(topic, entry) {
+        return entry.fallbackFirst
+            ? { type: 'subscribe', topic, fallbackFirst: true }
+            : { type: 'subscribe', topic };
+    }
+
     function ensureSocket() {
         if (stopped) {
             return;
@@ -97,7 +110,7 @@ const syncSocket = (function () {
             if (topics[t].state !== 'denied' || topics[t].deniedAttempts > 0) {
                 topics[t].deniedAttempts = 0;
                 topics[t].state = 'pending';
-                rawSend({ type: 'subscribe', topic: t });
+                rawSend(subscribeFrame(t, topics[t]));
             }
         });
         while (publishBuffer.length) {
@@ -132,7 +145,7 @@ const syncSocket = (function () {
                 return;
             }
             entry.state = 'pending';
-            rawSend({ type: 'subscribe', topic });
+            rawSend(subscribeFrame(topic, entry));
         }, wait);
     }
 
@@ -224,9 +237,10 @@ const syncSocket = (function () {
         /**
          * @param {string} topic the topic room
          * @param {KrtLiveSyncHandlers} handlers the callbacks to register
+         * @param {KrtLiveSyncSubscribeOptions} [options] how the relay authorizes the room
          * @returns {{unsubscribe(): void}} the subscription handle
          */
-        subscribe(topic, handlers) {
+        subscribe(topic, handlers, options) {
             if (!topic) {
                 return { unsubscribe() {} };
             }
@@ -235,12 +249,14 @@ const syncSocket = (function () {
                 ackedOnce: false,
                 deniedAttempts: 0,
                 resubscribeTimer: null,
+                fallbackFirst: false,
             });
             entry.handlers = handlers || {};
+            entry.fallbackFirst = !!(options && options.fallbackFirst);
             ensureSocket();
             if (isOpen()) {
                 entry.state = 'pending';
-                rawSend({ type: 'subscribe', topic });
+                rawSend(subscribeFrame(topic, entry));
             }
             return {
                 unsubscribe() {
@@ -494,17 +510,21 @@ function createReceiver(cfg) {
         if (!topic) {
             return;
         }
-        subscription = syncSocket.subscribe(topic, {
-            onChanged(sections) {
-                apply(sections);
+        subscription = syncSocket.subscribe(
+            topic,
+            {
+                onChanged(sections) {
+                    apply(sections);
+                },
+                onResync() {
+                    apply(null);
+                },
+                onDenied() {
+                    deferAllVisibleSections();
+                },
             },
-            onResync() {
-                apply(null);
-            },
-            onDenied() {
-                deferAllVisibleSections();
-            },
-        });
+            { fallbackFirst: !!(cfg && cfg.fallbackFirst) },
+        );
     }
 
     if (cfg && cfg.topic) {

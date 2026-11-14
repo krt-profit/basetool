@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -86,6 +87,9 @@ final class LiveSyncSubscriptions {
   /** The {@link #ATTR_REAUTHORIZE_DUE} value while a socket's rooms are being re-authorized. */
   private static final long REAUTHORIZING = Long.MAX_VALUE;
 
+  /** Session-attribute key ({@link FallbackFirstRooms}) of a socket's fallback-first rooms. */
+  private static final String ATTR_FALLBACK_FIRST = "livesync.fallbackFirst";
+
   private final LiveSyncRooms rooms;
   private final LiveSyncRateLimiter rateLimiter;
   private final LiveSyncSubscriptionAuthorizer authorizer;
@@ -105,12 +109,16 @@ final class LiveSyncSubscriptions {
   /**
    * Handles a {@code subscribe} frame: validates the topic, applies the rate limit, topic cap and
    * idempotency, then authorizes asynchronously on {@link #authExecutor}; a saturated executor
-   * resolves the subscribe as indeterminate.
+   * resolves the subscribe as indeterminate. A page that performs a class's fallback read itself
+   * asks for it first; the room keeps that order for its re-authorizations.
    *
    * @param session the subscribing session
    * @param rawTopic the frame's {@code topic} field, or {@code null} when absent
+   * @param fallbackFirst the frame's {@code fallbackFirst} field; ignored for a class without a
+   *     fallback read
    */
-  void subscribe(@NotNull WebSocketSession session, @Nullable String rawTopic) {
+  void subscribe(
+      @NotNull WebSocketSession session, @Nullable String rawTopic, boolean fallbackFirst) {
     LiveSyncTopic topic = LiveSyncTopic.parse(rawTopic);
     if (topic == null) {
       log.debug(
@@ -144,9 +152,11 @@ final class LiveSyncSubscriptions {
       return;
     }
     subs.add(topic.canonical());
+    rememberProbeOrder(session, topic, fallbackFirst);
     HandshakeCapture capture = HandshakeCapture.of(session);
+    LiveSyncSubscriptionAuthorizer.ProbeOrder probeOrder = probeOrder(session, topic);
     try {
-      authExecutor.execute(() -> authorizeAndRegister(session, topic, capture));
+      authExecutor.execute(() -> authorizeAndRegister(session, topic, capture, probeOrder));
     } catch (RejectedExecutionException _) {
       LiveSyncSubscriptionAuthorizer.Decision verdict =
           LiveSyncSubscriptionAuthorizer.indeterminate(topic);
@@ -208,14 +218,16 @@ final class LiveSyncSubscriptions {
    * @param session the subscribing session
    * @param topic the topic being authorized
    * @param capture what the socket's handshake captured
+   * @param probeOrder which of the class's resource reads runs first
    */
   private void authorizeAndRegister(
       @NotNull WebSocketSession session,
       @NotNull LiveSyncTopic topic,
-      @NotNull HandshakeCapture capture) {
+      @NotNull HandshakeCapture capture,
+      @NotNull LiveSyncSubscriptionAuthorizer.ProbeOrder probeOrder) {
     LiveSyncSubscriptionAuthorizer.Decision decision;
     try {
-      decision = capture.authorize(authorizer, topic);
+      decision = capture.authorize(authorizer, topic, probeOrder);
       if (decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE) {
         log.warn(
             "Live-sync subscribe to topic {} failed closed because its access check was"
@@ -282,6 +294,48 @@ final class LiveSyncSubscriptions {
       rooms.sendSnapshot(decorated, topic);
     }
     subscribeCounter(topic, MetricNames.OUTCOME_ALLOWED, MetricNames.REASON_NONE).increment();
+  }
+
+  /**
+   * Records whether a room's subscribing page asked for its class's fallback read first; a class
+   * without a fallback read records nothing.
+   *
+   * @param session the subscribing socket
+   * @param topic the room being subscribed
+   * @param fallbackFirst the frame's {@code fallbackFirst} field
+   */
+  private static void rememberProbeOrder(
+      @NotNull WebSocketSession session, @NotNull LiveSyncTopic topic, boolean fallbackFirst) {
+    Object stored =
+        session
+            .getAttributes()
+            .computeIfAbsent(
+                ATTR_FALLBACK_FIRST, _ -> new FallbackFirstRooms(ConcurrentHashMap.newKeySet()));
+    if (!(stored instanceof FallbackFirstRooms rooms)) {
+      return;
+    }
+    if (fallbackFirst && topic.topicClass().fallbackProbePath() != null) {
+      rooms.topics().add(topic.canonical());
+    } else {
+      rooms.topics().remove(topic.canonical());
+    }
+  }
+
+  /**
+   * Reads which of a room's class reads runs first, as its subscribing page asked.
+   *
+   * @param session the socket holding or subscribing the room
+   * @param topic the room
+   * @return {@link LiveSyncSubscriptionAuthorizer.ProbeOrder#FALLBACK_FIRST} for a room whose page
+   *     asked for it, else {@link LiveSyncSubscriptionAuthorizer.ProbeOrder#PRIMARY_FIRST}
+   */
+  @NotNull
+  private static LiveSyncSubscriptionAuthorizer.ProbeOrder probeOrder(
+      @NotNull WebSocketSession session, @NotNull LiveSyncTopic topic) {
+    return session.getAttributes().get(ATTR_FALLBACK_FIRST) instanceof FallbackFirstRooms rooms
+            && rooms.topics().contains(topic.canonical())
+        ? LiveSyncSubscriptionAuthorizer.ProbeOrder.FALLBACK_FIRST
+        : LiveSyncSubscriptionAuthorizer.ProbeOrder.PRIMARY_FIRST;
   }
 
   /**
@@ -354,7 +408,8 @@ final class LiveSyncSubscriptions {
         if (!session.isOpen()) {
           return;
         }
-        LiveSyncSubscriptionAuthorizer.Decision verdict = reauthorizationVerdict(topic, capture);
+        LiveSyncSubscriptionAuthorizer.Decision verdict =
+            reauthorizationVerdict(topic, capture, probeOrder(session, topic));
         reauthorizeCounter(topic, reauthorizeOutcome(verdict)).increment();
         if (verdict == LiveSyncSubscriptionAuthorizer.Decision.DENY) {
           evict(session, topic);
@@ -374,13 +429,16 @@ final class LiveSyncSubscriptions {
    *
    * @param topic the held room
    * @param capture what the socket's handshake captured
+   * @param probeOrder which of the class's resource reads runs first, as its page asked
    * @return the authorizer's verdict
    */
   @NotNull
   private LiveSyncSubscriptionAuthorizer.Decision reauthorizationVerdict(
-      @NotNull LiveSyncTopic topic, @NotNull HandshakeCapture capture) {
+      @NotNull LiveSyncTopic topic,
+      @NotNull HandshakeCapture capture,
+      @NotNull LiveSyncSubscriptionAuthorizer.ProbeOrder probeOrder) {
     try {
-      return capture.authorize(authorizer, topic);
+      return capture.authorize(authorizer, topic, probeOrder);
     } catch (RuntimeException e) {
       log.debug(
           "Live-sync re-authorization of topic {} threw; the room stays until the next check",
@@ -558,6 +616,13 @@ final class LiveSyncSubscriptions {
   }
 
   /**
+   * The rooms of one socket whose subscribing page asked for the class's fallback read first.
+   *
+   * @param topics the canonical topics of those rooms, a concurrent set
+   */
+  private record FallbackFirstRooms(@NotNull Set<String> topics) {}
+
+  /**
    * What the {@code /ws/sync} handshake captured on a socket to authorize its rooms, read once per
    * subscribe or re-check.
    *
@@ -613,12 +678,15 @@ final class LiveSyncSubscriptions {
      *
      * @param authorizer the subscribe authorizer
      * @param topic the topic to authorize
+     * @param probeOrder which of the class's resource reads runs first
      * @return the authorizer's verdict
      */
     @NotNull
     LiveSyncSubscriptionAuthorizer.Decision authorize(
-        @NotNull LiveSyncSubscriptionAuthorizer authorizer, @NotNull LiveSyncTopic topic) {
-      return authorizer.authorize(topic, token, pin, authorities, subject);
+        @NotNull LiveSyncSubscriptionAuthorizer authorizer,
+        @NotNull LiveSyncTopic topic,
+        @NotNull LiveSyncSubscriptionAuthorizer.ProbeOrder probeOrder) {
+      return authorizer.authorize(topic, token, pin, authorities, subject, probeOrder);
     }
 
     /**

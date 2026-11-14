@@ -1869,6 +1869,46 @@ web-only.
 
 ---
 
+### REQ-API-024 — An inbound string is capped at its declared maximum, else at the free-text default
+
+Every inbound string is trimmed, NFC-normalized and length-capped before validation, on the JSON
+path (`NormalizedStringDeserializer`, backend) and on the form-binding path (`NormalizedStringEditor`
+through `GlobalBindingAdvice`, frontend and backend). The cap is the default free-text cap
+`MAX_FREE_TEXT_LENGTH` (8 000 characters) unless the field declares a larger `@Size(max)`:
+
+- **JSON (backend):** a `String` property whose `@Size(max)` exceeds the default is capped at that
+  maximum; a smaller or absent maximum keeps the default, and a container's `@Size` bounds its
+  element count, never the length of its strings.
+- **Form binding (frontend):** a bound form is capped at the largest `@Size(max)` any of its
+  `String` fields declares above the default; each field's own `@Size` then validates it with a
+  field error. The backend's form binding carries only query, path and filter parameters and keeps
+  the default.
+- A value beyond the cap answers `400` as an unreadable body; a value within the cap but beyond the
+  field's `@Size` answers the ordinary validation error (REQ-API-003).
+
+A field the UI and the schema allow to be longer than the default — a 20 000-character mission
+description or material-exchange remark, a mission form's planning JSON, a staged connected-app
+change set of up to 512 KiB (REQ-XCH-021) — therefore reaches validation instead of failing as an
+unreadable body.
+
+**Acceptance**
+
+- [x] A JSON string property declaring a larger `@Size(max)` accepts text up to that maximum and
+  refuses one character more; a smaller, minimum-only or absent `@Size` keeps the default, and a
+  list's `@Size` does not raise its strings' cap (`NormalizedStringDeserializerTest`).
+- [x] A staged change set longer than the default is previewed and applied
+  (`ExchangeMassChangeControllerTest`).
+- [x] A bound form declaring a larger field binds text up to that maximum; a form without one, or a
+  binder without a form, keeps the default (`GlobalBindingAdviceTest`).
+- [x] `capFor` raises the cap only for a larger declared maximum (`TechnicalContractsTest`).
+
+**Enforced by:** `NormalizedStringDeserializerTest`, `GlobalBindingAdviceTest`,
+`TechnicalContractsTest`, `ExchangeMassChangeControllerTest` · **Code:**
+`NormalizedStringDeserializer`, `GlobalBindingAdvice`, `StringNormalization#capFor` · **Related:**
+REQ-API-003, REQ-API-015, REQ-XCH-021
+
+---
+
 ### Member catalogue evidence projection
 
 `GET /api/v1/game-items/{id}/catalogue` is a read-only full-catalogue projection for `ADMIN`,

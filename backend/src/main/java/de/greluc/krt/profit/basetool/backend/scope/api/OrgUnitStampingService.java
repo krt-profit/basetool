@@ -38,11 +38,12 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Create-time owner stamping of the scope kernel: resolves the {@link OrgUnit} a new aggregate is
  * stamped on and validates an explicit owning-org-unit reassignment (REQ-ORG-018). Read-only; the
- * caller persists the stamped entity in its own transaction.
+ * caller persists the stamped entity in its own transaction, which an {@link
+ * OwnerOrgUnitRequiredException} leaves committable, so a caller may catch it and go on.
  */
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, noRollbackFor = OwnerOrgUnitRequiredException.class)
 public class OrgUnitStampingService {
 
   private final RequestScopeResolver requestScopeResolver;

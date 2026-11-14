@@ -811,7 +811,18 @@ rule — no blanket "everything is masked" claim:
   `scripts/check-loki-rule-signatures.py`, which holds `JvmNativeThreadExhaustion` to its recorded
   lines too.
 - **Keycloak file log** (`app="keycloak"`) — masked **in the shipper** (Alloy stages scrub
-  `username=` / `ipAddress=` before ingestion).
+  `username=` / `ipAddress=` before ingestion). Besides `KeycloakErrorRateHigh`, which counts
+  `ERROR` lines, **`KeycloakBackendTruststoreUnreadable`** (warning) reads this stream: it fires on
+  the SPI's `Failed to load the backend truststore` `WARN`, written once per Keycloak start that
+  cannot read `KRT_BACKEND_TRUSTSTORE_PATH`, and holds for 30 minutes after it
+  (`count_over_time(…[30m]) > 0`, `for: 0m`) — the precheck then fails open (REQ-SEC-022).
+  **`KeycloakAccountExistenceProbeFailing`** (warning) fires for an hour on the SPI's per-login
+  `Account-existence probe could not reach the backend` `WARN`: a store that loads but does not
+  trust the backend (`PKIX path building failed`), a timeout or a refused connection — each a first
+  login the precheck let through unchecked. The wording is the project's own logging code, not the
+  JVM's; `scripts/check-loki-rule-signatures.py` holds both rules to verbatim production lines they
+  must fire on and lines they must stay silent on, so a reworded log message fails the check instead
+  of silencing the alert.
 
 **Every shipper-side mask captures the secret and nothing else, and captures all of it.** Two
 rules, because the masks broke both ways:
@@ -1562,6 +1573,11 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   timestamps from durable attempts without replaying completion counters. This recovery runs once
   per process before recording any new attempt, including a zero-delay scheduler tick. A refresh-only
   cache-training context performs no recovery database access.
+- A `PARTIAL` attempt logs one WARN naming its source and slice and the counters that made it
+  partial: fetched, valid, applied, skipped, failed, whether the census stayed complete and the
+  sweep outcome (`SyncRunService`). The umbrella job's failure names every incomplete slice with its
+  outcome (`SHIP_TYPE=PARTIAL`; `ScWikiScheduler`, `UexScheduler`), so the log alone tells which
+  slice to open on the sync-report page, where the records behind a conflict are listed.
 - `basetool_catalogue_attempt_active{source,aggregate}` identifies in-flight attempts;
   `basetool_catalogue_attempt_started_timestamp_seconds{source,aggregate}` records their actual
   start. `CatalogueAttemptRunningTooLong` watches source sweeps active for more than two hours.

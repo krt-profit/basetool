@@ -250,8 +250,9 @@ than blocking a legitimate new member: the precheck is **skipped** when the feat
 (HTTPS only — never HTTP), or when the flow is an **account-linking** flow (an already-authenticated
 session, ADR-0036, so the precheck never denies the very account being linked); and a backend error,
 timeout, TLS failure, or unparseable answer is treated as "unknown" → allow. Certificate validation
-is **never** disabled — the SPI trusts the backend's self-signed certificate via a configured PKCS#12
-truststore, and a TLS failure simply fails open.
+is **never** disabled — the SPI trusts the backend's internal-CA leaf through a PKCS#12 truststore
+(in production the CA-only internal truststore of REQ-SEC-070), and a TLS failure simply fails
+open.
 
 **Acceptance**
 
@@ -272,24 +273,30 @@ truststore, and a TLS failure simply fails open.
   startup (`DiscordSpiPrecheckProperties#isSharedSecretBlankOrStrong` `@AssertTrue`), while a blank
   value stays valid because it disables the endpoint.
 - [x] The two krt-theme login bundles (de/en) carry `discordAccountAlreadyExists`.
+- [x] The production keycloak unit mounts the CA-only internal truststore
+  (`/etc/basetool/secrets/tls/truststore.p12` at `/run/secrets/internal-truststore.p12`) and points
+  the SPI at it: `KRT_BACKEND_TRUSTSTORE_PATH` and `KRT_BACKEND_TRUSTSTORE_PASSWORD` are fixed in
+  `docker-compose.yml` (the password the three apps use for that store), not chosen by the host
+  `basetool.env`, and no hand-installed store or drop-in is involved. A Keycloak start that cannot
+  load the store raises `KeycloakBackendTruststoreUnreadable`, and a first login whose precheck
+  cannot reach or trust the backend raises `KeycloakAccountExistenceProbeFailing`.
 
-> [!warning] Production status — corrected 2026-09-25
-> The items above are proven by tests; **on production the precheck was failing open** until
-> 2026-09-25. `basetool.env` named `KRT_BACKEND_TRUSTSTORE_PATH=/run/secrets/backend-truststore.p12`, but the
-> file had never been created and nothing mounted it, so `BackendTrustSupport` logged `Failed to
-> load the backend truststore; the Discord account-existence precheck will fail open until it is
-> fixed.` at every Keycloak start (at least seven days of log history; how long before that is not
-> known). Every colliding first login in that time landed `PENDING` instead of being denied. Fixed
-> ~15:52 UTC that day: the store was built (aliases `backend` and `internal-ca`) and mounted by a
-> keycloak drop-in; no warning since. Runbook:
-> [`DISCORD_KEYCLOAK_SETUP.md` §7.3](../keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate),
-> whose §7.4 now checks the startup log. The fail-open is by design; what was missing was any
-> signal that the configured check was not running. Since the internal-TLS step 4 (~17:58 UTC the
-> same day, REQ-SEC-070) the store holds only `internal-ca`, so a release rollback to 1.11.0 or
-> older — which puts the backend back on the old shared certificate — makes the precheck fail open
-> again unless the `backend` alias is restored first (§7.3).
+> [!warning] Production status — 2026-11-13
+> The items above are proven by tests and by the generated unit. **On production the precheck has
+> failed open twice.** Until 2026-09-25 the truststore `basetool.env` named had never existed; it
+> was then built by hand and mounted by a hand-installed keycloak drop-in. That drop-in was later
+> lost, and Keycloak again logged `Failed to load the backend truststore; the Discord
+> account-existence precheck will fail open until it is fixed.` (`NoSuchFileException:
+> /run/secrets/backend-truststore.p12`) at every start; every colliding first login landed
+> `PENDING` instead of being denied. The managed mount above (ADR-0051 amendment) fixes it with
+> the deploy of the release that carries it, which restarts keycloak; the leftovers of the
+> hand-built store are a one-time host cleanup
+> ([`deployment.md` → *One-time cleanup*](../deployment.md#one-time-cleanup-the-hand-built-precheck-truststore)).
+> Runbook: [`DISCORD_KEYCLOAK_SETUP.md` §7.3](../keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate).
+> A release rollback to one from before the managed mount runs the precheck without a truststore,
+> so it fails open again until that release is replaced.
 
-**Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · `DiscordSpiPrecheckPropertiesTest` (blank secret valid, <32-char secret rejected, ≥32-char secret valid) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties` · **Decision:** ADR-0051
+**Enforced by:** `BackendAccountCheckerTest` (fail-open HTTP matrix) · `DiscordGuildRoleGateAuthenticatorTest` (deny-on-exists with the right message key, allow-on-not-exists, fail-open on unknown, skip on linking / unconfigured / non-HTTPS) · `DiscordAccountExistenceServiceTest` (candidate normalisation + name/e-mail split + empty-candidate short-circuit) · `DiscordAccountExistenceControllerTest` (shared-secret gate: 503 unconfigured / 401 bad / 200 exists) · `DiscordSpiPrecheckPropertiesTest` (blank secret valid, <32-char secret rejected, ≥32-char secret valid) · `scripts/generate-quadlet.test.sh` (the keycloak unit mounts the internal truststore; the env template points `KRT_BACKEND_TRUSTSTORE_PATH` at it with the apps' password) · the Loki alerts `KeycloakBackendTruststoreUnreadable` and `KeycloakAccountExistenceProbeFailing` (`monitoring/loki/rules/fake/basetool-log-alerts.yml`, their wording held by `scripts/check-loki-rule-signatures.py`) · **Code:** `DiscordGuildRoleGateAuthenticator`, `BackendAccountChecker`, `BackendTrustSupport`, `DiscordGuildRoleGateAuthenticatorFactory`, `DiscordAccountExistenceController`, `DiscordAccountExistenceService`, `DiscordSpiPrecheckProperties`, `UserRepository#existsByLowerUsernameOrDisplayNameIn` / `#existsByLowerEmail`, krt-theme `messages_*.properties`, `docker-compose.yml` (the prod `keycloak` service's truststore mount and variables) · **Decision:** ADR-0051 (amended 2026-11-13)
 
 HTTP response retention is bounded independently of the request timeout. The account-existence
 precheck accepts at most 4 KiB; Discord membership/nickname replies accept at most 64 KiB. The

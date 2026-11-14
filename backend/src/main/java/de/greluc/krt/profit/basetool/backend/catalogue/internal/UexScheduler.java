@@ -118,7 +118,7 @@ public class UexScheduler {
       SyncRunService.Result items =
           syncRuns.run(
               SyncSourceSystem.UEX, SyncAggregate.GAME_ITEM, null, uexItemSyncService::syncItems);
-      requireComplete(items);
+      requireComplete(SyncAggregate.GAME_ITEM, items);
       itemsProcessed = items.count();
       if (Boolean.TRUE.equals(properties.itemPriceSyncEnabled())) {
         runStep(SyncAggregate.ITEM_PRICE, uexItemPriceSyncService::syncItemPrices);
@@ -139,6 +139,7 @@ public class UexScheduler {
 
   private void runStep(SyncAggregate aggregate, Runnable task) {
     requireComplete(
+        aggregate,
         syncRuns.run(
             SyncSourceSystem.UEX,
             aggregate,
@@ -149,9 +150,13 @@ public class UexScheduler {
             }));
   }
 
-  private static void requireComplete(SyncRunService.Result result) {
+  private static void requireComplete(SyncAggregate aggregate, SyncRunService.Result result) {
     if (!result.complete()) {
-      throw new IllegalStateException("UEX sync did not completely apply a catalogue slice");
+      throw new IllegalStateException(
+          "UEX sync did not completely apply a catalogue slice: "
+              + aggregate
+              + "="
+              + result.status());
     }
   }
 

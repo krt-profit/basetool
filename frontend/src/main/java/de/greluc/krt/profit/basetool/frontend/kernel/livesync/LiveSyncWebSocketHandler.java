@@ -314,7 +314,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     switch (type) {
-      case "subscribe" -> subscriptions.subscribe(session, textValue(node, "topic"));
+      case "subscribe" ->
+          subscriptions.subscribe(
+              session, textValue(node, "topic"), booleanValue(node, "fallbackFirst"));
       case "changed" -> handleMultiplexedChanged(session, node);
       case "focus", "blur", "heartbeat" -> handleMultiplexedPresence(session, node, type, userId);
       default -> {}
@@ -662,6 +664,11 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
    */
   int topicBucketCount() {
     return rateLimiter.topicBucketCount();
+  }
+
+  private static boolean booleanValue(@NotNull JsonNode node, @NotNull String field) {
+    JsonNode value = node.get(field);
+    return value != null && value.isBoolean() && value.booleanValue();
   }
 
   @Nullable

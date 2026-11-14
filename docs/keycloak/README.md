@@ -311,29 +311,15 @@ any restart or deploy of keycloak clears it — which is also why step 4 costs n
 Docker Compose stack the root filesystem is writable: plain `docker exec keycloak
 /opt/keycloak/bin/kcadm.sh …` without `--config`, and the scripts' default prefix, work there.
 
-> [!warning] Step 1's truststore after the internal-TLS step-3 release (#2036) — open question
-> *(added 2026-09-25)* Until #2036's release is deployed, `/run/secrets/keystore.p12` in the
-> keycloak container is the **shared** self-signed keystore, and step 1 works as written — it did on
-> production on 2026-09-25. From that release on, `quadlet/systemd/keycloak.container` mounts
-> `/etc/basetool/secrets/tls/keycloak.p12` at that path — Keycloak's **own leaf**, signed by the internal
-> CA — and mounts **no** truststore at all (unlike backend, frontend and ingest, which get
-> `/run/secrets/internal-truststore.p12`). Two consequences, neither verified yet:
->
-> - Step 1 unchanged probably still works: the JDK trusts the certificate of a key entry in a
->   truststore — that is why the shared keystore worked — and kcadm talks to Keycloak itself at
->   `https://localhost:18443`, whose leaf names `localhost`. The password is the same
->   (`KC_HTTPS_KEY_STORE_PASSWORD`; the mint used it for every store).
-> - If it fails with a PKIX error, give kcadm the CA-only truststore through the tmpfs the session
->   file already uses — `sudo -u basetool podman exec -i keycloak sh -c 'cat > /opt/keycloak/data/tmp/truststore.p12' < /etc/basetool/secrets/tls/truststore.p12`,
->   then `config truststore --trustpass - /opt/keycloak/data/tmp/truststore.p12` — and delete it in
->   step 4 with the session file. That is a write into the container like the session file itself.
->
-> Whether the keycloak unit should mount the CA-only truststore like the three apps, so kcadm has a
-> proper anchor, is an open doc/code question.
->
-> *(2026-09-25, evening)* #2036's release is **v1.12.0, on production since 17:44 UTC**, and step 4
-> has made the CA the only anchor there — so production is now in the untested shape above. Step 1
-> as written has **not** been run against it yet; the next kcadm session is the first test. The same step appears in
+> [!note] Step 1's truststore
+> `/run/secrets/keystore.p12` in the keycloak container is Keycloak's **own leaf**
+> (`/etc/basetool/secrets/tls/keycloak.p12`), signed by the internal CA. The JDK trusts the
+> certificate of a key entry in a truststore, and kcadm talks to Keycloak itself at
+> `https://localhost:18443`, whose leaf names `localhost`, so step 1 as written is expected to work.
+> If it fails with a PKIX error, point kcadm at the CA-only internal truststore the unit mounts
+> beside it, the same store the account-existence precheck trusts (REQ-SEC-022):
+> `config truststore --trustpass - /run/secrets/internal-truststore.p12`. Its password is
+> `INTERNAL_TLS_TRUSTSTORE_PASSWORD`, else `SERVER_SSL_KEY_STORE_PASSWORD`. The same step appears in
 > [`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../archive/KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session).
 
 ### Why a service account and not the admin user
