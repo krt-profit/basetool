@@ -229,9 +229,9 @@ public interface BankPostingRepository extends JpaRepository<BankPosting, UUID> 
 
   /**
    * Every account's balance immediately before an instant in one grouped statement, the basis of a
-   * currency wipe's reset (REQ-PATCH-041). An earlier wipe's reset counts at its patch change's live
-   * time, every other posting at its booking instant. Accounts without an earlier posting produce no
-   * row.
+   * currency wipe's reset (REQ-PATCH-041). An earlier wipe's reset counts at its patch change's
+   * live time, every other posting at its booking instant. Accounts without an earlier posting
+   * produce no row.
    *
    * @param before exclusive upper bound
    * @return one balance row per account with a posting that took effect strictly before {@code

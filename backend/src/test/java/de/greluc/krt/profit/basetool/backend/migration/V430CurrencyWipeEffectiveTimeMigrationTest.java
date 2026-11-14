@@ -35,8 +35,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Verifies that after V430 only a wipe reset carries an effective time on the bank ledger and only a
- * currency-wipe shortage on the order money ledger (REQ-PATCH-041, REQ-PATCH-044).
+ * Verifies that after V430 only a wipe reset carries an effective time on the bank ledger and only
+ * a currency-wipe shortage on the order money ledger (REQ-PATCH-041, REQ-PATCH-044).
  */
 @SpringBootTest
 class V430CurrencyWipeEffectiveTimeMigrationTest {
@@ -64,12 +64,9 @@ class V430CurrencyWipeEffectiveTimeMigrationTest {
     inRolledBackTransaction(() -> {
       UUID deposit = bankTransaction("DEPOSIT");
 
-      assertThatThrownBy(
-              () ->
-                  jdbc.update(
-                      "UPDATE bank_transaction SET effective_at = ? WHERE id = ?",
-                      LIVE_AT,
-                      deposit))
+      assertThatThrownBy(() ->
+              jdbc.update(
+                  "UPDATE bank_transaction SET effective_at = ? WHERE id = ?", LIVE_AT, deposit))
           .isInstanceOf(DataIntegrityViolationException.class)
           .hasMessageContaining("chk_bank_transaction_effective_at");
     });

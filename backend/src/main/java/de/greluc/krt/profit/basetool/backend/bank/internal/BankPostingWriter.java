@@ -85,8 +85,8 @@ public class BankPostingWriter {
 
   /**
    * Locks every account and then every holder, each in id order, for a wipe reset that reads and
-   * offsets the whole ledger (REQ-BANK-013, REQ-PATCH-041): every booking, a custody move without an
-   * account leg included, waits until the reset ends.
+   * offsets the whole ledger (REQ-BANK-013, REQ-PATCH-041): every booking, a custody move without
+   * an account leg included, waits until the reset ends.
    *
    * @return every account, locked, in id order
    */

@@ -659,7 +659,7 @@ public class BankBookingRequestService {
       boolean ownerApprovalConfirmed,
       @Nullable String staffNote,
       long version) {
-    BankLinkedDecisions.Prepared linked =
+    final BankLinkedDecisions.Prepared linked =
         linkedDecisions.forRequest(requestId, Action.CONFIRM, null);
     lockPurposeOwner(requestId);
     BankBookingRequest request = lockRequest(requestId);
@@ -755,7 +755,7 @@ public class BankBookingRequestService {
   @Transactional
   public BankBookingRequestDto reject(
       @NotNull UUID requestId, @NotNull String reason, long version) {
-    BankLinkedDecisions.Prepared linked =
+    final BankLinkedDecisions.Prepared linked =
         linkedDecisions.forRequest(requestId, Action.REJECT, null);
     lockPurposeOwner(requestId);
     BankBookingRequest request = lockRequest(requestId);

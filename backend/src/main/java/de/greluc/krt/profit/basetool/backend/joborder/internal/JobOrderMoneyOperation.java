@@ -125,8 +125,8 @@ class JobOrderMoneyOperation {
   private UUID patchChangeId;
 
   /**
-   * The live time of the patch change whose currency wipe booked this shortage, read through
-   * {@link #effectiveAt()}; {@code null} for every other operation (V430 CHECK).
+   * The live time of the patch change whose currency wipe booked this shortage, read through {@link
+   * #effectiveAt()}; {@code null} for every other operation (V430 CHECK).
    */
   @Nullable
   @Getter(AccessLevel.NONE)
@@ -288,8 +288,8 @@ class JobOrderMoneyOperation {
   }
 
   /**
-   * Tells when this fact takes effect for a ledger as of an instant (REQ-PATCH-044): a currency-wipe
-   * shortage at its patch change's live time, every other fact when it was recorded.
+   * Tells when this fact takes effect for a ledger as of an instant (REQ-PATCH-044): a
+   * currency-wipe shortage at its patch change's live time, every other fact when it was recorded.
    *
    * @return the instant the fact takes effect
    */

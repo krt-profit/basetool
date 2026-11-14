@@ -213,7 +213,8 @@ class BankCurrencyWipeIntegrationTest {
                       new BankHolderTransferRequest(
                           holder.getId(), otherHolder.getId(), new BigDecimal("1000"), null)));
       Future<BankCurrencyWipe.Effect> wiped =
-          race.startWaiting(null, () -> transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange)));
+          race.startWaiting(
+              null, () -> transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange)));
       transfer.commit();
       LockRace.finish(wiped);
     } finally {
@@ -258,7 +259,8 @@ class BankCurrencyWipeIntegrationTest {
    * @param rate the setting value
    */
   private void setFeeRate(String rate) {
-    jdbc.update("UPDATE system_setting SET setting_value = ? WHERE setting_key = ?", rate, FEE_RATE);
+    jdbc.update(
+        "UPDATE system_setting SET setting_value = ? WHERE setting_key = ?", rate, FEE_RATE);
   }
 
   /**

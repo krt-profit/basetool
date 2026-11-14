@@ -55,8 +55,8 @@ class BankWipeResetBooking {
    * @param accountBalances the balance to offset per account id; an account without one is skipped
    * @param holderBalances the balance to offset per holder id
    * @param effectiveAt the live time whose balances a currency wipe offsets, kept on the reset so a
-   *     later wipe counts it then; {@code null} for the standalone reset, which takes effect when it
-   *     is recorded
+   *     later wipe counts it then; {@code null} for the standalone reset, which takes effect when
+   *     it is recorded
    * @return what was booked
    */
   @Transactional(propagation = Propagation.MANDATORY)

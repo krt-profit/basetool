@@ -56,7 +56,11 @@ class PurchasingRequestObserverTest {
   void setUp() {
     observer =
         new PurchasingRequestObserver(
-            trancheRepository, settlementRepository, dealService, trancheService, settlementService);
+            trancheRepository,
+            settlementRepository,
+            dealService,
+            trancheService,
+            settlementService);
     tranche = new PurchasingDealTranche();
     tranche.setId(UUID.randomUUID());
     settlement = new PurchasingDealSettlement();
