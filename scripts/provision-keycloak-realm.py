@@ -98,6 +98,10 @@ REALM_SETTINGS: dict[str, bool | int | str] = {
     "oauth2DeviceCodeLifespan": 600,
     "oauth2DevicePollingInterval": 5,
     "loginTheme": "krt-theme",
+    # Keycloak deprecates requireResidentKey and warns at every policy load while it is Yes or No;
+    # residentKey alone states the passkey requirement.
+    "webAuthnPolicyPasswordlessRequireResidentKey": "not specified",
+    "webAuthnPolicyPasswordlessResidentKey": "required",
 }
 
 EXTERNAL_CLIENTS_FILE = Path(__file__).resolve().parent / "keycloak" / "external-clients.json"
