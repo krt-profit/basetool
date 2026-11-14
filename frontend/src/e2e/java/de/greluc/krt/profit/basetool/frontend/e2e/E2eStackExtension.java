@@ -32,6 +32,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
@@ -166,6 +168,13 @@ public final class E2eStackExtension implements BeforeAllCallback {
           "ingest-dev");
 
   /**
+   * The host ports the dev-profile services publish: Keycloak, frontend, backend, ingest, the two
+   * databases and Redis.
+   */
+  private static final List<Integer> STACK_PORTS =
+      List.of(18080, 18081, 11261, 11262, 15432, 15433, 6379);
+
+  /**
    * The services whose images are pulled from a registry: the two databases and Redis. The
    * applications and the sandbox Keycloak are built from this checkout and tagged with {@link
    * #imageTag()}, so {@code docker compose pull} of them would fail against the registry.
@@ -254,7 +263,11 @@ public final class E2eStackExtension implements BeforeAllCallback {
             bootFailure);
       }
       try {
-        bringUpAndSeed(context);
+        bringUpAndSeed(teardown ->
+            context
+                .getRoot()
+                .getStore(ExtensionContext.Namespace.GLOBAL)
+                .put("e2e-docker-stack", teardown));
       } catch (Exception bringUpFailure) {
         bootFailure = bringUpFailure;
         throw bringUpFailure;
@@ -263,26 +276,23 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Starts the ephemeral stack once: stages realm and keystore, pulls and starts compose, registers
-   * teardown, verifies the served build, stores the accounts' roles and seeds the catalog data
-   * every picker needs.
+   * Starts the ephemeral stack: stages realm and keystore, pulls and starts compose, hands the
+   * teardown to {@code registerTeardown}, verifies the served build, stores the accounts' roles and
+   * seeds the catalog data every picker needs.
    *
-   * @param context the JUnit extension context whose root store owns the teardown hook
-   * @throws Exception if bootstrap or {@code docker compose up} fails
+   * @param registerTeardown receives the stack's teardown as soon as compose is up, before seeding
+   * @throws Exception if bootstrap, {@code docker compose up} or seeding fails
    */
-  private void bringUpAndSeed(ExtensionContext context) throws Exception {
+  void bringUpAndSeed(@NotNull Consumer<AutoCloseable> registerTeardown) throws Exception {
     Path root = repoRoot();
     stageRealm(root);
     if (prebuilt()) {
       requirePrebuiltImages(root);
     }
-    requireFrontendPortFree(root);
+    requireStackPortsFree(root);
     prePullImages(root);
     composeUp(root);
-    context
-        .getRoot()
-        .getStore(ExtensionContext.Namespace.GLOBAL)
-        .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root, ""));
+    registerTeardown.accept(this::tearDown);
     ServedBuildCheck.assertServesThisCheckout(
         EPHEMERAL_BASE_URL, root, BackendSeeder.trustingTestCa());
     BackendSeeder seeder = new BackendSeeder();
@@ -359,21 +369,34 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Fails fast, naming the other stack, when a container already publishes the frontend port — the
-   * ports and subnets are fixed, so only one ephemeral stack can run on a machine at a time.
+   * Fails fast, naming the other stack, when another checkout's container already publishes one of
+   * the stack's host ports — the ports and subnets are fixed, so only one ephemeral stack can run
+   * on a machine at a time.
    *
-   * @param root the repository root, used as the working directory of the {@code docker} call
-   * @throws Exception if the check cannot be run or the port is taken
+   * @param root the repository root, used as the working directory of the {@code docker} calls
+   * @throws Exception if a check cannot be run or a port is taken
    */
-  private void requireFrontendPortFree(Path root) throws Exception {
-    Path out = Paths.get("build", "e2e", "port-check.log").toAbsolutePath();
-    runProcess(
-        root,
-        "port-check",
-        List.of("docker", "ps", "--filter", "publish=18081", "--format", "{{.Names}}"),
-        Map.of(),
-        Duration.ofMinutes(1));
-    ServedBuildCheck.assertPortFree(Files.readString(out), 18081);
+  private void requireStackPortsFree(Path root) throws Exception {
+    for (int port : STACK_PORTS) {
+      String label = "port-check-" + port;
+      runProcess(
+          root,
+          label,
+          List.of("docker", "ps", "--filter", "publish=" + port, "--format", "{{.Names}}"),
+          Map.of(),
+          Duration.ofMinutes(1));
+      Path out = Paths.get("build", "e2e", label + ".log").toAbsolutePath();
+      ServedBuildCheck.assertPortFree(
+          Files.readString(out), port, ServedBuildCheck.composeProjectName(root));
+    }
+  }
+
+  /**
+   * Stops the stack this checkout started and removes its named volumes, keeping the container logs
+   * under {@code build/e2e/}; never throws.
+   */
+  void tearDown() {
+    composeDown(repoRoot(), "");
   }
 
   /**
