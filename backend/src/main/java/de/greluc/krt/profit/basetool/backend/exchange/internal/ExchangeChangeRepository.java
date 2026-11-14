@@ -181,6 +181,25 @@ public interface ExchangeChangeRepository extends JpaRepository<ExchangeChange, 
       @Param("entityKey") String entityKey);
 
   /**
+   * Returns the latest org-stock entry that names one shared row as written, ignoring the lot-level
+   * re-announces that name no row (REQ-PATCH-057).
+   *
+   * @param orgUnitId the unit whose pool feed holds the entries
+   * @param rowId the shared row
+   * @return the latest entry, or empty when the unit's feed names the row in none
+   */
+  @Query(
+      value =
+          """
+          SELECT * FROM exchange_change
+          WHERE org_unit_id = :orgUnitId AND resource = 'ORG_STOCK' AND org_entry_id = :rowId
+          ORDER BY tx DESC, seq DESC LIMIT 1
+          """,
+      nativeQuery = true)
+  Optional<ExchangeChange> findLatestForOrgEntry(
+      @Param("orgUnitId") UUID orgUnitId, @Param("rowId") UUID rowId);
+
+  /**
    * Returns the latest retained feed epoch of every requested key in one scalar batch.
    *
    * @param userId the member

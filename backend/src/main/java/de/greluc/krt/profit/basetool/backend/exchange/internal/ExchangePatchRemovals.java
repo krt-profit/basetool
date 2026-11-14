@@ -30,8 +30,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Names the patch change behind a feed entry's change, for the {@code REMOVED_ELSEWHERE} refusal of
- * a push against a lot or ship a patch change moved or wiped, and for the {@code VERSION_CONFLICT}
- * of a push that did not see such a change yet (REQ-PATCH-053).
+ * a push against a lot, ship or org-stock entry a patch change moved or wiped, and for the {@code
+ * VERSION_CONFLICT} of a push that did not see such a change yet (REQ-PATCH-053, REQ-PATCH-057).
  */
 @Component
 @RequiredArgsConstructor
@@ -57,6 +57,24 @@ class ExchangePatchRemovals {
       @NotNull UUID member, @NotNull ExchangeFeedResource resource, @NotNull String key) {
     return changeRepository
         .findLatestForKey(member, resource.name(), key)
+        .map(this::patchChangeOf)
+        .orElse(null);
+  }
+
+  /**
+   * Names the patch change behind the latest write of one shared row in its unit's org-stock feed
+   * (REQ-PATCH-057).
+   *
+   * @param orgUnitId the unit whose pool the row lies or lay in
+   * @param rowId the row
+   * @return the patch change with its current label, or {@code null} when the row's latest write
+   *     came from another channel or the feed names the row in none
+   */
+  @Nullable
+  ExchangePatchChangeRefDto latestPatchChangeOfOrgEntry(
+      @NotNull UUID orgUnitId, @NotNull UUID rowId) {
+    return changeRepository
+        .findLatestForOrgEntry(orgUnitId, rowId)
         .map(this::patchChangeOf)
         .orElse(null);
   }

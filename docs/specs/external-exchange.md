@@ -2303,6 +2303,9 @@ admin suspension), `ExchangeSyncE2eTest` (corpus round trip, confirmed mass chan
       and the DPoP-signed call it shares with the smoke test live in `scripts/sandbox_client.py`.
       `docker-compose.sandbox-load.yml` adds the management ports, which the metrics need, and
       makes the budget and the answers' lifetime settable.*
+- [x] The seed grants `sandbox-client` every capability the registry knows, the bank scopes
+      included, and switches the exchange and the bank route family on (REQ-BXCH-006).
+      *`SandboxSeedCapabilitiesTest` compares the seeded capabilities with `ExchangeCapability`.*
 
 **Status:** built — local sandbox, the image pipeline, its smoke job and the E2E stack with the
 gateway, WP 2.3 (#2099)
@@ -3050,7 +3053,9 @@ a stale one is refused `VERSION_CONFLICT` for that op (see *Per op* below). Only
   REQ-XCH-016 for the material, the place and the unit. The Lager decides its own refusals
   (`PoolEntryCommands`); every holder lot the batch touches takes its advisory lock first, then all
 their rows are locked in ascending id order (ADR-0229). `dryRun`
-  checks every op without writing.
+  checks every op without writing. An op on an entry a patch change wiped is `REMOVED_ELSEWHERE`
+  instead of `NOT_PERMITTED`. Such an op, and a `VERSION_CONFLICT` on an entry whose own last
+  change was a patch change's, name the patch change in `patchChange` (amendment, REQ-PATCH-057).
 - **Wire shape.** `change-set.schema.json#/$defs/orgStockChangeSet`; the answer is
   `change-result.schema.json`. Ids of units, entries, job orders and missions are the ones the org
   stock serves.

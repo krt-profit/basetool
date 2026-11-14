@@ -155,8 +155,7 @@ interface ExchangeChangeSetAdapter<S, C> {
    * @return the plan
    */
   static <C> @NotNull Planned<C> removedByPatch(@NotNull ExchangePatchChangeRefDto patchChange) {
-    return new Skip<>(
-        new Outcome(ExchangeOps.REJECTED, ExchangeReasons.REMOVED_ELSEWHERE, null, patchChange));
+    return new Skip<>(Outcome.removedByPatch(patchChange));
   }
 
   /**
@@ -169,8 +168,7 @@ interface ExchangeChangeSetAdapter<S, C> {
    * @return the plan
    */
   static <C> @NotNull Planned<C> versionConflict(@Nullable ExchangePatchChangeRefDto patchChange) {
-    return new Skip<>(
-        new Outcome(ExchangeOps.REJECTED, ExchangeReasons.VERSION_CONFLICT, null, patchChange));
+    return new Skip<>(Outcome.versionConflict(patchChange));
   }
 
   /**
@@ -226,6 +224,30 @@ interface ExchangeChangeSetAdapter<S, C> {
      */
     static @NotNull Outcome rejected(@NotNull String reason) {
       return new Outcome(ExchangeOps.REJECTED, reason);
+    }
+
+    /**
+     * The refusal of an op against an entry a patch change removed, naming the patch change
+     * (REQ-PATCH-053, REQ-PATCH-057).
+     *
+     * @param patchChange the patch change whose change removed the entry
+     * @return the outcome
+     */
+    static @NotNull Outcome removedByPatch(@NotNull ExchangePatchChangeRefDto patchChange) {
+      return new Outcome(
+          ExchangeOps.REJECTED, ExchangeReasons.REMOVED_ELSEWHERE, null, patchChange);
+    }
+
+    /**
+     * The refusal of an op that expected an older state of its entry, naming the patch change when
+     * the entry's latest change came from one (REQ-PATCH-054, REQ-PATCH-057).
+     *
+     * @param patchChange the patch change behind the entry's latest change, or {@code null} when it
+     *     came from another channel
+     * @return the outcome
+     */
+    static @NotNull Outcome versionConflict(@Nullable ExchangePatchChangeRefDto patchChange) {
+      return new Outcome(ExchangeOps.REJECTED, ExchangeReasons.VERSION_CONFLICT, null, patchChange);
     }
   }
 

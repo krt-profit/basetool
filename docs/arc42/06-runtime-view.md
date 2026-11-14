@@ -397,7 +397,9 @@ The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-0
    rooms and the admin's patch-change room refresh, the exchange feed shows a tombstone for each old
    lot key and an item for each new one from the `patch` source, and the gate lets the member
    through on the next request. A client's later push against an old lot is `REMOVED_ELSEWHERE`
-   with the patch change's id (REQ-PATCH-053).
+   with the patch change's id (REQ-PATCH-053). Each moved pool row's org-stock feed entries name the
+   row, so a Logistician's stale op on it is `VERSION_CONFLICT` naming the patch change
+   (REQ-PATCH-057).
 
 Until then the member's rows and ships from before the live time are locked: the Lager's entity
 listener notes every row a writing transaction changes and checks them before the commit, the

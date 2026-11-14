@@ -7,7 +7,7 @@
 > (REQ-PATCH-020…029), the profile setting „Meine Home Location“ as form default
 > (REQ-PATCH-030…033), the currency wipe (REQ-PATCH-040…046) and the exchange resource with the
 > home-location choice through a client and the patch change named in stale pushes
-> (REQ-PATCH-050…054).
+> (REQ-PATCH-050…054), also on org-stock entries (REQ-PATCH-057).
 > **Related ADRs:** [ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md),
 > [ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md),
 > [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md),
@@ -1130,3 +1130,45 @@ the optional one of REQ-PATCH-053 (`change-result.schema.json`); nothing else on
 **Enforced by:** `ExchangePatchChangeControllerTest` · **Code:** `ExchangePatchRemovals`,
 `ExchangeStockWriteService`, `ExchangeShipWriteService#staleVersion`,
 `ExchangeChangeSetAdapter#versionConflict`
+
+### REQ-PATCH-057 — An org-stock push against an entry a patch change moved or wiped names it
+
+A patch change touches shared pool rows too. The wipe deletes the rows from before the live time of
+the wiped types, personal and shared alike (REQ-PATCH-012). The relocation moves the relocating
+member's rows from before the live time, pool rows included, in place and raises their version
+(REQ-PATCH-025). An org-stock op names one entry by id and version (REQ-XCH-045), so the refusal is
+judged by that entry's own last change and not by its lot, which sums many holders:
+
+- every org-stock feed entry a shared row's own write makes, or the write of its earmarks, names the
+  row in `exchange_change.org_entry_id` (`V429`). A lot-level re-announce (a location or unit
+  rename, a member joining the pool, a holder's rename or name withholding, an earmarked mission's
+  rename) names no row. The column holds only the row id and is purged with the feed (REQ-XCH-013);
+- an op the Lager refuses `VERSION_CONFLICT` names the patch change in `results[].patchChange`
+  `{id, label}` when the latest feed entry naming that row in the op's pool came from a patch
+  change, as REQ-PATCH-054 does for a lot;
+- an op the Lager refuses `NOT_PERMITTED` because the entry is gone is refused `REMOVED_ELSEWHERE`
+  with the `patchChange` when the latest feed entry naming that row in the op's pool came from a
+  patch change, as REQ-PATCH-053 does for a lot. Every other gone entry, and every other
+  `NOT_PERMITTED`, stays as it is;
+- a patch change's write to another row of the same lot, or a lot-level re-announce from a patch
+  change, names the patch change for no entry.
+
+The property is the optional one of REQ-PATCH-053 (`change-result.schema.json`); nothing else on the
+wire changes.
+
+**Acceptance**
+
+- [x] After a relocation moved a pool entry, an op with its old version is `VERSION_CONFLICT` with
+  the patch change's id and label.
+- [x] An op on a pool entry the patch change deleted is `REMOVED_ELSEWHERE` with the patch change's
+  id and label.
+- [x] After a patch change only re-announced a lot, an op on an entry of it deleted elsewhere stays
+  `NOT_PERMITTED` and a stale op on another entry stays `VERSION_CONFLICT`, both without
+  `patchChange`.
+- [x] The org-stock feed names the row for a row's own write and no row for a lot-level re-announce;
+  `exchange_record_org_change` has one signature.
+
+**Enforced by:** `ExchangeOrgStockPatchChangeTest`, `V429ExchangeOrgEntryMigrationTest` · **Code:**
+`OrgStockRefusals`, `OrgStockExecutor`, `OrgStockPlan.PoolWrite#entry`,
+`ExchangePatchRemovals#latestPatchChangeOfOrgEntry`, `ExchangeChangeRepository#findLatestForOrgEntry`,
+`V429`

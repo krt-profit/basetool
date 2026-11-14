@@ -204,6 +204,13 @@ change came from a patch change, that conflict names it as well, in the same `pa
 property; pull the feed and show the member why their view was stale. A conflict after any other
 change carries no `patchChange`.
 
+[Org-stock](org-stock.md#the-result) ops name single entries, so the Basetool judges each entry by
+its own last change in its pool. An op on an entry the patch change wiped is `REMOVED_ELSEWHERE`
+with the `patchChange`. A stale op on an entry it moved to its holder's new home location is
+`VERSION_CONFLICT` with the `patchChange`. The pool's other entries are not affected: a change the
+patch change made to another entry of the same lot, or a lot the patch change only announced again,
+names it for no entry. Every other gone entry stays `NOT_PERMITTED`.
+
 ## Errors
 
 | Code | When |
