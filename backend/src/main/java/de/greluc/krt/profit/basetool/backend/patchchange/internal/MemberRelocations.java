@@ -77,17 +77,6 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
     return relocate(member, locationId, chooser, null);
   }
 
-  @Override
-  public @NotNull Chosen chooseHomeLocation(
-      @NotNull UUID member, @NotNull UUID locationId, @NotNull String clientId) {
-    RelocationResultDto result = relocate(member, locationId, RelocationChooser.CLIENT, clientId);
-    HomeLocationOptionDto location = result.location();
-    return new Chosen(
-        new PatchChangeExchangeView.Place(location.id(), location.name(), location.system()),
-        result.rows(),
-        result.ships());
-  }
-
   /**
    * Stores a member's choice in the open phase and relocates the member, in its own transaction
    * attributed to the phase's patch change.
@@ -111,6 +100,17 @@ public class MemberRelocations implements PatchChangeExchangeWriter {
             Objects.requireNonNull(
                 transaction.execute(_ ->
                     relocateWithinTransaction(phase.id(), member, locationId, chooser, clientId))));
+  }
+
+  @Override
+  public @NotNull Chosen chooseHomeLocation(
+      @NotNull UUID member, @NotNull UUID locationId, @NotNull String clientId) {
+    RelocationResultDto result = relocate(member, locationId, RelocationChooser.CLIENT, clientId);
+    HomeLocationOptionDto location = result.location();
+    return new Chosen(
+        new PatchChangeExchangeView.Place(location.id(), location.name(), location.system()),
+        result.rows(),
+        result.ships());
   }
 
   /**
