@@ -1290,7 +1290,10 @@ reload, with only opaque section keys on the wire — applies **tool-wide**, to 
 several users can see the same state. The transport is **one WebSocket per tab** (`/ws/sync`,
 `krt-live-sync.js`) carrying `subscribe` / `changed` / presence frames that name a **topic**;
 per-page sockets are forbidden for new surfaces (a second bespoke sync stack is the defect class
-this requirement exists to prevent, #1102). Covered topics and their section whitelists:
+this requirement exists to prevent, #1102). A `subscribe` frame may carry `fallbackFirst: true`:
+for a class authorized by two reads, the relay then runs the fallback read first, for the subscribe
+and every re-authorization of that room, because the page performs that read itself; the verdict
+is the same either way. Covered topics and their section whitelists:
 
 |          Topic           |                                                           Sections                                                            | Presence dots |                                        Subscribe authorization                                        |
 |--------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------|
@@ -1299,7 +1302,7 @@ this requirement exists to prevent, #1102). Covered topics and their section whi
 | `order:{id}`             | header, kpi, materials, aggregated, items, item-stock, handovers, item-handovers, item-handover-lines, blueprint-owners, assignees | no            | `GET /api/v1/orders/{id}` (a requesting-owner is admitted; their re-fetches stay redacted)            |
 | `orders` (global queue)  | queue, demand (the cross-order material demand, REQ-ORDERS-034)                                                               | no            | capabilities `canViewJobOrders` (requesters are refused)                                              |
 | `refinery-order:{id}`    | order, store                                                                                                                  | no            | `GET /api/v1/refinery-orders/{id}`                                                                    |
-| `bank:{accountId}`       | account, bookings, chart                                                                                                      | no            | staff account read, falling back to the org-unit account read; refused only when both explicitly deny |
+| `bank:{accountId}`       | account, bookings, chart                                                                                                      | no            | the page's own read first — the staff account page asks for the staff read (`fallbackFirst`), the org-unit page gets the org-unit read — then the other; refused only when both explicitly deny |
 | `bank` (staff-global)    | grid, requestQueue, manage, grants                                                                                            | no            | `ROLE_BANK_EMPLOYEE` (local check)                                                                    |
 | `orgunit-bank` (global)  | orgUnitBank, orgUnitBankSettings                                                                                              | no            | member-or-above (the `/org-unit-bank` page gate, local check)                                         |
 | `materialboard` (global) | board, requests                                                                                                               | no            | authenticated                                                                                         |

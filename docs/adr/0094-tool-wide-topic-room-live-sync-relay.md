@@ -1,6 +1,6 @@
 # ADR-0094 — Tool-wide topic-room live sync over one multiplexed WebSocket with Redis pub/sub fan-out
 
-- **Status:** Accepted
+- **Status:** Accepted (amended 2026-10-01, 2026-11-14)
 - **Date:** 2026-07-10
 - **Deciders:** @greluc
 - **Related:** REQ-FE-015 · REQ-FE-010 · REQ-NOTIF-006/-010 · REQ-OBS-011 · ADR-0031 (mission relay — generalized here) · ADR-0016 (notification SSE — its Redis deferral is discharged here) · ADR-0079 (Redis AOF/noeviction) · ADR-0084 (readiness excludes optional externals) · ADR-0085 (5000-account capacity) · #1102 · #1115 · #1120 · #1241 · #1243 (publish-amplification bounds) · #1236 (legacy-alias removal) · #1307/#1309 (Lager) · #1235 (Phase-3 completion)
@@ -289,6 +289,19 @@ exponential delay (1 s plus a random share of 1 s doubling to 30 s), so a transi
 does not cost the tab its live updates; a successful subscribe or a new socket restores the budget,
 and an `authz` deny stays terminal. The publish side, the bounds and the rest of the decision are
 unchanged.
+
+## Amendment 2026-11-14 — a page may ask for its own read first
+
+A class authorized by two reads (the try-both fallback, today `bank:{accountId}`) runs them in a
+fixed order, so the page that performs the second read itself paid a routine refusal of the first
+at every subscribe and every two-minute re-authorization; production logged the bank staff read's
+403 at `WARN` every two to five minutes for a member on an org-unit account page. A `subscribe`
+frame may therefore carry `fallbackFirst: true`, and the relay keeps it per room: the subscribe and
+every re-authorization of that room run the fallback read first. The bank staff account page sends
+it; the org-unit page sends nothing and gets the org-unit read, the class's primary. The hint
+orders the reads and never decides: the room is admitted when either read answers 2xx and refused
+only when both refuse, an indeterminate first read still fails closed without the second, and a
+class without a fallback ignores the field. Owner decision of 2026-11-14 (REQ-FE-015).
 
 ## Alternatives considered
 

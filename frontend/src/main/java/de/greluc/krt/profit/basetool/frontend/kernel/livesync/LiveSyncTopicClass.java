@@ -127,8 +127,10 @@ public enum LiveSyncTopicClass {
 
   /**
    * Per-account bank room for the staff and org-unit account detail pages; a subscribe is denied
-   * only when both the staff read and the org-unit {@link #fallbackProbePath} refuse. Shares the
-   * {@code bank} prefix with {@link #BANK_STAFF}.
+   * only when both the org-unit read and the staff {@link #fallbackProbePath} refuse. Each page
+   * asks for the read it performs itself first, the staff page with {@code fallbackFirst}, so
+   * neither page's routine refusal of the other read happens. Shares the {@code bank} prefix with
+   * {@link #BANK_STAFF}.
    */
   BANK_ACCOUNT(
       "bank",
@@ -136,9 +138,9 @@ public enum LiveSyncTopicClass {
       Set.of("account", "bookings", "chart"),
       false,
       "bank_account",
-      "/api/v1/bank/accounts/{id}",
-      null,
       "/api/v1/bank/org-units/accounts/{id}",
+      null,
+      "/api/v1/bank/accounts/{id}",
       null),
 
   /**
@@ -430,7 +432,8 @@ public enum LiveSyncTopicClass {
 
   /**
    * A second per-resource read tried when the {@link #authProbePath} explicitly refuses (403/404),
-   * so a subscribe is denied only when both refuse; {@code null} when the class has no fallback
+   * so a subscribe is denied only when both refuse; a subscribing page that performs this read
+   * itself asks for it first ({@code fallbackFirst}). {@code null} when the class has no fallback
    * read.
    */
   private final @Nullable String fallbackProbePath;
@@ -618,7 +621,7 @@ public enum LiveSyncTopicClass {
 
   /**
    * Returns a second authorization read tried only when {@link #authProbePath} refuses with
-   * 403/404; used by {@link #BANK_ACCOUNT}.
+   * 403/404, or first when the subscribing page asks for it; used by {@link #BANK_ACCOUNT}.
    *
    * @return the fallback probe path template, or {@code null} when the class has none
    */
