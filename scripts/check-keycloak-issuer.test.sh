@@ -23,6 +23,7 @@ COMPOSE_FILES=(
   docker-compose.build.yml
   docker-compose.e2e.yml
   docker-compose.localtest.yml
+  docker-compose.preview.yml
   docker-compose.monitoring.yml
 )
 
@@ -157,6 +158,15 @@ rewrite_or_die "${FIXTURE}/docker-compose.test.yml" \
   "one service left on a stale realm"
 run_checker "$FIXTURE" --only test-stack
 expect_failure "services that disagree on the issuer are rejected" "do not agree on the issuer"
+rm -rf "$FIXTURE"
+
+FIXTURE="$(new_fixture)"
+rewrite_or_die "${FIXTURE}/docker-compose.preview.yml" \
+  's|KC_HOSTNAME: http://keycloak.localhost:18080/auth|KC_HOSTNAME: http://keycloak.localhost:18080/sso|' \
+  "preview Keycloak moved to another path"
+run_checker "$FIXTURE" --only preview-stack
+expect_failure "a preview issuer that Keycloak no longer advertises is rejected" \
+  "makes Keycloak advertise"
 rm -rf "$FIXTURE"
 
 FIXTURE="$(new_fixture)"

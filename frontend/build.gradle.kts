@@ -540,6 +540,28 @@ tasks.register<Test>("smokeTest") {
   useJUnitPlatform { includeTags("smoke") }
 }
 
+val previewStackConfig: JavaExec.(String) -> Unit = { verb ->
+  group = "verification"
+  classpath = sourceSets["e2e"].runtimeClasspath
+  mainClass.set("de.greluc.krt.profit.basetool.frontend.e2e.PreviewStack")
+  args(verb)
+  workingDir = layout.projectDirectory.asFile
+  outputs.upToDateWhen { false }
+}
+
+tasks.register<JavaExec>("previewStackUp") {
+  description =
+    "Builds, starts and seeds this checkout's E2E stack and leaves it running for manual inspection."
+  previewStackConfig("up")
+  dependsOn("minifyStaticCss")
+  (findProperty("e2e.prebuilt") as String?)?.let { systemProperty("e2e.prebuilt", it) }
+}
+
+tasks.register<JavaExec>("previewStackDown") {
+  description = "Stops the stack previewStackUp started and removes its volumes."
+  previewStackConfig("down")
+}
+
 tasks.register<Test>("assetProfileTest") {
   description = "Measures cold legal-page asset bytes and Chromium script execution."
   playwrightSuiteConfig()

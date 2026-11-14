@@ -85,7 +85,8 @@ Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. The `test` pr
 
 Docker Compose profiles (`dev`, `prod`, the isolated test stack), host ports and the HTTPS /
 OpenAPI setup: the `local-stack` skill. Never substitute production artifacts for the test stack's
-(see Testing).
+(see Testing). To look at a UI change signed in and on seeded data, use the preview stack
+(`:frontend:previewStackUp` / `previewStackDown`, [`docs/agents/ui-preview.md`](docs/agents/ui-preview.md)).
 
 ## Production host access (HARD RULE)
 

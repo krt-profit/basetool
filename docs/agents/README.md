@@ -19,6 +19,7 @@ before you start it.
 | [`backend-concurrency.md`](backend-concurrency.md) | any multi-step transaction, version check, bulk update or find-or-create |
 | [`backend-testing.md`](backend-testing.md) | a backend unit test with real collaborators or a `@SpringBootTest` |
 | [`frontend-design-system.md`](frontend-design-system.md) | any UI work |
+| [`ui-preview.md`](ui-preview.md) | claiming a UI change looks right; starting or stopping the preview stack |
 | [`frontend-templates-and-assets.md`](frontend-templates-and-assets.md) | changing a template, stylesheet, script tag, DOM write or dialog |
 | [`frontend-live-update.md`](frontend-live-update.md) | any frontend mutation, read or live-synced section |
 | [`frontend-javascript.md`](frontend-javascript.md) | writing or moving a script under `static/js` |

@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Makes an ephemeral E2E stack provably this checkout's.
@@ -85,21 +86,31 @@ final class ServedBuildCheck {
   }
 
   /**
-   * Fails fast, naming the other stack, when a container already publishes the frontend port.
+   * Fails fast, naming the other stack, when a container of another compose project already
+   * publishes a stack port; this checkout's own containers are ignored, so its running stack can be
+   * brought up again in place.
    *
    * @param publishedBy the names of running containers publishing the port, one per line
    * @param port the port
+   * @param ownProject this checkout's compose project name, the prefix of its container names
    */
-  static void assertPortFree(String publishedBy, int port) {
-    String others = publishedBy == null ? "" : publishedBy.strip();
+  static void assertPortFree(String publishedBy, int port, String ownProject) {
+    String others =
+        publishedBy == null
+            ? ""
+            : publishedBy
+                .lines()
+                .map(String::strip)
+                .filter(name -> !name.isEmpty() && !name.startsWith(ownProject + "-"))
+                .collect(Collectors.joining(","));
     if (!others.isEmpty()) {
       throw new IllegalStateException(
           "Port "
               + port
               + " is already published by "
-              + others.replace('\n', ',')
+              + others
               + ". Only one ephemeral E2E stack can run on a machine at a time (fixed ports and"
-              + " subnets); wait for that run to finish, or tear its stack down with"
+              + " subnets); wait for that run to finish, or have its owner tear it down with"
               + " `docker compose -p <its project> down --volumes`.");
     }
   }

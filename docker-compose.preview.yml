@@ -1,0 +1,35 @@
+# Preview stack (REQ-OPS-057, docs/agents/ui-preview.md), stacked last on the E2E files:
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml -f docker-compose.build.yml \
+#     -f docker-compose.e2e.yml -f docker-compose.preview.yml --profile dev up -d
+# Keycloak advertises keycloak.localhost: a browser resolves *.localhost to the loopback, where
+# Keycloak stays published on 127.0.0.1. Inside the stack the name must reach the Keycloak
+# container instead; Reactor Netty answers *.localhost with the loopback itself unless /etc/hosts
+# names it, so Keycloak gets a fixed address and every app an extra_hosts entry for it.
+services:
+  keycloak-dev:
+    environment:
+      KC_HOSTNAME: http://keycloak.localhost:18080/auth
+    networks:
+      net-backend-keycloak:
+        ipv4_address: 172.28.5.10
+        aliases:
+          - keycloak
+          - host.docker.internal
+
+  backend-dev:
+    environment:
+      KEYCLOAK_ISSUER_URI: http://keycloak.localhost:18080/auth/realms/basetool
+    extra_hosts: !override
+      - "keycloak.localhost:172.28.5.10"
+
+  frontend-dev:
+    environment:
+      KEYCLOAK_ISSUER_URI: http://keycloak.localhost:18080/auth/realms/basetool
+    extra_hosts: !override
+      - "keycloak.localhost:172.28.5.10"
+
+  ingest-dev:
+    environment:
+      KEYCLOAK_ISSUER_URI: http://keycloak.localhost:18080/auth/realms/basetool
+    extra_hosts: !override
+      - "keycloak.localhost:172.28.5.10"

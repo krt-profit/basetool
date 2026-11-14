@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import java.util.List;
 import java.util.Map;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * The roles each account of {@code realm-export.e2e.json} holds in the backend's {@code user_roles}
@@ -55,11 +56,22 @@ final class E2eUserRoles {
   private E2eUserRoles() {}
 
   /**
+   * Returns the throwaway password {@code realm-export.e2e.json} gives an account.
+   *
+   * @param username the Keycloak username
+   * @return {@code <username>-pw}
+   */
+  static @NotNull String password(@NotNull String username) {
+    return username + "-pw";
+  }
+
+  /**
    * Stores every account's roles, so the stack's first browser login already carries them.
    *
    * @param seeder the seeder that signs the accounts in and writes {@code user_roles}
    */
   static void seed(BackendSeeder seeder) {
-    ROLES.forEach((username, roles) -> seeder.grantStoredRoles(username, username + "-pw", roles));
+    ROLES.forEach(
+        (username, roles) -> seeder.grantStoredRoles(username, password(username), roles));
   }
 }
