@@ -104,6 +104,9 @@ REALM_SETTINGS: dict[str, bool | int | str] = {
     "webAuthnPolicyPasswordlessResidentKey": "required",
 }
 
+# Longest prefix first: every passwordless key also starts with the two-factor prefix.
+WEBAUTHN_POLICY_PREFIXES = ("webAuthnPolicyPasswordless", "webAuthnPolicy")
+
 EXTERNAL_CLIENTS_FILE = Path(__file__).resolve().parent / "keycloak" / "external-clients.json"
 CHROMIUM_EXTENSION_ORIGIN = r"chrome-extension://[a-p]{32}"
 
@@ -731,6 +734,22 @@ def _equal(desired, live) -> bool:
     return _normalise(desired) == _normalise(live)
 
 
+def _webauthn_policy(key: str) -> str | None:
+    """The WebAuthn policy prefix a realm key belongs to, or ``None`` for any other key."""
+    return next((prefix for prefix in WEBAUTHN_POLICY_PREFIXES if key.startswith(prefix)), None)
+
+
+def _realm_update_payload(diff: dict, live: dict) -> dict:
+    """The realm update for ``diff``, carrying each WebAuthn policy it touches whole.
+
+    Keycloak applies a WebAuthn policy only when the update names that policy's ``RpEntityName``,
+    and then rebuilds it from the update alone, resetting every key the update leaves out.
+    """
+    touched = {_webauthn_policy(key) for key in diff} - {None}
+    whole = {key: value for key, value in live.items() if _webauthn_policy(key) in touched}
+    return {**whole, **diff}
+
+
 def _redact(payload: dict) -> dict:
     """A client representation without `secret` and `registrationAccessToken`; Keycloak keeps the stored secret."""
     return {key: value for key, value in payload.items()
@@ -821,8 +840,9 @@ class Planner:
             changes.append(Change(f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> "
                                   f"{_normalise(value)}", lambda: None))
         if diff:
+            payload = _realm_update_payload(diff, live)
             changes.append(Change("  (one partial update of the realm)",
-                                  lambda d=dict(diff): self.kc.update_realm(d, "token settings")))
+                                  lambda d=payload: self.kc.update_realm(d, "token settings")))
 
     def default_role_name(self) -> str:
         """The realm's default role, which every account the realm creates holds."""
