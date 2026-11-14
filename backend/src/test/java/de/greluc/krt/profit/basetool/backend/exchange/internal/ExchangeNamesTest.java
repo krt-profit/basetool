@@ -21,9 +21,16 @@ package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
-/** The cut of a display name to the length the published v1 schemas allow (REQ-XCH-026). */
+/**
+ * The cut of a display name to the length the published v1 schemas allow, and what a cut name sent
+ * back stands for (REQ-XCH-026).
+ */
 class ExchangeNamesTest {
 
   /** A character outside the Basic Multilingual Plane: two UTF-16 units, one code point. */
@@ -53,5 +60,47 @@ class ExchangeNamesTest {
     String kept = "n".repeat(ExchangeNames.MAX_NAME - 2) + ROCKET;
 
     assertThat(ExchangeNames.cut(kept + "tail")).isEqualTo(kept);
+  }
+
+  @Test
+  void aCutNameStandsForEveryLongerNameThatCutsToItButNotForItself() {
+    String sent = "n".repeat(ExchangeNames.MAX_NAME);
+    List<String> stored = List.of(sent, sent + " first", sent + " second", "m" + sent);
+
+    assertThat(ExchangeNames.cutTo(sent, startingWith(stored), Function.identity()))
+        .containsExactly(sent + " first", sent + " second");
+  }
+
+  @Test
+  void aCutNameEndingBeforeASurrogatePairStandsForTheNameItCameFrom() {
+    String sent = "n".repeat(ExchangeNames.MAX_NAME - 1);
+    String stored = sent + ROCKET + "tail";
+
+    assertThat(ExchangeNames.cutTo(sent, startingWith(List.of(stored)), Function.identity()))
+        .containsExactly(stored);
+  }
+
+  @Test
+  void aNameNoCutProducesStandsForNothingAndReadsNothing() {
+    List<String> asked = new ArrayList<>();
+    Function<String, List<String>> reader =
+        prefix -> {
+          asked.add(prefix);
+          return List.of(prefix + "x".repeat(ExchangeNames.MAX_NAME));
+        };
+
+    assertThat(ExchangeNames.cutTo("short", reader, Function.identity())).isEmpty();
+    assertThat(asked).isEmpty();
+  }
+
+  /**
+   * Reads the stored names that start with a prefix, as a repository's prefix query does.
+   *
+   * @param stored the stored names
+   * @return the reader
+   */
+  private static @NotNull Function<String, List<String>> startingWith(
+      @NotNull List<String> stored) {
+    return prefix -> stored.stream().filter(name -> name.startsWith(prefix)).toList();
   }
 }

@@ -90,10 +90,11 @@ its city's, else its space station's. `name` is the warehouse's own name for the
 ```
 
 These are the only places a stock lot or a ship can be at. A `location` in a change set resolves by
-its `guid` first, then by its `uex` link, then by the exact `name` of a non-hidden location; a
-value that matches nothing falls through to the next, and a place none of them matches is
-refused per op as `LOCATION_UNKNOWN` and is never created. Offer the member a place from this list
-instead. The list changes rarely; reading it once per session is enough.
+its `guid` first, then by its `uex` link, then by the exact `name` of a non-hidden location, then
+by the cut `name` this list answered for a longer one; a value that matches nothing falls through to
+the next, and a place none of them matches is refused per op as `LOCATION_UNKNOWN` and is never
+created. So is a cut `name` that several locations' names cut to. Offer the member a place from
+this list instead. The list changes rarely; reading it once per session is enough.
 
 ## Errors
 

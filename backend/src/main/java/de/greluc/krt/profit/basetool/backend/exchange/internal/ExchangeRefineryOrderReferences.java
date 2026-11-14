@@ -163,19 +163,18 @@ public class ExchangeRefineryOrderReferences {
   }
 
   /**
-   * Resolves a refining method: by its code first, then by its exact name.
+   * Resolves a refining method: by its code first, then by its exact name, then by the name the
+   * exchange cut its longer name to (REQ-XCH-026).
    *
    * @param ref the client's reference
-   * @return the method, or the outcome that ends the op
+   * @return the method, or the outcome that ends the op: ambiguous when several methods share the
+   *     code or the cut name, unmatched when none matches
    */
   private @NotNull MethodMatch method(@NotNull ExchangeRefineryOrderChangeSet.MethodRef ref) {
     if (ref.code() != null) {
-      List<RefiningMethod> byCode = refiningMethodRepository.findAllByCode(ref.code());
-      if (byCode.size() > 1) {
-        return new MethodMatch(null, new Outcome(ExchangeOps.AMBIGUOUS, ExchangeReasons.AMBIGUOUS));
-      }
-      if (byCode.size() == 1) {
-        return new MethodMatch(byCode.getFirst().getId(), null);
+      MethodMatch byCode = single(refiningMethodRepository.findAllByCode(ref.code()));
+      if (byCode != null) {
+        return byCode;
       }
     }
     if (ref.name() != null) {
@@ -183,8 +182,31 @@ public class ExchangeRefineryOrderReferences {
       if (byName.isPresent()) {
         return new MethodMatch(byName.get().getId(), null);
       }
+      MethodMatch byCutName =
+          single(
+              ExchangeNames.cutTo(
+                  ref.name(),
+                  refiningMethodRepository::findAllByNameStartingWith,
+                  RefiningMethod::getName));
+      if (byCutName != null) {
+        return byCutName;
+      }
     }
     return new MethodMatch(null, new Outcome(ExchangeOps.UNMATCHED, ExchangeReasons.UNMATCHED));
+  }
+
+  /**
+   * Decides a method step that found the given methods.
+   *
+   * @param found the methods the step found
+   * @return the one method, an ambiguous outcome for several, or {@code null} for none so the next
+   *     step runs
+   */
+  private static @Nullable MethodMatch single(@NotNull List<RefiningMethod> found) {
+    if (found.size() > 1) {
+      return new MethodMatch(null, new Outcome(ExchangeOps.AMBIGUOUS, ExchangeReasons.AMBIGUOUS));
+    }
+    return found.isEmpty() ? null : new MethodMatch(found.getFirst().getId(), null);
   }
 
   /**

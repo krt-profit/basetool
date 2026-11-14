@@ -145,7 +145,9 @@ an op is ignored: the server reports it as an `UNKNOWN_FIELD` warning and the op
 - **Location.** A [place](../formats.md#place--location-ref), resolved exactly. It must be a
   refinery the web offers for refinery orders, else `NOT_A_REFINERY`; a place without a location
   is `LOCATION_UNKNOWN`.
-- **Method.** `{code}` or `{name}`, resolved by its code first, then by its exact name.
+- **Method.** `{code}` or `{name}`, resolved by its code first, then by its exact name, then by the
+  `name` the feed cut to 200 characters for a longer one. A code or a cut name that several methods
+  share is `AMBIGUOUS`; nothing matching is `UNMATCHED`.
 - **Status.** `OPEN`, the default of a create, or `IN_PROGRESS`. `COMPLETED` comes only from a
   `pickup`, and `CANCELED` is not written here. An order whose yield was booked into stock keeps
   its status: changing it is `ORDER_STORED`.
