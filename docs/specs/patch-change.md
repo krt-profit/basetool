@@ -909,15 +909,31 @@ owns ends as `CANCELLED`, with the patch change as its reason
 (`bank_booking_request.cancelled_by_patch_change`). The cancellation clears the staff's open
 request notices like any other, and a purpose-bound request tells its owner (REQ-BANK-063). A
 request submitted after the live time stays pending; a request of an order attempt follows
-REQ-PATCH-043. The web and the exchange show only the status.
+REQ-PATCH-043.
+
+Wherever the web shows the request's status it names the patch change by its current label
+beneath the status („Patchwechsel 4.4“): „Meine Anträge“
+([REQ-BANK-022](bank.md#req-bank-022--confirm-before-post-booking-requests-create--cancel)),
+„Anträge an unsere Konten“, the staff queue (REQ-BANK-023), the request's own page as its reason
+(REQ-BANK-068) and the dashboard widget „Meine Bankanträge“. The bank reads the labels through
+the port `bank.api.BankPatchLabels`, once per page and not at all when no request of the page
+needs one. A request its requester withdrew shows the status alone. The exchange names it as
+`cancelledByPatch: {id, label}` on the member's own requests
+([REQ-BXCH-003](bank-exchange.md#req-bxch-003--the-members-own-requests-and-their-change-feed)).
 
 **Acceptance**
 
 - [x] Only requests submitted before the live time are cancelled, each with the patch change as
   its reason.
+- [x] Every web view of a cancelled request names the patch change beneath its status, and only
+  for a request the wipe cancelled; the exchange carries `cancelledByPatch` for exactly those.
 
-**Enforced by:** `BankCurrencyWipeIntegrationTest` · **Code:** `BankCurrencyWipeRequests`,
-`BankBookingRequest#cancelByPatchChange`, `V425`
+**Enforced by:** `BankCurrencyWipeIntegrationTest`, `BankRequestPatchLabelsTest`,
+`BankBookingRequestServiceTest`, `ExchangeBankRequestServiceTest`, frontend
+`BankRequestCancelledByPatchRenderTest`, `DashboardTradeWidgetsMvcTest` · **Code:**
+`BankCurrencyWipeRequests`, `BankBookingRequest#cancelByPatchChange`, `V425`,
+`bank.api.BankPatchLabels`, `BankRequestPatchLabels`, `PatchChangeLabelDirectory`,
+`ExchangeBankRequestService`, `templates/bank/fragments/bank-request-reason.html`
 
 ### REQ-PATCH-043 — Waiting order Bank attempts from before the live time are cancelled
 
