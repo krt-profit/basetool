@@ -93693,6 +93693,9 @@
           "version" : {
             "type" : "integer",
             "format" : "int64"
+          },
+          "withdrawnByPatchLabel" : {
+            "type" : "string"
           }
         }
       },
