@@ -168,8 +168,16 @@
                         </fieldset>
                     </form>
 
+                    <fieldset class="form-section" id="profile-section-home-location" th:unless="${homeLocationAvailable}">
+                        <legend class="form-section__head" th:text="'6 · ' + #{profile.homeLocation.label}">6 · Meine Home Location</legend>
+                        <div class="alert alert-warning profile-home-location-warning" role="alert" data-testid="profile-home-location-unavailable">
+                            <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-warning"/></svg>
+                            <p th:text="#{profile.homeLocation.unavailable}">Deine Home Location konnte nicht geladen werden.</p>
+                        </div>
+                    </fieldset>
+
                     <form id="profile-home-location-form" th:action="@{/profile/home-location}" method="post" th:object="${profileHomeLocationForm}"
-                          th:data-section-name="#{profile.homeLocation.label}">
+                          th:if="${homeLocationAvailable}" th:data-section-name="#{profile.homeLocation.label}">
                         <input type="hidden" name="version" th:field="*{version}">
                         <fieldset class="form-section" id="profile-section-home-location">
                             <legend class="form-section__head">

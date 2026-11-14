@@ -278,13 +278,17 @@ public class ProfileController {
   }
 
   /**
-   * Adds the section "my home location": the curated options and the form with the stored choice
-   * and its own version.
+   * Adds the section "my home location": whether it could be read and, when it could, the curated
+   * options and the form with the stored choice and its own version.
    *
    * @param model the profile model
    */
   private void addHomeLocationSection(@NotNull Model model) {
     ProfileHomeLocationSection homeLocation = homeLocationReader.profileSection();
+    model.addAttribute("homeLocationAvailable", homeLocation.available());
+    if (!homeLocation.available()) {
+      return;
+    }
     model.addAttribute("homeLocationOptions", homeLocation.options());
     model.addAttribute(
         "profileHomeLocationForm",

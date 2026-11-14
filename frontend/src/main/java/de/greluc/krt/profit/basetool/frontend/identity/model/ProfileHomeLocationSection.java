@@ -28,15 +28,24 @@ import org.jetbrains.annotations.Unmodifiable;
 
 /**
  * What the profile's section "my home location" shows (REQ-PATCH-030): the stored choice with its
- * version and the curated home locations to choose from.
+ * version and the curated home locations to choose from, or that they cannot be read.
  *
+ * @param available whether the setting and the curated home locations were both read; only then
+ *     does the section offer a form, so no version the page never read is saved
  * @param homeLocationId the stored choice, or {@code null} when there is none, the profile no
- *     longer offers it or it cannot be read
- * @param version the setting's version to echo back, {@code 0} when there is none or it cannot be
- *     read
- * @param options the curated home locations by name, empty when they cannot be read
+ *     longer offers it or the section is unavailable
+ * @param version the setting's version to echo back, {@code 0} when the member made no choice or
+ *     the section is unavailable
+ * @param options the curated home locations by name, empty when none are curated or the section is
+ *     unavailable
  */
 public record ProfileHomeLocationSection(
+    boolean available,
     @Nullable UUID homeLocationId,
     long version,
-    @NotNull @Unmodifiable List<LocationDto> options) {}
+    @NotNull @Unmodifiable List<LocationDto> options) {
+
+  /** The section whose setting or curated home locations could not be read. */
+  public static final ProfileHomeLocationSection UNAVAILABLE =
+      new ProfileHomeLocationSection(false, null, 0L, List.of());
+}
