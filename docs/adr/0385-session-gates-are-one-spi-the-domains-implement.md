@@ -57,10 +57,16 @@ change asks could keep using the tool for up to a minute while every backend cal
    refusal as an ordinary failure: the AJAX relay `BackendErrorResponses` (`relay`,
    `propagateBackendError`, `withBackendStatus`) and every custom fallback of a handler, a parallel
    read's `exceptionally` and `MutationResponseHelper` included, let it through to
-   `GlobalExceptionHandler` with `SectionFallback#rethrowHandOff`. The reauthentication-only guard
-   `SectionFallback#rethrowIfReauthenticationRequired` stays with the code where a gate's refusal
-   must not propagate: the servlet filters, a gate's own status read, the error handler and the
-   layout chrome, which renders on the pages a gate leaves open and so degrades.
+   `GlobalExceptionHandler` with `SectionFallback#rethrowHandOff`. Neither does a domain handler's
+   own catch arm: an arm outside the kernel whose caught type can hold the refusal
+   (`BackendServiceException`, `RuntimeException`, `Exception`, `Throwable`, alone or in a
+   multi-catch) starts with `rethrowHandOff`, with `BackendErrorResponses#propagateBackendError` or
+   with a rethrow, or catches more narrowly; `SessionGateHandOffArmTest` fails the build on any
+   other arm, with an allowance only for the notification stream's arms, which call no backend.
+   The reauthentication-only guard `SectionFallback#rethrowIfReauthenticationRequired` stays with
+   the code where a gate's refusal must not propagate: the servlet filters, a gate's own status
+   read, the error handler and the layout chrome, the navigation preferences included, which
+   renders on the pages a gate leaves open and so degrades.
 6. **The browser half stays a list of its own.** `krt-fetch.js` and `notifications.js` keep the
    gates' headers and events as constants, and `SessionGateClientParityTest` pins them against the
    gate beans of the running context.
@@ -89,8 +95,10 @@ labels stay as they were for both gates.
 - The kernel and the platform name no domain gate; `KernelDomainReachTest` lost one frozen reach,
   and `KernelGateCodeReachTest` fails the build when a kernel class file carries a gate's code.
 - A member a patch change asks is sent to the home-location page by the first refused request,
-  a page section's read, a fallback and the AJAX relay included, instead of after the cache
-  expires.
+  a page section's read, a fallback, a handler's own catch arm and the AJAX relay included,
+  instead of after the cache expires.
+- A new catch arm in a domain package that answers a gate's refusal with a toast, an empty section
+  or its own JSON fails the build until it hands the refusal off or catches more narrowly.
 - Opening a live-sync socket costs one status read per gate, also with a fresh cached verdict.
 
 ## Alternatives considered

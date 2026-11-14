@@ -75,8 +75,9 @@ Beyond roles there are three mechanisms that are easy to miss:
   discards the frontend's cached verdict; a socket handshake never reuses that verdict and asks
   every gate afresh. Every gate refusal carries the problem property `sessionGate: true`; the
   frontend kernel tells it by that mark, never by a code, and hands it off also when a page
-  section, a handler's fallback or the AJAX relay `BackendErrorResponses` meets it
-  (`SectionFallback#rethrowHandOff`), except on a gate's own page, which renders the layout the
+  section, a handler's fallback or own catch arm, or the AJAX relay `BackendErrorResponses` meets
+  it (`SectionFallback#rethrowHandOff`; `SessionGateHandOffArmTest` fails the build on a domain
+  catch arm that answers it itself), except on a gate's own page, which renders the layout the
   gate refuses and so falls back instead of redirecting to itself; the layout chrome degrades. The
   scripts' header and event lists are pinned against the gate beans. A gate may leave its repair
   open to an admin it holds (`adminExemptPaths`, `adminPages`); for the admin such a page is a gate
@@ -400,7 +401,8 @@ kernel holds one — `BackendApiClient`, and `BackendSideChannels` for the SSE r
 exhaustive switch and `GlobalExceptionHandler` answers it; a `web` handler adds no catch-all of its
 own, a page section that may fail alone goes through `SectionFallback`, which lets a lost session
 reach the login and a session gate's refusal reach the gate — so does a remaining custom fallback
-through `SectionFallback#rethrowHandOff` and the AJAX relay `BackendErrorResponses` — and the broad catch clauses that
+or catch arm through `SectionFallback#rethrowHandOff` (`SessionGateHandOffArmTest`) and the AJAX
+relay `BackendErrorResponses` — and the broad catch clauses that
 remain are frozen per file and only shrink (REQ-FE-036, `BroadCatchRatchetTest`). A runtime value enters a backend URI only as a template variable, for every
 verb (REQ-SEC-051, `WriteUriTemplateTest` and `ReadUriTemplateTest`). The first filter of all four refuses any request whose scheme, host
 and port differ from `app.backend-url`, before the OAuth2 filter can attach the member's bearer —

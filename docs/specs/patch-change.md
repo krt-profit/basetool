@@ -495,9 +495,10 @@ request, in sessions already open as well:
   cached verdict at once and hands the browser to the page: a page load is redirected, an AJAX
   call gets the header; so a member a new phase asks is held by the first refused request, not
   after the cache expires. This holds for a page section's read, a parallel read's fallback, a
-  form post's fallback and the shared AJAX relay (`BackendErrorResponses`) alike: each lets the
-  refusal through to `GlobalExceptionHandler` (`SectionFallback#rethrowHandOff`) instead of
-  answering it as an ordinary failure. The layout chrome, which also renders on the pages the gate
+  form post's fallback, a domain handler's own catch arm and the shared AJAX relay
+  (`BackendErrorResponses`) alike: each lets the refusal through to `GlobalExceptionHandler`
+  (`SectionFallback#rethrowHandOff`) instead of answering it as an ordinary failure. The layout
+  chrome, which also renders on the pages the gate
   leaves open, degrades instead. The refusal carries `sessionGate: true` like every session gate's,
   by which the frontend tells it (REQ-SEC-028);
 - an AJAX call gets `403` with the header `X-Home-Location-Required` naming the page, which
@@ -520,14 +521,15 @@ relocation lock refuses its writes on locked rows and ships instead (REQ-PATCH-0
 - [x] The backend refuses a pending member's web calls with `403 HOME_LOCATION_REQUIRED` and lets
   the exempt endpoints and an exchange client's relayed call through.
 - [x] A backend refusal of the gate discards the frontend's cached verdict and hands the browser to
-  the page, also when a page section's read, a parallel read's fallback, a form post's fallback or
-  the shared AJAX relay meets it, with a cached pass still warm.
+  the page, also when a page section's read, a parallel read's fallback, a form post's fallback, a
+  domain handler's own catch arm or the shared AJAX relay meets it, with a cached pass still warm.
 - [x] A WebSocket handshake asks the backend despite a cached pass and marks the socket of a member
   whose phase opened since.
 
 **Enforced by:** `HomeLocationGateTest` (frontend and backend), `SessionGateFilterTest`,
 `SessionGateAccessFilterTest`, `GlobalExceptionHandlerTest`, `SectionSessionGateHandoffMvcTest`,
-`SharedFallbackSessionGateHandoffMvcTest`, `BackendErrorResponsesTest`,
+`SharedFallbackSessionGateHandoffMvcTest`, `DomainArmSessionGateHandoffMvcTest`,
+`SessionGateHandOffArmTest`, `BackendErrorResponsesTest`,
 `BackendFallbackReauthenticationTest`, `SessionGateClientParityTest`,
 `HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate` (frontend and backend),
 `SessionGateFilter`, `SessionGates`, `SessionGateHandoff`, `SessionGateAccessFilter`,
