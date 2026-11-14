@@ -674,9 +674,11 @@ stock write; it is a game fact, so an earmarked order with invalid responsibilit
 For money the same criterion reads the ledgers: the Bank reset offsets the balances from the
 postings before the live time and the aUEC orders book what the facts before it still hold, so
 both keep every later booking
-([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)). The currency
-wipe takes the order guards before the Bank's request and account locks, the order a linked Bank
-decision follows.
+([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)). An earlier
+wipe's reset and shortages count at that wipe's live time, so a later wipe never takes the same
+money twice. The currency wipe takes the order guards and the purchasing deals before the Bank's
+request locks, and every account and then every holder last, the order every Bank decision
+follows (REQ-BANK-063).
 A relocation is the one write that changes a row's location in place: it keeps every earmark,
 pledge and offer, advances the row's version, and runs once per member under the history's shared
 lock, the hierarchy lock and the lot locks in ascending order; until it ran, the member's rows and
