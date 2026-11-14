@@ -19,7 +19,6 @@
 
 package de.greluc.krt.profit.basetool.frontend.patchchange.web;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateRead;
 import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
@@ -54,6 +53,9 @@ public class HomeLocationGate implements SessionGate {
   /** Name of the one-shot SSE event that hands an {@code EventSource} off to the page. */
   static final String SSE_EVENT = "home-location-gate";
 
+  /** Code of the backend's refusal while the member must still choose. */
+  static final String PROBLEM_CODE = "HOME_LOCATION_REQUIRED";
+
   /** Session attribute holding the epoch millis at which the cached "may proceed" was read. */
   static final String SESSION_CHECKED_AT = "krt.homeLocation.checkedAt";
 
@@ -79,7 +81,7 @@ public class HomeLocationGate implements SessionGate {
 
   @Override
   public @NotNull String problemCode() {
-    return BackendServiceException.CODE_HOME_LOCATION_REQUIRED;
+    return PROBLEM_CODE;
   }
 
   @Override

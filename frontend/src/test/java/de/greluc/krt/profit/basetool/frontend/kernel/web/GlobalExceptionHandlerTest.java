@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.StubSessionGate;
 import jakarta.servlet.http.HttpServletRequest;
@@ -134,6 +135,44 @@ class GlobalExceptionHandlerTest {
     assertEquals(
         ReauthenticationRequiredException.REAUTH_PATH,
         response.getHeaders().getFirst("X-Reauthenticate"));
+  }
+
+  @Test
+  void aJoinedSessionGatesRefusalOfANavigationRedirectsToTheGate() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/parallel-read");
+
+    Object result =
+        handler.handleCompletionException(
+            new CompletionException(markedGateRefusal()), new ConcurrentModel(), request);
+
+    assertEquals("redirect:/gate", result);
+    assertEquals(1, gate.forgotten());
+  }
+
+  @Test
+  void aJoinedSessionGatesRefusalOfAnAjaxCallSendsTheGatesHeader() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/parallel-read");
+    request.addHeader("X-Requested-With", "XMLHttpRequest");
+
+    Object result =
+        handler.handleCompletionException(
+            new CompletionException(new IllegalStateException(markedGateRefusal())),
+            new ConcurrentModel(),
+            request);
+
+    ResponseEntity<?> response = assertInstanceOf(ResponseEntity.class, result);
+    assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    assertEquals("/gate", response.getHeaders().getFirst("X-Gate-Required"));
+    assertEquals(1, gate.forgotten());
+  }
+
+  /**
+   * Builds the refusal the backend marks as the test gate's.
+   *
+   * @return the failure
+   */
+  private static SessionGateRefusalException markedGateRefusal() {
+    return new SessionGateRefusalException("gated", null, 403, "GATE_REQUIRED", "corr-gate", null);
   }
 
   @Test

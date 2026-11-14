@@ -479,10 +479,11 @@ request, in sessions already open as well:
   `HomeLocationGate` asks the backend (`GET /api/v1/patch-changes/me/home-location/status`) through
   `SessionGateFilter` and caches only a verdict that lets the member through, for 60 seconds; the
   home-location page and the choice clear it;
-- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend discards the cached
-  verdict at once and hands the browser to the page: a page load is redirected, an AJAX call gets
-  the header; so a member a new phase asks is held by the first refused request, not after the
-  cache expires;
+- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend, a page section's
+  read included, discards the cached verdict at once and hands the browser to the page: a page load
+  is redirected, an AJAX call gets the header; so a member a new phase asks is held by the first
+  refused request, not after the cache expires. The refusal carries `sessionGate: true` like every
+  session gate's, by which the frontend tells it (REQ-SEC-028);
 - an AJAX call gets `403` with the header `X-Home-Location-Required` naming the page, which
   `krtFetch` follows; an `EventSource` gets the one-shot event `home-location-gate`; a WebSocket
   handshake is marked (`SessionGateHandoff`) and closed with the terminal code `4003`;
@@ -502,12 +503,13 @@ relocation lock refuses its writes on locked rows and ships instead (REQ-PATCH-0
 - [x] The backend refuses a pending member's web calls with `403 HOME_LOCATION_REQUIRED` and lets
   the exempt endpoints and an exchange client's relayed call through.
 - [x] A backend refusal of the gate discards the frontend's cached verdict and hands the browser to
-  the page.
+  the page, also when a page section's read meets it.
 
 **Enforced by:** `HomeLocationGateTest` (frontend and backend), `SessionGateFilterTest`,
-`SessionGateAccessFilterTest`, `GlobalExceptionHandlerTest`, `SessionGateClientParityTest`,
-`HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate` (frontend and backend),
-`SessionGateFilter`, `SessionGates`, `SessionGateHandoff`, `SessionGateAccessFilter`,
+`SessionGateAccessFilterTest`, `GlobalExceptionHandlerTest`, `SectionSessionGateHandoffMvcTest`,
+`SessionGateClientParityTest`, `HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate`
+(frontend and backend), `SessionGateFilter`, `SessionGates`, `SessionGateHandoff`,
+`SessionGateAccessFilter`, `SessionGateRefusalException`, `SectionFallback`,
 `GlobalExceptionHandler`, `NotificationPageController`, `NotificationStreamService#reconnect`,
 `krt-fetch.js`, `notifications.js`
 

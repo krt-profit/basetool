@@ -120,7 +120,7 @@ public class ActiveOrgUnitRestore {
     } catch (ReauthenticationRequiredException _) {
       return;
     } catch (BackendServiceException e) {
-      if (BackendErrorMapper.isExpectedAccessGateRefusal(e.getProblemCode())) {
+      if (BackendErrorMapper.isExpectedAccessGateRefusal(e)) {
         log.debug(
             "An access gate refused reading the stored active org unit ({}); the next request"
                 + " reads it again",

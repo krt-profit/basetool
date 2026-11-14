@@ -157,7 +157,8 @@ class BackendApiClientProblemJsonTest {
                       403,
                       "{\"type\":\"urn:problem:terms-not-accepted\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"Accept"
                           + " the terms\","
-                          + "\"code\":\"TERMS_NOT_ACCEPTED\",\"correlationId\":\"corr-terms\"}");
+                          + "\"code\":\"TERMS_NOT_ACCEPTED\",\"correlationId\":\"corr-terms\","
+                          + "\"sessionGate\":true}");
               case "/api/v1/role-gated" ->
                   problemJson(
                       403,
@@ -235,8 +236,8 @@ class BackendApiClientProblemJsonTest {
   }
 
   /**
-   * A consent-gate 403 is logged at DEBUG, not WARN, since every unconsented member triggers it on
-   * every request (REQ-SEC-028, REQ-OBS-001).
+   * A consent-gate 403, marked as a session gate's, is logged at DEBUG, not WARN, since every
+   * unconsented member triggers it on every request (REQ-SEC-028, REQ-OBS-001).
    */
   @Test
   void get_ShouldLogTermsGate403AtDebug_NotWarn() {
@@ -247,9 +248,9 @@ class BackendApiClientProblemJsonTest {
     Level previous = logger.getLevel();
     logger.setLevel(Level.DEBUG);
     try {
-      BackendServiceException ex =
+      SessionGateRefusalException ex =
           assertThrows(
-              BackendServiceException.class,
+              SessionGateRefusalException.class,
               () -> backendApiClient.get("/api/v1/terms-gated", String.class));
       assertEquals("TERMS_NOT_ACCEPTED", ex.getProblemCode());
 
