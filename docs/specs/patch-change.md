@@ -479,11 +479,19 @@ request, in sessions already open as well:
   `HomeLocationGate` asks the backend (`GET /api/v1/patch-changes/me/home-location/status`) through
   `SessionGateFilter` and caches only a verdict that lets the member through, for 60 seconds; the
   home-location page and the choice clear it;
-- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend, a page section's
-  read included, discards the cached verdict at once and hands the browser to the page: a page load
-  is redirected, an AJAX call gets the header; so a member a new phase asks is held by the first
-  refused request, not after the cache expires. The refusal carries `sessionGate: true` like every
-  session gate's, by which the frontend tells it (REQ-SEC-028);
+- a WebSocket handshake never reuses a cached verdict: `SessionGateFilter` discards it and asks
+  the backend again, because the socket outlives the verdict and the rooms it then holds are
+  authorized without a backend call the gate could refuse; a member whose phase opened after the
+  cached verdict gets the `4003` close;
+- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend discards the
+  cached verdict at once and hands the browser to the page: a page load is redirected, an AJAX
+  call gets the header; so a member a new phase asks is held by the first refused request, not
+  after the cache expires. This holds for a page section's read, a parallel read's fallback, a
+  form post's fallback and the shared AJAX relay (`BackendErrorResponses`) alike: each lets the
+  refusal through to `GlobalExceptionHandler` (`SectionFallback#rethrowHandOff`) instead of
+  answering it as an ordinary failure. The layout chrome, which also renders on the pages the gate
+  leaves open, degrades instead. The refusal carries `sessionGate: true` like every session gate's,
+  by which the frontend tells it (REQ-SEC-028);
 - an AJAX call gets `403` with the header `X-Home-Location-Required` naming the page, which
   `krtFetch` follows; an `EventSource` gets the one-shot event `home-location-gate`; a WebSocket
   handshake is marked (`SessionGateHandoff`) and closed with the terminal code `4003`;
@@ -503,15 +511,20 @@ relocation lock refuses its writes on locked rows and ships instead (REQ-PATCH-0
 - [x] The backend refuses a pending member's web calls with `403 HOME_LOCATION_REQUIRED` and lets
   the exempt endpoints and an exchange client's relayed call through.
 - [x] A backend refusal of the gate discards the frontend's cached verdict and hands the browser to
-  the page, also when a page section's read meets it.
+  the page, also when a page section's read, a parallel read's fallback, a form post's fallback or
+  the shared AJAX relay meets it, with a cached pass still warm.
+- [x] A WebSocket handshake asks the backend despite a cached pass and marks the socket of a member
+  whose phase opened since.
 
 **Enforced by:** `HomeLocationGateTest` (frontend and backend), `SessionGateFilterTest`,
 `SessionGateAccessFilterTest`, `GlobalExceptionHandlerTest`, `SectionSessionGateHandoffMvcTest`,
-`SessionGateClientParityTest`, `HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate`
-(frontend and backend), `SessionGateFilter`, `SessionGates`, `SessionGateHandoff`,
-`SessionGateAccessFilter`, `SessionGateRefusalException`, `SectionFallback`,
-`GlobalExceptionHandler`, `NotificationPageController`, `NotificationStreamService#reconnect`,
-`krt-fetch.js`, `notifications.js`
+`SharedFallbackSessionGateHandoffMvcTest`, `BackendErrorResponsesTest`,
+`BackendFallbackReauthenticationTest`, `SessionGateClientParityTest`,
+`HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate` (frontend and backend),
+`SessionGateFilter`, `SessionGates`, `SessionGateHandoff`, `SessionGateAccessFilter`,
+`SessionGateRefusalException`, `SectionFallback`, `BackendErrorResponses`,
+`MutationResponseHelper`, `GlobalExceptionHandler`, `NotificationPageController`,
+`NotificationStreamService#reconnect`, `krt-fetch.js`, `notifications.js`
 
 ### REQ-PATCH-021 — Who is asked and what is offered
 
@@ -770,6 +783,10 @@ It **only sets that default and moves nothing**; new members set it there.
   curated locations by name, the hint that it only prefills the forms and moves nothing, and the
   shared save bar, which saves it in place (`POST /profile/home-location`, REQ-FE-001). A stored
   location the profile no longer offers shows as no choice. There is no way back to "no choice".
+- The section is editable only after the setting and the curated locations were both read: the
+  page reader `HomeLocationPreferenceReader` carries that availability explicitly, and while either
+  read fails the section says it cannot be loaded and renders no form, so no version the page never
+  read is posted and a failed read is never shown as "no choice".
 - Endpoints: `GET`/`PUT /api/v1/users/me/home-location` (any member, only their own row). A
   location that is not curated is refused with `400` (`error.profile.home_location_not_offered`), a
   stale version with `409`; choosing the stored location again changes nothing.
@@ -782,6 +799,8 @@ It **only sets that default and moves nothing**; new members set it there.
   a stale version are refused.
 - [x] The profile section lists the curated locations by name with the stored one selected and
   saves in place.
+- [x] A failed read of the setting or of the curated locations shows the section unavailable,
+  without a form to save.
 
 **Enforced by:** `MemberHomeLocationIntegrationTest`, `MyHomeLocationControllerIntegrationTest`,
 `ProfileHomeLocationMvcTest`, `HomeLocationPreferenceReaderTest`, `IdentityBackendClientTest`,
