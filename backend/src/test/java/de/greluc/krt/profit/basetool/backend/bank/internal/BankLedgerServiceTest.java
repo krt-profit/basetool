@@ -38,7 +38,9 @@ import de.greluc.krt.profit.basetool.backend.orgunit.api.OrgUnitMembershipReposi
 import de.greluc.krt.profit.basetool.backend.orgunit.api.Squadron;
 import de.greluc.krt.profit.basetool.backend.orgunit.api.SquadronRepository;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -46,11 +48,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Integration tests for {@link BankLedgerService} against real Postgres on the two-ledger model
@@ -75,7 +79,9 @@ class BankLedgerServiceTest {
   @Autowired private SquadronRepository squadronRepository;
   @Autowired private OrgUnitMembershipRepository orgUnitMembershipRepository;
   @Autowired private SystemSettingRepository systemSettingRepository;
+  @Autowired private JdbcTemplate jdbc;
 
+  private Instant started;
   private BankAccount account;
   private BankAccount otherAccount;
   private BankHolder holderA;
@@ -89,10 +95,31 @@ class BankLedgerServiceTest {
    */
   @BeforeEach
   void seed() {
+    started = Instant.now().truncatedTo(ChronoUnit.MICROS);
     account = newAccount("Test Konto " + UUID.randomUUID());
     otherAccount = newAccount("Gegenkonto " + UUID.randomUUID());
     holderA = newHolder("holder-a-" + UUID.randomUUID());
     holderB = newHolder("holder-b-" + UUID.randomUUID());
+  }
+
+  /**
+   * Removes every wipe reset the test booked, with its legs on every account and holder and its
+   * audit row: a reset left behind would take effect after the live time of every currency-wipe
+   * test and leave that wipe nothing to offset (REQ-PATCH-041).
+   */
+  @AfterEach
+  void removeWipeResets() {
+    List<UUID> resets =
+        jdbc.queryForList(
+            "SELECT id FROM bank_transaction WHERE type = 'WIPE_RESET' AND created_at >= ?",
+            UUID.class,
+            Timestamp.from(started));
+    for (UUID reset : resets) {
+      jdbc.update("DELETE FROM bank_audit_event WHERE transaction_id = ?", reset);
+      jdbc.update("DELETE FROM bank_holder_posting WHERE transaction_id = ?", reset);
+      jdbc.update("DELETE FROM bank_posting WHERE transaction_id = ?", reset);
+      jdbc.update("DELETE FROM bank_transaction WHERE id = ?", reset);
+    }
   }
 
   @Test

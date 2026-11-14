@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRows;
 import de.greluc.krt.profit.basetool.backend.platform.api.OwnedRowsMover;
-import de.greluc.krt.profit.basetool.backend.platform.api.UserReassignmentParticipant;
+import de.greluc.krt.profit.basetool.backend.platform.api.PreparedUserReassignmentParticipant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -31,11 +31,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Moves the member's order assignments and linked holder identities during account merge. */
+/**
+ * Moves the member's order assignments and linked holder identities during account merge; takes the
+ * money identity lock of both accounts before the merge locks their rows, as every money writer
+ * does.
+ */
 @Component
 @RequiredArgsConstructor
 @Transactional(propagation = Propagation.MANDATORY)
-public class JobOrderUserReassignment implements UserReassignmentParticipant {
+public class JobOrderUserReassignment implements PreparedUserReassignmentParticipant {
 
   static final int POSITION = 100;
 
@@ -80,6 +84,11 @@ public class JobOrderUserReassignment implements UserReassignmentParticipant {
         "job_order_money_holder_change.actor_id",
         "job_order_money_holder_change.previous_user_id",
         "job_order_money_holder_change.user_id");
+  }
+
+  @Override
+  public void prepareMerge(@NotNull UUID source, @NotNull UUID target) {
+    identityLock.lockAccounts(source, target);
   }
 
   @Override

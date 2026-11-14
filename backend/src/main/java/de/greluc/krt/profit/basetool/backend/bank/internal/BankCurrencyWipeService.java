@@ -44,10 +44,12 @@ import org.springframework.transaction.annotation.Transactional;
  * time in one wipe reset, so every later booking stays.
  *
  * <p>An account or holder whose later debits exceed its later credits would go below zero by that
- * offset; its offset then stops at zero ({@link BankWipeOffsets}). The owners of purpose-bound
- * requests are locked before the requests, the request locks come before the account locks, as in a
- * request's confirmation, and every holder is locked after the accounts before a balance is read,
- * so no custody move lands between the read and the reset.
+ * offset; its offset then stops at zero ({@link BankWipeOffsets}). A wipe reset that took effect at
+ * or after the live time already zeroed every account and holder balance, so the wipe then offsets
+ * nothing and stops nothing at zero. The owners of purpose-bound requests are locked before the
+ * requests, the request locks come before the account locks, as in a request's confirmation, and
+ * every holder is locked after the accounts before a balance is read or an earlier reset looked
+ * for, so no custody move and no standalone reset lands between the read and the reset.
  */
 @Service
 @RequiredArgsConstructor
@@ -57,6 +59,7 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   private static final List<String> ACCOUNT_SECTIONS = List.of("account", "bookings", "chart");
 
   private final BankPostingWriter writer;
+  private final BankTransactionRepository bankTransactions;
   private final BankPostingRepository postings;
   private final BankHolderPostingRepository holderPostings;
   private final BankWipeResetBooking resetBooking;
@@ -67,7 +70,10 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   @Override
   @Transactional(readOnly = true)
   public @NotNull Effect preview(@NotNull Instant liveAt) {
-    BankWipeOffsets accountOffsets = accountOffsets(liveAt);
+    BankWipeOffsets accountOffsets =
+        bankTransactions.existsWipeResetTakingEffectSince(liveAt)
+            ? BankWipeOffsets.NONE
+            : accountOffsets(liveAt);
     return new Effect(
         requests.countUnlinkedBefore(liveAt), accountOffsets.total(), accountOffsets.clamped());
   }
@@ -77,8 +83,9 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
   public @NotNull Effect apply(@NotNull Instant liveAt, @NotNull UUID patchChangeId) {
     int cancelled = requests.cancelUnlinkedBefore(liveAt, patchChangeId);
     List<BankAccount> locked = writer.lockLedger();
-    BankWipeOffsets accountOffsets = accountOffsets(liveAt);
-    BankWipeOffsets holderOffsets = holderOffsets(liveAt);
+    boolean zeroedSince = bankTransactions.existsWipeResetTakingEffectSince(liveAt);
+    BankWipeOffsets accountOffsets = zeroedSince ? BankWipeOffsets.NONE : accountOffsets(liveAt);
+    BankWipeOffsets holderOffsets = zeroedSince ? BankWipeOffsets.NONE : holderOffsets(liveAt);
     BankWipeResetBooking.Booked booked =
         resetBooking.book(locked, accountOffsets.offsets(), holderOffsets.offsets(), liveAt);
     auditService.record(

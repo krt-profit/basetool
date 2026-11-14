@@ -285,6 +285,7 @@ class JobOrderMoneyPrivacyIntegrationTest {
         .andExpect(jsonPath("$.hits[*].column", hasItem("previous_name")));
 
     transactions.executeWithoutResult(_ -> {
+      accountDeletion.prepareErasure(unitless);
       anonymisation.anonymise(unitless, List.of(unitlessName));
       users.findById(unitless).orElseThrow().setInKeycloak(false);
       accountDeletion.deleteUser(
@@ -782,6 +783,7 @@ class JobOrderMoneyPrivacyIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.netHandedOver").value("5"));
     transactions.executeWithoutResult(_ -> {
+      accountDeletion.prepareErasure(survivor);
       anonymisation.anonymise(survivor, List.of(unitlessName));
       users.findById(survivor).orElseThrow().setInKeycloak(false);
       accountDeletion.deleteUser(

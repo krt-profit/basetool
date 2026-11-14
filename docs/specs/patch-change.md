@@ -930,10 +930,19 @@ this live time and this trigger (REQ-PATCH-003); its balances as of its own live
 reset there, so it never offsets again what this one already offset. The standalone reset takes
 effect when it is recorded.
 
+A reset that took effect at or after the live time already zeroed every account and holder
+balance, including everything held at the live time. Because live times strictly increase
+(REQ-PATCH-003), that is the standalone reset of
+[REQ-BANK-013](bank.md#req-bank-013--admin-wipe-reset) recorded between the live time and the
+trigger. The wipe then offsets nothing: it books no reset, every booking after that reset stays on
+both ledgers, and no account or holder counts as stopped at zero. It still cancels the pending
+requests of REQ-PATCH-042 and records its summary event (REQ-PATCH-046).
+
 The reset locks every Bank account and then every holder, each in id order, before it reads a
-balance. A custody move without an account leg, such as a holder transfer whose fee rounds to zero
-or its reversal, locks its holders after its accounts (REQ-BANK-031), so the move and the reset
-take turns and no custody the reset read moves before it books.
+balance or looks for an earlier reset. A custody move without an account leg, such as a holder
+transfer whose fee rounds to zero or its reversal, locks its holders after its accounts
+(REQ-BANK-031), so the move and the reset take turns and no custody the reset read moves before it
+books; a standalone reset locks the same rows, so it lands wholly before or after the wipe.
 
 When an offset would take an account or a holder below zero, because more was booked out of it
 than into it since the live time, the offset **stops at zero**: the account or holder ends at
@@ -952,16 +961,20 @@ detail the reset booked on refresh in place.
 - [x] An account whose later debits exceed its later credits ends at zero, and the clamp is
   counted.
 - [x] A later wipe counts an earlier wipe's reset at that wipe's live time, so money booked after
-  the later live time stays.
+  the later live time stays, and still offsets what was booked between the two live times.
+- [x] After a standalone reset between the live time and the trigger the wipe offsets nothing:
+  credits after that reset stay on the account and on the holder, also when money was spent before
+  it, and the preview, the record and the summary event count no stopped account or holder.
 - [x] A holder transfer whose fee rounds to zero and that races the reset waits for it; its source
   ends at zero.
 
 **Enforced by:** `BankWipeOffsetsTest`, `BankCurrencyWipeIntegrationTest`,
-`CurrencyWipeEffectTest`, `BankLedgerServiceTest`, `V430CurrencyWipeEffectiveTimeMigrationTest` ·
-**Code:** `BankCurrencyWipeService`, `BankWipeOffsets`, `BankWipeResetBooking`,
-`BankPostingWriter#lockLedger`, `#lockHolders`, `#persistWipeReset`, `BankTransaction#effectiveAt`,
-`BankPostingRepository#accountBalancesBefore`, `BankHolderPostingRepository#holderAmountsBefore`,
-`#holderAmountsOf`, `V430`
+`PatchChangeCurrencyWipeIntegrationTest`, `CurrencyWipeEffectTest`, `BankLedgerServiceTest`,
+`V430CurrencyWipeEffectiveTimeMigrationTest` · **Code:** `BankCurrencyWipeService`,
+`BankWipeOffsets`, `BankWipeResetBooking`, `BankPostingWriter#lockLedger`, `#lockHolders`,
+`#persistWipeReset`, `BankTransaction#effectiveAt`, `BankPostingRepository#accountBalancesBefore`,
+`BankHolderPostingRepository#holderAmountsBefore`, `#holderAmountsOf`,
+`BankTransactionRepository#existsWipeResetTakingEffectSince`, `V430`
 
 ### REQ-PATCH-042 — Pending Bank requests from before the live time are cancelled
 
