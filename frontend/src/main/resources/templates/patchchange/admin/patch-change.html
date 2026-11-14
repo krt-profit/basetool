@@ -12,7 +12,7 @@
     <th:block th:replace="~{kernel/fragments/page-head :: pageHead(tabsKey='admin.dangerzone', eyebrowKey='nav.admin.group.system', titleText=#{admin.patchChange.title})}"></th:block>
 
     <span id="pc-i18n" hidden
-          th:attr="data-triggered=#{admin.patchChange.triggered},data-trigger-error=#{admin.patchChange.error.trigger},data-trigger-label=#{admin.patchChange.trigger},data-confirm-label=#{admin.patchChange.confirm.label},data-previous=#{admin.patchChange.previous},data-preview-error=#{admin.patchChange.preview.error},data-preview-empty=#{admin.patchChange.preview.empty},data-corrected=#{admin.patchChange.correct.success},data-correct-error=#{admin.patchChange.correct.error},data-conflict=#{admin.patchChange.correct.conflict},data-refresh-error=#{admin.patchChange.history.refreshError},data-exception-chip=#{admin.patchChange.exceptions.chip},data-exception-rows=#{admin.patchChange.exceptions.rows},data-exception-remove=#{admin.patchChange.exceptions.remove},data-exception-pick=#{admin.patchChange.exceptions.pick},data-exception-duplicate=#{admin.patchChange.exceptions.duplicate},data-exception-limit=#{admin.patchChange.exceptions.limit},data-exception-keep=#{admin.patchChange.exceptions.mode.KEEP},data-exception-wipe=#{admin.patchChange.exceptions.mode.WIPE}"></span>
+          th:attr="data-triggered=#{admin.patchChange.triggered},data-trigger-error=#{admin.patchChange.error.trigger},data-trigger-label=#{admin.patchChange.trigger},data-confirm-label=#{admin.patchChange.confirm.label},data-previous=#{admin.patchChange.previous},data-preview-error=#{admin.patchChange.preview.error},data-preview-empty=#{admin.patchChange.preview.empty},data-corrected=#{admin.patchChange.correct.success},data-correct-error=#{admin.patchChange.correct.error},data-conflict=#{admin.patchChange.correct.conflict},data-refresh-error=#{admin.patchChange.history.refreshError},data-exception-chip=#{admin.patchChange.exceptions.chip},data-exception-rows=#{admin.patchChange.exceptions.rows},data-exception-remove=#{admin.patchChange.exceptions.remove},data-exception-pick=#{admin.patchChange.exceptions.pick},data-exception-duplicate=#{admin.patchChange.exceptions.duplicate},data-exception-limit=#{admin.patchChange.exceptions.limit},data-exception-keep=#{admin.patchChange.exceptions.mode.KEEP},data-exception-wipe=#{admin.patchChange.exceptions.mode.WIPE},data-phase-end-text=#{admin.patchChange.phase.end.text},data-phase-ended=#{admin.patchChange.phase.end.success},data-phase-end-error=#{admin.patchChange.phase.end.error},data-home-locations=#{admin.patchChange.homeLocations.label},data-home-locations-none=#{admin.patchChange.homeLocations.none}"></span>
     <ul id="pc-count-labels" hidden>
         <li th:each="kind : ${countKinds}" th:data-count-kind="${kind}"
             th:text="#{|admin.patchChange.count.${kind}|}">Raffinerieauftr&auml;ge storniert</li>
@@ -158,8 +158,18 @@
                            th:checked="${defaults != null and defaults.homeLocationPrompt()}">
                     <span th:text="#{admin.patchChange.option.homeLocationPrompt}">Home-Location-Abfrage beim n&auml;chsten Login</span>
                 </label>
+                <p class="form-hint pc-hint" data-testid="pc-home-locations-hint"
+                   th:with="homeNames=${#strings.listJoin(form.homeLocations().![name()], ', ')}">
+                    <span id="pc-home-locations" data-testid="pc-home-locations"
+                          th:data-count="${#lists.size(form.homeLocations())}"
+                          th:text="${#lists.isEmpty(form.homeLocations())} ? #{admin.patchChange.homeLocations.none} : #{admin.patchChange.homeLocations.label(${homeNames})}">W&auml;hlbare Home Locations: Lorville, Area18</span>
+                    <a th:href="@{/admin/locations}" data-testid="pc-home-locations-curate"
+                       th:text="#{admin.patchChange.homeLocations.curate}">Home Locations pflegen</a>
+                </p>
+                <p id="pc-home-alert" class="alert alert-warning pc-alert" role="alert" data-testid="pc-home-alert"
+                   th:hidden="${!#lists.isEmpty(form.homeLocations()) or defaults == null or !defaults.homeLocationPrompt()}"
+                   th:text="#{admin.patchChange.homeLocations.empty}">Es ist keine Home Location gepflegt. Die Mitglieder k&ouml;nnten nichts w&auml;hlen; pflege die Home Locations vor dem Ausl&ouml;sen.</p>
             </div>
-            <p class="form-hint pc-hint" th:text="#{admin.patchChange.effects.hint}">W&auml;hrungs-Wipe und Home-Location-Abfrage wirken erst mit einem sp&auml;teren Release; die Auswahl wird schon gespeichert.</p>
         </section>
 
         <aside class="hud-box pc-preview" aria-labelledby="pc-preview-title" data-testid="pc-preview">
@@ -201,11 +211,13 @@
                             <th scope="col" th:text="#{admin.patchChange.history.column.triggered}">Ausgel&ouml;st</th>
                             <th scope="col" th:text="#{admin.patchChange.history.column.counts}">Wirkungen</th>
                             <th scope="col" th:text="#{admin.patchChange.history.column.options}">Optionen</th>
+                            <th scope="col" th:text="#{admin.patchChange.history.column.phase}">Abfrage</th>
                             <th scope="col" class="cell-actions"><span class="visually-hidden" th:text="#{admin.patchChange.history.column.actions}">Aktion</span></th>
                         </tr>
                         </thead>
                         <tbody>
                         <tr th:each="p : ${history}" th:id="|pc-row-${p.id()}|" data-testid="pc-history-row"
+                            th:with="phase=${p.phase()},phaseOpen=${p.phase() != null and p.phase().state().name() == 'OPEN'}"
                             th:attr="data-patch-change-id=${p.id()},data-version=${p.version()},data-label=${p.label()}">
                             <td><span class="data-value pc-row-label" th:text="${p.label()}">4.4</span></td>
                             <td th:attr="data-label=#{admin.patchChange.history.column.kind}"
@@ -250,9 +262,19 @@
                                           th:text="#{admin.patchChange.chip.homeLocationPrompt}">Home-Location-Abfrage</span>
                                 </div>
                             </td>
+                            <td th:attr="data-label=#{admin.patchChange.history.column.phase}">
+                                <span th:if="${phase != null}" class="chip" data-testid="pc-phase"
+                                      th:classappend="${phaseOpen} ? 'chip--warning' : 'chip--muted'"
+                                      th:with="phaseKey=|admin.patchChange.phase.${phase.state()}|"
+                                      th:attr="data-phase-state=${phase.state()}"
+                                      th:text="#{${phaseKey}(${phase.relocated()}, ${phase.asked()})}">Offen &middot; 41 / 87 umgezogen</span>
+                                <span th:if="${phase == null}" class="text-muted">&ndash;</span>
+                            </td>
                             <td class="cell-actions">
                                 <button type="button" class="btn btn-ghost btn-xs" data-pc-correct data-testid="pc-correct-open"
                                         th:text="#{admin.patchChange.correct}">Bezeichnung korrigieren</button>
+                                <button th:if="${phaseOpen}" type="button" class="btn btn-quiet-danger btn-xs" data-pc-phase-end
+                                        data-testid="pc-phase-end-open" th:text="#{admin.patchChange.phase.end}">Abfrage beenden</button>
                             </td>
                         </tr>
                         </tbody>
@@ -284,6 +306,22 @@
                         <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg>
                         <span th:text="#{general.save}">Speichern</span>
                     </button>
+                </div>
+            </form>
+        </th:block>
+    </th:block>
+
+    <th:block th:replace="~{kernel/fragments/modal-wrapper :: modal(modalId='pc-phase-end-modal', titleKey='admin.patchChange.phase.end.title', variant='krt-modal--danger', body=~{::pc-phase-end-modal-body})}">
+        <th:block th:ref="pc-phase-end-modal-body">
+            <form id="pc-phase-end-form" class="no-track" novalidate data-testid="pc-phase-end-form">
+                <div class="krt-modal-body">
+                    <p id="pc-phase-end-text" data-testid="pc-phase-end-text"></p>
+                </div>
+                <div class="krt-modal-foot">
+                    <button type="button" class="btn btn-ghost" data-trigger="close-modal-display"
+                            data-modal-id="pc-phase-end-modal" th:text="#{general.cancel}">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger" id="pc-phase-end-submit" data-testid="pc-phase-end-submit"
+                            th:text="#{admin.patchChange.phase.end}">Abfrage beenden</button>
                 </div>
             </form>
         </th:block>

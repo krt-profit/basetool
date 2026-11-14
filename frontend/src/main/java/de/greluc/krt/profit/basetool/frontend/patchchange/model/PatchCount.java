@@ -64,5 +64,7 @@ public enum PatchCount {
   /** The waiting aUEC order Bank attempts the currency wipe cancels (REQ-PATCH-043). */
   AUEC_BANK_ATTEMPTS_CANCELED,
   /** The aUEC unit commitments the currency wipe ends (REQ-PATCH-045). */
-  AUEC_COMMITMENTS_ENDED
+  AUEC_COMMITMENTS_ENDED,
+  /** The members older than the live time the home-location prompt asks (REQ-PATCH-021). */
+  MEMBERS_ASKED
 }

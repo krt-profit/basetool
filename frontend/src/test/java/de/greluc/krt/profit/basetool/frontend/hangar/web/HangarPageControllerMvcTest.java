@@ -86,7 +86,8 @@ class HangarPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of()));
 
@@ -194,7 +195,8 @@ class HangarPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))
@@ -234,7 +236,8 @@ class HangarPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 1000, 1, 1, List.of());
 
     LocationDto homeLoc = new LocationDto(UUID.randomUUID(), "Orison", null, false, true, 1L);
@@ -275,7 +278,8 @@ class HangarPageControllerMvcTest {
             0L,
             null,
             null,
-            null);
+            null,
+            false);
     PageResponse<ShipDto> ships = new PageResponse<>(List.of(ship), 0, 50, 1, 1, List.of());
 
     when(backendApiClient.get(eq("/api/v1/hangar/my-ships?page=0&size=50"), anyTypeRef()))

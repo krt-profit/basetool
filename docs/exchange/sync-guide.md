@@ -83,6 +83,26 @@ and **do not add it back**. The server refuses such an add per op with `REMOVED_
 tombstone lives (90 days). If you believe the entry should come back, ask the member; only after they
 agree resend the op with `override: true`.
 
+## Patch changes
+
+When a patch change asks the members for a new home location, the Basetool relocates each member's
+stock and ships once the member has chosen, in the Basetool or later through the patch-change
+resource. **The server is the only relocator:** do not move synced lots or ships to a home location
+yourself; follow the result in the feeds.
+
+- Only lots and ships **created before the patch went live** move. Stock booked or ships added later
+  stay where they are.
+- A relocated lot reaches the stock feed as a **tombstone for the old key** plus an **item for the
+  new key**. The new key's item also includes stock that already lay at the home location. Every
+  entry names the channel `patch` and the patch change's `id`, so you can take the relocation over
+  in one step. A moved ship arrives as an item with its new location and a new `version`.
+- Until the member has chosen, those lots and ships are **locked**. A change set that writes one of
+  them answers `409 RELOCATION_PENDING` and writes nothing: from the member's own client, and from
+  another member's client on a pool lot the member holds. Reads and booking **new** stock still
+  work. Pause the stock and ship sync, keep the local changes and ask the member to choose the home
+  location in the Basetool; then pull and push again.
+- After the move, a push against an old lot gets `REMOVED_ELSEWHERE`, as for any removed lot.
+
 ## Full resync after a cursor expired
 
 `410 CURSOR_EXPIRED` means the tombstones since your cursor are gone — or the cursor is not one the

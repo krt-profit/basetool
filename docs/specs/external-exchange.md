@@ -1933,6 +1933,11 @@ A client that cannot set its `User-Agent` — a Chromium browser extension — s
 
 ### REQ-XCH-025 — Errors are problem+json with a stable code
 
+> [!note] Amended 2026-11-14 (REQ-PATCH-023) — `RELOCATION_PENDING` passes through
+> A change set that writes a stock lot or ship a pending relocation locks is refused by the backend
+> with `409 RELOCATION_PENDING` and nothing is written; the relay passes the code with its fixed
+> detail (`ExchangeRelay.DETAILS`), and the registry and the sync guide name it
+> ([REQ-PATCH-023](patch-change.md#req-patch-023--the-relocation-lock)).
 Every error is RFC 9457 problem+json with a `code` from the registry in `docs/exchange/errors.md`,
 each with its HTTP status and the client action it requires. Codes are never reused or repurposed.
 The gateway's gates count their refusals on `basetool_ingest_exchange_refused_total` with the code

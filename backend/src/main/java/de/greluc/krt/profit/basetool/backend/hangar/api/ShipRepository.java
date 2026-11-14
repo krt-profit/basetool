@@ -207,19 +207,27 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
 
   /**
    * OrgUnit-scoped variant of {@link #resetAllFitted()}: clears the {@code fitted} flag only on
-   * ships within the caller's scope triple.
+   * ships within the caller's scope triple, leaving out the ships the relocation lock keeps from
+   * the caller (REQ-PATCH-023).
    *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @param lockedOwners the owners whose ships from before {@code lockedBefore} stay as they are
+   * @param lockedBefore the open phase's live time, or {@code null} when nothing is locked
    * @return how many fitted ships were cleared; ships already unfitted are not counted
    */
   @Modifying(clearAutomatically = true)
-  @Query("UPDATE Ship s SET s.fitted = false WHERE s.fitted = true AND " + ShipScope.TRIPLE)
+  @Query(
+      "UPDATE Ship s SET s.fitted = false WHERE s.fitted = true AND "
+          + ShipScope.TRIPLE
+          + ShipRelocationScope.UNLOCKED)
   int resetAllFittedScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("lockedOwners") Collection<UUID> lockedOwners,
+      @Param("lockedBefore") @Nullable Instant lockedBefore);
 
   /**
    * Counts, per owner, the fitted ships {@link #resetAllFittedScoped} is about to clear
@@ -228,16 +236,21 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @param lockedOwners the owners whose ships from before {@code lockedBefore} are left out
+   * @param lockedBefore the open phase's live time, or {@code null} when nothing is locked
    * @return one row per owner with at least one fitted ship in scope
    */
   @Query(
       "SELECT s.owner.id AS ownerId, COUNT(s) AS shipCount FROM Ship s WHERE s.fitted = true AND "
           + ShipScope.TRIPLE
+          + ShipRelocationScope.UNLOCKED
           + " GROUP BY s.owner.id")
   List<OwnerShipCount> countFittedByOwnerScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("lockedOwners") Collection<UUID> lockedOwners,
+      @Param("lockedBefore") @Nullable Instant lockedBefore);
 
   /**
    * Lists the org units of the fitted ships {@link #resetAllFittedScoped} is about to clear, for
@@ -246,16 +259,21 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
+   * @param lockedOwners the owners whose ships from before {@code lockedBefore} are left out
+   * @param lockedBefore the open phase's live time, or {@code null} when nothing is locked
    * @return the distinct org unit ids; ships without a unit are left out
    */
   @Query(
       "SELECT DISTINCT s.owningOrgUnit.id FROM Ship s WHERE s.fitted = true"
           + " AND s.owningOrgUnit IS NOT NULL AND "
-          + ShipScope.TRIPLE)
+          + ShipScope.TRIPLE
+          + ShipRelocationScope.UNLOCKED)
   List<UUID> findFittedOrgUnitIdsScoped(
       @Param("isAdminAllScope") boolean isAdminAllScope,
       @Param("activeOrgUnitId") @Nullable UUID activeOrgUnitId,
-      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
+      @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds,
+      @Param("lockedOwners") Collection<UUID> lockedOwners,
+      @Param("lockedBefore") @Nullable Instant lockedBefore);
 
   /**
    * Lists the org units an owner's ships belong to, for the unit hangar live sync (ADR-0260).
@@ -290,15 +308,18 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
    * Bulk-sets the location of every ship owned by {@code ownerId}, backing the hangar "set home
    * location" action.
    *
-   * <p>Does not bump {@code @Version}; clears the persistence context so later reads in the same
-   * transaction see the new state.
+   * <p>Advances every updated ship's {@code @Version}, so a form opened before answers a stale edit
+   * with a conflict; clears the persistence context so later reads in the same transaction see the
+   * new state.
    *
    * @param ownerId the owning user id whose ships are updated
    * @param location the location to set on every matching ship
    * @return the number of ships updated
    */
   @Modifying(clearAutomatically = true)
-  @Query("UPDATE Ship s SET s.location = :location WHERE s.owner.id = :ownerId")
+  @Query(
+      "UPDATE Ship s SET s.location = :location, s.version = s.version + 1"
+          + " WHERE s.owner.id = :ownerId")
   int setLocationForOwner(@Param("ownerId") UUID ownerId, @Param("location") Location location);
 
   /**

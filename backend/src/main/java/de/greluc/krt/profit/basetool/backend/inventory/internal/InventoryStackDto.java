@@ -41,6 +41,9 @@ import org.jetbrains.annotations.Nullable;
  * @param averageQuality the amount-weighted mean quality across all entries
  * @param maxQuality the highest quality value among the entries
  * @param entryCount the number of underlying entries collapsed into this stack
+ * @param relocationPending whether the holder has not chosen yet in the open home-location phase,
+ *     so their rows from before its live time are locked (REQ-PATCH-023); {@code false} on the
+ *     caller's own stacks
  */
 public record InventoryStackDto(
     @Nullable UserReferenceDto user,
@@ -52,4 +55,5 @@ public record InventoryStackDto(
     Double totalAmount,
     @Nullable Double averageQuality,
     @Nullable Integer maxQuality,
-    Integer entryCount) {}
+    Integer entryCount,
+    boolean relocationPending) {}

@@ -38,6 +38,7 @@ import java.util.UUID;
  * @param wipeExceptions its wipe exceptions with their entries' names, never {@code null} once
  *     constructed
  * @param counts what its effects touched, one entry per kind
+ * @param phase its home-location phase, or {@code null} when it did not ask for a home location
  */
 @DtoMirror
 public record PatchChangeDto(
@@ -50,7 +51,8 @@ public record PatchChangeDto(
     String triggeredBy,
     PatchChangeOptions options,
     List<WipeExceptionDto> wipeExceptions,
-    List<PatchCountDto> counts) {
+    List<PatchCountDto> counts,
+    PatchChangePhaseDto phase) {
 
   /** Copies the exceptions, so a missing list reads as none. */
   public PatchChangeDto {

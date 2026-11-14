@@ -45,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.hangar.api.ShipOrigin;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipReadinessDto;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRepository;
 import de.greluc.krt.profit.basetool.backend.hangar.api.ShipRequestDto;
+import de.greluc.krt.profit.basetool.backend.hangar.internal.HangarRelocationGuard.LockedShips;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserService;
 import de.greluc.krt.profit.basetool.backend.kernel.BadRequestException;
@@ -56,6 +57,7 @@ import de.greluc.krt.profit.basetool.backend.scope.api.OrgUnitStampingService;
 import de.greluc.krt.profit.basetool.backend.scope.api.RequestScopeResolver;
 import de.greluc.krt.profit.basetool.backend.scope.api.ScopePredicate;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -92,6 +94,7 @@ class HangarServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserService userService;
   @Mock private HangarUnitLiveSync unitLiveSync;
+  @Mock private HangarRelocationGuard relocationGuard;
 
   private HangarService hangarService;
 
@@ -113,7 +116,9 @@ class HangarServiceTest {
             eventPublisher,
             userService,
             unitLiveSync,
-            new HangarAdminNotifier(userService, eventPublisher));
+            new HangarAdminNotifier(userService, eventPublisher),
+            relocationGuard);
+    lenient().when(relocationGuard.lockedFor(any())).thenReturn(LockedShips.NONE);
   }
 
   @Test
@@ -377,10 +382,11 @@ class HangarServiceTest {
     when(b.getShipCount()).thenReturn(1L);
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(shipRepository.countFittedByOwnerScoped(false, null, Set.of())).thenReturn(List.of(a, b));
-    when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(4);
+    when(shipRepository.countFittedByOwnerScoped(false, null, Set.of(), Set.of(), null))
+        .thenReturn(List.of(a, b));
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(), Set.of(), null)).thenReturn(4);
     UUID unit = UUID.randomUUID();
-    when(shipRepository.findFittedOrgUnitIdsScoped(false, null, Set.of()))
+    when(shipRepository.findFittedOrgUnitIdsScoped(false, null, Set.of(), Set.of(), null))
         .thenReturn(List.of(unit));
     when(userService.currentActor()).thenReturn(ACTOR);
 
@@ -495,12 +501,13 @@ class HangarServiceTest {
         .thenReturn(new ScopePredicate(false, null, Set.of(reachedUnit, foreignUnit)));
     when(accessGateService.canActAsOfficerIn(reachedUnit)).thenReturn(true);
     when(accessGateService.canActAsOfficerIn(foreignUnit)).thenReturn(false);
-    when(shipRepository.resetAllFittedScoped(false, null, Set.of(reachedUnit))).thenReturn(2);
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(reachedUnit), Set.of(), null))
+        .thenReturn(2);
     when(userService.currentActor()).thenReturn(ACTOR);
 
     hangarService.resetAllFittedStatus();
 
-    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(reachedUnit));
+    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(reachedUnit), Set.of(), null);
   }
 
   @Test
@@ -509,30 +516,58 @@ class HangarServiceTest {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, pinned, Set.of(UUID.randomUUID())));
     when(accessGateService.canActAsOfficerIn(pinned)).thenReturn(true);
-    when(shipRepository.resetAllFittedScoped(false, null, Set.of(pinned))).thenReturn(0);
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(pinned), Set.of(), null))
+        .thenReturn(0);
 
     hangarService.resetAllFittedStatus();
 
-    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(pinned));
+    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(pinned), Set.of(), null);
   }
 
   @Test
   void resetAllFittedStatus_adminAllScope_staysUnnarrowed() {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(true, null, Set.of()));
-    when(shipRepository.resetAllFittedScoped(true, null, Set.of())).thenReturn(0);
+    when(shipRepository.resetAllFittedScoped(true, null, Set.of(), Set.of(), null)).thenReturn(0);
 
     hangarService.resetAllFittedStatus();
 
-    verify(shipRepository).resetAllFittedScoped(true, null, Set.of());
+    verify(shipRepository).resetAllFittedScoped(true, null, Set.of(), Set.of(), null);
     verify(accessGateService, never()).canActAsOfficerIn(any());
+  }
+
+  @Test
+  void resetAllFittedStatus_leavesOutTheShipsTheRelocationLockKeepsFromTheCaller() {
+    UUID lockedOwner = UUID.randomUUID();
+    Instant liveAt = Instant.parse("2026-01-01T00:00:00Z");
+    ShipRepository.OwnerShipCount fitted = mock(ShipRepository.OwnerShipCount.class);
+    when(fitted.getOwnerId()).thenReturn(lockedOwner);
+    when(requestScopeResolver.currentScopePredicate())
+        .thenReturn(new ScopePredicate(false, null, Set.of()));
+    when(shipRepository.countFittedByOwnerScoped(false, null, Set.of(), Set.of(), null))
+        .thenReturn(List.of(fitted));
+    when(relocationGuard.lockedFor(List.of(lockedOwner)))
+        .thenReturn(new LockedShips(Set.of(lockedOwner), liveAt));
+    when(shipRepository.countFittedByOwnerScoped(
+            false, null, Set.of(), Set.of(lockedOwner), liveAt))
+        .thenReturn(List.of());
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(), Set.of(lockedOwner), liveAt))
+        .thenReturn(0);
+
+    hangarService.resetAllFittedStatus();
+
+    verify(shipRepository)
+        .findFittedOrgUnitIdsScoped(false, null, Set.of(), Set.of(lockedOwner), liveAt);
+    verify(shipRepository).resetAllFittedScoped(false, null, Set.of(), Set.of(lockedOwner), liveAt);
+    verifyNoInteractions(auditService);
   }
 
   @Test
   void resetAllFittedStatus_recordsOnlyWhenShipsChanged() {
     when(requestScopeResolver.currentScopePredicate())
         .thenReturn(new ScopePredicate(false, null, Set.of()));
-    when(shipRepository.resetAllFittedScoped(false, null, Set.of())).thenReturn(0, 4);
+    when(shipRepository.resetAllFittedScoped(false, null, Set.of(), Set.of(), null))
+        .thenReturn(0, 4);
     org.mockito.Mockito.lenient().when(userService.currentActor()).thenReturn(ACTOR);
 
     hangarService.resetAllFittedStatus();

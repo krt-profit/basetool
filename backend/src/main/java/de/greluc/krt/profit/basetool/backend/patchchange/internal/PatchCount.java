@@ -51,5 +51,7 @@ public enum PatchCount {
   /** Bank attempts of aUEC orders waiting since before the live time that end as cancelled. */
   AUEC_BANK_ATTEMPTS_CANCELED,
   /** Unit commitments of aUEC orders opened before the live time that end. */
-  AUEC_COMMITMENTS_ENDED
+  AUEC_COMMITMENTS_ENDED,
+  /** Members whose accounts are older than the live time, asked for a new home location. */
+  MEMBERS_ASKED
 }

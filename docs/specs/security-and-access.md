@@ -1902,6 +1902,12 @@ cannot exist in one locale only) · **Text:** `terms.list_4_1_5`, `terms.p_4_2` 
 
 ### REQ-SEC-028 — Terms-of-Use consent is recorded, versioned and enforced
 
+> [!note] Amended 2026-11-14 (REQ-PATCH-020) — a second session gate shares the handoff
+> The home-location gate of a patch change holds a pending member the same way, after the consent
+> gate: a redirect to `/home-location`, the AJAX header `X-Home-Location-Required`, the one-shot SSE
+> event `home-location-gate` and the marked WebSocket handshake through the shared
+> `SessionGateHandoff`, with the backend's `403 HOME_LOCATION_REQUIRED` as the boundary
+> ([REQ-PATCH-020](patch-change.md#req-patch-020--the-home-location-gate-holds-a-pending-member-at-the-next-request)).
 > [!note] The go-live consent round — 2026-09-28 (epic #2078, #2092)
 > The wording change of REQ-SEC-027 (section 4), of the intro and of section 12 moves the version
 > from `df1f9b31581b0d0d` to `355bfed7e78bd936` (`generateTermsVersion` over the German bundle's
@@ -1984,7 +1990,7 @@ code `1006` and no reason, which is byte-for-byte what a dropped connection look
 therefore does the only correct thing for *that* and reconnects; `krt-live-sync.js` does so on
 full-jitter backoff capped at 30 s for as long as any topic is registered, and consent can never be
 given from a background socket, so the loop has no exit. The gate consequently **lets the upgrade
-complete and marks it** (`support.TermsGateHandoff`, a request attribute the handshake interceptor
+complete and marks it** (`kernel.security.SessionGateHandoff`, a request attribute the handshake interceptor
 copies onto the session), and `LiveSyncWebSocketHandler` closes the socket at connect with **`4003`
 carrying the consent-page URL as the close reason** — the first point at which a close code exists
 at all. `krt-live-sync.js` treats `4003` as terminal: it stops reconnecting permanently and
@@ -2127,7 +2133,7 @@ version scoping, one-sided cache, sort translation), `TermsAcceptancePageControl
 with `4003` and the consent URL, the refusal costs no per-user socket slot, and the code cannot
 drift from the client's) · **Code:** `TermsVersionProvider`, `TermsAcceptanceService`,
 `identity.api.TermsConsentCheck` (the leaf interface that keeps `config` and `service` acyclic per
-ADR-0047), `support.TermsGateHandoff` (the leaf that does the same for the frontend's `config` →
+ADR-0047), `kernel.security.SessionGateHandoff` (the leaf that does the same for the frontend's `config` →
 `websocket` handoff), `TermsController`, `AdminTermsController` · **Monitoring:**
 `basetool_terms_acceptances_total`, `basetool_terms_accepted_users`,
 `basetool_terms_refused_subjects`, `TermsConsentRolloutStalled`,

@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,8 @@ public class PatchChangeHistory {
   private final PatchChangeRepository repository;
   private final P4kPatchVersionReader patchVersions;
   private final UserRepository userRepository;
+  private final HomeLocationPhases phases;
+  private final HomeLocationOffer offer;
   private final WipeExceptionCatalogue exceptionCatalogue;
 
   /**
@@ -60,18 +63,24 @@ public class PatchChangeHistory {
     List<PatchChange> records = repository.findAllByOrderByLiveAtDesc();
     Map<UUID, String> names =
         names(records.stream().map(PatchChange::getTriggeredBy).filter(Objects::nonNull).toList());
+    UUID latestPrompt =
+        records.stream()
+            .filter(PatchChange::isHomeLocationPrompt)
+            .map(PatchChange::getId)
+            .findFirst()
+            .orElse(null);
     WipeExceptionCatalogue.Names entries =
         exceptionCatalogue.names(
             records.stream()
                 .flatMap(record -> record.options().wipeExceptions().stream())
                 .toList());
-    return records.stream().map(record -> toDto(record, names, entries)).toList();
+    return records.stream().map(record -> toDto(record, names, entries, latestPrompt)).toList();
   }
 
   /**
    * Returns what a new patch change's form starts from: the label suggested by the latest P4K
    * import, the previous patch change's label and live time, the presets of each kind and the
-   * catalogue types of each wipe group.
+   * catalogue types of each wipe group and the curated home locations.
    *
    * @return the form's defaults
    */
@@ -87,7 +96,8 @@ public class PatchChangeHistory {
             .toList(),
         Arrays.stream(WipeGroup.values())
             .map(group -> new PatchChangeFormDto.Group(group, WipeGroupTypes.typesOf(group)))
-            .toList());
+            .toList(),
+        offer.offered());
   }
 
   /**
@@ -102,7 +112,8 @@ public class PatchChangeHistory {
     return toDto(
         record,
         admin == null ? Map.of() : names(Set.of(admin)),
-        exceptionCatalogue.names(record.options().wipeExceptions()));
+        exceptionCatalogue.names(record.options().wipeExceptions()),
+        phases.latestPromptId());
   }
 
   /**
@@ -111,12 +122,14 @@ public class PatchChangeHistory {
    * @param record the record, its wipe groups, exceptions and counts readable
    * @param names the display name by member id
    * @param entries the names of the exceptions' catalogue entries
+   * @param latestPrompt the latest patch change with the prompt on, or {@code null}
    * @return the history row
    */
-  private static @NotNull PatchChangeDto toDto(
+  private @NotNull PatchChangeDto toDto(
       @NotNull PatchChange record,
       @NotNull Map<UUID, String> names,
-      @NotNull WipeExceptionCatalogue.Names entries) {
+      @NotNull WipeExceptionCatalogue.Names entries,
+      @Nullable UUID latestPrompt) {
     UUID admin = record.getTriggeredBy();
     PatchChangeOptions options = record.options();
     return new PatchChangeDto(
@@ -132,7 +145,8 @@ public class PatchChangeHistory {
             .map(exception -> WipeExceptionDto.of(exception, entries.of(exception)))
             .sorted(Comparator.comparing(dto -> Objects.requireNonNullElse(dto.name(), "")))
             .toList(),
-        record.counts().toDtos());
+        record.counts().toDtos(),
+        phases.phaseOf(record, latestPrompt));
   }
 
   /**

@@ -46,6 +46,8 @@ class RoleHierarchyTest {
 
   @MockitoBean private TermsAcceptanceGateFilter termsAcceptanceGateFilter;
 
+  @MockitoBean private HomeLocationGateFilter homeLocationGateFilter;
+
   @MockitoBean private BotProtectionFilter botProtectionFilter;
 
   @MockitoBean private SessionDebugFilter sessionDebugFilter;

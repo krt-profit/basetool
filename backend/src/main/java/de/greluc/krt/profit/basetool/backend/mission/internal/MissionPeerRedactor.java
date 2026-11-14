@@ -152,7 +152,8 @@ public class MissionPeerRedactor {
         dto.owningOrgUnitVersion(),
         dto.productionStatus(),
         null,
-        null);
+        null,
+        dto.relocationPending());
   }
 
   /**

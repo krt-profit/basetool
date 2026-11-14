@@ -331,7 +331,7 @@ class TermsAcceptanceGateFilterTest {
     filter.doFilter(request, response, filterChain);
 
     assertThat(response.getRedirectedUrl()).isNull();
-    assertThat(TermsGateHandoff.consentUrl(request)).isEqualTo("/terms/accept");
+    assertThat(SessionGateHandoff.gateUrl(request)).isEqualTo("/terms/accept");
     verify(filterChain).doFilter(any(), any());
   }
 
@@ -343,7 +343,7 @@ class TermsAcceptanceGateFilterTest {
 
     filter.doFilter(request, new MockHttpServletResponse(), filterChain);
 
-    assertThat(TermsGateHandoff.consentUrl(request)).isNull();
+    assertThat(SessionGateHandoff.gateUrl(request)).isNull();
     verify(filterChain).doFilter(any(), any());
   }
 

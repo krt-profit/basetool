@@ -665,4 +665,9 @@ both keep every later booking
 ([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)). The currency
 wipe takes the order guards before the Bank's request and account locks, the order a linked Bank
 decision follows.
+A relocation is the one write that changes a row's location in place: it keeps every earmark,
+pledge and offer, advances the row's version, and runs once per member under the history's shared
+lock, the hierarchy lock and the lot locks in ascending order; until it ran, the member's rows and
+ships from before the live time are locked against everyone but the member and admins
+([ADR-0383](../adr/0383-a-patch-change-relocation-moves-stock-in-place.md)).
 The contract lives in [`patch-change.md`](../specs/patch-change.md).

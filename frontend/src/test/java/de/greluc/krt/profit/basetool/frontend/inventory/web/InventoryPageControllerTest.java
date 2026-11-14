@@ -1149,7 +1149,7 @@ class InventoryPageControllerTest {
     UUID locationId = UUID.randomUUID();
     LocationReferenceDto location = new LocationReferenceDto(locationId, "Everus Harbor");
     InventoryStackDto stack =
-        new InventoryStackDto(null, location, 700, false, false, null, 10.0, 700.0, 700, 1);
+        new InventoryStackDto(null, location, 700, false, false, null, 10.0, 700.0, 700, 1, false);
     GroupedInventoryDto group =
         new GroupedInventoryDto(null, null, 10.0, 700.0, 700, List.of(stack));
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(group));
@@ -1211,7 +1211,8 @@ class InventoryPageControllerTest {
             700.0,
             700,
             List.of(
-                new InventoryStackDto(null, picked, 700, false, false, null, 10.0, 700.0, 700, 1)));
+                new InventoryStackDto(
+                    null, picked, 700, false, false, null, 10.0, 700.0, 700, 1, false)));
     GroupedInventoryDto unfiltered =
         new GroupedInventoryDto(
             null,
@@ -1220,8 +1221,10 @@ class InventoryPageControllerTest {
             700.0,
             700,
             List.of(
-                new InventoryStackDto(null, picked, 700, false, false, null, 10.0, 700.0, 700, 1),
-                new InventoryStackDto(null, other, 700, false, false, null, 20.0, 700.0, 700, 1)));
+                new InventoryStackDto(
+                    null, picked, 700, false, false, null, 10.0, 700.0, 700, 1, false),
+                new InventoryStackDto(
+                    null, other, 700, false, false, null, 20.0, 700.0, 700, 1, false)));
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenAnswer(invocation -> {
           String url = invocation.getArgument(0);

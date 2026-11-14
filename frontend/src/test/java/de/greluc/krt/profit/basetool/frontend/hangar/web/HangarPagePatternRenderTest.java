@@ -132,7 +132,8 @@ class HangarPagePatternRenderTest {
         0L,
         null,
         null,
-        null);
+        null,
+        false);
   }
 
   /**
@@ -183,7 +184,8 @@ class HangarPagePatternRenderTest {
             4L,
             null,
             null,
-            null);
+            null,
+            false);
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(assigned), 1L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
@@ -237,7 +239,8 @@ class HangarPagePatternRenderTest {
                 "USD",
                 true,
                 false),
-            null);
+            null,
+            false);
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(imported, ship("Plain", "0", false)), 2L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
@@ -279,7 +282,8 @@ class HangarPagePatternRenderTest {
             4L,
             null,
             null,
-            null);
+            null,
+            false);
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef()))
         .thenReturn(page(List.of(assigned), 1L));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef())).thenReturn(page(List.of(), 0L));
@@ -435,7 +439,8 @@ class HangarPagePatternRenderTest {
         ship.owningOrgUnitVersion(),
         ship.productionStatus(),
         ship.pledge(),
-        origin);
+        origin,
+        false);
   }
 
   /** The fitted segment reaches the backend and keeps the counter on the unfiltered total. */
@@ -485,8 +490,8 @@ class HangarPagePatternRenderTest {
             4L,
             3L,
             List.of(
-                new SquadronShipDetailDto("Pilot Eins", "Area18", true),
-                new SquadronShipDetailDto("Pilot Zwei", null, false)));
+                new SquadronShipDetailDto("Pilot Eins", "Area18", true, false),
+                new SquadronShipDetailDto("Pilot Zwei", null, false, false)));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef()))
         .thenReturn(page(List.of(cutlass), 1L));
     when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef())).thenReturn(page(List.of(), 7L));
@@ -512,6 +517,32 @@ class HangarPagePatternRenderTest {
         .doesNotContain("<thead><tr><th>Besitzer");
   }
 
+  /** An owner row whose ship a pending relocation locks carries the „Umzug ausstehend" chip. */
+  @Test
+  @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN", "MISSION_MANAGER"})
+  void marksTheOwnerRowOfAShipAPendingRelocationLocks() throws Exception {
+    when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
+        .thenReturn(LayoutResponses.officerReach(true));
+    SquadronShipOverviewDto cutlass =
+        new SquadronShipOverviewDto(
+            type("Cutlass Black", "Drake"),
+            2L,
+            1L,
+            List.of(
+                new SquadronShipDetailDto("Pilot Eins", "Area18", true, false),
+                new SquadronShipDetailDto("Pilot Zwei", null, false, true)));
+    when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef()))
+        .thenReturn(page(List.of(cutlass), 1L));
+    when(backendApiClient.get(startsWith(MY_SHIPS), anyTypeRef())).thenReturn(page(List.of(), 0L));
+
+    String html = render("/hangar/squadron");
+
+    assertThat(html)
+        .containsOnlyOnce("data-testid=\"relocation-pending-chip\"")
+        .contains(">Umzug ausstehend<");
+    assertThat(html.indexOf("relocation-pending-chip")).isGreaterThan(html.indexOf("Pilot Zwei"));
+  }
+
   /** A member sees the counts but neither the owner toggle nor the owner rows. */
   @Test
   @WithMockUser
@@ -521,7 +552,7 @@ class HangarPagePatternRenderTest {
             type("Cutlass Black", "Drake"),
             2L,
             1L,
-            List.of(new SquadronShipDetailDto("Pilot Eins", "Area18", true)));
+            List.of(new SquadronShipDetailDto("Pilot Eins", "Area18", true, false)));
     when(backendApiClient.get(startsWith(OVERVIEW), anyTypeRef()))
         .thenReturn(page(List.of(cutlass), 1L));
 

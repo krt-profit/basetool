@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="preview(rows)">
+    <div th:if="${!#lists.isEmpty(rows)}" class="card card--flush">
+        <table class="data-table data-table--stack data-table--compact hl-preview" data-testid="hl-preview">
+            <thead>
+            <tr>
+                <th scope="col" th:text="#{homeLocation.preview.column.location}">Jetziger Ort</th>
+                <th scope="col" class="num" th:text="#{homeLocation.preview.column.rows}">Posten</th>
+                <th scope="col" th:text="#{homeLocation.preview.column.pools}">Davon f&uuml;r Einheiten</th>
+                <th scope="col" class="num" th:text="#{homeLocation.preview.column.ships}">Schiffe</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="row : ${rows}" data-testid="hl-preview-row" th:attr="data-location-id=${row.locationId()}">
+                <td>
+                    <span class="cell-title" th:text="${row.locationName()} ?: #{homeLocation.preview.noLocation}">Port Tressler</span>
+                    <span class="chip chip--muted" data-hl-stays hidden th:text="#{homeLocation.preview.stays}">Bleibt</span>
+                </td>
+                <td class="num" th:attr="data-label=#{homeLocation.preview.column.rows}"
+                    th:text="${#numbers.formatInteger(row.rows(), 1, 'DEFAULT')}">12</td>
+                <td th:attr="data-label=#{homeLocation.preview.column.pools}">
+                    <span th:if="${#lists.isEmpty(row.pools())}" class="text-muted">&ndash;</span>
+                    <span th:each="pool, iter : ${row.pools()}"
+                          th:with="share=#{homeLocation.preview.pool(${pool.rows()}, ${pool.orgUnitName()})}"
+                          th:text="${iter.last} ? ${share} : ${share} + ','">4 f&uuml;r Staffel Sub-Radar</span>
+                </td>
+                <td class="num" th:attr="data-label=#{homeLocation.preview.column.ships}"
+                    th:text="${#numbers.formatInteger(row.ships(), 1, 'DEFAULT')}">1</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <th:block th:if="${#lists.isEmpty(rows)}">
+        <th:block th:replace="~{kernel/fragments/components :: emptyState(titleKey='homeLocation.preview.empty',
+            textKey='homeLocation.preview.empty.text', emptyId='hl-preview-empty')}"></th:block>
+    </th:block>
+</th:block>
+</body>
+</html>

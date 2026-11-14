@@ -651,12 +651,17 @@ The coverage list holds the **Patchwechsel** area
 - **Patchwechsel** (`AuditDomain.PATCH_CHANGE`, `ADMIN` only) — `PATCH_CHANGE_TRIGGERED` at the
   trigger (subject the patch change, labelled by its patch label; details `kind`, `liveAt`,
   `wipeGroups`, `refinery`, `currency`, `homeLocation` and one count per effect kind) and
-  `PATCH_CHANGE_LABEL_CORRECTED` with `from` and `to`; `PATCH_CHANGE_AUDIT_EXPORTED` and
-  `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. There is no target user,
-  and the details carry enums, instants, booleans and counts only (`wipeExceptions` is the number
-  of exceptions). Each affected area records one summary event of the trigger in its own trail:
-  the refinery's and the job orders' above, the Bank's own `WIPE_RESET_EXECUTED` naming the patch
-  change, the live time and the cancelled requests
+  `PATCH_CHANGE_LABEL_CORRECTED` with `from` and `to`; `PATCH_CHANGE_PHASE_ENDED` when an admin ends
+  a home-location phase early (subject the patch change; details `pending`, the members still to
+  relocate); `PATCH_CHANGE_RELOCATED` per member after the home-location choice (subject and target
+  the member; details `patchChange`, `label`, `location`, `rows`, `ships` and `chosenBy` `SELF`,
+  `ADMIN` or `CLIENT`, REQ-PATCH-027); `PATCH_CHANGE_AUDIT_EXPORTED` and
+  `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. Only the relocation has a
+  target user, and the details carry enums, instants, booleans, ids, the curated location name and
+  counts only (`wipeExceptions` is the number of exceptions); a relocation records no event in the
+  Lager's or the hangar's trail. Each affected area records one summary event of the trigger in its
+  own trail: the refinery's and the job orders' above, the Bank's own `WIPE_RESET_EXECUTED` naming
+  the patch change, the live time and the cancelled requests
   ([REQ-PATCH-046](patch-change.md#req-patch-046--preview-audit-and-live-update-of-the-currency-wipe)),
   and the wipe's areas
   ([REQ-PATCH-017](patch-change.md#req-patch-017--one-summary-event-per-affected-area)) these:

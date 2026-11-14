@@ -67,6 +67,8 @@
 /admin/members/{userId}/hangar/{shipId}/delete POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#deleteShip gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/{shipId}/org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#changeShipOrgUnit gate=class:hasRole('ADMIN') layout=no
 /admin/members/{userId}/hangar/{shipId}/update POST headers=[X-Requested-With=XMLHttpRequest] -> MemberHangarShipProxyController#updateShip gate=class:hasRole('ADMIN') layout=no
+/admin/members/{userId}/home-location GET -> AdminMemberHomeLocationPageController#page gate=class:hasRole('ADMIN') layout=yes
+/admin/members/{userId}/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> AdminMemberHomeLocationRelayController#chooseHomeLocation gate=class:hasRole('ADMIN') layout=no
 /admin/mission-data GET -> AdminMissionDataPageController#listData gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data GET params=[kind=squadrons] headers=[!X-Requested-With] -> LegacyAdminRedirectController#squadrons gate=class:hasRole('ADMIN') layout=yes
 /admin/mission-data/frequency-types POST -> AdminMissionDataPageController#createFrequencyType gate=class:hasRole('ADMIN') layout=yes
@@ -150,6 +152,7 @@
 /admin/settings/patch-change/form GET headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#form gate=class:hasRole('ADMIN') layout=no
 /admin/settings/patch-change/preview POST headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#preview gate=class:hasRole('ADMIN') layout=no
 /admin/settings/patch-change/{id}/label PATCH headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#correctLabel gate=class:hasRole('ADMIN') layout=no
+/admin/settings/patch-change/{id}/phase-end POST headers=[X-Requested-With=XMLHttpRequest] -> AdminPatchChangeRelayController#endPhase gate=class:hasRole('ADMIN') layout=no
 /admin/shops GET -> AdminShopsPageController#view gate=class:hasRole('ADMIN') layout=yes
 /admin/shops/entries GET -> AdminShopsController#shops gate=class:hasRole('ADMIN') layout=no
 /admin/shops/terminals GET -> AdminShopsController#terminals gate=class:hasRole('ADMIN') layout=no
@@ -342,6 +345,8 @@
 /hangar/{id}/org-unit POST headers=[X-Requested-With=XMLHttpRequest] -> HangarShipOrgUnitProxyController#changeShipOrgUnit gate=class:isAuthenticated() layout=no
 /hangar/{id}/update POST -> HangarPageController#updateShip gate=class:isAuthenticated() layout=yes
 /hangar/{id}/update POST headers=[X-Requested-With=XMLHttpRequest] -> HangarPageController#updateShipAjax gate=class:isAuthenticated() layout=yes
+/home-location GET -> HomeLocationPageController#page gate=class:isAuthenticated() layout=yes
+/home-location POST headers=[X-Requested-With=XMLHttpRequest] -> HomeLocationRelayController#chooseHomeLocation gate=class:isAuthenticated() layout=no
 /impressum GET -> ImpressumController#showImpressum gate=none layout=yes
 /internal/client-error POST -> ClientErrorReportController#report gate=class:isAuthenticated() layout=no
 /inventory GET -> InventoryPageController#viewAggregatedInventory gate=class:isAuthenticated() layout=yes

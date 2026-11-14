@@ -39,6 +39,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param options the options it was triggered with
  * @param wipeExceptions its wipe exceptions with their entries' names, ordered by name
  * @param counts what its effects touched, one entry per kind
+ * @param phase its home-location phase, or {@code null} when it did not ask for a home location
  */
 public record PatchChangeDto(
     @NotNull UUID id,
@@ -50,4 +51,5 @@ public record PatchChangeDto(
     @Nullable String triggeredBy,
     @NotNull PatchChangeOptions options,
     @NotNull @Unmodifiable List<WipeExceptionDto> wipeExceptions,
-    @NotNull @Unmodifiable List<PatchCountDto> counts) {}
+    @NotNull @Unmodifiable List<PatchCountDto> counts,
+    @Nullable PatchChangePhaseDto phase) {}

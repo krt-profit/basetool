@@ -121,6 +121,17 @@ class LiveSyncSectionMapParityTest {
   }
 
   @Test
+  void memberHomeLocationSeamMap_matchesThePatchChangeTopicWhitelist() throws IOException {
+    String module = "/static/js/patchchange/admin-member-home-location.js";
+    assertThat(readResource(module))
+        .as("the member's home-location tab joins the room a relocation and a phase end announce")
+        .contains("topicClass: 'PATCH_CHANGE'", "topic: 'patch-change'");
+    assertThat(seamMapKeys(module, "sections"))
+        .as("sections keys in admin-member-home-location.js vs the PATCH_CHANGE whitelist")
+        .containsExactlyInAnyOrderElementsOf(LiveSyncTopicClass.PATCH_CHANGE.allowedSections());
+  }
+
+  @Test
   void supplyPages_coverExactlyTheSupplyNeedsWhitelist() throws IOException {
     Set<String> sections = new LinkedHashSet<>();
     String needs = readResource("/static/js/supply/supply-needs.js");

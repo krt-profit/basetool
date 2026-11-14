@@ -279,6 +279,8 @@
                                     <button type="button" class="tree-chevron" aria-expanded="false" th:aria-controls="${entriesId}"
                                             th:aria-label="#{inventory.tree.toggle.userStack(${stack.user.effectiveName}, ${stack.location.name})}">▶</button>
                                     <span class="tree-label" th:text="${stack.user.effectiveName}" th:title="${stack.user.effectiveName}">User</span>
+                                    <span th:if="${stack.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
+                                          th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span>
                                 </div>
                                 <div class="tree-cell lager-cell-context">
                                     <span th:if="${contextSpansOrgUnits and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">ALP</span>
@@ -338,6 +340,8 @@
                                     <button type="button" class="tree-chevron" aria-expanded="false" th:aria-controls="${entriesId}"
                                             th:aria-label="#{inventory.tree.toggle.userStack(${stack.user.effectiveName}, ${stack.location.name})}">▶</button>
                                     <span class="tree-label" th:text="${stack.user.effectiveName}" th:title="${stack.user.effectiveName}">User</span>
+                                    <span th:if="${stack.relocationPending}" class="chip chip--warning" data-testid="relocation-pending-chip"
+                                          th:title="#{patchChange.relocationPending.title}" th:text="#{patchChange.relocationPending.chip}">Umzug ausstehend</span>
                                 </div>
                                 <div class="tree-cell lager-cell-context">
                                     <span th:if="${contextSpansOrgUnits and stack.owningSquadron != null}" class="squadron-badge" th:title="${stack.owningSquadron.name()}" th:text="${stack.owningSquadron.shorthand()}">ALP</span>

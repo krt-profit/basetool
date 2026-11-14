@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.patchchange.web;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,9 +38,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.CorrectPatchChangeLabelRequest;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationOptionDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeFormDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeOptions;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangePhaseDto;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangePhaseState;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangePreviewDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangePreviewRequest;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCount;
@@ -69,9 +73,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC test of {@link AdminPatchChangeRelayController} (REQ-PATCH-005, REQ-PATCH-008): the form
- * defaults, the preview, the trigger and the label correction reach the backend as typed requests,
- * and a backend refusal comes back as a problem with the backend's status and localised detail.
+ * MVC test of {@link AdminPatchChangeRelayController} (REQ-PATCH-005, REQ-PATCH-008,
+ * REQ-PATCH-024): the form defaults, the preview, the trigger, the label correction and the phase
+ * end reach the backend as typed requests, and a backend refusal comes back as a problem with the
+ * backend's status and localised detail.
  */
 @SpringBootTest
 class AdminPatchChangeRelayControllerMvcTest {
@@ -79,6 +84,7 @@ class AdminPatchChangeRelayControllerMvcTest {
   private static final String ADMIN = "/api/v1/patch-changes/admin";
   private static final String PAGE = "/admin/settings/patch-change";
   private static final UUID ID = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000a4");
+  private static final UUID LOCATION_ID = UUID.fromString("10c4710c-0000-4000-8000-000000000001");
   private static final Instant LIVE_AT = Instant.parse("2026-11-14T20:00:00Z");
   private static final UUID MATERIAL = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000b1");
 
@@ -124,7 +130,8 @@ class AdminPatchChangeRelayControllerMvcTest {
                 "4.4",
                 LIVE_AT,
                 List.of(new PatchChangeFormDto.Preset(PatchKind.REBUILD, REBUILD)),
-                List.of()));
+                List.of(),
+                List.of(new HomeLocationOptionDto(LOCATION_ID, "Lorville", "Stanton"))));
 
     mockMvc
         .perform(get(PAGE + "/form").header("X-Requested-With", "XMLHttpRequest"))
@@ -132,7 +139,8 @@ class AdminPatchChangeRelayControllerMvcTest {
         .andExpect(jsonPath("$.suggestedLabel").value("4.5"))
         .andExpect(jsonPath("$.previousLabel").value("4.4"))
         .andExpect(jsonPath("$.presets[0].kind").value("REBUILD"))
-        .andExpect(jsonPath("$.presets[0].options.wipeGroups[0]").value("CONSUMABLES"));
+        .andExpect(jsonPath("$.presets[0].options.wipeGroups[0]").value("CONSUMABLES"))
+        .andExpect(jsonPath("$.homeLocations[0].name").value("Lorville"));
   }
 
   @Test
@@ -239,7 +247,8 @@ class AdminPatchChangeRelayControllerMvcTest {
                 "Admin",
                 REBUILD,
                 List.of(),
-                List.of()));
+                List.of(),
+                new PatchChangePhaseDto(PatchChangePhaseState.OPEN, 87L, 0L)));
 
     mockMvc
         .perform(
@@ -297,7 +306,8 @@ class AdminPatchChangeRelayControllerMvcTest {
                 "Admin",
                 REBUILD,
                 List.of(),
-                List.of()));
+                List.of(),
+                null));
 
     mockMvc
         .perform(
@@ -326,6 +336,68 @@ class AdminPatchChangeRelayControllerMvcTest {
                 .content("{\"label\":\"4.4.1\",\"version\":1}"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("OPTIMISTIC_LOCK"));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void aPhaseEndIsRelayedAndAnswersThePatchChangeWithItsEndedPhase() throws Exception {
+    when(backendApiClient.post(
+            eq(ADMIN + "/{id}/phase-end"), isNull(), eq(PatchChangeDto.class), eq(ID)))
+        .thenReturn(
+            new PatchChangeDto(
+                ID,
+                2L,
+                "4.4",
+                PatchKind.REBUILD,
+                LIVE_AT,
+                LIVE_AT,
+                "Admin",
+                REBUILD,
+                List.of(),
+                List.of(),
+                new PatchChangePhaseDto(PatchChangePhaseState.ENDED, 87L, 41L)));
+
+    mockMvc
+        .perform(
+            post(PAGE + "/" + ID + "/phase-end")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(ID.toString()))
+        .andExpect(jsonPath("$.phase.state").value("ENDED"))
+        .andExpect(jsonPath("$.phase.relocated").value(41));
+  }
+
+  @Test
+  @WithMockUser(roles = "ADMIN")
+  void aPhaseThatIsNoLongerOpenComesBackAsTheBackendsConflict() throws Exception {
+    when(backendApiClient.post(
+            eq(ADMIN + "/{id}/phase-end"), isNull(), eq(PatchChangeDto.class), eq(ID)))
+        .thenThrow(refusal(409, "BUSINESS_CONFLICT", "Es läuft keine Home-Location-Abfrage."));
+
+    mockMvc
+        .perform(
+            post(PAGE + "/" + ID + "/phase-end")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.code").value("BUSINESS_CONFLICT"))
+        .andExpect(jsonPath("$.detail").value("Es läuft keine Home-Location-Abfrage."));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
+  void aMemberCannotEndAPhase() throws Exception {
+    mockMvc
+        .perform(
+            post(PAGE + "/" + ID + "/phase-end")
+                .header("X-Requested-With", "XMLHttpRequest")
+                .with(csrf()))
+        .andExpect(status().isForbidden());
+
+    verify(backendApiClient, never())
+        .post(anyString(), any(), eq(PatchChangeDto.class), any(Object[].class));
   }
 
   @Test

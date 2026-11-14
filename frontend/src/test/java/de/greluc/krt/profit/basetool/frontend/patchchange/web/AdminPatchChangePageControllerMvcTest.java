@@ -34,9 +34,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationOptionDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeFormDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangeOptions;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangePhaseDto;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchChangePhaseState;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCount;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchCountDto;
 import de.greluc.krt.profit.basetool.frontend.patchchange.model.PatchKind;
@@ -65,10 +68,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC test of {@link AdminPatchChangePageController} (REQ-PATCH-008): the page renders the form
- * with the default kind's preset, the preview, the confirmation and the history for an admin only,
- * its history fragment swaps in place, a failed read leaves the rest standing, and the danger zone
- * leads to it.
+ * MVC test of {@link AdminPatchChangePageController} (REQ-PATCH-008, REQ-PATCH-024): the page
+ * renders the form with the default kind's preset and the curated home locations, the preview, the
+ * confirmation and the history with each phase for an admin only, its history fragment swaps in
+ * place, a failed read leaves the rest standing, and the danger zone leads to it.
  */
 @SpringBootTest
 class AdminPatchChangePageControllerMvcTest {
@@ -76,8 +79,16 @@ class AdminPatchChangePageControllerMvcTest {
   private static final String HISTORY = "/api/v1/patch-changes/admin";
   private static final String FORM = "/api/v1/patch-changes/admin/form";
   private static final UUID ID = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000a4");
+  private static final UUID OLDER_ID = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000a3");
   private static final Instant LIVE_AT = Instant.parse("2026-11-14T20:00:00Z");
   private static final UUID MATERIAL = UUID.fromString("7a0c7a0c-0000-4000-8000-0000000000b1");
+
+  private static final HomeLocationOptionDto LORVILLE =
+      new HomeLocationOptionDto(
+          UUID.fromString("10c4710c-0000-4000-8000-000000000001"), "Lorville", "Stanton");
+  private static final HomeLocationOptionDto LEVSKI =
+      new HomeLocationOptionDto(
+          UUID.fromString("10c4710c-0000-4000-8000-000000000002"), "Levski", "Nyx");
 
   private static final PatchChangeOptions REBUILD =
       new PatchChangeOptions(Set.of(WipeGroup.CONSUMABLES), true, false, true);
@@ -103,11 +114,23 @@ class AdminPatchChangePageControllerMvcTest {
   }
 
   /**
-   * Stubs the form defaults with a previous patch change and both presets.
+   * Stubs the form defaults with a previous patch change, both presets and two curated home
+   * locations.
    *
    * @return the stubbed defaults
    */
   private PatchChangeFormDto stubForm() {
+    return stubForm(List.of(LORVILLE, LEVSKI));
+  }
+
+  /**
+   * Stubs the form defaults with a previous patch change, both presets and the given curated home
+   * locations.
+   *
+   * @param homeLocations the curated home locations
+   * @return the stubbed defaults
+   */
+  private PatchChangeFormDto stubForm(List<HomeLocationOptionDto> homeLocations) {
     PatchChangeFormDto form =
         new PatchChangeFormDto(
             "4.5",
@@ -123,12 +146,16 @@ class AdminPatchChangePageControllerMvcTest {
                         new WipeGroupType(WipeGroupType.Source.ITEM_TYPE, "Food"),
                         new WipeGroupType(
                             WipeGroupType.Source.ITEM_SUB_TYPE, "WeaponAttachment:Magazine"))),
-                new PatchChangeFormDto.Group(WipeGroup.OTHER_ITEMS, List.of())));
+                new PatchChangeFormDto.Group(WipeGroup.OTHER_ITEMS, List.of())),
+            homeLocations);
     when(backendApiClient.get(FORM, PatchChangeFormDto.class)).thenReturn(form);
     return form;
   }
 
-  /** Stubs a history of one rebuild that cancelled 1284 refinery orders. */
+  /**
+   * Stubs a history of one rebuild that cancelled 1284 refinery orders and asks 87 members, 41 of
+   * them relocated, above an older one whose phase it superseded.
+   */
   private void stubHistory() {
     PatchChangeDto row =
         new PatchChangeDto(
@@ -146,12 +173,28 @@ class AdminPatchChangePageControllerMvcTest {
                         WipeExceptionTarget.MATERIAL, MATERIAL, WipeExceptionMode.KEEP)),
                 true,
                 true,
-                false),
+                true),
             List.of(
                 new WipeExceptionDto(
                     WipeExceptionTarget.MATERIAL, MATERIAL, WipeExceptionMode.KEEP, "Quantanium")),
-            List.of(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 1284L)));
-    when(backendApiClient.get(eq(HISTORY), anyTypeRef())).thenReturn(List.of(row));
+            List.of(
+                new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 1284L),
+                new PatchCountDto(PatchCount.MEMBERS_ASKED, 87L)),
+            new PatchChangePhaseDto(PatchChangePhaseState.OPEN, 87L, 41L));
+    PatchChangeDto older =
+        new PatchChangeDto(
+            OLDER_ID,
+            0L,
+            "4.3",
+            PatchKind.FULL_WIPE,
+            Instant.parse("2026-08-02T18:00:00Z"),
+            Instant.parse("2026-08-02T18:40:00Z"),
+            "Admin Jo",
+            FULL_WIPE,
+            List.of(),
+            List.of(),
+            new PatchChangePhaseDto(PatchChangePhaseState.SUPERSEDED, 80L, 76L));
+    when(backendApiClient.get(eq(HISTORY), anyTypeRef())).thenReturn(List.of(row, older));
   }
 
   /**
@@ -280,6 +323,58 @@ class AdminPatchChangePageControllerMvcTest {
   }
 
   @Test
+  void theHistoryShowsEachPhaseAndOffersToEndOnlyTheOpenOne() throws Exception {
+    stubForm();
+    stubHistory();
+
+    String html = renderPage();
+
+    assertThat(html)
+        .contains(">Abfrage<")
+        .contains("class=\"chip chip--warning\" data-testid=\"pc-phase\"")
+        .contains("data-phase-state=\"OPEN\">Offen · 41 / 87 umgezogen<")
+        .contains("class=\"chip chip--muted\" data-testid=\"pc-phase\"")
+        .contains("data-phase-state=\"SUPERSEDED\">Abgelöst<")
+        .contains("Mitglieder werden gefragt: 87")
+        .contains("data-count-kind=\"MEMBERS_ASKED\"")
+        .containsPattern("class=\"btn btn-quiet-danger btn-xs\" data-pc-phase-end")
+        .contains("Abfrage beenden")
+        .contains("id=\"pc-phase-end-modal\"")
+        .contains("krt-modal--danger")
+        .contains("id=\"pc-phase-end-submit\"")
+        .contains("data-phase-end-text=\"Die Home-Location-Abfrage von Patch {0} endet.");
+    assertThat(html.split("data-pc-phase-end", -1))
+        .as("only the open phase offers its end")
+        .hasSize(2);
+  }
+
+  @Test
+  void theFormNamesTheCuratedHomeLocationsAndLinksToTheirCuration() throws Exception {
+    stubForm();
+    stubHistory();
+
+    assertThat(renderPage())
+        .contains("Wählbare Home Locations: Lorville, Levski")
+        .contains("data-count=\"2\"")
+        .containsPattern("href=\"/admin/locations\"[^>]*data-testid=\"pc-home-locations-curate\"")
+        .contains("Home Locations pflegen")
+        .containsPattern("id=\"pc-home-alert\"[^>]*hidden")
+        .contains("data-home-locations=\"Wählbare Home Locations: {0}\"");
+  }
+
+  @Test
+  void withoutACuratedHomeLocationTheFormWarnsWhileThePromptIsOn() throws Exception {
+    stubForm(List.of());
+    stubHistory();
+
+    assertThat(renderPage())
+        .contains("Wählbare Home Locations: keine")
+        .contains("data-count=\"0\"")
+        .containsPattern("id=\"pc-home-alert\"(?![^>]*hidden)[^>]*>")
+        .contains("Es ist keine Home Location gepflegt.");
+  }
+
+  @Test
   void theHistoryFragmentRendersOnlyTheHistoryWithoutReadingTheForm() throws Exception {
     stubHistory();
 
@@ -308,6 +403,7 @@ class AdminPatchChangePageControllerMvcTest {
                 null,
                 null,
                 List.of(new PatchChangeFormDto.Preset(PatchKind.REBUILD, REBUILD)),
+                List.of(),
                 List.of()));
     when(backendApiClient.get(eq(HISTORY), anyTypeRef())).thenReturn(List.of());
 

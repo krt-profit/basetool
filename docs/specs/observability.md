@@ -2108,6 +2108,13 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   adds no metric either: its summary events count under their areas' domains, the pledges it
   withdraws count once each in `basetool_supply_donations_total{status="WITHDRAWN"}`, and the
   DB-sampled gauges (open pledges, active offers, stock levels below minimum) see its deletes.
+- `basetool_patch_change_relocations_pending` gauge, sampled by the patch-change module's
+  `BusinessGaugeSource` (`PatchChangeBusinessGauges`): the members still to relocate in the open
+  home-location phase, `0` while none is open
+  ([REQ-PATCH-028](patch-change.md#req-patch-028--the-gauge-of-pending-relocations)). A count only, no
+  label. The operations dashboard `07-basetool-operations.json` shows it in the panel "Members still
+  to relocate after a patch change"; there is no alert rule, because the phase ends by itself once
+  everyone has chosen or an admin ends it.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most

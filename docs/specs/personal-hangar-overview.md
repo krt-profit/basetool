@@ -63,7 +63,8 @@ Writes (add / edit / delete / import / home-location) re-render the `hangarResul
 (REQ-FE-001/005) carrying the active `page`/`size`/`search` from the address bar, so a write never
 bounces the user back to page 0 or drops the filter. The home-location and delete-all affordances act
 on **all** the caller's ships (not the current page), so their count reflects the page envelope's
-`totalElements`.
+`totalElements`. The home-location write advances every updated ship's `version`, so an edit form
+opened before it answers `409`.
 
 A connected application's ship writes (REQ-XCH-017) run through the Hangar's own create, update and
 delete (`HangarService`), so the ships they create, change or remove appear in this list exactly
@@ -108,6 +109,16 @@ button, the other two in the ⋯ menu).
 
 ### REQ-HANGAR-004 — Every hangar mutation is audited
 
+> [!note] Amended 2026-11-14 (ADR-0383) — a patch change relocates ships and locks them until then
+> After a patch change's home-location choice, the member's ships from before the live time take the
+> chosen home location with a new `version`; the relocation records `PATCH_CHANGE_RELOCATED` in the
+> patch-change trail, not one hangar event per ship
+> ([REQ-PATCH-025](patch-change.md#req-patch-025--the-relocation-moves-in-place)). Until the member
+> has chosen, an edit, a unit change or a delete of such a ship is refused for the member's exchange
+> client with `409 RELOCATION_PENDING`
+> ([REQ-PATCH-023](patch-change.md#req-patch-023--the-relocation-lock)); an officer's fitted reset
+> leaves such ships fitted, and the unit overview and the admin member hangar mark them
+> „Umzug ausstehend".
 Every change to a hangar writes exactly one event to the **Hangar** audit area
 (`AuditDomain.HANGAR`, REQ-AUDIT-001), whichever channel made it — the web, the app, an admin on
 another member's hangar, the file or Fleetview import, the fitted reset of a caller with officer reach (limited to the units it reaches), or a connected

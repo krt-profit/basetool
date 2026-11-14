@@ -42,6 +42,8 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.UserReferenceDto;
  * @param averageQuality the amount-weighted mean quality
  * @param maxQuality the highest quality among the entries
  * @param entryCount the number of underlying entries
+ * @param relocationPending whether the holder has not chosen yet in the open home-location phase
+ *     (REQ-PATCH-023)
  */
 @DtoMirror
 public record InventoryStackDto(
@@ -54,4 +56,5 @@ public record InventoryStackDto(
     Double totalAmount,
     Double averageQuality,
     Integer maxQuality,
-    Integer entryCount) {}
+    Integer entryCount,
+    boolean relocationPending) {}

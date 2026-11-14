@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -120,9 +121,9 @@ class BackgroundReadGateContractTest {
   private static final Pattern P4K_GATE_BRANCH =
       Pattern.compile("if \\(!resp\\) return gateTookOver\\(\\);");
 
-  /** The header {@code krt-fetch.js} reads to detect a gated answer. */
-  private static final Pattern TERMS_HEADER_READ =
-      Pattern.compile("headers\\.get\\('([^']*Terms[^']*)'\\)");
+  /** The session gates' headers {@code krt-fetch.js} reads to detect a gated answer. */
+  private static final Pattern GATE_HEADERS_READ =
+      Pattern.compile("SESSION_GATE_HEADERS = \\[([^\\]]*)\\]");
 
   /**
    * No script besides the transport and the beacon issues a raw request, and no template's inline
@@ -295,20 +296,24 @@ class BackgroundReadGateContractTest {
   }
 
   /**
-   * Closes the loop between the two halves: the header {@code krt-fetch.js} acts on must be the one
-   * the filter sends.
+   * Closes the loop between the two halves: the headers {@code krt-fetch.js} acts on must be the
+   * ones the session gates send, the consent gate's and the home-location gate's.
    *
    * @throws IOException if the transport module cannot be read from the classpath
    */
   @Test
   void theHeaderKrtFetchActsOn_isTheOneTheGateSends() throws IOException {
-    Matcher matcher = TERMS_HEADER_READ.matcher(readResource(KRT_FETCH_MODULE));
+    Matcher matcher = GATE_HEADERS_READ.matcher(readResource(KRT_FETCH_MODULE));
     assertThat(matcher.find())
-        .as("the consent-header read not found in %s (anchor renamed?)", KRT_FETCH_MODULE)
+        .as("the session-gate header list not found in %s (anchor renamed?)", KRT_FETCH_MODULE)
         .isTrue();
-    assertThat(matcher.group(1))
-        .as("krtTermsGate reads a header the gate never sends")
-        .isEqualTo(TermsAcceptanceGateFilter.TERMS_GATE_HEADER);
+    assertThat(
+            Arrays.stream(matcher.group(1).split(","))
+                .map(header -> header.strip().replace("'", ""))
+                .toList())
+        .as("krtTermsGate reads a header no gate sends, or misses one a gate sends")
+        .containsExactlyInAnyOrder(
+            TermsAcceptanceGateFilter.TERMS_GATE_HEADER, HomeLocationGateFilter.GATE_HEADER);
   }
 
   /**

@@ -146,7 +146,8 @@ class InventoryLagerPatternRenderTest {
             12.5,
             700.0,
             700,
-            1);
+            1,
+            false);
     return List.of(
         new GroupedInventoryDto(
             new MaterialReferenceDto(MATERIAL_ID, "Quantanium", "SCU"),
@@ -520,7 +521,8 @@ class InventoryLagerPatternRenderTest {
             2.0,
             null,
             null,
-            1);
+            1,
+            false);
     return new GroupedInventoryDto(null, gameItem, 2.0, null, null, List.of(stack));
   }
 

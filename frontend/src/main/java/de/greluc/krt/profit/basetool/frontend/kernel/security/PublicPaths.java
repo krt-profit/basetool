@@ -28,7 +28,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
  * Decides which paths the frontend's session gates ({@link TermsAcceptanceGateFilter}, {@link
- * BackendRoleSyncFilter}) may not redirect (REQ-SEC-029).
+ * HomeLocationGateFilter}, {@link BackendRoleSyncFilter}) may not redirect (REQ-SEC-029).
  *
  * <p>Every predicate matches parsed {@link PathPattern}s segment by segment, the same way {@code
  * SecurityConfig}'s {@code permitAll} list is matched, so both layers accept the same spellings.
@@ -82,12 +82,13 @@ public final class PublicPaths {
           PATH_PARSER.parse("/licenses"));
 
   /**
-   * The pages of the session gates themselves: the terms consent page, and the approval waiting
-   * page with its status poll — see {@link #isAccessGatePage}.
+   * The pages of the session gates themselves: the terms consent page, the home-location page, and
+   * the approval waiting page with its status poll — see {@link #isAccessGatePage}.
    */
   private static final List<PathPattern> ACCESS_GATE_PAGES =
       List.of(
           PATH_PARSER.parse(TermsAcceptanceGateFilter.CONSENT_PATH),
+          PATH_PARSER.parse(HomeLocationGateFilter.GATE_PATH),
           PATH_PARSER.parse(BackendRoleSyncFilter.PENDING_APPROVAL_PATH + "/**"));
 
   /** Not instantiable: a predicate holder with no state. */
@@ -128,13 +129,14 @@ public final class PublicPaths {
   }
 
   /**
-   * Checks whether the path is a page of a session gate itself: the terms consent page, or the
-   * approval waiting page and its status poll. A gated session lands on these pages, they render
-   * without the active org unit, and the waiting page polls its status, so the restore of the
-   * stored choice ({@code ActiveOrgUnitRestore}) skips them.
+   * Checks whether the path is a page of a session gate itself: the terms consent page, the
+   * home-location page, or the approval waiting page and its status poll. A gated session lands on
+   * these pages, they render without the active org unit, and the waiting page polls its status, so
+   * the restore of the stored choice ({@code ActiveOrgUnitRestore}) skips them.
    *
    * @param path a context-relative path, as returned by {@link #relativePath}
-   * @return {@code true} for the consent page, the waiting page or a path below the waiting page
+   * @return {@code true} for the consent page, the home-location page, the waiting page or a path
+   *     below the waiting page
    */
   public static boolean isAccessGatePage(@NotNull String path) {
     return matchesAny(ACCESS_GATE_PAGES, PathContainer.parsePath(path));

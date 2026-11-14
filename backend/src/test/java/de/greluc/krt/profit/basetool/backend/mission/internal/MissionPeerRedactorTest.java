@@ -211,7 +211,8 @@ class MissionPeerRedactorTest {
             0L,
             ShipProductionStatus.IN_CONCEPT,
             new ShipPledgeDto("1001", LocalDate.of(2026, 1, 2), BigDecimal.TEN, "USD", true, true),
-            new ShipOriginDto(ShipOrigin.IN_GAME, false));
+            new ShipOriginDto(ShipOrigin.IN_GAME, false),
+            false);
     return new MissionUnitDto(
         UUID.randomUUID(), "Alpha", null, ship, 8.5, true, null, "note", 1L, List.of());
   }

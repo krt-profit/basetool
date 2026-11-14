@@ -888,6 +888,17 @@ public enum AuditEventType {
   PATCH_CHANGE_TRIGGERED(AuditDomain.PATCH_CHANGE),
   /** An admin corrected a patch change's label; the details carry the old and the new label. */
   PATCH_CHANGE_LABEL_CORRECTED(AuditDomain.PATCH_CHANGE),
+  /**
+   * An admin ended a home-location phase early; the subject is the patch change with its label, the
+   * details carry how many members were still pending (REQ-PATCH-027).
+   */
+  PATCH_CHANGE_PHASE_ENDED(AuditDomain.PATCH_CHANGE),
+  /**
+   * A member relocated after the home-location choice; the subject and the target are the member,
+   * the details carry the patch change, the location, the moved row and ship counts and who chose
+   * (REQ-PATCH-027).
+   */
+  PATCH_CHANGE_RELOCATED(AuditDomain.PATCH_CHANGE),
   /** The patch-change audit log was exported (REQ-AUDIT-003). */
   PATCH_CHANGE_AUDIT_EXPORTED(AuditDomain.PATCH_CHANGE),
   /** The patch-change audit log was purged (REQ-AUDIT-004). */

@@ -251,10 +251,15 @@
       "orgunit/special-commands.js"
     ],
     "patchchange": [
+      "patchchange/admin-member-home-location.js",
       "patchchange/admin-patch-change.js",
+      "patchchange/home-location-common.js",
+      "patchchange/home-location.js",
       "patchchange/patch-change-form.js",
       "patchchange/patch-change-history.js",
+      "patchchange/patch-change-home-locations.js",
       "patchchange/patch-change-messages.js",
+      "patchchange/patch-change-phase.js",
       "patchchange/patch-change-wipe.js"
     ],
     "personalinventory": [

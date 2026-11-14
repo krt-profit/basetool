@@ -35,13 +35,16 @@ import org.jetbrains.annotations.Unmodifiable;
  *     follow, or {@code null} before the first
  * @param presets the options each patch kind presets
  * @param groups the catalogue types each wipe group claims, in the groups' declaration order
+ * @param homeLocations the curated home locations a home-location phase would offer; empty when
+ *     none is curated, which the form warns about (REQ-PATCH-021)
  */
 public record PatchChangeFormDto(
     @Nullable String suggestedLabel,
     @Nullable String previousLabel,
     @Nullable Instant previousLiveAt,
     @NotNull @Unmodifiable List<Preset> presets,
-    @NotNull @Unmodifiable List<Group> groups) {
+    @NotNull @Unmodifiable List<Group> groups,
+    @NotNull @Unmodifiable List<HomeLocationOptionDto> homeLocations) {
 
   /**
    * The options a patch kind presets.

@@ -21,6 +21,14 @@ package de.greluc.krt.profit.basetool.frontend.hangar.model;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 
-/** Data transfer record carrying Squadron Ship Detail payload. */
+/**
+ * One ship of a ship type on the unit hangar overview.
+ *
+ * @param ownerName the owner's effective name
+ * @param locationName the ship's location, or {@code null}
+ * @param fitted whether the ship is fitted
+ * @param relocationPending whether a pending relocation locks the ship (REQ-PATCH-023)
+ */
 @DtoMirror
-public record SquadronShipDetailDto(String ownerName, String locationName, boolean fitted) {}
+public record SquadronShipDetailDto(
+    String ownerName, String locationName, boolean fitted, boolean relocationPending) {}

@@ -78,6 +78,13 @@ public class BackendServiceException extends RuntimeException {
   public static final String CODE_NO_ROLE = "NO_ROLE";
 
   /**
+   * Problem code the backend answers the web's {@code /api} calls with while the caller must still
+   * choose a new home location after a patch change (REQ-PATCH-020). Like {@link
+   * #CODE_TERMS_NOT_ACCEPTED}, an expected 403 that is not counted as a backend-call failure.
+   */
+  public static final String CODE_HOME_LOCATION_REQUIRED = "HOME_LOCATION_REQUIRED";
+
+  /**
    * Problem code of the {@code 400} the backend answers when a refinery order is linked to a
    * mission its owner does not take part in (REQ-SEC-042). The refinery create and edit handlers
    * branch on it to name the mission field instead of their generic failure message.

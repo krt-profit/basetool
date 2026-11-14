@@ -44,6 +44,7 @@ import java.util.UUID;
  *     or {@code IN_PRODUCTION}), or {@code null}
  * @param pledge the imported pledge data, or {@code null} when none was imported or not disclosed
  * @param origin the ship's origin, or {@code null} where it is not disclosed (REQ-HANGAR-017)
+ * @param relocationPending whether a pending relocation locks the ship (REQ-PATCH-023)
  */
 @DtoMirror
 public record ShipDto(
@@ -59,4 +60,5 @@ public record ShipDto(
     Long owningOrgUnitVersion,
     @BackendEnumAsString String productionStatus,
     ShipPledgeDto pledge,
-    ShipOriginDto origin) {}
+    ShipOriginDto origin,
+    boolean relocationPending) {}

@@ -43,7 +43,8 @@ never its `EVENT_RECIPIENT`.
 ### REQ-HANGAR-007 — A bulk reset of the fitted marks tells each owner
 
 `HangarService#resetAllFittedStatus` counts the fitted ships per owner in the caller's scope before it
-clears them and publishes one `HANGAR_FITTED_RESET_FOR_OWNER` per owner with their count. The default
+clears them and publishes one `HANGAR_FITTED_RESET_FOR_OWNER` per owner with their count; ships the
+relocation lock keeps from the caller (REQ-PATCH-023) are neither cleared nor counted. The default
 rule notifies the owner and excludes the actor, so an officer resetting their own ships hears nothing.
 
 ### REQ-HANGAR-008 — An admin changing a member's hangar or blueprints tells the member

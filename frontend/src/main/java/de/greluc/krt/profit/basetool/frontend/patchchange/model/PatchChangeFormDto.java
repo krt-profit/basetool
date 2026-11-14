@@ -33,6 +33,8 @@ import org.jetbrains.annotations.Nullable;
  * @param previousLiveAt the latest patch change's live time, or {@code null} before the first
  * @param presets the options each patch kind presets, never {@code null} once constructed
  * @param groups the catalogue types each wipe group claims, never {@code null} once constructed
+ * @param homeLocations the curated home locations a home-location phase would offer, never {@code
+ *     null} once constructed; empty when none is curated (REQ-PATCH-021)
  */
 @DtoMirror
 public record PatchChangeFormDto(
@@ -40,12 +42,14 @@ public record PatchChangeFormDto(
     String previousLabel,
     Instant previousLiveAt,
     List<Preset> presets,
-    List<Group> groups) {
+    List<Group> groups,
+    List<HomeLocationOptionDto> homeLocations) {
 
   /** Copies the lists, so a missing list reads as none. */
   public PatchChangeFormDto {
     presets = presets == null ? List.of() : List.copyOf(presets);
     groups = groups == null ? List.of() : List.copyOf(groups);
+    homeLocations = homeLocations == null ? List.of() : List.copyOf(homeLocations);
   }
 
   /**

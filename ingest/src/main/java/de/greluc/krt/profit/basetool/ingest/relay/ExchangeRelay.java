@@ -199,6 +199,10 @@ public class ExchangeRelay {
               "The change set removes more than the mass-change guard allows without"
                   + " confirmation."),
           Map.entry(
+              "RELOCATION_PENDING",
+              "A stock lot or ship from before the patch change stays locked until its holder has"
+                  + " chosen a new home location in the Basetool; nothing was applied."),
+          Map.entry(
               "BANK_JUSTIFICATION_REQUIRED",
               "A withdrawal or transfer from this account needs a justification."),
           Map.entry(

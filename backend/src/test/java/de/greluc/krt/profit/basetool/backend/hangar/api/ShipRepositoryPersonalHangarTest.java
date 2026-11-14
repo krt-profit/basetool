@@ -20,6 +20,7 @@
 package de.greluc.krt.profit.basetool.backend.hangar.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.greluc.krt.profit.basetool.backend.catalogue.api.CityRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.api.Location;
@@ -30,7 +31,10 @@ import de.greluc.krt.profit.basetool.backend.catalogue.api.ShipTypeRepository;
 import de.greluc.krt.profit.basetool.backend.catalogue.internal.ManufacturerRepository;
 import de.greluc.krt.profit.basetool.backend.identity.api.User;
 import de.greluc.krt.profit.basetool.backend.identity.api.UserRepository;
+import de.greluc.krt.profit.basetool.backend.kernel.OptimisticLock;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -40,11 +44,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration tests for {@link ShipRepository#findByOwnerIdFiltered} against real Postgres,
- * covering the Postgres-specific multi-key ordering and the server-side search (REQ-HANGAR-002).
+ * Integration tests for the personal-hangar queries of {@link ShipRepository} against real
+ * Postgres: the multi-key ordering and the server-side search (REQ-HANGAR-002), the bulk home
+ * location and the fitted reset the relocation lock narrows (REQ-PATCH-023).
  */
 @SpringBootTest
 @Transactional
@@ -58,6 +65,7 @@ class ShipRepositoryPersonalHangarTest {
   @Autowired private UserRepository userRepository;
   @Autowired private ManufacturerRepository manufacturerRepository;
   @Autowired private LocationRepository locationRepository;
+  @Autowired private JdbcTemplate jdbc;
 
   private User owner;
   private User otherOwner;
@@ -294,6 +302,61 @@ class ShipRepositoryPersonalHangarTest {
         .stream()
         .<Object>map(row -> row[0])
         .toList();
+  }
+
+  /** The bulk home location moves only the owner's ships and advances each one's version. */
+  @Test
+  void setLocationForOwner_movesTheOwnersShipsAndAdvancesTheirVersion() {
+    Ship mine = saveShip("s-A", avenger, "LTI", false, area18);
+    Ship theirs = saveShipFor(otherOwner, "s-B", avenger, "LTI", false, area18);
+    shipRepository.flush();
+    Long staleVersion = mine.getVersion();
+    Long foreignVersion = theirs.getVersion();
+
+    int updated = shipRepository.setLocationForOwner(owner.getId(), orison);
+
+    Ship moved = shipRepository.findById(mine.getId()).orElseThrow();
+    assertThat(updated).isEqualTo(1);
+    assertThat(moved.getLocation().getId()).isEqualTo(orison.getId());
+    assertThat(moved.getVersion()).isEqualTo(staleVersion + 1);
+    assertThat(shipRepository.findById(theirs.getId()).orElseThrow().getVersion())
+        .isEqualTo(foreignVersion);
+    assertThatThrownBy(() ->
+            OptimisticLock.checkOptionalClient(
+                moved.getVersion(), staleVersion, Ship.class, moved.getId()))
+        .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+  }
+
+  /**
+   * A fitted reset leaves out the locked owner's ships from before the cutoff and clears the rest;
+   * without a cutoff it leaves out nothing.
+   */
+  @Test
+  void resetAllFittedScoped_leavesOutTheLockedOwnersShipsFromBeforeTheCutoff() {
+    Instant cutoff = Instant.parse("2000-01-01T00:00:00Z");
+    Ship old = saveShip("s-old", avenger, "LTI", true, area18);
+    Ship young = saveShip("s-young", avenger, "LTI", true, area18);
+    Ship foreign = saveShipFor(otherOwner, "s-foreign", avenger, "LTI", true, area18);
+    shipRepository.flush();
+    jdbc.update(
+        "UPDATE ship SET created_at = ? WHERE id IN (?, ?)",
+        Timestamp.from(Instant.parse("1999-06-01T00:00:00Z")),
+        old.getId(),
+        foreign.getId());
+
+    shipRepository.resetAllFittedScoped(true, null, Set.of(), Set.of(owner.getId()), cutoff);
+
+    assertThat(fitted(old)).isTrue();
+    assertThat(fitted(young)).isFalse();
+    assertThat(fitted(foreign)).isFalse();
+
+    shipRepository.resetAllFittedScoped(true, null, Set.of(), Set.of(), null);
+
+    assertThat(fitted(old)).isFalse();
+  }
+
+  private boolean fitted(Ship ship) {
+    return shipRepository.findById(ship.getId()).orElseThrow().isFitted();
   }
 
   private User newUser(String username) {

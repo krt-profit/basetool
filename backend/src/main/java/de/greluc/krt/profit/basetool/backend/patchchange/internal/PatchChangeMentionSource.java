@@ -28,7 +28,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * The patch-change module's part of the person search (REQ-SEC-060): its tables hold validated
- * version labels and enum codes, never text a person typed, so none is searched.
+ * version labels, enum codes, ids and counts, never text a person typed, so none is searched.
  */
 @Component
 public class PatchChangeMentionSource implements PersonMentionSource {
@@ -43,6 +43,7 @@ public class PatchChangeMentionSource implements PersonMentionSource {
     return Set.of(
         "patch_change",
         "patch_change_effect_count",
+        "patch_change_relocation",
         "patch_change_wipe_exception",
         "patch_change_wipe_group");
   }

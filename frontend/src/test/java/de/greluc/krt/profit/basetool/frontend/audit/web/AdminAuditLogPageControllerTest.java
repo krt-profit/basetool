@@ -197,7 +197,7 @@ class AdminAuditLogPageControllerTest {
   }
 
   /**
-   * The patch-change area is its own tab right after the catalogue, offering its four event types;
+   * The patch-change area is its own tab right after the catalogue, offering its six event types;
    * the refinery's summary event of a patch change stays in the refinery tab (REQ-PATCH-009).
    */
   @Test
@@ -216,6 +216,8 @@ class AdminAuditLogPageControllerTest {
         List.of(
             "PATCH_CHANGE_TRIGGERED",
             "PATCH_CHANGE_LABEL_CORRECTED",
+            "PATCH_CHANGE_PHASE_ENDED",
+            "PATCH_CHANGE_RELOCATED",
             "PATCH_CHANGE_AUDIT_EXPORTED",
             "PATCH_CHANGE_AUDIT_PURGED"),
         model.getAttribute("eventTypes"));

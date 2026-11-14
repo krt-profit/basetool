@@ -835,7 +835,12 @@ function startSse() {
             }
             krtReauth.redirect(event && event.data ? event.data : null);
         });
-        source.addEventListener('terms-gate', (event) => {
+        /**
+         * Stops the stream for good and navigates to the page of the session gate that held it.
+         *
+         * @param {MessageEvent} event the gate's one-shot event, carrying the page's URL
+         */
+        const handOffToGate = (event) => {
             sseStopped = true;
             if (sseReconnectTimer !== null) {
                 window.clearTimeout(sseReconnectTimer);
@@ -848,7 +853,9 @@ function startSse() {
                 sseSource = null;
             }
             krtTermsGate.redirect(event && event.data ? event.data : null);
-        });
+        };
+        source.addEventListener('terms-gate', handOffToGate);
+        source.addEventListener('home-location-gate', handOffToGate);
         source.addEventListener('replaced', () => {
             sseStopped = true;
             if (sseReconnectTimer !== null) {
