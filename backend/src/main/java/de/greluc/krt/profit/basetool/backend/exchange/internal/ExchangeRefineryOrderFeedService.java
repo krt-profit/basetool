@@ -261,19 +261,17 @@ public class ExchangeRefineryOrderFeedService {
         creator == null
             ? null
             : new ExchangeRefineryOrderDto.Creator(
-                creator,
-                ExchangeStockFeedService.cut(refs.clientNames().getOrDefault(creator, creator))),
+                creator, ExchangeNames.cut(refs.clientNames().getOrDefault(creator, creator))),
         new ExchangeRefineryOrderDto.Versions(order.gameDataVersion(), order.financesVersion()),
         order.status().name(),
         ExchangePatchChangeRefDto.of(order.canceledByPatchChange(), refs.patchLabels()),
         new ExchangeLocationDto(
-            ExchangeStockFeedService.cut(place.name()),
+            ExchangeNames.cut(place.name()),
             ExchangeCatalogService.uex(place.uexCityId(), place.uexSpaceStationId()),
             refs.guids().get(place.id())),
         method == null
             ? null
-            : new ExchangeRefineryOrderDto.Method(
-                method.code(), ExchangeStockFeedService.cut(method.name())),
+            : new ExchangeRefineryOrderDto.Method(method.code(), ExchangeNames.cut(method.name())),
         order.startedAt(),
         order.durationMinutes(),
         order.endsAt(),
@@ -299,12 +297,10 @@ public class ExchangeRefineryOrderFeedService {
     return new ExchangeRefineryOrderDto.Good(
         good.id().toString(),
         new ExchangeItemRefDto(
-            good.inputMaterialId().toString(),
-            ExchangeStockFeedService.cut(good.inputMaterialName())),
+            good.inputMaterialId().toString(), ExchangeNames.cut(good.inputMaterialName())),
         good.inputQuantity(),
         new ExchangeItemRefDto(
-            good.outputMaterialId().toString(),
-            ExchangeStockFeedService.cut(good.outputMaterialName())),
+            good.outputMaterialId().toString(), ExchangeNames.cut(good.outputMaterialName())),
         good.outputQuantity(),
         good.quality());
   }

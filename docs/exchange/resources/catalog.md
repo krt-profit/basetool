@@ -55,6 +55,10 @@ The answer is a [`resolve-response`](../schemas/) with one result per reference,
 | `ambiguous` | `candidates`, at most ten `{guid, bt, name}` | Let the member pick. A fuzzy suggestion is always `ambiguous`, even alone. |
 | `unmatched` | nothing | Show it to the member; do not send it in a change set. |
 
+Every `name` in `ref` and `candidates` holds at most 200 characters, the length `item-ref` allows;
+a longer catalogue name is cut to it. Refer to the entry again by `guid` or `bt`, not by that
+`name`.
+
 `warnings[]` holds at most 50 `{pointer, code}`: `LOC_KEY_UNRESOLVED` at `/refs/<i>/locKey` for a
 reference with a `locKey` whose key fields did not resolve, and `UNKNOWN_FIELD` for a field the
 schema does not declare.
@@ -69,7 +73,8 @@ material matches, as an `ITEM`.
 No parameters. The answer is a [`location-list`](../schemas/): the warehouse's non-hidden locations,
 ordered by name, each with its UEX city or space station when it is linked to one (a city link wins)
 and with `guid`, the DataForge GUID of its starmap object, when it is linked to one: its own, else
-its city's, else its space station's. `name` is the warehouse's own name for the place.
+its city's, else its space station's. `name` is the warehouse's own name for the place, cut to the
+200 characters `location` allows.
 
 ```json
 {

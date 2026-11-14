@@ -67,9 +67,6 @@ public class ExchangeShipFeedService {
   /** The insurance kind of a number of months. */
   private static final String MONTHS = "MONTHS";
 
-  /** The longest display name the published item and location references carry. */
-  private static final int MAX_NAME = 200;
-
   private final ShipRepository shipRepository;
   private final ExchangeShipLinkRepository linkRepository;
   private final ExchangeFeedReader feedReader;
@@ -217,13 +214,14 @@ public class ExchangeShipFeedService {
         ship.id().toString(),
         externalId,
         ship.version() == null ? 0 : ship.version(),
-        new ExchangeItemRefDto(ship.shipTypeId().toString(), cut(ship.shipTypeName())),
+        new ExchangeItemRefDto(
+            ship.shipTypeId().toString(), ExchangeNames.cut(ship.shipTypeName())),
         ship.name() == null || ship.name().isBlank() ? null : ship.name(),
         insurance(ship.insurance()),
         ship.locationName() == null
             ? null
             : new ExchangeLocationDto(
-                cut(ship.locationName()),
+                ExchangeNames.cut(ship.locationName()),
                 ExchangeCatalogService.uex(ship.uexCityId(), ship.uexSpaceStationId()),
                 ship.locationId() == null ? null : guids.get(ship.locationId())),
         ship.fitted(),
@@ -258,15 +256,5 @@ public class ExchangeShipFeedService {
       return new ExchangeInsuranceDto(MONTHS, Math.min(Integer.parseInt(insurance), 120));
     }
     return new ExchangeInsuranceDto(MONTHS, 0);
-  }
-
-  /**
-   * Cuts a display name to the published limit.
-   *
-   * @param name the name
-   * @return the name, at most {@value #MAX_NAME} characters
-   */
-  private static @NotNull String cut(@NotNull String name) {
-    return name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name;
   }
 }

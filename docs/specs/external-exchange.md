@@ -849,7 +849,8 @@ several is the answer, so an ambiguous `scRecord` still yields to a name that re
 lists at most ten candidates as `{bt, name}`; fuzzy suggestions are always `ambiguous`, even when
 there is only one, because they are never taken without the member. `LOC_KEY_UNRESOLVED` points at
 `/refs/<i>/locKey` of every reference that carries a `locKey` and whose keys, `locKey` included, did
-not resolve; a response carries at most 50 warnings. Per catalogue:
+not resolve; a response carries at most 50 warnings. The `name` of every entry, resolved or a
+candidate, is cut to the 200 characters `item-ref` allows (REQ-XCH-026). Per catalogue:
 
 | `kind` | `bt` | `scRecord` | `scGuid` | `uexId` | `locKey` | `name` |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1326,7 +1327,7 @@ per-order breakdown and no low-count suppression; a client may cache it for up t
 approved for `exchange.demand.details` adds a per-order breakdown for the member's Logistician
 units (REQ-XCH-047, ADR-0257); without it the answer is exactly as described here.
 `GET /exchange/v1/catalog/locations` lists the non-hidden `location` rows with their UEX link and
-their starmap `guid`.
+their starmap `guid`, each `name` cut to the 200 characters `location` allows (REQ-XCH-026).
 
 The backend serves the location list as `GET /api/v1/exchange/catalog/locations` (any exchange
 scope), one query, a city link winning over a space-station link.
@@ -2023,6 +2024,16 @@ Change-set sanitization removes every undeclared field independently of the fift
 reporting cap. Unknown fields in later operations are removed too. The pointer-length check
 examines all undeclared fields before relay, including fields beyond the warning cap.
 
+**No answer carries a string longer than its v1 schema allows.** A schema is never widened to fit
+what the database stores; the backend cuts the value instead. Every display name of a place or a
+catalogue entry — a location, an item, a material, a ship type, a blueprint product, a refining
+method — and of a holder, a mission earmark or a client is cut to the 200 characters `location`,
+`item-ref` and the other v1 schemas allow, never inside a surrogate pair (`ExchangeNames.cut`), in
+the location list, the resolver, every feed and the patch-change read. The database stores those
+names with up to 255 characters, and one longer name would otherwise fail the whole answer at the
+gateway with `502 BACKEND_RELAY_FAILED`. Every other bounded string an answer carries is stored with
+at most its schema's length.
+
 **The release baseline is mandatory in CI.** The *Fetch the previous release's exchange schemas*
 step of `ci.yml` copies the newest `vX.Y.Z` tag's v1 schemas to `ingest/build/exchange-baseline/`,
 which `ingest/build.gradle.kts` passes to the tests as `-Dexchange.baseline`. The step fails the job
@@ -2042,6 +2053,11 @@ reason to skip. A local build fetches no baseline, and the comparison skips.
 - [x] A narrowing the owner accepts as a correction is listed by its exact comparison message, with
   its reason, in `ExchangeContractTest.ACCEPTED_NARROWINGS`; any other narrowing still fails, and the
   entry is proven to match exactly what the comparison reports for it.
+- [x] A location, item, material or ship-type name of 255 characters reaches the client cut to 200
+  from the location list and from `catalog/resolve`, and the answer matches its published schema;
+  the cut never splits a surrogate pair. *`ExchangeCatalogControllerTest`,
+  `ExchangeResolveControllerTest`, `ExchangeNamesTest`; `ExchangeControllerTest` relays a location
+  list at the bound and refuses one beyond it with `502 BACKEND_RELAY_FAILED`.*
 
 > [!note] 2026-10-03 — `refinery-draft` requires at least one order
 > `refinery-draft.schema.json` gains `"minItems": 1` on `orders`, and the fixture
@@ -2061,8 +2077,8 @@ reason to skip. A local build fetches no baseline, and the comparison skips.
 > `ACCEPTED_NARROWINGS`.
 
 **Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest`, the
-*Fetch the previous release's exchange schemas* step of `ci.yml` · **Status:** implemented —
-WP 0.2 (#2080)
+*Fetch the previous release's exchange schemas* step of `ci.yml`, `ExchangeNamesTest` ·
+**Status:** implemented — WP 0.2 (#2080)
 
 ### REQ-XCH-027 — Approved clients meet the client security requirements
 

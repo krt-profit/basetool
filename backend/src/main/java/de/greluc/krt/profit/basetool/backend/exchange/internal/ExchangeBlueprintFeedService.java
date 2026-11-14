@@ -60,9 +60,6 @@ public class ExchangeBlueprintFeedService {
   /** Keys up to this length are used as they are; longer ones are hashed. */
   private static final int MAX_PLAIN_KEY = 128;
 
-  /** The longest display name the published item reference carries. */
-  private static final int MAX_NAME = 200;
-
   private final PersonalBlueprintRepository blueprintRepository;
   private final ExchangeFeedReader feedReader;
   private final DefaultBlueprintKeys defaultKeys;
@@ -170,13 +167,10 @@ public class ExchangeBlueprintFeedService {
    */
   private @NotNull ExchangeBlueprintDto toDto(@NotNull PersonalBlueprint row) {
     String key = keyOf(row.getProductKey());
-    String name = row.getProductName();
     return new ExchangeBlueprintDto(
         key,
         new ExchangeItemRefDto(
-            ProductKeys.guidOf(row.getProductKey()),
-            key,
-            name.length() > MAX_NAME ? name.substring(0, MAX_NAME) : name),
+            ProductKeys.guidOf(row.getProductKey()), key, ExchangeNames.cut(row.getProductName())),
         row.getAcquiredAt(),
         defaultKeys.isDefault(row.getProductKey()),
         row.getNote(),
