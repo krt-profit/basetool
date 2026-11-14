@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.joborder.internal;
 import de.greluc.krt.profit.basetool.backend.joborder.internal.JobOrderMoneyAvailability.AccountReceipt;
 import de.greluc.krt.profit.basetool.backend.kernel.BusinessConflictException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -251,6 +252,25 @@ class JobOrderMoneyLedger {
           recipientAliases,
           corrections,
           revisedAmounts(revisions, entries),
+          availability,
+          linkedAttempts);
+    }
+
+    /**
+     * Folds only the facts recorded before the cutoff, at their current effective amounts and
+     * holder identities: the order's funds as they stood then, as corrected since (REQ-PATCH-044).
+     *
+     * @param cutoff the exclusive upper bound of the recording time
+     * @return the earlier ledger of the same order
+     */
+    Ledger before(Instant cutoff) {
+      return fold(
+          facts.stream().filter(fact -> fact.getRecordedAt().isBefore(cutoff)).toList(),
+          identities,
+          accountHoldings,
+          recipientAliases,
+          corrections,
+          revisions,
           availability,
           linkedAttempts);
     }

@@ -656,6 +656,12 @@ write-time merge skips every older row (REQ-PATCH-004), and the Lager learns the
 SPI `inventory.api.StockMergeCutoff` the `patchchange` module implements. The trigger itself is one
 transaction that takes the history's advisory lock first and lets each effect lock its own rows in
 id order ([ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md)).
+For money the same criterion reads the ledgers: the Bank reset offsets the balances from the
+postings before the live time and the aUEC orders book what the facts before it still hold, so
+both keep every later booking
+([ADR-0384](../adr/0384-the-currency-wipe-resets-the-bank-as-of-the-live-time.md)). The currency
+wipe takes the order guards before the Bank's request and account locks, the order a linked Bank
+decision follows.
 A relocation is the one write that changes a row's location in place: it keeps every earmark,
 pledge and offer, advances the row's version, and runs once per member under the history's shared
 lock, the hierarchy lock and the lot locks in ascending order; until it ran, the member's rows and

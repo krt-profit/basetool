@@ -111,7 +111,6 @@
                    th:hidden="${!#lists.isEmpty(form.homeLocations()) or defaults == null or !defaults.homeLocationPrompt()}"
                    th:text="#{admin.patchChange.homeLocations.empty}">Es ist keine Home Location gepflegt. Die Mitglieder k&ouml;nnten nichts w&auml;hlen; pflege die Home Locations vor dem Ausl&ouml;sen.</p>
             </div>
-            <p class="form-hint pc-hint" th:text="#{admin.patchChange.effects.hint}">Der W&auml;hrungs-Wipe wirkt erst mit einem sp&auml;teren Release; die Auswahl wird schon mit dem Patchwechsel gespeichert.</p>
         </section>
 
         <aside class="hud-box pc-preview" aria-labelledby="pc-preview-title" data-testid="pc-preview">

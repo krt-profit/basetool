@@ -495,7 +495,17 @@ is idempotent (a second click on an all-zero bank is a no-op with a notice).
   design system's bank patterns (specimen `components/BankPatterns/preview.html`).
 - [x] The audit log contains the summary event (actor, account count, total zeroed).
 
-**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/web/BankAdminController` · **Issues:** #556
+**Patch change (amendment, [REQ-PATCH-041](patch-change.md#req-patch-041--the-bank-reset-offsets-the-balances-as-of-the-live-time),
+[REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled),
+ADR-0384).** A patch change with the currency wipe runs a second form of this reset at its
+trigger. Its `WIPE_RESET` offsets exactly the account and holder balances **as of the live
+time**, so every booking after the live time stays; it refuses with `BANK_OVERDRAFT` when
+that offset would overdraw an account. It cancels the pending requests submitted before the
+live time with the patch change as their reason, and its one `WIPE_RESET_EXECUTED` names the
+patch change, the live time and the number of cancelled requests. The button above keeps its
+behaviour.
+
+**Enforced by:** `BankLedgerServiceTest` (wipe reset relative + idempotent), `BankControllerSecurityTest` (admin-only), `BankCurrencyWipeIntegrationTest` (reset as of the live time) · **Code:** `bank/internal/BankLedgerService#resetAllBalances`, `bank/internal/BankWipeResetBooking`, `bank/internal/BankCurrencyWipeService`, `bank/web/BankAdminController` · **Issues:** #556
 
 ### REQ-BANK-014 — Account statement PDF (Kontoauszug)
 
@@ -977,7 +987,10 @@ caller to oversee the org unit; cancel requires owning the request). A request c
 raised against a `CLOSED` account. `GET /api/v1/bank/org-units/requests/page` reads the same
 own requests as one page, filtered by lifecycle state (`status`, repeatable; every state when
 omitted), newest first, with the total over all pages — a read-only call that is not audited. The
-dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it.
+dashboard widget „Meine Bankanträge" (REQ-UI-034) uses it. A patch change with the currency
+wipe also cancels a pending request submitted before its live time, with the patch change as
+the reason; the request then reads `CANCELLED` like any other
+([REQ-PATCH-042](patch-change.md#req-patch-042--pending-bank-requests-from-before-the-live-time-are-cancelled)).
 
 **Acceptance**
 

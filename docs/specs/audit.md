@@ -164,6 +164,11 @@ web, naming its client (REQ-AUDIT-005):
   `JOB_ORDER_MONEY_COMMITMENT_CHANGED` records the unit, commitment occurrence, before and
   outstanding amounts, and reason. Credit and correction add the logical operation ID. The same
   transaction records the affected occurrence and its order-visible history.
+  A patch change's currency wipe records one summary event per trigger instead of per order
+  (`JOB_ORDER_MONEY_CURRENCY_WIPED`, subject the patch change with its label, details `orders`,
+  `holdings`, `shortageTotal`, `attemptsCancelled`, `commitmentsEnded` and `patchChange`,
+  [REQ-PATCH-046](patch-change.md#req-patch-046--preview-audit-and-live-update-of-the-currency-wipe));
+  its shortages, cancelled attempts and ended commitments carry no event of their own.
   Adding or removing an assignee who is not a direct member of the processing unit (REQ-ORDERS-047)
   records `JOB_ORDER_EXTERNAL_ASSIGNEE_ADDED` / `JOB_ORDER_EXTERNAL_ASSIGNEE_REMOVED` in place of
   `JOB_ORDER_ASSIGNEE_ADDED` / `_REMOVED`, also when the order is SK-public; the assignee is the
@@ -653,8 +658,11 @@ The coverage list holds the **Patchwechsel** area
   `ADMIN` or `CLIENT`, REQ-PATCH-027); `PATCH_CHANGE_AUDIT_EXPORTED` and
   `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. Only the relocation has a
   target user, and the details carry enums, instants, booleans, ids, the curated location name and
-  counts only. Each affected area records one summary event of the trigger in its own trail (the
-  refinery's above); a relocation records no event in the Lager's or the hangar's trail.
+  counts only. Each affected area records one summary event of the trigger in its own trail: the
+  refinery's and the job orders' above, and the Bank's own `WIPE_RESET_EXECUTED` naming the patch
+  change, the live time and the cancelled requests
+  ([REQ-PATCH-046](patch-change.md#req-patch-046--preview-audit-and-live-update-of-the-currency-wipe));
+  a relocation records no event in the Lager's or the hangar's trail.
 
 The types are offered by the viewer's per-area event-type list and labelled in DE/EN
 (`admin.audit.domain.PATCH_CHANGE`, `admin.audit.event.*`, `pdf.audit.title.PATCH_CHANGE`); both

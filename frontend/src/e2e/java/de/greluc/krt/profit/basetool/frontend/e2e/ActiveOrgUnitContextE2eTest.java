@@ -107,7 +107,9 @@ class ActiveOrgUnitContextE2eTest {
     }
   }
 
-  /** The pooled Lager shows the access notice and both units' stock until a Staffel is selected. */
+  /**
+   * The unit warehouse shows the shared notice and both units' stock until a Staffel is selected.
+   */
   @Test
   void withoutAChoiceTheLagerShowsBothUnitsUnderAllMyOrgUnits() {
     try (BrowserContext context = newContext()) {
@@ -116,7 +118,7 @@ class ActiveOrgUnitContextE2eTest {
         E2eSupport.login(page, STACK.baseUrl(), BOTH_USER, BOTH_PASSWORD);
         E2eSupport.navigate(page, STACK.baseUrl() + LAGER);
         assertThat(page.locator(SWITCHER)).hasValue("");
-        assertThat(page.getByTestId("inventory-scope-notice")).isVisible(visible());
+        assertThat(page.getByTestId("all-my-org-units-notice")).isVisible(visible());
         assertThat(group(page, staffelMaterialId)).isVisible(visible());
         assertThat(group(page, skMaterialId)).isVisible(visible());
 

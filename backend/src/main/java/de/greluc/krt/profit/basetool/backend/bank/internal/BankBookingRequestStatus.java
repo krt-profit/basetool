@@ -35,6 +35,9 @@ public enum BankBookingRequestStatus {
   /** A bank employee declined the request; no ledger effect, a reason is recorded. */
   REJECTED,
 
-  /** The requesting officer/lead withdrew the request before any decision; no ledger effect. */
+  /**
+   * The requester, the purpose owner or a patch change's currency wipe withdrew the request before
+   * any decision; no ledger effect.
+   */
   CANCELLED
 }

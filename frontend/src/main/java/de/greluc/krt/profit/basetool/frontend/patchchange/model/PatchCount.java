@@ -32,6 +32,18 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 public enum PatchCount {
   /** The running refinery orders the refinery effect cancels (REQ-PATCH-006). */
   REFINERY_ORDERS_CANCELED,
+  /** The Bank balances as of the live time the currency wipe resets (REQ-PATCH-041). */
+  BANK_RESET_TOTAL,
+  /** The pending Kartellbank requests the currency wipe cancels (REQ-PATCH-042). */
+  BANK_REQUESTS_CANCELED,
+  /** The aUEC order holdings the currency wipe books as a real shortage (REQ-PATCH-044). */
+  AUEC_SHORTAGES,
+  /** The sum of those shortages in whole aUEC (REQ-PATCH-044). */
+  AUEC_SHORTAGE_TOTAL,
+  /** The waiting aUEC order Bank attempts the currency wipe cancels (REQ-PATCH-043). */
+  AUEC_BANK_ATTEMPTS_CANCELED,
+  /** The aUEC unit commitments the currency wipe ends (REQ-PATCH-045). */
+  AUEC_COMMITMENTS_ENDED,
   /** The members older than the live time the home-location prompt asks (REQ-PATCH-021). */
   MEMBERS_ASKED
 }

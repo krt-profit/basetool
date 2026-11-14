@@ -26,6 +26,18 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 public enum PatchCount {
   /** Refinery orders started before the live time that end as cancelled. */
   REFINERY_ORDERS_CANCELED,
+  /** The sum of the Kartellbank's account balances as of the live time, in whole aUEC. */
+  BANK_RESET_TOTAL,
+  /** Pending Kartellbank requests submitted before the live time that end as cancelled. */
+  BANK_REQUESTS_CANCELED,
+  /** Holdings of aUEC orders that existed at the live time and are booked as a real shortage. */
+  AUEC_SHORTAGES,
+  /** The sum of those shortages, in whole aUEC. */
+  AUEC_SHORTAGE_TOTAL,
+  /** Bank attempts of aUEC orders waiting since before the live time that end as cancelled. */
+  AUEC_BANK_ATTEMPTS_CANCELED,
+  /** Unit commitments of aUEC orders opened before the live time that end. */
+  AUEC_COMMITMENTS_ENDED,
   /** Members whose accounts are older than the live time, asked for a new home location. */
   MEMBERS_ASKED
 }

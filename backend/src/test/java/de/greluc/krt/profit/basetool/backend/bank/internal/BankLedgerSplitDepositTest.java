@@ -108,6 +108,7 @@ class BankLedgerSplitDepositTest {
             orgUnitMembershipQueryService,
             writer,
             guards,
+            null,
             null);
   }
 

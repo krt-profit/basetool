@@ -190,19 +190,6 @@
     <property name="files" value="^(?!.*basetool.frontend.refinery.web.RefineryOrderPageController\.java$)"/>
   </module>
   <module name="FileLength">
-    <property name="id" value="fileLengthBankBookingRequestService"/>
-    <property name="fileExtensions" value="java"/>
-    <property name="max" value="982"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLength"/>
-    <property name="files" value="basetool.backend.bank.internal.BankBookingRequestService\.java$"/>
-  </module>
-  <module name="SuppressionSingleFilter">
-    <property name="id" value="fileLengthBankBookingRequestService"/>
-    <property name="files" value="^(?!.*basetool.backend.bank.internal.BankBookingRequestService\.java$)"/>
-  </module>
-  <module name="FileLength">
     <property name="id" value="fileLengthJobOrderPageController"/>
     <property name="fileExtensions" value="java"/>
     <property name="max" value="869"/>
