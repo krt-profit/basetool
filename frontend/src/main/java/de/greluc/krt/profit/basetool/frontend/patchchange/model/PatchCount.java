@@ -31,5 +31,7 @@ import de.greluc.krt.profit.basetool.frontend.kernel.model.DtoMirror;
 @DtoMirror
 public enum PatchCount {
   /** The running refinery orders the refinery effect cancels (REQ-PATCH-006). */
-  REFINERY_ORDERS_CANCELED
+  REFINERY_ORDERS_CANCELED,
+  /** The members older than the live time the home-location prompt asks (REQ-PATCH-021). */
+  MEMBERS_ASKED
 }

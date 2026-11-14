@@ -194,31 +194,37 @@ function maybeReauthenticate(response) {
     return header ? reauthRedirect(header) : false;
 }
 
+/** The response headers by which a session gate names its page to an AJAX caller. */
+const SESSION_GATE_HEADERS = ['X-Terms-Acceptance-Required', 'X-Home-Location-Required'];
+
 /**
- * If response carries the X-Terms-Acceptance-Required header, navigates to the consent page it
- * names and returns true; otherwise returns false. Safe to call with any Response (REQ-SEC-028).
+ * If response carries a session gate's header (the consent's, REQ-SEC-028, or the home
+ * location's, REQ-PATCH-020), navigates to the page it names and returns true; otherwise returns
+ * false. Safe to call with any Response.
  *
  * @param {Response} response the response to inspect
- * @returns {boolean} true when the browser was sent to the consent page
+ * @returns {boolean} true when the browser was sent to a gate's page
  */
 function maybeTermsGate(response) {
-    if (!response || !response.headers) {
+    if (!response || !response.headers || typeof response.headers.get !== 'function') {
         return false;
     }
-    const target =
-        typeof response.headers.get === 'function'
-            ? response.headers.get('X-Terms-Acceptance-Required')
-            : null;
-    return target ? termsGateRedirect(target) : false;
+    for (const header of SESSION_GATE_HEADERS) {
+        const target = response.headers.get(header);
+        if (target) {
+            return termsGateRedirect(target);
+        }
+    }
+    return false;
 }
 
 /**
- * Navigates the window to the consent page, refusing anything that is not a same-origin absolute
- * path. Also used by the SSE `terms-gate` event and the /ws/sync 4003 close, which carry a bare
- * URL.
+ * Navigates the window to a session gate's page, refusing anything that is not a same-origin
+ * absolute path. Also used by the SSE `terms-gate` and `home-location-gate` events and the
+ * /ws/sync 4003 close, which carry a bare URL.
  *
- * @param {string | null | undefined} url the consent-page path the server named
- * @returns {boolean} true when the browser was sent to the consent page
+ * @param {string | null | undefined} url the gate page's path the server named
+ * @returns {boolean} true when the browser was sent to the gate's page
  */
 function termsGateRedirect(url) {
     const target = safeSameOriginUrl(url);

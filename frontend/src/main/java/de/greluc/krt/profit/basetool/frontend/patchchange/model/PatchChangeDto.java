@@ -36,6 +36,7 @@ import java.util.UUID;
  * @param triggeredBy the triggering admin's display name, or {@code null} when the account is gone
  * @param options the options it was triggered with
  * @param counts what its effects touched, one entry per kind
+ * @param phase its home-location phase, or {@code null} when it did not ask for a home location
  */
 @DtoMirror
 public record PatchChangeDto(
@@ -47,4 +48,5 @@ public record PatchChangeDto(
     Instant triggeredAt,
     String triggeredBy,
     PatchChangeOptions options,
-    List<PatchCountDto> counts) {}
+    List<PatchCountDto> counts,
+    PatchChangePhaseDto phase) {}

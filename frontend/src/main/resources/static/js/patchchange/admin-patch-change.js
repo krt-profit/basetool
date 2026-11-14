@@ -23,14 +23,16 @@ import { krtPageSections } from '/js/kernel/krt-page-sections.js';
 import { initPatchChangeForm } from '/js/patchchange/patch-change-form.js';
 import { initLabelCorrection } from '/js/patchchange/patch-change-history.js';
 import { localizeTimes, readMessages } from '/js/patchchange/patch-change-messages.js';
+import { initPhaseEnd } from '/js/patchchange/patch-change-phase.js';
 
 /** The page's path, from which the history fragment is fetched. */
 const PAGE_URL = '/admin/settings/patch-change';
 
 /**
- * Wires the admin's patch-change page (REQ-PATCH-008): the form with its preview and trigger, the
- * history with its label correction, and the `patch-change` room the backend announces a trigger
- * or a correction in, on which the history and the form's previous values refresh in place.
+ * Wires the admin's patch-change page (REQ-PATCH-008, REQ-PATCH-024): the form with its preview
+ * and trigger, the history with its label correction and phase end, and the `patch-change` room
+ * the backend announces a trigger, a correction, a phase end or a relocation in, on which the
+ * history and the form's previous values refresh in place.
  */
 function initAdminPatchChange() {
     const i18n = readMessages();
@@ -68,6 +70,7 @@ function initAdminPatchChange() {
             form.refreshPrevious();
         }
     });
+    initPhaseEnd(sections, i18n);
 
     localizeTimes(document);
     document.addEventListener('krt:swapped', (event) => {

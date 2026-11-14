@@ -20,7 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.kernel.livesync;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.security.CurrentUser;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.TermsGateHandoff;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateHandoff;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -141,9 +141,9 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
   }
 
   /**
-   * Copies the consent gate's mark from the handshake request onto the future session, so {@link
-   * LiveSyncWebSocketHandler#afterConnectionEstablished} can close the socket with a terminal code
-   * (REQ-SEC-028).
+   * Copies a session gate's mark (the consent's or the home location's) from the handshake request
+   * onto the future session, so {@link LiveSyncWebSocketHandler#afterConnectionEstablished} can
+   * close the socket with a terminal code (REQ-SEC-028, REQ-PATCH-020).
    *
    * @param request the handshake request, carrying the gate's mark as a request attribute
    * @param attributes the future WebSocket-session attributes
@@ -153,9 +153,9 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
     if (!(request instanceof ServletServerHttpRequest servletRequest)) {
       return;
     }
-    String consentUrl = TermsGateHandoff.consentUrl(servletRequest.getServletRequest());
-    if (consentUrl != null) {
-      attributes.put(LiveSyncWebSocketHandler.ATTR_TERMS_GATE, consentUrl);
+    String gateUrl = SessionGateHandoff.gateUrl(servletRequest.getServletRequest());
+    if (gateUrl != null) {
+      attributes.put(LiveSyncWebSocketHandler.ATTR_TERMS_GATE, gateUrl);
     }
   }
 

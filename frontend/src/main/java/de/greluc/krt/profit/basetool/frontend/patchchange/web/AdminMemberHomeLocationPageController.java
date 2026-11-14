@@ -1,0 +1,122 @@
+/*
+ * Profit Basetool - squadron-management web app.
+ * Copyright (C) 2026 Lucas Greuloch
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package de.greluc.krt.profit.basetool.frontend.patchchange.web;
+
+import de.greluc.krt.profit.basetool.frontend.identity.model.UserDto;
+import de.greluc.krt.profit.basetool.frontend.kernel.layout.UsesLayoutModel;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.Roles;
+import de.greluc.krt.profit.basetool.frontend.kernel.web.SectionFallback;
+import de.greluc.krt.profit.basetool.frontend.patchchange.client.PatchChangeBackendClient;
+import de.greluc.krt.profit.basetool.frontend.patchchange.model.HomeLocationPromptDto;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+/**
+ * The admin's member tab {@code /admin/members/{userId}/home-location} (REQ-PATCH-022): where the
+ * member stands in the latest home-location phase and, while the member is pending, what would move
+ * and the choice on the member's behalf. The choice goes through {@link
+ * AdminMemberHomeLocationRelayController}, after which the content re-renders in place.
+ */
+@Controller
+@UsesLayoutModel
+@RequestMapping(AdminMemberHomeLocationPageController.PAGE)
+@RequiredArgsConstructor
+@PreAuthorize("hasRole('" + Roles.ADMIN + "')")
+@Slf4j
+public class AdminMemberHomeLocationPageController {
+
+  /** The page's path, also the path of its relay endpoint. */
+  static final String PAGE = "/admin/members/{userId}/home-location";
+
+  /** The page's view. */
+  static final String VIEW = "patchchange/admin/member-home-location";
+
+  /** The {@code fragment} value that renders only the content, for the in-place swap. */
+  static final String CONTENT_FRAGMENT = "content";
+
+  /** The message key shown in place of the content when the prompt cannot be read. */
+  static final String PROMPT_ERROR = "admin.memberHomeLocation.error.load";
+
+  /** Reads the member's prompt and the member. */
+  private final PatchChangeBackendClient patchChangeClient;
+
+  /**
+   * Renders the tab, or with {@code fragment=content} only its content. A prompt that cannot be
+   * read renders {@code promptError} in place of the content.
+   *
+   * @param userId the member
+   * @param fragment {@code content} for the content fragment; anything else renders the page
+   * @param model receives {@code memberId} and {@code prompt}, or {@code promptError} on a failed
+   *     read; for the page also {@code memberName}
+   * @return {@code patchchange/admin/member-home-location}, or its content fragment
+   */
+  @NotNull
+  @GetMapping
+  public String page(
+      @PathVariable @NotNull UUID userId,
+      @Nullable @RequestParam(required = false) String fragment,
+      Model model) {
+    model.addAttribute("memberId", userId);
+    HomeLocationPromptDto prompt =
+        SectionFallback.load(
+            log,
+            "member-home-location",
+            () -> patchChangeClient.memberHomeLocationPrompt(userId),
+            null);
+    if (prompt == null) {
+      model.addAttribute("promptError", PROMPT_ERROR);
+    } else {
+      model.addAttribute("prompt", prompt);
+    }
+    if (CONTENT_FRAGMENT.equals(fragment)) {
+      return VIEW + " :: " + CONTENT_FRAGMENT;
+    }
+    UserDto member =
+        SectionFallback.load(
+            log, "member-home-location-member", () -> patchChangeClient.member(userId), null);
+    model.addAttribute("memberName", memberName(member));
+    return VIEW;
+  }
+
+  /**
+   * Picks the name the page head shows for the member.
+   *
+   * @param member the member, or {@code null} when it could not be read
+   * @return the effective name, or {@code null} when none is known
+   */
+  @Contract("null -> null")
+  private static @Nullable String memberName(@Nullable UserDto member) {
+    if (member == null) {
+      return null;
+    }
+    return member.effectiveName() != null ? member.effectiveName() : member.username();
+  }
+}

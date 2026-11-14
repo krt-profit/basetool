@@ -209,8 +209,9 @@ public final class BackendErrorMapper {
 
   /**
    * Whether a problem code is one of the access gates refusing an authenticated user (pending
-   * approval, unaccepted terms, no role): expected and self-clearing (REQ-SEC-017, REQ-SEC-028,
-   * REQ-SEC-053), so logged at DEBUG and not counted as a failure.
+   * approval, unaccepted terms, no role, a missing home location): expected and self-clearing
+   * (REQ-SEC-017, REQ-SEC-028, REQ-SEC-053, REQ-PATCH-020), so logged at DEBUG and not counted as a
+   * failure.
    *
    * @param problemCode the RFC 7807 {@code code} the backend returned
    * @return {@code true} when the refusal is an expected access gate
@@ -218,7 +219,8 @@ public final class BackendErrorMapper {
   public static boolean isExpectedAccessGateRefusal(@NotNull String problemCode) {
     return BackendServiceException.CODE_PENDING_APPROVAL.equals(problemCode)
         || BackendServiceException.CODE_TERMS_NOT_ACCEPTED.equals(problemCode)
-        || BackendServiceException.CODE_NO_ROLE.equals(problemCode);
+        || BackendServiceException.CODE_NO_ROLE.equals(problemCode)
+        || BackendServiceException.CODE_HOME_LOCATION_REQUIRED.equals(problemCode);
   }
 
   /**

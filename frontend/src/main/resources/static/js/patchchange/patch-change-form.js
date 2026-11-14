@@ -23,6 +23,7 @@ import { krtFetch } from '/js/kernel/krt-fetch.js';
 import { krtHtml } from '/js/kernel/krt-html.js';
 import { krtI18nText } from '/js/kernel/krt-i18n.js';
 import { formatNumber } from '/js/kernel/krt-number-format.js';
+import { initHomeLocations } from '/js/patchchange/patch-change-home-locations.js';
 import { format, localTime, readCountLabels } from '/js/patchchange/patch-change-messages.js';
 
 /** The page's path, also the base of its relay endpoints. */
@@ -63,8 +64,8 @@ const OPTION_NAMES = ['cancelRefineryOrders', 'currencyWipe', 'homeLocationPromp
  * What the form offers the rest of the page.
  *
  * @typedef {object} PatchChangeFormSeam
- * @property {() => void} refreshPrevious re-reads the previous patch change for the hint and the
- *     preview, leaving the admin's inputs as they are
+ * @property {() => void} refreshPrevious re-reads the previous patch change and the curated home
+ *     locations for the hints and the preview, leaving the admin's inputs as they are
  */
 
 /**
@@ -160,6 +161,7 @@ export function initPatchChangeForm(sections, i18n) {
  */
 function wireForm(el, sections, i18n) {
     const countLabels = readCountLabels();
+    const homeLocations = initHomeLocations(el.form, i18n);
     let previewSeq = 0;
     /** @type {number | null} */
     let previewTimer = null;
@@ -229,9 +231,13 @@ function wireForm(el, sections, i18n) {
         el.trigger.disabled = value === '' || el.confirm.value.trim() !== value;
     }
 
-    /** Shows the danger alert while the currency wipe is on. */
-    function syncCurrencyAlert() {
+    /**
+     * Shows the alerts the options call for: the danger alert while the currency wipe is on and the
+     * warning while the home-location prompt is on without a curated home location.
+     */
+    function syncAlerts() {
         el.currencyAlert.hidden = !inputs('currencyWipe').some((option) => option.checked);
+        homeLocations.sync();
     }
 
     /**
@@ -347,18 +353,23 @@ function wireForm(el, sections, i18n) {
             el.label.value = fresh && fresh.suggestedLabel ? fresh.suggestedLabel : '';
             if (fresh) {
                 showPrevious(fresh.previousLabel, fresh.previousLiveAt);
+                homeLocations.show(fresh.homeLocations);
             }
             syncConfirmation();
-            syncCurrencyAlert();
+            syncAlerts();
             runPreview();
         });
     }
 
-    /** Re-reads the previous patch change for the hint and refreshes the preview. */
+    /**
+     * Re-reads the previous patch change and the curated home locations for the hints and
+     * refreshes the preview.
+     */
     function refreshPrevious() {
         readForm().then((fresh) => {
             if (fresh) {
                 showPrevious(fresh.previousLabel, fresh.previousLiveAt);
+                homeLocations.show(fresh.homeLocations);
             }
             runPreview();
         });
@@ -414,14 +425,14 @@ function wireForm(el, sections, i18n) {
         if (target.name === 'kind') {
             applyPreset(target);
         }
-        syncCurrencyAlert();
+        syncAlerts();
         runPreview();
     });
 
     el.liveAt.value = localNow();
     showPrevious(el.form.dataset.previousLabel, el.form.dataset.previousLiveAt);
     syncConfirmation();
-    syncCurrencyAlert();
+    syncAlerts();
     runPreview();
     return { refreshPrevious };
 }

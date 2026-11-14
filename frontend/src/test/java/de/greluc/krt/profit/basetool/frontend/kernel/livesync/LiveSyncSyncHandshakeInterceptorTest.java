@@ -25,7 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.greluc.krt.profit.basetool.frontend.kernel.security.TermsGateHandoff;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateHandoff;
 import de.greluc.krt.profit.basetool.frontend.kernel.web.ActiveSquadronContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -249,7 +249,7 @@ class LiveSyncSyncHandshakeInterceptorTest {
   @Test
   void relaysTheConsentGateMarkAndStillProceeds() {
     MockHttpServletRequest servletRequest = new MockHttpServletRequest();
-    TermsGateHandoff.mark(servletRequest, "/terms/accept");
+    SessionGateHandoff.mark(servletRequest, "/terms/accept");
 
     boolean proceed =
         interceptor.beforeHandshake(

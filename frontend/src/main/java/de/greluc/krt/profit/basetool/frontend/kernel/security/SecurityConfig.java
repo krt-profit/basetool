@@ -83,6 +83,7 @@ public class SecurityConfig {
   private final RequestLoggingFilter requestLoggingFilter;
   private final BackendRoleSyncFilter backendRoleSyncFilter;
   private final TermsAcceptanceGateFilter termsAcceptanceGateFilter;
+  private final HomeLocationGateFilter homeLocationGateFilter;
   private final BotProtectionFilter botProtectionFilter;
 
   /**
@@ -171,6 +172,7 @@ public class SecurityConfig {
     http.addFilterBefore(requestLoggingFilter, WebAsyncManagerIntegrationFilter.class)
         .addFilterBefore(backendRoleSyncFilter, AuthorizationFilter.class)
         .addFilterAfter(termsAcceptanceGateFilter, BackendRoleSyncFilter.class)
+        .addFilterAfter(homeLocationGateFilter, TermsAcceptanceGateFilter.class)
         .requestCache(cache -> cache.requestCache(navigationRequestCache))
         .csrf(Customizer.withDefaults())
         .headers(

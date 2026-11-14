@@ -124,6 +124,7 @@ public final class FrontendPageRoutes {
           "/admin/uex-data",
           "/organisation/leitung",
           "/pending-approval",
+          "/home-location",
           "/admin/p4k-import",
           "/admin/starmap",
           "/admin/items",

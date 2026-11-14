@@ -34,6 +34,11 @@ import { krtI18nText } from '/js/kernel/krt-i18n.js';
  * @property {string} correctError the fallback error of a label correction
  * @property {string} conflict the toast of a label correction on a stale version
  * @property {string} refreshError the toast of a failed history refresh
+ * @property {string} phaseEndText the confirmation of a phase end, `{0}` the patch label
+ * @property {string} phaseEnded the success toast of a phase end
+ * @property {string} phaseEndError the fallback error of a phase end
+ * @property {string} homeLocations the curated home locations, `{0}` their names
+ * @property {string} homeLocationsNone the hint while no home location is curated
  */
 
 /**
@@ -56,6 +61,11 @@ export function readMessages() {
         correctError: krtI18nText(data.correctError, 'data-correct-error'),
         conflict: krtI18nText(data.conflict, 'data-conflict'),
         refreshError: krtI18nText(data.refreshError, 'data-refresh-error'),
+        phaseEndText: krtI18nText(data.phaseEndText, 'data-phase-end-text'),
+        phaseEnded: krtI18nText(data.phaseEnded, 'data-phase-ended'),
+        phaseEndError: krtI18nText(data.phaseEndError, 'data-phase-end-error'),
+        homeLocations: krtI18nText(data.homeLocations, 'data-home-locations'),
+        homeLocationsNone: krtI18nText(data.homeLocationsNone, 'data-home-locations-none'),
     };
 }
 

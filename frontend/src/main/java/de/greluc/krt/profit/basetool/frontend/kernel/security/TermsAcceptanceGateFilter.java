@@ -19,10 +19,7 @@
 
 package de.greluc.krt.profit.basetool.frontend.kernel.security;
 
-import static de.greluc.krt.profit.basetool.frontend.kernel.security.ReauthenticationHandoff.isAjax;
-import static de.greluc.krt.profit.basetool.frontend.kernel.security.ReauthenticationHandoff.isEventStream;
 import static de.greluc.krt.profit.basetool.frontend.kernel.security.ReauthenticationHandoff.isWebSocketUpgrade;
-import static de.greluc.krt.profit.basetool.frontend.kernel.security.ReauthenticationHandoff.writeOneShotEvent;
 
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendApiClient;
@@ -113,26 +110,13 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
       return;
     }
-    String consentUrl = request.getContextPath() + CONSENT_PATH;
-    if (isEventStream(request)) {
-      log.debug("Consent missing; handing the SSE stream off to the consent page");
-      writeOneShotEvent(response, SSE_GATE_EVENT, consentUrl);
-      return;
-    }
-    if (isAjax(request)) {
-      log.debug("Consent missing; signalling the gate to the AJAX caller");
-      response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-      response.setHeader(TERMS_GATE_HEADER, consentUrl);
-      return;
-    }
-    if (isWebSocketUpgrade(request)) {
-      log.debug("Consent missing; marking the WebSocket handshake for a terminal refusal");
-      TermsGateHandoff.mark(request, consentUrl);
-      filterChain.doFilter(request, response);
-      return;
-    }
-    log.debug("Consent missing; routing {} to the consent page", request.getRequestURI());
-    response.sendRedirect(consentUrl);
+    log.debug("Consent missing; handing {} off to the consent page", request.getRequestURI());
+    SessionGateHandoff.handOff(
+        request,
+        response,
+        filterChain,
+        new SessionGateHandoff.Gate(
+            request.getContextPath() + CONSENT_PATH, SSE_GATE_EVENT, TERMS_GATE_HEADER));
   }
 
   /**

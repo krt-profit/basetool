@@ -43,8 +43,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * AJAX relay of the patch-change page to the backend's admin patch-change endpoints (REQ-PATCH-005,
- * REQ-PATCH-008); a backend refusal is relayed as {@code application/problem+json} with the
- * backend's localised detail.
+ * REQ-PATCH-008, REQ-PATCH-024); a backend refusal is relayed as {@code application/problem+json}
+ * with the backend's localised detail.
  */
 @RestController
 @RequestMapping(AdminPatchChangePageController.PAGE)
@@ -114,5 +114,20 @@ public class AdminPatchChangeRelayController {
         log,
         "correct the label of patch change " + id + " (ajax)",
         () -> ResponseEntity.ok(patchChangeClient.correctLabel(id, request)));
+  }
+
+  /**
+   * Ends a patch change's open home-location phase early (REQ-PATCH-024).
+   *
+   * @param id the patch change
+   * @return the patch change with its ended phase, or the relayed backend error ({@code 409} when
+   *     its phase is not the open one)
+   */
+  @PostMapping(value = "/{id}/phase-end", headers = "X-Requested-With=XMLHttpRequest")
+  public ResponseEntity<Object> endPhase(@PathVariable @NotNull UUID id) {
+    return relay(
+        log,
+        "end the home-location phase of patch change " + id + " (ajax)",
+        () -> ResponseEntity.ok(patchChangeClient.endPhase(id)));
   }
 }

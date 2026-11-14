@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{kernel/fragments/layout :: page(pagePickers=false, pageNumbers=false, pageDates=false, pageFilters=false, pageOverflow=false, pageFocus=false, pageTitle=~{::title}, pageLinks=~{::extraLinks}, pageBare=true, pageContent=~{::pageContent}, pageTail=~{::pageTail})}">
+<head>
+    <title th:text="${appTitle} + ' - ' + #{homeLocation.title.plain}">Profit Basetool - Neue Home Location</title>
+    <th:block th:fragment="extraLinks">
+        <link rel="stylesheet" th:href="@{/css/patchchange/home-location-preview.css}">
+        <link rel="stylesheet" th:href="@{/css/pages/patchchange/home-location.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:fragment="pageContent">
+<header>
+    <nav>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/basetool-logo.svg}" alt="" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+<main class="hl-page" data-testid="hl-page">
+    <div th:if="${promptError != null}" class="alert alert-danger" role="alert" data-testid="hl-load-error"
+         th:text="#{${promptError}}">Die Home-Location-Abfrage konnte nicht geladen werden. Bitte lade die Seite neu.</div>
+
+    <th:block th:if="${prompt != null}">
+        <div class="greeting">
+            <h1 th:text="#{homeLocation.title(${prompt.label()})}">Patch 4.4: Neue Home Location</h1>
+            <p th:text="#{homeLocation.lead(${prompt.label()})}">Star Citizen hat mit Patch 4.4 alles an eine neue Residenz geliefert. W&auml;hle sie, damit dein Lager und deine Schiffe mitziehen.</p>
+        </div>
+
+        <span id="hl-i18n" hidden
+              th:attr="data-cta=#{homeLocation.cta},data-cta-choose=#{homeLocation.cta.choose},data-success=#{homeLocation.success},data-error=#{homeLocation.error}"></span>
+
+        <form id="hl-form" class="hud-box hl-form no-track" novalidate data-testid="hl-form">
+            <section aria-labelledby="hl-choose-title">
+                <h2 id="hl-choose-title" class="hl-step__title" th:text="#{homeLocation.step.choose}">1. Home Location w&auml;hlen</h2>
+                <div th:if="${#lists.isEmpty(prompt.locations())}" class="alert alert-warning hl-alert" role="alert"
+                     data-testid="hl-no-locations" th:text="#{homeLocation.empty}">Es ist noch keine Home Location gepflegt.</div>
+                <div th:unless="${#lists.isEmpty(prompt.locations())}" class="hl-cards" role="radiogroup"
+                     aria-labelledby="hl-choose-title" data-testid="hl-cards">
+                    <label class="hl-card" th:each="location : ${prompt.locations()}"
+                           th:data-testid="|hl-card-${location.id()}|">
+                        <input type="radio" name="locationId" required th:value="${location.id()}"
+                               th:data-location-name="${location.name()}">
+                        <span class="hl-card__name" th:text="${location.name()}">Lorville</span>
+                        <span th:if="${location.system() != null}" class="hl-card__system"
+                              th:text="${location.system()}">Stanton</span>
+                    </label>
+                </div>
+            </section>
+
+            <section aria-labelledby="hl-preview-title">
+                <h2 id="hl-preview-title" class="hl-step__title" th:text="#{homeLocation.step.preview}">2. Was umzieht</h2>
+                <th:block th:replace="~{patchchange/fragments/home-location-preview :: preview(${prompt.preview()})}"></th:block>
+            </section>
+
+            <div class="hl-confirm">
+                <p id="hl-error" class="alert alert-danger hl-alert" role="alert" hidden data-testid="hl-error"></p>
+                <p id="hl-success" class="alert alert-success hl-alert" role="status" hidden data-testid="hl-success"></p>
+                <button type="submit" id="hl-submit" class="btn btn--cta" disabled data-testid="hl-submit"
+                        th:text="#{homeLocation.cta.choose}">Home Location w&auml;hlen</button>
+                <p class="form-hint" th:text="#{homeLocation.note}">Die Wahl ist endg&uuml;ltig. Es zieht alles um, was vor der Live-Zeit angelegt wurde. Bis dahin sind diese Posten und Schiffe f&uuml;r andere gesperrt.</p>
+            </div>
+        </form>
+    </th:block>
+
+    <form th:action="@{/logout}" method="post" class="hl-logout">
+        <button type="submit" class="btn btn-ghost" data-testid="hl-logout" th:text="#{nav.logout}">Abmelden</button>
+    </form>
+</main>
+</th:block>
+<th:block th:fragment="pageTail">
+<script type="module" th:src="@{/js/patchchange/home-location.js}" th:attr="nonce=${cspNonce}"></script>
+</th:block>
+</body>
+</html>
