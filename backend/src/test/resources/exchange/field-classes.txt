@@ -78,6 +78,8 @@ bank-request.schema.json#/properties/account/properties/name SHORT_NAME
 bank-request.schema.json#/properties/account/properties/no IDENTIFIER
 bank-request.schema.json#/properties/account/properties/orgUnitShorthand SHORT_NAME
 bank-request.schema.json#/properties/amount FACT_VALUE
+bank-request.schema.json#/properties/cancelledByPatch/properties/id IDENTIFIER
+bank-request.schema.json#/properties/cancelledByPatch/properties/label SHORT_NAME
 bank-request.schema.json#/properties/client IDENTIFIER
 bank-request.schema.json#/properties/createdAt FACT_VALUE
 bank-request.schema.json#/properties/decidedAt FACT_VALUE

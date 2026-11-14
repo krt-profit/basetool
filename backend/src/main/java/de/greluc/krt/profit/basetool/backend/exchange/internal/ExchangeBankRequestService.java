@@ -26,11 +26,16 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankR
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestPageDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeBankRequestTargetDto;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeTombstoneDto;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeLabels;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -43,7 +48,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The member's own booking requests as a snapshot and a change feed for exchange clients
  * (REQ-BXCH-003). The Bank supplies the requests in scope and the feed keys use their request ids.
- * Each page carries the open-request cap and counts as a Bank read.
+ * Each page carries the open-request cap, names the patch change that cancelled a request with one
+ * label read (REQ-PATCH-042) and counts as a Bank read.
  */
 @Service
 @RequiredArgsConstructor
@@ -52,6 +58,7 @@ public class ExchangeBankRequestService {
   private final BankOwnRequestReads requestReads;
   private final ExchangeFeedReader feedReader;
   private final ExchangeBankMetrics metrics;
+  private final PatchChangeLabels patchChangeLabels;
 
   /**
    * Returns one page of the member's own requests.
@@ -100,8 +107,9 @@ public class ExchangeBankRequestService {
         rows.hasMore()
             ? ExchangeFeedCursor.snapshot(at, rows.items().getLast().id()).format()
             : ExchangeFeedCursor.feed(at).format();
+    Map<UUID, String> labels = patchLabels(rows.items());
     return new ExchangeBankRequestPageDto(
-        rows.items().stream().map(ExchangeBankRequestService::toDto).toList(),
+        rows.items().stream().map(request -> toDto(request, labels)).toList(),
         List.of(),
         next,
         rows.hasMore(),
@@ -127,12 +135,13 @@ public class ExchangeBankRequestService {
             .ownRequestsByIds(member, changes.keys().stream().map(UUID::fromString).toList())
             .stream()
             .collect(Collectors.toMap(r -> r.id().toString(), Function.identity()));
+    Map<UUID, String> labels = patchLabels(current.values());
     List<ExchangeBankRequestDto> items = new ArrayList<>();
     List<ExchangeTombstoneDto> removed = new ArrayList<>();
     for (String key : changes.keys()) {
       BankOwnRequestReads.OwnRequest request = current.get(key);
       if (request != null) {
-        items.add(toDto(request));
+        items.add(toDto(request, labels));
       } else {
         removed.add(changes.tombstone(key, key));
       }
@@ -142,13 +151,33 @@ public class ExchangeBankRequestService {
   }
 
   /**
+   * Reads the labels of the patch changes that cancelled the given requests in one query, and none
+   * when no currency wipe cancelled any of them (REQ-PATCH-042).
+   *
+   * @param requests the requests of a page
+   * @return the label by patch change id
+   */
+  @NotNull
+  private Map<UUID, String> patchLabels(
+      @NotNull Collection<BankOwnRequestReads.OwnRequest> requests) {
+    Set<UUID> ids =
+        requests.stream()
+            .map(BankOwnRequestReads.OwnRequest::cancelledByPatchChange)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    return ids.isEmpty() ? Map.of() : patchChangeLabels.labels(ids);
+  }
+
+  /**
    * Shapes one request; money and the split percent are whole JSON integers.
    *
    * @param request the request read
+   * @param patchLabels the labels of the patch changes that cancelled a request of the page, by id
    * @return the allow-listed request
    */
   @NotNull
-  private static ExchangeBankRequestDto toDto(@NotNull BankOwnRequestReads.OwnRequest request) {
+  private static ExchangeBankRequestDto toDto(
+      @NotNull BankOwnRequestReads.OwnRequest request, @NotNull Map<UUID, String> patchLabels) {
     BankOwnRequestReads.Account account = request.account();
     BankOwnRequestReads.TargetAccount target = request.targetAccount();
     BankRequestApprover approver = request.requiredApprover();
@@ -172,6 +201,7 @@ public class ExchangeBankRequestService {
         request.rejectReason(),
         request.client(),
         request.splitEnabled(),
-        split == null ? null : split.intValueExact());
+        split == null ? null : split.intValueExact(),
+        ExchangePatchChangeRefDto.of(request.cancelledByPatchChange(), patchLabels));
   }
 }

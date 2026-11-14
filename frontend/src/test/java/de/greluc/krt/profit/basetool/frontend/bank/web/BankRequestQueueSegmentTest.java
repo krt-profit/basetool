@@ -102,6 +102,7 @@ class BankRequestQueueSegmentTest {
         null,
         0L,
         callerMayConfirm,
+        null,
         null);
   }
 

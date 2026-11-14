@@ -90330,6 +90330,9 @@
           "callerMayConfirm" : {
             "type" : "boolean"
           },
+          "cancelledByPatchLabel" : {
+            "type" : "string"
+          },
           "clientName" : {
             "type" : "string"
           },

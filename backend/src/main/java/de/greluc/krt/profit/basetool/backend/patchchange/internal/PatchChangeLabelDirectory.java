@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.patchchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPatchLabels;
 import de.greluc.krt.profit.basetool.backend.joborder.api.JobOrderPatchLabels;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchChangeLabels;
 import de.greluc.krt.profit.basetool.backend.supply.api.SupplyPatchLabels;
@@ -33,12 +34,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Answers the current labels of patch changes for the exchange feeds (REQ-PATCH-007), the aUEC
- * order history (REQ-PATCH-044) and the donation lists (REQ-SUP-010).
+ * order history (REQ-PATCH-044), the donation lists (REQ-SUP-010) and the booking-request views
+ * (REQ-PATCH-042).
  */
 @Component
 @RequiredArgsConstructor
 class PatchChangeLabelDirectory
-    implements PatchChangeLabels, JobOrderPatchLabels, SupplyPatchLabels {
+    implements PatchChangeLabels, JobOrderPatchLabels, SupplyPatchLabels, BankPatchLabels {
 
   private final PatchChangeRepository repository;
 

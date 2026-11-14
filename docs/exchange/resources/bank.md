@@ -177,8 +177,10 @@ Each item is a [`bank-request`](../schemas/):
 - `rejectReason` is the bank's reason for a rejection; `decidedAt` the time of the decision or the
   cancellation.
 - A [patch change](patch-change.md) with the currency wipe cancels every request still pending that
-  was raised before its live time; it reaches the feed as a change to `CANCELLED`. A request raised
-  later stays pending.
+  was raised before its live time; it reaches the feed as a change to `CANCELLED` and carries
+  `cancelledByPatch: {id, label}`, the patch change with its current label. The field is present
+  only on a request a patch change cancelled; a request the member withdrew has none. A request
+  raised later stays pending.
 - `splitEnabled` and `splitPercent` describe a deposit that distributes a whole percent of the
   amount across the squadron accounts.
 - `client` names the connected application that raised the request, by its registry id; it is

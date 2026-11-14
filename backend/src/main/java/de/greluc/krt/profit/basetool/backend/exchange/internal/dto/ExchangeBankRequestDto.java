@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
@@ -48,6 +49,8 @@ import org.jetbrains.annotations.Nullable;
  * @param client the connected application that raised it, or {@code null} for the Basetool
  * @param splitEnabled whether a deposit distributes {@code splitPercent} across squadron accounts
  * @param splitPercent the whole percent distributed, or {@code null} without a split
+ * @param cancelledByPatch the patch change whose currency wipe cancelled the request, left out for
+ *     every other request (REQ-PATCH-042)
  */
 public record ExchangeBankRequestDto(
     @NotNull UUID id,
@@ -67,4 +70,6 @@ public record ExchangeBankRequestDto(
     @Nullable String rejectReason,
     @Nullable String client,
     boolean splitEnabled,
-    @Nullable Integer splitPercent) {}
+    @Nullable Integer splitPercent,
+    @JsonInclude(JsonInclude.Include.NON_NULL) @Nullable
+        ExchangePatchChangeRefDto cancelledByPatch) {}

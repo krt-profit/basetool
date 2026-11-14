@@ -202,6 +202,11 @@ class DashboardTradeWidgetsMvcTest {
   }
 
   private static BankBookingRequestDto bankRequest(String type, String status, long amount) {
+    return bankRequest(type, status, amount, null);
+  }
+
+  private static BankBookingRequestDto bankRequest(
+      String type, String status, long amount, String cancelledByPatchLabel) {
     return new BankBookingRequestDto(
         ID,
         ID,
@@ -242,7 +247,8 @@ class DashboardTradeWidgetsMvcTest {
         null,
         1L,
         null,
-        null);
+        null,
+        cancelledByPatchLabel);
   }
 
   /** Both boards are read and merged, the newest entry first, counted by both totals. */
@@ -527,6 +533,27 @@ class DashboardTradeWidgetsMvcTest {
         .contains("Bestätigt")
         .contains("Abgelehnt")
         .doesNotContain("Ausstehend");
+  }
+
+  /**
+   * REQ-PATCH-042: a request a currency wipe cancelled names its patch change beneath its status,
+   * one its requester withdrew shows the status alone.
+   */
+  @Test
+  void bankRequests_nameThePatchChangeThatCancelledARequest() throws Exception {
+    when(backendApiClient.get(eq(BANK_REQUESTS_DECIDED_URL), anyTypeRef()))
+        .thenReturn(
+            page(
+                2,
+                List.of(
+                    bankRequest("DEPOSIT", "CANCELLED", 7_000, "4.4"),
+                    bankRequest("TRANSFER", "CANCELLED", 9_000))));
+
+    String html = render(REQUESTS, Map.of("status", "DECIDED"));
+
+    String reason = "data-testid=\"dashboard-bank-requests-cancelled-by-patch\"";
+    assertThat(html).containsPattern(reason + "[^>]*>Patchwechsel 4\\.4</span>");
+    assertThat(html.split(reason, -1)).hasSize(2);
   }
 
   /** All asks without a state filter, sizes the page by the rows and counts the page total. */

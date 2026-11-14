@@ -112,6 +112,7 @@ public class BankOwnRequestReadService implements BankOwnRequestReads {
         request.getRejectReason(),
         request.getClientId(),
         request.isSplitEnabled(),
-        request.getSplitPercent());
+        request.getSplitPercent(),
+        request.getCancelledByPatchChange());
   }
 }

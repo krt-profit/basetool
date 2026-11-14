@@ -35,6 +35,7 @@ import de.greluc.krt.profit.basetool.backend.bank.api.BankAdmission;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankApproverNoteRequiredException;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankBookingRequestType;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankConflictException;
+import de.greluc.krt.profit.basetool.backend.bank.api.BankPatchLabels;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankPurposeKind;
 import de.greluc.krt.profit.basetool.backend.bank.api.BankRequestApprover;
 import de.greluc.krt.profit.basetool.backend.bank.api.BookingRequestPurposeObserver;
@@ -63,6 +64,7 @@ import de.greluc.krt.profit.basetool.backend.platform.api.ClientDirectory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -110,6 +112,7 @@ class BankBookingRequestServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<BookingRequestPurposeObserver> purposeObservers;
   @Mock private ClientDirectory clientDirectory;
+  @Mock private BankPatchLabels patchLabels;
 
   private BankAccessRules policy;
   private BankBookingRequestService service;
@@ -147,6 +150,7 @@ class BankBookingRequestServiceTest {
             eventPublisher,
             new BankPurposeObservers(purposeObservers),
             new BankRequestClientNames(clientDirectory),
+            new BankRequestPatchLabels(patchLabels),
             mock(BankLinkedDecisions.class),
             mock(BankLinkedBookings.class),
             mock(BankLinkedRequestLiveSync.class),
@@ -257,6 +261,45 @@ class BankBookingRequestServiceTest {
     assertThat(result.getContent())
         .extracting(BankBookingRequestDto::status)
         .containsExactly(BankBookingRequestStatus.CONFIRMED);
+  }
+
+  /**
+   * REQ-PATCH-042: a request a currency wipe cancelled names its patch change by label on the
+   * requester's page, one the requester withdrew names none, from one label read for the page.
+   */
+  @Test
+  void pageForCurrentRequester_namesThePatchChangeThatCancelledARequest() {
+    UUID caller = UUID.randomUUID();
+    UUID patchChange = UUID.randomUUID();
+    BankBookingRequest wiped =
+        pending(
+            UUID.randomUUID(),
+            account(UUID.randomUUID()),
+            BankBookingRequestType.DEPOSIT,
+            caller,
+            0L);
+    wiped.cancelByPatchChange(patchChange, Instant.now());
+    BankBookingRequest withdrawn =
+        pending(
+            UUID.randomUUID(),
+            account(UUID.randomUUID()),
+            BankBookingRequestType.DEPOSIT,
+            caller,
+            0L);
+    withdrawn.setStatus(BankBookingRequestStatus.CANCELLED);
+    Set<BankBookingRequestStatus> statuses = Set.of(BankBookingRequestStatus.CANCELLED);
+    Pageable pageable = PageRequest.of(0, 3);
+    when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
+    when(requestRepository.findByRequestedByAndStatusIn(caller, statuses, pageable))
+        .thenReturn(new PageImpl<>(List.of(wiped, withdrawn), pageable, 2));
+    when(patchLabels.labels(Set.of(patchChange))).thenReturn(Map.of(patchChange, "4.4"));
+
+    Page<BankBookingRequestDto> result = service.pageForCurrentRequester(statuses, pageable);
+
+    assertThat(result.getContent())
+        .extracting(BankBookingRequestDto::cancelledByPatchLabel)
+        .containsExactly("4.4", null);
+    verify(patchLabels).labels(Set.of(patchChange));
   }
 
   /** Without a known caller there is nothing to read. */
