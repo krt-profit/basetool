@@ -603,24 +603,46 @@ PowerShell here, and the comparison strips the carriage returns.
    scripts/host-scripts-manifest.sh generate --rev v1.15.0 > expected.sha256
    ```
 
-   That prints one `sha256sum` line per file the role installs, read with `git show <tag>:scripts/<file>`.
+   That prints one `sha256sum` line per file the role installs, read with `git show <tag>:scripts/<file>`,
+   and one `host/etc/…` line per installed companion of `scripts/host-companions.json` (the units,
+   timers, drop-ins, logrotate and tmpfiles files the role puts under `/etc`). The `20-service-user.conf`
+   ordering drop-ins are hashed in their normalized form (comments dropped, the service uid replaced),
+   so a plain `sha256sum` of the installed file never matches them; step 3 hashes them the same way.
    For a tag from before `scripts/host-scripts.list` existed, loop over the files that step 1 printed:
    `git show v1.14.0:scripts/<file> | sha256sum`.
 
-3. Compare:
+3. Hash the companions on the host with the host's own `host_companions.py --inspect`, which normalizes
+   an ordering drop-in for the `basetool` service user's uid and hashes every other file byte-exactly
+   (PowerShell, in the directory of `expected.sha256`):
+
+   ```powershell
+   $etc = Select-String -Path expected.sha256 -Pattern '  host(/etc/\S+)$' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+   ```
+
+   ```powershell
+   ssh greluc@<host> ('u=$(id -u basetool); for f in ' + ($etc -join ' ') + '; do echo "$(python3 /opt/basetool/scripts/host_companions.py --inspect "$f" --service-uid "$u")  host$f"; done') | Set-Content -Encoding ascii host-etc.sha256
+   ```
+
+   A companion the host lacks, or a host whose role predates `host_companions.py`, prints an empty
+   hash, which step 4 reports as a `<` line. When step 2 printed no `host/etc/…` line, skip this step.
+
+4. Compare:
 
    ```bash
-   tr -d '\r' < host.sha256 | sort -k2 > host.sorted
-   sort -k2 expected.sha256 > expected.sorted
+   cat host.sha256 host-etc.sha256 | tr -d '\r' | sort -k2 > host.sorted
+   tr -d '\r' < expected.sha256 | sort -k2 > expected.sorted
    diff expected.sorted host.sorted
    ```
+
+   Both sides lose their carriage returns: PowerShell adds them to the host files, and under Git-Bash
+   the companion lines of step 2 come from a Windows Python that ends them with CRLF.
 
    No output is a match. A line starting `<` is a file the tag has and the host lacks or holds with other
    bytes: **that blocks the promotion**. A line starting `>` for a name that is not in the list is a
    leftover on the host (read it, it does not block); a `>` for a listed name is the other half of a
    `<`.
 
-4. **On any `<` line, do not promote.** Run the role from a checkout **of that tag** (not `main`; the
+5. **On any `<` line, do not promote.** Run the role from a checkout **of that tag** (not `main`; the
    hashes must be the tag's), as an owner-approved production write:
 
    ```bash
@@ -628,7 +650,7 @@ PowerShell here, and the comparison strips the carriage returns.
    ansible-playbook site.yml --limit production --tags deploy,scripts
    ```
 
-   then repeat steps 1 to 3 until `diff` prints nothing. `--tags observability` and `--tags updates`
+   then repeat steps 1 to 4 until `diff` prints nothing. `--tags observability` and `--tags updates`
    install the collectors and are only needed when their files differ.
 
 Once a host runs a `deploy.sh` that has the check, the host does this itself: every tick logs

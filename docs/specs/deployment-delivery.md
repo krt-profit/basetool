@@ -3103,8 +3103,10 @@ after the apps, and the promotion failed.
   records no backoff and no marker, so the first tick after the role run applies the release. Other
   stale scripts only warn. `--force` and `BASETOOL_REQUIRE_CURRENT_SCRIPTS=false` bypass it, loudly.
 - **The comparison before a promotion is mandatory** (`docs/deployment.md` → *Before a promotion: the
-  host scripts*): every file under `/opt/basetool/scripts` against the tag, byte-exact, and a mismatch
-  blocks the promotion until `--tags deploy,scripts` has been run from that tag (an owner-approved
+  host scripts*): every file under `/opt/basetool/scripts` against the tag, byte-exact, and every
+  installed companion of `scripts/host-companions.json` through the host's
+  `host_companions.py --inspect` (ordering drop-ins normalized as below), and a mismatch blocks the
+  promotion until `--tags deploy,scripts` has been run from that tag (an owner-approved
   production write).
 - **Bootstrap.** A host whose `deploy.sh` lacks this check cannot guard itself; its first install comes
   through the role, and the mandatory step is the protection until then (ADR-0247).
