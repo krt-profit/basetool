@@ -4760,6 +4760,9 @@
             "type" : "integer",
             "format" : "int64"
           },
+          "cancelledByPatch" : {
+            "$ref" : "#/components/schemas/ExchangePatchChangeRefDto"
+          },
           "client" : {
             "type" : "string"
           },

@@ -5,6 +5,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-14
 
+- **New: `cancelledByPatch` on bank requests.** A request that a patch change's currency wipe
+  cancelled carries `cancelledByPatch: {id, label}`, the patch change with its current label; every
+  other request leaves the field out ([bank](resources/bank.md#own-requests)). New in
+  `bank-request.schema.json`: the optional `cancelledByPatch`.
 - **New: the relocation after a patch change.** When a patch change asks the members for a new home
   location, the Basetool moves each member's lots and ships from before the patch's live time to the
   chosen home once the member has chosen. A relocated lot arrives as a tombstone for the old key and
