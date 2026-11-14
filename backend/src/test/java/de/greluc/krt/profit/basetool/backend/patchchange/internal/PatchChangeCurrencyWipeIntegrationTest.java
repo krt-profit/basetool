@@ -73,8 +73,9 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Triggers a patch change with the currency wipe against PostgreSQL (REQ-PATCH-040, -044…046): the
  * aUEC holdings that existed at the live time and are still held become real shortages that name
- * the patch change, the commitments opened before it end, later money stays, and the job-order and
- * Bank trails each record one summary event.
+ * the patch change, the commitments opened before it end, later money stays, a later wipe counts an
+ * earlier wipe's shortages at that wipe's live time, and the job-order and Bank trails each record
+ * one summary event.
  *
  * <p>Its live time lies in 2000, before every other test's rows; every row it writes is removed
  * afterwards, the patch changes included, because a leftover row would move the merge cutoff.
@@ -84,7 +85,9 @@ class PatchChangeCurrencyWipeIntegrationTest {
 
   private static final Instant LIVE_AT = Instant.parse("2000-01-01T00:00:00Z");
   private static final Instant BEFORE = Instant.parse("1999-06-01T00:00:00Z");
+  private static final Instant LATER_LIVE_AT = Instant.parse("2000-06-01T00:00:00Z");
   private static final String LABEL = "0.1";
+  private static final String LATER_LABEL = "0.2";
   private static final String MONEY = "/api/v1/orders/{id}/money";
   private static final String FEE_RATE = "operation.transfer_fee_rate";
   private static final PatchChangeOptions CURRENCY_WIPE =
@@ -230,6 +233,44 @@ class PatchChangeCurrencyWipeIntegrationTest {
                 Long.class,
                 "patchChange=" + recorded.id() + " liveAt=" + LIVE_AT + "%"))
         .isEqualTo(1L);
+  }
+
+  @Test
+  void aLaterWipeCountsAnEarlierWipesShortagesAtThatWipesLiveTime() throws Exception {
+    UUID order = createOrder();
+    provide(order, "4000000", 0);
+    backdate(order);
+    signInAdmin();
+    trigger.trigger(
+        new TriggerPatchChangeRequest(LABEL, PatchKind.FULL_WIPE, LIVE_AT, CURRENCY_WIPE, LABEL));
+    provide(order, "1000000", 2);
+
+    PatchChangePreviewDto preview =
+        trigger.preview(new PatchChangePreviewRequest(LATER_LIVE_AT, CURRENCY_WIPE));
+    PatchChangeDto later =
+        trigger.trigger(
+            new TriggerPatchChangeRequest(
+                LATER_LABEL, PatchKind.FULL_WIPE, LATER_LIVE_AT, CURRENCY_WIPE, LATER_LABEL));
+
+    assertThat(preview.counts())
+        .contains(
+            new PatchCountDto(PatchCount.AUEC_SHORTAGES, 0),
+            new PatchCountDto(PatchCount.AUEC_SHORTAGE_TOTAL, 0));
+    assertThat(later.counts())
+        .contains(
+            new PatchCountDto(PatchCount.AUEC_SHORTAGES, 0),
+            new PatchCountDto(PatchCount.AUEC_SHORTAGE_TOTAL, 0));
+    mvc.perform(get(MONEY, order).with(reader()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.holdings").value("1000000"))
+        .andExpect(jsonPath("$.shortages").value("4000000"));
+    assertThat(
+            jdbc.queryForList(
+                "SELECT effective_at FROM job_order_money_operation"
+                    + " WHERE order_id = ? AND kind = 'SHORTAGE'",
+                Timestamp.class,
+                order))
+        .containsExactly(Timestamp.from(LIVE_AT));
   }
 
   @Test

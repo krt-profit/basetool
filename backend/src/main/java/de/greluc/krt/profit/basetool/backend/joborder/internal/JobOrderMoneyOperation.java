@@ -124,6 +124,15 @@ class JobOrderMoneyOperation {
   @Column(updatable = false)
   private UUID patchChangeId;
 
+  /**
+   * The live time of the patch change whose currency wipe booked this shortage, read through
+   * {@link #effectiveAt()}; {@code null} for every other operation (V430 CHECK).
+   */
+  @Nullable
+  @Getter(AccessLevel.NONE)
+  @Column(updatable = false)
+  private Instant effectiveAt;
+
   JobOrderMoneyOperation(
       UUID orderId,
       UUID operationId,
@@ -229,13 +238,14 @@ class JobOrderMoneyOperation {
    * @param holderId the canonical holder
    * @param amount the lost amount, positive whole aUEC
    * @param patchChangeId the patch change the shortage is attributed to
+   * @param liveAt the patch change's live time, when the shortage takes effect
    * @return the shortage, recorded by no actor
    */
   static JobOrderMoneyOperation currencyWipeShortage(
-      UUID orderId, UUID holderId, BigDecimal amount, UUID patchChangeId) {
+      UUID orderId, UUID holderId, BigDecimal amount, UUID patchChangeId, Instant liveAt) {
     var fact =
         marker(orderId, UUID.randomUUID(), holderId, null, amount, JobOrderMoneyKind.SHORTAGE);
-    fact.patchChangeId = patchChangeId;
+    fact.attributeToPatchChange(patchChangeId, liveAt);
     return fact;
   }
 
@@ -246,10 +256,11 @@ class JobOrderMoneyOperation {
    * @param accountHoldingId the order's position
    * @param amount the lost amount, positive whole aUEC
    * @param patchChangeId the patch change the shortage is attributed to
+   * @param liveAt the patch change's live time, when the shortage takes effect
    * @return the shortage, recorded by no actor
    */
   static JobOrderMoneyOperation accountCurrencyWipeShortage(
-      UUID orderId, UUID accountHoldingId, BigDecimal amount, UUID patchChangeId) {
+      UUID orderId, UUID accountHoldingId, BigDecimal amount, UUID patchChangeId, Instant liveAt) {
     var fact =
         accountOperation(
             orderId,
@@ -260,8 +271,30 @@ class JobOrderMoneyOperation {
             JobOrderMoneyKind.SHORTAGE,
             null,
             amount);
-    fact.patchChangeId = patchChangeId;
+    fact.attributeToPatchChange(patchChangeId, liveAt);
     return fact;
+  }
+
+  /**
+   * Names the patch change whose currency wipe books this shortage and lets it take effect at that
+   * patch change's live time, while the recording time stays the moment of the trigger.
+   *
+   * @param patchChange the patch change
+   * @param liveAt its live time
+   */
+  private void attributeToPatchChange(UUID patchChange, Instant liveAt) {
+    patchChangeId = patchChange;
+    effectiveAt = liveAt;
+  }
+
+  /**
+   * Tells when this fact takes effect for a ledger as of an instant (REQ-PATCH-044): a currency-wipe
+   * shortage at its patch change's live time, every other fact when it was recorded.
+   *
+   * @return the instant the fact takes effect
+   */
+  Instant effectiveAt() {
+    return effectiveAt == null ? recordedAt : effectiveAt;
   }
 
   UUID personalHolderId() {

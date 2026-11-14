@@ -71,7 +71,7 @@ class JobOrderCurrencyWipeService implements JobOrderCurrencyWipe {
         editor.lockMoneyOrdersForPatchChange(operations.ordersWithMoneyBefore(liveAt))) {
       JobOrderCurrencyWipePlanner.Plan plan = planner.plan(order.getId(), liveAt);
       cancelAttempts(plan, patchChangeId);
-      bookShortages(order.getId(), plan, patchChangeId);
+      bookShortages(order.getId(), plan, patchChangeId, liveAt);
       plan.commitments().forEach(commitments::endForCurrencyWipe);
       if (!plan.isEmpty()) {
         effects.currencyWiped(order, !plan.commitments().isEmpty());
@@ -118,28 +118,32 @@ class JobOrderCurrencyWipeService implements JobOrderCurrencyWipe {
   }
 
   /**
-   * Books the order's shortages, each its own operation that names the patch change.
+   * Books the order's shortages, each its own operation that names the patch change and takes
+   * effect at its live time, so a later wipe counts it then.
    *
    * @param orderId the order
    * @param plan the order's plan
    * @param patchChangeId the patch change
+   * @param liveAt the patch change's live time
    */
   private void bookShortages(
       @NotNull UUID orderId,
       @NotNull JobOrderCurrencyWipePlanner.Plan plan,
-      @NotNull UUID patchChangeId) {
+      @NotNull UUID patchChangeId,
+      @NotNull Instant liveAt) {
     for (JobOrderCurrencyWipePlanner.Shortage shortage : plan.shortages()) {
       plan.ledger().recordChange(shortage.holderId(), shortage.accountHoldingId());
       UUID holderId = shortage.holderId();
       operations.save(
           holderId != null
               ? JobOrderMoneyOperation.currencyWipeShortage(
-                  orderId, holderId, shortage.amount(), patchChangeId)
+                  orderId, holderId, shortage.amount(), patchChangeId, liveAt)
               : JobOrderMoneyOperation.accountCurrencyWipeShortage(
                   orderId,
                   Objects.requireNonNull(shortage.accountHoldingId()),
                   shortage.amount(),
-                  patchChangeId));
+                  patchChangeId,
+                  liveAt));
     }
   }
 

@@ -35,8 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Books one {@code WIPE_RESET} transaction that offsets given balances on both ledgers
  * (REQ-BANK-013, ADR-0039): a negative account leg per non-zero account balance and a negative
- * holder leg per non-zero holder balance. The standalone reset offsets the current balances, a
- * patch change's currency wipe the balances as of its live time (ADR-0384).
+ * holder leg per non-zero holder balance. The standalone reset offsets the current balances and
+ * takes effect when it is recorded; a patch change's currency wipe offsets the balances as of its
+ * live time and takes effect then (ADR-0384).
  */
 @Component
 @RequiredArgsConstructor
@@ -53,6 +54,9 @@ class BankWipeResetBooking {
    * @param accounts the accounts the caller locked, in lock order
    * @param accountBalances the balance to offset per account id; an account without one is skipped
    * @param holderBalances the balance to offset per holder id
+   * @param effectiveAt the live time whose balances a currency wipe offsets, kept on the reset so a
+   *     later wipe counts it then; {@code null} for the standalone reset, which takes effect when it
+   *     is recorded
    * @return what was booked
    */
   @Transactional(propagation = Propagation.MANDATORY)
@@ -60,7 +64,8 @@ class BankWipeResetBooking {
   Booked book(
       @NotNull List<BankAccount> accounts,
       @NotNull Map<UUID, BigDecimal> accountBalances,
-      @NotNull Map<UUID, BigDecimal> holderBalances) {
+      @NotNull Map<UUID, BigDecimal> holderBalances,
+      @Nullable Instant effectiveAt) {
     List<BankAccount> reset =
         accounts.stream().filter(account -> signum(accountBalances, account.getId()) != 0).toList();
     List<UUID> stashes =
@@ -72,9 +77,7 @@ class BankWipeResetBooking {
       return new Booked(null, 0, 0, BigDecimal.ZERO);
     }
     Instant now = Instant.now();
-    BankTransaction tx =
-        writer.persistTransaction(
-            BankTransactionType.WIPE_RESET, NOTE, null, null, null, BigDecimal.ZERO, now, null);
+    BankTransaction tx = writer.persistWipeReset(NOTE, now, effectiveAt);
     BigDecimal total = BigDecimal.ZERO;
     for (BankAccount account : reset) {
       BigDecimal amount = Objects.requireNonNull(accountBalances.get(account.getId()));

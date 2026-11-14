@@ -79,7 +79,7 @@ class BankCurrencyWipeService implements BankCurrencyWipe {
     BankWipeOffsets accountOffsets = accountOffsets(liveAt);
     BankWipeOffsets holderOffsets = holderOffsets(liveAt);
     BankWipeResetBooking.Booked booked =
-        resetBooking.book(locked, accountOffsets.offsets(), holderOffsets.offsets());
+        resetBooking.book(locked, accountOffsets.offsets(), holderOffsets.offsets(), liveAt);
     auditService.record(
         BankAuditEventType.WIPE_RESET_EXECUTED,
         null,

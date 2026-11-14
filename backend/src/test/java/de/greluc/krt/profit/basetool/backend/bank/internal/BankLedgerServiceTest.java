@@ -628,6 +628,17 @@ class BankLedgerServiceTest {
     assertEquals(0, holderTotal(holderA).signum());
     assertEquals(0, holderTotal(holderB).signum());
     assertTrue(postingRepository.count() > postingsBefore, "history preserved, postings added");
+    UUID reset =
+        postingRepository
+            .findBookingsInPeriod(account.getId(), Instant.EPOCH, Instant.now())
+            .stream()
+            .filter(row -> row.type() == BankTransactionType.WIPE_RESET)
+            .map(BankBookingRow::transactionId)
+            .findFirst()
+            .orElseThrow();
+    assertNull(
+        transactionRepository.findById(reset).orElseThrow().getEffectiveAt(),
+        "the standalone reset takes effect when it is recorded");
 
     bankLedgerService.resetAllBalances();
     assertEquals(0, balance(account).signum());

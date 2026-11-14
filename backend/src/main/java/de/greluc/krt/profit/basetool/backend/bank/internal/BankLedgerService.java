@@ -834,7 +834,7 @@ public class BankLedgerService {
         holderPostingRepository.holderTotals().stream()
             .collect(Collectors.toMap(BankHolderBalance::holderId, BankHolderBalance::amount));
     BankWipeResetBooking.Booked booked =
-        resetBooking.book(accounts, accountBalances, holderBalances);
+        resetBooking.book(accounts, accountBalances, holderBalances, null);
     if (booked.transactionId() == null) {
       log.info("Bank wipe reset executed: nothing to zero (idempotent no-op).");
       return new BankWipeResetResultDto(0, 0, BigDecimal.ZERO);

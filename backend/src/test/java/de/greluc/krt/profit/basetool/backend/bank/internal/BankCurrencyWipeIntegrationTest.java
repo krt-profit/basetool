@@ -43,8 +43,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The Kartellbank's part of a currency wipe against PostgreSQL (REQ-PATCH-041, -042, ADR-0384): one
  * reset offsets the balances as of the live time on both ledgers, later bookings stay, the pending
  * requests from before the live time end as cancelled with the patch change as reason, a reset that
- * would overdraw an account stops at zero, and a custody move without an account leg waits for the
- * reset.
+ * would overdraw an account stops at zero, a custody move without an account leg waits for the
+ * reset, and a later wipe counts an earlier wipe's reset at that wipe's live time.
  *
  * <p>Its live time lies in 2000, before every other test's bookings; every row it writes is removed
  * afterwards, so no later test meets a balance as of that time.
@@ -54,6 +54,7 @@ class BankCurrencyWipeIntegrationTest {
 
   private static final Instant LIVE_AT = Instant.parse("2000-01-01T00:00:00Z");
   private static final Instant BEFORE = Instant.parse("1999-06-01T00:00:00Z");
+  private static final Instant LATER_LIVE_AT = Instant.parse("2000-06-01T00:00:00Z");
   private static final String FEE_RATE = "operation.transfer_fee_rate";
 
   @Autowired private BankCurrencyWipe wipe;
@@ -66,6 +67,7 @@ class BankCurrencyWipeIntegrationTest {
   @Autowired private JdbcTemplate jdbc;
 
   private final UUID patchChange = UUID.randomUUID();
+  private final UUID laterPatchChange = UUID.randomUUID();
   private BankAccount account;
   private BankAccount otherAccount;
   private BankHolder holder;
@@ -103,8 +105,10 @@ class BankCurrencyWipeIntegrationTest {
       jdbc.update("DELETE FROM bank_posting WHERE transaction_id = ?", transaction);
       jdbc.update("DELETE FROM bank_transaction WHERE id = ?", transaction);
     }
-    jdbc.update(
-        "DELETE FROM bank_audit_event WHERE details LIKE ?", "patchChange=" + patchChange + "%");
+    for (UUID wiped : List.of(patchChange, laterPatchChange)) {
+      jdbc.update(
+          "DELETE FROM bank_audit_event WHERE details LIKE ?", "patchChange=" + wiped + "%");
+    }
     jdbc.update("DELETE FROM bank_holder WHERE id IN (?, ?)", holder.getId(), otherHolder.getId());
     jdbc.update("DELETE FROM bank_account WHERE id IN (?, ?)", accounts.get(0), accounts.get(1));
   }
@@ -177,6 +181,25 @@ class BankCurrencyWipeIntegrationTest {
   }
 
   @Test
+  void aLaterWipeCountsAnEarlierWipesResetAtThatWipesLiveTime() {
+    backdate(deposit(account, holder, "100"));
+    transactions.execute(_ -> wipe.apply(LIVE_AT, patchChange));
+    deposit(account, holder, "20");
+
+    BankCurrencyWipe.Effect preview = transactions.execute(_ -> wipe.preview(LATER_LIVE_AT));
+    BankCurrencyWipe.Effect applied =
+        transactions.execute(_ -> wipe.apply(LATER_LIVE_AT, laterPatchChange));
+
+    assertThat(Objects.requireNonNull(preview).resetTotal()).isEqualByComparingTo("0");
+    assertThat(preview.accountsClamped()).isZero();
+    assertThat(Objects.requireNonNull(applied).resetTotal()).isEqualByComparingTo("0");
+    assertThat(applied.accountsClamped()).isZero();
+    assertThat(postingRepository.accountBalance(account.getId())).isEqualByComparingTo("20");
+    assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("20");
+    assertThat(effectiveTimesOfTheResets()).containsExactly(Timestamp.from(LIVE_AT));
+  }
+
+  @Test
   void aZeroFeeHolderTransferThatRacesTheWipeLeavesItsSourceAtZero() throws Exception {
     backdate(deposit(account, holder, "1000"));
     String feeRate = feeRate();
@@ -201,6 +224,22 @@ class BankCurrencyWipeIntegrationTest {
     assertThat(holderPostingRepository.holderTotal(holder.getId())).isEqualByComparingTo("0");
     assertThat(holderPostingRepository.holderTotal(otherHolder.getId()))
         .isEqualByComparingTo("1000");
+  }
+
+  /**
+   * Reads the effective time of every wipe reset that booked on the test's account.
+   *
+   * @return the stored effective times, {@code null} for a reset that takes effect when recorded
+   */
+  private List<Timestamp> effectiveTimesOfTheResets() {
+    return jdbc.queryForList(
+        """
+        SELECT t.effective_at FROM bank_transaction t
+        WHERE t.type = 'WIPE_RESET'
+          AND t.id IN (SELECT transaction_id FROM bank_posting WHERE account_id = ?)
+        """,
+        Timestamp.class,
+        account.getId());
   }
 
   /**

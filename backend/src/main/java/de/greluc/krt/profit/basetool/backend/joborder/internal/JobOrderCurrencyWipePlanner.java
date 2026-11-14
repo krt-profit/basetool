@@ -40,9 +40,10 @@ import org.springframework.stereotype.Component;
  * and the unit commitments opened before the live time.
  *
  * <p>A holding's shortage is the part of its booked amount that existed at the live time and is
- * still held: the lesser of its balance from the facts recorded before the live time and its
- * current balance less what still stays bound once the attempts are cancelled. Money added later
- * and money a later attempt still binds stay.
+ * still held: the lesser of its balance from the facts that took effect before the live time and
+ * its current balance less what still stays bound once the attempts are cancelled. An earlier
+ * wipe's shortage takes effect at that wipe's live time. Money added later and money a later
+ * attempt still binds stay.
  */
 @Component
 @RequiredArgsConstructor
