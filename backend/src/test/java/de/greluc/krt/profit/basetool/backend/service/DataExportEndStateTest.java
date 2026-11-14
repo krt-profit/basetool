@@ -238,6 +238,12 @@ class DataExportEndStateTest {
             + " VALUES (?, ?, 'PENDING', FALSE)",
         UUID.randomUUID(),
         s);
+    for (User owner : new User[] {subject, other}) {
+      jdbc.update(
+          "INSERT INTO member_home_location (user_id, location_id) VALUES (?, ?)",
+          owner.getId(),
+          location.getId());
+    }
     jdbc.update(
         "INSERT INTO org_unit_membership (user_id, org_unit_id, kind, role)"
             + " VALUES (?, ?, 'SQUADRON', 'MEMBER')",

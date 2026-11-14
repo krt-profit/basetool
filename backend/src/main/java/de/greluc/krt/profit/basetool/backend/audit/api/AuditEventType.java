@@ -899,6 +899,12 @@ public enum AuditEventType {
    * (REQ-PATCH-027).
    */
   PATCH_CHANGE_RELOCATED(AuditDomain.PATCH_CHANGE),
+  /**
+   * A member's profile setting "my home location" changed; the subject and the target are the
+   * member, the details carry the location and whether the member or a relocation set it
+   * (REQ-PATCH-032).
+   */
+  HOME_LOCATION_PREFERENCE_SET(AuditDomain.PATCH_CHANGE),
   /** The patch-change audit log was exported (REQ-AUDIT-003). */
   PATCH_CHANGE_AUDIT_EXPORTED(AuditDomain.PATCH_CHANGE),
   /** The patch-change audit log was purged (REQ-AUDIT-004). */

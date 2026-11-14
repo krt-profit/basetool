@@ -25,6 +25,14 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "homeLocationPreference",
+    "legalBasis" : "ART_15_20",
+    "rows" : [ {
+      "home_location" : "Zzz Export Hub",
+      "updated_at" : "<instant>"
+    } ],
+    "truncated" : false
+  }, {
     "key" : "termsAcceptances",
     "legalBasis" : "ART_15",
     "rows" : [ {

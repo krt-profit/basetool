@@ -137,6 +137,7 @@ public final class ApiDomains {
           Map.entry("MaterialRequestController", "materialexchange"),
           Map.entry("MeController", "identity"),
           Map.entry("MyBlueprintSharingController", "identity"),
+          Map.entry("MyHomeLocationController", "identity"),
           Map.entry("MyPayoutPreferenceController", "identity"),
           Map.entry("MemberMembershipController", "identity"),
           Map.entry("MissionCheckInController", "mission"),
