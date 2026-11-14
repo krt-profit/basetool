@@ -139,6 +139,7 @@
       "joborder/orders-detail-events.js",
       "joborder/orders-detail-production.js",
       "joborder/orders-detail-reports.js",
+      "joborder/orders-detail-support.js",
       "joborder/orders-detail.js",
       "joborder/orders-index-reorder.js",
       "joborder/orders-index.js",

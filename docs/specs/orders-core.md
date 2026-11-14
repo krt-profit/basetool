@@ -57,16 +57,24 @@ required. The same order, requester, number and complete provenance remain. A tr
 itself move stock, holdings or payments. The requesting OrgUnit is a separate customer and need
 not belong to Profit.
 
+On the order detail page the transfer is an edit action, not part of the summary: a holder of the
+transfer capability opens the "Verantwortung umschreiben" dialog from the header's overflow menu,
+which shows the current responsible unit and the eligible targets. The entry stays available for
+every order kind, after handovers and while the responsibility is invalid, because the transfer is
+the recovery path then. The transfer submits the responsibility version the live header carries.
+
 **Acceptance**
 
 - [ ] Profit Bereich, its active Staffel and SK can each be directly responsible; an independent
   flag cannot admit an outside unit or exclude a unit within the actual eligible hierarchy.
 - [ ] Reassignment takes effect without target approval and retains requester/history.
+- [ ] The detail page offers the transfer only through its dialog and only with the capability.
 
 **Enforced by:** The MATERIAL/ITEM foundation is covered by
 `JobOrderHierarchyAuthorityIntegrationTest`, `ProfitHierarchyIntegrationTest`,
 `ProfitHierarchyWriteRaceIntegrationTest`, `ProfitHierarchyStartupIntegrationTest`,
-`ProfitHierarchyNoticeIntegrationTest` and `V379ProfitHierarchyMigrationTest`.
+`ProfitHierarchyNoticeIntegrationTest` and `V379ProfitHierarchyMigrationTest`; the detail-page
+dialog by `OrdersDetailPatternRenderTest` and `JobOrderResponsibilityRecoveryMvcTest`.
 The aUEC workflow follows its own implementation slice.
 **Issues:** #3193, #3197, #3200
 
@@ -88,14 +96,21 @@ as a supporter. The effect on its outstanding money commitment follows
 Withdrawing support ends its open promises and preserves past contributions. REJECTED, COMPLETED and
 CANCELLED end open promises. Reopening leaves them historical. An empty promise leaves support active.
 
+The order detail page shows the participations in a collapsible "Staffelunterstützung" panel below
+the summary. Its header lists the shorthands of the active supporting Staffeln; expanded, it lists
+every participation with its withdraw action and the enrollment row. The panel starts collapsed and
+remembers the viewer's open state in the browser across live refreshes and visits.
+
 **Acceptance**
 
 - [ ] Concurrent enrollment/promise creation produces one active Staffel participation.
+- [ ] The support panel renders collapsed and names only the active Staffeln in its header.
 - [ ] A helper becoming responsible retains history without duplicate active roles.
 - [ ] Reopening or replenishing a former need does not revive ended promises.
 
 **Enforced by:** `JobOrderHierarchyAuthorityIntegrationTest` and `MaterialClaimConcurrencyTest`
-cover MATERIAL/ITEM participation and role conversion. The aUEC promise workflow follows its
+cover MATERIAL/ITEM participation and role conversion; `OrdersDetailPatternRenderTest` covers the
+support panel. The aUEC promise workflow follows its
 own implementation slice. **Issues:** #3193, #3200, #3207
 
 ### REQ-ORDERS-052 — Permitted readers see the complete order

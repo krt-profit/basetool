@@ -1,4 +1,9 @@
 {
   "version": "0.0.1",
-  "configurations": []
+  "configurations": [
+    {
+      "name": "preview-stack",
+      "url": "https://localhost:18081"
+    }
+  ]
 }

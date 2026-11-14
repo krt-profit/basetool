@@ -2517,6 +2517,13 @@ there.
   an empty realm of the pinned 26.7.4 image failed its verification on `basetool-frontend` and only
   a second apply converged it; the stub did not model the behaviour, so the self-test stayed green.
   Found against a throwaway local Keycloak while building WP 2.2.)*
+- **A WebAuthn policy is written whole.** The passwordless policy states its passkey requirement
+  with `residentKey` = `required` and leaves the deprecated `requireResidentKey` `not specified`,
+  which Keycloak warns about at every policy load while it is `Yes` or `No`. Keycloak 26.8 applies a
+  realm update's WebAuthn policy only when the update names that policy's `RpEntityName`, and then
+  rebuilds the policy from the update alone, resetting every key it leaves out. The realm-settings
+  update therefore carries every live key of a WebAuthn policy it changes, with the managed keys
+  overlaid, and no other key of that policy changes.
 
 **Acceptance**
 
@@ -2527,6 +2534,10 @@ there.
   diffs only in the lines its header lists as environment-specific.
 - [ ] `provision-keycloak-realm.test.sh` section 8: against a realm still carrying the entries
   retired on 2026-09-22, the plan removes exactly those and a second apply is empty.
+- [x] Section 13: a passwordless policy with `requireResidentKey` = `Yes` converges to
+  `not specified` and keeps its entity name, signature algorithms, user verification and passkey
+  switch; the stub, like Keycloak, ignores a WebAuthn policy update without its `RpEntityName` and
+  drops every key such an update leaves out.
 - [x] Section 4: a realm still holding `basetool-android`, its marker role, the DPoP policy and
   profile plans exactly the three deletions in order (policy, profile, client), writes nothing in
   the dry run, deletes them on apply while every foreign policy and profile survives, verifies
@@ -3103,8 +3114,10 @@ after the apps, and the promotion failed.
   records no backoff and no marker, so the first tick after the role run applies the release. Other
   stale scripts only warn. `--force` and `BASETOOL_REQUIRE_CURRENT_SCRIPTS=false` bypass it, loudly.
 - **The comparison before a promotion is mandatory** (`docs/deployment.md` → *Before a promotion: the
-  host scripts*): every file under `/opt/basetool/scripts` against the tag, byte-exact, and a mismatch
-  blocks the promotion until `--tags deploy,scripts` has been run from that tag (an owner-approved
+  host scripts*): every file under `/opt/basetool/scripts` against the tag, byte-exact, and every
+  installed companion of `scripts/host-companions.json` through the host's
+  `host_companions.py --inspect` (ordering drop-ins normalized as below), and a mismatch blocks the
+  promotion until `--tags deploy,scripts` has been run from that tag (an owner-approved
   production write).
 - **Bootstrap.** A host whose `deploy.sh` lacks this check cannot guard itself; its first install comes
   through the role, and the mandatory step is the protection until then (ADR-0247).
@@ -3580,6 +3593,44 @@ competes with the next attempt for the Docker VM or its log.
 
 **Enforced by:** `OwnedProcessTreeTest` (`:test-support:test`) · **Runbook:**
 [`docs/e2e-test/README.md`](../e2e-test/README.md) · **Related:** REQ-OPS-041
+
+### REQ-OPS-057 — A UI change can be looked at on a running, seeded stack of the checkout
+
+An agent or a developer can look at a UI change in a real browser before calling it done, signed in
+and on data, without hand-made credentials or realm files.
+
+- **One bring-up.** `:frontend:previewStackUp` starts the stack `E2eStackExtension` starts for
+  `:frontend:e2eTest`, with the same images built from the checkout, the same synthetic realm, the
+  same throwaway credentials and the same seeding, and leaves it running. `ServedBuildCheck` proves
+  that the stack serves this checkout's assets. It also stacks `docker-compose.preview.yml`, which
+  moves the issuer to `keycloak.localhost`, so a browser on the host signs in on a loopback name
+  while Keycloak stays published on `127.0.0.1`; `check-keycloak-issuer.py` holds the apps to
+  that issuer.
+- **It fits the workstation.** Outside the prebuilt CI mode, the four images built from the checkout
+  are built one after another before `up`, because four in-image Gradle builds at once exhaust a
+  4 GiB Docker VM. `up --build` then reads the BuildKit cache.
+- **It says how to get in.** After a successful start, the task prints the frontend URL and every
+  throwaway account with its password and roles.
+- **Every port is checked.** Before compose starts, the pre-flight checks every host port the dev
+  profile publishes and fails naming the container of another checkout that holds one. This
+  checkout's own containers do not count, so a running stack can be brought up again in place
+  after an edit.
+- **It goes away.** `:frontend:previewStackDown` removes the containers and volumes and keeps the
+  logs under `frontend/build/e2e/`. A start that fails after compose came up tears itself down.
+- **It is documented for every agent.** [`docs/agents/ui-preview.md`](../agents/ui-preview.md)
+  carries the workflow, the rule that another checkout's stack is never torn down unasked, and what
+  to report. `frontend/AGENTS.md` points to it, and Claude Code's `.claude/launch.json` names the
+  running frontend `preview-stack`.
+
+**Acceptance**
+
+- [x] `E2eStackPortsParityTest` keeps the checked ports equal to the loopback ports of
+  `docker-compose.yml`.
+- [x] JUnit and the preview task share `E2eStackExtension.bringUpAndSeed`; only the teardown
+  registrar differs.
+
+**Enforced by:** `E2eStackPortsParityTest` (`:frontend:test`) · **Runbook:**
+[`docs/agents/ui-preview.md`](../agents/ui-preview.md) · **Related:** REQ-OPS-055, REQ-OPS-056
 
 ## Open questions
 

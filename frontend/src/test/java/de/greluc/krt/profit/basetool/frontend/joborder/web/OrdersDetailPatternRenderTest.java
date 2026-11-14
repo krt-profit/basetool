@@ -449,7 +449,8 @@ class OrdersDetailPatternRenderTest {
         .thenAnswer(call ->
             JsonMapper.builder().build().readValue(support, call.<Class<Object>>getArgument(1)));
 
-    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+    String html = render(orderId, "ROLE_KRT_MEMBER");
+    assertThat(html)
         .contains(
             "data-testid=\"order-support-enroll\"",
             "Joining Staffel",
@@ -458,6 +459,27 @@ class OrdersDetailPatternRenderTest {
         .containsPattern("data-testid=\"order-support-withdraw\"[^>]*data-version=\"9\"")
         .doesNotContainPattern("data-testid=\"order-support-withdraw\"[^>]*data-version=\"17\"")
         .doesNotContain("id=\"status-select\"");
+    var panel = Pattern.compile("<details([^>]*data-od-support[^>]*)>").matcher(html);
+    assertThat(panel.find()).isTrue();
+    assertThat(panel.group(1)).doesNotContain(" open");
+    var summary =
+        Pattern.compile("data-testid=\"order-support-toggle\"[^>]*>(.*?)</summary>", Pattern.DOTALL)
+            .matcher(html);
+    assertThat(summary.find()).isTrue();
+    assertThat(summary.group(1)).contains(">OWN<").doesNotContain(">PAST<");
+  }
+
+  /** Offers the responsibility transfer only through its dialog, and only with the capability. */
+  @Test
+  void responsibilityTransferLivesInADialogBehindTheCapability() throws Exception {
+    UUID orderId = UUID.randomUUID();
+    stubOrder(order(orderId, "MATERIAL", "OPEN", List.of(), List.of(), List.of(), true));
+
+    assertThat(render(orderId, "ROLE_KRT_MEMBER"))
+        .doesNotContain(
+            "id=\"responsibility-transfer-form\"",
+            "id=\"transfer-responsibility-modal\"",
+            "data-testid=\"order-transfer-responsibility\"");
   }
 
   /**

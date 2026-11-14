@@ -2133,7 +2133,10 @@ Two global scripts drive them: `krt-overflow-menu.js` opens and closes the menus
 outside click, Tab, focus back to the toggle, arrow keys, Home/End), closes a menu when one of its
 entries is clicked, and opens a panel upwards (`.overflow-menu__panel--up`) when it does not fit below
 its toggle — inside the viewport under the sticky header, the body of an enclosing table and every
-clipping ancestor — and there is more room above; `common-handlers.js` publishes the sticky header's
+clipping ancestor — and there is more room above. Horizontally a panel is right-aligned to its
+toggle, left-aligned (`.overflow-menu__panel--start`) when that leaves the viewport on the left, and
+shifted left until it ends 8 px inside the viewport when it still overruns the right edge, as a
+toggle in the middle of a phone row does (`OverflowMenuViewportE2eTest`); `common-handlers.js` publishes the sticky header's
 height as `--krt-header-height` for sticky content below it; `krt-filter-chips.js` renders a chip per active control of the bound form
 (skipping search fields, segmented controls and `data-filter-chip-ignore`), and removing a chip
 clears that control and fires its `input` and `change` events, so the page's own live filter runs.
@@ -2213,7 +2216,8 @@ detail with category/flag chips, four figures and the terminal table sorted by s
 by max. profit, sortable by their column headers (REQ-UI-030), with a two-line route „Kauf <Terminal> (<Ort>) · <Preis>" / „Verkauf <Terminal> (<Ort>)
 · <Preis>", the terminal's location (planet or star system, then city, station or outpost) in
 brackets after its name; the lines wrap rather than cut off.
-Auftragsdetail: page head with kind and status badges and the admin overflow „Auftrag löschen", the
+Auftragsdetail: page head with kind and status badges and the overflow menu („Verantwortung
+umschreiben" for a transfer holder, „Auftrag löschen" for an admin), the
 progress tile „Geliefert / benötigt" leading the KPI grid, tabs filtered per kind (Material: Bedarf
 · Übergaben · Bearbeiter · Verknüpft; Item: Items · Materialien · Hersteller · Übergaben ·
 Bearbeiter · Verknüpft) with empty tabs hidden, and „Übergabe erfassen" as the one action of the

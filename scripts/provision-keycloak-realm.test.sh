@@ -55,6 +55,12 @@ realm = {
     "clientSessionMaxLifespan": 0, "clientOfflineSessionIdleTimeout": 0,
     "clientOfflineSessionMaxLifespan": 0, "oauth2DeviceCodeLifespan": 600,
     "defaultRole": {"id": "r-default", "name": "default-roles-basetool"},
+    "webAuthnPolicyPasswordlessRpEntityName": "keycloak",
+    "webAuthnPolicyPasswordlessSignatureAlgorithms": ["ES256", "RS256"],
+    "webAuthnPolicyPasswordlessRequireResidentKey": "Yes",
+    "webAuthnPolicyPasswordlessResidentKey": "required",
+    "webAuthnPolicyPasswordlessUserVerificationRequirement": "required",
+    "webAuthnPolicyPasswordlessPasskeysEnabled": True,
 }
 data = {
     "realm": realm,
@@ -187,6 +193,10 @@ def policy_freezes(uuid):
                    for p in data["policies"]["policies"])
     return marker and attached
 
+def webauthn_policy(key):
+    """The WebAuthn policy prefix of a realm key, or None; the passwordless prefix is tried first."""
+    return next((p for p in ("webAuthnPolicyPasswordless", "webAuthnPolicy") if key.startswith(p)), None)
+
 parts = path.split("/")
 
 if verb == "get":
@@ -310,7 +320,12 @@ if verb == "update":
     if parts[0] == "realms":
         if "-r" in argv:
             fail("stub: the realm is updated without -r")
-        data["realm"].update(body)
+        # As Keycloak: a WebAuthn policy applies only with its RpEntityName, rebuilt from the body alone.
+        applied = {p for p in ("webAuthnPolicyPasswordless", "webAuthnPolicy") if body.get(p + "RpEntityName")}
+        for key in [k for k in data["realm"] if webauthn_policy(k) in applied and k not in body]:
+            del data["realm"][key]
+        data["realm"].update({k: v for k, v in body.items()
+                              if webauthn_policy(k) is None or webauthn_policy(k) in applied})
         save()
         sys.exit(0)
     if path in ("client-policies/profiles", "client-policies/policies"):
@@ -960,6 +975,8 @@ assert_eq "$(query "$state" "[d['realm'].get(k) for k in ('oauth2DeviceCodeLifes
   "[600, 5, 'krt-theme']" "the device code lifespan, polling interval and login theme are pinned"
 assert_eq "$(query "$state" "[d['realm'].get(k) for k in ('webAuthnPolicyPasswordlessRequireResidentKey', 'webAuthnPolicyPasswordlessResidentKey')]")" \
   "['not specified', 'required']" "the passkey policy states residentKey alone, not the deprecated requireResidentKey"
+assert_eq "$(query "$state" "[d['realm'].get(k) for k in ('webAuthnPolicyPasswordlessRpEntityName', 'webAuthnPolicyPasswordlessSignatureAlgorithms', 'webAuthnPolicyPasswordlessUserVerificationRequirement', 'webAuthnPolicyPasswordlessPasskeysEnabled')]")" \
+  "['keycloak', ['ES256', 'RS256'], 'required', True]" "the passkey update carries the live policy whole, so Keycloak keeps its other settings"
 output="$(run_provisioner "$state" --apply)"
 assert_contains "$output" "No changes" "a second run changes nothing"
 rm -rf "$state"
