@@ -192,18 +192,18 @@ public class ScWikiVehicleSyncService {
    */
   @Nullable
   private Disposition upsert(ScWikiVehicleDto dto, VehicleRun run) {
-    MatchKey key = MatchKey.EXTERNAL_UUID;
+    MatchKey matchedBy = MatchKey.EXTERNAL_UUID;
     Optional<ShipType> match = shipTypeRepository.findByExternalUuid(dto.uuid());
     if (match.isEmpty()) {
-      key = MatchKey.P4K_UUID;
+      matchedBy = MatchKey.P4K_UUID;
       match = shipTypeRepository.findByP4kUuid(dto.uuid());
     }
     if (match.isEmpty() && StringUtils.hasText(dto.className())) {
-      key = MatchKey.UEX_ALIAS;
+      matchedBy = MatchKey.UEX_ALIAS;
       match = shipTypeRepository.findByUexAliasOfClassName(dto.className());
     }
     if (match.isEmpty()) {
-      key = MatchKey.NAME;
+      matchedBy = MatchKey.NAME;
       Optional<ShipType> named = shipTypeRepository.findByNameIgnoreCase(dto.name());
       if (named.isPresent() && run.sharesName(dto)) {
         ShipType holder = named.get();
@@ -219,9 +219,9 @@ public class ScWikiVehicleSyncService {
     ShipType ship = match.orElseGet(ShipType::new);
     UUID stored = ship.getExternalUuid();
     if (stored != null && !stored.equals(dto.uuid())) {
-      if (key == MatchKey.P4K_UUID && !run.census().contains(stored)) {
+      if (matchedBy == MatchKey.P4K_UUID && !run.census().contains(stored)) {
         reportRelinked(dto, stored, run.runId());
-      } else if (key == MatchKey.NAME && run.isOtherVehicle(ship, dto)) {
+      } else if (matchedBy == MatchKey.NAME && run.isOtherVehicle(ship, dto)) {
         return reportNameHeldByOtherVehicle(dto, run.runId());
       } else {
         return reportIdentityConflict(dto, run.runId(), "Existing vehicle has another game UUID.");
