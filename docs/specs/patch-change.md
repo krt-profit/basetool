@@ -347,7 +347,9 @@ clean-up of pool stock; the patch wipe is a separate path for everyone.
   promise revives. The open order pages refresh through the stock write.
 - **Donation pledges** earmarked on a wiped row are withdrawn as their donor would withdraw them,
   with the usual notice; the donation keeps the patch change as its reason
-  (`supply_donation.withdrawn_by_patch_change`, V423), which only a withdrawn donation holds.
+  (`supply_donation.withdrawn_by_patch_change`, V423), which only a withdrawn donation holds. The
+  donation lists name the patch change by its current label beneath the status
+  ([REQ-SUP-010](supply.md#req-sup-010--decline-and-withdraw)).
 - **Materialbörse offers** standing on a wiped row end with the usual „stock gone“ notice to the
   members who registered interest.
 - **Minimum stock levels** turn low by themselves; they are read-time sums.
@@ -356,10 +358,13 @@ clean-up of pool stock; the patch wipe is a separate path for everyone.
 
 - [x] A wiped row's earmark, active offer and pledge go: the earmark and the offer are deleted, the
   pledge is withdrawn with the patch change as its reason; the job order stays.
+- [x] „Meine Spenden" and „Eingehende Spenden" name the patch change beneath a wiped pledge's
+  status, and only there.
 
-**Enforced by:** `PatchChangeWipeIntegrationTest` · **Code:** `StockWipeEffect`,
+**Enforced by:** `PatchChangeWipeIntegrationTest`, `SupplyMapperTest`,
+`SupplyWithdrawalReasonRenderTest` · **Code:** `StockWipeEffect`,
 `materialexchange.api.MaterialExchangePatchWipe`, `supply.api.SupplyPatchWipe`,
-`joborder.api.JobOrderPatchWipe`
+`supply.api.SupplyPatchLabels`, `joborder.api.JobOrderPatchWipe`, `PatchChangeLabelDirectory`
 
 ### REQ-PATCH-014 — The wipe is excepted from the invalid-responsibility gate
 
