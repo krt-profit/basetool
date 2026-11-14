@@ -105,6 +105,19 @@ public class PatchChange extends AbstractEntity<UUID> {
   @Column(name = "home_location_prompt", nullable = false, updatable = false)
   private boolean homeLocationPrompt;
 
+  /**
+   * When an admin ended the home-location phase early, or {@code null}; written only by {@link
+   * PatchChangeRepository#endPhase}, so a label correction never touches it (REQ-PATCH-024).
+   */
+  @Column(name = "phase_ended_at", insertable = false, updatable = false)
+  @Nullable
+  private Instant phaseEndedAt;
+
+  /** The admin who ended the home-location phase, or {@code null}; written with the end. */
+  @Column(name = "phase_ended_by", insertable = false, updatable = false)
+  @Nullable
+  private UUID phaseEndedBy;
+
   /** What the effects touched at the trigger, one count per kind. */
   @ElementCollection
   @CollectionTable(

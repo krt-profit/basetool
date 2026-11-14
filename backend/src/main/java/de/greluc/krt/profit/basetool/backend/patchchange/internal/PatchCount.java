@@ -25,5 +25,7 @@ package de.greluc.krt.profit.basetool.backend.patchchange.internal;
  */
 public enum PatchCount {
   /** Refinery orders started before the live time that end as cancelled. */
-  REFINERY_ORDERS_CANCELED
+  REFINERY_ORDERS_CANCELED,
+  /** Members whose accounts are older than the live time, asked for a new home location. */
+  MEMBERS_ASKED
 }

@@ -125,7 +125,9 @@ class PatchChangeTriggerIntegrationTest {
     PatchChangeDto recorded = trigger.trigger(request("0.1", LIVE_AT));
 
     assertThat(recorded.counts())
-        .containsExactly(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 2));
+        .contains(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 2))
+        .extracting(PatchCountDto::kind)
+        .containsExactly(PatchCount.REFINERY_ORDERS_CANCELED, PatchCount.MEMBERS_ASKED);
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.CANCELED);
     assertThat(statusOf(runningWithoutStart)).isEqualTo(RefineryOrderStatus.CANCELED);
     assertThat(statusOf(openAfter)).isEqualTo(RefineryOrderStatus.OPEN);
@@ -193,7 +195,9 @@ class PatchChangeTriggerIntegrationTest {
             new TriggerPatchChangeRequest(
                 "0.1", PatchKind.REBUILD, LIVE_AT, withoutRefinery, "0.1"));
 
-    assertThat(recorded.counts()).isEmpty();
+    assertThat(recorded.counts())
+        .extracting(PatchCountDto::kind)
+        .containsExactly(PatchCount.MEMBERS_ASKED);
     assertThat(recorded.options()).isEqualTo(withoutRefinery);
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.OPEN);
   }
@@ -240,7 +244,9 @@ class PatchChangeTriggerIntegrationTest {
                 LIVE_AT, PatchChangeOptions.presetFor(PatchKind.FULL_WIPE)));
 
     assertThat(preview.counts())
-        .containsExactly(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 1));
+        .contains(new PatchCountDto(PatchCount.REFINERY_ORDERS_CANCELED, 1))
+        .extracting(PatchCountDto::kind)
+        .containsExactly(PatchCount.REFINERY_ORDERS_CANCELED, PatchCount.MEMBERS_ASKED);
     assertThat(statusOf(openBefore)).isEqualTo(RefineryOrderStatus.OPEN);
     assertThat(history.history()).isEmpty();
   }

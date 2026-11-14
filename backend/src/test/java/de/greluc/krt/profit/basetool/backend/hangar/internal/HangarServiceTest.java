@@ -92,6 +92,7 @@ class HangarServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserService userService;
   @Mock private HangarUnitLiveSync unitLiveSync;
+  @Mock private HangarRelocationGuard relocationGuard;
 
   private HangarService hangarService;
 
@@ -113,7 +114,8 @@ class HangarServiceTest {
             eventPublisher,
             userService,
             unitLiveSync,
-            new HangarAdminNotifier(userService, eventPublisher));
+            new HangarAdminNotifier(userService, eventPublisher),
+            relocationGuard);
   }
 
   @Test

@@ -38,6 +38,7 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param triggeredBy the triggering admin's display name, or {@code null} when the account is gone
  * @param options the options it was triggered with
  * @param counts what its effects touched, one entry per kind
+ * @param phase its home-location phase, or {@code null} when it did not ask for a home location
  */
 public record PatchChangeDto(
     @NotNull UUID id,
@@ -48,4 +49,5 @@ public record PatchChangeDto(
     @NotNull Instant triggeredAt,
     @Nullable String triggeredBy,
     @NotNull PatchChangeOptions options,
-    @NotNull @Unmodifiable List<PatchCountDto> counts) {}
+    @NotNull @Unmodifiable List<PatchCountDto> counts,
+    @Nullable PatchChangePhaseDto phase) {}

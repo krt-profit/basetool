@@ -103,6 +103,7 @@ public class HangarService {
   private final UserService userService;
   private final HangarUnitLiveSync unitLiveSync;
   private final HangarAdminNotifier adminNotifier;
+  private final HangarRelocationGuard relocationGuard;
 
   /**
    * Adds a ship to a user's hangar, stamping the owning org unit from the user's stampable unit (an
@@ -337,6 +338,7 @@ public class HangarService {
 
     OptimisticLock.checkOptionalClient(ship.getVersion(), dto.version(), Ship.class, shipId);
     ShipOwnership.requireOwner(ship, userId);
+    relocationGuard.requireWritable(List.of(shipId));
 
     List<String> changed = new ArrayList<>();
     if (ShipOriginRules.apply(ship, dto.origin())) {
@@ -462,6 +464,7 @@ public class HangarService {
       long owningOrgUnitVersion) {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
     ShipOwnership.requireOwner(ship, userId);
+    relocationGuard.requireWritable(List.of(shipId));
     OrgUnit current = ship.getOwningOrgUnit();
     if (Objects.equals(current == null ? null : current.getId(), orgUnitId)) {
       return new ShipMove(ship, false);
@@ -638,6 +641,7 @@ public class HangarService {
   public int deleteShip(@NotNull UUID userId, @NotNull UUID shipId) {
     Ship ship = Entities.require(shipRepository.findById(shipId), "Ship not found");
     ShipOwnership.requireOwner(ship, userId);
+    relocationGuard.requireWritable(List.of(shipId));
 
     int detached = shipDeletionObserver.beforeShipDelete(shipId);
 

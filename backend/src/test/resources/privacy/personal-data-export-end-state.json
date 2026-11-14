@@ -109,6 +109,18 @@
     } ],
     "truncated" : false
   }, {
+    "key" : "homeLocationChoices",
+    "legalBasis" : "ART_15",
+    "rows" : [ {
+      "patch" : "0.9",
+      "home_location" : "Zzz Export Hub",
+      "chosen_by" : "SELF",
+      "relocated_at" : "<instant>",
+      "rows_moved" : 3,
+      "ships_moved" : 1
+    } ],
+    "truncated" : false
+  }, {
     "key" : "connectedApps",
     "legalBasis" : "ART_15_20",
     "rows" : [ {

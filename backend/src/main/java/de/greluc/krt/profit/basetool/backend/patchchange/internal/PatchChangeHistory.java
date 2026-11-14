@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +48,8 @@ public class PatchChangeHistory {
   private final PatchChangeRepository repository;
   private final P4kPatchVersionReader patchVersions;
   private final UserRepository userRepository;
+  private final HomeLocationPhases phases;
+  private final HomeLocationOffer offer;
 
   /**
    * Lists every patch change, newest live time first.
@@ -58,12 +61,19 @@ public class PatchChangeHistory {
     List<PatchChange> records = repository.findAllByOrderByLiveAtDesc();
     Map<UUID, String> names =
         names(records.stream().map(PatchChange::getTriggeredBy).filter(Objects::nonNull).toList());
-    return records.stream().map(record -> toDto(record, names)).toList();
+    UUID latestPrompt =
+        records.stream()
+            .filter(PatchChange::isHomeLocationPrompt)
+            .map(PatchChange::getId)
+            .findFirst()
+            .orElse(null);
+    return records.stream().map(record -> toDto(record, names, latestPrompt)).toList();
   }
 
   /**
    * Returns what a new patch change's form starts from: the label suggested by the latest P4K
-   * import, the previous patch change's label and live time, and the presets of each kind.
+   * import, the previous patch change's label and live time, the presets of each kind and the
+   * curated home locations.
    *
    * @return the form's defaults
    */
@@ -76,7 +86,8 @@ public class PatchChangeHistory {
         previous == null ? null : previous.getLiveAt(),
         Arrays.stream(PatchKind.values())
             .map(kind -> new PatchChangeFormDto.Preset(kind, PatchChangeOptions.presetFor(kind)))
-            .toList());
+            .toList(),
+        offer.offered());
   }
 
   /**
@@ -88,7 +99,7 @@ public class PatchChangeHistory {
   @NotNull
   PatchChangeDto toDto(@NotNull PatchChange record) {
     UUID admin = record.getTriggeredBy();
-    return toDto(record, admin == null ? Map.of() : names(Set.of(admin)));
+    return toDto(record, admin == null ? Map.of() : names(Set.of(admin)), phases.latestPromptId());
   }
 
   /**
@@ -96,10 +107,11 @@ public class PatchChangeHistory {
    *
    * @param record the record, its wipe groups and counts readable
    * @param names the display name by member id
+   * @param latestPrompt the latest patch change with the prompt on, or {@code null}
    * @return the history row
    */
-  private static @NotNull PatchChangeDto toDto(
-      @NotNull PatchChange record, @NotNull Map<UUID, String> names) {
+  private @NotNull PatchChangeDto toDto(
+      @NotNull PatchChange record, @NotNull Map<UUID, String> names, @Nullable UUID latestPrompt) {
     UUID admin = record.getTriggeredBy();
     return new PatchChangeDto(
         record.getId(),
@@ -110,7 +122,8 @@ public class PatchChangeHistory {
         record.getTriggeredAt(),
         admin == null ? null : names.get(admin),
         record.options(),
-        record.counts().toDtos());
+        record.counts().toDtos(),
+        phases.phaseOf(record, latestPrompt));
   }
 
   /**

@@ -26,6 +26,8 @@ import de.greluc.krt.profit.basetool.backend.identity.api.TermsConsentCheck;
 import de.greluc.krt.profit.basetool.backend.kernel.Permissions;
 import de.greluc.krt.profit.basetool.backend.kernel.ProblemResponseFactory;
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationGateAccessFilter;
+import de.greluc.krt.profit.basetool.backend.patchchange.api.HomeLocationGateCheck;
 import de.greluc.krt.profit.basetool.backend.platform.api.ActingMemberFilterProvider;
 import de.greluc.krt.profit.basetool.backend.platform.api.ApiClientMetricsFilter;
 import de.greluc.krt.profit.basetool.backend.platform.api.ClientAttribution;
@@ -304,6 +306,7 @@ public class SecurityConfig {
    * @param actingMemberFilterProvider supplies the acting-member filter, placed after the
    *     bearer-token filter (ADR-0129)
    * @param clientAttribution bounds the {@code client_id} label of the API client request counter
+   * @param homeLocationGateCheck tells the home-location gate which members must still choose
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -322,7 +325,8 @@ public class SecurityConfig {
       RefusedSubjectWindow noRoleRefusedSubjectWindow,
       ActingMemberFilterProvider actingMemberFilterProvider,
       RateLimitProperties rateLimitProperties,
-      ClientAttribution clientAttribution)
+      ClientAttribution clientAttribution,
+      HomeLocationGateCheck homeLocationGateCheck)
       throws Exception {
 
     boolean isTest = env.matchesProfiles("test");
@@ -463,13 +467,21 @@ public class SecurityConfig {
                 refusedSubjectWindow),
             PendingApprovalAccessFilter.class)
         .addFilterAfter(
+            new HomeLocationGateAccessFilter(
+                homeLocationGateCheck,
+                messageSource,
+                problemResponseFactory,
+                objectMapper,
+                meterRegistry),
+            TermsAcceptanceAccessFilter.class)
+        .addFilterAfter(
             new SubjectRateLimitingFilter(
                 rateLimitProperties,
                 messageSource,
                 problemResponseFactory,
                 objectMapper,
                 meterRegistry),
-            TermsAcceptanceAccessFilter.class)
+            HomeLocationGateAccessFilter.class)
         .addFilterBefore(
             new IdentityProviderUnavailableFilter(
                 messageSource, problemResponseFactory, objectMapper, meterRegistry),

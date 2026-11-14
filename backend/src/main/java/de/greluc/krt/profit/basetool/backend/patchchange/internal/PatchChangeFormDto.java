@@ -33,12 +33,15 @@ import org.jetbrains.annotations.Unmodifiable;
  * @param previousLiveAt the latest patch change's live time, the earliest a new live time may
  *     follow, or {@code null} before the first
  * @param presets the options each patch kind presets
+ * @param homeLocations the curated home locations a home-location phase would offer; empty when
+ *     none is curated, which the form warns about (REQ-PATCH-021)
  */
 public record PatchChangeFormDto(
     @Nullable String suggestedLabel,
     @Nullable String previousLabel,
     @Nullable Instant previousLiveAt,
-    @NotNull @Unmodifiable List<Preset> presets) {
+    @NotNull @Unmodifiable List<Preset> presets,
+    @NotNull @Unmodifiable List<HomeLocationOptionDto> homeLocations) {
 
   /**
    * The options a patch kind presets.

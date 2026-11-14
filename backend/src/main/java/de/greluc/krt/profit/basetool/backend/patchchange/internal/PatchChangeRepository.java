@@ -24,8 +24,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -48,6 +50,44 @@ public interface PatchChangeRepository extends JpaRepository<PatchChange, UUID> 
       value = "SELECT 1 FROM pg_advisory_xact_lock(" + HISTORY_LOCK_SPACE + ", 0)",
       nativeQuery = true)
   int lockHistory();
+
+  /**
+   * Takes the history's lock in shared mode, so relocations run side by side but never beside a
+   * trigger or a phase end, which take it exclusively (REQ-PATCH-026).
+   *
+   * @return always {@code 1}
+   */
+  @Query(
+      value = "SELECT 1 FROM pg_advisory_xact_lock_shared(" + HISTORY_LOCK_SPACE + ", 0)",
+      nativeQuery = true)
+  int lockHistoryShared();
+
+  /**
+   * Returns the latest patch change that asked for a new home location, the only one whose phase
+   * can be open (REQ-PATCH-024).
+   *
+   * @return the latest one with the prompt on, or empty when none asked
+   */
+  Optional<PatchChange> findFirstByHomeLocationPromptTrueOrderByLiveAtDesc();
+
+  /**
+   * Ends a home-location phase, leaving the label and its version untouched.
+   *
+   * @param id the patch change
+   * @param endedAt when the phase ended
+   * @param endedBy the admin who ended it, or {@code null} when no member is known
+   * @return {@code 1} when the phase ended now, {@code 0} when it had ended before
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query(
+      value =
+          "UPDATE patch_change SET phase_ended_at = :endedAt, phase_ended_by = :endedBy"
+              + " WHERE id = :id AND home_location_prompt AND phase_ended_at IS NULL",
+      nativeQuery = true)
+  int endPhase(
+      @Param("id") UUID id,
+      @Param("endedAt") Instant endedAt,
+      @Param("endedBy") @Nullable UUID endedBy);
 
   /**
    * Returns the latest patch change by live time.

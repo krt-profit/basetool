@@ -530,8 +530,14 @@ DELETE /api/v1/outposts/{id}/loading-dock-override | OutpostController#clearLoad
 GET /api/v1/patch-changes/admin | AdminPatchChangeController#listPatchChanges | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/patch-changes/admin | AdminPatchChangeController#triggerPatchChange | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 GET /api/v1/patch-changes/admin/form | AdminPatchChangeController#patchChangeForm | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/patch-changes/admin/members/{userId}/home-location | AdminPatchChangeController#memberHomeLocationPrompt | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/patch-changes/admin/members/{userId}/home-location | AdminPatchChangeController#chooseMemberHomeLocation | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 POST /api/v1/patch-changes/admin/preview | AdminPatchChangeController#previewPatchChange | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
 PATCH /api/v1/patch-changes/admin/{id}/label | AdminPatchChangeController#correctPatchChangeLabel | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+POST /api/v1/patch-changes/admin/{id}/phase-end | AdminPatchChangeController#endHomeLocationPhase | pre=hasRole('ADMIN') | url=/api/v1/*/admin/** -> hasAnyAuthority(ROLE_ADMIN)
+GET /api/v1/patch-changes/me/home-location | HomeLocationController#homeLocationPrompt | pre=isAuthenticated() | url=anyRequest -> authenticated
+POST /api/v1/patch-changes/me/home-location | HomeLocationController#chooseHomeLocation | pre=isAuthenticated() | url=anyRequest -> authenticated
+GET /api/v1/patch-changes/me/home-location/status | HomeLocationController#homeLocationStatus | pre=isAuthenticated() | url=anyRequest -> authenticated
 DELETE /api/v1/personal-blueprints | PersonalBlueprintController#deleteAll | pre=isAuthenticated() | url=anyRequest -> authenticated
 GET /api/v1/personal-blueprints | PersonalBlueprintController#list | pre=isAuthenticated() | url=anyRequest -> authenticated
 POST /api/v1/personal-blueprints | PersonalBlueprintController#add | pre=isAuthenticated() | url=anyRequest -> authenticated

@@ -20,7 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.patchchange.web;
 
 import de.greluc.krt.profit.basetool.backend.kernel.Roles;
+import de.greluc.krt.profit.basetool.backend.patchchange.internal.ChooseHomeLocationRequest;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.CorrectPatchChangeLabelRequest;
+import de.greluc.krt.profit.basetool.backend.patchchange.internal.HomeLocationPhaseEnd;
+import de.greluc.krt.profit.basetool.backend.patchchange.internal.HomeLocationPromptDto;
+import de.greluc.krt.profit.basetool.backend.patchchange.internal.HomeLocationPrompts;
+import de.greluc.krt.profit.basetool.backend.patchchange.internal.MemberRelocations;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeDto;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeFormDto;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeHistory;
@@ -28,6 +33,8 @@ import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeLab
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangePreviewDto;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangePreviewRequest;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.PatchChangeTrigger;
+import de.greluc.krt.profit.basetool.backend.patchchange.internal.RelocationChooser;
+import de.greluc.krt.profit.basetool.backend.patchchange.internal.RelocationResultDto;
 import de.greluc.krt.profit.basetool.backend.patchchange.internal.TriggerPatchChangeRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -46,8 +53,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The admin's patch-change surface (REQ-PATCH-005, REQ-PATCH-008): the form's defaults, the
- * preview, the trigger, the history and the label correction. Only an admin reaches it, also when
+ * The admin's patch-change surface (REQ-PATCH-005, REQ-PATCH-008, REQ-PATCH-022, REQ-PATCH-024):
+ * the form's defaults, the preview, the trigger, the history, the label correction, the end of a
+ * home-location phase and the choice on a member's behalf. Only an admin reaches it, also when
  * pinned to one org unit, because a patch change applies to every org unit.
  */
 @RestController
@@ -59,6 +67,9 @@ public class AdminPatchChangeController {
   private final PatchChangeHistory history;
   private final PatchChangeTrigger trigger;
   private final PatchChangeLabelCorrection labelCorrection;
+  private final HomeLocationPhaseEnd phaseEnd;
+  private final HomeLocationPrompts prompts;
+  private final MemberRelocations relocations;
 
   /**
    * Lists every patch change, newest live time first.
@@ -120,5 +131,43 @@ public class AdminPatchChangeController {
   public PatchChangeDto correctPatchChangeLabel(
       @PathVariable UUID id, @Valid @RequestBody CorrectPatchChangeLabelRequest request) {
     return labelCorrection.correct(id, request);
+  }
+
+  /**
+   * Ends a patch change's open home-location phase early.
+   *
+   * @param id the patch change
+   * @return the patch change with its ended phase
+   */
+  @PostMapping("/{id}/phase-end")
+  @Operation(summary = "End a patch change's open home-location phase (admin).")
+  public PatchChangeDto endHomeLocationPhase(@PathVariable UUID id) {
+    return phaseEnd.end(id);
+  }
+
+  /**
+   * Reads a member's home-location prompt, for a choice on the member's behalf.
+   *
+   * @param userId the member
+   * @return the member's state, the home locations on offer and what would move
+   */
+  @GetMapping("/members/{userId}/home-location")
+  @Operation(summary = "Read a member's home-location prompt (admin).")
+  public HomeLocationPromptDto memberHomeLocationPrompt(@PathVariable UUID userId) {
+    return prompts.promptFor(userId);
+  }
+
+  /**
+   * Chooses a member's new home location on the member's behalf and relocates the member.
+   *
+   * @param userId the member
+   * @param request the chosen home location
+   * @return what moved
+   */
+  @PostMapping("/members/{userId}/home-location")
+  @Operation(summary = "Choose a member's new home location on the member's behalf (admin).")
+  public RelocationResultDto chooseMemberHomeLocation(
+      @PathVariable UUID userId, @Valid @RequestBody ChooseHomeLocationRequest request) {
+    return relocations.relocate(userId, request.locationId(), RelocationChooser.ADMIN);
   }
 }

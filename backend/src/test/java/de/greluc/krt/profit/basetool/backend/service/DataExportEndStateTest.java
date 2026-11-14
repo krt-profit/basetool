@@ -75,6 +75,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -272,6 +273,24 @@ class DataExportEndStateTest {
   }
 
   private void seedHoldings() {
+    entityManager.flush();
+    UUID patchChange = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO patch_change (id, version, label, kind, live_at, triggered_at,"
+            + " cancel_refinery_orders, currency_wipe, home_location_prompt)"
+            + " VALUES (?, 0, '0.9', 'REBUILD', ?, ?, true, false, true)",
+        patchChange,
+        Timestamp.from(Instant.parse("2000-01-01T00:00:00Z")),
+        Timestamp.from(Instant.parse("2000-01-02T00:00:00Z")));
+    for (User owner : new User[] {subject, other}) {
+      jdbc.update(
+          "INSERT INTO patch_change_relocation (patch_change_id, user_id, home_location_id,"
+              + " chosen_by, relocated_at, rows_moved, ships_moved)"
+              + " VALUES (?, ?, ?, 'SELF', now(), 3, 1)",
+          patchChange,
+          owner.getId(),
+          location.getId());
+    }
     for (User owner : new User[] {subject, other}) {
       InventoryItem item = new InventoryItem();
       item.setUser(owner);
