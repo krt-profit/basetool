@@ -39,6 +39,10 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
   result item now names it in the same optional `patchChange`
   ([pushing against what a patch change removed](resources/patch-change.md#pushing-against-what-a-patch-change-removed)).
   No schema change beyond the description.
+- **Fixed: the sandbox client has the bank scopes.** The sandbox registry grants `sandbox-client`
+  `exchange.bank.read`, `exchange.bank.request` and `exchange.bank.queue`, as the sandbox page
+  promised, and the seed switches the bank on ([sandbox](sandbox.md#clients)). Nothing changes
+  outside the sandbox.
 - **Changed: deleted wipe exceptions stay in the patch-change read.** An exception whose item or
   material was removed from the catalogue since is no longer left out: its `entry` keeps its `bt`
   and carries no `name` ([patch change](resources/patch-change.md)). No schema change.

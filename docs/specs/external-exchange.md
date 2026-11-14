@@ -2303,6 +2303,9 @@ admin suspension), `ExchangeSyncE2eTest` (corpus round trip, confirmed mass chan
       and the DPoP-signed call it shares with the smoke test live in `scripts/sandbox_client.py`.
       `docker-compose.sandbox-load.yml` adds the management ports, which the metrics need, and
       makes the budget and the answers' lifetime settable.*
+- [x] The seed grants `sandbox-client` every capability the registry knows, the bank scopes
+      included, and switches the exchange and the bank route family on (REQ-BXCH-006).
+      *`SandboxSeedCapabilitiesTest` compares the seeded capabilities with `ExchangeCapability`.*
 
 **Status:** built — local sandbox, the image pipeline, its smoke job and the E2E stack with the
 gateway, WP 2.3 (#2099)
