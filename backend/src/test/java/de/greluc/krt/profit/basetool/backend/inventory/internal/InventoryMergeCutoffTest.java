@@ -43,9 +43,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * The no-mixing rule of the write-time merge (REQ-INV-026, REQ-PATCH-004): a row created before the
- * latest patch change's live time never absorbs another row, and the merge asks the group only for
- * rows from the cutoff on.
+ * The no-mixing rule of the write-time merge (REQ-INV-026, REQ-PATCH-004): while the holder's
+ * cutoff stands, a row created before it, or without a creation time, never absorbs another row,
+ * and the merge asks the group only for rows from the cutoff on.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryMergeCutoffTest {
@@ -63,7 +63,7 @@ class InventoryMergeCutoffTest {
   void setUp() {
     service =
         new InventoryMergeService(
-            orderWrites, repository, offers, auditRecorder, () -> Optional.of(CUTOFF));
+            orderWrites, repository, offers, auditRecorder, _ -> Optional.of(CUTOFF));
   }
 
   @Test
@@ -71,6 +71,57 @@ class InventoryMergeCutoffTest {
     InventoryItem prePatch = pieceRow(CUTOFF.minusSeconds(1));
 
     InventoryItem result = service.mergeStockIfRequested(prePatch, false);
+
+    assertThat(result).isSameAs(prePatch);
+    verify(repository, never())
+        .findMergeGroupForUpdate(any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aRowWithoutACreationTimeIsNeverASurvivorWhileACutoffStands() {
+    InventoryItem undated = pieceRow(null);
+
+    InventoryItem result = service.mergeStockIfRequested(undated, false);
+
+    assertThat(result).isSameAs(undated);
+    verify(repository, never())
+        .findMergeGroupForUpdate(any(), any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void aHolderWithoutACutoffMergesEveryRowDatedOrNot() {
+    InventoryMergeService unrestricted =
+        new InventoryMergeService(orderWrites, repository, offers, auditRecorder, _ -> Optional.empty());
+    InventoryItem undated = pieceRow(null);
+    when(repository.findMergeGroupForUpdate(
+            eq(undated.getUser().getId()),
+            eq(undated.getMaterial().getId()),
+            eq(undated.getLocation().getId()),
+            eq(undated.getQuality()),
+            eq(false),
+            eq(false),
+            eq((UUID) null),
+            eq((Instant) null)))
+        .thenReturn(List.of(undated));
+
+    InventoryItem result = unrestricted.mergeStockIfRequested(undated, false);
+
+    assertThat(result).isSameAs(undated);
+  }
+
+  @Test
+  void theCutoffIsAskedForTheRowsHolder() {
+    InventoryItem prePatch = pieceRow(CUTOFF.minusSeconds(1));
+    UUID holder = prePatch.getUser().getId();
+    InventoryMergeService perHolder =
+        new InventoryMergeService(
+            orderWrites,
+            repository,
+            offers,
+            auditRecorder,
+            asked -> asked.equals(holder) ? Optional.of(CUTOFF) : Optional.empty());
+
+    InventoryItem result = perHolder.mergeStockIfRequested(prePatch, false);
 
     assertThat(result).isSameAs(prePatch);
     verify(repository, never())
@@ -100,7 +151,7 @@ class InventoryMergeCutoffTest {
   /**
    * Builds a piece-counted stock row created at the given time.
    *
-   * @param createdAt when the row was created
+   * @param createdAt when the row was created, or {@code null} for an undated row
    * @return the row
    */
   private static InventoryItem pieceRow(Instant createdAt) {

@@ -97,15 +97,6 @@ public interface PatchChangeRepository extends JpaRepository<PatchChange, UUID> 
   Optional<PatchChange> findFirstByOrderByLiveAtDesc();
 
   /**
-   * Returns the latest live time of every patch change, the cutoff of the write-time stock merge
-   * (REQ-PATCH-004).
-   *
-   * @return the latest live time, or empty before the first patch change
-   */
-  @Query("SELECT MAX(p.liveAt) FROM PatchChange p")
-  Optional<Instant> findLatestLiveAt();
-
-  /**
    * Returns the patch change live before a given one.
    *
    * @param liveAt the given one's live time
