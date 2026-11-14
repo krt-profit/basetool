@@ -646,10 +646,15 @@ The coverage list holds the **Patchwechsel** area
 - **Patchwechsel** (`AuditDomain.PATCH_CHANGE`, `ADMIN` only) — `PATCH_CHANGE_TRIGGERED` at the
   trigger (subject the patch change, labelled by its patch label; details `kind`, `liveAt`,
   `wipeGroups`, `refinery`, `currency`, `homeLocation` and one count per effect kind) and
-  `PATCH_CHANGE_LABEL_CORRECTED` with `from` and `to`; `PATCH_CHANGE_AUDIT_EXPORTED` and
-  `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. There is no target user,
-  and the details carry enums, instants, booleans and counts only. Each affected area records one
-  summary event of the trigger in its own trail (the refinery's above).
+  `PATCH_CHANGE_LABEL_CORRECTED` with `from` and `to`; `PATCH_CHANGE_PHASE_ENDED` when an admin ends
+  a home-location phase early (subject the patch change; details `pending`, the members still to
+  relocate); `PATCH_CHANGE_RELOCATED` per member after the home-location choice (subject and target
+  the member; details `patchChange`, `label`, `location`, `rows`, `ships` and `chosenBy` `SELF`,
+  `ADMIN` or `CLIENT`, REQ-PATCH-027); `PATCH_CHANGE_AUDIT_EXPORTED` and
+  `PATCH_CHANGE_AUDIT_PURGED` as every area records its export and purge. Only the relocation has a
+  target user, and the details carry enums, instants, booleans, ids, the curated location name and
+  counts only. Each affected area records one summary event of the trigger in its own trail (the
+  refinery's above); a relocation records no event in the Lager's or the hangar's trail.
 
 The types are offered by the viewer's per-area event-type list and labelled in DE/EN
 (`admin.audit.domain.PATCH_CHANGE`, `admin.audit.event.*`, `pdf.audit.title.PATCH_CHANGE`); both

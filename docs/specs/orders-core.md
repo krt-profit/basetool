@@ -223,6 +223,11 @@ return and settlement cases are part of the
 
 ### REQ-ORDERS-055 — Invalid responsibility permits reading and valid transfer only
 
+> [!note] Amended 2026-11-14 (ADR-0383) — a patch change's relocation is excepted
+> A patch change's relocation still takes the shared hierarchy lock before its lot and row locks,
+> but validates no linked job order: it is a game fact and no order write, and it leaves every
+> earmark as it is ([REQ-PATCH-026](patch-change.md#req-patch-026--one-all-or-nothing-transaction-per-member-exactly-once)).
+
 The hierarchy foundation applies this prerequisite inside existing order and Inventory-owned
 linked-stock writes. All Inventory write transactions acquire the shared hierarchy lock before
 lot/row locks; organisational changes acquire its exclusive counterpart before the change and

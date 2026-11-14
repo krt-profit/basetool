@@ -2104,6 +2104,13 @@ with no manifest, or a malformed one, removes the file rather than writing zeros
   is excluded from `AuditDomainSilenceAnomaly` too: patch changes come a few times a year
   (`audit_domain_silence_alerts_14_silent_patch_change_is_exempt_test.yml`). The existing
   `basetool_audit_events_total{domain}` counts the domain without a new metric.
+- `basetool_patch_change_relocations_pending` gauge, sampled by the patch-change module's
+  `BusinessGaugeSource` (`PatchChangeBusinessGauges`): the members still to relocate in the open
+  home-location phase, `0` while none is open
+  ([REQ-PATCH-028](patch-change.md#req-patch-028--the-gauge-of-pending-relocations)). A count only, no
+  label. The operations dashboard `07-basetool-operations.json` shows it in the panel "Members still
+  to relocate after a patch change"; there is no alert rule, because the phase ends by itself once
+  everyone has chosen or an admin ends it.
 - `basetool_bank_audit_events_total{event_type}` counter at the single `BankAuditService.record`
   choke point (`event_type` = the bounded `BankAuditEventType` enum). The bank keeps a physically
   separate `bank_audit_event` table excluded from `AuditDomain`, so before #1041 item 10 the most

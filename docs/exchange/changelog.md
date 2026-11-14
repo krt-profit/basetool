@@ -3,6 +3,17 @@
 Changes to the Exchange API contract, newest first. Every change within `v1` is additive
 ([versioning](versioning.md)).
 
+## 2026-11-14
+
+- **New: the relocation after a patch change.** When a patch change asks the members for a new home
+  location, the Basetool moves each member's lots and ships from before the patch's live time to the
+  chosen home once the member has chosen. A relocated lot arrives as a tombstone for the old key and
+  an item for the new key, both from the channel `patch` with the patch change's `id`; a moved ship
+  arrives with its new location and a new `version` ([patch changes](sync-guide.md#patch-changes)).
+- **New: the error `RELOCATION_PENDING`.** Until the member has chosen, a change set that writes one
+  of those lots or ships answers `409 RELOCATION_PENDING` and writes nothing, from the member's own
+  client and from another member's client on a pool lot the member holds; reads and new stock still
+  work ([errors](errors.md#request-errors)). No schema changes.
 ## 2026-11-13
 
 - **New: the ship's `origin`.** Every ship in `GET /exchange/v1/me/ships` carries `origin`:

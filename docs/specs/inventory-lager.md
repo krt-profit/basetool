@@ -47,6 +47,14 @@ to-many allocations, not a stack dimension.
 
 ### REQ-INV-001 — Inventory is append-only by default (merge is the scoped exception)
 
+> [!note] Amended 2026-11-14 (ADR-0383) — the patch-change relocation moves rows in place
+> A patch change's relocation changes the location of a member's rows from before the live time
+> **in place**, the one exception to this rule: every row keeps its identity, earmarks, pledges and
+> offers, nothing merges, and the row's version advances
+> ([REQ-PATCH-025](patch-change.md#req-patch-025--the-relocation-moves-in-place)). Until the member
+> relocates, those rows are locked for everyone but the member and admins
+> ([REQ-PATCH-023](patch-change.md#req-patch-023--the-relocation-lock)).
+
 A write path does **not** fold a new or edited `InventoryItem` into a different existing row
 **unless the scoped stock merge of [REQ-INV-026](#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in)
 applies** — a `PIECE` material always, an `SCU` material only on the caller's per-action opt-in.

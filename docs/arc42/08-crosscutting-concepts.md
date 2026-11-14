@@ -656,4 +656,9 @@ write-time merge skips every older row (REQ-PATCH-004), and the Lager learns the
 SPI `inventory.api.StockMergeCutoff` the `patchchange` module implements. The trigger itself is one
 transaction that takes the history's advisory lock first and lets each effect lock its own rows in
 id order ([ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md)).
+A relocation is the one write that changes a row's location in place: it keeps every earmark,
+pledge and offer, advances the row's version, and runs once per member under the history's shared
+lock, the hierarchy lock and the lot locks in ascending order; until it ran, the member's rows and
+ships from before the live time are locked against everyone but the member and admins
+([ADR-0383](../adr/0383-a-patch-change-relocation-moves-stock-in-place.md)).
 The contract lives in [`patch-change.md`](../specs/patch-change.md).

@@ -361,3 +361,27 @@ See [the aUEC order contract](../specs/orders-auec.md) for settlement and correc
    ([ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md)).
 
 The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-001…009).
+
+## 6.15 A member chooses a new home location after a patch change
+
+1. A trigger with the home-location option opens its phase. After the commit the asked members'
+   notification streams close; on reconnect the backend's `HomeLocationGateAccessFilter` refuses
+   the stream with `403 HOME_LOCATION_REQUIRED`, and the frontend relay hands the browser the event
+   `home-location-gate`. A page load meets the frontend's `HomeLocationGateFilter` instead, an AJAX
+   call the header `X-Home-Location-Required`.
+2. The page `/home-location` reads the member's prompt: the curated home locations and, per current
+   location, the rows (with the pool shares) and ships from before the live time.
+3. The choice opens one transaction inside `PatchChangeWrites.runFor` of the phase. It takes the
+   history's lock in shared mode and re-checks the phase, claims the member's
+   `patch_change_relocation` row, takes the shared hierarchy lock, the lot locks of the old and new
+   lot keys in ascending order and the rows, moves the rows in place with a new version, then locks
+   the member's ships and moves them.
+4. `PATCH_CHANGE_RELOCATED` commits with it; after the commit the Lager, Materialbörse and hangar
+   rooms and the admin's patch-change room refresh, the exchange feed shows a tombstone for each old
+   lot key and an item for each new one from the `patch` source, and the gate lets the member
+   through on the next request.
+
+Until then the member's rows and ships from before the live time are locked: the Lager's entity
+listener notes every row a writing transaction changes and checks them before the commit, the
+hangar checks its ship writes, and a write the lock forbids answers `409 RELOCATION_PENDING`
+(REQ-PATCH-020…029, [ADR-0383](../adr/0383-a-patch-change-relocation-moves-stock-in-place.md)).
