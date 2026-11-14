@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.GatePageRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.StubSessionGate;
 import jakarta.servlet.http.HttpServletRequest;
@@ -101,6 +102,21 @@ class GlobalExceptionHandlerTest {
   void aSessionGatesRefusalOnAGatesOwnPageIsShownInsteadOfRedirectingToItself() {
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/basetool/gate");
     request.setContextPath("/basetool");
+    GatePageRequest.mark(request);
+
+    Object result =
+        handler.handleBackendServiceException(gateRefusal(403), request, new ConcurrentModel());
+
+    ModelAndView view = assertInstanceOf(ModelAndView.class, result);
+    assertEquals(HttpStatus.FORBIDDEN, view.getStatus());
+    assertEquals(0, gate.forgotten());
+  }
+
+  @Test
+  void aSessionGatesRefusalOnALegalPageIsShownInsteadOfSendingTheBrowserToTheGate() {
+    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/basetool/impressum");
+    request.setContextPath("/basetool");
+    GatePageRequest.mark(request);
 
     Object result =
         handler.handleBackendServiceException(gateRefusal(403), request, new ConcurrentModel());

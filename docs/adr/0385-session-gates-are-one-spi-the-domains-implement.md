@@ -42,8 +42,8 @@ change asks could keep using the tool for up to a minute while every backend cal
    are the legal pages and the open-source licences (REQ-UI-021). A gate's page and a legal page
    render the layout, whose reads the backend gate refuses, so on them a gate refusal is never
    handed off: `SessionGateFilter` marks the request (`GatePageRequest`), a page section falls back,
-   the layout marks the page for the scripts (decision 8), and on a gate's own page the error
-   handler shows a direct refusal instead of redirecting to the page the browser is on. Every
+   the layout marks the page for the scripts (decision 8), and on every marked page the error
+   handler shows a direct refusal instead of sending the browser away. Every
    layout-chrome read degrades on its own as well, wherever it renders: the layout context with the
    capabilities, the org units and the notification badge, the squadron list, the navigation
    preferences and the supply and purchasing switches.

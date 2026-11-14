@@ -56,4 +56,14 @@ public final class GatePageRequest {
     return attributes != null
         && Boolean.TRUE.equals(attributes.getAttribute(ATTRIBUTE, RequestAttributes.SCOPE_REQUEST));
   }
+
+  /**
+   * Tells whether a request renders a gate's page or a legal page.
+   *
+   * @param request the request
+   * @return {@code true} only for a request {@link #mark} marked
+   */
+  public static boolean isMarked(@NotNull HttpServletRequest request) {
+    return Boolean.TRUE.equals(request.getAttribute(ATTRIBUTE));
+  }
 }

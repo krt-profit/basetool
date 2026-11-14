@@ -22,7 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
-import de.greluc.krt.profit.basetool.frontend.kernel.security.PublicPaths;
+import de.greluc.krt.profit.basetool.frontend.kernel.security.GatePageRequest;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateHandoff;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
@@ -102,8 +102,9 @@ public class GlobalExceptionHandler {
    * <p>Both forms carry the backend's HTTP status, so a {@code fetch} that tests {@code
    * response.ok} and a browser navigation see the failure as one. A {@code 403} of a session gate
    * discards the gate's cached verdict and sends the browser to the gate's page instead: a redirect
-   * for a navigation, a {@code 403} with the gate's header for an AJAX caller (ADR-0385). On a
-   * gate's own page it is shown like any other refusal, so the page never redirects to itself.
+   * for a navigation, a {@code 403} with the gate's header for an AJAX caller (ADR-0385). On a page
+   * {@link GatePageRequest} marks, a gate's own page or a legal page, it is shown like any other
+   * refusal, so the page never redirects to itself and a legal page stays readable.
    *
    * @param ex the backend failure
    * @param request the current request, used to decide JSON-vs-HTML
@@ -120,7 +121,7 @@ public class GlobalExceptionHandler {
         ex.getStatusCode() == HttpStatus.FORBIDDEN.value()
             ? sessionGates.refusedBy(ex.getProblemCode())
             : Optional.empty();
-    if (gate.isPresent() && !sessionGates.isGatePage(PublicPaths.relativePath(request))) {
+    if (gate.isPresent() && !GatePageRequest.isMarked(request)) {
       return handOffToGate(gate.get(), request);
     }
     Locale locale = LocaleContextHolder.getLocale();

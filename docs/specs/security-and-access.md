@@ -2165,8 +2165,9 @@ from this response blanks a legal document on a build nobody can redeploy.
   `SectionFallbackTest`, `GlobalExceptionHandlerTest`, `SectionSessionGateHandoffMvcTest`.*
 - [x] A held member reads every legal page and the licences with each chrome read and the page's
   own read refused by the gate, the purchasing switch's cache cold: the page answers `200` with
-  the chrome degraded and is marked for the scripts, never redirected to the gate.
-  *`GateExemptPageChromeMvcTest`, `SessionGateFilterTest`, `BackendFallbackReauthenticationTest`.*
+  the chrome degraded and is marked for the scripts, never redirected to the gate; a direct
+  refusal there is shown, not handed off. *`GateExemptPageChromeMvcTest`, `SessionGateFilterTest`,
+  `BackendFallbackReauthenticationTest`, `GlobalExceptionHandlerTest`.*
 - [x] Every gate's refusal carries `sessionGate: true`, and the frontend kernel tells a gate's
   refusal by it alone. *`SessionGateAccessFilterTest`, `BackendErrorMapperTest`,
   `KernelGateCodeReachTest`.*
