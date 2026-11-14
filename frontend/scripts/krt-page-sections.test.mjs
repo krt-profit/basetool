@@ -309,6 +309,14 @@ await test('a peer frame re-renders only the named section and does not echo', a
     assert.equal(h.live.sent.length, 0);
 });
 
+await test('the receiver hands a fallback-first room on to its subscription', async () => {
+    const h = harness();
+    h.krtPageSections.create(declaration({ receiver: { fallbackFirst: true } }));
+    h.krtPageSections.create(declaration({ receiver: {} }));
+    assert.equal(h.live.receivers[0].fallbackFirst, true);
+    assert.equal(h.live.receivers[1].fallbackFirst, undefined);
+});
+
 await test('the receiver can widen the sections a peer change re-renders', async () => {
     const h = harness();
     const sections = h.krtPageSections.create(

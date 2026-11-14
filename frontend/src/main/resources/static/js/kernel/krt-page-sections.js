@@ -289,6 +289,7 @@ function create(config) {
             events: receiverCfg.events,
             pill: receiverCfg.pill,
             busyTest: receiverCfg.busyTest,
+            fallbackFirst: receiverCfg.fallbackFirst,
             /** @param {string[]} keys the sections a peer changed */
             refresh(keys) {
                 const list = typeof expand === 'function' ? expand(keys) : keys;
