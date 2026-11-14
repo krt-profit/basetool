@@ -140,8 +140,9 @@ function widgetUrl(item) {
 }
 
 /**
- * Shows the error state of one instance, with a button that loads it again. The message carries
- * the test id `dashboard-<slug>-error`, the button `dashboard-<slug>-retry`.
+ * Shows the error state of one instance, inset like the widget's content, with a button that loads
+ * it again. The message carries the test id `dashboard-<slug>-error`, the button
+ * `dashboard-<slug>-retry`.
  *
  * @param {HTMLElement} item the instance
  * @param {Element} body the instance's body
@@ -160,7 +161,10 @@ function showError(item, body) {
     retry.dataset.trigger = 'dashboard-widget-retry';
     retry.dataset.testid = `dashboard-${slug}-retry`;
     retry.textContent = board instanceof HTMLElement ? (board.dataset.retry ?? '') : '';
-    body.replaceChildren(message, retry);
+    const state = document.createElement('div');
+    state.className = 'dash-widget__error';
+    state.append(message, retry);
+    body.replaceChildren(state);
 }
 
 /**

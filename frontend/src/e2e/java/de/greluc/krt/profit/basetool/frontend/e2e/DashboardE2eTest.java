@@ -57,6 +57,8 @@ class DashboardE2eTest {
   private static final String WIDE = "[data-dashboard-column='WIDE'] [data-dashboard-item]";
   private static final String NARROW = "[data-dashboard-column='NARROW'] [data-dashboard-item]";
 
+  private static final double MIN_ERROR_STATE_INSET_PX = 8;
+
   private static final String RESET_DASHBOARD =
       """
       async () => {
@@ -386,7 +388,8 @@ class DashboardE2eTest {
 
   /**
    * The order and refinery widgets load their own bodies and offer their own options; a refused or
-   * failing widget shows its own error state with its own test id while the others keep working.
+   * failing widget shows its own error state with its own test id, its retry button inset from the
+   * widget's edges, while the others keep working.
    */
   @Test
   void theOrderWidgetsLoadAndEachFailsOnItsOwn() {
@@ -420,6 +423,13 @@ class DashboardE2eTest {
           assertThat(page.getByTestId("dashboard-refinery-ready-error")).isVisible();
           assertThat(page.getByTestId("dashboard-assigned-orders-error")).isVisible();
           assertThat(page.getByTestId("dashboard-refinery-ready-retry")).isVisible();
+          BoundingBox retry = page.getByTestId("dashboard-refinery-ready-retry").boundingBox();
+          BoundingBox widget = page.getByTestId("dashboard-widget-refinery-ready").boundingBox();
+          assertTrue(
+              retry.x - widget.x >= MIN_ERROR_STATE_INSET_PX
+                  && widget.y + widget.height - (retry.y + retry.height)
+                      >= MIN_ERROR_STATE_INSET_PX,
+              "the retry button keeps the widget's padding");
           for (String loaded : new String[] {"orders-to-process", "material-demand", "low-stock"}) {
             assertThat(
                     page.getByTestId("dashboard-widget-" + loaded).locator("[data-widget-content]"))
