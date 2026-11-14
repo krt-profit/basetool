@@ -116,7 +116,7 @@ batch may update or remove a ship only once. How an op that is not applied is re
 | `link` or `upsert` of a ship this installation links to another id | `rejected` | `LINK_TARGET_TAKEN` |
 | `upsert` or `remove` with a `version` the ship no longer has, or of a ship an earlier op of the batch changed | `rejected` | `VERSION_CONFLICT` |
 | `upsert` without `shipId` for an id this installation already linked | `rejected` | `VERSION_CONFLICT` |
-| `upsert` of a ship the web, the app, the system, another client or another installation removed | `rejected` | `REMOVED_ELSEWHERE` |
+| `upsert` of a ship the web, the app, the system, another client, another installation or a patch change removed | `rejected` | `REMOVED_ELSEWHERE`; for a patch change the result item names it in `patchChange` |
 | `upsert` naming an `orgUnit` the member does not directly belong to | `rejected` | `ORG_UNIT_NOT_ALLOWED` |
 | `upsert` changing the unit without `orgUnitVersion`, or with one the ship no longer has | `rejected` | `ORG_UNIT_VERSION_CONFLICT` |
 | `upsert` sending another `origin` than `PLEDGE` for a ship locked to `PLEDGE` | `rejected` | `ORIGIN_LOCKED` |

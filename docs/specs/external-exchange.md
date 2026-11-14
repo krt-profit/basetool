@@ -72,6 +72,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | `GET /exchange/v1/me/store-choices/receivers` · `…/job-orders?material=` | `exchange.refinery.store` | REQ-XCH-054 |
 | `GET /exchange/v1/me/org-demand` | `exchange.demand.read` (+ `exchange.demand.details`) | REQ-XCH-018, REQ-XCH-047 |
 | `GET /exchange/v1/me/org-units` | `exchange.orgunits.read` | REQ-XCH-048 |
+| `GET /exchange/v1/me/patch-change` · `POST …/home-location` | `exchange.patch.read` / `.write` (`.write` granted only with `.read`) | REQ-PATCH-050…053 ([patch-change.md](patch-change.md)) |
 | `GET /exchange/v1/org-stock` | `exchange.orgstock.read` (+ `exchange.orgstock.details`) | REQ-XCH-042, REQ-XCH-043 |
 | `POST /exchange/v1/org-stock/changes` | `exchange.orgstock.write` | REQ-XCH-045 |
 | `GET /exchange/v1/org-stock/members?unit=` · `…/targets?unit=&material=` | `exchange.orgstock.write` | REQ-XCH-045 |
@@ -958,6 +959,9 @@ when that write lowered or removed an offer (REQ-FE-015). A rolled-back write ra
 An `add` of an entry that has a live tombstone is refused per op with `REMOVED_ELSEWHERE`,
 whichever installation or channel removed it. A client may send `override: true` only after asking
 the member; the override is journaled.
+
+A lot or ship a patch change moved or wiped is refused the same way whatever the op's
+`expectedQuantity`, and the result item names the patch change (amendment, REQ-PATCH-053).
 
 **Acceptance**
 
@@ -2631,7 +2635,7 @@ succeeding, never succeeded).
 ### REQ-XCH-036 — The frozen exchange is pinned at build time
 
 The exchange contract and the backend surface the gateway relays to keep their behaviour
-byte-identical (D-05 of the domain modularisation plan): the 31 relay operations on 29 backend
+byte-identical (D-05 of the domain modularisation plan): the 33 relay operations on 31 backend
 paths (with the refinery-order feed, change set and store choices of REQ-XCH-051…056, the three
 bank reads of REQ-BXCH-002, the own requests of REQ-BXCH-003, their writes of REQ-BXCH-004 and
 the staff queue of REQ-BXCH-005), their parameters, request and answer shapes, the relayed codes
@@ -2662,7 +2666,7 @@ contract allows.
   key thumbprint, connection time, correlation id, DPoP nonce, idempotency key, trace context,
   the rate-limit counters). A difference writes the observed answer under
   `ingest/build/exchange-golden/` for review; a deliberate change replaces the golden in the same
-  pull request. The test also asserts that the backend stub received exactly the 31 relay
+  pull request. The test also asserts that the backend stub received exactly the 33 relay
   operations.
 - **Security filter order.** `SecurityFilterChainOrderTest` and
   `SecurityFilterChainProductionShapeTest` pin, through `FilterChainProxy`, the gateway's chains in
@@ -2690,7 +2694,7 @@ Every guard is proven able to fail by a planted violation in its own test.
   answer validates against its published schema.
   *`ExchangeWireContractTest`.*
 - [x] Every `/exchange/v1` route answers byte for byte as recorded, and the relay sends exactly the
-  seam's 31 operations. *`ExchangeGoldenAnswerTest`.*
+  seam's 33 operations. *`ExchangeGoldenAnswerTest`.*
 - [x] The gateway's security filter chains hold exactly the pinned filters in order.
   *`SecurityFilterChainOrderTest`, `SecurityFilterChainProductionShapeTest`.*
 - [x] A pull request touching the exchange path without the `e2e` label fails.
@@ -2704,13 +2708,13 @@ Every identifier the modules exchange on the relay seam is declared once, in
 `test-support`'s `ExchangeSeam`, and each module's parity test asserts its own declarations against
 it, so a rename on one side alone fails that side's build:
 
-- the 31 relay operations with their gateway route, backend path, capability, paging and published
-  schemas — against the backend's fifteen exchange controllers and their `@exchangeGate`
+- the 33 relay operations with their gateway route, backend path, capability, paging and published
+  schemas — against the backend's sixteen exchange controllers and their `@exchangeGate`
   expressions, `ActingMemberFilter`'s 29 paths (each exact but for a whole `{id}` segment, as in
   the bank reads), the gateway's `ExchangeRoutes` and its relay
   prefix (`ExchangeRelaySeamParityTest` in both modules), and the paths the relay actually calls
   (`ExchangeGoldenAnswerTest`);
-- the five relay headers, the twenty-one capability scopes (`exchange.orgstock.details` and
+- the five relay headers, the twenty-three capability scopes (`exchange.orgstock.details` and
   `exchange.demand.details` the two that gate no route of their own; `exchange.bank.request` the one no
   route serves yet), the gate codes with their statuses, the
   codes the gateway passes through (the shared `NOT_FOUND` of REQ-BXCH-002 and `NOT_BANK_STAFF` of REQ-BXCH-005 among them) and the
@@ -2763,7 +2767,7 @@ G-18)
 > this requirement, the app leaves the readers of `openapi.json`, and the opening paragraph counts
 > the 31 relay operations `ExchangeFence.RELAY_OPERATIONS` holds, not 20; git keeps the text.
 
-The backend operations the gateway relays to — the 31 operations under `/api/v1/exchange/**` —
+The backend operations the gateway relays to — the 33 operations under `/api/v1/exchange/**` —
 are described in their own committed document,
 `backend/src/main/resources/api/exchange-relay.openapi.json`, and in no other (ADR-0216, amendment
 of 2026-10-02). The published `openapi.json`, which the frontend generates its test types from,
@@ -2778,7 +2782,7 @@ never served to a client. The external contract stays the gateway's `exchange-v1
   reach. A component both reach is in both, identical. The runtime `/v3/api-docs` is unchanged: it
   still describes the full model, ADMIN-only, and is switched off in production.
 - **Its own assertions.** Before writing, the generator requires of the relay document exactly the
-  31 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
+  33 relay operations, all of the `exchange` domain, none anonymous, the `bearer-jwt` scheme and
   requirement, and no dangling reference; of `openapi.json` no relay path and no dangling reference
   (REQ-API-018).
 - **Its own staleness check.** Each document is compared with its committed file, line ends
@@ -2791,8 +2795,8 @@ never served to a client. The external contract stays the gateway's `exchange-v1
 
 **Acceptance**
 
-- [x] The relay document holds exactly the 31 relay operations and 135 schemas; `openapi.json` holds
-  none of them and the 115 schemas only they reach left it; the union of both is the generated
+- [x] The relay document holds exactly the 33 relay operations and 149 schemas; `openapi.json` holds
+  none of them and the 129 schemas only they reach left it; the union of both is the generated
   model. *`ExchangeFenceTest`, `OpenApiDocumentAssertionsTest`.*
 - [x] A stale relay document fails the generator in CI and is rewritten outside it — proven by
   editing the committed file and running the generator with `CI=true`.

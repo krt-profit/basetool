@@ -1,11 +1,12 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-13.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-11-14.
 > **Owner area:** PATCH
 > **Status:** The record, the options, the trigger with the refinery effect, the admin page with
 > its history, the audit area, the `patch` change source and the no-mixing rule are implemented
 > (REQ-PATCH-001…009), the wipe by group and exception with its dependents, preview and audit
 > (REQ-PATCH-010…018), the home-location phase with its gate, lock and in-place relocation
-> (REQ-PATCH-020…029) and the currency wipe (REQ-PATCH-040…046). The form default and the exchange
-> resource follow in their own slices of epic #3328 and add their requirements here.
+> (REQ-PATCH-020…029), the currency wipe (REQ-PATCH-040…046) and the exchange resource with the
+> home-location choice through a client (REQ-PATCH-050…053). The form default follows in its own
+> slice of epic #3328 and adds its requirements here.
 > **Related ADRs:** [ADR-0380](../adr/0380-the-patchchange-module-records-patch-changes-and-runs-their-effects.md),
 > [ADR-0381](../adr/0381-the-live-time-decides-what-a-patch-change-touches.md),
 > [ADR-0382](../adr/0382-patch-effects-are-excepted-from-the-invalid-responsibility-gate.md),
@@ -509,11 +510,15 @@ the chosen location reads „bleibt“. Rows and ships created later are not cou
 ### REQ-PATCH-022 — The choice is final, once per member and phase
 
 The choice is stored per member per phase (`patch_change_relocation`, keyed by patch change and
-member) together with who chose — the member (`SELF`), an admin on the member's behalf (`ADMIN`) or,
-with the exchange resource of epic #3328, the member's client (`CLIENT`) — and what moved. It is
-**final**: a second choice in the same phase is refused with `409`
-(`error.patch_change.already_relocated`), a choice without an open phase with
-`error.patch_change.phase_not_open`. There is no undo; later corrections use the ordinary rebooks.
+member) together with who chose — the member (`SELF`), an admin on the member's behalf (`ADMIN`) or
+the member's exchange client (`CLIENT`, REQ-PATCH-052) — and what moved. It is **final**: a second
+choice in the same phase is refused with `409 HOME_LOCATION_ALREADY_CHOSEN`
+(`error.patch_change.already_relocated`), a choice without an open phase, or by a member the phase
+does not ask, with `409 HOME_LOCATION_NOT_ASKED` (`error.patch_change.phase_not_open`,
+`error.patch_change.not_asked`), a location not on offer with `400 HOME_LOCATION_NOT_OFFERED`
+(`error.patch_change.home_location_not_offered`); the web and the exchange share the codes
+(`HomeLocationChoiceRefusedException`). There is no undo; later corrections use the ordinary
+rebooks.
 
 An admin chooses on a member's behalf from the member's admin tab „Home Location“
 (`/admin/members/{id}/home-location`), which shows the member's state and the same preview; it runs
@@ -666,7 +671,7 @@ The patch-change trail (REQ-PATCH-009) records:
 
 | Event | When |
 | --- | --- |
-| `PATCH_CHANGE_RELOCATED` | per member; the subject and the target are the member, the details are the patch change and its label, the location, the moved row and ship counts and who chose (`SELF`, `ADMIN`, `CLIENT`) |
+| `PATCH_CHANGE_RELOCATED` | per member; the subject and the target are the member, the details are the patch change and its label, the location, the moved row and ship counts and who chose (`SELF`, `ADMIN`, `CLIENT`), for `CLIENT` also the registry id of the client (`client`) |
 | `PATCH_CHANGE_PHASE_ENDED` | an admin ended the phase early; the subject is the patch change with its label, the details the number of members still pending |
 
 Single rows and ships are not audited one by one, and no free text or personal data goes into the
@@ -865,3 +870,100 @@ refresh in place.
 `AdminAuditLogPageControllerTest`, `LiveSyncTopicRegistryParityTest` · **Code:** `PatchCount`,
 `CurrencyWipeEffect`, `JobOrderCurrencyWipeService`, `BankCurrencyWipeService`,
 `JobOrderMoneyEffects#currencyWiped`, `LiveSyncTopicClass.BANK_ACCOUNT`
+
+### REQ-PATCH-050 — An exchange client reads the latest patch change and its options
+
+Under the capability `exchange.patch.read`, `GET /exchange/v1/me/patch-change` answers the latest
+patch change by live time (`patchChange`, absent before the first): its `id`, the same the feeds
+name in every entry it caused (REQ-PATCH-007), its current label, its kind, its live time and its
+options as triggered — **every** wipe group in declaration order with `selected` and the keys of
+its catalogue types (`source` and `value` of `WipeGroupTypes`, REQ-PATCH-010), the wipe exceptions
+whose catalogue entry still exists with the entry named as the stock feed names it, its target and
+its mode (REQ-PATCH-011), and the refinery, currency-wipe and home-location options. The list is
+the central list of what a patch change wiped, so a client can apply the same groups to its own
+items (#3021, #3251). The resource is its own page of the exchange documentation
+([`patch-change.md`](../exchange/resources/patch-change.md)) and is additive in `v1`.
+
+**Acceptance**
+
+- [x] Before the first patch change the read carries no patch change; after it, its id, label,
+  kind, live time, all eight wipe groups with their types and `selected`, the exceptions and the
+  further options.
+- [x] Without `exchange.patch.read` the read answers `403 SCOPE_MISSING`.
+
+**Enforced by:** `ExchangePatchChangeControllerTest`, `ExchangePatchChangeRouteTest`,
+`ExchangeContractTest` (the schema and its fixtures) · **Code:** `patchchange.api.PatchChangeExchangeReader`,
+`PatchChangeExchangeViews`, `ExchangePatchChangeService`, `ExchangePatchChangeController` (both
+modules), `patch-change.schema.json`
+
+### REQ-PATCH-051 — The read carries the member's home-location prompt
+
+Beside the patch change the read carries the member's prompt (`homeLocation`) as the member's own
+page reads it (REQ-PATCH-021, `HomeLocationPrompts`): the state (`NOT_ASKED`, `PENDING`,
+`RELOCATED`, `PHASE_ENDED`) in the latest patch change that asked, which need not be the latest
+patch change (REQ-PATCH-024), that patch change's id, label and live time, the chosen home location
+and the time of the choice, the curated home locations on offer with the id a choice names, and,
+while the member is pending, the preview per current location: rows from before the live time, the
+share held for each org unit's pool, and the ships. Every location carries its name, its UEX place
+and its starmap GUID as the stock feed names them (REQ-XCH-018), a home location also its star
+system. Only the member's own prompt is read; an admin role widens nothing.
+
+**Acceptance**
+
+- [x] A pending member's read carries the phase, the offered home locations and the preview with
+  the pool share; after the choice it reads `RELOCATED` with the chosen location and its time.
+
+**Enforced by:** `ExchangePatchChangeControllerTest` · **Code:** `PatchChangeExchangeViews`,
+`ExchangeLocationLinks`, `ExchangePatchChangeDto`
+
+### REQ-PATCH-052 — An exchange client makes the member's choice with the web's rules
+
+Under the capability `exchange.patch.write`, which the registry grants only together with
+`exchange.patch.read` (`error.exchange.client.patchWriteNeedsRead`),
+`POST /exchange/v1/me/patch-change/home-location` with `{"location": "<id>"}` makes the member's
+choice with the rules of REQ-PATCH-021 and REQ-PATCH-022 and runs the same relocation in the same
+request (REQ-PATCH-025, REQ-PATCH-026), recorded as chosen by `CLIENT`; the audit event
+`PATCH_CHANGE_RELOCATED` names the client in `client` (REQ-PATCH-027). A second choice answers
+`409 HOME_LOCATION_ALREADY_CHOSEN`, a choice without an open phase asking the member
+`409 HOME_LOCATION_NOT_ASKED`, a location not on offer `400 HOME_LOCATION_NOT_OFFERED`; nothing
+moves then. The request needs an `Idempotency-Key` and counts one write against the daily quota
+(REQ-XCH-020); the answer names the chosen location and the moved row and ship counts. The
+gateway passes the three codes on with fixed details (`ExchangeRelay.DETAILS`).
+
+**Acceptance**
+
+- [x] A client's choice relocates the member once, records `CLIENT` and the client in the audit
+  event; a second choice and a choice without an open phase answer `409`, a location not on offer
+  `400`.
+- [x] Without `exchange.patch.write` the choice answers `403 SCOPE_MISSING`; the registry refuses
+  the write without the read.
+- [x] The gateway counts the choice as one write and refuses a body outside its schema before the
+  relay.
+
+**Enforced by:** `ExchangePatchChangeControllerTest`, `AdminExchangeRegistryControllerTest`,
+`ExchangePatchChangeRouteTest`, `HomeLocationRelocationIntegrationTest`,
+`ExchangeRoutesContractTest` · **Code:** `patchchange.api.PatchChangeExchangeWriter`,
+`MemberRelocations`, `HomeLocationChoiceRefusedException`, `PatchChangeProblemCode`,
+`ExchangeRegistryService#requireGrantable`, `ExchangeRoutes`, `V428`
+
+### REQ-PATCH-053 — A push against what a patch change removed names the patch change
+
+A stock op against a lot whose quantity is zero and whose latest feed entry came from a patch
+change is refused per op as `REMOVED_ELSEWHERE` whatever its `expectedQuantity`, unless it expects
+and keeps the empty lot or sends `override`; a ship `upsert` naming a ship a patch change removed
+is refused the same way (REQ-XCH-014). The op result names the patch change in
+`results[].patchChange` `{id, label}`, so a client drops its pending change and pulls instead of
+asking the member (#3255 amendment). A lot that kept rows from after the live time is no removed
+lot: a stale op on it stays `VERSION_CONFLICT`. The change is additive in `v1`
+(`change-result.schema.json`).
+
+**Acceptance**
+
+- [x] After a relocation, a push against the old lot with its old quantity is `REMOVED_ELSEWHERE`
+  with the patch change's id and label.
+- [x] An upsert of a ship a patch change removed is `REMOVED_ELSEWHERE` with the patch change's
+  id.
+
+**Enforced by:** `ExchangePatchChangeControllerTest` · **Code:** `ExchangePatchRemovals`,
+`ExchangeStockWriteService#removedByPatch`, `ExchangeShipWriteService`,
+`ExchangeChangeSetAdapter#removedByPatch`, `ExchangeChangeResultDto.OpResult`

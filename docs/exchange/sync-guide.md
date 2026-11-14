@@ -86,9 +86,10 @@ agree resend the op with `override: true`.
 ## Patch changes
 
 When a patch change asks the members for a new home location, the Basetool relocates each member's
-stock and ships once the member has chosen, in the Basetool or later through the patch-change
-resource. **The server is the only relocator:** do not move synced lots or ships to a home location
-yourself; follow the result in the feeds.
+stock and ships once the member has chosen, in the Basetool or through the
+[patch-change resource](resources/patch-change.md). **The server is the only relocator:** do not
+move synced lots or ships to a home location yourself; follow the result in the feeds. The same
+resource lists what the patch change wiped, so you can apply the same list to your own items.
 
 - Only lots and ships **created before the patch went live** move. Stock booked or ships added later
   stay where they are.
@@ -100,8 +101,11 @@ yourself; follow the result in the feeds.
   them answers `409 RELOCATION_PENDING` and writes nothing: from the member's own client, and from
   another member's client on a pool lot the member holds. Reads and booking **new** stock still
   work. Pause the stock and ship sync, keep the local changes and ask the member to choose the home
-  location in the Basetool; then pull and push again.
-- After the move, a push against an old lot gets `REMOVED_ELSEWHERE`, as for any removed lot.
+  location, in the Basetool or through the patch-change resource; then pull and push again.
+- After the move or a wipe, a push against an old lot gets `REMOVED_ELSEWHERE` whatever its
+  `expectedQuantity`, and an `upsert` of a wiped ship as well; the result item names the patch
+  change's `id`. Drop your pending change for that lot or ship and pull. A lot that kept rows from
+  after the live time is no removed lot: a stale op on it is `VERSION_CONFLICT`.
 
 ## Full resync after a cursor expired
 

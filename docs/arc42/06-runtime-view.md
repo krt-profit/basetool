@@ -382,7 +382,10 @@ The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-0
    `home-location-gate`. A page load meets the frontend's `HomeLocationGateFilter` instead, an AJAX
    call the header `X-Home-Location-Required`.
 2. The page `/home-location` reads the member's prompt: the curated home locations and, per current
-   location, the rows (with the pool shares) and ships from before the live time.
+   location, the rows (with the pool shares) and ships from before the live time. An exchange client
+   reads the same prompt with the latest patch change and its wipe list through
+   `GET /exchange/v1/me/patch-change` and may send the choice through
+   `POST …/home-location`, which runs the same step 3 recorded as `CLIENT` (REQ-PATCH-050…052).
 3. The choice opens one transaction inside `PatchChangeWrites.runFor` of the phase. It takes the
    history's lock in shared mode and re-checks the phase, claims the member's
    `patch_change_relocation` row, takes the shared hierarchy lock, the lot locks of the old and new
@@ -391,7 +394,8 @@ The contract lives in [`patch-change.md`](../specs/patch-change.md) (REQ-PATCH-0
 4. `PATCH_CHANGE_RELOCATED` commits with it; after the commit the Lager, Materialbörse and hangar
    rooms and the admin's patch-change room refresh, the exchange feed shows a tombstone for each old
    lot key and an item for each new one from the `patch` source, and the gate lets the member
-   through on the next request.
+   through on the next request. A client's later push against an old lot is `REMOVED_ELSEWHERE`
+   with the patch change's id (REQ-PATCH-053).
 
 Until then the member's rows and ships from before the live time are locked: the Lager's entity
 listener notes every row a writing transaction changes and checks them before the commit, the
