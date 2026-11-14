@@ -21,8 +21,11 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
+import java.util.Optional;
 import java.util.function.Supplier;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -32,13 +35,15 @@ import org.slf4j.event.Level;
  *
  * <p>A lost session is never a section failure: a {@link ReauthenticationRequiredException}, or a
  * failure whose cause chain carries the OAuth2 re-authentication signal, propagates to {@link
- * GlobalExceptionHandler}, which sends the browser to the login. Every other runtime failure is
- * logged once and answered with the fallback: a mapped {@link BackendServiceException} at {@code
- * DEBUG}, anything else at {@code WARN} or the level the caller names.
+ * GlobalExceptionHandler}, which sends the browser to the login. Neither is a session gate's
+ * refusal: a {@link SessionGateRefusalException}, also inside a cause chain, propagates so the
+ * handler hands the browser to the gate (ADR-0385). Every other runtime failure is logged once and
+ * answered with the fallback: a mapped {@link BackendServiceException} at {@code DEBUG}, anything
+ * else at {@code WARN} or the level the caller names.
  */
 public final class SectionFallback {
 
-  /** Upper bound on the cause-chain walk for a wrapped re-authentication failure. */
+  /** Upper bound on the cause-chain walk for a wrapped failure that must propagate. */
   private static final int MAX_CAUSE_DEPTH = 25;
 
   private SectionFallback() {}
@@ -65,6 +70,7 @@ public final class SectionFallback {
    * @return the call's result, or {@code fallback} when the call threw
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
+   * @throws SessionGateRefusalException when a session gate holds the user
    */
   public static <T> T load(
       @NotNull Logger log,
@@ -87,6 +93,7 @@ public final class SectionFallback {
    * @return the call's result, or {@code fallback} when the call threw
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
+   * @throws SessionGateRefusalException when a session gate holds the user
    */
   public static <T> T load(
       @NotNull Logger log,
@@ -96,10 +103,10 @@ public final class SectionFallback {
       T fallback) {
     try {
       return call.get();
-    } catch (ReauthenticationRequiredException e) {
+    } catch (ReauthenticationRequiredException | SessionGateRefusalException e) {
       throw e;
     } catch (RuntimeException e) {
-      rethrowReauthSignal(section, e);
+      rethrowHandOff(section, e);
       logFailure(log, unexpectedLevel, section, e);
       return fallback;
     }
@@ -115,6 +122,7 @@ public final class SectionFallback {
    * @return {@code true} when the work completed, {@code false} when it threw
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
+   * @throws SessionGateRefusalException when a session gate holds the user
    */
   public static boolean run(@NotNull Logger log, @NotNull String section, @NotNull Runnable work) {
     return run(log, Level.WARN, section, work);
@@ -131,6 +139,7 @@ public final class SectionFallback {
    * @return {@code true} when the work completed, {@code false} when it threw
    * @throws ReauthenticationRequiredException when the user's session can no longer reach the
    *     backend
+   * @throws SessionGateRefusalException when a session gate holds the user
    */
   public static boolean run(
       @NotNull Logger log,
@@ -140,13 +149,25 @@ public final class SectionFallback {
     try {
       work.run();
       return true;
-    } catch (ReauthenticationRequiredException e) {
+    } catch (ReauthenticationRequiredException | SessionGateRefusalException e) {
       throw e;
     } catch (RuntimeException e) {
-      rethrowReauthSignal(section, e);
+      rethrowHandOff(section, e);
       logFailure(log, unexpectedLevel, section, e);
       return false;
     }
+  }
+
+  /**
+   * Finds a session gate's refusal in a failure's cause chain, such as the {@code
+   * CompletionException} of a joined {@code ParallelPageLoader} future.
+   *
+   * @param failure the caught failure
+   * @return the refusal, or empty when the chain carries none
+   */
+  static @NotNull Optional<SessionGateRefusalException> sessionGateRefusalIn(
+      @NotNull Throwable failure) {
+    return Optional.ofNullable(inCauseChain(failure, SessionGateRefusalException.class));
   }
 
   /**
@@ -176,16 +197,53 @@ public final class SectionFallback {
    * @throws ReauthenticationRequiredException when {@code failure}'s cause chain carries the signal
    */
   private static void rethrowReauthSignal(@NotNull String section, @NotNull Throwable failure) {
-    Throwable current = failure;
-    for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
-      if (current instanceof ReauthenticationRequiredException reauth) {
-        throw reauth;
-      }
-      current = current.getCause() == current ? null : current.getCause();
+    ReauthenticationRequiredException reauth =
+        inCauseChain(failure, ReauthenticationRequiredException.class);
+    if (reauth != null) {
+      throw reauth;
     }
     if (ReauthenticationRequiredException.isReauthSignal(failure)) {
       throw new ReauthenticationRequiredException(
           "Page section '" + section + "' lost the OAuth2 session", failure);
     }
+  }
+
+  /**
+   * Propagates what a section never answers with its fallback: a lost session first, then a
+   * session gate's refusal.
+   *
+   * @param section the section name for the exception message
+   * @param failure the caught failure
+   * @throws ReauthenticationRequiredException when {@code failure}'s cause chain carries the
+   *     re-authentication signal
+   * @throws SessionGateRefusalException when {@code failure}'s cause chain carries a gate's refusal
+   */
+  private static void rethrowHandOff(@NotNull String section, @NotNull Throwable failure) {
+    rethrowReauthSignal(section, failure);
+    Optional<SessionGateRefusalException> refusal = sessionGateRefusalIn(failure);
+    if (refusal.isPresent()) {
+      throw refusal.get();
+    }
+  }
+
+  /**
+   * Walks a failure's cause chain, the failure included, for the first throwable of a type; stops
+   * at a self-referential cause and after {@link #MAX_CAUSE_DEPTH} links.
+   *
+   * @param failure the caught failure
+   * @param type the type looked for
+   * @param <T> the type looked for
+   * @return the first match, or {@code null} when the chain holds none
+   */
+  private static <T extends Throwable> @Nullable T inCauseChain(
+      @NotNull Throwable failure, @NotNull Class<T> type) {
+    Throwable current = failure;
+    for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
+      if (type.isInstance(current)) {
+        return type.cast(current);
+      }
+      current = current.getCause() == current ? null : current.getCause();
+    }
+    return null;
   }
 }
