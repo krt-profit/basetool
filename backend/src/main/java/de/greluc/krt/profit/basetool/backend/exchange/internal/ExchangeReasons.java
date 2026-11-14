@@ -46,5 +46,8 @@ final class ExchangeReasons {
   /** The refusal of a quantity that is not in its material's or item's own unit. */
   static final String UNIT_MISMATCH = "UNIT_MISMATCH";
 
+  /** The refusal of an entry another channel, installation or a patch change removed. */
+  static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";
+
   private ExchangeReasons() {}
 }

@@ -169,6 +169,8 @@ GET /api/v1/exchange/me/installation | ExchangeInstallationController#current | 
 POST /api/v1/exchange/me/installation | ExchangeInstallationController#label | pre=@exchangeGate.allows('exchange.connect', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/org-demand | ExchangeDemandController#orgDemand | pre=@exchangeGate.allows('exchange.demand.read', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/org-units | ExchangeOrgUnitController#orgUnits | pre=@exchangeGate.allows('exchange.orgunits.read', authentication) | url=anyRequest -> authenticated
+GET /api/v1/exchange/me/patch-change | ExchangePatchChangeController#patchChange | pre=@exchangeGate.allows('exchange.patch.read', authentication) | url=anyRequest -> authenticated
+POST /api/v1/exchange/me/patch-change/home-location | ExchangePatchChangeController#chooseHomeLocation | pre=@exchangeGate.allows('exchange.patch.write', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/refinery-orders | ExchangeRefineryOrderController#refineryOrders | pre=@exchangeGate.allows('exchange.refinery.read', authentication) | url=anyRequest -> authenticated
 POST /api/v1/exchange/me/refinery-orders/changes | ExchangeRefineryOrderController#refineryOrderChanges | pre=@exchangeGate.allows('exchange.refinery.write', authentication) | url=anyRequest -> authenticated
 GET /api/v1/exchange/me/ships | ExchangeShipController#ships | pre=@exchangeGate.allows('exchange.hangar.read', authentication) | url=anyRequest -> authenticated

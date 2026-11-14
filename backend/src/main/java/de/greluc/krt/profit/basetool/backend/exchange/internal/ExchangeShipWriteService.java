@@ -31,6 +31,7 @@ import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeCatal
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeItemRef;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeOrgUnitChoice;
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveRequest;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeResolveResponse;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeShipChangeSet;
@@ -89,7 +90,7 @@ public class ExchangeShipWriteService
   static final String LINK_TARGET_TAKEN = "LINK_TARGET_TAKEN";
 
   /** The refusal of bringing back a ship removed by another channel or installation. */
-  static final String REMOVED_ELSEWHERE = "REMOVED_ELSEWHERE";
+  static final String REMOVED_ELSEWHERE = ExchangeReasons.REMOVED_ELSEWHERE;
 
   /** The refusal of an org unit outside the member's stampable units. */
   static final String ORG_UNIT_NOT_ALLOWED = ExchangeReasons.ORG_UNIT_NOT_ALLOWED;
@@ -106,6 +107,7 @@ public class ExchangeShipWriteService
   private final ExchangeShipLinkRepository linkRepository;
   private final ShipCommands shipCommands;
   private final ExchangeChangeRepository changeRepository;
+  private final ExchangePatchRemovals patchRemovals;
   private final ExchangeJournalService journalService;
   private final ExchangeMassChangeGuard guard;
   private final ExchangeChangeSetRunner runner;
@@ -402,7 +404,8 @@ public class ExchangeShipWriteService
 
   /**
    * Plans an upsert that names a ship the server no longer has: brought back when this installation
-   * removed it or the member agreed, refused when it was removed elsewhere.
+   * removed it or the member agreed, refused when it was removed elsewhere, naming the patch change
+   * that wiped it (REQ-PATCH-053).
    *
    * @param caller the caller
    * @param op the op
@@ -434,7 +437,10 @@ public class ExchangeShipWriteService
       return ExchangeChangeSetAdapter.skip(UNMATCHED, UNMATCHED_REASON);
     }
     if (!Boolean.TRUE.equals(op.override()) && !writtenBy(caller, tombstone.get())) {
-      return ExchangeChangeSetAdapter.skip(REJECTED, REMOVED_ELSEWHERE);
+      ExchangePatchChangeRefDto patchChange = patchRemovals.patchChangeOf(tombstone.get());
+      return patchChange == null
+          ? ExchangeChangeSetAdapter.skip(REJECTED, REMOVED_ELSEWHERE)
+          : ExchangeChangeSetAdapter.removedByPatch(patchChange);
     }
     UnitTarget unit = unitTarget(op);
     if (!unitAllowed(unit, memberships)) {

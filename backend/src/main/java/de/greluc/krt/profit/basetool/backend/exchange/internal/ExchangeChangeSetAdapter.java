@@ -19,6 +19,7 @@
 
 package de.greluc.krt.profit.basetool.backend.exchange.internal;
 
+import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangePatchChangeRefDto;
 import de.greluc.krt.profit.basetool.backend.exchange.internal.dto.ExchangeRefineryOrderDto;
 import java.util.List;
 import java.util.UUID;
@@ -146,6 +147,19 @@ interface ExchangeChangeSetAdapter<S, C> {
   }
 
   /**
+   * Plans the refusal of an op against an entry a patch change removed, naming the patch change
+   * (REQ-PATCH-053).
+   *
+   * @param patchChange the patch change whose change removed the entry
+   * @param <C> the resource's planned change
+   * @return the plan
+   */
+  static <C> @NotNull Planned<C> removedByPatch(@NotNull ExchangePatchChangeRefDto patchChange) {
+    return new Skip<>(
+        new Outcome(ExchangeOps.REJECTED, ExchangeReasons.REMOVED_ELSEWHERE, null, patchChange));
+  }
+
+  /**
    * The result of one op as the client sees it.
    *
    * @param result {@code applied}, {@code unchanged}, {@code unmatched}, {@code ambiguous} or
@@ -153,8 +167,26 @@ interface ExchangeChangeSetAdapter<S, C> {
    * @param reason the error-registry code of a refusal, or {@code null}
    * @param written the entry an applied op wrote, or the existing entry a refusal names; {@code
    *     null} for resources whose result names no entry
+   * @param patchChange the patch change that removed the entry a {@code REMOVED_ELSEWHERE} refusal
+   *     names, or {@code null}
    */
-  record Outcome(@NotNull String result, @Nullable String reason, @Nullable Written written) {
+  record Outcome(
+      @NotNull String result,
+      @Nullable String reason,
+      @Nullable Written written,
+      @Nullable ExchangePatchChangeRefDto patchChange) {
+
+    /**
+     * The outcome of an op that names no patch change.
+     *
+     * @param result the result
+     * @param reason the error-registry code of a refusal, or {@code null}
+     * @param written the entry an applied op wrote, or the existing entry a refusal names, or
+     *     {@code null}
+     */
+    Outcome(@NotNull String result, @Nullable String reason, @Nullable Written written) {
+      this(result, reason, written, null);
+    }
 
     /**
      * The outcome of an op whose result names no entry.
@@ -163,7 +195,7 @@ interface ExchangeChangeSetAdapter<S, C> {
      * @param reason the error-registry code of a refusal, or {@code null}
      */
     Outcome(@NotNull String result, @Nullable String reason) {
-      this(result, reason, null);
+      this(result, reason, null, null);
     }
 
     /** The outcome of an op that changed something, or would have in a dry run. */

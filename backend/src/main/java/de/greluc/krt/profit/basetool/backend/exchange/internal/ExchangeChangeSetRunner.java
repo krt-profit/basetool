@@ -109,7 +109,8 @@ public class ExchangeChangeSetRunner {
               adapter.opId(changeSet, i),
               outcome.result(),
               outcome.reason(),
-              written == null ? null : written.id()));
+              written == null ? null : written.id(),
+              outcome.patchChange()));
     }
     if (!dryRun && applied > 0) {
       execution.announce();

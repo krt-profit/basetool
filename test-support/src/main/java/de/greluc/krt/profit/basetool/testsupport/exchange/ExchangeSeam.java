@@ -56,7 +56,7 @@ public final class ExchangeSeam {
   public static final String CONNECT = "exchange.connect";
 
   /**
-   * The 31 relay operations on 29 backend paths, each with the gateway route that relays it, the
+   * The 33 relay operations on 31 backend paths, each with the gateway route that relays it, the
    * capability both sides demand and the published schemas of its body and answer.
    */
   public static final @Unmodifiable List<RelayOperation> OPERATIONS =
@@ -174,6 +174,22 @@ public final class ExchangeSeam {
               true,
               null,
               "page.schema.json#/$defs/orgStockPage"),
+          new RelayOperation(
+              "GET",
+              "/me/patch-change",
+              "/me/patch-change",
+              "exchange.patch.read",
+              false,
+              null,
+              "patch-change.schema.json"),
+          new RelayOperation(
+              "POST",
+              "/me/patch-change/home-location",
+              "/me/patch-change/home-location",
+              "exchange.patch.write",
+              false,
+              "patch-change.schema.json#/$defs/homeLocationChoice",
+              "patch-change.schema.json#/$defs/homeLocationChosen"),
           new RelayOperation(
               "GET",
               "/me/refinery-orders",
@@ -341,7 +357,7 @@ public final class ExchangeSeam {
           INSTALLATION_HEADER,
           CONNECTED_AT_HEADER);
 
-  /** The eighteen capability scopes. */
+  /** The twenty-three capability scopes. */
   public static final @Unmodifiable Set<String> CAPABILITY_SCOPES =
       Set.of(
           CONNECT,
@@ -364,7 +380,9 @@ public final class ExchangeSeam {
           "exchange.drafts.refinery",
           "exchange.bank.read",
           "exchange.bank.request",
-          "exchange.bank.queue");
+          "exchange.bank.queue",
+          "exchange.patch.read",
+          "exchange.patch.write");
 
   /**
    * The capability scopes that gate no route of their own and add to the answer of another route's
@@ -407,7 +425,10 @@ public final class ExchangeSeam {
           "BANK_SELF_TRANSFER",
           "BANK_REQUEST_NOT_PENDING",
           "BANK_REQUEST_ALREADY_APPROVED",
-          "BANK_OPEN_REQUEST_CAP");
+          "BANK_OPEN_REQUEST_CAP",
+          "HOME_LOCATION_NOT_ASKED",
+          "HOME_LOCATION_ALREADY_CHOSEN",
+          "HOME_LOCATION_NOT_OFFERED");
 
   /** The backend-wide codes the gateway translates into a code of the exchange registry. */
   public static final @Unmodifiable Map<String, String> TRANSLATED_CODES =
