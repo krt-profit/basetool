@@ -80,6 +80,9 @@ class ExchangePatchChangeRouteTest {
   private static final Set<String> SCOPES =
       Set.of("exchange.connect", "exchange.patch.read", "exchange.patch.write");
 
+  /** The longest location and star-system name the catalogue stores. */
+  private static final String LONGEST_NAME = "L".repeat(255);
+
   @Autowired private WebApplicationContext context;
 
   @MockitoBean private JwtDecoder jwtDecoder;
@@ -171,6 +174,35 @@ class ExchangePatchChangeRouteTest {
   }
 
   @Test
+  void aReadNamingAHomeLocationByTheLongestCatalogueNameIsRelayed() throws Exception {
+    when(relay.forward(eq(HttpMethod.GET), eq(READ_BACKEND), isNull(), any(), any()))
+        .thenReturn(ok(longestNames(example("patch-change/valid/relocated.json"))));
+
+    call(TOKEN, HttpMethod.GET, READ_ROUTE, null)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.homeLocation.chosen.name").value(LONGEST_NAME))
+        .andExpect(jsonPath("$.homeLocation.chosen.system").value(LONGEST_NAME))
+        .andExpect(jsonPath("$.homeLocation.locations[0].name").value(LONGEST_NAME));
+  }
+
+  @Test
+  void aCommittedChoiceOfAHomeLocationWithTheLongestCatalogueNameReachesTheClient()
+      throws Exception {
+    when(relay.forward(eq(HttpMethod.POST), eq(CHOICE_BACKEND), any(), any(), any()))
+        .thenReturn(
+            ok(longestNames(example("patch-change--homeLocationChosen/valid/chosen.json"))));
+
+    call(
+            TOKEN,
+            HttpMethod.POST,
+            CHOICE_ROUTE,
+            example("patch-change--homeLocationChoice/valid/choice.json"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.location.name").value(LONGEST_NAME))
+        .andExpect(jsonPath("$.location.system").value(LONGEST_NAME));
+  }
+
+  @Test
   void aChoiceOutsideItsSchemaIsRefusedBeforeTheRelay() throws Exception {
     call(
             TOKEN,
@@ -244,6 +276,18 @@ class ExchangePatchChangeRouteTest {
    */
   private static @NotNull String example(@NotNull String name) throws Exception {
     return Files.readString(EXAMPLES.resolve(name));
+  }
+
+  /**
+   * Renames the examples' home location Lorville and its system Stanton to the longest name the
+   * catalogue stores.
+   *
+   * @param json an example naming Lorville in Stanton
+   * @return the example with both names at the catalogue's length
+   */
+  private static @NotNull String longestNames(@NotNull String json) {
+    return json.replace("\"Lorville\"", "\"" + LONGEST_NAME + "\"")
+        .replace("\"Stanton\"", "\"" + LONGEST_NAME + "\"");
   }
 
   /**

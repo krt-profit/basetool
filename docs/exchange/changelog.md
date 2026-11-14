@@ -5,6 +5,12 @@ Changes to the Exchange API contract, newest first. Every change within `v1` is 
 
 ## 2026-11-14
 
+- **Changed: home locations carry their full name.** In the patch-change read and the
+  home-location choice's answer, a home location's `name` and `system` take up to 255 characters,
+  the length the catalogue stores, so a long curated name no longer fails the read. A preview's
+  `location` and a wipe exception's `entry` stay named as the stock feed names them
+  ([patch change](resources/patch-change.md#the-members-home-location)). In
+  `patch-change.schema.json`: `maxLength` 255 on `#/$defs/homeLocation` `name` and `system`.
 - **New: `cancelledByPatch` on bank requests.** A request that a patch change's currency wipe
   cancelled carries `cancelledByPatch: {id, label}`, the patch change with its current label; every
   other request leaves the field out ([bank](resources/bank.md#own-requests)). New in
