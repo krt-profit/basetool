@@ -328,7 +328,8 @@ class ProblemCodeRegistryTest {
 
   /**
    * The committed document lists exactly the registered codes on {@code ProblemDetail.code}, and
-   * documents {@code correlationId} and {@code fieldErrors}.
+   * documents {@code correlationId}, {@code fieldErrors} and the session gates' {@code sessionGate}
+   * marker.
    *
    * @throws IOException if the document cannot be read
    */
@@ -355,7 +356,15 @@ class ProblemCodeRegistryTest {
         .isEqualTo(
             new TreeSet<>(ProblemCodeRegistry.codes(ProblemCodeRegistry.registryEnums()).keySet()));
     assertThat(problem.path("properties").propertyNames())
-        .contains("code", "correlationId", "fieldErrors", "errors", "type", "title", "status");
+        .contains(
+            "code",
+            "correlationId",
+            "fieldErrors",
+            "errors",
+            "type",
+            "title",
+            "status",
+            "sessionGate");
     assertThat(problem.path("required").isMissingNode() || !hasCodeRequired(problem))
         .as("code stays optional (REQ-API-019)")
         .isTrue();

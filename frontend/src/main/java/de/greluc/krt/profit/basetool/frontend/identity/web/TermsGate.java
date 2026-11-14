@@ -21,7 +21,6 @@ package de.greluc.krt.profit.basetool.frontend.identity.web;
 
 import de.greluc.krt.profit.basetool.frontend.identity.client.IdentityBackendClient;
 import de.greluc.krt.profit.basetool.frontend.identity.model.TermsStatusDto;
-import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateRead;
 import jakarta.servlet.http.HttpServletRequest;
@@ -56,6 +55,9 @@ public class TermsGate implements SessionGate {
   /** Name of the one-shot SSE event that hands an {@code EventSource} off to the consent page. */
   static final String SSE_EVENT = "terms-gate";
 
+  /** Code of the backend's refusal while the member has not accepted the terms in force. */
+  static final String PROBLEM_CODE = "TERMS_NOT_ACCEPTED";
+
   /** Session attribute holding the epoch millis at which the cached verdict was read. */
   static final String SESSION_CHECKED_AT = "krt.terms.checkedAt";
 
@@ -84,7 +86,7 @@ public class TermsGate implements SessionGate {
 
   @Override
   public @NotNull String problemCode() {
-    return BackendServiceException.CODE_TERMS_NOT_ACCEPTED;
+    return PROBLEM_CODE;
   }
 
   @Override

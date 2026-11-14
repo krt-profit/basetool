@@ -1912,8 +1912,11 @@ cannot exist in one locale only) · **Text:** `terms.list_4_1_5`, `terms.p_4_2` 
 > `home-location-gate` and the marked WebSocket handshake through the shared `SessionGateHandoff`,
 > with the backend's `403 HOME_LOCATION_REQUIRED` as the boundary
 > ([REQ-PATCH-020](patch-change.md#req-patch-020--the-home-location-gate-holds-a-pending-member-at-the-next-request)).
-> A gate never refuses its own endpoints or pages nor those of an earlier gate. When a gate's
-> backend `403` reaches the frontend, the frontend discards that gate's cached verdict and hands the
+> A gate never refuses its own endpoints or pages nor those of an earlier gate. Every gate's `403`
+> carries the problem property `sessionGate: true`, by which the frontend kernel tells a gate's
+> refusal without naming a gate's code: logged at `DEBUG`, not counted as a failed backend call, and
+> let through a page section's `SectionFallback`. When a gate's backend `403` reaches the frontend,
+> directly or inside a page section, the frontend discards that gate's cached verdict and hands the
 > browser to the gate's page. Paths, headers, events, the close code and the metrics are unchanged.
 > [!note] The go-live consent round — 2026-09-28 (epic #2078, #2092)
 > The wording change of REQ-SEC-027 (section 4), of the intro and of section 12 moves the version
@@ -1993,7 +1996,8 @@ stream attempts plus 483 consent-page renders into 973 reads of `/api/v1/terms/s
 is safe because recording consent discards the verdict (`TermsGate#forget`), so nobody is held
 behind a stale "no", and a backend failure never caches a negative in the first place (it fails
 open without writing). A backend `403 TERMS_NOT_ACCEPTED` that reaches the frontend discards a
-stale "yes" the same way and sends the browser to the consent page (ADR-0385).
+stale "yes" the same way and sends the browser to the consent page, also when a page section's read
+meets it (ADR-0385).
 
 **A WebSocket handshake is answered with a terminal close code, never a redirect.** A refused
 upgrade — `302` to the consent page included — reaches the browser's `WebSocket` as `close` with
@@ -2129,8 +2133,12 @@ from this response blanks a legal document on a build nobody can redeploy.
 - [x] A gated background read navigates to the consent page and disarms its timer, instead of
   re-fetching the refusal on every tick or freezing on its last value.
   *`BackgroundReadGateContractTest`, `TermsGateTest`.*
-- [x] A backend refusal that reaches the frontend discards the cached verdict and hands the
-  browser to the consent page. *`GlobalExceptionHandlerTest`.*
+- [x] A backend refusal that reaches the frontend, a page section's read included, discards the
+  cached verdict and hands the browser to the consent page; any other section failure still falls
+  back. *`GlobalExceptionHandlerTest`, `SectionFallbackTest`, `SectionSessionGateHandoffMvcTest`.*
+- [x] Every gate's refusal carries `sessionGate: true`, and the frontend kernel tells a gate's
+  refusal by it alone. *`SessionGateAccessFilterTest`, `BackendErrorMapperTest`,
+  `KernelGateCodeReachTest`.*
 
 **Enforced by:** `TermsAcceptanceGateTest` (backend: refusal, both exemptions, non-UUID subjects,
 the test-profile arming), `SessionGateAccessFilterTest` (the gates' order and exemptions),
@@ -2138,7 +2146,9 @@ the test-profile arming), `SessionGateAccessFilterTest` (the gates' order and ex
 fires only while the gate is closed, the WebSocket mark and that a plain request to the same
 path is still redirected, the readable-documents exemption, fail-open, cache bound),
 `SessionGateFilterTest`, `SessionGateClientParityTest` (the scripts' headers and events against the
-gates), `BackgroundReadGateContractTest` (the client half: every read goes through `krtFetch.get`,
+gates), `KernelGateCodeReachTest` (no kernel class file carries a gate's code),
+`SectionSessionGateHandoffMvcTest` (a section's gate refusal is handed off for both gates),
+`BackgroundReadGateContractTest` (the client half: every read goes through `krtFetch.get`,
 which sends the XHR marker, offers the answer to `krtSessionGate` and refuses a redirect; no raw request in
 any script or template; the polls disarm on a gated answer — pinned against the shipped JS and
 templates; REQ-FE-031), `TermsAcceptanceQueryDataTest` + `TermsAcceptanceServiceTest` (append-only history,
@@ -2150,7 +2160,8 @@ with `4003` and the consent URL, the refusal costs no per-user socket slot, and 
 drift from the client's) · **Code:** `TermsVersionProvider`, `TermsAcceptanceService`,
 `identity.api.TermsAcceptanceGate`, `identity.api.TermsConsentCheck`, `platform.api.SessionGate`,
 `SessionGateAccessFilter`, `identity.web.TermsGate`, `kernel.security.SessionGate`, `SessionGates`,
-`SessionGateFilter`, `kernel.security.SessionGateHandoff` (the leaf that keeps the frontend's
+`SessionGateFilter`, `kernel.backend.SessionGateRefusalException`, `SectionFallback`,
+`kernel.security.SessionGateHandoff` (the leaf that keeps the frontend's
 `config` → `websocket` handoff acyclic), `TermsController`, `AdminTermsController` · **Monitoring:**
 `basetool_terms_acceptances_total`, `basetool_terms_accepted_users`,
 `basetool_terms_refused_subjects`, `TermsConsentRolloutStalled`,

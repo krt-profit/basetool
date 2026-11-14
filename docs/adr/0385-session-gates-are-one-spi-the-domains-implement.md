@@ -38,11 +38,20 @@ change asks could keep using the tool for up to a minute while every backend cal
    read it. The identity domain implements `TermsGate`, the patch-change domain `HomeLocationGate`.
 3. **A gate leaves open what an earlier gate needs.** On both sides a gate never holds a member on
    its own page or endpoints nor on those of a gate ordered before it, so each step stays reachable
-   while an earlier one holds the member. The approval waiting page is open to every gate.
-4. **A gate's backend refusal evicts the frontend's cached verdict.** When the backend answers a
-   request with a gate's `403`, the frontend discards that gate's verdict and hands the browser to
-   the gate's page: a redirect for a navigation, a `403` with the gate's header for an AJAX caller.
-5. **The browser half stays a list of its own.** `krt-fetch.js` and `notifications.js` keep the
+   while an earlier one holds the member. The approval waiting page is open to every gate. A gate's
+   page reads only what its backend gate leaves open.
+4. **Every gate refusal is marked, and the frontend tells it by the mark.**
+   `SessionGateAccessFilter` adds the problem property `sessionGate: true` to every gate's `403`;
+   the body only grows. The frontend kernel parses a marked refusal into a
+   `SessionGateRefusalException` and never compares a gate's code: `BackendErrorMapper` logs it at
+   `DEBUG` and does not count it as a failed call, and `SectionFallback` lets it through like a lost
+   session, also out of a joined parallel read, while every other section failure still falls back.
+5. **A gate's backend refusal evicts the frontend's cached verdict.** When the backend answers a
+   request with a gate's `403`, directly or inside a page section, the frontend discards that gate's
+   verdict and hands the browser to the gate's page: a redirect for a navigation, a `403` with the
+   gate's header for an AJAX caller. The gate is the one in `SessionGates` whose code the refusal
+   carries.
+6. **The browser half stays a list of its own.** `krt-fetch.js` and `notifications.js` keep the
    gates' headers and events as constants, and `SessionGateClientParityTest` pins them against the
    gate beans of the running context.
 
@@ -53,9 +62,10 @@ labels stay as they were for both gates.
 
 - A further gate is one bean per side plus its header and event in the two scripts, which the
   parity test enforces.
-- The kernel and the platform name no domain gate; `KernelDomainReachTest` lost one frozen reach.
-- A member a patch change asks is sent to the home-location page by the first refused request
-  instead of after the cache expires.
+- The kernel and the platform name no domain gate; `KernelDomainReachTest` lost one frozen reach,
+  and `KernelGateCodeReachTest` fails the build when a kernel class file carries a gate's code.
+- A member a patch change asks is sent to the home-location page by the first refused request,
+  a page section's read included, instead of after the cache expires.
 
 ## Alternatives considered
 
@@ -65,5 +75,9 @@ labels stay as they were for both gates.
   wire the deployed pages and the extractor already rely on.
 - **Render the gate list into every page.** It would drive the scripts from the server, but pages
   outside the layout would lose the gates; a parity test pins the same contract without that risk.
+- **Read the gates' codes from `SessionGates` in the error mapper.** The gates read their status
+  through the backend client that owns the mapper, so the beans would depend on each other.
+- **A shared problem-type prefix for the gates.** It changes the `type` existing clients already
+  see; a new property leaves every field they read as it is.
 - **Evict the cached verdicts from the trigger.** The frontend's sessions live in Redis, keyed by
   session, not by member; reaching them from the backend's commit would need a new channel.

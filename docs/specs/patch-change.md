@@ -347,7 +347,9 @@ clean-up of pool stock; the patch wipe is a separate path for everyone.
   promise revives. The open order pages refresh through the stock write.
 - **Donation pledges** earmarked on a wiped row are withdrawn as their donor would withdraw them,
   with the usual notice; the donation keeps the patch change as its reason
-  (`supply_donation.withdrawn_by_patch_change`, V423), which only a withdrawn donation holds.
+  (`supply_donation.withdrawn_by_patch_change`, V423), which only a withdrawn donation holds. The
+  donation lists name the patch change by its current label beneath the status
+  ([REQ-SUP-010](supply.md#req-sup-010--decline-and-withdraw)).
 - **Materialbörse offers** standing on a wiped row end with the usual „stock gone“ notice to the
   members who registered interest.
 - **Minimum stock levels** turn low by themselves; they are read-time sums.
@@ -356,10 +358,13 @@ clean-up of pool stock; the patch wipe is a separate path for everyone.
 
 - [x] A wiped row's earmark, active offer and pledge go: the earmark and the offer are deleted, the
   pledge is withdrawn with the patch change as its reason; the job order stays.
+- [x] „Meine Spenden" and „Eingehende Spenden" name the patch change beneath a wiped pledge's
+  status, and only there.
 
-**Enforced by:** `PatchChangeWipeIntegrationTest` · **Code:** `StockWipeEffect`,
+**Enforced by:** `PatchChangeWipeIntegrationTest`, `SupplyMapperTest`,
+`SupplyWithdrawalReasonRenderTest` · **Code:** `StockWipeEffect`,
 `materialexchange.api.MaterialExchangePatchWipe`, `supply.api.SupplyPatchWipe`,
-`joborder.api.JobOrderPatchWipe`
+`supply.api.SupplyPatchLabels`, `joborder.api.JobOrderPatchWipe`, `PatchChangeLabelDirectory`
 
 ### REQ-PATCH-014 — The wipe is excepted from the invalid-responsibility gate
 
@@ -474,10 +479,11 @@ request, in sessions already open as well:
   `HomeLocationGate` asks the backend (`GET /api/v1/patch-changes/me/home-location/status`) through
   `SessionGateFilter` and caches only a verdict that lets the member through, for 60 seconds; the
   home-location page and the choice clear it;
-- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend discards the cached
-  verdict at once and hands the browser to the page: a page load is redirected, an AJAX call gets
-  the header; so a member a new phase asks is held by the first refused request, not after the
-  cache expires;
+- a backend refusal with `403 HOME_LOCATION_REQUIRED` that reaches the frontend, a page section's
+  read included, discards the cached verdict at once and hands the browser to the page: a page load
+  is redirected, an AJAX call gets the header; so a member a new phase asks is held by the first
+  refused request, not after the cache expires. The refusal carries `sessionGate: true` like every
+  session gate's, by which the frontend tells it (REQ-SEC-028);
 - an AJAX call gets `403` with the header `X-Home-Location-Required` naming the page, which
   `krtFetch` follows; an `EventSource` gets the one-shot event `home-location-gate`; a WebSocket
   handshake is marked (`SessionGateHandoff`) and closed with the terminal code `4003`;
@@ -497,12 +503,13 @@ relocation lock refuses its writes on locked rows and ships instead (REQ-PATCH-0
 - [x] The backend refuses a pending member's web calls with `403 HOME_LOCATION_REQUIRED` and lets
   the exempt endpoints and an exchange client's relayed call through.
 - [x] A backend refusal of the gate discards the frontend's cached verdict and hands the browser to
-  the page.
+  the page, also when a page section's read meets it.
 
 **Enforced by:** `HomeLocationGateTest` (frontend and backend), `SessionGateFilterTest`,
-`SessionGateAccessFilterTest`, `GlobalExceptionHandlerTest`, `SessionGateClientParityTest`,
-`HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate` (frontend and backend),
-`SessionGateFilter`, `SessionGates`, `SessionGateHandoff`, `SessionGateAccessFilter`,
+`SessionGateAccessFilterTest`, `GlobalExceptionHandlerTest`, `SectionSessionGateHandoffMvcTest`,
+`SessionGateClientParityTest`, `HomeLocationPageControllerMvcTest` · **Code:** `HomeLocationGate`
+(frontend and backend), `SessionGateFilter`, `SessionGates`, `SessionGateHandoff`,
+`SessionGateAccessFilter`, `SessionGateRefusalException`, `SectionFallback`,
 `GlobalExceptionHandler`, `NotificationPageController`, `NotificationStreamService#reconnect`,
 `krt-fetch.js`, `notifications.js`
 

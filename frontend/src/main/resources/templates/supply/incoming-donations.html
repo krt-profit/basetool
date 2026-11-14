@@ -82,6 +82,7 @@
                                 th:text="${d.receivedAmount() != null ? d.receivedAmount() + ' / ' + d.pledgedAmount() : d.pledgedAmount()}">3</td>
                             <td class="cell-status">
                                 <th:block th:replace="~{supply/fragments/status-chip :: chip(kind='donation', status=${d.status()})}"></th:block>
+                                <th:block th:replace="~{supply/fragments/status-chip :: withdrawnByPatch(label=${d.withdrawnByPatchLabel()})}"></th:block>
                             </td>
                             <td class="cell-actions">
                                 <div class="supply-row-actions">

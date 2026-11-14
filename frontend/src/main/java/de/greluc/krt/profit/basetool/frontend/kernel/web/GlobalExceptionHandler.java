@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.kernel.web;
 
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGate;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGateHandoff;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
@@ -523,12 +524,13 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a joined parallel read's session loss through the central reauthentication response.
+   * Maps a joined parallel read's session loss through the central reauthentication response, and
+   * its session gate's refusal through the gate's hand-off.
    *
    * @param failure the joined read's failure
    * @param model the fallback error model
    * @param request the current request
-   * @return the reauthentication response or the ordinary error page
+   * @return the reauthentication response, the gate's hand-off or the ordinary error page
    */
   @NotNull
   @ExceptionHandler(CompletionException.class)
@@ -540,6 +542,11 @@ public class GlobalExceptionHandler {
       SectionFallback.rethrowIfReauthenticationRequired(failure);
     } catch (ReauthenticationRequiredException _) {
       return handleReauthenticationRequired(request);
+    }
+    Optional<SessionGateRefusalException> gateRefusal =
+        SectionFallback.sessionGateRefusalIn(failure);
+    if (gateRefusal.isPresent()) {
+      return handleBackendServiceException(gateRefusal.get(), request, model);
     }
     return new ModelAndView(
         handleException(failure, model, request), model.asMap(), HttpStatus.INTERNAL_SERVER_ERROR);

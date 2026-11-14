@@ -32,6 +32,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.BackendServiceException;
 import de.greluc.krt.profit.basetool.frontend.kernel.backend.ReauthenticationRequiredException;
+import de.greluc.krt.profit.basetool.frontend.kernel.backend.SessionGateRefusalException;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.SessionGates;
 import de.greluc.krt.profit.basetool.frontend.kernel.security.StubSessionGate;
 import java.time.Clock;
@@ -41,10 +42,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -123,6 +126,23 @@ class ActiveOrgUnitRestoreTest {
         "access gate refused", null, 403, problemCode, null, List.of(), null);
   }
 
+  private static BackendServiceException sessionGateRefusal() {
+    return new SessionGateRefusalException(
+        "session gate refused", null, 403, "ANY_GATE_REQUIRED", null, null);
+  }
+
+  /**
+   * The refusals of the approval wait, the role check and a session gate.
+   *
+   * @return one refusal of each kind
+   */
+  static Stream<BackendServiceException> accessGateRefusals() {
+    return Stream.of(
+        gateRefusal(BackendServiceException.CODE_PENDING_APPROVAL),
+        sessionGateRefusal(),
+        gateRefusal(BackendServiceException.CODE_NO_ROLE));
+  }
+
   @Test
   void theStoredChoiceSeedsTheSessionOnceForThePrincipal() {
     signIn("lena");
@@ -197,18 +217,13 @@ class ActiveOrgUnitRestoreTest {
    * A session that starts behind an access gate stays unrestored without a wait, logs only at
    * DEBUG, and the first request after the gate clears restores the stored choice.
    *
-   * @param problemCode the gate's refusal code
+   * @param refusal the gate's refusal
    */
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        BackendServiceException.CODE_PENDING_APPROVAL,
-        BackendServiceException.CODE_TERMS_NOT_ACCEPTED,
-        BackendServiceException.CODE_NO_ROLE
-      })
-  void anAccessGateRefusalWaitsForTheGateNotForTheRetry(String problemCode) {
+  @MethodSource("accessGateRefusals")
+  void anAccessGateRefusalWaitsForTheGateNotForTheRetry(BackendServiceException refusal) {
     signIn("lena");
-    when(source.storedChoice()).thenThrow(gateRefusal(problemCode)).thenReturn(Optional.of(ARGON));
+    when(source.storedChoice()).thenThrow(refusal).thenReturn(Optional.of(ARGON));
     ActiveOrgUnitRestore restore = restoreAt(NOW);
 
     restore.restoreOnce(request);
@@ -229,9 +244,7 @@ class ActiveOrgUnitRestoreTest {
     session.setAttribute(ActiveSquadronContext.ACTIVE_ORG_UNIT_SESSION_KEY, HEL.toString());
     session.setAttribute(ActiveOrgUnitRestore.RESTORED_FOR_SESSION_KEY, "max");
     signIn("lena");
-    when(source.storedChoice())
-        .thenThrow(gateRefusal(BackendServiceException.CODE_TERMS_NOT_ACCEPTED))
-        .thenReturn(Optional.empty());
+    when(source.storedChoice()).thenThrow(sessionGateRefusal()).thenReturn(Optional.empty());
     ActiveOrgUnitRestore restore = restoreAt(NOW);
 
     restore.restoreOnce(request);

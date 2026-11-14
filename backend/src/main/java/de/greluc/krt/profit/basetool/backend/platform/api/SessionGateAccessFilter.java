@@ -51,11 +51,11 @@ import tools.jackson.databind.ObjectMapper;
  * Refuses the API with an RFC 7807 403 to an authenticated caller a {@link SessionGate} holds
  * (REQ-SEC-028, REQ-PATCH-020, ADR-0385).
  *
- * <p>The gates run in their order, and the first that holds the caller refuses. A gate leaves open
- * its own exempt endpoints and those of every gate before it. Non-{@code /api} and unauthenticated
- * requests pass, and so does a {@code sub} that is not a UUID. Paths are matched as {@link
- * PathPattern}s on the decoded path, so a percent-encoded spelling neither bypasses a gate nor
- * loses an exemption.
+ * <p>The gates run in their order, and the first that holds the caller refuses; the refusal carries
+ * {@code sessionGate: true} besides the gate's code. A gate leaves open its own exempt endpoints
+ * and those of every gate before it. Non-{@code /api} and unauthenticated requests pass, and so
+ * does a {@code sub} that is not a UUID. Paths are matched as {@link PathPattern}s on the decoded
+ * path, so a percent-encoded spelling neither bypasses a gate nor loses an exemption.
  */
 @Slf4j
 public class SessionGateAccessFilter extends OncePerRequestFilter {
@@ -71,6 +71,12 @@ public class SessionGateAccessFilter extends OncePerRequestFilter {
 
   /** MDC key the logback pattern renders as the user id. */
   static final String MDC_USER_ID = "userId";
+
+  /**
+   * Problem property set to {@code true} on every gate's refusal, by which a client tells a session
+   * gate's 403 from any other without knowing the gates' codes.
+   */
+  static final String SESSION_GATE_PROPERTY = "sessionGate";
 
   /** Each gate with the endpoints it leaves open, in the gates' order. */
   private final List<Guard> guards;
@@ -205,6 +211,7 @@ public class SessionGateAccessFilter extends OncePerRequestFilter {
             code.typeSuffix(),
             code.code(),
             correlationId);
+    problem.setProperty(SESSION_GATE_PROPERTY, true);
     response.getOutputStream().write(objectMapper.writeValueAsBytes(problem));
   }
 

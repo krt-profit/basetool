@@ -30,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.patchchange.api.PatchKind;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionMode;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeExceptionTarget;
 import de.greluc.krt.profit.basetool.backend.patchchange.api.WipeGroup;
+import de.greluc.krt.profit.basetool.backend.supply.api.SupplyPatchLabels;
 import de.greluc.krt.profit.basetool.backend.support.TestPlaces;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -77,6 +78,7 @@ class PatchChangeWipeIntegrationTest {
   @Autowired private JobOrderResponsibilityGuard responsibilityGuard;
   @Autowired private PlatformTransactionManager transactionManager;
   @Autowired private MeterRegistry meterRegistry;
+  @Autowired private SupplyPatchLabels supplyPatchLabels;
 
   private final List<UUID> users = new ArrayList<>();
   private final List<UUID> units = new ArrayList<>();
@@ -215,6 +217,9 @@ class PatchChangeWipeIntegrationTest {
                 UUID.class,
                 pledge))
         .isEqualTo(recorded.id());
+    assertThat(supplyPatchLabels.labels(List.of(recorded.id())))
+        .as("the donation lists name the withdrawing patch change by its label (REQ-SUP-010)")
+        .containsEntry(recorded.id(), "0.1");
     assertThat(exists("ship", inGameBefore)).isFalse();
     assertThat(exists("ship", inGameAfter)).isTrue();
     assertThat(exists("ship", pledgedBefore)).isTrue();
