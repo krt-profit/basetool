@@ -680,7 +680,9 @@ protection for a host that has not got the check yet, and it is how the first in
 > [`EXCHANGE_GO_LIVE_RUNBOOK.md`](archive/EXCHANGE_GO_LIVE_RUNBOOK.md); **1.17.0** (the internal-only
 > backend, #2638) → [`RELEASE_1.17.0_PRODUCTION_RUNBOOK.md`](archive/RELEASE_1.17.0_PRODUCTION_RUNBOOK.md);
 > **1.23.0** (roles in the Basetool, P4K catalogue version 2, bank and refinery orders on the
-> exchange) → [`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.23.0_PRODUCTION_RUNBOOK.md).
+> exchange) → [`RELEASE_1.23.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.23.0_PRODUCTION_RUNBOOK.md);
+> **1.25.0** (the patch change, the ship origin, Grafana's Keycloak-only sign-in) →
+> [`RELEASE_1.25.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.25.0_PRODUCTION_RUNBOOK.md).
 
 ```bash
 gh workflow run promote.yml -f version=1.9.3
